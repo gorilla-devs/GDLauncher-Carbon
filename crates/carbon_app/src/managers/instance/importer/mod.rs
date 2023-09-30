@@ -12,10 +12,13 @@ use crate::{
     managers::{AppInner, ManagerRef},
 };
 
-use self::legacy_gdlauncher::LegacyGDLauncherImporter;
+use self::{
+    curseforge_archive::CurseforgeArchiveImporter, legacy_gdlauncher::LegacyGDLauncherImporter,
+};
 
 use super::InstanceManager;
 
+pub mod curseforge_archive;
 pub mod legacy_gdlauncher;
 
 #[derive(Debug)]
@@ -144,6 +147,7 @@ impl Entity {
     pub fn create_importer(self) -> Arc<dyn InstanceImporter> {
         match self {
             Self::LegacyGDLauncher => Arc::new(LegacyGDLauncherImporter::new()),
+            Self::CurseForgeZip => Arc::new(CurseforgeArchiveImporter::new()),
             _ => todo!(),
         }
     }
@@ -158,7 +162,8 @@ impl Entity {
 
 #[derive(Debug)]
 pub struct ImportableInstance {
-    pub name: String,
+    pub filename: String,
+    pub instance_name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -189,4 +194,69 @@ pub trait InstanceImporter: std::fmt::Debug + Send + Sync {
     async fn scan(&self, app: &Arc<AppInner>, scan_path: PathBuf) -> anyhow::Result<()>;
     async fn get_status(&self) -> ImportScanStatus;
     async fn begin_import(&self, app: &Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId>;
+}
+
+#[derive(Debug, Clone)]
+enum ImporterState<T: Clone + Into<ImportableInstance>> {
+    NoResults,
+    SingleResult(InternalImportEntry<T>),
+    MultiResult(Vec<InternalImportEntry<T>>),
+}
+
+#[derive(Debug, Clone)]
+enum InternalImportEntry<T: Clone + Into<ImportableInstance>> {
+    Valid(T),
+    Invalid(InvalidImportEntry),
+}
+
+impl<T: Clone + Into<ImportableInstance>> ImporterState<T> {
+    async fn set_single(&mut self, entry: InternalImportEntry<T>) {
+        *self = Self::SingleResult(entry);
+    }
+
+    async fn push_multi(&mut self, entry: InternalImportEntry<T>) {
+        match self {
+            Self::NoResults | Self::SingleResult(_) => {
+                *self = Self::MultiResult(vec![entry]);
+            }
+            Self::MultiResult(entries) => {
+                entries.push(entry);
+            }
+        }
+    }
+
+    async fn get(&self, index: u32) -> Option<&T> {
+        match self {
+            Self::SingleResult(InternalImportEntry::Valid(entry)) => Some(entry),
+            Self::MultiResult(entries) => entries
+                .get(index as usize)
+                .map(|r| match r {
+                    InternalImportEntry::Valid(entry) => Some(entry),
+                    _ => None,
+                })
+                .flatten(),
+            _ => None,
+        }
+    }
+}
+
+impl<T: Clone + Into<ImportableInstance>> From<ImporterState<T>> for ImportScanStatus {
+    fn from(value: ImporterState<T>) -> Self {
+        match value {
+            ImporterState::NoResults => ImportScanStatus::NoResults,
+            ImporterState::SingleResult(r) => ImportScanStatus::SingleResult(r.into()),
+            ImporterState::MultiResult(r) => {
+                ImportScanStatus::MultiResult(r.into_iter().map(Into::into).collect())
+            }
+        }
+    }
+}
+
+impl<T: Clone + Into<ImportableInstance>> From<InternalImportEntry<T>> for ImportEntry {
+    fn from(value: InternalImportEntry<T>) -> Self {
+        match value {
+            InternalImportEntry::Valid(t) => ImportEntry::Valid(t.into()),
+            InternalImportEntry::Invalid(e) => ImportEntry::Invalid(e),
+        }
+    }
 }

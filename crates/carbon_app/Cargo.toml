@@ -24,6 +24,7 @@ tracing-appender = { workspace = true }
 reqwest = { workspace = true }
 reqwest-middleware = { workspace = true }
 async-stream = { workspace = true }
+dunce = { workspace = true }
 axum = { workspace = true, features = ["ws"] }
 jsonwebtoken = { workspace = true }
 async-trait = { workspace = true }

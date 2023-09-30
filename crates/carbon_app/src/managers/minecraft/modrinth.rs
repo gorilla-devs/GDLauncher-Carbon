@@ -14,6 +14,8 @@ use crate::domain::modplatforms::modrinth::version::{
 
 use thiserror::Error;
 
+use super::UpdateValue;
+
 #[derive(Error, Debug)]
 pub enum PathTraversalError {
     #[error("Path `{0}` has a root component and joining it will cause a path traversal")]
@@ -96,7 +98,6 @@ pub fn secure_path_join<P1: AsRef<Path>, P2: AsRef<Path>>(
 #[derive(Debug, Copy, Clone)]
 pub enum ProgressState {
     Idle,
-    DownloadingMRPack(u64, u64),
     ExtractingPackOverrides(u64, u64),
     AcquiringPackMetadata(u64, u64),
 }
@@ -107,23 +108,26 @@ pub struct ModpackInfo {
     pub downloadables: Vec<Downloadable>,
 }
 
-pub async fn prepare_modpack_from_file(
+pub async fn download_mrpack(
     app: &App,
     mrpack_file: &VersionFile,
-    instance_path: InstancePath,
-    progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
-) -> anyhow::Result<ModpackInfo> {
-    let temp_dir = &app.settings_manager().runtime_path.get_temp();
+    target_path: &Path,
+    progress_percentage_sender: tokio::sync::watch::Sender<UpdateValue<(u64, u64)>>,
+) -> anyhow::Result<()> {
     let _pack_download_url = mrpack_file.url.clone();
 
     // generate uuid
-    let uuid = uuid::Uuid::new_v4();
-    let file_path = temp_dir.to_path().join(format!("{}.mrpack", uuid));
-    let file_downloadable = Downloadable::new(&mrpack_file.url.to_string(), file_path.clone())
+    let file = app
+        .settings_manager()
+        .runtime_path
+        .get_temp()
+        .maketmpfile()
+        .await?;
+    let file_downloadable = Downloadable::new(&mrpack_file.url.to_string(), file.to_path_buf())
         .with_size(mrpack_file.size as u64);
 
     tokio::fs::create_dir_all(
-        &file_path
+        &file
             .parent()
             .ok_or(anyhow::anyhow!("Failed to get parent"))?,
     )
@@ -132,12 +136,11 @@ pub async fn prepare_modpack_from_file(
     let (download_progress_sender, mut download_progress_recv) =
         tokio::sync::watch::channel(Progress::new());
 
-    let progress_percentage_sender = tokio::spawn(async move {
+    tokio::spawn(async move {
         while download_progress_recv.borrow_mut().changed().await.is_ok() {
-            progress_percentage_sender.send(ProgressState::DownloadingMRPack(
-                download_progress_recv.borrow().current_size,
-                download_progress_recv.borrow().total_size,
-            ))?;
+            let p = download_progress_recv.borrow();
+            progress_percentage_sender
+                .send_modify(|progress| progress.set((p.current_size, p.total_size)));
         }
 
         Ok::<_, anyhow::Error>(progress_percentage_sender)
@@ -145,20 +148,20 @@ pub async fn prepare_modpack_from_file(
 
     carbon_net::download_file(&file_downloadable, Some(download_progress_sender)).await?;
 
-    let progress_percentage_sender = progress_percentage_sender.await??;
-
-    prepare_modpack_from_mrpack(app, file_path, instance_path, progress_percentage_sender).await
+    file.rename(target_path).await?;
+    Ok(())
 }
 
 pub async fn prepare_modpack_from_mrpack(
     app: &App,
-    mrpack_path: PathBuf,
-    instance_path: InstancePath,
+    mrpack_path: &Path,
+    instance_path: &InstancePath,
+    skip_overlays: bool,
     progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
 ) -> anyhow::Result<ModpackInfo> {
     let progress_percentage_sender = Arc::new(progress_percentage_sender);
 
-    let file_path_clone = mrpack_path.clone();
+    let file_path_clone = mrpack_path.to_path_buf();
     let (mut archive, index) = spawn_blocking(move || {
         let file = std::fs::File::open(file_path_clone)?;
         let mut archive = zip::ZipArchive::new(file)?;
@@ -244,50 +247,50 @@ pub async fn prepare_modpack_from_mrpack(
             .collect::<Result<Vec<_>, _>>()?
     };
 
-    let data_path = instance_path.get_data_path();
-    let overrides_folder_name = "overrides";
-    spawn_blocking(move || {
-        let total_archive_files = archive.len() as u64;
-        for i in 0..archive.len() {
-            let mut file = archive.by_index(i)?;
-            if !(file.name().starts_with(&overrides_folder_name)) {
-                continue;
-            }
-
-            let out_path = match file.enclosed_name() {
-                Some(path) => secure_path_join(
-                    Path::new(&data_path),
-                    path.strip_prefix(&overrides_folder_name).expect(
-                        "valid path as we skipped paths that did not start with this prefix",
-                    ),
-                )?,
-                None => continue,
-            };
-
-            if file.name().ends_with('/') {
-                continue;
-            } else {
-                if let Some(parent) = out_path.parent() {
-                    if !parent.exists() {
-                        std::fs::create_dir_all(parent)?;
-                    }
+    if !skip_overlays {
+        let data_path = instance_path.get_data_path();
+        let overrides_folder_name = "overrides";
+        spawn_blocking(move || {
+            let total_archive_files = archive.len() as u64;
+            for i in 0..archive.len() {
+                let mut file = archive.by_index(i)?;
+                if !(file.name().starts_with(&overrides_folder_name)) {
+                    continue;
                 }
-                let mut out_file = std::fs::File::create(&out_path)?;
 
-                std::io::copy(&mut file, &mut out_file)?;
+                let out_path = match file.enclosed_name() {
+                    Some(path) => secure_path_join(
+                        Path::new(&data_path),
+                        path.strip_prefix(&overrides_folder_name).expect(
+                            "valid path as we skipped paths that did not start with this prefix",
+                        ),
+                    )?,
+                    None => continue,
+                };
+
+                if file.name().ends_with('/') {
+                    continue;
+                } else {
+                    if let Some(parent) = out_path.parent() {
+                        if !parent.exists() {
+                            std::fs::create_dir_all(parent)?;
+                        }
+                    }
+                    let mut out_file = std::fs::File::create(&out_path)?;
+
+                    std::io::copy(&mut file, &mut out_file)?;
+                }
+
+                progress_percentage_sender.send(ProgressState::ExtractingPackOverrides(
+                    i as u64,
+                    total_archive_files,
+                ))?;
             }
 
-            progress_percentage_sender.send(ProgressState::ExtractingPackOverrides(
-                i as u64,
-                total_archive_files,
-            ))?;
-        }
-
-        Ok::<(), anyhow::Error>(())
-    })
-    .await??;
-
-    tokio::fs::remove_file(&mrpack_path).await?;
+            Ok::<(), anyhow::Error>(())
+        })
+        .await??;
+    }
 
     Ok(ModpackInfo {
         index,

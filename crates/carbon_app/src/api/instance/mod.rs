@@ -838,7 +838,8 @@ pub enum ImportEntity {
 
 #[derive(Type, Debug, Serialize)]
 struct ImportableInstance {
-    name: String,
+    filename: String,
+    instance_name: String,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -1254,7 +1255,10 @@ impl From<ImportEntity> for importer::Entity {
 
 impl From<importer::ImportableInstance> for ImportableInstance {
     fn from(value: importer::ImportableInstance) -> Self {
-        Self { name: value.name }
+        Self {
+            filename: value.filename,
+            instance_name: value.instance_name,
+        }
     }
 }
 

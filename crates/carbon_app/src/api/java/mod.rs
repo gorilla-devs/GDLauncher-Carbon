@@ -220,6 +220,7 @@ pub enum FESystemJavaProfileName {
     Alpha,
     Beta,
     Gamma,
+    GammaSnapshot,
     MinecraftJavaExe,
 }
 
@@ -231,6 +232,7 @@ impl From<crate::domain::java::SystemJavaProfileName> for FESystemJavaProfileNam
             SystemJavaProfileName::Alpha => Self::Alpha,
             SystemJavaProfileName::Beta => Self::Beta,
             SystemJavaProfileName::Gamma => Self::Gamma,
+            SystemJavaProfileName::GammaSnapshot => Self::GammaSnapshot,
             SystemJavaProfileName::MinecraftJavaExe => Self::MinecraftJavaExe,
         }
     }
@@ -243,6 +245,7 @@ impl From<FESystemJavaProfileName> for crate::domain::java::SystemJavaProfileNam
             FESystemJavaProfileName::Alpha => Self::Alpha,
             FESystemJavaProfileName::Beta => Self::Beta,
             FESystemJavaProfileName::Gamma => Self::Gamma,
+            FESystemJavaProfileName::GammaSnapshot => Self::GammaSnapshot,
             FESystemJavaProfileName::MinecraftJavaExe => Self::MinecraftJavaExe,
         }
     }

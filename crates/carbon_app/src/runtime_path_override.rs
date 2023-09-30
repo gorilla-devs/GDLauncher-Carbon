@@ -20,5 +20,5 @@ pub(crate) async fn get_runtime_path_override() -> PathBuf {
         }
     }
 
-    path.expect("Runtime path not found").join("data")
+    dunce::canonicalize(path.expect("Runtime path not found").join("data")).unwrap()
 }
