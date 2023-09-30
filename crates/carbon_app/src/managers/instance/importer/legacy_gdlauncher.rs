@@ -4,6 +4,7 @@ use anyhow::anyhow;
 use tokio::sync::RwLock;
 
 use crate::{
+    api::keys::instance::*,
     api::translation::Translation,
     domain::{
         instance::info::{
@@ -92,7 +93,7 @@ impl LegacyGDLauncherImporter {
 
 #[async_trait::async_trait]
 impl InstanceImporter for LegacyGDLauncherImporter {
-    async fn scan(&self, _app: &Arc<AppInner>, mut scan_path: PathBuf) -> anyhow::Result<()> {
+    async fn scan(&self, app: &Arc<AppInner>, mut scan_path: PathBuf) -> anyhow::Result<()> {
         if !scan_path.is_dir() {
             return Ok(());
         }
@@ -122,16 +123,18 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                 if path.metadata().await?.is_dir() {
                     if let Ok(Some(entry)) = self.scan_instance(path.path()).await {
                         self.state.write().await.push_multi(entry).await;
+                        app.invalidate(GET_IMPORT_SCAN_STATUS, None);
                     }
                 }
             }
         } else {
             if let Ok(Some(entry)) = self.scan_instance(scan_path).await {
                 self.state.write().await.set_single(entry).await;
+                app.invalidate(GET_IMPORT_SCAN_STATUS, None);
             }
         }
 
-        Ok(()) // TODO: invalidate on iter
+        Ok(())
     }
 
     async fn get_status(&self) -> ImportScanStatus {

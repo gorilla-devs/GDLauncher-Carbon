@@ -7,6 +7,7 @@ use tokio::sync::{watch, RwLock};
 use tracing::debug;
 
 use crate::{
+    api::keys::instance::*,
     api::translation::Translation,
     domain::vtask::VisualTaskId,
     managers::{AppInner, ManagerRef},
@@ -72,6 +73,8 @@ impl ManagerRef<'_, InstanceImportManager> {
                         .write()
                         .await = Some((true, scanner.clone()));
 
+                    app.invalidate(GET_IMPORT_SCAN_STATUS, None);
+
                     let fut = async {
                         let r = scanner.scan(&app, path.clone()).await;
 
@@ -79,6 +82,8 @@ impl ManagerRef<'_, InstanceImportManager> {
                             tracing::error!({ error = ?e }, "instance scanning failed for path {path:?}");
                         }
                     };
+
+                    app.invalidate(GET_IMPORT_SCAN_STATUS, None);
 
                     let target_changed = async {
                         while rx.changed().await.is_ok() {

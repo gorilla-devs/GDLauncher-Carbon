@@ -8,6 +8,7 @@ use anyhow::anyhow;
 use tokio::sync::RwLock;
 
 use crate::{
+    api::keys::instance::*,
     api::translation::Translation,
     domain::{
         instance::info::{CurseforgeModpack, GameVersion, Modpack},
@@ -181,6 +182,7 @@ impl InstanceImporter for CurseforgeArchiveImporter {
         if scan_path.is_file() {
             if let Ok(Some(entry)) = self.scan_archive(app, scan_path).await {
                 self.state.write().await.set_single(entry).await;
+                app.invalidate(GET_IMPORT_SCAN_STATUS, None);
             }
         } else if scan_path.is_dir() {
             let Ok(mut dir) = tokio::fs::read_dir(&scan_path).await else {
@@ -194,6 +196,7 @@ impl InstanceImporter for CurseforgeArchiveImporter {
                     futures.push(async move {
                         if let Ok(Some(entry)) = self.scan_archive(app, entry.path()).await {
                             self.state.write().await.push_multi(entry).await;
+                            app.invalidate(GET_IMPORT_SCAN_STATUS, None);
                         }
                     })
                 }
