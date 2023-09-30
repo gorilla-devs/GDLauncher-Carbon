@@ -78,6 +78,16 @@ impl ManagerRef<'_, InstanceImportManager> {
                     let fut = async {
                         let r = scanner.scan(&app, path.clone()).await;
 
+                        {
+                            let import_manager = app.instance_manager().import_manager();
+
+                            let mut scanner = import_manager.scanner.write().await;
+
+                            if let Some((scanning, _)) = &mut *scanner {
+                                *scanning = false;
+                            }
+                        }
+
                         if let Err(e) = r {
                             tracing::error!({ error = ?e }, "instance scanning failed for path {path:?}");
                         }
