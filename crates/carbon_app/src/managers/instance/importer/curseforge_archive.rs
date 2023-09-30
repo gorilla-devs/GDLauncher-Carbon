@@ -12,7 +12,6 @@ use crate::{
     domain::{
         instance::info::{CurseforgeModpack, GameVersion, Modpack},
         modplatforms::curseforge::{
-            filters::{ModsParameters, ModsParametersBody},
             manifest::Manifest,
         },
         vtask::VisualTaskId,
@@ -61,7 +60,7 @@ impl CurseforgeArchiveImporter {
 
     async fn scan_archive(
         &self,
-        app: &Arc<AppInner>,
+        _app: &Arc<AppInner>,
         path: PathBuf,
     ) -> anyhow::Result<Option<InternalImportEntry<Importable>>> {
         if !path.is_file() {
@@ -102,7 +101,7 @@ impl CurseforgeArchiveImporter {
         })
         .await?;
 
-        let (manifest, murmur2) = match r {
+        let (manifest, _murmur2) = match r {
             Ok(t) => t,
             Err(reason) => {
                 return Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {

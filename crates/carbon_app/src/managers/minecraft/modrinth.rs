@@ -114,11 +114,9 @@ pub async fn download_mrpack(
     target_path: &Path,
     progress_percentage_sender: tokio::sync::watch::Sender<UpdateValue<(u64, u64)>>,
 ) -> anyhow::Result<()> {
-    let temp_dir = &app.settings_manager().runtime_path.get_temp();
     let _pack_download_url = mrpack_file.url.clone();
 
     // generate uuid
-    let uuid = uuid::Uuid::new_v4();
     let file = app
         .settings_manager()
         .runtime_path
