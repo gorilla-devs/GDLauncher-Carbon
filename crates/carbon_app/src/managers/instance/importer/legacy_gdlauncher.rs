@@ -14,20 +14,7 @@ use crate::{
     managers::{instance::InstanceVersionSource, AppInner},
 };
 
-use super::{ImportScanStatus, ImportableInstance, InstanceImporter, InvalidImportEntry};
-
-#[derive(Debug)]
-enum State {
-    None,
-    Single(ImportEntry),
-    Multi(Vec<ImportEntry>),
-}
-
-#[derive(Debug, Clone)]
-enum ImportEntry {
-    Valid(Importable),
-    Invalid(InvalidImportEntry),
-}
+use super::{ImportScanStatus, ImportableInstance, InstanceImporter, InvalidImportEntry, ImporterState, InternalImportEntry};
 
 #[derive(Debug, Clone)]
 struct Importable {
@@ -42,28 +29,19 @@ impl From<Importable> for ImportableInstance {
     }
 }
 
-impl From<ImportEntry> for super::ImportEntry {
-    fn from(value: ImportEntry) -> Self {
-        match value {
-            ImportEntry::Valid(v) => Self::Valid(v.into()),
-            ImportEntry::Invalid(v) => Self::Invalid(v),
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct LegacyGDLauncherImporter {
-    state: RwLock<State>,
+    state: RwLock<ImporterState<Importable>>,
 }
 
 impl LegacyGDLauncherImporter {
     pub fn new() -> Self {
         Self {
-            state: RwLock::new(State::None),
+            state: RwLock::new(ImporterState::NoResults),
         }
     }
 
-    async fn scan_instance(&self, path: PathBuf) -> anyhow::Result<Option<ImportEntry>> {
+    async fn scan_instance(&self, path: PathBuf) -> anyhow::Result<Option<InternalImportEntry<Importable>>> {
         let config = path.join("config.json");
         if !config.is_file() {
             return Ok(None);
@@ -78,8 +56,8 @@ impl LegacyGDLauncherImporter {
             .to_string();
 
         match config {
-            Ok(config) => Ok(Some(ImportEntry::Valid(Importable { name, path, config }))),
-            Err(_) => Ok(Some(ImportEntry::Invalid(InvalidImportEntry {
+            Ok(config) => Ok(Some(InternalImportEntry::Valid(Importable { name, path, config }))),
+            Err(_) => Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
                 name,
                 reason: Translation::InstanceImportLegacyBadConfigFile,
             }))),
@@ -111,25 +89,20 @@ impl InstanceImporter for LegacyGDLauncherImporter {
         let instances_path = scan_path.join("instances");
 
         if instances_path.is_dir() {
-            let Ok(mut instances) = tokio::fs::read_dir(&instances_path).await else {
+            let Ok(mut dir) = tokio::fs::read_dir(&instances_path).await else {
                 return Ok(());
             };
 
-            while let Some(instance) = instances.next_entry().await? {
-                if instance.metadata().await?.is_dir() {
-                    if let Ok(Some(entity)) = self.scan_instance(instance.path()).await {
-                        let mut state = self.state.write().await;
-
-                        match &mut *state {
-                            State::Multi(vec) => vec.push(entity),
-                            state => *state = State::Multi(vec![entity]),
-                        }
+            while let Some(path) = dir.next_entry().await? {
+                if path.metadata().await?.is_dir() {
+                    if let Ok(Some(entry)) = self.scan_instance(path.path()).await {
+                        self.state.write().await.push_multi(entry).await;
                     }
                 }
             }
         } else {
-            if let Ok(Some(entity)) = self.scan_instance(scan_path).await {
-                *self.state.write().await = State::Single(entity);
+            if let Ok(Some(entry)) = self.scan_instance(scan_path).await {
+                self.state.write().await.set_single(entry).await;
             }
         }
 
@@ -137,38 +110,30 @@ impl InstanceImporter for LegacyGDLauncherImporter {
     }
 
     async fn get_default_scan_path(&self, _app: &Arc<AppInner>) -> anyhow::Result<Option<PathBuf>> {
-        Ok(Some(
-            directories::BaseDirs::new()
-                .ok_or(anyhow!("Cannot build basedirs"))?
-                .data_dir()
-                .join("gdlauncher_next"),
-        ))
+        let basedirs = directories::BaseDirs::new()
+            .ok_or(anyhow!("Cannot build basedirs"))?;
+
+        // old gdl did not respect the xdg basedirs spec on linux
+        #[cfg(target_os = "linux")]
+        let p = basedirs.config_dir().join("gdlauncher_next");
+        #[cfg(not(target_os = "linux"))]
+        let p = basedirs.data_dir().join("gdlauncher_next");
+
+        Ok(Some(p))
     }
 
     async fn get_status(&self) -> ImportScanStatus {
-        match &*self.state.read().await {
-            State::None => ImportScanStatus::NoResults,
-            State::Single(result) => ImportScanStatus::SingleResult(result.clone().into()),
-            State::Multi(results) => {
-                ImportScanStatus::MultiResult(results.iter().map(|r| r.clone().into()).collect())
-            }
-        }
+        self.state.read().await.clone().into()
     }
 
     async fn begin_import(&self, app: &Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId> {
-        let instance = match &*self.state.read().await {
-            State::Single(ImportEntry::Valid(entry)) if index == 0 => Some(entry.clone()),
-            State::Multi(entries) => entries
-                .get(index as usize)
-                .map(|r| match r {
-                    ImportEntry::Valid(entry) => Some(entry.clone()),
-                    _ => None,
-                })
-                .flatten(),
-            _ => None,
-        };
-
-        let instance = instance.ok_or_else(|| anyhow!("invalid importable instance index"))?;
+        let instance = self.state
+            .read()
+            .await
+            .get(index)
+            .await
+            .cloned()
+            .ok_or_else(|| anyhow!("invalid importable instance index"))?;
 
         let instance_version_source = 'a: {
             let modloader = match &*instance.config.loader.loader_type {
@@ -230,11 +195,8 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             let instance = &instance;
             async move {
                 let path = instance_path.join("instance");
-                tokio::fs::write(
-                    instance_path.join(".first_run_incomplete"),
-                    "skip-modpack-init",
-                )
-                .await?;
+
+                tokio::fs::create_dir_all(instance_path.join(".setup").join("modpack-complete")).await?;
 
                 // create copy-filter function in file utils for all importers
                 crate::domain::runtime_path::copy_dir_filter(&instance.path, &path, |path| {

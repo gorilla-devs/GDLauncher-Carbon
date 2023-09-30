@@ -34,4 +34,8 @@ pub enum Translation {
     InstanceTaskInstallModDownloadFile,
     FinalizingImport,
     InstanceImportLegacyBadConfigFile,
+    InstanceImportCfZipMalformed,
+    InstanceImportCfZipMissingManifest,
+    InstanceImportCfZipMalformedManifest,
+    InstanceImportCfZipNotMinecraftModpack,
 }
