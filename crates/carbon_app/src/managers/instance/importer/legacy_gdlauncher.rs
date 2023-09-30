@@ -21,14 +21,17 @@ use super::{
 
 #[derive(Debug, Clone)]
 struct Importable {
-    name: String,
+    filename: String,
     path: PathBuf,
     config: LegacyGDLauncherConfig,
 }
 
 impl From<Importable> for ImportableInstance {
     fn from(value: Importable) -> Self {
-        Self { name: value.name }
+        Self {
+            filename: value.filename.clone(),
+            instance_name: value.filename,
+        }
     }
 }
 
@@ -55,7 +58,7 @@ impl LegacyGDLauncherImporter {
 
         let config = tokio::fs::read_to_string(config).await?;
         let config = serde_json::from_str::<LegacyGDLauncherConfig>(&config);
-        let name = path
+        let filename = path
             .file_name()
             .expect("filename cannot be empty")
             .to_string_lossy()
@@ -63,12 +66,12 @@ impl LegacyGDLauncherImporter {
 
         match config {
             Ok(config) => Ok(Some(InternalImportEntry::Valid(Importable {
-                name,
+                filename,
                 path,
                 config,
             }))),
             Err(_) => Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
-                name,
+                name: filename,
                 reason: Translation::InstanceImportLegacyBadConfigFile,
             }))),
         }
@@ -234,7 +237,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             .instance_manager()
             .create_instance_ext(
                 app.instance_manager().get_default_group().await?,
-                instance.name.clone(),
+                instance.filename.clone(),
                 instance.config.background.is_some(),
                 instance_version_source,
                 String::new(),

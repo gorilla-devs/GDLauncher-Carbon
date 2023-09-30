@@ -155,7 +155,8 @@ impl Entity {
 
 #[derive(Debug)]
 pub struct ImportableInstance {
-    pub name: String,
+    pub filename: String,
+    pub instance_name: String,
 }
 
 #[derive(Debug, Clone)]

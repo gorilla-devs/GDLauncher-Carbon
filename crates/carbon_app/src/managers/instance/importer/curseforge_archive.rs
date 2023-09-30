@@ -11,9 +11,7 @@ use crate::{
     api::translation::Translation,
     domain::{
         instance::info::{CurseforgeModpack, GameVersion, Modpack},
-        modplatforms::curseforge::{
-            manifest::Manifest,
-        },
+        modplatforms::curseforge::manifest::Manifest,
         vtask::VisualTaskId,
     },
     managers::{instance::InstanceVersionSource, AppInner},
@@ -26,7 +24,7 @@ use super::{
 
 #[derive(Debug, Clone)]
 struct Importable {
-    name: String,
+    filename: String,
     path: PathBuf,
     manifest: Manifest,
     meta: Option<CfMetadata>,
@@ -42,7 +40,10 @@ struct CfMetadata {
 
 impl From<Importable> for ImportableInstance {
     fn from(value: Importable) -> Self {
-        Self { name: value.name }
+        Self {
+            filename: value.filename,
+            instance_name: value.manifest.name,
+        }
     }
 }
 
@@ -166,7 +167,7 @@ impl CurseforgeArchiveImporter {
         */
 
         Ok(Some(InternalImportEntry::Valid(Importable {
-            name,
+            filename: name,
             path,
             manifest,
             meta,

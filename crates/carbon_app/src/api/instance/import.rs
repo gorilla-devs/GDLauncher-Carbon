@@ -69,7 +69,7 @@ pub struct FEImportableInstance {
 impl From<importer::ImportableInstance> for FEImportableInstance {
     fn from(instance: importer::ImportableInstance) -> Self {
         Self {
-            name: instance.name,
+            name: instance.filename,
         }
     }
 }
