@@ -49,7 +49,12 @@ pub async fn download_modpack_zip(
         .ok_or(anyhow::anyhow!("Failed to get download url"))?;
 
     // generate uuid
-    let file = app.settings_manager().runtime_path.get_temp().maketmpfile().await?;
+    let file = app
+        .settings_manager()
+        .runtime_path
+        .get_temp()
+        .maketmpfile()
+        .await?;
     let file_downloadable = Downloadable::new(&modpack_download_url, file.to_path_buf())
         .with_size(cf_addon.file_length as u64);
 
@@ -66,9 +71,8 @@ pub async fn download_modpack_zip(
     tokio::spawn(async move {
         while download_progress_recv.borrow_mut().changed().await.is_ok() {
             let p = download_progress_recv.borrow();
-            progress_percentage_sender.send_modify(|progress| {
-                progress.set((p.current_size, p.total_size))
-            });
+            progress_percentage_sender
+                .send_modify(|progress| progress.set((p.current_size, p.total_size)));
         }
 
         Ok::<_, anyhow::Error>(progress_percentage_sender)
@@ -198,7 +202,7 @@ pub async fn prepare_modpack_from_zip(
 
             Ok::<(), anyhow::Error>(())
         })
-            .await??;
+        .await??;
     }
 
     Ok(ModpackInfo {

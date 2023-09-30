@@ -4,9 +4,9 @@ use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::modplatforms::modrinth::search::VersionID;
 use crate::domain::vtask::VisualTaskId;
 use crate::managers::java::managed::Step;
-use crate::managers::minecraft::{curseforge, UpdateValue};
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
 use crate::managers::minecraft::modrinth;
+use crate::managers::minecraft::{curseforge, UpdateValue};
 use crate::managers::vtask::Subtask;
 
 use std::fmt::Debug;

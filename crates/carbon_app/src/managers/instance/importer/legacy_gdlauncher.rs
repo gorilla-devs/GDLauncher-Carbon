@@ -14,7 +14,10 @@ use crate::{
     managers::{instance::InstanceVersionSource, AppInner},
 };
 
-use super::{ImportScanStatus, ImportableInstance, InstanceImporter, InvalidImportEntry, ImporterState, InternalImportEntry};
+use super::{
+    ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter, InternalImportEntry,
+    InvalidImportEntry,
+};
 
 #[derive(Debug, Clone)]
 struct Importable {
@@ -41,7 +44,10 @@ impl LegacyGDLauncherImporter {
         }
     }
 
-    async fn scan_instance(&self, path: PathBuf) -> anyhow::Result<Option<InternalImportEntry<Importable>>> {
+    async fn scan_instance(
+        &self,
+        path: PathBuf,
+    ) -> anyhow::Result<Option<InternalImportEntry<Importable>>> {
         let config = path.join("config.json");
         if !config.is_file() {
             return Ok(None);
@@ -56,7 +62,11 @@ impl LegacyGDLauncherImporter {
             .to_string();
 
         match config {
-            Ok(config) => Ok(Some(InternalImportEntry::Valid(Importable { name, path, config }))),
+            Ok(config) => Ok(Some(InternalImportEntry::Valid(Importable {
+                name,
+                path,
+                config,
+            }))),
             Err(_) => Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
                 name,
                 reason: Translation::InstanceImportLegacyBadConfigFile,
@@ -110,8 +120,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
     }
 
     async fn get_default_scan_path(&self, _app: &Arc<AppInner>) -> anyhow::Result<Option<PathBuf>> {
-        let basedirs = directories::BaseDirs::new()
-            .ok_or(anyhow!("Cannot build basedirs"))?;
+        let basedirs = directories::BaseDirs::new().ok_or(anyhow!("Cannot build basedirs"))?;
 
         // old gdl did not respect the xdg basedirs spec on linux
         #[cfg(target_os = "linux")]
@@ -127,7 +136,8 @@ impl InstanceImporter for LegacyGDLauncherImporter {
     }
 
     async fn begin_import(&self, app: &Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId> {
-        let instance = self.state
+        let instance = self
+            .state
             .read()
             .await
             .get(index)
@@ -196,7 +206,8 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             async move {
                 let path = instance_path.join("instance");
 
-                tokio::fs::create_dir_all(instance_path.join(".setup").join("modpack-complete")).await?;
+                tokio::fs::create_dir_all(instance_path.join(".setup").join("modpack-complete"))
+                    .await?;
 
                 // create copy-filter function in file utils for all importers
                 crate::domain::runtime_path::copy_dir_filter(&instance.path, &path, |path| {

@@ -1,11 +1,29 @@
-use std::{path::PathBuf, sync::Arc, io::{Cursor, Read}};
+use std::{
+    io::{Cursor, Read},
+    path::PathBuf,
+    sync::Arc,
+};
 
 use anyhow::anyhow;
 use tokio::sync::RwLock;
 
-use crate::{managers::{AppInner, instance::InstanceVersionSource}, domain::{modplatforms::curseforge::{filters::{ModsParameters, ModsParametersBody}, manifest::Manifest}, vtask::VisualTaskId, instance::info::{Modpack, CurseforgeModpack, GameVersion}}, api::translation::Translation};
+use crate::{
+    api::translation::Translation,
+    domain::{
+        instance::info::{CurseforgeModpack, GameVersion, Modpack},
+        modplatforms::curseforge::{
+            filters::{ModsParameters, ModsParametersBody},
+            manifest::Manifest,
+        },
+        vtask::VisualTaskId,
+    },
+    managers::{instance::InstanceVersionSource, AppInner},
+};
 
-use super::{InvalidImportEntry, ImportableInstance, InstanceImporter, ImporterState, InternalImportEntry, ImportScanStatus};
+use super::{
+    ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter, InternalImportEntry,
+    InvalidImportEntry,
+};
 
 #[derive(Debug, Clone)]
 struct Importable {
@@ -41,7 +59,11 @@ impl CurseforgeArchiveImporter {
         }
     }
 
-    async fn scan_archive(&self, app: &Arc<AppInner>, path: PathBuf) -> anyhow::Result<Option<InternalImportEntry<Importable>>> {
+    async fn scan_archive(
+        &self,
+        app: &Arc<AppInner>,
+        path: PathBuf,
+    ) -> anyhow::Result<Option<InternalImportEntry<Importable>>> {
         if !path.is_file() {
             return Ok(None);
         }
@@ -58,11 +80,14 @@ impl CurseforgeArchiveImporter {
             let mut zip = zip::ZipArchive::new(Cursor::new(&content))
                 .map_err(|_| Translation::InstanceImportCfZipMalformed)?;
 
-            let mut manifest = zip.by_name("manifest.json")
+            let mut manifest = zip
+                .by_name("manifest.json")
                 .map_err(|_| Translation::InstanceImportCfZipMissingManifest)?;
 
             let mut data = Vec::new();
-            manifest.read_to_end(&mut data).map_err(|_| Translation::InstanceImportCfZipMalformedManifest)?;
+            manifest
+                .read_to_end(&mut data)
+                .map_err(|_| Translation::InstanceImportCfZipMalformedManifest)?;
 
             let manifest = serde_json::from_slice::<Manifest>(&data)
                 .map_err(|_| Translation::InstanceImportCfZipMalformedManifest)?;
@@ -74,21 +99,24 @@ impl CurseforgeArchiveImporter {
             });
 
             Ok((manifest, murmur2))
-        }).await?;
+        })
+        .await?;
 
         let (manifest, murmur2) = match r {
             Ok(t) => t,
-            Err(reason) => return Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
-                name,
-                reason,
-            }))),
+            Err(reason) => {
+                return Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
+                    name,
+                    reason,
+                })))
+            }
         };
 
         if manifest.manifest_type != "minecraftModpack" {
             return Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
                 name,
                 reason: Translation::InstanceImportCfZipNotMinecraftModpack,
-            })))
+            })));
         }
 
         // does not seem to works with packs directly downloaded from curseforge. As that's already and edge case we ignore it for now
@@ -184,7 +212,8 @@ impl InstanceImporter for CurseforgeArchiveImporter {
     }
 
     async fn begin_import(&self, app: &Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId> {
-        let instance = self.state
+        let instance = self
+            .state
             .read()
             .await
             .get(index)
@@ -206,7 +235,11 @@ impl InstanceImporter for CurseforgeArchiveImporter {
         };
 
         let mut use_icon = false;
-        if let Some(CfMetadata { image_url: Some(ref image_url), .. }) = &instance.meta {
+        if let Some(CfMetadata {
+            image_url: Some(ref image_url),
+            ..
+        }) = &instance.meta
+        {
             app.instance_manager()
                 .download_icon(image_url.clone())
                 .await?;

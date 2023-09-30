@@ -12,7 +12,9 @@ use crate::{
     managers::{AppInner, ManagerRef},
 };
 
-use self::{legacy_gdlauncher::LegacyGDLauncherImporter, curseforge_archive::CurseforgeArchiveImporter};
+use self::{
+    curseforge_archive::CurseforgeArchiveImporter, legacy_gdlauncher::LegacyGDLauncherImporter,
+};
 
 use super::InstanceManager;
 
@@ -236,7 +238,9 @@ impl<T: Clone + Into<ImportableInstance>> From<ImporterState<T>> for ImportScanS
         match value {
             ImporterState::NoResults => ImportScanStatus::NoResults,
             ImporterState::SingleResult(r) => ImportScanStatus::SingleResult(r.into()),
-            ImporterState::MultiResult(r) => ImportScanStatus::MultiResult(r.into_iter().map(Into::into).collect()),
+            ImporterState::MultiResult(r) => {
+                ImportScanStatus::MultiResult(r.into_iter().map(Into::into).collect())
+            }
         }
     }
 }
