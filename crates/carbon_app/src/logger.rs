@@ -61,6 +61,8 @@ pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
             .with(printer)
             .with(filter)
             .init();
+
+        None
     }
     #[cfg(not(debug_assertions))]
     {
@@ -84,6 +86,4 @@ pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
         tracing::trace!("Logger initialized");
         return Some(guard);
     }
-
-    None
 }

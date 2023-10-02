@@ -6,16 +6,15 @@ import {
   app,
   BrowserWindow,
   dialog,
-  Menu,
-  session,
-  shell,
-  screen,
   ipcMain,
-  OpenDialogOptions
+  Menu,
+  OpenDialogOptions,
+  screen,
+  session,
+  shell
 } from "electron";
-import { release } from "os";
+import os, { release } from "os";
 import { join, resolve } from "path";
-import os from "os";
 import "./cli"; // THIS MUST BE BEFORE "coreModule" IMPORT!
 import coreModule from "./coreModule";
 import "./preloadListeners";
@@ -220,7 +219,6 @@ app.on("window-all-closed", async () => {
 });
 
 app.on("second-instance", (e, argv) => {
-  dialog.showErrorBox("Welcome Back", `You arrived from: ${argv}`);
   if (win) {
     // Focus on the main window if the user tried to open another
     if (win.isMinimized()) win.restore();
