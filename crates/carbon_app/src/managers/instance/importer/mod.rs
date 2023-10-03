@@ -15,12 +15,14 @@ use crate::{
 
 use self::{
     curseforge_archive::CurseforgeArchiveImporter, legacy_gdlauncher::LegacyGDLauncherImporter,
+    modrinth_archive::ModrinthArchiveImporter,
 };
 
 use super::InstanceManager;
 
-pub mod curseforge_archive;
-pub mod legacy_gdlauncher;
+mod curseforge_archive;
+mod legacy_gdlauncher;
+mod modrinth_archive;
 
 #[derive(Debug)]
 pub struct InstanceImportManager {
@@ -163,6 +165,7 @@ impl Entity {
         match self {
             Self::LegacyGDLauncher => Arc::new(LegacyGDLauncherImporter::new()),
             Self::CurseForgeZip => Arc::new(CurseforgeArchiveImporter::new()),
+            Self::MRPack => Arc::new(ModrinthArchiveImporter::new()),
             _ => todo!(),
         }
     }

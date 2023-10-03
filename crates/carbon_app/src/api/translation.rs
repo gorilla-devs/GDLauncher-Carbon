@@ -38,4 +38,7 @@ pub enum Translation {
     InstanceImportCfZipMissingManifest,
     InstanceImportCfZipMalformedManifest,
     InstanceImportCfZipNotMinecraftModpack,
+    InstanceImportMrpackMalformed,
+    InstanceImportMrpackMissingManifest,
+    InstanceImportMrpackMalformedManifest,
 }
