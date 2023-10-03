@@ -115,6 +115,13 @@ impl ManagerRef<'_, InstanceImportManager> {
             None => Err(anyhow!("scan target is not set")),
         }
     }
+
+    pub async fn get_scan_path(self) -> anyhow::Result<Option<PathBuf>> {
+        match self.scanner.read().await.as_ref() {
+            Some((_, scanner)) => Ok(scanner.get_default_scan_path(self.app).await?),
+            None => Err(anyhow!("scan target is not set")),
+        }
+    }
 }
 
 impl<'a> ManagerRef<'a, InstanceManager> {

@@ -1,4 +1,4 @@
-use std::{path::PathBuf, sync::Arc};
+use std::sync::Arc;
 
 use rspc::Type;
 use serde::{Deserialize, Serialize};
@@ -89,7 +89,9 @@ pub async fn scan_importable_instances(
         .import_manager()
         .set_scan_target(Some((
             Entity::LegacyGDLauncher,
-            PathBuf::from("/home/admin/lpwinsync/gdlauncher_next"),
+app.instance_manager()
+    .import_manager()
+    .get_scan_path().await?.unwrap(),
         )))
 }
 
