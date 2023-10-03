@@ -89,9 +89,11 @@ pub async fn scan_importable_instances(
         .import_manager()
         .set_scan_target(Some((
             Entity::LegacyGDLauncher,
-app.instance_manager()
-    .import_manager()
-    .get_scan_path().await?.unwrap(),
+            app.instance_manager()
+                .import_manager()
+                .get_scan_path()
+                .await?
+                .unwrap(),
         )))
 }
 
