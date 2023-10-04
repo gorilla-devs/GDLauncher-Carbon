@@ -29,7 +29,9 @@ export function initRTPath(override: string | null | undefined) {
     const tmp_path = fss.readFileSync(runtimeOverridePath).toString();
     fse.ensureDirSync(tmp_path);
     file_override = tmp_path;
-  } catch {}
+  } catch {
+    // ignore
+  }
 
   setCurrentRTPath(file_override || initialRTPath);
 }

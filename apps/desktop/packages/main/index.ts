@@ -225,7 +225,7 @@ app.on("window-all-closed", async () => {
   app.quit();
 });
 
-app.on("second-instance", (e, argv) => {
+app.on("second-instance", (_e, _argv) => {
   if (win) {
     // Focus on the main window if the user tried to open another
     if (win.isMinimized()) win.restore();

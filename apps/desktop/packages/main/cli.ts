@@ -1,7 +1,7 @@
 import { app } from "electron";
 import * as Sentry from "@sentry/electron/main";
 import handleUncaughtException from "./handleUncaughtException";
-import { setCurrentRTPath, initRTPath } from "./runtimePath";
+import { initRTPath } from "./runtimePath";
 
 const args = process.argv.slice(1);
 
