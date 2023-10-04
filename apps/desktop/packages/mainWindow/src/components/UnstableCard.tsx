@@ -13,7 +13,7 @@ const UnstableCard = () => {
             <div class="flex w-full justify-center items-center h-10 font-bold box-border bg-red-900">
               <Trans key="adbanner.snapshot_title" />
             </div>
-            <div class="w-full box-border flex-wrap p-4 border-1 border-darkSlate-600 rounded-xl border-x-solid border-b-solid">
+            <div class="w-full box-border flex-wrap border-1 border-darkSlate-600 p-4 rounded-xl border-x-solid border-b-solid">
               <Trans key="adbanner.snapshot_text" />
             </div>
           </div>

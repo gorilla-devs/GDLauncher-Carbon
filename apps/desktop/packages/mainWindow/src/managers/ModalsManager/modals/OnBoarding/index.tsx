@@ -17,18 +17,18 @@ const OnBoarding = (props: ModalProps) => {
     {
       label: t("introduction"),
       icon: <div>1</div>,
-      onClick: () => setCurrentStep(0),
+      onClick: () => setCurrentStep(0)
     },
     {
       label: t("handle_java"),
       icon: <div>2</div>,
-      onClick: () => setCurrentStep(1),
+      onClick: () => setCurrentStep(1)
     },
     {
       label: t("import_instances"),
       icon: <div>3</div>,
-      onClick: () => setCurrentStep(2),
-    },
+      onClick: () => setCurrentStep(2)
+    }
   ];
 
   const nextStep = () => {
@@ -51,7 +51,7 @@ const OnBoarding = (props: ModalProps) => {
       }
     >
       <div class="select-none box-border lg:w-160 h-full flex flex-col">
-        <div class="max-w-70 mx-auto w-full h-15">
+        <div class="w-full h-15 max-w-70 mx-auto">
           <Steps steps={onBoardingSteps} currentStep={currentStep()} />
         </div>
         <div class="h-full">

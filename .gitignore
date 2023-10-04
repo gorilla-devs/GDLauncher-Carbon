@@ -87,6 +87,8 @@ apps/desktop/binaries
 MC_TEST
 tests_decompressed
 java_runtimes
+playwright-report
+test-results
 
 **/.idea
 crates/carbon_app/src/db.rs

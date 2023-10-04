@@ -8,7 +8,7 @@ import {
   CFFECategory,
   MRFECategory,
   FESearchAPI,
-  FEUnifiedModLoaderType,
+  FEUnifiedModLoaderType
 } from "@gd/core_module/bindings";
 import { ModpackPlatforms } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
@@ -16,7 +16,7 @@ import {
   CategoryIcon,
   PlatformIcon,
   fetchImage,
-  getValideInstance,
+  getValideInstance
 } from "@/utils/instances";
 import { useTransContext } from "@gd/i18n";
 import { useInfiniteModsQuery } from "../InfiniteScrollModsQueryWrapper";
@@ -26,7 +26,7 @@ import {
   curseforgeCategories,
   getCategoryId,
   modrinthCategories,
-  supportedModloaders,
+  supportedModloaders
 } from "@/utils/sidebar";
 
 const Sidebar = () => {
@@ -83,7 +83,7 @@ const Sidebar = () => {
                             style={{
                               "background-image": imageResource()
                                 ? `url("${imageResource()}")`
-                                : `url("${DefaultImg}")`,
+                                : `url("${DefaultImg}")`
                             }}
                           />
                           <p class="m-0">{instance.name}</p>
@@ -102,7 +102,7 @@ const Sidebar = () => {
               onChange={(val) => {
                 infiniteQuery.setQuery({
                   searchApi: (val as string).toLowerCase() as FESearchAPI,
-                  categories: [],
+                  categories: []
                 });
                 infiniteQuery.resetList();
               }}
@@ -139,13 +139,13 @@ const Sidebar = () => {
                         const newModloaders = checked
                           ? [
                               ...prevModloaders,
-                              modloader as FEUnifiedModLoaderType,
+                              modloader as FEUnifiedModLoaderType
                             ]
                           : filteredModloaders;
 
                         infiniteQuery.setQuery({
                           modloaders:
-                            newModloaders.length === 0 ? null : newModloaders,
+                            newModloaders.length === 0 ? null : newModloaders
                         });
                       }}
                       checked={infiniteQuery.query.modloaders?.includes(
@@ -202,7 +202,7 @@ const Sidebar = () => {
                                 );
 
                             infiniteQuery.setQuery({
-                              categories: newCategories,
+                              categories: newCategories
                             });
                           }}
                         />

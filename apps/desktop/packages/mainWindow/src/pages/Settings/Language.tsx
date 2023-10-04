@@ -4,39 +4,30 @@ import PageTitle from "./components/PageTitle";
 import Row from "./components/Row";
 import RowsContainer from "./components/RowsContainer";
 import { Radio } from "@gd/ui";
-import { For } from "solid-js";
-import { rspc, queryClient } from "@/utils/rspcClient";
+import { For, getOwner, runWithOwner } from "solid-js";
+import { rspc } from "@/utils/rspcClient";
 import Title from "./components/Title";
+import changeLanguage from "@/utils/language";
 
 const Language = () => {
   let settings = rspc.createQuery(() => ["settings.getSettings"]);
-
-  const settingsMutation = rspc.createMutation(["settings.setSettings"], {
-    onMutate: (newSettings) => {
-      queryClient.setQueryData(["settings.getSettings"], newSettings);
-    },
-  });
+  const owner = getOwner();
 
   return (
     <>
       <PageTitle>
-        <Trans
-          key="settings.language"
-          options={{
-            defaultValue: "Language",
-          }}
-        />
+        <Trans key="settings:language" />
       </PageTitle>
       <RowsContainer>
         <Row class="flex-col justify-start">
           <Title class="w-full">
-            <Trans key="settings.select_a_language" />
+            <Trans key="settings:select_a_language" />
           </Title>
           <div class="w-full flex flex-col divide-y divide-darkSlate-600">
             <Radio.group
               onChange={(value) => {
-                settingsMutation.mutate({
-                  language: value as string,
+                runWithOwner(owner, () => {
+                  changeLanguage(value as string);
                 });
               }}
               value={settings.data?.language}

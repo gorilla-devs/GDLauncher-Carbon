@@ -8,13 +8,13 @@ import {
   setLoadingInstances,
   setSelectedInstancesIndexes,
   setTaskId,
-  taskId,
+  taskId
 } from "@/utils/import";
 import {
   importedInstances,
   isProgressFailed,
   isProgressKnown,
-  setImportedInstances,
+  setImportedInstances
 } from "@/utils/instances";
 import { rspc } from "@/utils/rspcClient";
 import { FEEntity, FETask } from "@gd/core_module/bindings";
@@ -27,7 +27,7 @@ import {
   Show,
   Switch,
   createEffect,
-  createSignal,
+  createSignal
 } from "solid-js";
 
 type Props = {
@@ -42,7 +42,7 @@ const Import = (props: Props) => {
   const [t] = useTransContext();
 
   const scanImportableInstancesMutation = rspc.createMutation([
-    "instance.scanImportableInstances",
+    "instance.scanImportableInstances"
   ]);
 
   const entries = () => Object.entries(selectedInstancesIndexes);
@@ -54,7 +54,7 @@ const Import = (props: Props) => {
     {
       onSuccess(taskId) {
         setTaskId(taskId);
-      },
+      }
     }
   );
 
@@ -64,7 +64,7 @@ const Import = (props: Props) => {
       // eslint-disable-next-line solid/reactivity
       const task = rspc.createQuery(() => [
         "vtask.getTask",
-        taskId() as number,
+        taskId() as number
       ]);
 
       const isFailed = task.data && isProgressFailed(task.data.progress);
@@ -87,7 +87,7 @@ const Import = (props: Props) => {
 
         importInstanceMutation.mutate({
           entity: selectedEntity(),
-          index: nextInstanceIndex,
+          index: nextInstanceIndex
         });
       }
     }
@@ -98,7 +98,7 @@ const Import = (props: Props) => {
       // eslint-disable-next-line solid/reactivity
       rspc.createQuery(() => [
         "instance.getImportableInstances",
-        selectedEntity(),
+        selectedEntity()
       ])
     );
   });
@@ -115,7 +115,7 @@ const Import = (props: Props) => {
     instances()?.data?.forEach((_instance, i) => {
       setSelectedInstancesIndexes((prev) => ({
         ...prev,
-        [i]: checked,
+        [i]: checked
       }));
     });
   };
@@ -156,7 +156,7 @@ const Import = (props: Props) => {
                       selectedEntity() !== entity,
                     "border-2 border-solid border-primary-500":
                       currentlySupportedEnties.includes(entity) ||
-                      selectedEntity() === entity,
+                      selectedEntity() === entity
                   }}
                   onClick={() => {
                     if (currentlySupportedEnties.includes(entity))
@@ -193,7 +193,7 @@ const Import = (props: Props) => {
                 "text-darkSlate-600":
                   isAllImported() ||
                   importedInstances().length > 0 ||
-                  getLoadingInstances().length > 0,
+                  getLoadingInstances().length > 0
               }}
               onClick={() => {
                 if (
@@ -230,7 +230,7 @@ const Import = (props: Props) => {
                             // eslint-disable-next-line solid/reactivity
                             setSelectedInstancesIndexes((prev) => ({
                               ...prev,
-                              [i()]: checked,
+                              [i()]: checked
                             }));
                           }}
                         />
@@ -238,7 +238,7 @@ const Import = (props: Props) => {
                           classList={{
                             "text-darkSlate-500": importedInstances().includes(
                               i()
-                            ),
+                            )
                           }}
                         >
                           {instance.name}
@@ -267,7 +267,7 @@ const Import = (props: Props) => {
                                         Known: number;
                                       }
                                     ).Known * 100
-                                  }%`,
+                                  }%`
                                 }}
                               />
                             </div>
@@ -300,7 +300,7 @@ const Import = (props: Props) => {
 
           importInstanceMutation.mutate({
             entity: selectedEntity(),
-            index: parsedIndex,
+            index: parsedIndex
           });
         }}
       >
@@ -312,7 +312,7 @@ const Import = (props: Props) => {
               options={{
                 instances_amount: Object.values(
                   selectedInstancesIndexes
-                ).filter((id) => id).length,
+                ).filter((id) => id).length
               }}
             />
           </Match>

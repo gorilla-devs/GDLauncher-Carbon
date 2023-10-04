@@ -14,7 +14,7 @@ import {
   ModrinthModpack,
   ModpackPlatform,
   CFFECategory,
-  MRFECategory,
+  MRFECategory
 } from "@gd/core_module/bindings";
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg";
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg";

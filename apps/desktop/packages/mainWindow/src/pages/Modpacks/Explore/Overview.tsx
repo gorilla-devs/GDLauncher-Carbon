@@ -15,21 +15,21 @@ const Overview = () => {
       sanitizeHtml(routeData.modpackDescription?.data?.data || "", {
         allowedTags: sanitizeHtml.defaults.allowedTags.concat([
           "img",
-          "iframe",
+          "iframe"
         ]),
         allowedAttributes: {
           a: ["href", "name", "target", "class"],
           img: ["src", "width", "height"],
-          iframe: ["src", "width", "height", "allowfullscreen"],
+          iframe: ["src", "width", "height", "allowfullscreen"]
         },
         allowedIframeHostnames: [
           "www.youtube.com",
           "i.imgur.com",
-          "cdn.ko-fi.com",
+          "cdn.ko-fi.com"
         ],
         transformTags: {
-          a: sanitizeHtml.simpleTransform("a", { class: "text-blue-500" }),
-        },
+          a: sanitizeHtml.simpleTransform("a", { class: "text-blue-500" })
+        }
       });
 
     return (

@@ -24,7 +24,7 @@ export const convertSecondsToHumanTime = (seconds: number) => {
     { name: "day", length: 60 * 60 * 24 },
     { name: "hour", length: 60 * 60 },
     { name: "minute", length: 60 },
-    { name: "second", length: 1 },
+    { name: "second", length: 1 }
   ];
 
   let remainingSeconds = seconds;

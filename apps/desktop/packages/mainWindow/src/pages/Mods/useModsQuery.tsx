@@ -18,7 +18,7 @@ const useModsQuery = (
     index: 0,
     pageSize: 20,
     searchApi: "curseforge",
-    ...initialValue,
+    ...initialValue
   });
 
   const setQueryParams = (newValue: Partial<FEUnifiedSearchParameters>) => {
@@ -27,7 +27,7 @@ const useModsQuery = (
     setQuery((prev) => ({
       ...prev,
       ...newValue,
-      index: indexValue,
+      index: indexValue
     }));
   };
 

@@ -18,7 +18,7 @@ export const routes: RouteDefinition[] = [
   {
     path: "/",
     component: lazy(() => import("@/pages/Login")),
-    data: LoginData,
+    data: LoginData
   },
   {
     path: "/",
@@ -32,7 +32,7 @@ export const routes: RouteDefinition[] = [
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Library/Home")),
+            component: lazy(() => import("@/pages/Library/Home"))
           },
           {
             path: "/:id",
@@ -43,48 +43,48 @@ export const routes: RouteDefinition[] = [
                 path: "/",
                 component: lazy(
                   () => import("@/pages/Library/Instance/Overview")
-                ),
+                )
               },
               {
                 path: "/mods",
                 component: lazy(
                   () => import("@/pages/Library/Instance/Tabs/Mods")
-                ),
+                )
               },
               {
                 path: "/settings",
                 component: lazy(
                   () => import("@/pages/Library/Instance/Tabs/Settings")
-                ),
+                )
               },
               {
                 path: "/logs",
                 component: lazy(
                   () => import("@/pages/Library/Instance/Tabs/Log")
                 ),
-                data: InstanceLogsData,
+                data: InstanceLogsData
               },
               {
                 path: "/resourcepacks",
                 component: lazy(
                   () => import("@/pages/Library/Instance/Tabs/ResourcePacks")
-                ),
+                )
               },
               {
                 path: "/screenshots",
                 component: lazy(
                   () => import("@/pages/Library/Instance/Tabs/Screenshots")
-                ),
+                )
               },
               {
                 path: "/versions",
                 component: lazy(
                   () => import("@/pages/Library/Instance/Tabs/Versions")
-                ),
-              },
-            ],
-          },
-        ],
+                )
+              }
+            ]
+          }
+        ]
       },
       {
         path: "/modpacks",
@@ -93,9 +93,9 @@ export const routes: RouteDefinition[] = [
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Modpacks/ModpacksBrowser")),
-          },
-        ],
+            component: lazy(() => import("@/pages/Modpacks/ModpacksBrowser"))
+          }
+        ]
       },
       {
         path: "/mods",
@@ -104,9 +104,9 @@ export const routes: RouteDefinition[] = [
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Mods/ModsBrowser")),
-          },
-        ],
+            component: lazy(() => import("@/pages/Mods/ModsBrowser"))
+          }
+        ]
       },
       {
         path: "/mods/:id/:platform",
@@ -115,25 +115,25 @@ export const routes: RouteDefinition[] = [
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Modpacks/Explore/Overview")),
+            component: lazy(() => import("@/pages/Modpacks/Explore/Overview"))
           },
           {
             path: "/versions",
             component: lazy(() => import("@/pages/Modpacks/Explore/Versions")),
-            data: ModpackVersionsData,
+            data: ModpackVersionsData
           },
           {
             path: "/changelog",
-            component: lazy(() => import("@/pages/Modpacks/Explore/Changelog")),
+            component: lazy(() => import("@/pages/Modpacks/Explore/Changelog"))
           },
           {
             path: "/screenshots",
             component: lazy(
               () => import("@/pages/Modpacks/Explore/Screenshots")
             ),
-            data: ModpackScreenshotsData,
-          },
-        ],
+            data: ModpackScreenshotsData
+          }
+        ]
       },
       {
         path: "/modpacks/:id/:platform",
@@ -142,25 +142,25 @@ export const routes: RouteDefinition[] = [
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Modpacks/Explore/Overview")),
+            component: lazy(() => import("@/pages/Modpacks/Explore/Overview"))
           },
           {
             path: "/versions",
             component: lazy(() => import("@/pages/Modpacks/Explore/Versions")),
-            data: ModpackVersionsData,
+            data: ModpackVersionsData
           },
           {
             path: "/changelog",
-            component: lazy(() => import("@/pages/Modpacks/Explore/Changelog")),
+            component: lazy(() => import("@/pages/Modpacks/Explore/Changelog"))
           },
           {
             path: "/screenshots",
             component: lazy(
               () => import("@/pages/Modpacks/Explore/Screenshots")
             ),
-            data: ModpackScreenshotsData,
-          },
-        ],
+            data: ModpackScreenshotsData
+          }
+        ]
       },
       {
         path: "/settings",
@@ -169,31 +169,35 @@ export const routes: RouteDefinition[] = [
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Settings/General")),
+            component: lazy(() => import("@/pages/Settings/General"))
           },
           {
             path: "/language",
-            component: lazy(() => import("@/pages/Settings/Language")),
+            component: lazy(() => import("@/pages/Settings/Language"))
           },
           {
             path: "/appearance",
-            component: lazy(() => import("@/pages/Settings/Appearance")),
+            component: lazy(() => import("@/pages/Settings/Appearance"))
           },
           {
             path: "/java",
             component: lazy(() => import("@/pages/Settings/Java")),
-            data: SettingsJavaData,
+            data: SettingsJavaData
           },
           {
             path: "/privacy",
-            component: lazy(() => import("@/pages/Settings/Privacy")),
+            component: lazy(() => import("@/pages/Settings/Privacy"))
           },
-        ],
+          {
+            path: "/runtime-path",
+            component: lazy(() => import("@/pages/Settings/RuntimePath"))
+          }
+        ]
       },
       {
         path: "**",
-        component: lazy(() => import("@/errors/404")),
-      },
-    ],
-  },
+        component: lazy(() => import("@/errors/404"))
+      }
+    ]
+  }
 ];

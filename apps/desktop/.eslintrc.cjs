@@ -2,18 +2,19 @@ module.exports = {
   env: {
     browser: true,
     es2021: true,
-    node: true,
+    node: true
   },
   overrides: [],
   rules: {
-    "prettier/prettier": ["error", { endOfLine: "lf" }],
+    "prettier/prettier": ["error", { endOfLine: "lf", trailingComma: "none" }],
     "no-unused-vars": [
       "error",
-      { varsIgnorePattern: "^_", argsIgnorePattern: "^_" },
+      { varsIgnorePattern: "^_", argsIgnorePattern: "^_" }
     ],
+    "solid/reactivity": "off"
   },
   globals: {
-    __APP_VERSION__: "readonly",
+    __APP_VERSION__: "readonly"
   },
   parser: "@typescript-eslint/parser",
   plugins: ["i18next", "solid", "prettier"],
@@ -22,7 +23,7 @@ module.exports = {
     "plugin:solid/typescript",
     "plugin:i18next/recommended",
     "prettier",
-    "@unocss",
+    "@unocss"
   ],
-  ignorePatterns: ["dist/**/*", "node_modules/**/*"],
+  ignorePatterns: ["dist/**/*", "node_modules/**/*"]
 };

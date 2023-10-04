@@ -4,7 +4,7 @@ import { Tag, Tooltip } from "@gd/ui";
 import {
   CFFECategory,
   MRFECategoriesResponse,
-  MRFECategory,
+  MRFECategory
 } from "@gd/core_module/bindings";
 import { CategoryIcon } from "@/utils/instances";
 import { capitalize } from "@/utils/helpers";

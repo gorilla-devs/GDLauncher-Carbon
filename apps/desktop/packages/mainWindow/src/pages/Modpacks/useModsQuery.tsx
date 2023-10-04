@@ -18,7 +18,7 @@ const useModpacksQuery = (
     sortOrder: "descending",
     index: 0,
     pageSize: 40,
-    searchApi: "curseforge",
+    searchApi: "curseforge"
   });
 
   const setQueryParams = (newValue: Partial<FEUnifiedSearchParameters>) => {
@@ -27,7 +27,7 @@ const useModpacksQuery = (
     setQuery((prev) => ({
       ...prev,
       ...newValue,
-      index: indexValue,
+      index: indexValue
     }));
   };
 

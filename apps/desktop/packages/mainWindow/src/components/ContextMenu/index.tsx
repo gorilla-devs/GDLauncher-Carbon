@@ -5,7 +5,7 @@ import {
   onMount,
   Show,
   mergeProps,
-  onCleanup,
+  onCleanup
 } from "solid-js";
 import { Portal } from "solid-js/web";
 import { useContextMenu } from "./ContextMenuContext";
@@ -35,7 +35,7 @@ const ContextMenu = (props: ContextMenuProps) => {
 
   const mergedProps = mergeProps(
     {
-      trigger: "context",
+      trigger: "context"
     },
     props
   );
@@ -119,7 +119,7 @@ const ContextMenu = (props: ContextMenuProps) => {
               position: "absolute",
               top: y() + "px",
               left: x() + "px",
-              "z-index": "1000000",
+              "z-index": "1000000"
             }}
             onClick={closeContextMenu}
           >
@@ -129,7 +129,7 @@ const ContextMenu = (props: ContextMenuProps) => {
                   class="flex items-center cursor-pointer w-full gap-1 px-3 h-8 hover:bg-darkSlate-700 py-1"
                   classList={{
                     "hover:text-red-600 text-red-500": item.id === "delete",
-                    "hover:text-white text-darkGray-50": !item.id,
+                    "hover:text-white text-darkGray-50": !item.id
                   }}
                   onClick={item.action}
                 >

@@ -9,7 +9,7 @@ import {
   getName,
   getSummary,
   getWebsiteUrl,
-  isCurseForgeData,
+  isCurseForgeData
 } from "@/utils/mods";
 import { formatDownloadCount } from "@/utils/helpers";
 import { CategoryIcon } from "@/utils/instances";
@@ -18,7 +18,7 @@ import {
   CFFEModAuthor,
   MRFECategoriesResponse,
   MRFECategory,
-  MRFEProjectSearchResult,
+  MRFEProjectSearchResult
 } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Tag } from "@gd/ui";
@@ -27,7 +27,7 @@ import { For, Match, Show, Switch } from "solid-js";
 
 const Authors = (props: { data: ModRowProps }) => {
   return (
-    <div class="flex flex-wrap gap-2 scrollbar-hide max-w-full">
+    <div class="flex gap-2 scrollbar-hide max-w-full flex-wrap">
       <Switch>
         <Match when={isCurseForgeData(props.data.data)}>
           <For each={getAuthors(props.data)}>
@@ -139,7 +139,7 @@ const OverviewPopover = (props: {
                 options={{
                   time: formatDistanceToNowStrict(
                     new Date(getDateModification(props.data)).getTime()
-                  ),
+                  )
                 }}
               />
             </div>

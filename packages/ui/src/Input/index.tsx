@@ -1,8 +1,6 @@
 import { Show, JSX, splitProps } from "solid-js";
 
 interface Props extends JSX.InputHTMLAttributes<HTMLInputElement> {
-  value?: string | number;
-  placeholder?: string;
   error?: string | boolean;
   disabled?: boolean;
   class?: string;
@@ -24,18 +22,13 @@ function Input(props: Props) {
   return (
     <>
       <div
-        class={`h-10 gap-2 box-border transition-all duration-100 ease-in-out ${
+        class={`h-10 gap-2 box-border transition-all duration-100 rounded-md ease-in-out ${
           local.class || ""
         }`}
         classList={{
-          "bg-darkSlate-700 rounded-full px-4 flex items-center max-w-max":
-            local.icon,
-          "rounded-md": !local.icon,
+          "bg-darkSlate-700 px-4 flex items-center": local.icon,
         }}
       >
-        <Show when={local.icon}>
-          <span class="text-darkSlate-500">{local.icon}</span>
-        </Show>
         <input
           class={`h-full w-full box-border py-2 rounded-md placeholder:text-darkSlate-400 ${
             local.inputClass || ""
@@ -56,6 +49,9 @@ function Input(props: Props) {
           disabled={local.disabled}
           {...otherProps}
         />
+        <Show when={local.icon}>
+          <span class="text-darkSlate-300">{local.icon}</span>
+        </Show>
       </div>
 
       <Show when={local.error}>

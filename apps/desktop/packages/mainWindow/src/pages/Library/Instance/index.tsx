@@ -7,7 +7,7 @@ import {
   Outlet,
   useLocation,
   useParams,
-  useRouteData,
+  useRouteData
 } from "@solidjs/router";
 import {
   For,
@@ -18,7 +18,7 @@ import {
   createResource,
   createSignal,
   onCleanup,
-  onMount,
+  onMount
 } from "solid-js";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { queryClient, rspc } from "@/utils/rspcClient";
@@ -27,14 +27,14 @@ import {
   FEModResponse,
   MRFEProject,
   InstanceDetails,
-  UngroupedInstance,
+  UngroupedInstance
 } from "@gd/core_module/bindings";
 import {
   fetchImage,
   getCurseForgeData,
   getModrinthData,
   getPreparingState,
-  getRunningState,
+  getRunningState
 } from "@/utils/instances";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { ContextMenu } from "@/components/ContextMenu";
@@ -80,10 +80,10 @@ const Instance = () => {
       | undefined
     > => {
       await queryClient.cancelQueries({
-        queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)],
+        queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)]
       });
       await queryClient.cancelQueries({
-        queryKey: ["instance.getInstancesUngrouped"],
+        queryKey: ["instance.getInstancesUngrouped"]
       });
 
       const instancesUngrouped: UngroupedInstance[] | undefined =
@@ -92,7 +92,7 @@ const Instance = () => {
       const instanceDetails: InstanceDetails | undefined =
         queryClient.getQueryData([
           "instance.getInstanceDetails",
-          parseInt(params.id, 10),
+          parseInt(params.id, 10)
         ]);
 
       queryClient.setQueryData(
@@ -110,10 +110,10 @@ const Instance = () => {
     },
     onSettled() {
       queryClient.invalidateQueries({
-        queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)],
+        queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)]
       });
       queryClient.invalidateQueries({
-        queryKey: ["instance.getInstancesUngrouped"],
+        queryKey: ["instance.getInstancesUngrouped"]
       });
       setIsFavorite((prev) => !prev);
     },
@@ -134,7 +134,7 @@ const Instance = () => {
           context.instanceDetails
         );
       }
-    },
+    }
   });
 
   createEffect(() => {
@@ -145,25 +145,25 @@ const Instance = () => {
   const instancePages = () => [
     {
       label: "Overview",
-      path: `/library/${params.id}`,
+      path: `/library/${params.id}`
     },
 
     ...(routeData.instanceDetails.data?.modloaders.length! > 0
       ? [
           {
             label: "Mods",
-            path: `/library/${params.id}/mods`,
-          },
+            path: `/library/${params.id}/mods`
+          }
         ]
       : []),
     {
       label: "Settings",
-      path: `/library/${params.id}/settings`,
+      path: `/library/${params.id}/settings`
     },
     {
       label: "Logs",
-      path: `/library/${params.id}/logs`,
-    },
+      path: `/library/${params.id}/logs`
+    }
     // {
     //   label: "Resource Packs",
     //   path: `/library/${params.id}/resourcepacks`,
@@ -182,11 +182,11 @@ const Instance = () => {
     getRouteIndex(instancePages(), location.pathname, true);
 
   const launchInstanceMutation = rspc.createMutation([
-    "instance.launchInstance",
+    "instance.launchInstance"
   ]);
 
   const updateInstanceMutation = rspc.createMutation([
-    "instance.updateInstance",
+    "instance.updateInstance"
   ]);
 
   const killInstanceMutation = rspc.createMutation(["instance.killInstance"]);
@@ -210,8 +210,8 @@ const Instance = () => {
         rspc.createQuery(() => [
           "modplatforms.curseforge.getMod",
           {
-            modId: isCurseforge.project_id as number,
-          },
+            modId: isCurseforge.project_id as number
+          }
         ]).data
       );
     }
@@ -228,7 +228,7 @@ const Instance = () => {
       setModpackDetails(
         rspc.createQuery(() => [
           "modplatforms.modrinth.getProject",
-          isModrninth.project_id,
+          isModrninth.project_id
         ]).data
       );
     }
@@ -241,7 +241,7 @@ const Instance = () => {
         use_loaded_icon: null,
         memory: null,
         notes: null,
-        instance: parseInt(params.id, 10),
+        instance: parseInt(params.id, 10)
       });
     }
     setEditableName(false);
@@ -285,21 +285,20 @@ const Instance = () => {
   const [isSticky, setIsSticky] = createSignal(false);
 
   const openFolderMutation = rspc.createMutation([
-    "instance.openInstanceFolder",
+    "instance.openInstanceFolder"
   ]);
 
   const handleEdit = () => {
     modalsContext?.openModal(
       {
-        name: "instanceCreation",
+        name: "instanceCreation"
       },
       {
         id: params.id,
         modloader: routeData.instanceDetails.data?.modloaders[0]?.type_,
         title: routeData.instanceDetails.data?.name,
         mcVersion: routeData.instanceDetails.data?.version,
-        modloaderVersion:
-          routeData.instanceDetails.data?.modloaders[0]?.version,
+        modloaderVersion: routeData.instanceDetails.data?.modloaders[0]?.version
       }
     );
   };
@@ -307,7 +306,7 @@ const Instance = () => {
   const handleOpenFolder = () => {
     openFolderMutation.mutate({
       instance_id: parseInt(params.id, 10),
-      folder: "Root",
+      folder: "Root"
     });
   };
 
@@ -315,13 +314,13 @@ const Instance = () => {
     {
       icon: "i-ri:pencil-fill",
       label: t("instance.action_edit"),
-      action: handleEdit,
+      action: handleEdit
     },
     {
       icon: "i-ri:folder-open-fill",
       label: t("instance.action_open_folder"),
-      action: handleOpenFolder,
-    },
+      action: handleOpenFolder
+    }
   ];
 
   createEffect(() => {
@@ -359,7 +358,7 @@ const Instance = () => {
           transition: "height 0.2s",
           "background-image": imageUrl()
             ? `url("${imageUrl()}")`
-            : `url("${DefaultImg}")`,
+            : `url("${DefaultImg}")`
         }}
       >
         <div class="h-full bg-gradient-to-t from-darkSlate-800">
@@ -373,7 +372,7 @@ const Instance = () => {
               <Trans
                 key="instance.step_back"
                 options={{
-                  defaultValue: "Back",
+                  defaultValue: "Back"
                 }}
               />
             </Button>
@@ -387,7 +386,7 @@ const Instance = () => {
                     style={{
                       "background-image": imageUrl()
                         ? `url("${imageUrl()}")`
-                        : `url("${DefaultImg}")`,
+                        : `url("${DefaultImg}")`
                     }}
                   />
 
@@ -398,7 +397,7 @@ const Instance = () => {
                         "border-2 border-darkSlate-800 border-solid rounded-lg bg-darkSlate-700":
                           editableName(),
                         "border-2 border-transparent border-solid rounded-lg":
-                          !editableName(),
+                          !editableName()
                       }}
                     >
                       <span class="flex gap-2 cursor-pointer">
@@ -435,14 +434,14 @@ const Instance = () => {
                         <div
                           class="cursor-pointer ease-in-out z-10 text-white transition i-ri:check-fill text-3xl duration-50 hover:text-green-500"
                           classList={{
-                            hidden: !editableName(),
+                            hidden: !editableName()
                           }}
                           onClick={() => handleNameChange()}
                         />
                         <div
                           class="cursor-pointer ease-in-out text-white transition text-3xl duration-50 z-10 i-ri:close-fill hover:text-red-500"
                           classList={{
-                            hidden: !editableName(),
+                            hidden: !editableName()
                           }}
                           onClick={() => {
                             if (
@@ -462,7 +461,7 @@ const Instance = () => {
                       ref={innerContainerRef}
                       class="flex justify-between cursor-default flex-row"
                     >
-                      <div class="flex flex-row gap-4 items-start mt-2 ml-2 text-lightGray-600 flex-wrap">
+                      <div class="flex flex-row gap-4 items-start mt-2 ml-2 flex-wrap text-lightGray-600">
                         <div class="m-0 flex gap-2 items-center">
                           <For
                             each={routeData.instanceDetails.data?.modloaders}
@@ -510,7 +509,7 @@ const Instance = () => {
                           <div
                             class="flex justify-center items-center cursor-pointer rounded-full h-8 w-8"
                             style={{
-                              background: "rgba(255, 255, 255, 0.1)",
+                              background: "rgba(255, 255, 255, 0.1)"
                             }}
                           >
                             <div class="text-xl i-ri:more-2-fill" />
@@ -519,13 +518,13 @@ const Instance = () => {
                         <div
                           class="rounded-full h-8 flex justify-center items-center cursor-pointer w-8"
                           style={{
-                            background: "rgba(255, 255, 255, 0.1)",
+                            background: "rgba(255, 255, 255, 0.1)"
                           }}
                           onClick={() =>
                             setFavoriteMutation.mutate({
                               instance: parseInt(params.id, 10),
                               favorite:
-                                !routeData.instanceDetails.data?.favorite,
+                                !routeData.instanceDetails.data?.favorite
                             })
                           }
                         >
@@ -533,7 +532,7 @@ const Instance = () => {
                             class="text-xl"
                             classList={{
                               "text-yellow-500 i-ri:star-s-fill": isFavorite(),
-                              "i-ri:star-line": !isFavorite(),
+                              "i-ri:star-line": !isFavorite()
                             }}
                           />
                         </div>
@@ -593,7 +592,7 @@ const Instance = () => {
                     <Trans
                       key="instance.step_back"
                       options={{
-                        defaultValue: "Back",
+                        defaultValue: "Back"
                       }}
                     />
                   </Button>

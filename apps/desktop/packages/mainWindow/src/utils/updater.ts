@@ -47,9 +47,12 @@ export const checkForUpdates = async () => {
       }
 
       window.checkForUpdates(lastChannel!);
-      interval = setInterval(() => {
-        window.checkForUpdates(lastChannel!);
-      }, 60 * 30 * 1000);
+      interval = setInterval(
+        () => {
+          window.checkForUpdates(lastChannel!);
+        },
+        60 * 30 * 1000
+      );
     }
   });
 };
