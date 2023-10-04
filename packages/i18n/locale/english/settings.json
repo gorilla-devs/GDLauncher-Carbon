@@ -44,5 +44,9 @@
   "language": "Language",
   "Java": "Java",
   "General": "General",
-  "Appearance": "Appearance"
+  "Appearance": "Appearance",
+  "confirm_change_runtime_path_text": "Are you sure you want to change the runtime path? This will move all your instances and configuration files to the new path.",
+  "runtime_path_old_path": "Old Path",
+  "runtime_path_new_path": "New Path",
+  "confirm_change_confirm_button": "Yes, change path"
 }

@@ -112,7 +112,7 @@ ipcMain.handle("changeRuntimePath", async (_, _newPath: string | null) => {
     }
 
     try {
-      await fs.unlink(path.join(currentRTPath, file));
+      await fse.remove(path.join(currentRTPath, file));
     } catch (err) {
       console.error(`[RUNTIME] Error unlinking file: ${err}`);
     }

@@ -5,17 +5,20 @@ import RowsContainer from "./components/RowsContainer";
 import Row from "./components/Row";
 import Title from "./components/Title";
 import {
-  Match,
-  Switch,
   createEffect,
   createResource,
-  createSignal
+  createSignal,
+  Match,
+  Switch
 } from "solid-js";
 import Center from "./components/Center";
+import { useModal } from "@/managers/ModalsManager";
 
 const [isChangingRuntimePath, setIsChangingRuntimePath] = createSignal(false);
 
 const RuntimePath = () => {
+  const modalsContext = useModal();
+
   const [runtimePath, setRuntimePath] = createSignal<string | undefined>(
     undefined
   );
@@ -125,9 +128,16 @@ const RuntimePath = () => {
                 disabled={!isPathValid() || isChangingRuntimePath()}
                 loading={isChangingRuntimePath()}
                 onClick={async () => {
-                  setIsChangingRuntimePath(true);
-                  window.changeRuntimePath(runtimePath()!);
-                  setIsChangingRuntimePath(false);
+                  modalsContext?.openModal(
+                    {
+                      name: "ConfirmChangeRuntimePath"
+                    },
+                    {
+                      runtimePath: runtimePath()!,
+                      setIsChangingRuntimePath,
+                      isChangingRuntimePath: isChangingRuntimePath
+                    }
+                  );
                 }}
               >
                 <i class="w-5 h-5 i-ri-restart-line" />
