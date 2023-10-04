@@ -8,15 +8,15 @@ export default defineConfig({
   plugins: [],
   resolve: {
     alias: {
-      electron: "@overwolf/ow-electron",
-    },
+      electron: "@overwolf/ow-electron"
+    }
   },
   build: {
     outDir: "../../dist/preload",
     lib: {
       entry: "index.ts",
       formats: ["cjs"],
-      fileName: () => "[name].cjs",
+      fileName: () => "[name].cjs"
     },
     minify: process.env./* from mode option */ NODE_ENV === "production",
     emptyOutDir: true,
@@ -25,9 +25,9 @@ export default defineConfig({
         "electron",
         "@overwolf/ow-electron",
         ...builtinModules,
-        ...builtinModules.map((e) => `node:${e}`),
+        ...builtinModules.map((e) => `node:${e}`)
         // ...Object.keys(pkg.dependencies || {}),
-      ],
-    },
-  },
+      ]
+    }
+  }
 });

@@ -526,7 +526,7 @@ enum ListInstanceStatus {
 #[derive(Type, Debug, Serialize)]
 struct ValidListInstance {
     mc_version: Option<String>,
-    modloader: Option<CFFEModLoaderType>,
+    modloader: Option<FEInstanceModloaderType>,
     modpack_platform: Option<ModpackPlatform>,
     state: LaunchState,
 }
@@ -755,13 +755,13 @@ enum InstanceFolder {
 
 #[derive(Type, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 struct ModLoader {
-    type_: CFFEModLoaderType,
+    type_: FEInstanceModloaderType,
     version: String,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
-enum CFFEModLoaderType {
+enum FEInstanceModloaderType {
     Forge,
     Fabric,
     Quilt,
@@ -796,7 +796,7 @@ struct ModFileMetadata {
     version: Option<String>,
     description: Option<String>,
     authors: Option<String>,
-    modloaders: Vec<CFFEModLoaderType>,
+    modloaders: Vec<FEInstanceModloaderType>,
     has_image: bool,
 }
 
@@ -905,7 +905,7 @@ impl From<domain::info::ModLoader> for ModLoader {
     }
 }
 
-impl From<domain::info::ModLoaderType> for CFFEModLoaderType {
+impl From<domain::info::ModLoaderType> for FEInstanceModloaderType {
     fn from(value: domain::info::ModLoaderType) -> Self {
         use domain::info::ModLoaderType as domain;
 
@@ -1006,12 +1006,12 @@ impl From<ModLoader> for domain::info::ModLoader {
     }
 }
 
-impl From<CFFEModLoaderType> for domain::info::ModLoaderType {
-    fn from(value: CFFEModLoaderType) -> Self {
+impl From<FEInstanceModloaderType> for domain::info::ModLoaderType {
+    fn from(value: FEInstanceModloaderType) -> Self {
         match value {
-            CFFEModLoaderType::Forge => Self::Forge,
-            CFFEModLoaderType::Fabric => Self::Fabric,
-            CFFEModLoaderType::Quilt => Self::Quilt,
+            FEInstanceModloaderType::Forge => Self::Forge,
+            FEInstanceModloaderType::Fabric => Self::Fabric,
+            FEInstanceModloaderType::Quilt => Self::Quilt,
         }
     }
 }

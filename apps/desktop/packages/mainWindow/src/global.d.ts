@@ -6,7 +6,7 @@ import { BoundsSize } from "./utils/adhelper";
 import type {
   ProgressInfo,
   UpdateCheckResult,
-  UpdateInfo,
+  UpdateInfo
 } from "electron-updater";
 
 declare global {
@@ -15,7 +15,9 @@ declare global {
     ipcRenderer: import("electron").IpcRenderer;
     report: any;
     getAdSize: () => Promise<BoundsSize>;
-    openFileDialog: (filters?: any) => Promise<Electron.OpenDialogReturnValue>;
+    openFileDialog: (
+      filters: Electron.OpenDialogOptions
+    ) => Promise<Electron.OpenDialogReturnValue>;
     adSizeChanged: (
       cb: (event: Electron.IpcRendererEvent, ...args: any[]) => void
     ) => void;
@@ -39,6 +41,10 @@ declare global {
     openCMPWindow: () => void;
     getCoreModulePort: () => Promise<number>;
     getCurrentOS: () => Promise<{ platform: string; arch: string }>;
+    getInitialRuntimePath: () => Promise<string>;
+    getRuntimePath: () => Promise<string>;
+    changeRuntimePath: (newPath: string | null) => Promise<void>;
+    validateRuntimePath: (newPath: string | null) => Promise<boolean>;
   }
 }
 

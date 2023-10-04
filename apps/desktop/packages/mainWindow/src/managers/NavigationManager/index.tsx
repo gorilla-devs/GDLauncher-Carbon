@@ -1,7 +1,7 @@
 import {
   getInstanceIdFromPath,
   isLibraryPath,
-  setLastInstanceOpened,
+  setLastInstanceOpened
 } from "@/utils/routes";
 import { useNavigate } from "@solidjs/router";
 import { JSX, createContext, createSignal, useContext } from "solid-js";

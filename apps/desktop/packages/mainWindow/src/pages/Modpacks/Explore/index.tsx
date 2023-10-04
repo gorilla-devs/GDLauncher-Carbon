@@ -10,7 +10,7 @@ import {
   Tab,
   TabList,
   Tabs,
-  createNotification,
+  createNotification
 } from "@gd/ui";
 import {
   Link,
@@ -18,7 +18,7 @@ import {
   useLocation,
   useParams,
   useRouteData,
-  useSearchParams,
+  useSearchParams
 } from "@solidjs/router";
 import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import fetchData from "../modpack.overview";
@@ -66,20 +66,20 @@ const Modpack = () => {
   const instancePages = () => [
     {
       label: "Overview",
-      path: `/${detailsType()}/${params.id}/${params.platform}`,
+      path: `/${detailsType()}/${params.id}/${params.platform}`
     },
     {
       label: "Changelog",
-      path: `/${detailsType()}/${params.id}/${params.platform}/changelog`,
+      path: `/${detailsType()}/${params.id}/${params.platform}/changelog`
     },
     {
       label: "Screenshots",
-      path: `/${detailsType()}/${params.id}/${params.platform}/screenshots`,
+      path: `/${detailsType()}/${params.id}/${params.platform}/screenshots`
     },
     {
       label: "Versions",
-      path: `/${detailsType()}/${params.id}/${params.platform}/versions`,
-    },
+      path: `/${detailsType()}/${params.id}/${params.platform}/versions`
+    }
   ];
 
   let refStickyTabs: HTMLDivElement;
@@ -103,7 +103,7 @@ const Modpack = () => {
       },
       onSettled() {
         navigate(`/library`);
-      },
+      }
     }
   );
 
@@ -117,7 +117,7 @@ const Modpack = () => {
       onError() {
         setLoading(false);
         addNotification("Error while downloading the modpack.", "error");
-      },
+      }
     }
   );
 
@@ -132,8 +132,8 @@ const Modpack = () => {
       return {
         Curseforge: {
           file_id: routeData.modpackDetails.data.data.mainFileId,
-          project_id: routeData.modpackDetails.data.data.id,
-        },
+          project_id: routeData.modpackDetails.data.data.id
+        }
       };
     } else {
       const versions = routeData.modrinthProjectVersions.data;
@@ -148,8 +148,8 @@ const Modpack = () => {
       const modrinth = {
         Modrinth: {
           project_id: routeData.modpackDetails.data.id,
-          version_id: versionId.id,
-        },
+          version_id: versionId.id
+        }
       };
 
       return modrinth;
@@ -182,8 +182,8 @@ const Modpack = () => {
         notes: "",
         name: name,
         version: {
-          Modpack: modpackObj,
-        },
+          Modpack: modpackObj
+        }
       });
     }
   };
@@ -192,7 +192,7 @@ const Modpack = () => {
     if (instanceId() !== undefined && !isNaN(instanceId())) {
       const mods = rspc.createQuery(() => [
         "instance.getInstanceMods",
-        instanceId() as number,
+        instanceId() as number
       ]);
 
       if (mods.data) setInstanceMods(mods.data);
@@ -217,7 +217,7 @@ const Modpack = () => {
       <div
         class="relative h-full bg-darkSlate-800 overflow-x-hidden overflow-auto max-h-full"
         style={{
-          "scrollbar-gutter": "stable",
+          "scrollbar-gutter": "stable"
         }}
         onScroll={() => {
           const rect = refStickyTabs.getBoundingClientRect();
@@ -235,7 +235,7 @@ const Modpack = () => {
                     ? routeData.modpackDetails.data?.data.logo?.thumbnailUrl
                     : routeData.modpackDetails.data?.icon_url
                 }")`,
-                "background-position": "right-5rem",
+                "background-position": "right-5rem"
               }}
             />
             <div class="z-20 top-5 sticky left-5 w-fit">
@@ -259,7 +259,7 @@ const Modpack = () => {
                       routeData.isCurseforge
                         ? routeData.modpackDetails.data?.data.logo?.thumbnailUrl
                         : routeData.modpackDetails.data?.icon_url
-                    }")`,
+                    }")`
                   }}
                 />
                 <div class="flex flex-1 flex-col">
@@ -368,7 +368,7 @@ const Modpack = () => {
                             <Trans
                               key="mod.downloaded"
                               options={{
-                                defaultValue: "Downloaded",
+                                defaultValue: "Downloaded"
                               }}
                             />
                           </Button>
@@ -435,7 +435,7 @@ const Modpack = () => {
                       <Trans
                         key="modpack.download"
                         options={{
-                          defaultValue: "Download",
+                          defaultValue: "Download"
                         }}
                       />
                     </Show>

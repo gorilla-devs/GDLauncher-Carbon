@@ -74,7 +74,8 @@ const Overview = () => {
             title={t("instance.overview_card_last_played_title")}
             text={format(
               new Date(
-                (routeData.instanceDetails.data as InstanceDetails)?.last_played
+                (routeData.instanceDetails.data as InstanceDetails)
+                  ?.last_played as string
               ),
               "PPP"
             )}
@@ -88,7 +89,7 @@ const Overview = () => {
             <Trans
               key="instance.notes"
               options={{
-                defaultValue: "notes",
+                defaultValue: "notes"
               }}
             />
           </div>

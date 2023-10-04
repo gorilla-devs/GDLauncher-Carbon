@@ -38,7 +38,7 @@ function initAnalytics() {
         debug: import.meta.env.DEV,
         opt_out_capturing_by_default: !settings.data.metricsEnabled,
         bootstrap: {
-          distinctID: settings.data.randomUserUuid,
+          distinctID: settings.data.randomUserUuid
         },
         loaded: async () => {
           const os = await window.getCurrentOS();
@@ -47,10 +47,10 @@ function initAnalytics() {
             $set: {
               app_version: __APP_VERSION__,
               os: os.platform,
-              arch: os.arch,
+              arch: os.arch
             },
             $pathname: window.location.hash,
-            $current_url: window.location.hash,
+            $current_url: window.location.hash
           });
 
           if (!startupEventSent && settings.data?.metricsEnabled) {
@@ -58,7 +58,7 @@ function initAnalytics() {
             startupEventSent = true;
             trackEvent("app_started");
           }
-        },
+        }
       });
     });
 
@@ -69,8 +69,8 @@ function initAnalytics() {
         posthog.opt_in_capturing({
           capture_properties: {
             $current_url: window.location.hash,
-            $pathname: window.location.hash,
-          },
+            $pathname: window.location.hash
+          }
         });
 
         if (!startupEventSent) {
@@ -102,12 +102,12 @@ export function trackEvent(event: string, properties?: Record<string, any>) {
         {
           ...(properties || {}),
           $pathname: window.location.hash,
-          $current_url: window.location.hash,
-        },
+          $current_url: window.location.hash
+        }
       ]);
     } else {
       posthog.capture(event, {
-        ...(properties || {}),
+        ...(properties || {})
       });
     }
   }
@@ -124,13 +124,13 @@ export function trackPageView() {
         "$pageview",
         {
           $pathname: window.location.hash,
-          $current_url: window.location.hash,
-        },
+          $current_url: window.location.hash
+        }
       ]);
     } else {
       posthog.capture("$pageview", {
         $pathname: window.location.hash,
-        $current_url: window.location.hash,
+        $current_url: window.location.hash
       });
     }
   }

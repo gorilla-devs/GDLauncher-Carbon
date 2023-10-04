@@ -1,8 +1,7 @@
 import { app } from "electron";
 import * as Sentry from "@sentry/electron/main";
-import fs from "fs";
-import path from "path";
 import handleUncaughtException from "./handleUncaughtException";
+import { initRTPath } from "./runtimePath";
 
 const args = process.argv.slice(1);
 
@@ -18,14 +17,14 @@ function validateArgument(arg: string): Argument | null {
   if (hasValue) {
     return {
       argument: arg,
-      value: args[args.indexOf(arg) + 1],
+      value: args[args.indexOf(arg) + 1]
     };
   }
 
   if (args.includes(arg)) {
     return {
       argument: arg,
-      value: null,
+      value: null
     };
   }
 
@@ -33,30 +32,18 @@ function validateArgument(arg: string): Argument | null {
 }
 
 if (app.isPackaged) {
-  const overrideDataPath = validateArgument("--runtime_path");
-  if (overrideDataPath?.value) {
-    app.setPath("userData", overrideDataPath?.value);
-  } else {
-    const userData = path.join(app.getPath("appData"), "gdlauncher_carbon");
-    const runtimeOverridePath = path.join(userData, "runtime_path_override");
+  const overrideCLIDataPath = validateArgument("--runtime_path");
+  const overrideEnvDataPath = process.env.GDL_RUNTIME_PATH;
 
-    const runtimePathExists = fs.existsSync(runtimeOverridePath);
-
-    if (runtimePathExists) {
-      const override = fs.readFileSync(runtimeOverridePath);
-      app.setPath("userData", override.toString());
-    } else {
-      app.setPath("userData", userData);
-    }
-  }
+  initRTPath(overrideCLIDataPath?.value || overrideEnvDataPath);
 } else {
-  const userData = import.meta.env.RUNTIME_PATH;
-  if (!userData) {
+  const rtPath = import.meta.env.RUNTIME_PATH;
+  if (!rtPath) {
     throw new Error("Missing runtime path");
   }
-
-  app.setPath("userData", userData);
+  initRTPath(rtPath);
 }
+
 const allowMultipleInstances = validateArgument(
   "--gdl_allow_multiple_instances"
 );
@@ -76,7 +63,7 @@ if (!disableSentry) {
     process.removeListener("uncaughtException", handleUncaughtException);
 
     Sentry.init({
-      dsn: import.meta.env.VITE_MAIN_DSN,
+      dsn: import.meta.env.VITE_MAIN_DSN
     });
   }
 }

@@ -19,7 +19,7 @@ const Versions = () => {
 
   const instanceDetails = rspc.createQuery(() => [
     "instance.getInstanceDetails",
-    instanceId() as number,
+    instanceId() as number
   ]);
 
   const modplatform = () => instanceDetails.data?.modloaders[0].type_;

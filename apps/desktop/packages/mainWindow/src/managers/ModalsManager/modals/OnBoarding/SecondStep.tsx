@@ -19,7 +19,7 @@ const SecondStep = (props: Props) => {
               key="onboarding.java_title"
               options={{
                 defaultValue:
-                  "Do you want the launcher to automatically handle java for you? It will also download a managed java version if you don't have a correct one",
+                  "Do you want the launcher to automatically handle java for you? It will also download a managed java version if you don't have a correct one"
               }}
             />
           </p>

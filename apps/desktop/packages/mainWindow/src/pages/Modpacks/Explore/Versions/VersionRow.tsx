@@ -2,7 +2,7 @@ import {
   CFFEFile,
   CFFEMod,
   MRFEProject,
-  MRFEVersion,
+  MRFEVersion
 } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { format } from "date-fns";
@@ -42,7 +42,7 @@ const VersionRow = (props: Props) => {
       onSettled() {
         setLoading(false);
         navigate(`/library`);
-      },
+      }
     }
   );
 
@@ -54,7 +54,7 @@ const VersionRow = (props: Props) => {
       },
       onError() {
         addNotification("Error while downloading the modpack.", "error");
-      },
+      }
     }
   );
 
@@ -107,7 +107,7 @@ const VersionRow = (props: Props) => {
                   getReleaseType() === "stable" ||
                   getReleaseType() === "release",
                 "text-yellow-500": getReleaseType() === "beta",
-                "text-red-500": getReleaseType() === "alpha",
+                "text-red-500": getReleaseType() === "alpha"
               }}
             >
               {getReleaseType()}
@@ -120,7 +120,7 @@ const VersionRow = (props: Props) => {
         classList={{
           "cursor-pointer text-lightGray-800 group-hover:text-lightSlate-50 group-hover:text-lg transition transition-all duration-75 ease-in-out":
             !props.disabled,
-          "cursor-not-allowed text-lightGray-800": props.disabled,
+          "cursor-not-allowed text-lightGray-800": props.disabled
         }}
         onClick={() => {
           if (props.disabled) return;
@@ -132,14 +132,14 @@ const VersionRow = (props: Props) => {
             ? {
                 Curseforge: {
                   file_id: (props.modVersion as CFFEFile).id,
-                  project_id: (props.modVersion as CFFEFile).modId,
-                },
+                  project_id: (props.modVersion as CFFEFile).modId
+                }
               }
             : {
                 Modrinth: {
                   project_id: (props.modVersion as MRFEVersion).project_id,
-                  version_id: (props.modVersion as MRFEVersion).id,
-                },
+                  version_id: (props.modVersion as MRFEVersion).id
+                }
               };
 
           if (icon) {
@@ -154,8 +154,8 @@ const VersionRow = (props: Props) => {
               ? (props.modVersion as CFFEFile).displayName
               : (props.project as MRFEProject).title,
             version: {
-              Modpack: modpack,
-            },
+              Modpack: modpack
+            }
           });
         }}
       >

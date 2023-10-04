@@ -6,14 +6,14 @@ const fetchData = () => {
   const activeUuid = rspc.createQuery(() => ["account.getActiveUuid"]);
   const status = rspc.createQuery(() => ["account.enroll.getStatus"]);
   const curseForgeModloaders = rspc.createQuery(() => [
-    "modplatforms.curseforge.getModloaders",
+    "modplatforms.curseforge.getModloaders"
   ]);
   const curseforgeCategories = rspc.createQuery(() => [
-    "modplatforms.curseforge.getCategories",
+    "modplatforms.curseforge.getCategories"
   ]);
 
   const modrinthCategories = rspc.createQuery(() => [
-    "modplatforms.modrinth.getCategories",
+    "modplatforms.modrinth.getCategories"
   ]);
 
   return {
@@ -23,7 +23,7 @@ const fetchData = () => {
     minecraftVersions,
     curseForgeModloaders,
     curseforgeCategories,
-    modrinthCategories,
+    modrinthCategories
   };
 };
 

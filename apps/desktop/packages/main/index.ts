@@ -6,15 +6,15 @@ import {
   app,
   BrowserWindow,
   dialog,
-  Menu,
-  session,
-  shell,
-  screen,
   ipcMain,
+  Menu,
+  OpenDialogOptions,
+  screen,
+  session,
+  shell
 } from "electron";
-import { release } from "os";
+import os, { platform, release } from "os";
 import { join, resolve } from "path";
-import os from "os";
 import "./cli"; // THIS MUST BE BEFORE "coreModule" IMPORT!
 import coreModule from "./coreModule";
 import "./preloadListeners";
@@ -22,13 +22,16 @@ import getAdSize from "./adSize";
 import handleUncaughtException from "./handleUncaughtException";
 import initAutoUpdater from "./autoUpdater";
 import "./appMenu";
+import "./runtimePath";
 
 if ((app as any).overwolf) {
   (app as any).overwolf.disableAnonymousAnalytics();
 }
 
 // Disable GPU Acceleration for Windows 7
-if (release().startsWith("6.1")) app.disableHardwareAcceleration();
+if (release().startsWith("6.1") && platform() === "win32") {
+  app.disableHardwareAcceleration();
+}
 
 // Set application name for Windows 10+ notifications
 if (process.platform === "win32") app.setAppUserModelId(app.getName());
@@ -36,7 +39,7 @@ if (process.platform === "win32") app.setAppUserModelId(app.getName());
 if (process.defaultApp) {
   if (process.argv.length >= 2) {
     app.setAsDefaultProtocolClient("gdlauncher", process.execPath, [
-      resolve(process.argv[1]),
+      resolve(process.argv[1])
     ]);
   }
 } else {
@@ -65,8 +68,8 @@ async function createWindow() {
       preload: join(__dirname, "../preload/index.cjs"),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false, // TODO: fix, see https://github.com/electron-react-boilerplate/electron-react-boilerplate/issues/3288
-    },
+      sandbox: false // TODO: fix, see https://github.com/electron-react-boilerplate/electron-react-boilerplate/issues/3288
+    }
   });
 
   initAutoUpdater(win);
@@ -88,11 +91,8 @@ async function createWindow() {
     return getAdSize().adSize;
   });
 
-  ipcMain.handle("openFileDialog", async (_, filters) => {
-    return dialog.showOpenDialog({
-      properties: ["openFile"],
-      filters,
-    });
+  ipcMain.handle("openFileDialog", async (_, opts: OpenDialogOptions) => {
+    return dialog.showOpenDialog(opts);
   });
 
   ipcMain.handle("getCurrentOS", async () => {
@@ -111,6 +111,13 @@ async function createWindow() {
     }
   });
 
+  win.webContents.on("render-process-gone", (event, detailed) => {
+    console.log("render-process-gone", detailed);
+    if (detailed.reason === "crashed") {
+      win?.webContents.reload();
+    }
+  });
+
   if (app.isPackaged) {
     win.loadFile(join(__dirname, "../mainWindow/index.html"));
   } else {
@@ -119,7 +126,7 @@ async function createWindow() {
     }`;
 
     win.loadURL(url, {
-      userAgent: "GDLauncher Carbon",
+      userAgent: "GDLauncher Carbon"
     });
   }
 
@@ -161,7 +168,7 @@ async function createWindow() {
         upsertKeyValue(responseHeaders, "Access-Control-Allow-Origin", ["*"]);
         upsertKeyValue(responseHeaders, "Access-Control-Allow-Headers", ["*"]);
         callback({
-          responseHeaders,
+          responseHeaders
         });
       }
     );
@@ -182,7 +189,7 @@ app.whenReady().then(() => {
   console.log("OVERWOLF APP ID", process.env.OVERWOLF_APP_UID);
   session.defaultSession.webRequest.onBeforeSendHeaders(
     {
-      urls: ["http://*/*", "https://*/*"],
+      urls: ["http://*/*", "https://*/*"]
     },
     (details, callback) => {
       details.requestHeaders["Origin"] = "https://app.gdlauncher.com";
@@ -192,7 +199,7 @@ app.whenReady().then(() => {
 
   session.defaultSession.webRequest.onHeadersReceived(
     {
-      urls: ["http://*/*", "https://*/*"],
+      urls: ["http://*/*", "https://*/*"]
     },
     (details, callback) => {
       // eslint-disable-next-line
@@ -202,7 +209,7 @@ app.whenReady().then(() => {
       details.responseHeaders!["Access-Control-Allow-Origin"] = ["*"];
       callback({
         cancel: false,
-        responseHeaders: details.responseHeaders,
+        responseHeaders: details.responseHeaders
       });
     }
   );
@@ -220,8 +227,7 @@ app.on("window-all-closed", async () => {
   app.quit();
 });
 
-app.on("second-instance", (e, argv) => {
-  dialog.showErrorBox("Welcome Back", `You arrived from: ${argv}`);
+app.on("second-instance", (_e, _argv) => {
   if (win) {
     // Focus on the main window if the user tried to open another
     if (win.isMinimized()) win.restore();

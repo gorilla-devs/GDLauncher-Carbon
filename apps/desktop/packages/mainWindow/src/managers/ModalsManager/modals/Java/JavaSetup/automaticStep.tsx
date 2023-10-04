@@ -14,7 +14,7 @@ const AutomaticStep = () => {
             key="java.java_missing"
             options={{
               defaultValue: "Java {{version}} missing",
-              version: 8,
+              version: 8
             }}
           />
         </h3>
@@ -25,7 +25,7 @@ const AutomaticStep = () => {
         <Trans
           key="java.automatic_download_progress"
           options={{
-            defaultValue: "Downloaded",
+            defaultValue: "Downloaded"
           }}
         />
       </p>

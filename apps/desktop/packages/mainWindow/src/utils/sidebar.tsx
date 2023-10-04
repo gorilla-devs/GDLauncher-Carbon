@@ -8,7 +8,7 @@ import {
   CFFEModLoaderType,
   FEUnifiedSearchCategoryID,
   MRFECategory,
-  MRFELoader,
+  MRFELoader
 } from "@gd/core_module/bindings";
 
 export const [isSidebarOpened, setIsSidebarOpened] = createSignal(true);
@@ -30,7 +30,7 @@ export const toggleSidebar = () => {
 };
 
 export const getForgeModloaderIcon = (modloader?: CFFEModLoaderType) => {
-  switch (modloader?.toLowerCase()) {
+  switch (modloader?.toString().toLowerCase()) {
     case "forge":
       return forgeIcon;
     case "fabric":
@@ -45,7 +45,7 @@ export const getForgeModloaderIcon = (modloader?: CFFEModLoaderType) => {
 export const getModloaderIcon = (category: CFFEModLoaderType | MRFELoader) => {
   if (typeof category === "string") {
     return getForgeModloaderIcon(category);
-  } else return category.icon;
+  } else return (category as MRFELoader).icon;
 };
 
 export const ModloaderIcon = (props: {

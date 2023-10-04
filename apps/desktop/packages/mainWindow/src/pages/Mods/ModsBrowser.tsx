@@ -9,7 +9,7 @@ import {
   createResource,
   createSignal,
   onCleanup,
-  onMount,
+  onMount
 } from "solid-js";
 import {
   CFFEModSearchSortField,
@@ -18,7 +18,7 @@ import {
   FEUnifiedSearchResult,
   InstanceDetails,
   MRFESearchIndex,
-  Mod,
+  Mod
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import { CurseForgeSortFields, ModrinthSortFields } from "@/utils/constants";
@@ -29,7 +29,7 @@ import { fetchImage } from "@/utils/instances";
 import { FetchingModpacks, NoModpacksAvailable } from "./ModsStatus";
 import {
   ErrorFetchingModpacks,
-  NoMoreModpacks,
+  NoMoreModpacks
 } from "../Modpacks/ModpacksStatus";
 import { useRouteData, useSearchParams } from "@solidjs/router";
 import { rspc } from "@/utils/rspcClient";
@@ -62,7 +62,7 @@ const ModsBrowser = () => {
     if (instanceId() !== undefined) {
       const mods = rspc.createQuery(() => [
         "instance.getInstanceMods",
-        instanceId() as number,
+        instanceId() as number
       ]);
 
       if (mods.data) setInstanceMods(mods.data);
@@ -73,7 +73,7 @@ const ModsBrowser = () => {
     if (instanceId() !== undefined) {
       const InstanceDetails = rspc.createQuery(() => [
         "instance.getInstanceDetails",
-        instanceId() as number,
+        instanceId() as number
       ]);
 
       if (InstanceDetails.data) setinstanceDetails(InstanceDetails.data);
@@ -164,7 +164,7 @@ const ModsBrowser = () => {
         newQuery["modloaders"].push("fabric");
         newQuery["modloaders"].push("quilt");
       } else {
-        newQuery["modloaders"] = [...modloaders];
+        newQuery["modloaders"] = [...modloaders] as any;
       }
     }
 
@@ -189,7 +189,7 @@ const ModsBrowser = () => {
                   style={{
                     "background-image": imageResource()
                       ? `url("${imageResource()}")`
-                      : `url("${DefaultImg}")`,
+                      : `url("${DefaultImg}")`
                   }}
                 >
                   <div class="absolute z-0 bg-gradient-to-r from-darkSlate-700 from-50% inset-0" />
@@ -200,7 +200,7 @@ const ModsBrowser = () => {
                       style={{
                         "background-image": imageResource()
                           ? `url("${imageResource()}")`
-                          : `url("${DefaultImg}")`,
+                          : `url("${DefaultImg}")`
                       }}
                     />
                     <h2 class="m-0">{instanceDetails()?.name}</h2>
@@ -210,7 +210,7 @@ const ModsBrowser = () => {
                     onClick={() => {
                       infiniteQuery.setInstanceId(undefined);
                       infiniteQuery.setQuery({
-                        modloaders: null,
+                        modloaders: null
                       });
                       setinstanceDetails(undefined);
                       setInstanceMods([]);
@@ -236,19 +236,19 @@ const ModsBrowser = () => {
                   <Dropdown
                     options={sortingFields().map((field) => ({
                       label: t(`instance.sort_by_${field}`),
-                      key: field,
+                      key: field
                     }))}
                     onChange={(val) => {
                       const sortIndex = isCurseforge()
                         ? {
-                            curseForge: val.key as CFFEModSearchSortField,
+                            curseForge: val.key as CFFEModSearchSortField
                           }
                         : {
-                            modrinth: val.key as MRFESearchIndex,
+                            modrinth: val.key as MRFESearchIndex
                           };
 
                       infiniteQuery.setQuery({
-                        sortIndex,
+                        sortIndex
                       });
                     }}
                     value={
@@ -273,12 +273,12 @@ const ModsBrowser = () => {
                     "i-ri:sort-asc":
                       infiniteQuery.query.sortOrder === "ascending",
                     "i-ri:sort-desc":
-                      infiniteQuery.query.sortOrder === "descending",
+                      infiniteQuery.query.sortOrder === "descending"
                   }}
                   onClick={() => {
                     const isAsc = infiniteQuery.query.sortOrder === "ascending";
                     infiniteQuery.setQuery({
-                      sortOrder: isAsc ? "descending" : "ascending",
+                      sortOrder: isAsc ? "descending" : "ascending"
                     });
                   }}
                 />
@@ -289,7 +289,7 @@ const ModsBrowser = () => {
         <div
           class="flex flex-col gap-2 left-0 right-0 absolute bottom-0 pb-5 overflow-y-hidden"
           style={{
-            top: `${headerHeight()}px`,
+            top: `${headerHeight()}px`
           }}
         >
           <Switch>
@@ -309,7 +309,7 @@ const ModsBrowser = () => {
                   style={{
                     height: `${infiniteQuery?.rowVirtualizer.getTotalSize()}px`,
                     width: "100%",
-                    position: "relative",
+                    position: "relative"
                   }}
                 >
                   <For each={allVirtualRows()}>
@@ -331,7 +331,7 @@ const ModsBrowser = () => {
                             left: 0,
                             width: "100%",
                             height: `${virtualItem.size}px`,
-                            transform: `translateY(${virtualItem.start}px)`,
+                            transform: `translateY(${virtualItem.start}px)`
                           }}
                         >
                           <div>

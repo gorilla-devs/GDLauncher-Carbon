@@ -4,7 +4,7 @@ import {
   msToMinutes,
   msToSeconds,
   parseTwoDigitNumber,
-  strToMs,
+  strToMs
 } from "@/utils/helpers";
 import { handleStatus } from "@/utils/login";
 import { queryClient, rspc } from "@/utils/rspcClient";
@@ -12,7 +12,7 @@ import {
   AccountEntry,
   AccountStatus,
   AccountType,
-  DeviceCode,
+  DeviceCode
 } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Spinner, createNotification } from "@gd/ui";
@@ -55,7 +55,7 @@ const mapStatus = (status: AccountStatus | undefined) => {
             <Trans
               key="account_invalid"
               options={{
-                defaultValue: "invalid",
+                defaultValue: "invalid"
               }}
             />
           </p>
@@ -69,7 +69,7 @@ const mapStatus = (status: AccountStatus | undefined) => {
             <Trans
               key="account_invalid"
               options={{
-                defaultValue: "invalid",
+                defaultValue: "invalid"
               }}
             />
           </p>
@@ -82,7 +82,7 @@ const mapStatus = (status: AccountStatus | undefined) => {
             <Trans
               key="account_online"
               options={{
-                defaultValue: "online",
+                defaultValue: "online"
               }}
             />
           </p>
@@ -95,7 +95,7 @@ const mapStatus = (status: AccountStatus | undefined) => {
             <Trans
               key="account_expired"
               options={{
-                defaultValue: "Expired",
+                defaultValue: "Expired"
               }}
             />
           </p>
@@ -107,7 +107,7 @@ const mapStatus = (status: AccountStatus | undefined) => {
           <Trans
             key="account_refreshing"
             options={{
-              defaultValue: "Refresh",
+              defaultValue: "Refresh"
             }}
           />
         </div>
@@ -200,7 +200,7 @@ export const AccountsDropdown = (props: Props) => {
       await queryClient.cancelQueries({ queryKey: ["account.setActiveUuid"] });
 
       const previousActiveUUID: string | undefined = queryClient.getQueryData([
-        "account.setActiveUuid",
+        "account.setActiveUuid"
       ]);
 
       queryClient.setQueryData(["account.setActiveUuid", null], uuid);
@@ -223,7 +223,7 @@ export const AccountsDropdown = (props: Props) => {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["account.setActiveUuid"] });
-    },
+    }
   });
 
   const accountEnrollCancelMutation = rspc.createMutation(
@@ -239,7 +239,7 @@ export const AccountsDropdown = (props: Props) => {
         setEnrollmentInProgress(false);
         setLoginDeviceCode(null);
         setAddAccountStarting(false);
-      },
+      }
     }
   );
 
@@ -254,7 +254,7 @@ export const AccountsDropdown = (props: Props) => {
           accountEnrollCancelMutation.mutate(undefined);
         setAddAccountStarting(false);
         addNotification(error.message, "error");
-      },
+      }
     }
   );
 
@@ -267,7 +267,7 @@ export const AccountsDropdown = (props: Props) => {
       onMutate() {
         setLoadingAuthorization(false);
         setEnrollmentInProgress(false);
-      },
+      }
     }
   );
 
@@ -285,7 +285,7 @@ export const AccountsDropdown = (props: Props) => {
         queryClient.getQueryData(["account.getAccounts"]);
 
       const previousActiveUUID: string | undefined = queryClient.getQueryData([
-        "account.getActiveUuid",
+        "account.getActiveUuid"
       ]);
 
       queryClient.setQueryData(["account.getActiveUuid"], null);
@@ -337,7 +337,7 @@ export const AccountsDropdown = (props: Props) => {
       if (routeData.accounts.data?.length === 0) {
         navigate("/");
       }
-    },
+    }
   });
 
   const reset = () => {
@@ -381,17 +381,17 @@ export const AccountsDropdown = (props: Props) => {
           accountEnrollFinalizeMutation.mutate(undefined);
         }
         reset();
-      },
+      }
     });
   });
 
   return (
-    <div class="relative inline-block" id={props.id}>
+    <div class="relative inline-block z-[10001]" id={props.id}>
       <p
         class="mt-0 mb-2 font-bold"
         classList={{
           "text-white": !props.disabled,
-          "text-darkSlate-50": props.disabled,
+          "text-darkSlate-50": props.disabled
         }}
       >
         {props.label}
@@ -411,7 +411,7 @@ export const AccountsDropdown = (props: Props) => {
           "border-0": true,
           "text-darkSlate-50 hover:text-white": !props.disabled,
           rounded: true,
-          "bg-darkSlate-700": true,
+          "bg-darkSlate-700": true
         }}
       >
         <div class="flex gap-2 items-center">
@@ -422,11 +422,11 @@ export const AccountsDropdown = (props: Props) => {
             />
           </Show>
           <p
-            class="lg:block m-0 overflow-hidden justify-center w-full text-ellipsis align-middle leading-loose hidden"
+            class="m-0 lg:block overflow-hidden justify-center w-full text-ellipsis align-middle leading-loose hidden"
             classList={{
               "text-darkSlate-50 hover:text-white group-hover:text-white":
                 !props.disabled,
-              "text-darkSlate-500": props.disabled,
+              "text-darkSlate-500": props.disabled
             }}
           >
             {(activeAccount() as Label)?.name}
@@ -437,7 +437,7 @@ export const AccountsDropdown = (props: Props) => {
           class="text-3xl ease-in-out duration-100 i-ri:arrow-drop-down-line"
           classList={{
             "text-darkSlate-50 group-hover:text-white": !props.disabled,
-            "text-darkSlate-500": props.disabled,
+            "text-darkSlate-500": props.disabled
           }}
         />
       </button>
@@ -458,7 +458,7 @@ export const AccountsDropdown = (props: Props) => {
         }}
         classList={{
           flex: menuOpened(),
-          hidden: !menuOpened(),
+          hidden: !menuOpened()
         }}
       >
         <div class="w-full flex flex-col mb-4">
@@ -480,7 +480,7 @@ export const AccountsDropdown = (props: Props) => {
               <Trans
                 key="uuid"
                 options={{
-                  defaultValue: "UUID",
+                  defaultValue: "UUID"
                 }}
               />
             </h5>
@@ -543,7 +543,7 @@ export const AccountsDropdown = (props: Props) => {
                       <Trans
                         key="switch_account"
                         options={{
-                          defaultValue: "Switch",
+                          defaultValue: "Switch"
                         }}
                       />
                     </p>
@@ -560,7 +560,7 @@ export const AccountsDropdown = (props: Props) => {
             classList={{
               "flex-col": !!enrollmentInProgress(),
               "min-h-10": !!enrollmentInProgress(),
-              "items-start": !!enrollmentInProgress(),
+              "items-start": !!enrollmentInProgress()
             }}
           >
             <div class="flex justify-between w-full">
@@ -568,7 +568,7 @@ export const AccountsDropdown = (props: Props) => {
                 class="flex gap-3 items-center"
                 classList={{
                   "cursor-not-allowed": !!enrollmentInProgress(),
-                  "cursor-pointer": !enrollmentInProgress(),
+                  "cursor-pointer": !enrollmentInProgress()
                 }}
               >
                 <div
@@ -576,20 +576,20 @@ export const AccountsDropdown = (props: Props) => {
                   classList={{
                     "text-darkSlate-500": !!enrollmentInProgress(),
                     "group-hover:text-white": !enrollmentInProgress(),
-                    "cursor-not-allowed": !!enrollmentInProgress(),
+                    "cursor-not-allowed": !!enrollmentInProgress()
                   }}
                 />
                 <span
                   class="text-darkSlate-50 transition ease-in-out select-none"
                   classList={{
-                    "cursor-not-allowed": !!enrollmentInProgress(),
+                    "cursor-not-allowed": !!enrollmentInProgress()
                   }}
                 >
                   <p
                     class="m-0"
                     classList={{
                       "text-darkSlate-500": !!enrollmentInProgress(),
-                      "group-hover:text-white": !enrollmentInProgress(),
+                      "group-hover:text-white": !enrollmentInProgress()
                     }}
                     onClick={() => {
                       if (!loadingAuthorization()) {
@@ -606,7 +606,7 @@ export const AccountsDropdown = (props: Props) => {
                     <Trans
                       key="add_account"
                       options={{
-                        defaultValue: "Add Account",
+                        defaultValue: "Add Account"
                       }}
                     />
                   </p>
@@ -671,7 +671,7 @@ export const AccountsDropdown = (props: Props) => {
             class="flex gap-3 py-2 items-center"
             classList={{
               "text-darkSlate-500": !!enrollmentInProgress(),
-              "color-red cursor-pointer": !enrollmentInProgress(),
+              "color-red cursor-pointer": !enrollmentInProgress()
             }}
             onClick={() => {
               if (enrollmentInProgress()) return;
@@ -683,7 +683,7 @@ export const AccountsDropdown = (props: Props) => {
             <Trans
               key="account_log_out"
               options={{
-                defaultValue: "Log out",
+                defaultValue: "Log out"
               }}
             />
           </div>

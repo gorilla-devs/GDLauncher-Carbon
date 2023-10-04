@@ -14,7 +14,7 @@ const ManualStep = (props: StepsProps) => {
                 key="java.select_java_zip"
                 options={{
                   defaultValue: "Select java {{version}} zip",
-                  version: 8,
+                  version: 8
                 }}
               />
             </p>
@@ -25,7 +25,7 @@ const ManualStep = (props: StepsProps) => {
             key="java.select_required_java_text"
             options={{
               defaultValue:
-                "Select the required paths to java. Java 8 is used for all the versions < 1.17",
+                "Select the required paths to java. Java 8 is used for all the versions < 1.17"
             }}
           />
         </p>
@@ -42,7 +42,7 @@ const ManualStep = (props: StepsProps) => {
             <Trans
               key="java.step_back"
               options={{
-                defaultValue: "Back",
+                defaultValue: "Back"
               }}
             />
           </Button>
@@ -57,7 +57,7 @@ const ManualStep = (props: StepsProps) => {
             <Trans
               key="java.setup"
               options={{
-                defaultValue: "Setup",
+                defaultValue: "Setup"
               }}
             />
           </Button>

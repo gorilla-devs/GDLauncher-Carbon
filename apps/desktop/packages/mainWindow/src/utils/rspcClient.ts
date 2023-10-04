@@ -3,7 +3,7 @@ import {
   createClient,
   wsLink,
   createWSClient,
-  Unsubscribable,
+  Unsubscribable
 } from "@rspc/client";
 import { createSolidQueryHooks } from "@rspc/solid";
 import type { Procedures } from "@gd/core_module";
@@ -12,9 +12,9 @@ export const rspc = createSolidQueryHooks<Procedures>();
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false, // default: true
-    },
-  },
+      refetchOnWindowFocus: false // default: true
+    }
+  }
 });
 
 export let port: number | null = null;
@@ -22,15 +22,15 @@ export let port: number | null = null;
 export default function initRspc(_port: number) {
   port = _port;
   const wsClient = createWSClient({
-    url: `ws://localhost:${_port}/rspc/ws`,
+    url: `ws://localhost:${_port}/rspc/ws`
   });
 
   const client = createClient<Procedures>({
     links: [
       wsLink({
-        client: wsClient,
-      }),
-    ],
+        client: wsClient
+      })
+    ]
   });
 
   const createInvalidateQuery = () => {
@@ -46,7 +46,7 @@ export default function initRspc(_port: number) {
               key.concat(invalidateOperation.args);
             }
             context.queryClient.invalidateQueries(key);
-          },
+          }
         });
       }
     }
@@ -67,6 +67,6 @@ export default function initRspc(_port: number) {
 
   return {
     client,
-    createInvalidateQuery,
+    createInvalidateQuery
   };
 }

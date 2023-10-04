@@ -8,7 +8,7 @@ export default function NotFound() {
           <Trans
             key="404_message"
             options={{
-              defaultValue: "404: Not Found",
+              defaultValue: "404: Not Found"
             }}
           />
         </h1>
@@ -16,7 +16,7 @@ export default function NotFound() {
           <Trans
             key="its_gone"
             options={{
-              defaultValue: "It's gone 😞",
+              defaultValue: "It's gone 😞"
             }}
           />
         </p>

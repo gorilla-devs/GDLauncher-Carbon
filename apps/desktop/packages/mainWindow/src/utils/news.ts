@@ -64,7 +64,7 @@ export const initNews = async () => {
         title: newsEntry.title,
         description: newsEntry.text,
         image: `${MOJANG_API}${newsEntry.newsPageImage.url}`,
-        url: newsEntry.readMoreLink,
+        url: newsEntry.readMoreLink
       })) || [];
 
     return newsArr.splice(0, 20);

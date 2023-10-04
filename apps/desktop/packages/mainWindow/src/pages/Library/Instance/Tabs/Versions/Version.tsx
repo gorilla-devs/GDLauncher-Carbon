@@ -27,7 +27,7 @@ const Active = () => {
       <Trans
         key="instance.active_version"
         options={{
-          defaultValue: "Active",
+          defaultValue: "Active"
         }}
       />
       <div class="text-green-500 text-2xl i-ri:check-fill" />
@@ -68,7 +68,7 @@ const Version = (props: Props) => {
             <Trans
               key="instance.switch_version"
               options={{
-                defaultValue: "Switch Version",
+                defaultValue: "Switch Version"
               }}
             />
             <div class="text-darkSlate-300 text-2xl i-ri:download-2-line group-hover:text-darkSlate-100" />
