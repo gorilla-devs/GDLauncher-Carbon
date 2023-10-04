@@ -1,4 +1,5 @@
 import { app, ipcMain } from "electron";
+import fss from "fs";
 import path from "path";
 import fs from "fs/promises";
 import fse from "fs-extra";
@@ -7,7 +8,39 @@ import os from "os";
 export const RUNTIME_PATH_DIR_NAME = "gdlauncher_carbon";
 export const RUNTIME_PATH_OVERRIDE_NAME = "runtime_path_override";
 
+let INITIAL_RUNTIME_PATH_OVERRIDE: string | null = null;
+
+export function initRTPath(override: string | null | undefined) {
+  if (override) {
+    INITIAL_RUNTIME_PATH_OVERRIDE = override;
+    setCurrentRTPath(override);
+    return;
+  }
+
+  const initialRTPath = getInitialRTPath();
+
+  const runtimeOverridePath = path.join(
+    initialRTPath,
+    RUNTIME_PATH_OVERRIDE_NAME
+  );
+
+  let file_override: string | null = null;
+  try {
+    const tmp_path = fss.readFileSync(runtimeOverridePath).toString();
+    fse.ensureDirSync(tmp_path);
+    file_override = tmp_path;
+  } catch {}
+
+  setCurrentRTPath(file_override || initialRTPath);
+}
+
 export function getInitialRTPath() {
+  if (import.meta.env.RUNTIME_PATH) {
+    return import.meta.env.RUNTIME_PATH;
+  } else if (INITIAL_RUNTIME_PATH_OVERRIDE) {
+    return INITIAL_RUNTIME_PATH_OVERRIDE;
+  }
+
   let runtimePath = null;
 
   if (os.platform() !== "linux") {

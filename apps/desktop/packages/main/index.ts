@@ -109,10 +109,10 @@ async function createWindow() {
     }
   });
 
-  win.webContents.on('render-process-gone', (event, detailed) => {
-    console.log('render-process-gone', detailed);
-    if (detailed.reason === 'crashed') {
-      win.webContents.reload();
+  win.webContents.on("render-process-gone", (event, detailed) => {
+    console.log("render-process-gone", detailed);
+    if (detailed.reason === "crashed") {
+      win?.webContents.reload();
     }
   });
 
