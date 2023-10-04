@@ -134,6 +134,30 @@ impl ManagerRef<'_, MinecraftManager> {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct UpdateValue<T: Copy + Clone + Eq>(pub T);
+
+impl<T: Copy + Clone + Eq> UpdateValue<T> {
+    pub fn new(value: T) -> Self {
+        Self(value)
+    }
+
+    pub fn set(&mut self, value: T) {
+        self.0 = value;
+    }
+
+    pub fn get(&self) -> &T {
+        &self.0
+    }
+
+    pub fn update_from(&mut self, from: &Self, update_callback: impl FnOnce(T)) {
+        if self.0 != from.0 {
+            self.0 = from.0;
+            update_callback(self.0);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
