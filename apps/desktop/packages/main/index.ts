@@ -13,7 +13,7 @@ import {
   session,
   shell
 } from "electron";
-import os, { release } from "os";
+import os, { platform, release } from "os";
 import { join, resolve } from "path";
 import "./cli"; // THIS MUST BE BEFORE "coreModule" IMPORT!
 import coreModule from "./coreModule";
@@ -29,7 +29,9 @@ if ((app as any).overwolf) {
 }
 
 // Disable GPU Acceleration for Windows 7
-if (release().startsWith("6.1")) app.disableHardwareAcceleration();
+if (release().startsWith("6.1") && platform() === "win32") {
+  app.disableHardwareAcceleration();
+}
 
 // Set application name for Windows 10+ notifications
 if (process.platform === "win32") app.setAppUserModelId(app.getName());

@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs/promises";
 import fse from "fs-extra";
 import os from "os";
+import coreModule from "./coreModule";
 
 export const RUNTIME_PATH_DIR_NAME = "gdlauncher_carbon";
 export const RUNTIME_PATH_OVERRIDE_NAME = "runtime_path_override";
@@ -105,18 +106,14 @@ ipcMain.handle("changeRuntimePath", async (_, _newPath: string | null) => {
 
   await fs.writeFile(runtimeOverridePath, newPath);
 
-  const files = await fs.readdir(currentRTPath);
-  for (const file of files) {
-    if (file === RUNTIME_PATH_OVERRIDE_NAME) {
-      continue;
-    }
-
-    try {
-      await fse.remove(path.join(currentRTPath, file));
-    } catch (err) {
-      console.error(`[RUNTIME] Error unlinking file: ${err}`);
-    }
+  try {
+    let _coreModule = await coreModule;
+    _coreModule.kill();
+  } catch {
+    // No op
   }
+
+  await fse.remove(path.join(currentRTPath, "data"));
 
   app.relaunch();
 });
