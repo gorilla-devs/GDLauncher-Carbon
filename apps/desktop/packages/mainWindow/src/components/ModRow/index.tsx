@@ -4,7 +4,7 @@ import { rspc } from "@/utils/rspcClient";
 import {
   CFFEFileIndex,
   MRFEVersion,
-  MRFEVersionsResponse,
+  MRFEVersionsResponse
 } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Popover, Spinner, createNotification } from "@gd/ui";
@@ -19,7 +19,7 @@ import {
   createSignal,
   mergeProps,
   onCleanup,
-  onMount,
+  onMount
 } from "solid-js";
 import OverviewPopover from "../OverviewPopover";
 import {
@@ -31,7 +31,7 @@ import {
   getName,
   getProjectId,
   getSummary,
-  isCurseForgeData,
+  isCurseForgeData
 } from "@/utils/mods";
 import Categories from "./Categories";
 import Authors from "./Authors";
@@ -53,7 +53,7 @@ const ModRow = (props: ModRowProps) => {
       // eslint-disable-next-line solid/reactivity
       const task = rspc.createQuery(() => [
         "vtask.getTask",
-        taskId() as number,
+        taskId() as number
       ]);
 
       const isDowloaded = () =>
@@ -85,7 +85,7 @@ const ModRow = (props: ModRowProps) => {
       onSettled() {
         setLoading(false);
         navigate(`/library`);
-      },
+      }
     }
   );
 
@@ -104,7 +104,7 @@ const ModRow = (props: ModRowProps) => {
       onError() {
         setLoading(false);
         addNotification("Error while downloading the modpack.", "error");
-      },
+      }
     }
   );
 
@@ -138,7 +138,7 @@ const ModRow = (props: ModRowProps) => {
     },
     onSuccess(taskId) {
       setTaskId(taskId);
-    },
+    }
   });
 
   const isModInstalled = () =>
@@ -158,7 +158,7 @@ const ModRow = (props: ModRowProps) => {
     ) {
       const modrinthProjectVersions = rspc.createQuery(() => [
         "modplatforms.modrinth.getProjectVersions",
-        getProjectId(props) as string,
+        getProjectId(props) as string
       ]);
       if (modrinthProjectVersions) setModVersions(modrinthProjectVersions);
     }
@@ -214,7 +214,7 @@ const ModRow = (props: ModRowProps) => {
               onClick={() => handleExplore()}
               classList={{
                 "max-w-140": !isRowSmall(),
-                "max-w-90": isRowSmall(),
+                "max-w-90": isRowSmall()
               }}
             >
               {getName(props)}
@@ -259,7 +259,7 @@ const ModRow = (props: ModRowProps) => {
       // eslint-disable-next-line solid/reactivity
       const modrinthVersions = rspc.createQuery(() => [
         "modplatforms.modrinth.getProjectVersions",
-        currentProjectId() as string,
+        currentProjectId() as string
       ]);
       const lastVersion = modrinthVersions.data?.[0];
 
@@ -275,8 +275,8 @@ const ModRow = (props: ModRowProps) => {
           notes: "",
           name: getName(props),
           version: {
-            Modpack: modpack,
-          },
+            Modpack: modpack
+          }
         });
       }
     }
@@ -290,14 +290,14 @@ const ModRow = (props: ModRowProps) => {
       ? {
           Curseforge: {
             file_id: (fileId as number) || props.data.curseforge.mainFileId,
-            project_id: (projectId as number) || props.data.curseforge.id,
-          },
+            project_id: (projectId as number) || props.data.curseforge.id
+          }
         }
       : {
           Modrinth: {
             project_id: projectId?.toString() || props.data.modrinth.project_id,
-            version_id: fileId?.toString() as string,
-          },
+            version_id: fileId?.toString() as string
+          }
         };
   };
 
@@ -369,8 +369,8 @@ const ModRow = (props: ModRowProps) => {
                                 notes: "",
                                 name: getName(props),
                                 version: {
-                                  Modpack: instanceCreationObj(),
-                                },
+                                  Modpack: instanceCreationObj()
+                                }
                               });
                             }
                           }}
@@ -420,7 +420,7 @@ const ModRow = (props: ModRowProps) => {
                                     fileId,
                                     getProjectId(props)
                                   ),
-                                  instance_id: instanceId() as number,
+                                  instance_id: instanceId() as number
                                 });
                               }
                             }}
@@ -433,7 +433,7 @@ const ModRow = (props: ModRowProps) => {
                                     val.key,
                                     getProjectId(props)
                                   ),
-                                  instance_id: instanceId() as number,
+                                  instance_id: instanceId() as number
                                 });
                               }
                             }}

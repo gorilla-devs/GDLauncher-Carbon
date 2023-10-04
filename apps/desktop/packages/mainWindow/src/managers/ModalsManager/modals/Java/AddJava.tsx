@@ -8,7 +8,7 @@ import {
   FEManagedJavaArch,
   FEManagedJavaOs,
   FEManagedJavaVersion,
-  FEVendor,
+  FEVendor
 } from "@gd/core_module/bindings";
 import { hasKey } from "@/utils/helpers";
 
@@ -19,7 +19,7 @@ type mappedOS = {
 const osMappedNames: mappedOS = {
   win32: "windows",
   darwin: "macOs",
-  linux: "linux",
+  linux: "linux"
 };
 
 const AddJava = (props: ModalProps) => {
@@ -41,7 +41,7 @@ const AddJava = (props: ModalProps) => {
   // eslint-disable-next-line solid/reactivity
   let versionsByVendor = rspc.createQuery(() => [
     "java.getManagedVersionsByVendor",
-    vendor(),
+    vendor()
   ]);
 
   let addJavaMutation = rspc.createMutation(["java.setupManagedJava"], {
@@ -54,14 +54,14 @@ const AddJava = (props: ModalProps) => {
     onSettled() {
       modalsContext?.closeModal();
       setLoading(false);
-    },
+    }
   });
 
   onMount(() => {
     window.getCurrentOS().then((currentOs) => {
       setCurrentOs({
         platform: osMappedNames[currentOs.platform],
-        arch: currentOs.arch as FEManagedJavaArch,
+        arch: currentOs.arch as FEManagedJavaArch
       });
     });
   });
@@ -80,13 +80,13 @@ const AddJava = (props: ModalProps) => {
   const mappedJavaVersions = () =>
     javaVersions()?.map((versions) => ({
       key: versions.id as string,
-      label: versions.name as string,
+      label: versions.name as string
     })) || [];
 
   const mappedVendors = () =>
     javaVendors?.data?.map((vendors) => ({
       key: vendors as string,
-      label: vendors as string,
+      label: vendors as string
     })) || [];
 
   return (
@@ -99,7 +99,7 @@ const AddJava = (props: ModalProps) => {
                 <Trans
                   key="java.java_vendors"
                   options={{
-                    defaultValue: "Vendors",
+                    defaultValue: "Vendors"
                   }}
                 />
               </h5>
@@ -118,7 +118,7 @@ const AddJava = (props: ModalProps) => {
                 <Trans
                   key="java.java_major"
                   options={{
-                    defaultValue: "Java Major",
+                    defaultValue: "Java Major"
                   }}
                 />
               </h5>
@@ -141,7 +141,7 @@ const AddJava = (props: ModalProps) => {
                 <Trans
                   key="java.no_available_javas"
                   options={{
-                    defaultValue: "No java available for this vendor",
+                    defaultValue: "No java available for this vendor"
                   }}
                 />
               </Show>
@@ -160,7 +160,7 @@ const AddJava = (props: ModalProps) => {
                     arch: currentOs().arch as FEManagedJavaArch,
                     os: currentOs().platform as FEManagedJavaOs,
                     id,
-                    vendor: vend,
+                    vendor: vend
                   });
                 }
               }}
@@ -168,7 +168,7 @@ const AddJava = (props: ModalProps) => {
               <Trans
                 key="java.install"
                 options={{
-                  defaultValue: "Install",
+                  defaultValue: "Install"
                 }}
               />
             </Button>

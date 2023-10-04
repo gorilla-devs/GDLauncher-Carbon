@@ -19,7 +19,7 @@ const loadCoreModule: CoreModule = () =>
     if (isDev) {
       resolve({
         port: 4650,
-        kill: () => {},
+        kill: () => {}
       });
       return;
     }
@@ -43,8 +43,8 @@ const loadCoreModule: CoreModule = () =>
           stdio: "pipe",
           env: {
             ...process.env,
-            RUST_BACKTRACE: "full",
-          },
+            RUST_BACKTRACE: "full"
+          }
         }
       );
     } catch (err) {
@@ -67,7 +67,7 @@ const loadCoreModule: CoreModule = () =>
           console.log(`[CORE] Port: ${port}`);
           resolve({
             port,
-            kill: () => coreModule?.kill(),
+            kill: () => coreModule?.kill()
           });
         }
       }
@@ -87,7 +87,7 @@ const loadCoreModule: CoreModule = () =>
 
       resolve({
         port: 0,
-        kill: () => coreModule?.kill(),
+        kill: () => coreModule?.kill()
       });
     });
   });

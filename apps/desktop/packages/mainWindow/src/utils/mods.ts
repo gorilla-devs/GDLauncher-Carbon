@@ -4,7 +4,7 @@ import {
   MRFEVersion,
   FEUnifiedSearchResult,
   MRFECategoriesResponse,
-  Mod,
+  Mod
 } from "@gd/core_module/bindings";
 import { MODRNITH_WEBSITE_MODPACKS } from "./constants";
 import useModpacksQuery from "@/pages/Modpacks/useModsQuery";
@@ -20,7 +20,7 @@ export const [modpacksQuery, setModpacksQuery] = useModpacksQuery({
   sortOrder: "descending",
   index: 0,
   pageSize: 40,
-  searchApi: "curseforge",
+  searchApi: "curseforge"
 });
 
 export const [modsQuery, setModsQuery] = useModsQuery({
@@ -33,7 +33,7 @@ export const [modsQuery, setModsQuery] = useModsQuery({
   sortIndex: { curseForge: "featured" },
   sortOrder: "descending",
   index: 0,
-  pageSize: 20,
+  pageSize: 20
 });
 
 type BaseProps = {

@@ -1,6 +1,6 @@
 import {
   CreateInfiniteQueryResult,
-  createInfiniteQuery,
+  createInfiniteQuery
 } from "@tanstack/solid-query";
 import {
   Accessor,
@@ -10,12 +10,12 @@ import {
   createSignal,
   mergeProps,
   onMount,
-  useContext,
+  useContext
 } from "solid-js";
 import {
   FEUnifiedSearchParameters,
   FEUnifiedSearchResult,
-  FEUnifiedSearchType,
+  FEUnifiedSearchType
 } from "@gd/core_module/bindings";
 import { createVirtualizer } from "@tanstack/solid-virtual";
 import { rspc } from "@/utils/rspcClient";
@@ -24,7 +24,7 @@ import {
   modpacksQuery,
   modsQuery,
   setModpacksQuery,
-  setModsQuery,
+  setModsQuery
 } from "@/utils/mods";
 
 type InfiniteQueryType = {
@@ -72,7 +72,7 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
       const setQuery = getQueryFunction();
 
       setQuery({
-        index: ctx.pageParam + (query().pageSize || 20) + 1,
+        index: ctx.pageParam + (query().pageSize || 20) + 1
       });
       return rspcContext.client.query(["modplatforms.unifiedSearch", query()]);
     },
@@ -82,7 +82,7 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
       const pageSize = query().pageSize || 20;
       const hasNextPage = index + pageSize < totalCount;
       return hasNextPage && index;
-    },
+    }
   });
 
   const allRows = () =>
@@ -96,7 +96,7 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
     },
     getScrollElement: () => parentRef(),
     estimateSize: () => 150,
-    overscan: 15,
+    overscan: 15
   });
 
   onMount(() => {
@@ -143,7 +143,7 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
     resetList,
     allRows,
     setInstanceId,
-    instanceId,
+    instanceId
   };
 
   return (

@@ -82,7 +82,7 @@ const TermsAndConditions = (props: Props) => {
                     class="cursor-pointer underline text-lightSlate-400"
                     onClick={() => {
                       modalsContext?.openModal({
-                        name: "termsAndConditions",
+                        name: "termsAndConditions"
                       });
                     }}
                   >
@@ -93,7 +93,7 @@ const TermsAndConditions = (props: Props) => {
                     class="underline text-lightSlate-400 cursor-pointer"
                     onClick={() => {
                       modalsContext?.openModal({
-                        name: "privacyStatement",
+                        name: "privacyStatement"
                       });
                     }}
                   >
@@ -122,7 +122,7 @@ const TermsAndConditions = (props: Props) => {
                 try {
                   const res = await settingsMutation.mutateAsync({
                     termsAndPrivacyAccepted: true,
-                    metricsEnabled: acceptedMetrics(),
+                    metricsEnabled: acceptedMetrics()
                   });
 
                   console.log(res);

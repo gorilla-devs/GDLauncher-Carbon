@@ -19,7 +19,7 @@ const NoVersions = () => {
             key="modpack.no_versions_text"
             options={{
               defaultValue:
-                "At the moment this modpack does not contain any other versions",
+                "At the moment this modpack does not contain any other versions"
             }}
           />
         </p>
@@ -27,7 +27,7 @@ const NoVersions = () => {
           <Trans
             key="modpack.no_versions"
             options={{
-              defaultValue: "No versions",
+              defaultValue: "No versions"
             }}
           />
         </Button>
@@ -51,8 +51,8 @@ const Versions = () => {
     const instanceDetails = rspc.createQuery(() => [
       "modplatforms.curseforge.getMod",
       {
-        modId: modId() as number,
-      },
+        modId: modId() as number
+      }
     ]);
 
     createEffect(() => {

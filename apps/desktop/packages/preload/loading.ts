@@ -12,7 +12,7 @@ function useLoading() {
       } else {
         oDiv.innerHTML = `<div>${error}</div>`;
       }
-    },
+    }
   };
 }
 

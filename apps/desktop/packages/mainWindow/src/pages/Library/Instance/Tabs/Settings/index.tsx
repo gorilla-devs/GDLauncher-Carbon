@@ -18,7 +18,7 @@ const Settings = () => {
     {
       onMutate: (newData) => {
         queryClient.setQueryData(["instance.getInstanceDetails"], newData);
-      },
+      }
     }
   );
 
@@ -48,9 +48,9 @@ const Settings = () => {
                     Set: e.target.checked
                       ? {
                           max_mb: Math.round(mbTotalRAM() / 2),
-                          min_mb: Math.round(mbTotalRAM() / 2),
+                          min_mb: Math.round(mbTotalRAM() / 2)
                         }
-                      : null,
+                      : null
                   },
                   extra_java_args: null,
                   global_java_args: null,
@@ -59,7 +59,7 @@ const Settings = () => {
                   notes: null,
                   use_loaded_icon: null,
                   version: null,
-                  instance: parseInt(params.id, 10),
+                  instance: parseInt(params.id, 10)
                 });
               }}
             />
@@ -86,7 +86,7 @@ const Settings = () => {
                     if (!oldData) return;
                     oldData.memory = {
                       max_mb: val,
-                      min_mb: val,
+                      min_mb: val
                     };
                     return oldData;
                   }
@@ -109,7 +109,7 @@ const Settings = () => {
                   notes: null,
                   use_loaded_icon: null,
                   version: null,
-                  instance: parseInt(params.id, 10),
+                  instance: parseInt(params.id, 10)
                 });
               }}
             />
@@ -137,7 +137,7 @@ const Settings = () => {
                 notes: null,
                 use_loaded_icon: null,
                 version: null,
-                instance: parseInt(params.id, 10),
+                instance: parseInt(params.id, 10)
               });
             }}
           />
@@ -166,7 +166,7 @@ const Settings = () => {
                   notes: null,
                   use_loaded_icon: null,
                   version: null,
-                  instance: parseInt(params.id, 10),
+                  instance: parseInt(params.id, 10)
                 });
               }}
             />
@@ -194,7 +194,7 @@ const Settings = () => {
                   notes: null,
                   use_loaded_icon: null,
                   version: null,
-                  instance: parseInt(params.id, 10),
+                  instance: parseInt(params.id, 10)
                 });
               }}
             />
@@ -213,7 +213,7 @@ const Settings = () => {
                   notes: null,
                   use_loaded_icon: null,
                   version: null,
-                  instance: parseInt(params.id, 10),
+                  instance: parseInt(params.id, 10)
                 });
               }}
             >
@@ -234,7 +234,7 @@ const Settings = () => {
                   notes: null,
                   use_loaded_icon: null,
                   version: null,
-                  instance: parseInt(params.id, 10),
+                  instance: parseInt(params.id, 10)
                 });
               }}
             >

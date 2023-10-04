@@ -30,7 +30,7 @@ const RiveAppWrapper = (props: Props) => {
           if ((state.data as string[])[0] === "") {
             props?.onStop?.();
           }
-        },
+        }
       });
     }
   });
@@ -48,7 +48,7 @@ const RiveAppWrapper = (props: Props) => {
       height={props.height || 600}
       style={{
         width: `${props.width || 600}px`,
-        height: `${props.height || 600}px`,
+        height: `${props.height || 600}px`
       }}
     />
   );

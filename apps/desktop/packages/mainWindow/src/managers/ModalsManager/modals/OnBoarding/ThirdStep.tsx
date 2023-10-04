@@ -18,11 +18,11 @@ const ThirdStep = (props: Props) => {
 
   const instances = rspc.createQuery(() => [
     "instance.getImportableInstances",
-    legacyGDLauncherEntity,
+    legacyGDLauncherEntity
   ]);
 
   const scanImportableInstancesMutation = rspc.createMutation([
-    "instance.scanImportableInstances",
+    "instance.scanImportableInstances"
   ]);
 
   createEffect(() => {
@@ -43,12 +43,12 @@ const ThirdStep = (props: Props) => {
             />
           </div>
           <div class="flex flex-col mt-10">
-            <p class="text-left text-darkSlate-50 leading-6 mb-8">
+            <p class="text-left text-darkSlate-50 mb-8 leading-6">
               <Trans
                 key="onboarding.import_instance_text"
                 options={{
                   defaultValue:
-                    "To start enjoying your favorite game you will need to create an instance. You can do this by selecting one of the modpacks available or by importing a zip or an instance from another launcher on your computer",
+                    "To start enjoying your favorite game you will need to create an instance. You can do this by selecting one of the modpacks available or by importing a zip or an instance from another launcher on your computer"
                 }}
               />
             </p>
@@ -61,14 +61,14 @@ const ThirdStep = (props: Props) => {
                 modalsContext?.closeModal();
                 modalsContext?.openModal({
                   name: "instanceCreation",
-                  url: "/modpacks",
+                  url: "/modpacks"
                 });
               }}
             >
               <Trans
                 key="onboarding.add_instance"
                 options={{
-                  defaultValue: "+ Add Instance",
+                  defaultValue: "+ Add Instance"
                 }}
               />
             </Button>
@@ -88,7 +88,7 @@ const ThirdStep = (props: Props) => {
   };
 
   return (
-    <div class="flex flex-col items-center justify-between w-120 h-120 lg:w-160 h-full box-border">
+    <div class="flex flex-col items-center justify-between w-120 lg:w-160 h-full box-border h-120">
       <Switch>
         <Match when={instances.data && instances.data?.length > 0}>
           <div class="mt-10 h-full max-w-full">

@@ -2,7 +2,7 @@ import {
   AccountEntry,
   DeviceCode,
   EnrollmentError,
-  EnrollmentStatus,
+  EnrollmentStatus
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import { CreateQueryResult } from "@tanstack/solid-query";

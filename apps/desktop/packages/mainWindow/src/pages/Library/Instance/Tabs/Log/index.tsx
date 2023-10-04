@@ -11,7 +11,7 @@ import {
   createResource,
   createSignal,
   onCleanup,
-  onMount,
+  onMount
 } from "solid-js";
 import fetchData from "../../instance.logs.data";
 import { getRunningState } from "@/utils/instances";
@@ -192,7 +192,7 @@ const Logs = () => {
                 <Trans
                   key="logs.no_logs"
                   options={{
-                    defaultValue: "No logs",
+                    defaultValue: "No logs"
                   }}
                 />
               </p>

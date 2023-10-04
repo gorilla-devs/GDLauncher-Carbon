@@ -6,7 +6,7 @@ const fetchData = ({ params }) => {
 
   const instanceDetails = rspc.createQuery(() => [
     "instance.getInstanceDetails",
-    parseInt(params.id, 10),
+    parseInt(params.id, 10)
   ]);
 
   return { logs, instanceDetails };

@@ -13,7 +13,7 @@ const Auth = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const accountEnrollCancelMutation = rspc.createMutation([
-    "account.enroll.cancel",
+    "account.enroll.cancel"
   ]);
 
   const accountEnrollBeginMutation = rspc.createMutation(
@@ -21,7 +21,7 @@ const Auth = () => {
     {
       onError() {
         retryLogin();
-      },
+      }
     }
   );
 
@@ -64,7 +64,7 @@ const Auth = () => {
         <Trans
           key="login.sign_in_with_microsoft"
           options={{
-            defaultValue: "Sign in with Microsoft",
+            defaultValue: "Sign in with Microsoft"
           }}
         />
       </Button>
@@ -73,7 +73,7 @@ const Auth = () => {
           key="login.sign_in_with_microsoft_text"
           options={{
             defaultValue:
-              "Sign in with your Microsoft Account. By doing so, you accept all our policies and terms stated below.",
+              "Sign in with your Microsoft Account. By doing so, you accept all our policies and terms stated below."
           }}
         />
       </p>

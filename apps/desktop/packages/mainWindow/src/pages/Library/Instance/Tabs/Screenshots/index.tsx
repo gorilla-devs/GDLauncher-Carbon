@@ -14,28 +14,28 @@ type ScreenshotsType = {
 const screenshots: ScreenshotsType[] = [
   {
     img: screenshot1,
-    date: "2023-01-31T09:20:53.513Z",
+    date: "2023-01-31T09:20:53.513Z"
   },
   {
     img: screenshot1,
-    date: "2023-01-31T09:20:53.513Z",
+    date: "2023-01-31T09:20:53.513Z"
   },
   {
     img: screenshot1,
-    date: "2023-01-28T09:20:53.513Z",
+    date: "2023-01-28T09:20:53.513Z"
   },
   {
     img: screenshot1,
-    date: "2023-01-29T09:20:53.513Z",
+    date: "2023-01-29T09:20:53.513Z"
   },
   {
     img: screenshot1,
-    date: "2023-01-30T09:20:53.513Z",
+    date: "2023-01-30T09:20:53.513Z"
   },
   {
     img: screenshot1,
-    date: "2023-01-29T09:20:53.513Z",
-  },
+    date: "2023-01-29T09:20:53.513Z"
+  }
 ];
 
 const NoMods = () => {
@@ -48,7 +48,7 @@ const NoMods = () => {
             key="instance.no_screenshots_text"
             options={{
               defaultValue:
-                "You don't have any screenshots related to this modpack at the moment, to take a screenshot press the print screen key during the game",
+                "You don't have any screenshots related to this modpack at the moment, to take a screenshot press the print screen key during the game"
             }}
           />
         </p>
@@ -79,7 +79,7 @@ const Screenshots = () => {
       filteredscreenshots.push({
         ...screenshot,
         timestamp: fileBirthdate,
-        days,
+        days
       });
     });
     const sortedScreenshots = filteredscreenshots.sort(
@@ -92,7 +92,7 @@ const Screenshots = () => {
       if (hashmapDates.has(screenshot.days)) {
         hashmapDates.set(screenshot.days, [
           ...hashmapDates.get(screenshot.days),
-          screenshot,
+          screenshot
         ]);
       } else {
         hashmapDates.set(screenshot.days, [screenshot]);
@@ -124,7 +124,7 @@ const Screenshots = () => {
               <Trans
                 key="instance.select_all_screenshots"
                 options={{
-                  defaultValue: "Select All",
+                  defaultValue: "Select All"
                 }}
               />
             </div>
@@ -133,7 +133,7 @@ const Screenshots = () => {
               <Trans
                 key="instance.open_screenshots_folder"
                 options={{
-                  defaultValue: "Open folder",
+                  defaultValue: "Open folder"
                 }}
               />
             </div>
@@ -142,7 +142,7 @@ const Screenshots = () => {
               <Trans
                 key="instance.disable_screenshot"
                 options={{
-                  defaultValue: "disable",
+                  defaultValue: "disable"
                 }}
               />
             </div>
@@ -151,7 +151,7 @@ const Screenshots = () => {
               <Trans
                 key="instance.delete_screenshot"
                 options={{
-                  defaultValue: "delete",
+                  defaultValue: "delete"
                 }}
               />
             </div>
@@ -161,7 +161,7 @@ const Screenshots = () => {
             <Trans
               key="instance.screenshots"
               options={{
-                defaultValue: "Screenshots",
+                defaultValue: "Screenshots"
               }}
             />
           </div>

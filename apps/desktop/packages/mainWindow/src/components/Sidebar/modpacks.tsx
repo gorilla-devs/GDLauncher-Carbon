@@ -6,7 +6,7 @@ import {
   CFFECategory,
   MRFECategory,
   FESearchAPI,
-  FEUnifiedModLoaderType,
+  FEUnifiedModLoaderType
 } from "@gd/core_module/bindings";
 import { ModpackPlatforms } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
@@ -18,7 +18,7 @@ import {
   curseforgeCategories,
   getCategoryId,
   modrinthCategories,
-  supportedModloaders,
+  supportedModloaders
 } from "@/utils/sidebar";
 
 const Sidebar = () => {
@@ -47,7 +47,7 @@ const Sidebar = () => {
                 infiniteQuery.setQuery({
                   searchApi: (val as string).toLowerCase() as FESearchAPI,
                   categories: [],
-                  modloaders: null,
+                  modloaders: null
                 });
               }}
               value={capitalize(infiniteQuery?.query?.searchApi)}
@@ -85,13 +85,13 @@ const Sidebar = () => {
                         const newModloaders = checked
                           ? [
                               ...prevModloaders,
-                              modloaderName() as FEUnifiedModLoaderType,
+                              modloaderName() as FEUnifiedModLoaderType
                             ]
                           : filteredModloaders;
 
                         infiniteQuery.setQuery({
                           modloaders:
-                            newModloaders.length === 0 ? null : newModloaders,
+                            newModloaders.length === 0 ? null : newModloaders
                         });
                       }}
                     />
@@ -144,7 +144,7 @@ const Sidebar = () => {
                                 );
 
                             infiniteQuery.setQuery({
-                              categories: newCategories,
+                              categories: newCategories
                             });
                           }}
                         />
