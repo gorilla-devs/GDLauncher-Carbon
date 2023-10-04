@@ -109,6 +109,13 @@ async function createWindow() {
     }
   });
 
+  win.webContents.on('render-process-gone', (event, detailed) => {
+    console.log('render-process-gone', detailed);
+    if (detailed.reason === 'crashed') {
+      win.webContents.reload();
+    }
+  });
+
   if (app.isPackaged) {
     win.loadFile(join(__dirname, "../mainWindow/index.html"));
   } else {

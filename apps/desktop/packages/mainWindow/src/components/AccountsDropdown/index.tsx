@@ -386,7 +386,7 @@ export const AccountsDropdown = (props: Props) => {
   });
 
   return (
-    <div class="relative inline-block" id={props.id}>
+    <div class="relative inline-block z-[10001]" id={props.id}>
       <p
         class="mt-0 mb-2 font-bold"
         classList={{
