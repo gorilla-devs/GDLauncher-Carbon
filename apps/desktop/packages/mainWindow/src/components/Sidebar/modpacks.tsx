@@ -4,9 +4,9 @@ import { Checkbox, Collapsable, Radio, Skeleton } from "@gd/ui";
 import { For, Match, Switch } from "solid-js";
 import {
   CFFECategory,
-  MRFECategory,
   FESearchAPI,
-  FEUnifiedModLoaderType
+  FEUnifiedModLoaderType,
+  MRFECategory
 } from "@gd/core_module/bindings";
 import { ModpackPlatforms } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
@@ -14,9 +14,9 @@ import { CategoryIcon, PlatformIcon } from "@/utils/instances";
 import { useTransContext } from "@gd/i18n";
 import { useInfiniteModsQuery } from "../InfiniteScrollModsQueryWrapper";
 import {
-  ModloaderIcon,
   curseforgeCategories,
   getCategoryId,
+  ModloaderIcon,
   modrinthCategories,
   supportedModloaders
 } from "@/utils/sidebar";
@@ -69,8 +69,6 @@ const Sidebar = () => {
           <div class="flex flex-col gap-3">
             <For each={modloaders()}>
               {(modloader) => {
-                const modloaderName = () => capitalize(modloader);
-
                 return (
                   <div class="flex items-center gap-2">
                     <Checkbox
@@ -79,13 +77,13 @@ const Sidebar = () => {
                           infiniteQuery?.query.modloaders || [];
 
                         const filteredModloaders = prevModloaders.filter(
-                          (modloader) => modloader !== modloaderName()
+                          (modloader) => modloader !== modloader
                         );
 
                         const newModloaders = checked
                           ? [
                               ...prevModloaders,
-                              modloaderName() as FEUnifiedModLoaderType
+                              modloader as FEUnifiedModLoaderType
                             ]
                           : filteredModloaders;
 
@@ -96,7 +94,7 @@ const Sidebar = () => {
                       }}
                     />
                     <ModloaderIcon modloader={modloader} />
-                    <p class="m-0">{capitalize(modloaderName())}</p>
+                    <p class="m-0">{capitalize(modloader)}</p>
                   </div>
                 );
               }}
@@ -130,7 +128,7 @@ const Sidebar = () => {
                     return (
                       <div class="flex items-center gap-3">
                         <Checkbox
-                          checked={!!isCategoryIncluded}
+                          checked={isCategoryIncluded}
                           onChange={(checked) => {
                             const prevCategories =
                               infiniteQuery?.query.categories || [];

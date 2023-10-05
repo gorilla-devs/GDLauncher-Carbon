@@ -17,10 +17,12 @@ const Versions = () => {
 
   const isModpack = () => getUrlType(location.pathname) === "modpacks";
 
-  const instanceDetails = rspc.createQuery(() => [
-    "instance.getInstanceDetails",
-    instanceId() as number
-  ]);
+  const instanceDetails = rspc.createQuery(
+    () => ["instance.getInstanceDetails", instanceId() as number],
+    {
+      enabled: !isModpack() && instanceId() !== undefined
+    }
+  );
 
   const modplatform = () => instanceDetails.data?.modloaders[0].type_;
 

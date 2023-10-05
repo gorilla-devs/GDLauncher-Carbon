@@ -3,28 +3,28 @@ import SiderbarWrapper from "./wrapper";
 import { Checkbox, Collapsable, Radio, Skeleton } from "@gd/ui";
 import fetchData from "@/pages/Mods/modsBrowser.data";
 import { useRouteData, useSearchParams } from "@solidjs/router";
-import { For, Match, Show, Switch, createResource } from "solid-js";
+import { createResource, For, Match, Show, Switch } from "solid-js";
 import {
   CFFECategory,
-  MRFECategory,
   FESearchAPI,
-  FEUnifiedModLoaderType
+  FEUnifiedModLoaderType,
+  MRFECategory
 } from "@gd/core_module/bindings";
 import { ModpackPlatforms } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
 import {
   CategoryIcon,
-  PlatformIcon,
   fetchImage,
-  getValideInstance
+  getValideInstance,
+  PlatformIcon
 } from "@/utils/instances";
 import { useTransContext } from "@gd/i18n";
 import { useInfiniteModsQuery } from "../InfiniteScrollModsQueryWrapper";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import {
-  ModloaderIcon,
   curseforgeCategories,
   getCategoryId,
+  ModloaderIcon,
   modrinthCategories,
   supportedModloaders
 } from "@/utils/sidebar";
@@ -65,7 +65,6 @@ const Sidebar = () => {
               <Radio.group
                 onChange={(val) => {
                   infiniteQuery.setInstanceId(val as number);
-                  infiniteQuery.resetList();
                 }}
                 value={instanceId()}
               >
@@ -104,7 +103,6 @@ const Sidebar = () => {
                   searchApi: (val as string).toLowerCase() as FESearchAPI,
                   categories: []
                 });
-                infiniteQuery.resetList();
               }}
               value={capitalize(infiniteQuery?.query?.searchApi)}
             >
@@ -188,7 +186,7 @@ const Sidebar = () => {
                     return (
                       <div class="flex items-center gap-3">
                         <Checkbox
-                          checked={!!isCategoryIncluded}
+                          checked={isCategoryIncluded}
                           onChange={(checked) => {
                             const prevCategories =
                               infiniteQuery?.query.categories || [];

@@ -1,15 +1,16 @@
 import { Trans, useTransContext } from "@gd/i18n";
 import { Dropdown, Input, Skeleton } from "@gd/ui";
 import {
-  For,
-  Match,
-  Show,
-  Switch,
   createEffect,
+  createMemo,
   createResource,
   createSignal,
+  For,
+  Match,
   onCleanup,
-  onMount
+  onMount,
+  Show,
+  Switch
 } from "solid-js";
 import {
   CFFEModSearchSortField,
@@ -17,8 +18,8 @@ import {
   FEUnifiedSearchParameters,
   FEUnifiedSearchResult,
   InstanceDetails,
-  MRFESearchIndex,
-  Mod
+  Mod,
+  MRFESearchIndex
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import { CurseForgeSortFields, ModrinthSortFields } from "@/utils/constants";
@@ -141,15 +142,23 @@ const ModsBrowser = () => {
   const instancePlatform = () =>
     Object.keys(instanceDetails()?.modpack || {})[0]?.toLocaleLowerCase();
 
-  createEffect(() => {
+  createEffect((firstTime: boolean) => {
     const modloaders = instanceModloaders();
     const platform = instancePlatform();
     const _ = instanceId();
+
+    if (firstTime) {
+      return false;
+    }
 
     const newQuery: Partial<FEUnifiedSearchParameters> = {};
 
     if (platform) {
       newQuery["searchApi"] = platform as FESearchAPI;
+    }
+
+    if (instanceDetails()?.version) {
+      newQuery["gameVersions"] = [instanceDetails()?.version!];
     }
 
     if (modloaders) {
@@ -169,7 +178,11 @@ const ModsBrowser = () => {
     }
 
     infiniteQuery.setQuery(newQuery);
-  });
+
+    return false;
+  }, true);
+
+  const hasFiltersData = createMemo(() => Boolean(sortingFields()));
 
   return (
     <div class="box-border h-full w-full relative">
@@ -178,10 +191,10 @@ const ModsBrowser = () => {
         class="flex flex-col bg-darkSlate-800 z-10 px-5 pt-5"
       >
         <Switch>
-          <Match when={infiniteQuery?.isLoading}>
+          <Match when={!hasFiltersData()}>
             <Skeleton.filters />
           </Match>
-          <Match when={!infiniteQuery?.isLoading}>
+          <Match when={hasFiltersData()}>
             <div class="flex flex-col bg-darkSlate-800 top-0 z-10 left-0 right-0 sticky">
               <Show when={instanceDetails()}>
                 <div
@@ -220,7 +233,7 @@ const ModsBrowser = () => {
               </Show>
               <div class="flex items-center justify-between gap-3 flex-wrap pb-4">
                 <Input
-                  placeholder="Type Here"
+                  placeholder={t("mods.search_mods")}
                   icon={<div class="i-ri:search-line" />}
                   class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
                   value={infiniteQuery.query.searchQuery!}

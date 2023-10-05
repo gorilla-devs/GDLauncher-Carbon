@@ -207,6 +207,7 @@
   "ModCacheTaskUpdateQueryApis": "Updating query apis",
   "ModCacheTaskUpdateScanFiles": "Scanning files",
   "ModCacheTaskUpdate": "Updating",
+  "mods.search_mods": "Search mods...",
   "mods.fetching_no_more_mods": "No more mods to load",
   "mods.fetching_mods_text": "Loading mods",
   "mods.fetching_mods_error": "There was an error while fetching mods",

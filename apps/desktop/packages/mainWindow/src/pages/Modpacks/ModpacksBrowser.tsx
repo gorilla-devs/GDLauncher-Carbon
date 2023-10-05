@@ -1,14 +1,15 @@
 import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Dropdown, Input, Skeleton } from "@gd/ui";
 import {
+  createEffect,
+  createMemo,
+  createSignal,
   For,
   Match,
-  Show,
-  Switch,
-  createEffect,
-  createSignal,
   onCleanup,
-  onMount
+  onMount,
+  Show,
+  Switch
 } from "solid-js";
 import {
   CFFEModSearchSortField,
@@ -87,6 +88,10 @@ const ModpackBrowser = () => {
   const sortingFields = () =>
     isCurseforge() ? CurseForgeSortFields : ModrinthSortFields;
 
+  const hasFiltersData = createMemo(
+    () => sortingFields() && mappedMcVersions().length > 0
+  );
+
   return (
     <div class="box-border h-full w-full relative">
       <div
@@ -94,10 +99,10 @@ const ModpackBrowser = () => {
         class="flex flex-col bg-darkSlate-800 z-10 pt-5 px-5"
       >
         <Switch>
-          <Match when={infiniteQuery?.isLoading}>
+          <Match when={!hasFiltersData()}>
             <Skeleton.filters />
           </Match>
-          <Match when={!infiniteQuery?.isLoading}>
+          <Match when={hasFiltersData()}>
             <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
               <Input
                 placeholder="Type Here"
@@ -163,12 +168,7 @@ const ModpackBrowser = () => {
                   });
                 }}
               >
-                <Trans
-                  key="sidebar.plus_add_instance"
-                  options={{
-                    defaultValue: "+ Add Instance"
-                  }}
-                />
+                <Trans key="sidebar.plus_add_instance" />
               </Button>
               <div
                 class="cursor-pointer text-2xl"
@@ -185,18 +185,6 @@ const ModpackBrowser = () => {
                   });
                 }}
               />
-              {/* <Button
-            type="outline"
-            size="medium"
-            icon={<div class="rounded-full text-md i-ri:download-2-fill" />}
-          >
-            <Trans
-              key="instance.import"
-              options={{
-                defaultValue: "Import",
-              }}
-            />
-          </Button> */}
             </div>
           </Match>
         </Switch>

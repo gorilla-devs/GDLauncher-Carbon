@@ -7,31 +7,31 @@ import {
   MRFEVersionsResponse
 } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { Button, Popover, Spinner, createNotification } from "@gd/ui";
+import { Button, createNotification, Popover, Spinner } from "@gd/ui";
 import { RSPCError } from "@rspc/client";
 import { CreateQueryResult } from "@tanstack/solid-query";
 import { formatDistanceToNowStrict } from "date-fns";
 import {
-  Match,
-  Show,
-  Switch,
   createEffect,
   createSignal,
+  Match,
   mergeProps,
   onCleanup,
-  onMount
+  onMount,
+  Show,
+  Switch
 } from "solid-js";
 import OverviewPopover from "../OverviewPopover";
 import {
-  ModProps,
-  ModRowProps,
   getDataCreation,
   getDownloads,
   getLogoUrl,
   getName,
   getProjectId,
   getSummary,
-  isCurseForgeData
+  isCurseForgeData,
+  ModProps,
+  ModRowProps
 } from "@/utils/mods";
 import Categories from "./Categories";
 import Authors from "./Authors";
@@ -47,6 +47,8 @@ const ModRow = (props: ModRowProps) => {
   const [isRowSmall, setIsRowSmall] = createSignal(false);
 
   const [taskId, setTaskId] = createSignal<undefined | number>(undefined);
+
+  // console.log(props);
 
   createEffect(() => {
     if (taskId() !== undefined) {
@@ -401,7 +403,8 @@ const ModRow = (props: ModRowProps) => {
                             loading={loading()}
                             disabled={
                               (modrinthVersions()?.isFetching && !loading()) ||
-                              !instanceId()
+                              !instanceId() ||
+                              !getCurrentMcVersionObj()?.[0]
                             }
                             // options={mappedVersions()}
                             rounded

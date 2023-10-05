@@ -1,15 +1,16 @@
 import {
-  CreateInfiniteQueryResult,
-  createInfiniteQuery
+  createInfiniteQuery,
+  CreateInfiniteQueryResult
 } from "@tanstack/solid-query";
 import {
   Accessor,
-  Setter,
   createContext,
-  createEffect,
+  createMemo,
   createSignal,
   mergeProps,
   onMount,
+  Setter,
+  untrack,
   useContext
 } from "solid-js";
 import {
@@ -34,7 +35,6 @@ type InfiniteQueryType = {
   setQuery: (_newValue: Partial<FEUnifiedSearchParameters>) => void;
   rowVirtualizer: any;
   setParentRef: Setter<HTMLDivElement | undefined>;
-  resetList: () => void;
   allRows: () => FEUnifiedSearchResult[];
   setInstanceId: Setter<number | undefined>;
   instanceId: Accessor<number | undefined>;
@@ -56,13 +56,12 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
   const [parentRef, setParentRef] = createSignal<HTMLDivElement | undefined>(
     undefined
   );
-  const [isLoading, setIsLoading] = createSignal(false);
 
   const mergedProps = mergeProps({ type: "modPack" }, props);
 
   const isModpack = () => mergedProps.type === "modPack";
 
-  const query = () => (isModpack() ? modpacksQuery : modsQuery);
+  const query = createMemo(() => (isModpack() ? modpacksQuery : modsQuery));
   const getQueryFunction = () =>
     isModpack() ? setModpacksQuery : setModsQuery;
 
@@ -72,7 +71,11 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
       const setQuery = getQueryFunction();
 
       setQuery({
-        index: ctx.pageParam + (query().pageSize || 20) + 1
+        index: ctx.pageParam + (query().pageSize || 20)
+      });
+
+      untrack(() => {
+        console.log("Querying", { ...query() });
       });
       return rspcContext.client.query(["modplatforms.unifiedSearch", query()]);
     },
@@ -112,35 +115,17 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
     rowVirtualizer.scrollToIndex(0);
   };
 
-  const resetList = () => {
-    setIsLoading(true);
-    infiniteQuery.remove();
-    infiniteQuery.refetch();
-    rowVirtualizer.scrollToIndex(0);
-  };
-
-  createEffect(() => {
-    if (!infiniteQuery.isLoading) setIsLoading(false);
-  });
-
-  createEffect(() => {
-    if (query()) {
-      resetList();
-    }
-  });
-
   const context = {
     infiniteQuery,
     get query() {
       return query();
     },
     get isLoading() {
-      return isLoading();
+      return infiniteQuery.isLoading;
     },
     setQuery: setQueryWrapper,
     rowVirtualizer,
     setParentRef,
-    resetList,
     allRows,
     setInstanceId,
     instanceId

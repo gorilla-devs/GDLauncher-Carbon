@@ -16,7 +16,7 @@ const useModsQuery = (
     sortIndex: { curseForge: "featured" },
     sortOrder: "descending",
     index: 0,
-    pageSize: 20,
+    pageSize: 40,
     searchApi: "curseforge",
     ...initialValue
   });

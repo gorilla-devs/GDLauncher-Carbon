@@ -164,6 +164,8 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         query UNIFIED_SEARCH[app, search_params: filters::FEUnifiedSearchParameters] {
+            println!("Search called");
+
             match search_params.search_api {
                 FESearchAPI::Curseforge => {
                     let search_params: curseforge::filters::CFFEModSearchParameters = search_params.try_into()?;
