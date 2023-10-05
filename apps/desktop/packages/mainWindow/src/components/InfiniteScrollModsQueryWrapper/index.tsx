@@ -5,10 +5,8 @@ import {
 import {
   Accessor,
   createContext,
-  createMemo,
   createSignal,
   mergeProps,
-  onMount,
   Setter,
   untrack,
   useContext
@@ -27,6 +25,8 @@ import {
   setModpacksQuery,
   setModsQuery
 } from "@/utils/mods";
+import { modpacksDefaultQuery } from "@/pages/Modpacks/useModsQuery";
+import { modsDefaultQuery } from "@/pages/Mods/useModsQuery";
 
 type InfiniteQueryType = {
   infiniteQuery: CreateInfiniteQueryResult<any, unknown>;
@@ -51,6 +51,8 @@ export const useInfiniteModsQuery = () => {
   return useContext(InfiniteQueryContext) as InfiniteQueryType;
 };
 
+const [lastType, setLastType] = createSignal<FEUnifiedSearchType | null>(null);
+
 const InfiniteScrollModsQueryWrapper = (props: Props) => {
   const rspcContext = rspc.useContext();
   const [parentRef, setParentRef] = createSignal<HTMLDivElement | undefined>(
@@ -59,34 +61,44 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
 
   const mergedProps = mergeProps({ type: "modPack" }, props);
 
-  const isModpack = () => mergedProps.type === "modPack";
+  const isModpack = mergedProps.type === "modPack";
 
-  const query = createMemo(() => (isModpack() ? modpacksQuery : modsQuery));
-  const getQueryFunction = () =>
-    isModpack() ? setModpacksQuery : setModsQuery;
+  const query = isModpack ? modpacksQuery : modsQuery;
+  const getQueryFunction = isModpack ? setModpacksQuery : setModsQuery;
+  const defaultQuery = isModpack ? modpacksDefaultQuery : modsDefaultQuery;
 
   const infiniteQuery = createInfiniteQuery({
     queryKey: () => ["modplatforms.unifiedSearch"],
     queryFn: (ctx) => {
-      const setQuery = getQueryFunction();
-
-      setQuery({
-        index: ctx.pageParam + (query().pageSize || 20)
-      });
-
       untrack(() => {
-        console.log("Querying", { ...query() });
+        console.log("Querying", { ...query }, lastType(), mergedProps.type);
       });
-      return rspcContext.client.query(["modplatforms.unifiedSearch", query()]);
+
+      getQueryFunction({
+        index: ctx.pageParam + query.pageSize!
+      });
+
+      return rspcContext.client.query(["modplatforms.unifiedSearch", query]);
     },
     getNextPageParam: (lastPage) => {
       const index = lastPage?.pagination?.index || 0;
       const totalCount = lastPage.pagination?.totalCount || 0;
-      const pageSize = query().pageSize || 20;
+      const pageSize = query.pageSize || 20;
       const hasNextPage = index + pageSize < totalCount;
       return hasNextPage && index;
-    }
+    },
+    enabled: false
   });
+
+  if (lastType() !== mergedProps.type) {
+    infiniteQuery.remove();
+    infiniteQuery.refetch();
+    getQueryFunction(defaultQuery);
+    parentRef()?.scrollTo(0, scrollTop());
+    setLastType(mergedProps.type);
+  } else if (!infiniteQuery.isFetched) {
+    infiniteQuery.refetch();
+  }
 
   const allRows = () =>
     infiniteQuery.data ? infiniteQuery.data.pages.flatMap((d) => d.data) : [];
@@ -102,14 +114,8 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
     overscan: 15
   });
 
-  onMount(() => {
-    parentRef()?.scrollTo(0, scrollTop());
-  });
-
   const setQueryWrapper = (newValue: Partial<FEUnifiedSearchParameters>) => {
-    const setQuery = getQueryFunction();
-
-    setQuery(newValue);
+    getQueryFunction(newValue);
     infiniteQuery.remove();
     infiniteQuery.refetch();
     rowVirtualizer.scrollToIndex(0);
@@ -118,7 +124,7 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
   const context = {
     infiniteQuery,
     get query() {
-      return query();
+      return query;
     },
     get isLoading() {
       return infiniteQuery.isLoading;
