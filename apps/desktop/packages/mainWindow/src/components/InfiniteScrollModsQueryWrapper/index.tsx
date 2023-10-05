@@ -7,6 +7,7 @@ import {
   createContext,
   createSignal,
   mergeProps,
+  onCleanup,
   Setter,
   untrack,
   useContext
@@ -52,6 +53,7 @@ export const useInfiniteModsQuery = () => {
 };
 
 const [lastType, setLastType] = createSignal<FEUnifiedSearchType | null>(null);
+const [lastScrollPosition, setLastScrollPosition] = createSignal<number>(0);
 
 const InfiniteScrollModsQueryWrapper = (props: Props) => {
   const rspcContext = rspc.useContext();
@@ -90,14 +92,30 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
     enabled: false
   });
 
+  // when the user navigates away from the page, get the scroll position
+  function getCurrentScrollPosition() {
+    setLastScrollPosition(parentRef()?.scrollTop || 0);
+  }
+
+  onCleanup(() => {
+    getCurrentScrollPosition();
+  });
+
   if (lastType() !== mergedProps.type) {
     infiniteQuery.remove();
     infiniteQuery.refetch();
     getQueryFunction(defaultQuery);
     parentRef()?.scrollTo(0, scrollTop());
     setLastType(mergedProps.type);
+    setLastScrollPosition(0);
   } else if (!infiniteQuery.isFetched) {
     infiniteQuery.refetch();
+  } else {
+    queueMicrotask(() => {
+      parentRef()?.scrollTo({
+        top: lastScrollPosition()
+      });
+    });
   }
 
   const allRows = () =>
