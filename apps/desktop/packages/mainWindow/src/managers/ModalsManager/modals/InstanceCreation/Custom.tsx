@@ -1,13 +1,13 @@
-import { Button, Checkbox, Dropdown, Input, createNotification } from "@gd/ui";
+import { Button, Checkbox, createNotification, Dropdown, Input } from "@gd/ui";
 import { ModalProps, useModal } from "../..";
 import { Trans, useTransContext } from "@gd/i18n";
-import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
+import { createEffect, createSignal, For, Match, Show, Switch } from "solid-js";
 import { port, rspc } from "@/utils/rspcClient";
 import {
+  CFFEModLoaderType,
   FEModdedManifestLoaderVersion,
   ManifestVersion,
   McType,
-  CFFEModLoaderType,
   ModLoader
 } from "@gd/core_module/bindings";
 import { blobToBase64 } from "@/utils/helpers";
@@ -59,7 +59,6 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     instanceData()?.mcVersion || ""
   );
   const [title, setTitle] = createSignal(instanceData()?.title || "");
-  const [releaseVersionFilter, setReleaseVersionFilter] = createSignal(true);
   const [snapshotVersionFilter, setSnapshotVersionFilter] = createSignal(false);
   const [oldBetaVersionFilter, setOldBetaVersionFilter] = createSignal(false);
   const [oldAlphaVersionFilter, setOldAlphaVersionFilter] = createSignal(false);
@@ -162,7 +161,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
   createEffect(() => {
     const filteredData = mcVersions().filter(
       (item) =>
-        (item.type === "release" && releaseVersionFilter()) ||
+        item.type === "release" ||
         (item.type === "snapshot" && snapshotVersionFilter()) ||
         (item.type === "old_beta" && oldBetaVersionFilter()) ||
         (item.type === "old_alpha" && oldAlphaVersionFilter())
@@ -584,15 +583,6 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 }}
               />
               <div class="flex gap-4 mt-2">
-                <div class="flex gap-2">
-                  <Checkbox
-                    checked={releaseVersionFilter()}
-                    onChange={(e) => setReleaseVersionFilter(e)}
-                  />
-                  <h6 class="m-0 flex items-center">
-                    <Trans key="instance.instance_version_release" />
-                  </h6>
-                </div>
                 <div class="flex gap-2 items-center">
                   <Checkbox
                     checked={snapshotVersionFilter()}

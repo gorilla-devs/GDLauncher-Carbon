@@ -10,7 +10,7 @@ export const modpacksDefaultQuery: FEUnifiedSearchParameters = {
   sortIndex: { curseForge: "featured" },
   sortOrder: "descending",
   index: 0,
-  pageSize: 40,
+  pageSize: 20,
   searchApi: "curseforge"
 };
 
