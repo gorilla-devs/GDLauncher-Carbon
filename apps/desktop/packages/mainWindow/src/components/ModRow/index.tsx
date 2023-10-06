@@ -48,8 +48,6 @@ const ModRow = (props: ModRowProps) => {
 
   const [taskId, setTaskId] = createSignal<undefined | number>(undefined);
 
-  // console.log(props);
-
   createEffect(() => {
     if (taskId() !== undefined) {
       // eslint-disable-next-line solid/reactivity

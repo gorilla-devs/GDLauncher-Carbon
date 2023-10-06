@@ -1,22 +1,22 @@
 import {
+  createEffect,
   createSignal,
   For,
-  Show,
   JSX,
-  createEffect,
   onCleanup,
+  Show,
 } from "solid-js";
 import { Button } from "../Button";
 import { Portal } from "solid-js/web";
 import { useFloating } from "solid-floating-ui";
 import {
-  offset,
-  flip,
-  shift,
   autoUpdate,
+  flip,
   hide,
-  size,
+  offset,
   Placement,
+  shift,
+  size,
 } from "@floating-ui/dom";
 
 type Option = {
@@ -43,6 +43,7 @@ type Props = {
   placement?: "bottom" | "top";
   menuPlacement?: Placement;
 };
+
 interface DropDownButtonProps {
   children: JSX.Element;
   options: Option[];
