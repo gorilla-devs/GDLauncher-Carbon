@@ -1,15 +1,9 @@
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { formatDownloadCount, truncateText } from "@/utils/helpers";
 import { rspc } from "@/utils/rspcClient";
-import {
-  CFFEFileIndex,
-  MRFEVersion,
-  MRFEVersionsResponse
-} from "@gd/core_module/bindings";
+import { CFFEFileIndex, MRFEVersion } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, createNotification, Popover, Spinner } from "@gd/ui";
-import { RSPCError } from "@rspc/client";
-import { CreateQueryResult } from "@tanstack/solid-query";
 import { formatDistanceToNowStrict } from "date-fns";
 import {
   createEffect,
@@ -38,9 +32,6 @@ import Authors from "./Authors";
 
 const ModRow = (props: ModRowProps) => {
   const [loading, setLoading] = createSignal(false);
-  const [modrinthVersions, setModVersions] = createSignal<
-    CreateQueryResult<MRFEVersionsResponse, RSPCError> | undefined
-  >(undefined);
   const [currentProjectId, setCurrentProjectId] = createSignal<
     string | number | undefined
   >(undefined);
@@ -56,11 +47,11 @@ const ModRow = (props: ModRowProps) => {
         taskId() as number
       ]);
 
-      const isDowloaded = () =>
+      const isDownloaded = () =>
         (task.data?.download_total || 0) > 0 &&
         task.data?.download_total === task.data?.downloaded;
 
-      if (isDowloaded()) {
+      if (isDownloaded()) {
         setLoading(false);
         setTaskId(undefined);
       }
@@ -123,11 +114,11 @@ const ModRow = (props: ModRowProps) => {
       return props.data.curseforge.latestFilesIndexes.filter(
         (file) => file.gameVersion === (props as ModProps).mcVersion
       );
-    } else {
-      return (modrinthVersions()?.data || []).filter((version) =>
-        version.game_versions.includes((props as ModProps).mcVersion || "")
-      );
     }
+
+    return props.data.modrinth.versions.filter(
+      (version) => version === (props as ModProps).mcVersion
+    );
   };
 
   const instanceId = () => (props as ModProps)?.instanceId;
@@ -149,22 +140,9 @@ const ModRow = (props: ModRowProps) => {
           : mod.modrinth?.project_id) === getProjectId(props)
     ) !== undefined;
 
-  createEffect(() => {
-    if (
-      getProjectId(props) &&
-      !isCurseForgeData(props.data) &&
-      props.type === "Mod" &&
-      !isModInstalled()
-    ) {
-      const modrinthProjectVersions = rspc.createQuery(() => [
-        "modplatforms.modrinth.getProjectVersions",
-        getProjectId(props) as string
-      ]);
-      if (modrinthProjectVersions) setModVersions(modrinthProjectVersions);
-    }
-  });
+  console.log(props.data);
 
-  let containrRef: HTMLDivElement;
+  let containerRef: HTMLDivElement;
   let resizeObserver: ResizeObserver;
 
   onMount(() => {
@@ -181,7 +159,7 @@ const ModRow = (props: ModRowProps) => {
       });
     });
 
-    resizeObserver.observe(containrRef);
+    resizeObserver.observe(containerRef);
   });
 
   onCleanup(() => {
@@ -222,7 +200,7 @@ const ModRow = (props: ModRowProps) => {
           </Popover>
           <Categories
             modProps={props}
-            isRowSmall={isRowSmall}
+            isRowSmall={isRowSmall()}
             modrinthCategories={props.modrinthCategories?.filter((category) =>
               category.project_type.includes(props.type.toLowerCase())
             )}
@@ -251,37 +229,6 @@ const ModRow = (props: ModRowProps) => {
       </div>
     );
   };
-
-  createEffect(() => {
-    if (props.type !== "Modpack") return;
-    if (!isCurseForgeData(props.data) && currentProjectId()) {
-      setLoading(true);
-      // eslint-disable-next-line solid/reactivity
-      const modrinthVersions = rspc.createQuery(() => [
-        "modplatforms.modrinth.getProjectVersions",
-        currentProjectId() as string
-      ]);
-      const lastVersion = modrinthVersions.data?.[0];
-
-      if (lastVersion) {
-        const modpack = instanceCreationObj(
-          lastVersion.id,
-          lastVersion.project_id
-        );
-
-        createInstanceMutation.mutate({
-          group: props.defaultGroup || 1,
-          use_loaded_icon: true,
-          notes: "",
-          name: getName(props),
-          version: {
-            Modpack: modpack
-          }
-        });
-      }
-    }
-  });
-
   const instanceCreationObj = (
     fileId?: number | string,
     projectId?: number | string
@@ -303,7 +250,7 @@ const ModRow = (props: ModRowProps) => {
 
   return (
     <div
-      ref={(el) => (containrRef = el)}
+      ref={(el) => (containerRef = el)}
       class="flex flex-col gap-4 overflow-hidden relative p-5 bg-darkSlate-700 rounded-2xl box-border h-36"
     >
       <div class="absolute z-10 bg-gradient-to-r from-darkSlate-700 from-50% inset-0" />
@@ -349,9 +296,10 @@ const ModRow = (props: ModRowProps) => {
                         <Button
                           size={isRowSmall() ? "small" : "medium"}
                           disabled={loading()}
-                          rounded
                           onClick={() => {
                             if (props.type !== "Modpack") return;
+                            console.log("clicked modpack", props.data);
+
                             const imgUrl = getLogoUrl(props);
                             if (imgUrl) loadIconMutation.mutate(imgUrl);
 
@@ -400,21 +348,18 @@ const ModRow = (props: ModRowProps) => {
                             size={isRowSmall() ? "small" : "medium"}
                             loading={loading()}
                             disabled={
-                              (modrinthVersions()?.isFetching && !loading()) ||
-                              !instanceId() ||
-                              !getCurrentMcVersionObj()?.[0]
+                              !instanceId() || !getCurrentMcVersionObj()?.[0]
                             }
-                            // options={mappedVersions()}
-                            rounded
-                            // value={mappedVersions()[0]?.key}
                             onClick={() => {
                               if (props.type !== "Mod") return;
+                              console.log("clicked mod", props.data);
+
                               const fileVersion = getCurrentMcVersionObj()?.[0];
 
                               if (fileVersion && instanceId()) {
                                 const fileId = isCurseForgeData(props.data)
                                   ? (fileVersion as CFFEFileIndex).fileId
-                                  : (fileVersion as MRFEVersion).id;
+                                  : (fileVersion as unknown as MRFEVersion).id;
 
                                 installModMutation.mutate({
                                   mod_source: instanceCreationObj(

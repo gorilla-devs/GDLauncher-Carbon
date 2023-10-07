@@ -153,6 +153,9 @@
   "instance.isInQueue": "In queue",
   "instance.mods.search": "Search mod",
   "instance.instance_mc_version": "Minecraft version",
+  "instance.include_snapshot_versions": "Include snapshot versions",
+  "instance.include_old_alpha_versions": "Include old alpha versions",
+  "instance.include_old_beta_versions": "Include old beta versions",
   "mod.downloaded": "Downloaded",
   "java.java_major": "Java Major",
   "java.java_vendors": "Java Distirbution",
@@ -252,16 +255,12 @@
   "app_update.current_version": "Current Version",
   "app_update.available_version": "Available Version",
   "app_update.current_release_channel": "Current Release Channel",
-
   "adbanner.snapshot_title": "GDLauncher Snapshot Release",
   "adbanner.snapshot_text": "This is a GDLauncher snapshot release.\nThis means that it is highly unstable and contains potentially disruptive bugs. It also does not have auto updates.",
-
   "adbanner.beta_title": "GDLauncher Beta Release",
   "adbanner.beta_text": "This is a GDLauncher beta release.\nThis means that it might contain some bugs but it should be mostly stable.",
-
   "adbanner.alpha_title": "GDLauncher Alpha Release",
   "adbanner.alpha_text": "This is a GDLauncher alpha release.\nThis means that it is unstable and contains many bugs.",
-
   "tooltip.undo": "Undo",
   "tooltip.reset": "Reset",
   "tooltip.apply_and_restart": "Apply and restart",

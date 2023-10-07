@@ -1,7 +1,7 @@
 /* eslint-disable solid/no-innerhtml */
 import SiderbarWrapper from "./wrapper";
 import { Checkbox, Collapsable, Dropdown, Radio, Skeleton } from "@gd/ui";
-import { createEffect, createMemo, For, Match, Show, Switch } from "solid-js";
+import { createMemo, For, Match, Show, Switch } from "solid-js";
 import {
   CFFECategory,
   FESearchAPI,
@@ -43,13 +43,14 @@ const mapTypeToColor = (type: McType) => {
   );
 };
 
+const [gameVersionFilters, setGameVersionFilters] = createStore({
+  snapshot: false,
+  oldAlpha: false,
+  oldBeta: false
+});
+
 const Sidebar = () => {
   const infiniteQuery = useInfiniteModsQuery();
-  const [gameVersionFilters, setGameVersionFilters] = createStore({
-    snapshot: false,
-    oldAlpha: false,
-    oldBeta: false
-  });
 
   const [t] = useTransContext();
 
@@ -98,16 +99,22 @@ const Sidebar = () => {
     ];
   };
 
-  const filteredGameVersionsSelectedValue = () => {
-    return filteredMappedGameVersions()?.[0]?.key;
-  };
+  function updateGameVersionsFilter(
+    newValue: Partial<typeof gameVersionFilters>
+  ) {
+    setGameVersionFilters(newValue);
 
-  createEffect(() => {
-    filteredGameVersions();
-    infiniteQuery?.setQuery({
-      gameVersions: null
-    });
-  });
+    if (
+      infiniteQuery.query.gameVersions?.[0] &&
+      !filteredGameVersions().find(
+        (item) => item.id === infiniteQuery.query.gameVersions?.[0]
+      )
+    ) {
+      infiniteQuery?.setQuery({
+        gameVersions: null
+      });
+    }
+  }
 
   return (
     <SiderbarWrapper collapsable={false} noPadding>
@@ -144,40 +151,40 @@ const Sidebar = () => {
                 <Checkbox
                   checked={gameVersionFilters.snapshot}
                   onChange={(e) =>
-                    setGameVersionFilters({
+                    updateGameVersionsFilter({
                       snapshot: e
                     })
                   }
                 />
-                <h6 class="m-0 flex items-center">
-                  <Trans key="instance.instance_version_snapshot" />
-                </h6>
+                <div class="m-0 flex items-center">
+                  <Trans key="instance.include_snapshot_versions" />
+                </div>
               </div>
               <div class="flex gap-2">
                 <Checkbox
                   checked={gameVersionFilters.oldAlpha}
-                  onChange={(e) => setGameVersionFilters({ oldAlpha: e })}
+                  onChange={(e) => updateGameVersionsFilter({ oldAlpha: e })}
                 />
-                <h6 class="m-0 flex items-center">
-                  <Trans key="instance.instance_version_old_alpha" />
-                </h6>
+                <div class="m-0 flex items-center">
+                  <Trans key="instance.include_old_alpha_versions" />
+                </div>
               </div>
               <div class="flex gap-2">
                 <Checkbox
                   checked={gameVersionFilters.oldBeta}
-                  onChange={(e) => setGameVersionFilters({ oldBeta: e })}
+                  onChange={(e) => updateGameVersionsFilter({ oldBeta: e })}
                 />
-                <h6 class="m-0 flex items-center">
-                  <Trans key="instance.instance_version_old_beta" />
-                </h6>
+                <div class="m-0 flex items-center">
+                  <Trans key="instance.include_old_beta_versions" />
+                </div>
               </div>
             </div>
             <Dropdown
               class="w-full"
-              containerClass="w-full mt-2"
+              containerClass="w-full mt-4"
               options={filteredMappedGameVersions()}
               icon={<div class="i-ri:price-tag-3-fill" />}
-              value={filteredGameVersionsSelectedValue()}
+              value={infiniteQuery.query.gameVersions?.[0] || null}
               onChange={(val) => {
                 infiniteQuery?.setQuery({
                   gameVersions: [val.key as string]

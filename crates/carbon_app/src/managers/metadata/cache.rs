@@ -1,39 +1,41 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
-
 use std::collections::VecDeque;
+use std::ffi::OsStr;
 use std::io::Cursor;
 use std::io::Read;
 use std::path::PathBuf;
 use std::usize;
 
 use image::ImageOutputFormat;
+use itertools::Itertools;
 use md5::Digest;
-
 use sha2::Sha512;
 use tokio::sync::mpsc;
 use tokio::sync::watch;
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 use tokio::sync::Semaphore;
-use tracing::debug;
 use tracing::error;
 use tracing::info;
 use tracing::trace;
+use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::api::keys::instance::INSTANCE_MODS;
 use crate::db::read_filters::BytesFilter;
 use crate::db::read_filters::DateTimeFilter;
 use crate::db::read_filters::IntFilter;
-
 use crate::db::read_filters::StringFilter;
+use crate::db::{
+    curse_forge_mod_cache as cfdb, curse_forge_mod_image_cache as cfimgdb, mod_file_cache as fcdb,
+    mod_metadata as metadb, modrinth_mod_cache as mrdb, modrinth_mod_image_cache as mrimgdb,
+};
 use crate::domain::instance::InstanceId;
 use crate::domain::modplatforms::curseforge::filters::ModsParameters;
 use crate::domain::modplatforms::curseforge::filters::ModsParametersBody;
 use crate::domain::modplatforms::curseforge::FingerprintsMatchesResult;
 use crate::domain::modplatforms::curseforge::Mod;
-
 use crate::domain::modplatforms::modrinth::project::Project;
 use crate::domain::modplatforms::modrinth::responses::ProjectsResponse;
 use crate::domain::modplatforms::modrinth::responses::TeamResponse;
@@ -43,15 +45,8 @@ use crate::domain::modplatforms::modrinth::search::TeamIDs;
 use crate::domain::modplatforms::modrinth::search::VersionHashesQuery;
 use crate::domain::modplatforms::modrinth::version::HashAlgorithm;
 use crate::domain::runtime_path::InstancesPath;
-
 use crate::managers::ManagerRef;
 use crate::once_send::OnceSend;
-
-use crate::db::{
-    curse_forge_mod_cache as cfdb, curse_forge_mod_image_cache as cfimgdb, mod_file_cache as fcdb,
-    mod_metadata as metadb, modrinth_mod_cache as mrdb, modrinth_mod_image_cache as mrimgdb,
-};
-use itertools::Itertools;
 
 pub struct MetaCacheManager {
     waiting_instances: RwLock<HashSet<InstanceId>>,
@@ -280,16 +275,17 @@ impl ManagerRef<'_, MetaCacheManager> {
                             continue;
                         };
 
-                        let is_jar = utf8_name.ends_with(".jar");
-                        let is_jar_disabled = utf8_name.ends_with(".jar.disabled");
+                        let allowed_base_ext =
+                            [".jar", ".zip"].iter().any(|&ext| utf8_name.ends_with(ext));
+                        let allowed_disabled_ext = [".jar.disabled", ".zip.disabled"]
+                            .iter()
+                            .any(|&ext| utf8_name.ends_with(ext));
 
-                        if !is_jar && !is_jar_disabled {
+                        if !allowed_base_ext && !allowed_disabled_ext {
                             continue;
                         }
 
-                        if is_jar_disabled {
-                            utf8_name = utf8_name.strip_suffix(".disabled").unwrap();
-                        }
+                        utf8_name = utf8_name.strip_suffix(".disabled").unwrap_or(utf8_name);
 
                         let Ok(metadata) = entry.metadata().await else {
                             continue;
@@ -300,7 +296,10 @@ impl ManagerRef<'_, MetaCacheManager> {
                         }
 
                         trace!("tracking mod `{utf8_name}` for instance {instance_id}");
-                        modpaths.insert(utf8_name.to_string(), (!is_jar_disabled, metadata.len()));
+                        modpaths.insert(
+                            utf8_name.to_string(),
+                            (!allowed_disabled_ext, metadata.len()),
+                        );
                     }
 
                     if let Ok(Ok(cached_entries)) = cached_entries.await {
@@ -1019,8 +1018,16 @@ impl ManagerRef<'_, MetaCacheManager> {
     ) -> anyhow::Result<String> {
         let mut path = mods_dir_path.join(&mod_filename);
 
+        let prev_ext = path
+            .extension()
+            .and_then(OsStr::to_str)
+            .ok_or(anyhow::anyhow!(
+                "mod file `{}` has no extension",
+                mod_filename
+            ))?;
+
         if !enabled {
-            path.set_extension("jar.disabled");
+            path.set_extension(format!("{prev_ext}.disabled"));
         }
 
         let content = tokio::fs::read(path).await?;
@@ -1038,7 +1045,13 @@ impl ManagerRef<'_, MetaCacheManager> {
         })
         .await?;
 
-        let meta = meta?;
+        let meta = match meta {
+            Ok(meta) => meta,
+            Err(e) => {
+                warn!({ error = ?e }, "could not parse mod metadata for {}", mod_filename);
+                None
+            }
+        };
 
         let dbmeta = self
             .app
