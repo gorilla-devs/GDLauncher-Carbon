@@ -1108,11 +1108,11 @@ impl ManagerRef<'_, MetaCacheManager> {
                         }
                         Ok(Ok(None)) => None,
                         Ok(Err(e)) => {
-                            error!({ error = ?e }, "could not scale mod icon for {}", meta.modid);
+                            error!({ error = ?e }, "could not scale mod icon for {}", mod_filename);
                             None
                         }
                         Err(e) => {
-                            error!({ error = ?e }, "could not scale mod icon for {}", meta.modid);
+                            error!({ error = ?e }, "could not scale mod icon for {}", mod_filename);
                             None
                         }
                     }
@@ -1129,7 +1129,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                     match meta {
                         Some(meta) => vec![
                             metadb::SetParam::SetName(meta.name),
-                            metadb::SetParam::SetModid(Some(meta.modid)),
+                            metadb::SetParam::SetModid(meta.modid),
                             metadb::SetParam::SetVersion(meta.version),
                             metadb::SetParam::SetDescription(meta.description),
                             metadb::SetParam::SetAuthors(meta.authors),
