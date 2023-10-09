@@ -5,13 +5,16 @@ use std::collections::VecDeque;
 use std::io::Cursor;
 use std::io::Read;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::usize;
 
+use futures::Future;
 use image::ImageOutputFormat;
 use md5::Digest;
 
 use sha2::Sha512;
 use tokio::sync::mpsc;
+use tokio::sync::oneshot;
 use tokio::sync::watch;
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
@@ -45,7 +48,6 @@ use crate::domain::modplatforms::modrinth::version::HashAlgorithm;
 use crate::domain::runtime_path::InstancesPath;
 
 use crate::managers::ManagerRef;
-use crate::once_send::OnceSend;
 
 use crate::db::{
     curse_forge_mod_cache as cfdb, curse_forge_mod_image_cache as cfimgdb, mod_file_cache as fcdb,
@@ -60,26 +62,177 @@ pub struct MetaCacheManager {
     ignored_remote_mr_hashes: RwLock<HashSet<String>>,
     failed_cf_thumbs: RwLock<HashMap<i32, (std::time::Instant, u32)>>,
     failed_mr_thumbs: RwLock<HashMap<String, (std::time::Instant, u32)>>,
-    priority_instance: Mutex<Option<InstanceId>>,
-    remote_instance: watch::Sender<Option<InstanceId>>,
-    waiting_notify: watch::Sender<()>,
-    // local cache notify, remote cache notify
-    background_watches: OnceSend<(watch::Receiver<()>, watch::Receiver<Option<InstanceId>>)>,
+    local_instance: watch::Sender<CacheTargets>,
     image_scale_semaphore: Semaphore,
     image_download_semaphore: Semaphore,
 }
 
-impl Default for MetaCacheManager {
-    fn default() -> Self {
-        Self::new()
+trait CompletionSender {
+    fn complete(self);
+}
+
+struct CacheTargets<S: CompletionSender> {
+    backend_override: Arc<RwLock<Option<(InstanceId, S)>>>,
+    priority: Option<InstanceId>,
+}
+
+#[derive(Clone)]
+enum ActiveCacheTask<S: CompletionSender> {
+    BackendOverride(Arc<RwLock<Option<(InstanceId, S)>>>),
+    Standard(InstanceId),
+}
+
+impl<S: CompletionSender> CacheTargets<S> {
+    fn new() -> Self {
+        Self {
+            backend_override: None,
+            priority: None,
+        }
+    }
+
+    // TODO: need a locking form of activecachetask maybe
+    async fn target_instance(&self) -> Option<InstanceId> {
+        let backend_override = self.backend_override.read().await.map(|(instance, _)| instance);
+
+        match (backend_override, self.priority) {
+            (Some(instance), _) => Some(instance),
+            (None, Some(instance)) => Some(instance),
+            (None, None) => None,
+        }
+    }
+
+
+    fn target(&self) -> Option<&CacheRequest<S>> {
+        match self {
+            Self { backend_override: Some(target), priority: _ } => Some(target),
+            Self { backend_override: None, priority: Some(target) } => Some(target),
+            Self { backend_override: None, priority: None } => None,
+        }
+    }
+}
+
+impl<S: CompletionSender> CacheRequest<S> {
+    fn new(instance: InstanceId) -> Self {
+        Self {
+            instance,
+            progress_sender: None,
+        }
+    }
+
+    fn take(&mut self) -> ActiveCacheTask<S> {
+        ActiveCacheTask {
+            instance: self.instance,
+            sender: self.progress_sender.take(),
+        }
+    }
+}
+
+impl<S: CompletionSender> ActiveCacheTask<S> {
+    fn complete(self) {
+        if let Some(sender) = self.sender {
+            sender.complete();
+        }
+    }
+}
+
+struct LoopWatcher<T: LoopValue> {
+    watcher: watch::Receiver<T>,
+    token: T::Token,
+}
+
+trait LoopValue {
+    type Token: Clone + Copy;
+    type Value;
+
+    fn token(&self) -> Self::Token;
+    // Option<(value, value matches last)>
+    fn loop_cmp(&self, token: Self::Token) -> Option<(Self::Value, bool)>;
+}
+
+impl<S: CompletionSender> LoopValue for CacheTargets<S> {
+    type Token = Option<InstanceId>;
+    type Value = ActiveCacheTask<S>;
+
+    fn token(&self) -> Self::Token {
+        self.target().map(|target| target.instance)
+    }
+
+    fn loop_cmp(&self, token: Self::Token) -> Option<(Self::Value, bool)> {
+        match self.target() {
+            Some(req @ CacheRequest {
+                instance, ..
+            }) => Some((req.take(), token == Some(*instance))),
+            None => None,
+        }
+    }
+}
+
+impl LoopValue for Option<InstanceId> {
+    type Token = Self;
+    type Value = InstanceId;
+
+    fn token(&self) -> Self::Token {
+        *self
+    }
+
+    fn loop_cmp(&self, token: Self::Token) -> Option<Self::Value> {
+        match *self == token {
+            false => *self,
+            true => None,
+        }
+    }
+}
+
+impl<T: LoopValue> LoopWatcher<T> {
+    fn new(watch: watch::Receiver<T>) -> Self {
+        Self {
+            token: watch.borrow().token(),
+            watcher: watch,
+        }
+    }
+
+    // Option<(value, value matches last)>
+    async fn next(&mut self) -> Option<(T::Value, bool)> {
+        loop {
+            if let Some(v) = self.watcher.borrow().loop_cmp(self.token) {
+                return Some(v)
+            }
+
+            if !self.watcher.changed().await.is_ok() {
+                return None
+            }
+        }
+    }
+
+    async fn loop_interrupt<F: Future<Output = ()>>(&mut self, mut f: impl FnMut(T::Value) -> F) {
+        let mut next = self.next().await;
+
+        while let Some(n) = next.take() {
+            tokio::select! {
+                v = async {
+                    loop {
+                        match self.next().await {
+                            Some((v, false)) => break v,
+                            Some((v, true)) => {
+                                next = v;
+                                continue
+                            },
+                            None => futures::future::pending().await,
+                        }
+                    }
+                } => next = Some(v),
+                _ = f(n) => {
+                    if next.is_none() {
+                        next = self.next().await;
+                    }
+                }
+            }
+        }
     }
 }
 
 impl MetaCacheManager {
     pub fn new() -> Self {
-        let (local_tx, local_rx) = watch::channel(());
-        let (remote_tx, remote_rx) = watch::channel(None);
-
         Self {
             waiting_instances: RwLock::new(HashSet::new()),
             scanned_instances: Mutex::new(HashSet::new()),
@@ -87,10 +240,10 @@ impl MetaCacheManager {
             ignored_remote_mr_hashes: RwLock::new(HashSet::new()),
             failed_cf_thumbs: RwLock::new(HashMap::new()),
             failed_mr_thumbs: RwLock::new(HashMap::new()),
-            priority_instance: Mutex::new(None),
-            remote_instance: remote_tx,
-            waiting_notify: local_tx,
-            background_watches: OnceSend::new((local_rx, remote_rx)),
+            local_instance: watch::channel(CacheTargets::new()).0,
+            curseforge_instance: watch::channel(CacheTargets::new()).0,
+            modrinth_instance: watch::channel(CacheTargets::new()).0,
+            image_cache_instance: watch::channel(None).0,
             image_scale_semaphore: Semaphore::new(num_cpus::get()),
             image_download_semaphore: Semaphore::new(10),
         }
@@ -172,17 +325,18 @@ impl ManagerRef<'_, MetaCacheManager> {
 
     /// Panics if called more than once
     pub async fn launch_background_tasks(self) {
-        let (mut local_notify, remote_watch) = self
-            .background_watches
-            .take()
-            .expect("launch_background_tasks may only be called once");
+        let local_watch = self.local_instance.subscribe();
+        let remote_watch = self.remote_instance.subscribe();
+        let cf_remote_watch = self.curseforge_instance.subscribe();
+        let mr_remote_watch = self.modrinth_instance.subscribe();
+        let (cf_cache_tx, cf_watch) = watch::channel(CacheTargets::new());
+        let (cf_icons_tx, cf_icons_watch) = watch::channel(Option::<InstanceId>::None);
 
         let app_local = self.app.clone();
         let app_cf = self.app.clone();
+        let app_cficons = self.app.clone();
         let app_mr = self.app.clone();
         let app_debounce = self.app.clone();
-        let cf_remote_watch = remote_watch.clone();
-        let mr_remote_watch = remote_watch.clone();
         let debounce_remote_watch = remote_watch;
 
         let (list_debounce_tx, mut list_debounce_rx) = mpsc::unbounded_channel::<()>();
@@ -197,7 +351,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                 // clear notification queue
                 while list_debounce_rx.try_recv().is_ok() {}
 
-                if let Some(target_instance) = target_instance {
+                if let CacheRequest { target: Some(target_instance), .. } = target_instance {
                     app_debounce.invalidate(INSTANCE_MODS, Some(target_instance.0.into()));
                     tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                 }
@@ -365,313 +519,303 @@ impl ManagerRef<'_, MetaCacheManager> {
         });
 
         tokio::spawn(async move {
-            let app = app_cf;
+            let app = &app_cf;
             let list_debounce = &cf_list_debounce_tx;
-            let mut remote_watch = cf_remote_watch;
+            let icons_tx = &cf_icons_tx;
 
-            while remote_watch.changed().await.is_ok() {
-                loop {
-                    debug!("remote watch target updated (curseforge)");
-                    let Some(instance_id) = *remote_watch.borrow() else {
-                        break;
-                    };
-                    info!("updating curseforge metadata cache for instance {instance_id}");
+            let f = |task| async move {
+                let instance_id = task.instance;
 
-                    let icons_fut = async {
-                        let modlist =
-                            app.prisma_client
-                                .mod_file_cache()
-                                .find_many(vec![
-                                    fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-                                    fcdb::WhereParam::MetadataIs(vec![
-                                        metadb::WhereParam::CurseforgeIs(vec![
-                                            cfdb::WhereParam::LogoImageIs(vec![
-                                                cfimgdb::WhereParam::UpToDate(IntFilter::Equals(0)),
-                                            ]),
-                                        ]),
+                let modlist = app
+                    .prisma_client
+                    .mod_file_cache()
+                    .find_many(vec![
+                        fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
+                        fcdb::WhereParam::MetadataIs(vec![
+                            metadb::WhereParam::CurseforgeIsNot(vec![
+                                cfdb::WhereParam::CachedAt(DateTimeFilter::Gt(
+                                    (chrono::Utc::now() - chrono::Duration::days(1)).into(),
+                                )),
+                            ]),
+                        ]),
+                    ])
+                    .with(fcdb::metadata::fetch())
+                    .exec()
+                    .await?
+                    .into_iter()
+                    .map(|m| {
+                        let metadata = m.metadata.expect(
+                            "metadata was queried with mod cache yet is not present",
+                        );
+
+                        (
+                                    metadata.murmur_2 as u32,
+                                    (metadata.id, metadata.murmur_2 as u32),
+                        )
+                    });
+
+                let mcm = app.meta_cache_manager();
+                let ignored_hashes = mcm.ignored_remote_cf_hashes.read().await;
+
+                let mut modlist = modlist
+                    .filter(|(_, (_, murmur2))| !ignored_hashes.contains(murmur2))
+                    .collect::<VecDeque<_>>();
+
+                drop(ignored_hashes);
+
+                let (batch_tx, mut batch_rx) = mpsc::unbounded_channel::<(
+                            Vec<u32>,
+                            Vec<(String, u32)>,
+                            FingerprintsMatchesResult,
+                            Vec<Mod>,
+                            Option<ActiveCacheTask>,
+                )>();
+
+                let app_db = app.clone();
+                let list_debounce = list_debounce.clone();
+                tokio::spawn(async move {
+                    while let Some((fingerprints, batch, fp_response, mods_response, task)) =
+                                batch_rx.recv().await
+                    {
+                        trace!(
+                            "processing curseforge mod batch for instance {instance_id}"
+                        );
+
+                        let mut matches = fp_response
+                            .exact_fingerprints
+                            .into_iter()
+                            .zip(fp_response.exact_matches.into_iter())
+                            .zip(mods_response.into_iter())
+                            .map(|((fingerprint, fileinfo), modinfo)| {
+                                (fingerprint, (fileinfo, modinfo))
+                            })
+                            .collect::<HashMap<_, _>>();
+
+                        let mcm = app_db.meta_cache_manager();
+                        let mut ignored_hashes = mcm.ignored_remote_cf_hashes.write().await;
+                        ignored_hashes.extend(
+                            fingerprints.iter().filter(|fp| !matches.contains_key(fp)),
+                        );
+                        drop(ignored_hashes);
+
+                        let app_db = &app_db;
+                        let futures =
+                            batch.into_iter().filter_map(|(metadata_id, murmur2)| {
+                                let fpmatch = matches.remove(&murmur2);
+                                fpmatch.map(|(fileinfo, modinfo)| async move {
+                                    let r = app_db
+                                        .meta_cache_manager()
+                                        .cache_curseforge_meta_unchecked(
+                                            metadata_id,
+                                            fileinfo.file.id,
+                                            murmur2,
+                                            modinfo,
+                                        ).await;
+
+                                    if let Err(e) = r {
+                                        tracing::error!({ error = ?e }, "Could not store curseforge mod metadata");
+                                    }
+                                })
+                            });
+
+                        futures::future::join_all(futures).await;
+                        let _ = list_debounce.send(());
+                        icons_tx.send(Some(task.instance));
+
+                        if let Some(task) = task {
+                            task.complete();
+                        }
+                    }
+                });
+
+                while !modlist.is_empty() {
+                    let (fingerprints, metadata) = modlist
+                        .drain(0..usize::min(1000, modlist.len()))
+                        .unzip::<_, _, Vec<_>, Vec<_>>();
+
+                    trace!("querying curseforge mod batch for instance {instance_id}");
+
+                    let fp_response = app
+                        .modplatforms_manager()
+                        .curseforge
+                        .get_fingerprints(&fingerprints[..])
+                        .await?
+                        .data;
+
+                    let mods_response = app
+                        .modplatforms_manager()
+                        .curseforge
+                        .get_mods(ModsParameters {
+                            body: ModsParametersBody {
+                                mod_ids: fp_response
+                                    .exact_matches
+                                    .iter()
+                                    .map(|m| m.file.mod_id)
+                                    .collect::<Vec<_>>(),
+                            },
+                        })
+                        .await?
+                        .data;
+
+                    batch_tx
+                        .send((fingerprints, metadata, fp_response, mods_response))
+                        .expect(
+                            "batch processor should not drop until the transmitter is dropped",
+                        );
+                }
+
+                Ok::<_, anyhow::Error>(())
+            };
+
+            LoopWatcher::new(cf_watch).loop_interrupt(|task| async move {
+                let instance_id = task.instance;
+
+                if let Err(e) = f(task).await {
+                    error!({ error = ?e }, "failed to query curseforge for instance {instance_id} mods");
+                }
+            }).await;
+        });
+
+        tokio::spawn(async move {
+            let app = &app_cficons;
+
+            LoopWatcher::new(cf_icons_watch).loop_interrupt(|instance_id| async move {
+                let modlist =
+                    app.prisma_client
+                        .mod_file_cache()
+                        .find_many(vec![
+                            fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
+                            fcdb::WhereParam::MetadataIs(vec![
+                                metadb::WhereParam::CurseforgeIs(vec![
+                                    cfdb::WhereParam::LogoImageIs(vec![
+                                        cfimgdb::WhereParam::UpToDate(IntFilter::Equals(0)),
                                     ]),
-                                ])
-                                .with(fcdb::metadata::fetch().with(
-                                    metadb::curseforge::fetch().with(cfdb::logo_image::fetch()),
-                                ))
-                                .exec()
-                                .await;
+                                ]),
+                            ]),
+                        ])
+                        .with(fcdb::metadata::fetch().with(
+                            metadb::curseforge::fetch().with(cfdb::logo_image::fetch()),
+                        ))
+                        .exec()
+                        .await;
 
-                        let modlist = match modlist {
-                            Ok(modlist) => modlist,
-                            Err(e) => {
-                                error!({ error = ?e }, "error querying database for updated curseforge mod icons list");
-                                return;
-                            }
-                        };
+                let modlist = match modlist {
+                    Ok(modlist) => modlist,
+                    Err(e) => {
+                        error!({ error = ?e }, "error querying database for updated curseforge mod icons list");
+                        return;
+                    }
+                };
 
-                        let modlist = modlist.into_iter().map(|file| {
-                            let meta = file
-                                .metadata
-                                .expect("metadata was ensured present but not returned");
-                            let cf = meta
-                                .curseforge
-                                .flatten()
-                                .expect("curseforge was ensured present but not returned");
-                            let row = cf
-                                .logo_image
-                                .flatten()
-                                .expect("mod image was ensured present but not returned");
+                let modlist = modlist.into_iter().map(|file| {
+                    let meta = file
+                        .metadata
+                        .expect("metadata was ensured present but not returned");
+                    let cf = meta
+                        .curseforge
+                        .flatten()
+                        .expect("curseforge was ensured present but not returned");
+                    let row = cf
+                        .logo_image
+                        .flatten()
+                        .expect("mod image was ensured present but not returned");
 
-                            (
+                    (
                                 file.instance_id,
                                 file.filename,
                                 cf.project_id,
                                 cf.file_id,
                                 row,
-                            )
-                        });
+                    )
+                });
 
-                        let app = &app;
-                        let futures = modlist
-                            .map(|(instance_id, filename, project_id, file_id, row)| async move {
-                                let mcm = app.meta_cache_manager();
+                let app = &app;
+                let futures = modlist
+                    .map(|(instance_id, filename, project_id, file_id, row)| async move {
+                        let mcm = app.meta_cache_manager();
 
-                                {
-                                    let fails = mcm.failed_cf_thumbs.read().await;
-                                    if let Some((time, _)) = fails.get(&project_id) {
-                                        if *time > std::time::Instant::now() {
-                                            return
-                                        } else {
-                                            mcm.failed_cf_thumbs.write().await.remove(&project_id);
-                                        }
-                                    }
+                        {
+                            let fails = mcm.failed_cf_thumbs.read().await;
+                            if let Some((time, _)) = fails.get(&project_id) {
+                                if *time > std::time::Instant::now() {
+                                    return
+                                } else {
+                                    mcm.failed_cf_thumbs.write().await.remove(&project_id);
                                 }
+                            }
+                        }
 
-                                let r = async {
-                                    let dl_guard = mcm
-                                        .image_download_semaphore
-                                        .acquire()
-                                        .await
-                                        .expect("the image download semaphore is never closed");
+                        let r = async {
+                            let dl_guard = mcm
+                                .image_download_semaphore
+                                .acquire()
+                                .await
+                                .expect("the image download semaphore is never closed");
 
-                                    debug!("thumbnailing curseforge mod icon for {instance_id}/{filename} (project: {project_id}, file: {file_id})");
+                            debug!("thumbnailing curseforge mod icon for {instance_id}/{filename} (project: {project_id}, file: {file_id})");
 
-                                    let icon = app.reqwest_client
-                                        .get(&row.url)
-                                        .header("avoid-caching", "")
-                                        .send()
-                                        .await?
-                                        .error_for_status()?
-                                        .bytes()
-                                        .await?;
+                            let icon = app.reqwest_client
+                                .get(&row.url)
+                                .header("avoid-caching", "")
+                                .send()
+                                .await?
+                                .error_for_status()?
+                                .bytes()
+                                .await?;
 
-                                    drop(dl_guard);
+                            drop(dl_guard);
 
-                                    let scale_guard = mcm
-                                        .image_scale_semaphore
-                                        .acquire()
-                                        .await
-                                        .expect("the image scale semaphore is never closed");
+                            let scale_guard = mcm
+                                .image_scale_semaphore
+                                .acquire()
+                                .await
+                                .expect("the image scale semaphore is never closed");
 
-                                    let image = icon.to_vec();
+                            let image = icon.to_vec();
 
-                                    let image = tokio::task::spawn_blocking(move || {
-                                        let scaled = scale_mod_image(&image[..])?;
-                                        Ok::<_, anyhow::Error>(scaled)
-                                    })
-                                        .await??;
+                            let image = tokio::task::spawn_blocking(move || {
+                                let scaled = scale_mod_image(&image[..])?;
+                                Ok::<_, anyhow::Error>(scaled)
+                            })
+                                .await??;
 
-                                    drop(scale_guard);
+                            drop(scale_guard);
 
-                                    app.prisma_client.curse_forge_mod_image_cache()
-                                        .update(
-                                            cfimgdb::UniqueWhereParam::MetadataIdEquals(row.metadata_id.clone()),
-                                            vec![
-                                                cfimgdb::SetParam::SetUpToDate(1),
-                                                cfimgdb::SetParam::SetData(Some(image))
-                                            ]
-                                        )
-                                        .exec()
-                                        .await?;
+                            app.prisma_client.curse_forge_mod_image_cache()
+                                .update(
+                                    cfimgdb::UniqueWhereParam::MetadataIdEquals(row.metadata_id.clone()),
+                                    vec![
+                                        cfimgdb::SetParam::SetUpToDate(1),
+                                        cfimgdb::SetParam::SetData(Some(image))
+                                    ]
+                                )
+                                .exec()
+                                .await?;
 
-                                    debug!("saved curseforge mod thumbnail for {instance_id}/{filename} (project: {project_id}, file: {file_id})");
+                            debug!("saved curseforge mod thumbnail for {instance_id}/{filename} (project: {project_id}, file: {file_id})");
 
-                                    let _ = list_debounce.send(());
-                                    Ok::<_, anyhow::Error>(())
-                                }.await;
+                            let _ = list_debounce.send(());
+                            Ok::<_, anyhow::Error>(())
+                        }.await;
 
-                                if let Err(e) = r {
-                                    error!({ error = ?e }, "error downloading mod icon for {instance_id}/{filename} (project: {project_id}, file: {file_id}, image url: {})", row.url);
+                        if let Err(e) = r {
+                            error!({ error = ?e }, "error downloading mod icon for {instance_id}/{filename} (project: {project_id}, file: {file_id}, image url: {})", row.url);
 
-                                    let mut fails = mcm.failed_cf_thumbs.write().await;
-                                    fails.entry(project_id)
-                                        .and_modify(|v| *v = (
+                            let mut fails = mcm.failed_cf_thumbs.write().await;
+                            fails.entry(project_id)
+                                .and_modify(|v| *v = (
                                             std::time::Instant::now() + std::time::Duration::from_secs(u64::pow(2, v.1 + 1)),
                                             v.1 + 1,
-                                        ))
-                                        .or_insert_with(|| (
+                                ))
+                                .or_insert_with(|| (
                                             std::time::Instant::now() + std::time::Duration::from_secs(2),
                                             1
-                                        ));
-                                }
-                            });
-
-                        futures::future::join_all(futures).await.into_iter();
-                    };
-
-                    let fut = async {
-                        let modlist = app
-                            .prisma_client
-                            .mod_file_cache()
-                            .find_many(vec![
-                                fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-                                fcdb::WhereParam::MetadataIs(vec![
-                                    metadb::WhereParam::CurseforgeIsNot(vec![
-                                        cfdb::WhereParam::CachedAt(DateTimeFilter::Gt(
-                                            (chrono::Utc::now() - chrono::Duration::days(1)).into(),
-                                        )),
-                                    ]),
-                                ]),
-                            ])
-                            .with(fcdb::metadata::fetch())
-                            .exec()
-                            .await?
-                            .into_iter()
-                            .map(|m| {
-                                let metadata = m.metadata.expect(
-                                    "metadata was queried with mod cache yet is not present",
-                                );
-
-                                (
-                                    metadata.murmur_2 as u32,
-                                    (metadata.id, metadata.murmur_2 as u32),
-                                )
-                            });
-
-                        let mcm = app.meta_cache_manager();
-                        let ignored_hashes = mcm.ignored_remote_cf_hashes.read().await;
-
-                        let mut modlist = modlist
-                            .filter(|(_, (_, murmur2))| !ignored_hashes.contains(murmur2))
-                            .collect::<VecDeque<_>>();
-
-                        drop(ignored_hashes);
-
-                        let (batch_tx, mut batch_rx) = mpsc::unbounded_channel::<(
-                            Vec<u32>,
-                            Vec<(String, u32)>,
-                            FingerprintsMatchesResult,
-                            Vec<Mod>,
-                        )>();
-
-                        let app_db = app.clone();
-                        let list_debounce = list_debounce.clone();
-                        tokio::spawn(async move {
-                            while let Some((fingerprints, batch, fp_response, mods_response)) =
-                                batch_rx.recv().await
-                            {
-                                trace!(
-                                    "processing curseforge mod batch for instance {instance_id}"
-                                );
-
-                                let mut matches = fp_response
-                                    .exact_fingerprints
-                                    .into_iter()
-                                    .zip(fp_response.exact_matches.into_iter())
-                                    .zip(mods_response.into_iter())
-                                    .map(|((fingerprint, fileinfo), modinfo)| {
-                                        (fingerprint, (fileinfo, modinfo))
-                                    })
-                                    .collect::<HashMap<_, _>>();
-
-                                let mcm = app_db.meta_cache_manager();
-                                let mut ignored_hashes = mcm.ignored_remote_cf_hashes.write().await;
-                                ignored_hashes.extend(
-                                    fingerprints.iter().filter(|fp| !matches.contains_key(fp)),
-                                );
-                                drop(ignored_hashes);
-
-                                let app_db = &app_db;
-                                let futures =
-                                    batch.into_iter().filter_map(|(metadata_id, murmur2)| {
-                                        let fpmatch = matches.remove(&murmur2);
-                                        fpmatch.map(|(fileinfo, modinfo)| async move {
-                                            let r = app_db
-                                                .meta_cache_manager()
-                                                .cache_curseforge_meta_unchecked(
-                                                    metadata_id,
-                                                    fileinfo.file.id,
-                                                    murmur2,
-                                                    modinfo,
-                                                ).await;
-
-                                            if let Err(e) = r {
-                                                tracing::error!({ error = ?e }, "Could not store curseforge mod metadata");
-                                            }
-                                        })
-                                    });
-
-                                futures::future::join_all(futures).await;
-                                let _ = list_debounce.send(());
-                            }
-                        });
-
-                        while !modlist.is_empty() {
-                            let (fingerprints, metadata) = modlist
-                                .drain(0..usize::min(1000, modlist.len()))
-                                .unzip::<_, _, Vec<_>, Vec<_>>();
-
-                            trace!("querying curseforge mod batch for instance {instance_id}");
-
-                            let fp_response = app
-                                .modplatforms_manager()
-                                .curseforge
-                                .get_fingerprints(&fingerprints[..])
-                                .await?
-                                .data;
-
-                            let mods_response = app
-                                .modplatforms_manager()
-                                .curseforge
-                                .get_mods(ModsParameters {
-                                    body: ModsParametersBody {
-                                        mod_ids: fp_response
-                                            .exact_matches
-                                            .iter()
-                                            .map(|m| m.file.mod_id)
-                                            .collect::<Vec<_>>(),
-                                    },
-                                })
-                                .await?
-                                .data;
-
-                            batch_tx
-                                .send((fingerprints, metadata, fp_response, mods_response))
-                                .expect(
-                                "batch processor should not drop until the transmitter is dropped",
-                            );
+                                ));
                         }
+                    });
 
-                        Ok::<_, anyhow::Error>(())
-                    };
-
-                    // not done inline to avoid indenting it even further
-                    let fut = async {
-                        if let Err(e) = fut.await {
-                            error!({ error = ?e }, "failed to query curseforge for instance {instance_id} mods");
-                        }
-                    };
-
-                    let wait_changed = async {
-                        while remote_watch.changed().await.is_ok() {
-                            if *remote_watch.borrow() != Some(instance_id) {
-                                break;
-                            }
-                        }
-                    };
-
-                    tokio::select! {
-                        _ = wait_changed => continue,
-                        _ = futures::future::join(fut, icons_fut) => break,
-                    };
-                }
-            }
+                futures::future::join_all(futures).await.into_iter();
+            });
         });
 
         tokio::spawn(async move {
