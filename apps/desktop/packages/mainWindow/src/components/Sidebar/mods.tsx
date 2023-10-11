@@ -32,6 +32,7 @@ import {
 const Sidebar = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const infiniteQuery = useInfiniteModsQuery();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [t] = useTransContext();
 
@@ -46,10 +47,8 @@ const Sidebar = () => {
 
   const modloaders = () => supportedModloaders();
 
-  const [searchParams] = useSearchParams();
-
   const instanceId = () =>
-    infiniteQuery.instanceId() || parseInt(searchParams.instanceId, 10);
+    infiniteQuery.instanceId() ?? parseInt(searchParams.instanceId, 10);
 
   const filteredInstances = () =>
     routeData.instancesUngrouped.data?.filter(
@@ -64,6 +63,9 @@ const Sidebar = () => {
             <div class="flex flex-col gap-3">
               <Radio.group
                 onChange={(val) => {
+                  setSearchParams({
+                    instanceId: val as number
+                  });
                   infiniteQuery.setInstanceId(val as number);
                 }}
                 value={instanceId()}

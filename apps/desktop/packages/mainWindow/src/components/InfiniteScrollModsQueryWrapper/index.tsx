@@ -44,6 +44,7 @@ type InfiniteQueryType = {
 type Props = {
   children: any;
   type: FEUnifiedSearchType | null;
+  initialQuery?: Partial<FEUnifiedSearchParameters>;
 };
 
 const InfiniteQueryContext = createContext<InfiniteQueryType>();
@@ -67,7 +68,10 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
 
   const query = isModpack ? modpacksQuery : modsQuery;
   const getQueryFunction = isModpack ? setModpacksQuery : setModsQuery;
-  const defaultQuery = isModpack ? modpacksDefaultQuery : modsDefaultQuery;
+  const defaultQuery = {
+    ...(isModpack ? modpacksDefaultQuery : modsDefaultQuery),
+    ...(props.initialQuery || {})
+  };
 
   const infiniteQuery = createInfiniteQuery({
     queryKey: () => ["modplatforms.unifiedSearch"],

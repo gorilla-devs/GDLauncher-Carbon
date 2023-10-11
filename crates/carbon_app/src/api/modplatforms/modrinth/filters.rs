@@ -7,9 +7,12 @@ use std::{
 use rspc::Type;
 use serde::{Deserialize, Serialize};
 
-use crate::domain::modplatforms::modrinth::search::{
-    ProjectID, ProjectIDs, ProjectSearchParameters, SearchFacet, SearchFacetAnd, SearchFacetOr,
-    SearchIndex, TeamID, VersionID, VersionIDs,
+use crate::domain::modplatforms::modrinth::{
+    project::ProjectVersionsFilters,
+    search::{
+        ProjectID, ProjectIDs, ProjectSearchParameters, SearchFacet, SearchFacetAnd, SearchFacetOr,
+        SearchIndex, TeamID, VersionID, VersionIDs,
+    },
 };
 use anyhow::anyhow;
 
@@ -289,6 +292,25 @@ impl From<MRFEProjectSearchParameters> for ProjectSearchParameters {
             offset: value.offset,
             limit: value.limit,
             filters: value.filters,
+        }
+    }
+}
+
+#[derive(Type, Deserialize, Serialize, Debug, Clone)]
+pub struct MRFEProjectVersionsFilters {
+    pub project_id: MRFEProjectID,
+    #[specta(optional)]
+    pub game_version: Option<String>,
+    #[specta(optional)]
+    pub loaders: Option<String>,
+}
+
+impl From<MRFEProjectVersionsFilters> for ProjectVersionsFilters {
+    fn from(value: MRFEProjectVersionsFilters) -> Self {
+        ProjectVersionsFilters {
+            project_id: value.project_id.into(),
+            game_version: value.game_version,
+            loaders: value.loaders,
         }
     }
 }

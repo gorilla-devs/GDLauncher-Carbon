@@ -97,6 +97,7 @@
   "instance.active_version": "Active",
   "instance.switch_version": "Switch Version",
   "instance.no_modpacks_text": "At the moment there is no modpacks.",
+  "instance.go_to_installed_mods": "Go to installed mods",
   "modpack.download": "Download",
   "modpack.mcVersion": "Minecraft version",
   "modpack.total_download": "Total download",

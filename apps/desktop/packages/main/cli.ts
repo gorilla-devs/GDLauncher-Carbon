@@ -1,7 +1,7 @@
 import { app } from "electron";
 import * as Sentry from "@sentry/electron/main";
 import handleUncaughtException from "./handleUncaughtException";
-import { initRTPath } from "./runtimePath";
+import { getCurrentRTPath, initRTPath } from "./runtimePath";
 
 const args = process.argv.slice(1);
 
@@ -43,6 +43,8 @@ if (app.isPackaged) {
   }
   initRTPath(rtPath);
 }
+
+console.log("Runtime path:", getCurrentRTPath());
 
 const allowMultipleInstances = validateArgument(
   "--gdl_allow_multiple_instances"

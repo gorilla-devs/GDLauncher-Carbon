@@ -1,5 +1,5 @@
 import { Trans, useTransContext } from "@gd/i18n";
-import { Dropdown, Input, Skeleton } from "@gd/ui";
+import { Button, Dropdown, Input, Skeleton } from "@gd/ui";
 import {
   createEffect,
   createMemo,
@@ -35,9 +35,11 @@ import {
 import { useRouteData, useSearchParams } from "@solidjs/router";
 import { rspc } from "@/utils/rspcClient";
 import DefaultImg from "/assets/images/default-instance-img.png";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 const ModsBrowser = () => {
   const [t] = useTransContext();
+  const navigate = useGDNavigate();
 
   const [instanceMods, setInstanceMods] = createSignal<Mod[]>([]);
   const [instanceDetails, setinstanceDetails] = createSignal<
@@ -54,10 +56,10 @@ const ModsBrowser = () => {
 
   const lastItem = () => allVirtualRows()[allVirtualRows().length - 1];
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const instanceId = () =>
-    parseInt(searchParams.instanceId, 10) || infiniteQuery.instanceId();
+    infiniteQuery.instanceId() ?? parseInt(searchParams.instanceId, 10);
 
   createEffect(() => {
     if (instanceId() !== undefined) {
@@ -106,7 +108,7 @@ const ModsBrowser = () => {
 
   const [headerHeight, setHeaderHeight] = createSignal(90);
 
-  let containrRef: HTMLDivElement;
+  let containerRef: HTMLDivElement;
   let resizeObserver: ResizeObserver;
 
   onMount(() => {
@@ -116,7 +118,7 @@ const ModsBrowser = () => {
       });
     });
 
-    resizeObserver.observe(containrRef);
+    resizeObserver.observe(containerRef);
   });
 
   onCleanup(() => {
@@ -139,17 +141,18 @@ const ModsBrowser = () => {
 
   const instanceModloaders = () =>
     instanceDetails()?.modloaders.map((modloader) => modloader.type_);
+
   const instancePlatform = () =>
     Object.keys(instanceDetails()?.modpack || {})[0]?.toLocaleLowerCase();
 
-  createEffect((firstTime: boolean) => {
+  createEffect((_firstTime: boolean) => {
     const modloaders = instanceModloaders();
     const platform = instancePlatform();
     const _ = instanceId();
 
-    if (firstTime) {
-      return false;
-    }
+    // if (_firstTime) {
+    //   return false;
+    // }
 
     const newQuery: Partial<FEUnifiedSearchParameters> = {};
 
@@ -187,7 +190,7 @@ const ModsBrowser = () => {
   return (
     <div class="box-border h-full w-full relative">
       <div
-        ref={(el) => (containrRef = el)}
+        ref={(el) => (containerRef = el)}
         class="flex flex-col bg-darkSlate-800 z-10 px-5 pt-5"
       >
         <Switch>
@@ -208,6 +211,18 @@ const ModsBrowser = () => {
                   <div class="absolute z-0 bg-gradient-to-r from-darkSlate-700 from-50% inset-0" />
                   <div class="absolute inset-0 from-darkSlate-700 z-0 bg-gradient-to-t" />
                   <div class="flex gap-4 z-10 items-center">
+                    <Button
+                      onClick={() => {
+                        navigate(`/library/${instanceId()}/mods`);
+                      }}
+                      type="outline"
+                      size="small"
+                      icon={
+                        <i class="i-ri:arrow-left-s-line text-darkSlate-50 cursor-pointer hover:text-white transition tranition-color" />
+                      }
+                    >
+                      <Trans key="instance.go_to_installed_mods" />
+                    </Button>
                     <div
                       class="w-6 h-6 bg-center bg-cover"
                       style={{
@@ -221,6 +236,9 @@ const ModsBrowser = () => {
                   <i
                     class="i-ri:close-fill text-darkSlate-50 cursor-pointer hover:text-white transition tranition-color"
                     onClick={() => {
+                      setSearchParams({
+                        instanceId: undefined
+                      });
                       infiniteQuery.setInstanceId(undefined);
                       infiniteQuery.setQuery({
                         modloaders: null

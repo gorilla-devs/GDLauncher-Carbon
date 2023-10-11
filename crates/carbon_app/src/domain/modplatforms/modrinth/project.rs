@@ -2,7 +2,14 @@
 //!
 //! [documentation](https://docs.modrinth.com/api-spec/#tag/project_model)
 
-use super::*;
+use super::{search::ProjectID, *};
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct ProjectVersionsFilters {
+    pub project_id: ProjectID,
+    pub game_version: Option<String>,
+    pub loaders: Option<String>,
+}
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Project {

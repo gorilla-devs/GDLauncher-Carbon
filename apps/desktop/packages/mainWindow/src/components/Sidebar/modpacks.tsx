@@ -187,7 +187,7 @@ const Sidebar = () => {
               value={infiniteQuery.query.gameVersions?.[0] || null}
               onChange={(val) => {
                 infiniteQuery?.setQuery({
-                  gameVersions: [val.key as string]
+                  gameVersions: val.key ? [val.key as string] : null
                 });
               }}
             />
