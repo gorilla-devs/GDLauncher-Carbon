@@ -9,7 +9,6 @@ import {
   mergeProps,
   onCleanup,
   Setter,
-  untrack,
   useContext
 } from "solid-js";
 import {
@@ -76,10 +75,6 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
   const infiniteQuery = createInfiniteQuery({
     queryKey: () => ["modplatforms.unifiedSearch"],
     queryFn: (ctx) => {
-      untrack(() => {
-        console.log("Querying", { ...query }, lastType(), mergedProps.type);
-      });
-
       getQueryFunction({
         index: ctx.pageParam + query.pageSize!
       });

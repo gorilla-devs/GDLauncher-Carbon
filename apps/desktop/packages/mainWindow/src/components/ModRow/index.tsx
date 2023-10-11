@@ -123,8 +123,6 @@ const ModRow = (props: ModRowProps) => {
     );
   };
 
-  console.log(props.data);
-
   const instanceId = () => (props as ModProps)?.instanceId;
 
   const installModMutation = rspc.createMutation(["instance.installMod"], {
@@ -235,7 +233,6 @@ const ModRow = (props: ModRowProps) => {
     fileId?: number | string,
     projectId?: number | string
   ) => {
-    console.log("isCurseForgeData(props)", isCurseForgeData(props.data));
     return isCurseForgeData(props.data)
       ? {
           Curseforge: {
