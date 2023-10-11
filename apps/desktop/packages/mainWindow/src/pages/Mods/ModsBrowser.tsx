@@ -58,8 +58,16 @@ const ModsBrowser = () => {
 
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const instanceId = () =>
-    infiniteQuery.instanceId() ?? parseInt(searchParams.instanceId, 10);
+  const instanceId = () => {
+    const res =
+      infiniteQuery.instanceId() ?? parseInt(searchParams.instanceId, 10);
+
+    if (isNaN(res)) {
+      return undefined;
+    }
+
+    return res;
+  };
 
   createEffect(() => {
     if (instanceId() !== undefined) {
