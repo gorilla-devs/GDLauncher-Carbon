@@ -299,23 +299,35 @@ const ModRow = (props: ModRowProps) => {
                         <Button
                           size={isRowSmall() ? "small" : "medium"}
                           disabled={loading()}
-                          onClick={() => {
-                            if (props.type !== "Modpack") return;
+                          onClick={async () => {
+                            runWithOwner(owner, async () => {
+                              if (props.type !== "Modpack") return;
 
-                            const imgUrl = getLogoUrl(props);
-                            if (imgUrl) loadIconMutation.mutate(imgUrl);
+                              const imgUrl = getLogoUrl(props);
+                              if (imgUrl) loadIconMutation.mutate(imgUrl);
 
-                            if (isCurseForgeData(props.data)) {
+                              let fileVersion = undefined;
+                              if (!isCurseForgeData(props.data)) {
+                                const mrVersions = await rspcFetch(() => [
+                                  "modplatforms.modrinth.getProjectVersions",
+                                  {
+                                    project_id: getProjectId(props)
+                                  }
+                                ]);
+
+                                fileVersion = (mrVersions as any).data[0].id;
+                              }
+
                               createInstanceMutation.mutate({
                                 group: props.defaultGroup || 1,
                                 use_loaded_icon: true,
                                 notes: "",
                                 name: getName(props),
                                 version: {
-                                  Modpack: instanceCreationObj()
+                                  Modpack: instanceCreationObj(fileVersion)
                                 }
                               });
-                            }
+                            });
                           }}
                         >
                           <Show when={loading()}>
