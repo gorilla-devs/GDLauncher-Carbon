@@ -1,15 +1,16 @@
 import { Trans, useTransContext } from "@gd/i18n";
-import { Dropdown, Input, Skeleton } from "@gd/ui";
+import { Button, Dropdown, Input, Skeleton } from "@gd/ui";
 import {
-  For,
-  Match,
-  Show,
-  Switch,
   createEffect,
+  createMemo,
   createResource,
   createSignal,
+  For,
+  Match,
   onCleanup,
-  onMount
+  onMount,
+  Show,
+  Switch
 } from "solid-js";
 import {
   CFFEModSearchSortField,
@@ -17,8 +18,8 @@ import {
   FEUnifiedSearchParameters,
   FEUnifiedSearchResult,
   InstanceDetails,
-  MRFESearchIndex,
-  Mod
+  Mod,
+  MRFESearchIndex
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import { CurseForgeSortFields, ModrinthSortFields } from "@/utils/constants";
@@ -34,9 +35,11 @@ import {
 import { useRouteData, useSearchParams } from "@solidjs/router";
 import { rspc } from "@/utils/rspcClient";
 import DefaultImg from "/assets/images/default-instance-img.png";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 const ModsBrowser = () => {
   const [t] = useTransContext();
+  const navigate = useGDNavigate();
 
   const [instanceMods, setInstanceMods] = createSignal<Mod[]>([]);
   const [instanceDetails, setinstanceDetails] = createSignal<
@@ -53,10 +56,18 @@ const ModsBrowser = () => {
 
   const lastItem = () => allVirtualRows()[allVirtualRows().length - 1];
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const instanceId = () =>
-    parseInt(searchParams.instanceId, 10) || infiniteQuery.instanceId();
+  const instanceId = () => {
+    const res =
+      infiniteQuery.instanceId() ?? parseInt(searchParams.instanceId, 10);
+
+    if (isNaN(res)) {
+      return undefined;
+    }
+
+    return res;
+  };
 
   createEffect(() => {
     if (instanceId() !== undefined) {
@@ -105,7 +116,7 @@ const ModsBrowser = () => {
 
   const [headerHeight, setHeaderHeight] = createSignal(90);
 
-  let containrRef: HTMLDivElement;
+  let containerRef: HTMLDivElement;
   let resizeObserver: ResizeObserver;
 
   onMount(() => {
@@ -115,7 +126,7 @@ const ModsBrowser = () => {
       });
     });
 
-    resizeObserver.observe(containrRef);
+    resizeObserver.observe(containerRef);
   });
 
   onCleanup(() => {
@@ -138,18 +149,27 @@ const ModsBrowser = () => {
 
   const instanceModloaders = () =>
     instanceDetails()?.modloaders.map((modloader) => modloader.type_);
+
   const instancePlatform = () =>
     Object.keys(instanceDetails()?.modpack || {})[0]?.toLocaleLowerCase();
 
-  createEffect(() => {
+  createEffect((_firstTime: boolean) => {
     const modloaders = instanceModloaders();
     const platform = instancePlatform();
     const _ = instanceId();
+
+    // if (_firstTime) {
+    //   return false;
+    // }
 
     const newQuery: Partial<FEUnifiedSearchParameters> = {};
 
     if (platform) {
       newQuery["searchApi"] = platform as FESearchAPI;
+    }
+
+    if (instanceDetails()?.version) {
+      newQuery["gameVersions"] = [instanceDetails()?.version!];
     }
 
     if (modloaders) {
@@ -169,19 +189,23 @@ const ModsBrowser = () => {
     }
 
     infiniteQuery.setQuery(newQuery);
-  });
+
+    return false;
+  }, true);
+
+  const hasFiltersData = createMemo(() => Boolean(sortingFields()));
 
   return (
     <div class="box-border h-full w-full relative">
       <div
-        ref={(el) => (containrRef = el)}
+        ref={(el) => (containerRef = el)}
         class="flex flex-col bg-darkSlate-800 z-10 px-5 pt-5"
       >
         <Switch>
-          <Match when={infiniteQuery?.isLoading}>
+          <Match when={!hasFiltersData()}>
             <Skeleton.filters />
           </Match>
-          <Match when={!infiniteQuery?.isLoading}>
+          <Match when={hasFiltersData()}>
             <div class="flex flex-col bg-darkSlate-800 top-0 z-10 left-0 right-0 sticky">
               <Show when={instanceDetails()}>
                 <div
@@ -195,6 +219,18 @@ const ModsBrowser = () => {
                   <div class="absolute z-0 bg-gradient-to-r from-darkSlate-700 from-50% inset-0" />
                   <div class="absolute inset-0 from-darkSlate-700 z-0 bg-gradient-to-t" />
                   <div class="flex gap-4 z-10 items-center">
+                    <Button
+                      onClick={() => {
+                        navigate(`/library/${instanceId()}/mods`);
+                      }}
+                      type="outline"
+                      size="small"
+                      icon={
+                        <i class="i-ri:arrow-left-s-line text-darkSlate-50 cursor-pointer hover:text-white transition tranition-color" />
+                      }
+                    >
+                      <Trans key="instance.go_to_installed_mods" />
+                    </Button>
                     <div
                       class="w-6 h-6 bg-center bg-cover"
                       style={{
@@ -208,6 +244,9 @@ const ModsBrowser = () => {
                   <i
                     class="i-ri:close-fill text-darkSlate-50 cursor-pointer hover:text-white transition tranition-color"
                     onClick={() => {
+                      setSearchParams({
+                        instanceId: undefined
+                      });
                       infiniteQuery.setInstanceId(undefined);
                       infiniteQuery.setQuery({
                         modloaders: null
@@ -220,7 +259,7 @@ const ModsBrowser = () => {
               </Show>
               <div class="flex items-center justify-between gap-3 flex-wrap pb-4">
                 <Input
-                  placeholder="Type Here"
+                  placeholder={t("mods.search_mods")}
                   icon={<div class="i-ri:search-line" />}
                   class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
                   value={infiniteQuery.query.searchQuery!}

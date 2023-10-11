@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 use std::convert::Infallible;
 use std::path::PathBuf;
-
 use std::sync::Arc;
 
 use anyhow::anyhow;
@@ -9,14 +8,15 @@ use axum::body::StreamBody;
 use axum::extract::{Query, State};
 use axum::response::IntoResponse;
 use chrono::{DateTime, Utc};
-
 use hyper::http::HeaderValue;
 use hyper::{HeaderMap, StatusCode};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
 use crate::api::instance::import::FEEntity;
+use crate::domain::instance as domain;
 use crate::error::{AxumError, FeError};
+use crate::managers::instance as manager;
 use crate::managers::instance::log::EntryType;
 use crate::managers::instance::InstanceMoveTarget;
 use crate::managers::{App, AppInner};
@@ -24,9 +24,6 @@ use crate::managers::{App, AppInner};
 use super::keys::instance::*;
 use super::router::router;
 use super::vtask::FETaskId;
-
-use crate::domain::instance as domain;
-use crate::managers::instance as manager;
 
 pub mod import;
 
@@ -779,7 +776,7 @@ struct Mod {
 
 #[derive(Type, Debug, Serialize)]
 struct ModFileMetadata {
-    modid: String,
+    modid: Option<String>,
     name: Option<String>,
     version: Option<String>,
     description: Option<String>,

@@ -5,7 +5,7 @@ use url::Url;
 
 use crate::{
     domain::modplatforms::modrinth::{
-        project::Project,
+        project::{Project, ProjectVersionsFilters},
         responses::{
             CategoriesResponse, LoadersResponse, ProjectsResponse, TeamResponse,
             VersionHashesResponse, VersionsResponse,
@@ -107,11 +107,22 @@ impl Modrinth {
     #[tracing::instrument(skip(self))]
     pub async fn get_project_versions(
         &self,
-        project: ProjectID,
+        filters: ProjectVersionsFilters,
     ) -> anyhow::Result<VersionsResponse> {
-        let url = self
+        let mut url = self
             .base_url
-            .join(&format!("project/{}/version", &*project))?;
+            .join(&format!("project/{}/version", &*filters.project_id))?;
+        {
+            let mut query_pairs = url.query_pairs_mut();
+
+            if let Some(game_version) = filters.game_version {
+                query_pairs.append_pair("game_versions", &format!(r#"["{}"]"#, &game_version));
+            }
+
+            if let Some(loaders) = filters.loaders {
+                query_pairs.append_pair("loaders", &format!(r#"["{}"]"#, &loaders));
+            }
+        }
 
         trace!("GET {}", url);
 
@@ -266,6 +277,7 @@ mod test {
     use tracing_test::traced_test;
 
     use crate::domain::modplatforms::modrinth::{
+        project::ProjectVersionsFilters,
         search::{SearchFacet, SearchIndex},
         version::HashAlgorithm,
     };
@@ -385,7 +397,11 @@ mod test {
         let modrinth = Modrinth::new(client);
 
         let results = modrinth
-            .get_project_versions(ProjectID("u6dRKJwZ".to_string()))
+            .get_project_versions(ProjectVersionsFilters {
+                project_id: ProjectID("u6dRKJwZ".to_string()),
+                game_version: None,
+                loaders: None,
+            })
             .await?;
         tracing::debug!("Versions: {:?}", results);
         assert!(!results.is_empty());

@@ -1,13 +1,15 @@
+use std::io::{BufRead, Read};
 use std::{
     collections::HashMap,
     io::{self, Seek},
     num::ParseIntError,
 };
 
-use crate::domain::instance::{self as domain, info::ModLoaderType};
 use anyhow::{anyhow, bail};
 use serde::Deserialize;
-use std::io::{BufRead, Read};
+use zip::read::ZipFile;
+
+use crate::domain::instance::{self as domain, info::ModLoaderType};
 
 #[derive(Deserialize)]
 #[serde(untagged)]
@@ -16,7 +18,13 @@ enum McModInfoContainer {
     New(NewMcModInfo),
 }
 
-#[derive(Deserialize)]
+impl Default for McModInfoContainer {
+    fn default() -> Self {
+        Self::New(NewMcModInfo::default())
+    }
+}
+
+#[derive(Deserialize, Default)]
 // mcmod.info (new)
 // https://github.com/MinecraftForge/FML/wiki/FML-mod-information-file/c8d8f1929aff9979e322af79a59ce81f3e02db6a
 struct NewMcModInfo {
@@ -24,9 +32,9 @@ struct NewMcModInfo {
     mod_list: Vec<NewMcModInfoObj>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default)]
 struct NewMcModInfoObj {
-    modid: String,
+    modid: Option<String>,
     name: Option<String>,
     version: Option<String>,
     description: Option<String>,
@@ -36,14 +44,16 @@ struct NewMcModInfoObj {
     logo_file: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Default, Debug)]
 // mcmod.info (old)
 // https://github.com/MinecraftForge/FML/wiki/FML-mod-information-file/5bf6a2d05145ec79387acc0d45c958642fb049fc
 struct McModInfo {
-    modid: String,
+    modid: Option<String>,
     name: Option<String>,
+    #[serde(alias = "mcversion")] // cccmod.info uses mcversion instead of version
     version: Option<String>,
     description: Option<String>,
+    #[serde(alias = "authorList")] // cccmod.info uses authorList instead of authors
     authors: Option<Vec<String>>,
     #[serde(rename = "logoFile")]
     logo_file: Option<String>,
@@ -89,7 +99,7 @@ struct ModsToml {
 #[derive(Deserialize)]
 struct ModsTomlEntry {
     #[serde(rename = "modId")]
-    modid: String,
+    modid: Option<String>,
     version: String,
     #[serde(rename = "displayName")]
     display_name: String,
@@ -291,7 +301,7 @@ enum QuiltProvides {
 enum QuiltEntrypoint {
     String(String),
     Object {
-        #[serde(default = " fabric_quilt_adapter_default")]
+        #[serde(default = "fabric_quilt_adapter_default")]
         adapter: String,
         value: String,
     },
@@ -486,7 +496,7 @@ struct QuiltModJson {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModFileMetadata {
-    pub modid: String,
+    pub modid: Option<String>,
     pub name: Option<String>,
     pub version: Option<String>,
     pub description: Option<String>,
@@ -561,7 +571,7 @@ impl TryFrom<FabricModJson> for ModFileMetadata {
 
         match value {
             FabricModJson::Single(info) => Ok(Self {
-                modid: info.id,
+                modid: Some(info.id),
                 name: info.name,
                 version: Some(info.version),
                 description: info.description,
@@ -576,7 +586,7 @@ impl TryFrom<FabricModJson> for ModFileMetadata {
 
                 let info = list.swap_remove(0);
                 Ok(Self {
-                    modid: info.id.clone(),
+                    modid: Some(info.id.clone()),
                     name: info.name.clone(),
                     version: Some(info.version.clone()),
                     description: info.description.clone(),
@@ -607,7 +617,7 @@ impl From<QuiltModJson> for ModFileMetadata {
             (None, None, None, None)
         };
         Self {
-            modid: value.quilt_loader.id,
+            modid: Some(value.quilt_loader.id),
             name,
             version: Some(value.quilt_loader.version),
             description,
@@ -624,7 +634,7 @@ fn merge_mod_metadata(
 ) -> Option<ModFileMetadata> {
     match metadata {
         Some(metadata) => Some(ModFileMetadata {
-            modid: metadata.modid,
+            modid: metadata.modid.or(other.modid),
             name: metadata.name.or(other.name),
             version: metadata.version.or(other.version),
             description: metadata.description.or(other.description),
@@ -711,12 +721,30 @@ pub fn parse_metadata(reader: impl Read + Seek) -> anyhow::Result<Option<ModFile
     }
 
     'mcmodinfo: {
-        let Ok(file) = zip.by_name("mcmod.info") else {
+        let mut file: Option<ZipFile> = None;
+
+        // CodeChickenCore for some unearthly reason uses cccmod.info instead of mcmod.info
+        // https://github.com/Chicken-Bones/CodeChickenCore/blob/master/resources/cccmod.info
+        let valid_names = ["mcmod.info", "cccmod.info"];
+
+        let file_index = valid_names
+            .iter()
+            .position(|&name| zip.by_name(name).is_ok());
+
+        if let Some(index) = file_index {
+            file = zip.by_name(valid_names[index]).ok();
+        }
+
+        if file.is_none() {
             break 'mcmodinfo;
-        };
+        }
 
         let mcmod: McModInfo =
-            serde_json::from_reader::<_, McModInfoContainer>(file)?.try_into()?;
+            serde_json::from_reader::<_, McModInfoContainer>(file.expect("we just checked this"))
+                .unwrap_or_default()
+                .try_into()
+                .unwrap_or_default();
+
         mod_metadata = merge_mod_metadata(mod_metadata, mcmod.into());
     }
 
@@ -763,7 +791,7 @@ mod test {
         "#;
 
         let expected = Some(ModFileMetadata {
-            modid: String::from("com.test.testmod"),
+            modid: Some(String::from("com.test.testmod")),
             name: Some(String::from("TestMod")),
             version: Some(String::from("1.0.0")),
             description: Some(String::from("test desc")),
@@ -787,7 +815,7 @@ mod test {
         "#;
 
         let expected = Some(ModFileMetadata {
-            modid: String::from("com.test.testmod"),
+            modid: Some(String::from("com.test.testmod")),
             name: None,
             version: None,
             description: None,
@@ -797,6 +825,64 @@ mod test {
         });
 
         let returned = parsemeta("mcmod.info", mcmodinfo)?;
+
+        assert_eq!(returned, expected);
+        Ok(())
+    }
+
+    #[test]
+    pub fn old_forge_metadata_broken() -> anyhow::Result<()> {
+        let mcmodinfo = r#"
+          [{
+            "modid": invalid string with no quotes,
+            "name": "TestMod",
+            "description": "test desc",
+            "version": "1.0.0",
+            "authors": ["TestAuthor1", "TestAuthor2"],
+            "logoFile": "/test/logo"
+          }]
+        "#;
+
+        let expected = Some(ModFileMetadata {
+            modid: None,
+            name: None,
+            version: None,
+            description: None,
+            authors: None,
+            logo_file: None,
+            modloaders: vec![ModLoaderType::Forge],
+        });
+
+        let returned = parsemeta("mcmod.info", mcmodinfo)?;
+
+        assert_eq!(returned, expected);
+        Ok(())
+    }
+
+    #[test]
+    pub fn old_forge_metadata_cccmod() -> anyhow::Result<()> {
+        let mcmodinfo = r#"
+          [{
+            "modid": "com.test.testmod",
+            "name": "TestMod",
+            "description": "test desc",
+            "mcversion": "1.0.0",
+            "authorList": ["TestAuthor1", "TestAuthor2"],
+            "logoFile": "/test/logo"
+          }]
+        "#;
+
+        let expected = Some(ModFileMetadata {
+            modid: Some(String::from("com.test.testmod")),
+            name: Some(String::from("TestMod")),
+            version: Some(String::from("1.0.0")),
+            description: Some(String::from("test desc")),
+            authors: Some(String::from("TestAuthor1, TestAuthor2")),
+            logo_file: Some(String::from("/test/logo")),
+            modloaders: vec![ModLoaderType::Forge],
+        });
+
+        let returned = parsemeta("cccmod.info", mcmodinfo)?;
 
         assert_eq!(returned, expected);
         Ok(())
@@ -818,7 +904,7 @@ mod test {
         "#;
 
         let expected = Some(ModFileMetadata {
-            modid: String::from("com.test.testmod"),
+            modid: Some(String::from("com.test.testmod")),
             name: Some(String::from("TestMod")),
             version: Some(String::from("1.0.0")),
             description: Some(String::from("test desc")),
@@ -844,7 +930,7 @@ mod test {
         "#;
 
         let expected = Some(ModFileMetadata {
-            modid: String::from("com.test.testmod"),
+            modid: Some(String::from("com.test.testmod")),
             name: None,
             version: None,
             description: None,
@@ -871,7 +957,7 @@ logoFile = "test/logo"
         "#;
 
         let expected = Some(ModFileMetadata {
-            modid: String::from("com.test.testmod"),
+            modid: Some(String::from("com.test.testmod")),
             name: Some(String::from("TestMod")),
             version: Some(String::from("1.0.0")),
             description: Some(String::from("test desc")),
@@ -895,7 +981,7 @@ displayName = "TestMod"
         "#;
 
         let expected = Some(ModFileMetadata {
-            modid: String::from("com.test.testmod"),
+            modid: Some(String::from("com.test.testmod")),
             name: Some(String::from("TestMod")),
             version: Some(String::from("1.0.0")),
             description: None,
@@ -960,7 +1046,7 @@ displayName = "TestMod"
         "#;
 
         let expected = Some(ModFileMetadata {
-            modid: String::from("com.test.testmod"),
+            modid: Some(String::from("com.test.testmod")),
             name: Some(String::from("TestMod")),
             version: Some(String::from("1.0.0")),
             description: Some(String::from("This is an example description!")),
@@ -1022,7 +1108,7 @@ displayName = "TestMod"
         "#;
 
         let expected = Some(ModFileMetadata {
-            modid: String::from("com.test.testmod"),
+            modid: Some(String::from("com.test.testmod")),
             name: Some(String::from("TestMod")),
             version: Some(String::from("1.0.0")),
             description: Some(String::from("A short description of your mod.")),

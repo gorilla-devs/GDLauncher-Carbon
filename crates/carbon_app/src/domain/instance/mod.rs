@@ -1,6 +1,7 @@
-use crate::domain::vtask::VisualTaskId;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
+
+use crate::domain::vtask::VisualTaskId;
 
 pub mod info;
 
@@ -76,7 +77,7 @@ pub struct Mod {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModFileMetadata {
-    pub modid: String,
+    pub modid: Option<String>,
     pub name: Option<String>,
     pub version: Option<String>,
     pub description: Option<String>,

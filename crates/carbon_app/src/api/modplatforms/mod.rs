@@ -132,9 +132,9 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
             Ok(modrinth::responses::MRFEProjectsResponse::from(response))
         }
-        query MODRINTH_GET_PROJECT_VERSIONS[app, project: modrinth::filters::MRFEProjectID] {
+        query MODRINTH_GET_PROJECT_VERSIONS[app, filters: modrinth::filters::MRFEProjectVersionsFilters] {
             let modplatforms = app.modplatforms_manager();
-            let response = modplatforms.modrinth.get_project_versions(project.into()).await?;
+            let response = modplatforms.modrinth.get_project_versions(filters.into()).await?;
 
             Ok(modrinth::responses::MRFEVersionsResponse::from(response))
         }
@@ -164,6 +164,8 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         query UNIFIED_SEARCH[app, search_params: filters::FEUnifiedSearchParameters] {
+            println!("Search called");
+
             match search_params.search_api {
                 FESearchAPI::Curseforge => {
                     let search_params: curseforge::filters::CFFEModSearchParameters = search_params.try_into()?;

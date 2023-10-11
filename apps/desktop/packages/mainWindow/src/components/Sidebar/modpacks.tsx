@@ -1,25 +1,53 @@
 /* eslint-disable solid/no-innerhtml */
 import SiderbarWrapper from "./wrapper";
-import { Checkbox, Collapsable, Radio, Skeleton } from "@gd/ui";
-import { For, Match, Switch } from "solid-js";
+import { Checkbox, Collapsable, Dropdown, Radio, Skeleton } from "@gd/ui";
+import { createMemo, For, Match, Show, Switch } from "solid-js";
 import {
   CFFECategory,
-  MRFECategory,
   FESearchAPI,
-  FEUnifiedModLoaderType
+  FEUnifiedModLoaderType,
+  McType,
+  MRFECategory
 } from "@gd/core_module/bindings";
 import { ModpackPlatforms } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
 import { CategoryIcon, PlatformIcon } from "@/utils/instances";
-import { useTransContext } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { useInfiniteModsQuery } from "../InfiniteScrollModsQueryWrapper";
 import {
-  ModloaderIcon,
   curseforgeCategories,
   getCategoryId,
+  ModloaderIcon,
   modrinthCategories,
   supportedModloaders
 } from "@/utils/sidebar";
+import { mappedMcVersions, mcVersions } from "@/utils/mcVersion";
+import { createStore } from "solid-js/store";
+
+const mapTypeToColor = (type: McType) => {
+  return (
+    <Switch>
+      <Match when={type === "release"}>
+        <span class="text-green-500">{`[${type}]`}</span>
+      </Match>
+      <Match when={type === "snapshot"}>
+        <span class="text-yellow-500">{`[${type}]`}</span>
+      </Match>
+      <Match when={type === "old_alpha"}>
+        <span class="text-purple-500">{`[${type}]`}</span>
+      </Match>
+      <Match when={type === "old_beta"}>
+        <span class="text-red-500">{`[${type}]`}</span>
+      </Match>
+    </Switch>
+  );
+};
+
+const [gameVersionFilters, setGameVersionFilters] = createStore({
+  snapshot: false,
+  oldAlpha: false,
+  oldBeta: false
+});
 
 const Sidebar = () => {
   const infiniteQuery = useInfiniteModsQuery();
@@ -36,6 +64,57 @@ const Sidebar = () => {
         );
 
   const modloaders = () => supportedModloaders();
+
+  const filteredGameVersions = createMemo(() => {
+    const snapshot = gameVersionFilters.snapshot;
+    const oldAlpha = gameVersionFilters.oldAlpha;
+    const oldBeta = gameVersionFilters.oldBeta;
+
+    return mcVersions().filter(
+      (item) =>
+        item.type === "release" ||
+        (item.type === "snapshot" && snapshot) ||
+        (item.type === "old_beta" && oldBeta) ||
+        (item.type === "old_alpha" && oldAlpha)
+    );
+  });
+
+  const filteredMappedGameVersions = () => {
+    const allVersionsLabel = {
+      label: <span>{t("minecraft_all_versions")}</span>,
+      key: ""
+    };
+
+    return [
+      allVersionsLabel,
+      ...filteredGameVersions().map((item) => ({
+        label: (
+          <div class="flex justify-between w-full">
+            <span>{item.id}</span>
+            {mapTypeToColor(item.type)}
+          </div>
+        ),
+        key: item.id
+      }))
+    ];
+  };
+
+  function updateGameVersionsFilter(
+    newValue: Partial<typeof gameVersionFilters>
+  ) {
+    setGameVersionFilters(newValue);
+
+    if (
+      infiniteQuery.query.gameVersions?.[0] &&
+      !filteredGameVersions().find(
+        (item) => item.id === infiniteQuery.query.gameVersions?.[0]
+      )
+    ) {
+      infiniteQuery?.setQuery({
+        gameVersions: null
+      });
+    }
+  }
 
   return (
     <SiderbarWrapper collapsable={false} noPadding>
@@ -65,12 +144,62 @@ const Sidebar = () => {
             </Radio.group>
           </div>
         </Collapsable>
+        <Collapsable title={t("general.game_versions")} noPadding>
+          <Show when={mappedMcVersions().length > 0}>
+            <div class="flex flex-col gap-4 mt-2">
+              <div class="flex gap-2 items-center">
+                <Checkbox
+                  checked={gameVersionFilters.snapshot}
+                  onChange={(e) =>
+                    updateGameVersionsFilter({
+                      snapshot: e
+                    })
+                  }
+                />
+                <div class="m-0 flex items-center">
+                  <Trans key="instance.include_snapshot_versions" />
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <Checkbox
+                  checked={gameVersionFilters.oldAlpha}
+                  onChange={(e) => updateGameVersionsFilter({ oldAlpha: e })}
+                />
+                <div class="m-0 flex items-center">
+                  <Trans key="instance.include_old_alpha_versions" />
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <Checkbox
+                  checked={gameVersionFilters.oldBeta}
+                  onChange={(e) => updateGameVersionsFilter({ oldBeta: e })}
+                />
+                <div class="m-0 flex items-center">
+                  <Trans key="instance.include_old_beta_versions" />
+                </div>
+              </div>
+            </div>
+            <Dropdown
+              class="w-full"
+              containerClass="w-full mt-4"
+              options={filteredMappedGameVersions()}
+              icon={<div class="i-ri:price-tag-3-fill" />}
+              value={infiniteQuery.query.gameVersions?.[0] || null}
+              onChange={(val) => {
+                infiniteQuery?.setQuery({
+                  gameVersions: val.key ? [val.key as string] : null
+                });
+              }}
+            />
+          </Show>
+          <Show when={mappedMcVersions().length === 0}>
+            <Skeleton.select />
+          </Show>
+        </Collapsable>
         <Collapsable title={t("general.modloaders")} noPadding>
           <div class="flex flex-col gap-3">
             <For each={modloaders()}>
               {(modloader) => {
-                const modloaderName = () => capitalize(modloader);
-
                 return (
                   <div class="flex items-center gap-2">
                     <Checkbox
@@ -79,13 +208,13 @@ const Sidebar = () => {
                           infiniteQuery?.query.modloaders || [];
 
                         const filteredModloaders = prevModloaders.filter(
-                          (modloader) => modloader !== modloaderName()
+                          (modloader) => modloader !== modloader
                         );
 
                         const newModloaders = checked
                           ? [
                               ...prevModloaders,
-                              modloaderName() as FEUnifiedModLoaderType
+                              modloader as FEUnifiedModLoaderType
                             ]
                           : filteredModloaders;
 
@@ -96,7 +225,7 @@ const Sidebar = () => {
                       }}
                     />
                     <ModloaderIcon modloader={modloader} />
-                    <p class="m-0">{capitalize(modloaderName())}</p>
+                    <p class="m-0">{capitalize(modloader)}</p>
                   </div>
                 );
               }}
@@ -130,7 +259,7 @@ const Sidebar = () => {
                     return (
                       <div class="flex items-center gap-3">
                         <Checkbox
-                          checked={!!isCategoryIncluded}
+                          checked={isCategoryIncluded}
                           onChange={(checked) => {
                             const prevCategories =
                               infiniteQuery?.query.categories || [];

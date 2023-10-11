@@ -1,25 +1,23 @@
 import { Trans, useTransContext } from "@gd/i18n";
-import { Button, Dropdown, Input, Skeleton } from "@gd/ui";
+import { Dropdown, Input, Skeleton } from "@gd/ui";
 import {
+  createEffect,
+  createMemo,
+  createSignal,
   For,
   Match,
-  Show,
-  Switch,
-  createEffect,
-  createSignal,
   onCleanup,
-  onMount
+  onMount,
+  Switch
 } from "solid-js";
 import {
   CFFEModSearchSortField,
   MRFESearchIndex
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
-import { mappedMcVersions } from "@/utils/mcVersion";
 import { CurseForgeSortFields, ModrinthSortFields } from "@/utils/constants";
 import { setScrollTop } from "@/utils/browser";
 import ModRow from "@/components/ModRow";
-import { useModal } from "@/managers/ModalsManager";
 import { useRouteData } from "@solidjs/router";
 import fetchData from "./modpacksBrowser.data";
 import {
@@ -32,8 +30,6 @@ import { useInfiniteModsQuery } from "@/components/InfiniteScrollModsQueryWrappe
 
 const ModpackBrowser = () => {
   const [t] = useTransContext();
-  const modalsContext = useModal();
-
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const infiniteQuery = useInfiniteModsQuery();
@@ -87,6 +83,8 @@ const ModpackBrowser = () => {
   const sortingFields = () =>
     isCurseforge() ? CurseForgeSortFields : ModrinthSortFields;
 
+  const hasFiltersData = createMemo(() => sortingFields());
+
   return (
     <div class="box-border h-full w-full relative">
       <div
@@ -94,10 +92,10 @@ const ModpackBrowser = () => {
         class="flex flex-col bg-darkSlate-800 z-10 pt-5 px-5"
       >
         <Switch>
-          <Match when={infiniteQuery?.isLoading}>
+          <Match when={!hasFiltersData()}>
             <Skeleton.filters />
           </Match>
-          <Match when={!infiniteQuery?.isLoading}>
+          <Match when={hasFiltersData()}>
             <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
               <Input
                 placeholder="Type Here"
@@ -110,12 +108,7 @@ const ModpackBrowser = () => {
               />
               <div class="flex items-center gap-3">
                 <p class="text-darkSlate-50">
-                  <Trans
-                    key="instance.sort_by"
-                    options={{
-                      defaultValue: "Sort by:"
-                    }}
-                  />
+                  <Trans key="instance.sort_by" />
                 </p>
                 <Dropdown
                   options={sortingFields().map((field) => ({
@@ -138,38 +131,7 @@ const ModpackBrowser = () => {
                   value={0}
                   rounded
                 />
-                <Show when={mappedMcVersions().length > 0}>
-                  <Dropdown
-                    options={mappedMcVersions()}
-                    icon={<div class="i-ri:price-tag-3-fill" />}
-                    rounded
-                    value={mappedMcVersions()[0].key}
-                    onChange={(val) => {
-                      infiniteQuery?.setQuery({
-                        gameVersions: [val.key as string]
-                      });
-                    }}
-                  />
-                </Show>
-                <Show when={mappedMcVersions().length === 0}>
-                  <Skeleton.select />
-                </Show>
               </div>
-              <Button
-                type="outline"
-                onClick={() => {
-                  modalsContext?.openModal({
-                    name: "instanceCreation"
-                  });
-                }}
-              >
-                <Trans
-                  key="sidebar.plus_add_instance"
-                  options={{
-                    defaultValue: "+ Add Instance"
-                  }}
-                />
-              </Button>
               <div
                 class="cursor-pointer text-2xl"
                 classList={{
@@ -185,18 +147,6 @@ const ModpackBrowser = () => {
                   });
                 }}
               />
-              {/* <Button
-            type="outline"
-            size="medium"
-            icon={<div class="rounded-full text-md i-ri:download-2-fill" />}
-          >
-            <Trans
-              key="instance.import"
-              options={{
-                defaultValue: "Import",
-              }}
-            />
-          </Button> */}
             </div>
           </Match>
         </Switch>
