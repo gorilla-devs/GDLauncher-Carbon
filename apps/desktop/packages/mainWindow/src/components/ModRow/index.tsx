@@ -51,8 +51,6 @@ const ModRow = (props: ModRowProps) => {
         (task.data?.download_total || 0) > 0 &&
         task.data?.download_total === task.data?.downloaded;
 
-      console.log(task.data, isDownloaded());
-
       if (isDownloaded()) {
         setLoading(false);
         setTaskId(undefined);
