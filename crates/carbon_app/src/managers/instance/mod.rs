@@ -31,6 +31,7 @@ use super::ManagerRef;
 use crate::domain::instance::{self as domain, GameLogId, GroupId, InstanceFolder, InstanceId};
 use domain::info;
 
+pub mod export;
 pub mod importer;
 pub mod installer;
 pub mod log;
@@ -47,6 +48,7 @@ pub struct InstanceManager {
     path_lock: Mutex<()>,
     loaded_icon: Mutex<Option<(String, Vec<u8>)>>,
     persistence_manager: PersistenceManager,
+    export_manager: ExportManager,
     game_logs: RwLock<HashMap<GameLogId, (InstanceId, watch::Receiver<GameLog>)>>,
 }
 
