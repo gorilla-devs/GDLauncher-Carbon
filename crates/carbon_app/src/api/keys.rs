@@ -94,6 +94,7 @@ keys! {
         DISABLE_MOD                                 = "disableMod";
         DELETE_MOD                                  = "deleteMod";
         INSTALL_MOD                                 = "installMod";
+        GET_IMPORTABLE_ENTITIES                     = "getImportableEntities";
         GET_IMPORT_ENTITY_DEFAULT_PATH              = "getImportEntityDefaultPath";
         SET_IMPORT_SCAN_TARGET                      = "setImportScanTarget";
         CANCEL_IMPORT_SCAN                          = "cancelImportScan";

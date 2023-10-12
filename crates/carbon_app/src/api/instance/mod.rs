@@ -277,6 +277,16 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             .await
         }
 
+        query GET_IMPORTABLE_ENTITIES[_, _args: ()] {
+            anyhow::Result::Ok(importer::Entity::list()
+                .into_iter()
+                .map(|(e, support)| ImportEntityStatus {
+                    entity: ImportEntity::from(e),
+                    supported: support,
+                })
+                .collect::<Vec<_>>())
+        }
+
         query GET_IMPORT_ENTITY_DEFAULT_PATH[_, entity: ImportEntity] {
             importer::Entity::from(entity)
                 .get_default_scan_path()
@@ -822,7 +832,7 @@ struct ModrinthModMetadata {
     has_image: bool,
 }
 
-#[derive(Type, Debug, Deserialize)]
+#[derive(Type, Debug, Serialize, Deserialize)]
 pub enum ImportEntity {
     LegacyGDLauncher,
     MRPack,
@@ -865,6 +875,12 @@ enum ImportScanStatus {
 struct FullImportScanStatus {
     scanning: bool,
     status: ImportScanStatus,
+}
+
+#[derive(Type, Debug, Serialize)]
+struct ImportEntityStatus {
+    entity: ImportEntity,
+    supported: bool,
 }
 
 impl From<domain::InstanceDetails> for InstanceDetails {
@@ -1249,6 +1265,25 @@ impl From<ImportEntity> for importer::Entity {
             ImportEntity::FTB => Self::FTB,
             ImportEntity::MultiMC => Self::MultiMC,
             ImportEntity::PrismLauncher => Self::PrismLauncher,
+        }
+    }
+}
+
+impl From<importer::Entity> for ImportEntity {
+    fn from(entity: importer::Entity) -> Self {
+        use importer::Entity as backend;
+
+        match entity {
+            backend::LegacyGDLauncher => Self::LegacyGDLauncher,
+            backend::MRPack => Self::MRPack,
+            backend::Modrinth => Self::Modrinth,
+            backend::CurseForgeZip => Self::CurseForgeZip,
+            backend::CurseForge => Self::CurseForge,
+            backend::ATLauncher => Self::ATLauncher,
+            backend::Technic => Self::Technic,
+            backend::FTB => Self::FTB,
+            backend::MultiMC => Self::MultiMC,
+            backend::PrismLauncher => Self::PrismLauncher,
         }
     }
 }

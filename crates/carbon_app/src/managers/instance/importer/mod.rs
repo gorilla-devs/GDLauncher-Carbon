@@ -156,9 +156,16 @@ pub enum Entity {
 }
 
 impl Entity {
-    pub fn get_available() -> Vec<Self> {
+    pub fn list() -> Vec<(Self, bool)> {
         use strum::IntoEnumIterator;
-        Self::iter().collect()
+
+        const SUPPORT: [Entity; 3] = [
+            Entity::LegacyGDLauncher,
+            Entity::MRPack,
+            Entity::CurseForgeZip,
+        ];
+
+        Self::iter().map(|v| (v, SUPPORT.contains(&v))).collect()
     }
 
     pub fn create_importer(self) -> Arc<dyn InstanceImporter> {
