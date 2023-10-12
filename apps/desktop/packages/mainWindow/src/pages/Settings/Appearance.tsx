@@ -16,7 +16,7 @@ const Appearance = () => {
   const settingsMutation = rspc.createMutation(["settings.setSettings"], {
     onMutate: (newTheme) => {
       queryClient.setQueryData(["settings.setSettings"], newTheme);
-    },
+    }
   });
 
   // const anotherTheme = getThemeColors(anotherThemeName);
@@ -26,12 +26,7 @@ const Appearance = () => {
     <LoadingError routeData={routeData}>
       <>
         <PageTitle>
-          <Trans
-            key="settings.appearance"
-            options={{
-              defaultValue: "Appearance",
-            }}
-          />
+          <Trans key="settings:Appearance" />
         </PageTitle>
         <Row class="gap-4 w-full border-box flex-wrap max-w-full">
           <For each={themes}>
@@ -48,7 +43,7 @@ const Appearance = () => {
                   style={{ "background-color": shade1 }}
                   onClick={() => {
                     settingsMutation.mutate({
-                      theme: theme,
+                      theme: theme
                     });
                   }}
                 >
@@ -65,7 +60,7 @@ const Appearance = () => {
                       <Trans
                         key={`settings.theme_${theme}`}
                         options={{
-                          defaultValue: "default",
+                          defaultValue: "default"
                         }}
                       />
                     </p>

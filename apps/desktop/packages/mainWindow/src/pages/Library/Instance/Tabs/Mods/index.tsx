@@ -26,7 +26,7 @@ const Mods = () => {
   const enableModMutation = rspc.createMutation(["instance.enableMod"]);
 
   const openFolderMutation = rspc.createMutation([
-    "instance.openInstanceFolder",
+    "instance.openInstanceFolder"
   ]);
 
   const filteredMods = createMemo(() =>
@@ -47,7 +47,7 @@ const Mods = () => {
               key="instance.no_mods_text"
               options={{
                 defaultValue:
-                  "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder",
+                  "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder"
               }}
             />
           </p>
@@ -86,14 +86,14 @@ const Mods = () => {
               <Trans
                 key="instance.sort_by"
                 options={{
-                  defaultValue: "Sort by:",
+                  defaultValue: "Sort by:"
                 }}
               />
             </p>
             <Dropdown
               options={[
                 { label: t("instance.sort_by_asc"), key: "asc" },
-                { label: t("instance.sort_by_desc"), key: "desc" },
+                { label: t("instance.sort_by_desc"), key: "desc" }
               ]}
               value={"asc"}
               rounded
@@ -125,7 +125,7 @@ const Mods = () => {
               <Trans
                 key="instance.select_all_mods"
                 options={{
-                  defaultValue: "Select All",
+                  defaultValue: "Select All"
                 }}
               />
             </div>
@@ -134,7 +134,7 @@ const Mods = () => {
               onClick={() => {
                 openFolderMutation.mutate({
                   folder: "Mods",
-                  instance_id: parseInt(params.id, 10),
+                  instance_id: parseInt(params.id, 10)
                 });
               }}
             >
@@ -142,7 +142,7 @@ const Mods = () => {
               <Trans
                 key="instance.open_mods_folder"
                 options={{
-                  defaultValue: "Open folder",
+                  defaultValue: "Open folder"
                 }}
               />
             </div>
@@ -153,7 +153,7 @@ const Mods = () => {
                 Object.keys(selectedMods).forEach((mod) => {
                   deleteModMutation.mutate({
                     instance_id: parseInt(params.id, 10),
-                    mod_id: mod,
+                    mod_id: mod
                   });
                 });
               }}
@@ -162,7 +162,7 @@ const Mods = () => {
               <Trans
                 key="instance.delete_mod"
                 options={{
-                  defaultValue: "delete",
+                  defaultValue: "delete"
                 }}
               />
             </div>
@@ -180,12 +180,12 @@ const Mods = () => {
                       if (areSelectedEnabled) {
                         disableModMutation.mutate({
                           instance_id: parseInt(params.id, 10),
-                          mod_id: mod.id,
+                          mod_id: mod.id
                         });
                       } else {
                         enableModMutation.mutate({
                           instance_id: parseInt(params.id, 10),
-                          mod_id: mod.id,
+                          mod_id: mod.id
                         });
                       }
                     });
@@ -199,7 +199,7 @@ const Mods = () => {
                     <Trans
                       key="instance.enable_all_selected_mod"
                       options={{
-                        defaultValue: "Enable selected",
+                        defaultValue: "Enable selected"
                       }}
                     />
                   }
@@ -207,7 +207,7 @@ const Mods = () => {
                   <Trans
                     key="instance.disable_all_selected_mod"
                     options={{
-                      defaultValue: "Disable selected",
+                      defaultValue: "Disable selected"
                     }}
                   />
                 </Show>
@@ -220,7 +220,7 @@ const Mods = () => {
             <Trans
               key="instance.mods"
               options={{
-                defaultValue: "Mods",
+                defaultValue: "Mods"
               }}
             />
           </div>

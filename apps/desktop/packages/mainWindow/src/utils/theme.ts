@@ -3,7 +3,7 @@ import {
   lightTheme,
   Theme as UITheme,
   poisonGreen,
-  dracula,
+  dracula
 } from "@gd/ui";
 import { createEffect } from "solid-js";
 import { rspc } from "./rspcClient";
@@ -12,7 +12,7 @@ enum _Theme {
   _Default = "default",
   _Light = "light",
   _PoisonGreen = "poison-green",
-  _Dracula = "dracula",
+  _Dracula = "dracula"
 }
 
 const initThemes = () => {

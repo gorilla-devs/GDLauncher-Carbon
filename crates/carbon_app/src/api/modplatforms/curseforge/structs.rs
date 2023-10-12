@@ -865,7 +865,7 @@ pub enum CFFEModLoaderType {
     LiteLoader,
     Fabric,
     Quilt,
-    Other(u8),
+    Unknown,
 }
 
 use mpcf::ModLoaderType as CFModLoaderType;
@@ -878,7 +878,7 @@ impl From<CFModLoaderType> for CFFEModLoaderType {
             CFModLoaderType::LiteLoader => CFFEModLoaderType::LiteLoader,
             CFModLoaderType::Fabric => CFFEModLoaderType::Fabric,
             CFModLoaderType::Quilt => CFFEModLoaderType::Quilt,
-            CFModLoaderType::Other(other) => CFFEModLoaderType::Other(other),
+            CFModLoaderType::Other(_) => CFFEModLoaderType::Unknown,
         }
     }
 }
@@ -892,7 +892,7 @@ impl From<CFFEModLoaderType> for CFModLoaderType {
             CFFEModLoaderType::LiteLoader => CFModLoaderType::LiteLoader,
             CFFEModLoaderType::Fabric => CFModLoaderType::Fabric,
             CFFEModLoaderType::Quilt => CFModLoaderType::Quilt,
-            CFFEModLoaderType::Other(other) => CFModLoaderType::Other(other),
+            CFFEModLoaderType::Unknown => CFModLoaderType::Other(0),
         }
     }
 }

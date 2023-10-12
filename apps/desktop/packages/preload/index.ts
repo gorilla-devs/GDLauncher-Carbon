@@ -5,3 +5,4 @@ import "./autoupdate";
 import "./openExternal";
 import "./os";
 import "./overwolf";
+import "./runtimePath";

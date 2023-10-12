@@ -3,7 +3,7 @@ import {
   createContext,
   createSignal,
   JSX,
-  useContext,
+  useContext
 } from "solid-js";
 
 type ContextMenuContextValue = {

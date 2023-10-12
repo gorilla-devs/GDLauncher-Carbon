@@ -1,15 +1,16 @@
 import { Trans, useTransContext } from "@gd/i18n";
-import { Dropdown, Input, Skeleton } from "@gd/ui";
+import { Button, Dropdown, Input, Skeleton } from "@gd/ui";
 import {
-  For,
-  Match,
-  Show,
-  Switch,
   createEffect,
+  createMemo,
   createResource,
   createSignal,
+  For,
+  Match,
   onCleanup,
   onMount,
+  Show,
+  Switch
 } from "solid-js";
 import {
   CFFEModSearchSortField,
@@ -17,8 +18,8 @@ import {
   FEUnifiedSearchParameters,
   FEUnifiedSearchResult,
   InstanceDetails,
-  MRFESearchIndex,
   Mod,
+  MRFESearchIndex
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import { CurseForgeSortFields, ModrinthSortFields } from "@/utils/constants";
@@ -29,14 +30,16 @@ import { fetchImage } from "@/utils/instances";
 import { FetchingModpacks, NoModpacksAvailable } from "./ModsStatus";
 import {
   ErrorFetchingModpacks,
-  NoMoreModpacks,
+  NoMoreModpacks
 } from "../Modpacks/ModpacksStatus";
 import { useRouteData, useSearchParams } from "@solidjs/router";
 import { rspc } from "@/utils/rspcClient";
 import DefaultImg from "/assets/images/default-instance-img.png";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 const ModsBrowser = () => {
   const [t] = useTransContext();
+  const navigate = useGDNavigate();
 
   const [instanceMods, setInstanceMods] = createSignal<Mod[]>([]);
   const [instanceDetails, setinstanceDetails] = createSignal<
@@ -53,16 +56,24 @@ const ModsBrowser = () => {
 
   const lastItem = () => allVirtualRows()[allVirtualRows().length - 1];
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const instanceId = () =>
-    parseInt(searchParams.instanceId, 10) || infiniteQuery.instanceId();
+  const instanceId = () => {
+    const res =
+      infiniteQuery.instanceId() ?? parseInt(searchParams.instanceId, 10);
+
+    if (isNaN(res)) {
+      return undefined;
+    }
+
+    return res;
+  };
 
   createEffect(() => {
     if (instanceId() !== undefined) {
       const mods = rspc.createQuery(() => [
         "instance.getInstanceMods",
-        instanceId() as number,
+        instanceId() as number
       ]);
 
       if (mods.data) setInstanceMods(mods.data);
@@ -73,7 +84,7 @@ const ModsBrowser = () => {
     if (instanceId() !== undefined) {
       const InstanceDetails = rspc.createQuery(() => [
         "instance.getInstanceDetails",
-        instanceId() as number,
+        instanceId() as number
       ]);
 
       if (InstanceDetails.data) setinstanceDetails(InstanceDetails.data);
@@ -105,7 +116,7 @@ const ModsBrowser = () => {
 
   const [headerHeight, setHeaderHeight] = createSignal(90);
 
-  let containrRef: HTMLDivElement;
+  let containerRef: HTMLDivElement;
   let resizeObserver: ResizeObserver;
 
   onMount(() => {
@@ -115,7 +126,7 @@ const ModsBrowser = () => {
       });
     });
 
-    resizeObserver.observe(containrRef);
+    resizeObserver.observe(containerRef);
   });
 
   onCleanup(() => {
@@ -138,18 +149,27 @@ const ModsBrowser = () => {
 
   const instanceModloaders = () =>
     instanceDetails()?.modloaders.map((modloader) => modloader.type_);
+
   const instancePlatform = () =>
     Object.keys(instanceDetails()?.modpack || {})[0]?.toLocaleLowerCase();
 
-  createEffect(() => {
+  createEffect((_firstTime: boolean) => {
     const modloaders = instanceModloaders();
     const platform = instancePlatform();
     const _ = instanceId();
+
+    // if (_firstTime) {
+    //   return false;
+    // }
 
     const newQuery: Partial<FEUnifiedSearchParameters> = {};
 
     if (platform) {
       newQuery["searchApi"] = platform as FESearchAPI;
+    }
+
+    if (instanceDetails()?.version) {
+      newQuery["gameVersions"] = [instanceDetails()?.version!];
     }
 
     if (modloaders) {
@@ -164,24 +184,28 @@ const ModsBrowser = () => {
         newQuery["modloaders"].push("fabric");
         newQuery["modloaders"].push("quilt");
       } else {
-        newQuery["modloaders"] = [...modloaders];
+        newQuery["modloaders"] = [...modloaders] as any;
       }
     }
 
     infiniteQuery.setQuery(newQuery);
-  });
+
+    return false;
+  }, true);
+
+  const hasFiltersData = createMemo(() => Boolean(sortingFields()));
 
   return (
     <div class="box-border h-full w-full relative">
       <div
-        ref={(el) => (containrRef = el)}
+        ref={(el) => (containerRef = el)}
         class="flex flex-col bg-darkSlate-800 z-10 px-5 pt-5"
       >
         <Switch>
-          <Match when={infiniteQuery?.isLoading}>
+          <Match when={!hasFiltersData()}>
             <Skeleton.filters />
           </Match>
-          <Match when={!infiniteQuery?.isLoading}>
+          <Match when={hasFiltersData()}>
             <div class="flex flex-col bg-darkSlate-800 top-0 z-10 left-0 right-0 sticky">
               <Show when={instanceDetails()}>
                 <div
@@ -189,18 +213,30 @@ const ModsBrowser = () => {
                   style={{
                     "background-image": imageResource()
                       ? `url("${imageResource()}")`
-                      : `url("${DefaultImg}")`,
+                      : `url("${DefaultImg}")`
                   }}
                 >
                   <div class="absolute z-0 bg-gradient-to-r from-darkSlate-700 from-50% inset-0" />
                   <div class="absolute inset-0 from-darkSlate-700 z-0 bg-gradient-to-t" />
                   <div class="flex gap-4 z-10 items-center">
+                    <Button
+                      onClick={() => {
+                        navigate(`/library/${instanceId()}/mods`);
+                      }}
+                      type="outline"
+                      size="small"
+                      icon={
+                        <i class="i-ri:arrow-left-s-line text-darkSlate-50 cursor-pointer hover:text-white transition tranition-color" />
+                      }
+                    >
+                      <Trans key="instance.go_to_installed_mods" />
+                    </Button>
                     <div
                       class="w-6 h-6 bg-center bg-cover"
                       style={{
                         "background-image": imageResource()
                           ? `url("${imageResource()}")`
-                          : `url("${DefaultImg}")`,
+                          : `url("${DefaultImg}")`
                       }}
                     />
                     <h2 class="m-0">{instanceDetails()?.name}</h2>
@@ -208,9 +244,12 @@ const ModsBrowser = () => {
                   <i
                     class="i-ri:close-fill text-darkSlate-50 cursor-pointer hover:text-white transition tranition-color"
                     onClick={() => {
+                      setSearchParams({
+                        instanceId: undefined
+                      });
                       infiniteQuery.setInstanceId(undefined);
                       infiniteQuery.setQuery({
-                        modloaders: null,
+                        modloaders: null
                       });
                       setinstanceDetails(undefined);
                       setInstanceMods([]);
@@ -220,7 +259,7 @@ const ModsBrowser = () => {
               </Show>
               <div class="flex items-center justify-between gap-3 flex-wrap pb-4">
                 <Input
-                  placeholder="Type Here"
+                  placeholder={t("mods.search_mods")}
                   icon={<div class="i-ri:search-line" />}
                   class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
                   value={infiniteQuery.query.searchQuery!}
@@ -236,19 +275,19 @@ const ModsBrowser = () => {
                   <Dropdown
                     options={sortingFields().map((field) => ({
                       label: t(`instance.sort_by_${field}`),
-                      key: field,
+                      key: field
                     }))}
                     onChange={(val) => {
                       const sortIndex = isCurseforge()
                         ? {
-                            curseForge: val.key as CFFEModSearchSortField,
+                            curseForge: val.key as CFFEModSearchSortField
                           }
                         : {
-                            modrinth: val.key as MRFESearchIndex,
+                            modrinth: val.key as MRFESearchIndex
                           };
 
                       infiniteQuery.setQuery({
-                        sortIndex,
+                        sortIndex
                       });
                     }}
                     value={
@@ -273,12 +312,12 @@ const ModsBrowser = () => {
                     "i-ri:sort-asc":
                       infiniteQuery.query.sortOrder === "ascending",
                     "i-ri:sort-desc":
-                      infiniteQuery.query.sortOrder === "descending",
+                      infiniteQuery.query.sortOrder === "descending"
                   }}
                   onClick={() => {
                     const isAsc = infiniteQuery.query.sortOrder === "ascending";
                     infiniteQuery.setQuery({
-                      sortOrder: isAsc ? "descending" : "ascending",
+                      sortOrder: isAsc ? "descending" : "ascending"
                     });
                   }}
                 />
@@ -289,7 +328,7 @@ const ModsBrowser = () => {
         <div
           class="flex flex-col gap-2 left-0 right-0 absolute bottom-0 pb-5 overflow-y-hidden"
           style={{
-            top: `${headerHeight()}px`,
+            top: `${headerHeight()}px`
           }}
         >
           <Switch>
@@ -309,7 +348,7 @@ const ModsBrowser = () => {
                   style={{
                     height: `${infiniteQuery?.rowVirtualizer.getTotalSize()}px`,
                     width: "100%",
-                    position: "relative",
+                    position: "relative"
                   }}
                 >
                   <For each={allVirtualRows()}>
@@ -331,7 +370,7 @@ const ModsBrowser = () => {
                             left: 0,
                             width: "100%",
                             height: `${virtualItem.size}px`,
-                            transform: `translateY(${virtualItem.start}px)`,
+                            transform: `translateY(${virtualItem.start}px)`
                           }}
                         >
                           <div>

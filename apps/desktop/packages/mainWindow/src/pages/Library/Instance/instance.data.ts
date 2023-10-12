@@ -4,16 +4,16 @@ import { rspc } from "@/utils/rspcClient";
 const fetchData = ({ params }) => {
   const instanceDetails = rspc.createQuery(() => [
     "instance.getInstanceDetails",
-    parseInt(params.id, 10),
+    parseInt(params.id, 10)
   ]);
 
   const instancesUngrouped = rspc.createQuery(() => [
-    "instance.getInstancesUngrouped",
+    "instance.getInstancesUngrouped"
   ]);
 
   const instanceMods = rspc.createQuery(() => [
     "instance.getInstanceMods",
-    parseInt(params.id, 10),
+    parseInt(params.id, 10)
   ]);
 
   const totalRam = rspc.createQuery(() => ["systeminfo.getTotalRAM"]);

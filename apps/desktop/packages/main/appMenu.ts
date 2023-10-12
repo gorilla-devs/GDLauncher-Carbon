@@ -8,28 +8,28 @@ const edit = [
           submenu: [
             {
               label: "About GDLauncher",
-              role: "about",
+              role: "about"
             },
             { type: "separator" },
             {
               label: "Services",
               role: "services",
-              submenu: [],
+              submenu: []
             },
             { type: "separator" },
             {
               label: "Hide GDLauncher",
               accelerator: "Command+H",
-              role: "hide",
+              role: "hide"
             },
             {
               label: "Hide Others",
               accelerator: "Command+Alt+H",
-              role: "hideOthers",
+              role: "hideOthers"
             },
             {
               label: "Show All",
-              role: "unhide",
+              role: "unhide"
             },
             { type: "separator" },
             {
@@ -37,10 +37,10 @@ const edit = [
               accelerator: "Command+Q",
               click: () => {
                 app.quit();
-              },
-            },
-          ],
-        },
+              }
+            }
+          ]
+        }
       ]
     : []),
   {
@@ -49,28 +49,28 @@ const edit = [
       {
         label: "Cut",
         accelerator: "CmdOrCtrl+X",
-        selector: "cut:",
+        selector: "cut:"
       },
       {
         label: "Copy",
         accelerator: "CmdOrCtrl+C",
-        selector: "copy:",
+        selector: "copy:"
       },
       {
         label: "Paste",
         accelerator: "CmdOrCtrl+V",
-        selector: "paste:",
+        selector: "paste:"
       },
       {
         label: "Select All",
         accelerator: "CmdOrCtrl+A",
-        selector: "selectAll:",
+        selector: "selectAll:"
       },
       { type: "separator" },
       { label: "Undo", accelerator: "CmdOrCtrl+Z", selector: "undo:" },
-      { label: "Redo", accelerator: "Shift+CmdOrCtrl+Z", selector: "redo:" },
-    ],
-  },
+      { label: "Redo", accelerator: "Shift+CmdOrCtrl+Z", selector: "redo:" }
+    ]
+  }
 ];
 
 Menu.setApplicationMenu(Menu.buildFromTemplate(edit as any));

@@ -1,39 +1,35 @@
 import { Trans, useTransContext } from "@gd/i18n";
-import { Button, Dropdown, Input, Skeleton } from "@gd/ui";
+import { Dropdown, Input, Skeleton } from "@gd/ui";
 import {
+  createEffect,
+  createMemo,
+  createSignal,
   For,
   Match,
-  Show,
-  Switch,
-  createEffect,
-  createSignal,
   onCleanup,
   onMount,
+  Switch
 } from "solid-js";
 import {
   CFFEModSearchSortField,
-  MRFESearchIndex,
+  MRFESearchIndex
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
-import { mappedMcVersions } from "@/utils/mcVersion";
 import { CurseForgeSortFields, ModrinthSortFields } from "@/utils/constants";
 import { setScrollTop } from "@/utils/browser";
 import ModRow from "@/components/ModRow";
-import { useModal } from "@/managers/ModalsManager";
 import { useRouteData } from "@solidjs/router";
 import fetchData from "./modpacksBrowser.data";
 import {
   ErrorFetchingModpacks,
   FetchingModpacks,
   NoModpacksAvailable,
-  NoMoreModpacks,
+  NoMoreModpacks
 } from "./ModpacksStatus";
 import { useInfiniteModsQuery } from "@/components/InfiniteScrollModsQueryWrapper";
 
 const ModpackBrowser = () => {
   const [t] = useTransContext();
-  const modalsContext = useModal();
-
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const infiniteQuery = useInfiniteModsQuery();
@@ -87,6 +83,8 @@ const ModpackBrowser = () => {
   const sortingFields = () =>
     isCurseforge() ? CurseForgeSortFields : ModrinthSortFields;
 
+  const hasFiltersData = createMemo(() => sortingFields());
+
   return (
     <div class="box-border h-full w-full relative">
       <div
@@ -94,10 +92,10 @@ const ModpackBrowser = () => {
         class="flex flex-col bg-darkSlate-800 z-10 pt-5 px-5"
       >
         <Switch>
-          <Match when={infiniteQuery?.isLoading}>
+          <Match when={!hasFiltersData()}>
             <Skeleton.filters />
           </Match>
-          <Match when={!infiniteQuery?.isLoading}>
+          <Match when={hasFiltersData()}>
             <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
               <Input
                 placeholder="Type Here"
@@ -110,100 +108,52 @@ const ModpackBrowser = () => {
               />
               <div class="flex items-center gap-3">
                 <p class="text-darkSlate-50">
-                  <Trans
-                    key="instance.sort_by"
-                    options={{
-                      defaultValue: "Sort by:",
-                    }}
-                  />
+                  <Trans key="instance.sort_by" />
                 </p>
                 <Dropdown
                   options={sortingFields().map((field) => ({
                     label: t(`instance.sort_by_${field}`),
-                    key: field,
+                    key: field
                   }))}
                   onChange={(val) => {
                     const sortIndex = isCurseforge()
                       ? {
-                          curseForge: val.key as CFFEModSearchSortField,
+                          curseForge: val.key as CFFEModSearchSortField
                         }
                       : {
-                          modrinth: val.key as MRFESearchIndex,
+                          modrinth: val.key as MRFESearchIndex
                         };
 
                     infiniteQuery?.setQuery({
-                      sortIndex: sortIndex,
+                      sortIndex: sortIndex
                     });
                   }}
                   value={0}
                   rounded
                 />
-                <Show when={mappedMcVersions().length > 0}>
-                  <Dropdown
-                    options={mappedMcVersions()}
-                    icon={<div class="i-ri:price-tag-3-fill" />}
-                    rounded
-                    value={mappedMcVersions()[0].key}
-                    onChange={(val) => {
-                      infiniteQuery?.setQuery({
-                        gameVersions: [val.key as string],
-                      });
-                    }}
-                  />
-                </Show>
-                <Show when={mappedMcVersions().length === 0}>
-                  <Skeleton.select />
-                </Show>
               </div>
-              <Button
-                type="outline"
-                onClick={() => {
-                  modalsContext?.openModal({
-                    name: "instanceCreation",
-                  });
-                }}
-              >
-                <Trans
-                  key="sidebar.plus_add_instance"
-                  options={{
-                    defaultValue: "+ Add Instance",
-                  }}
-                />
-              </Button>
               <div
                 class="cursor-pointer text-2xl"
                 classList={{
                   "i-ri:sort-asc":
                     infiniteQuery?.query.sortOrder === "ascending",
                   "i-ri:sort-desc":
-                    infiniteQuery?.query.sortOrder === "descending",
+                    infiniteQuery?.query.sortOrder === "descending"
                 }}
                 onClick={() => {
                   const isAsc = infiniteQuery?.query.sortOrder === "ascending";
                   infiniteQuery?.setQuery({
-                    sortOrder: isAsc ? "descending" : "ascending",
+                    sortOrder: isAsc ? "descending" : "ascending"
                   });
                 }}
               />
-              {/* <Button
-            type="outline"
-            size="medium"
-            icon={<div class="rounded-full text-md i-ri:download-2-fill" />}
-          >
-            <Trans
-              key="instance.import"
-              options={{
-                defaultValue: "Import",
-              }}
-            />
-          </Button> */}
             </div>
           </Match>
         </Switch>
         <div
           class="flex flex-col gap-2 left-0 right-0 absolute bottom-0 pb-5 overflow-y-hidden"
           style={{
-            top: `${headerHeight()}px`,
+            top: `${headerHeight()}px`
           }}
         >
           <Switch>
@@ -226,7 +176,7 @@ const ModpackBrowser = () => {
                   style={{
                     height: `${infiniteQuery?.rowVirtualizer.getTotalSize()}px`,
                     width: "100%",
-                    position: "relative",
+                    position: "relative"
                   }}
                 >
                   <For each={allVirtualRows()}>
@@ -247,7 +197,7 @@ const ModpackBrowser = () => {
                             left: 0,
                             width: "100%",
                             height: `${virtualItem.size}px`,
-                            transform: `translateY(${virtualItem.start}px)`,
+                            transform: `translateY(${virtualItem.start}px)`
                           }}
                         >
                           <div>

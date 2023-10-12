@@ -4,7 +4,7 @@ import {
   FEModResponse,
   MRFEProject,
   MRFETeamMember,
-  MRFETeamResponse,
+  MRFETeamResponse
 } from "@gd/core_module/bindings";
 import { rspc } from "@/utils/rspcClient";
 
@@ -25,7 +25,7 @@ const Authors = (props: Props) => {
     ) {
       const modrinthAuthorsQuery = rspc.createQuery(() => [
         "modplatforms.modrinth.getTeam",
-        (props.modpackDetails as MRFEProject)?.team,
+        (props.modpackDetails as MRFEProject)?.team
       ]);
 
       if (modrinthAuthorsQuery.data) setAuthors(modrinthAuthorsQuery.data);

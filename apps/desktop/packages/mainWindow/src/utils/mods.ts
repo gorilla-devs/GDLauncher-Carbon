@@ -1,40 +1,18 @@
 import {
   CFFEFileIndex,
   CFFEMod,
-  MRFEVersion,
   FEUnifiedSearchResult,
-  MRFECategoriesResponse,
   Mod,
+  MRFECategoriesResponse,
+  MRFEVersion
 } from "@gd/core_module/bindings";
 import { MODRNITH_WEBSITE_MODPACKS } from "./constants";
 import useModpacksQuery from "@/pages/Modpacks/useModsQuery";
 import useModsQuery from "@/pages/Mods/useModsQuery";
 
-export const [modpacksQuery, setModpacksQuery] = useModpacksQuery({
-  searchQuery: "",
-  categories: null,
-  gameVersions: null,
-  modloaders: null,
-  projectType: "modPack",
-  sortIndex: { curseForge: "featured" },
-  sortOrder: "descending",
-  index: 0,
-  pageSize: 40,
-  searchApi: "curseforge",
-});
+export const [modpacksQuery, setModpacksQuery] = useModpacksQuery();
 
-export const [modsQuery, setModsQuery] = useModsQuery({
-  searchApi: "curseforge",
-  searchQuery: "",
-  categories: null,
-  gameVersions: null,
-  modloaders: null,
-  projectType: "mod",
-  sortIndex: { curseForge: "featured" },
-  sortOrder: "descending",
-  index: 0,
-  pageSize: 20,
-});
+export const [modsQuery, setModsQuery] = useModsQuery();
 
 type BaseProps = {
   data: FEUnifiedSearchResult;

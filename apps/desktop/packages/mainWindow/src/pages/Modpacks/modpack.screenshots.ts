@@ -5,14 +5,14 @@ const fetchData = ({ params }: { params: any }) => {
   if (isCurseforge) {
     const modpackDetails = rspc.createQuery(() => [
       "modplatforms.curseforge.getMod",
-      { modId: parseInt(params.id, 10) },
+      { modId: parseInt(params.id, 10) }
     ]);
 
     return { modpackDetails, isCurseforge };
   } else {
     const modpackDetails = rspc.createQuery(() => [
       "modplatforms.modrinth.getProject",
-      params.id,
+      params.id
     ]);
 
     return { modpackDetails, isCurseforge };

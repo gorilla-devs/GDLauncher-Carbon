@@ -1,7 +1,6 @@
 use std::collections::HashSet;
 use std::convert::Infallible;
 use std::path::PathBuf;
-
 use std::sync::Arc;
 
 use anyhow::anyhow;
@@ -9,14 +8,15 @@ use axum::body::StreamBody;
 use axum::extract::{Query, State};
 use axum::response::IntoResponse;
 use chrono::{DateTime, Utc};
-
 use hyper::http::HeaderValue;
 use hyper::{HeaderMap, StatusCode};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
 use crate::api::instance::import::FEEntity;
+use crate::domain::instance as domain;
 use crate::error::{AxumError, FeError};
+use crate::managers::instance as manager;
 use crate::managers::instance::log::EntryType;
 use crate::managers::instance::InstanceMoveTarget;
 use crate::managers::{App, AppInner};
@@ -24,9 +24,6 @@ use crate::managers::{App, AppInner};
 use super::keys::instance::*;
 use super::router::router;
 use super::vtask::FETaskId;
-
-use crate::domain::instance as domain;
-use crate::managers::instance as manager;
 
 pub mod import;
 
@@ -514,7 +511,7 @@ enum ListInstanceStatus {
 #[derive(Type, Debug, Serialize)]
 struct ValidListInstance {
     mc_version: Option<String>,
-    modloader: Option<CFFEModLoaderType>,
+    modloader: Option<FEInstanceModloaderType>,
     modpack_platform: Option<ModpackPlatform>,
     state: LaunchState,
 }
@@ -743,13 +740,13 @@ enum InstanceFolder {
 
 #[derive(Type, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 struct ModLoader {
-    type_: CFFEModLoaderType,
+    type_: FEInstanceModloaderType,
     version: String,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
-enum CFFEModLoaderType {
+enum FEInstanceModloaderType {
     Forge,
     Fabric,
     Quilt,
@@ -779,12 +776,12 @@ struct Mod {
 
 #[derive(Type, Debug, Serialize)]
 struct ModFileMetadata {
-    modid: String,
+    modid: Option<String>,
     name: Option<String>,
     version: Option<String>,
     description: Option<String>,
     authors: Option<String>,
-    modloaders: Vec<CFFEModLoaderType>,
+    modloaders: Vec<FEInstanceModloaderType>,
     has_image: bool,
 }
 
@@ -848,7 +845,7 @@ impl From<domain::info::ModLoader> for ModLoader {
     }
 }
 
-impl From<domain::info::ModLoaderType> for CFFEModLoaderType {
+impl From<domain::info::ModLoaderType> for FEInstanceModloaderType {
     fn from(value: domain::info::ModLoaderType) -> Self {
         use domain::info::ModLoaderType as domain;
 
@@ -949,12 +946,12 @@ impl From<ModLoader> for domain::info::ModLoader {
     }
 }
 
-impl From<CFFEModLoaderType> for domain::info::ModLoaderType {
-    fn from(value: CFFEModLoaderType) -> Self {
+impl From<FEInstanceModloaderType> for domain::info::ModLoaderType {
+    fn from(value: FEInstanceModloaderType) -> Self {
         match value {
-            CFFEModLoaderType::Forge => Self::Forge,
-            CFFEModLoaderType::Fabric => Self::Fabric,
-            CFFEModLoaderType::Quilt => Self::Quilt,
+            FEInstanceModloaderType::Forge => Self::Forge,
+            FEInstanceModloaderType::Fabric => Self::Fabric,
+            FEInstanceModloaderType::Quilt => Self::Quilt,
         }
     }
 }

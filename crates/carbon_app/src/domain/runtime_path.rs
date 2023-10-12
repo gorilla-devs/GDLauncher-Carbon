@@ -340,3 +340,41 @@ impl Deref for RuntimePath {
         &self.0
     }
 }
+
+/// Recursivley copy from `from` to `to` except when excluded by `filter`.
+/// Overwrites existing files. May fail if a parent directory is filtered but children are not.
+pub async fn copy_dir_filter<F>(from: &Path, to: &Path, filter: F) -> anyhow::Result<()>
+where
+    F: for<'a> Fn(&'a Path) -> bool,
+{
+    let entries = walkdir::WalkDir::new(from).into_iter().filter_map(|entry| {
+        let Ok(entry) = entry else { return None };
+
+        let srcpath = entry.path().to_path_buf();
+        let relpath = srcpath.strip_prefix(from).unwrap();
+
+        if !filter(&relpath) {
+            return None;
+        }
+
+        let destpath = to.join(relpath);
+
+        Some(async move {
+            if entry.metadata()?.is_dir() {
+                tokio::fs::create_dir_all(destpath).await?;
+            } else {
+                tokio::fs::create_dir_all(destpath.parent().unwrap()).await?;
+                tokio::fs::copy(srcpath, destpath).await?;
+            }
+
+            Ok::<_, anyhow::Error>(())
+        })
+    });
+
+    futures::future::join_all(entries)
+        .await
+        .into_iter()
+        .collect::<Result<_, _>>()?;
+
+    Ok(())
+}

@@ -15,6 +15,7 @@ use crate::{
             },
             modrinth::{
                 self,
+                project::ProjectVersionsFilters,
                 search::{ProjectID, VersionID},
             },
             ModChannel,
@@ -890,7 +891,11 @@ impl ResourceInstaller for ModrinthModInstaller {
                             app_clone
                                 .modplatforms_manager()
                                 .modrinth
-                                .get_project_versions(ProjectID(project_id))
+                                .get_project_versions(ProjectVersionsFilters {
+                                    project_id: ProjectID(project_id),
+                                    game_version: None,
+                                    loaders: None,
+                                })
                                 .await
                                 .and_then(|versions| {
                                     if let Some((release, modloaders)) = game_version {

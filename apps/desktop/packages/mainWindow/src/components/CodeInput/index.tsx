@@ -12,7 +12,7 @@ export const DeviceCode = (props: Props) => {
       <span
         class="text-2xl font-normal"
         style={{
-          color: props.disabled ? "#404759" : "",
+          color: props.disabled ? "#404759" : ""
         }}
       >
         {props.value}
@@ -21,7 +21,7 @@ export const DeviceCode = (props: Props) => {
         id={props.id}
         class="cursor-pointer text-darkSlate-50 i-ri:file-copy-fill"
         style={{
-          color: props.disabled ? "#404759" : "#8A8B8F",
+          color: props.disabled ? "#404759" : "#8A8B8F"
         }}
         onClick={() => {
           if (props?.onClick && !props.disabled) {

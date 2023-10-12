@@ -13,7 +13,7 @@ const NoModpacksAvailable = () => {
           <Trans
             key="instance.fetching_no_modpacks_available"
             options={{
-              defaultValue: "No modpacks available",
+              defaultValue: "No modpacks available"
             }}
           />
         </p>
@@ -30,7 +30,7 @@ const FetchingModpacks = () => {
           <Trans
             key="instance.fetching_modpacks_text"
             options={{
-              defaultValue: "Loading modpacks",
+              defaultValue: "Loading modpacks"
             }}
           />
         </p>
@@ -71,5 +71,5 @@ export {
   NoMoreModpacks,
   NoModpacksAvailable,
   FetchingModpacks,
-  ErrorFetchingMods,
+  ErrorFetchingMods
 };

@@ -1,14 +1,13 @@
 use anyhow::bail;
 use thiserror::Error;
 
-use crate::domain::instance::info::ModLoaderType;
-use crate::{domain::vtask::VisualTaskId, managers::ManagerRef};
-
 use crate::db::{
     curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
     modrinth_mod_cache as mrdb,
 };
-use crate::{db::read_filters::IntFilter, domain::instance as domain};
+use crate::domain::instance as domain;
+use crate::domain::instance::info::ModLoaderType;
+use crate::{domain::vtask::VisualTaskId, managers::ManagerRef};
 
 use super::{
     installer::{CurseforgeModInstaller, IntoInstaller, ModrinthModInstaller},
@@ -28,9 +27,7 @@ impl ManagerRef<'_, InstanceManager> {
             .app
             .prisma_client
             .mod_file_cache()
-            .find_many(vec![fcdb::WhereParam::InstanceId(IntFilter::Equals(
-                *instance_id,
-            ))])
+            .find_many(vec![fcdb::instance_id::equals(*instance_id)])
             .with(
                 fcdb::metadata::fetch()
                     .with(metadb::logo_image::fetch())
@@ -44,26 +41,24 @@ impl ManagerRef<'_, InstanceManager> {
                 id: m.id,
                 filename: m.filename,
                 enabled: m.enabled,
-                metadata: m.metadata.as_ref().and_then(|m| {
-                    m.modid.clone().map(|modid| domain::ModFileMetadata {
-                        modid,
-                        name: m.name.clone(),
-                        version: m.version.clone(),
-                        description: m.description.clone(),
-                        authors: m.authors.clone(),
-                        modloaders: m
-                            .modloaders
-                            .split(',')
-                            // ignore unknown modloaders
-                            .flat_map(|loader| ModLoaderType::try_from(loader).ok())
-                            .collect::<Vec<_>>(),
-                        has_image: m
-                            .logo_image
-                            .as_ref()
-                            .map(|v| v.as_ref().map(|_| ()))
-                            .flatten()
-                            .is_some(),
-                    })
+                metadata: m.metadata.as_ref().map(|m| domain::ModFileMetadata {
+                    modid: m.modid.clone(),
+                    name: m.name.clone(),
+                    version: m.version.clone(),
+                    description: m.description.clone(),
+                    authors: m.authors.clone(),
+                    modloaders: m
+                        .modloaders
+                        .split(',')
+                        // ignore unknown modloaders
+                        .flat_map(|loader| ModLoaderType::try_from(loader).ok())
+                        .collect::<Vec<_>>(),
+                    has_image: m
+                        .logo_image
+                        .as_ref()
+                        .map(|v| v.as_ref().map(|_| ()))
+                        .flatten()
+                        .is_some(),
                 }),
                 curseforge: m
                     .metadata
@@ -320,9 +315,9 @@ pub struct InvalidModIdError(String);
 
 #[cfg(test)]
 mod test {
-    use crate::managers::instance::InstanceVersionSource;
     use std::collections::HashSet;
 
+    use crate::managers::instance::InstanceVersionSource;
     use crate::{api::keys::instance::INSTANCE_MODS, domain::instance::info};
 
     #[tokio::test]

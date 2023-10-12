@@ -1,21 +1,20 @@
 import {
-  CreateInfiniteQueryResult,
   createInfiniteQuery,
+  CreateInfiniteQueryResult
 } from "@tanstack/solid-query";
 import {
   Accessor,
-  Setter,
   createContext,
-  createEffect,
   createSignal,
   mergeProps,
-  onMount,
-  useContext,
+  onCleanup,
+  Setter,
+  useContext
 } from "solid-js";
 import {
   FEUnifiedSearchParameters,
   FEUnifiedSearchResult,
-  FEUnifiedSearchType,
+  FEUnifiedSearchType
 } from "@gd/core_module/bindings";
 import { createVirtualizer } from "@tanstack/solid-virtual";
 import { rspc } from "@/utils/rspcClient";
@@ -24,8 +23,10 @@ import {
   modpacksQuery,
   modsQuery,
   setModpacksQuery,
-  setModsQuery,
+  setModsQuery
 } from "@/utils/mods";
+import { modpacksDefaultQuery } from "@/pages/Modpacks/useModsQuery";
+import { modsDefaultQuery } from "@/pages/Mods/useModsQuery";
 
 type InfiniteQueryType = {
   infiniteQuery: CreateInfiniteQueryResult<any, unknown>;
@@ -34,7 +35,6 @@ type InfiniteQueryType = {
   setQuery: (_newValue: Partial<FEUnifiedSearchParameters>) => void;
   rowVirtualizer: any;
   setParentRef: Setter<HTMLDivElement | undefined>;
-  resetList: () => void;
   allRows: () => FEUnifiedSearchResult[];
   setInstanceId: Setter<number | undefined>;
   instanceId: Accessor<number | undefined>;
@@ -43,6 +43,7 @@ type InfiniteQueryType = {
 type Props = {
   children: any;
   type: FEUnifiedSearchType | null;
+  initialQuery?: Partial<FEUnifiedSearchParameters>;
 };
 
 const InfiniteQueryContext = createContext<InfiniteQueryType>();
@@ -51,39 +52,70 @@ export const useInfiniteModsQuery = () => {
   return useContext(InfiniteQueryContext) as InfiniteQueryType;
 };
 
+const [lastType, setLastType] = createSignal<FEUnifiedSearchType | null>(null);
+const [lastScrollPosition, setLastScrollPosition] = createSignal<number>(0);
+
 const InfiniteScrollModsQueryWrapper = (props: Props) => {
   const rspcContext = rspc.useContext();
   const [parentRef, setParentRef] = createSignal<HTMLDivElement | undefined>(
     undefined
   );
-  const [isLoading, setIsLoading] = createSignal(false);
 
   const mergedProps = mergeProps({ type: "modPack" }, props);
 
-  const isModpack = () => mergedProps.type === "modPack";
+  const isModpack = mergedProps.type === "modPack";
 
-  const query = () => (isModpack() ? modpacksQuery : modsQuery);
-  const getQueryFunction = () =>
-    isModpack() ? setModpacksQuery : setModsQuery;
+  const query = isModpack ? modpacksQuery : modsQuery;
+  const getQueryFunction = isModpack ? setModpacksQuery : setModsQuery;
+  const defaultQuery = {
+    ...(isModpack ? modpacksDefaultQuery : modsDefaultQuery),
+    ...(props.initialQuery || {})
+  };
 
   const infiniteQuery = createInfiniteQuery({
     queryKey: () => ["modplatforms.unifiedSearch"],
     queryFn: (ctx) => {
-      const setQuery = getQueryFunction();
-
-      setQuery({
-        index: ctx.pageParam + (query().pageSize || 20) + 1,
+      getQueryFunction({
+        index: ctx.pageParam + query.pageSize!
       });
-      return rspcContext.client.query(["modplatforms.unifiedSearch", query()]);
+
+      return rspcContext.client.query(["modplatforms.unifiedSearch", query]);
     },
     getNextPageParam: (lastPage) => {
       const index = lastPage?.pagination?.index || 0;
       const totalCount = lastPage.pagination?.totalCount || 0;
-      const pageSize = query().pageSize || 20;
+      const pageSize = query.pageSize || 20;
       const hasNextPage = index + pageSize < totalCount;
       return hasNextPage && index;
     },
+    enabled: false
   });
+
+  // when the user navigates away from the page, get the scroll position
+  function getCurrentScrollPosition() {
+    setLastScrollPosition(parentRef()?.scrollTop || 0);
+  }
+
+  onCleanup(() => {
+    getCurrentScrollPosition();
+  });
+
+  if (lastType() !== mergedProps.type) {
+    infiniteQuery.remove();
+    infiniteQuery.refetch();
+    getQueryFunction(defaultQuery);
+    parentRef()?.scrollTo(0, scrollTop());
+    setLastType(mergedProps.type);
+    setLastScrollPosition(0);
+  } else if (!infiniteQuery.isFetched) {
+    infiniteQuery.refetch();
+  } else {
+    queueMicrotask(() => {
+      parentRef()?.scrollTo({
+        top: lastScrollPosition()
+      });
+    });
+  }
 
   const allRows = () =>
     infiniteQuery.data ? infiniteQuery.data.pages.flatMap((d) => d.data) : [];
@@ -96,54 +128,30 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
     },
     getScrollElement: () => parentRef(),
     estimateSize: () => 150,
-    overscan: 15,
-  });
-
-  onMount(() => {
-    parentRef()?.scrollTo(0, scrollTop());
+    overscan: 15
   });
 
   const setQueryWrapper = (newValue: Partial<FEUnifiedSearchParameters>) => {
-    const setQuery = getQueryFunction();
-
-    setQuery(newValue);
+    getQueryFunction(newValue);
     infiniteQuery.remove();
     infiniteQuery.refetch();
     rowVirtualizer.scrollToIndex(0);
   };
-
-  const resetList = () => {
-    setIsLoading(true);
-    infiniteQuery.remove();
-    infiniteQuery.refetch();
-    rowVirtualizer.scrollToIndex(0);
-  };
-
-  createEffect(() => {
-    if (!infiniteQuery.isLoading) setIsLoading(false);
-  });
-
-  createEffect(() => {
-    if (query()) {
-      resetList();
-    }
-  });
 
   const context = {
     infiniteQuery,
     get query() {
-      return query();
+      return query;
     },
     get isLoading() {
-      return isLoading();
+      return infiniteQuery.isLoading;
     },
     setQuery: setQueryWrapper,
     rowVirtualizer,
     setParentRef,
-    resetList,
     allRows,
     setInstanceId,
-    instanceId,
+    instanceId
   };
 
   return (

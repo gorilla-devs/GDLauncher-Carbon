@@ -1,7 +1,7 @@
 import {
   CFFEModSearchSortField,
   MRFESearchIndex,
-  ModpackPlatform,
+  ModpackPlatform
 } from "@gd/core_module/bindings";
 
 export const NEWS_URL =
@@ -18,7 +18,7 @@ export const CurseForgeSortFields: CFFEModSearchSortField[] = [
   "author",
   "totalDownloads",
   "category",
-  "gameVersion",
+  "gameVersion"
 ];
 
 export const ModrinthSortFields: MRFESearchIndex[] = [
@@ -26,7 +26,7 @@ export const ModrinthSortFields: MRFESearchIndex[] = [
   "downloads",
   "follows",
   "newest",
-  "updated",
+  "updated"
 ];
 
 export const supportedCfModloaders = ["forge", "fabric", "quilt"];

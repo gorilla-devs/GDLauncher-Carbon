@@ -5,23 +5,25 @@ const fetchData = ({ params }: { params: any }) => {
   if (isCurseforge) {
     const curseforgeGetModFiles = rspc.createQuery(() => [
       "modplatforms.curseforge.getModFiles",
-      { modId: parseInt(params.id, 10), query: {} },
+      { modId: parseInt(params.id, 10), query: {} }
     ]);
 
     const curseforgeGetMod = rspc.createQuery(() => [
       "modplatforms.curseforge.getMod",
-      { modId: parseInt(params.id, 10) },
+      { modId: parseInt(params.id, 10) }
     ]);
 
     return { curseforgeGetModFiles, curseforgeGetMod, isCurseforge };
   } else {
     const modrinthGetProject = rspc.createQuery(() => [
       "modplatforms.modrinth.getProject",
-      params.id,
+      params.id
     ]);
     const modrinthProjectVersions = rspc.createQuery(() => [
       "modplatforms.modrinth.getProjectVersions",
-      params.id,
+      {
+        project_id: params.id
+      }
     ]);
 
     return { modrinthGetProject, isCurseforge, modrinthProjectVersions };

@@ -62,7 +62,7 @@ mod app {
         account_manager: AccountManager,
         pub(crate) invalidation_channel: broadcast::Sender<InvalidationEvent>,
         download_manager: DownloadManager,
-        instance_manager: InstanceManager,
+        pub(crate) instance_manager: InstanceManager,
         meta_cache_manager: MetaCacheManager,
         pub(crate) metrics_manager: MetricsManager,
         pub(crate) modplatforms_manager: ModplatformsManager,
@@ -135,8 +135,10 @@ mod app {
             let _app = app.clone();
             tokio::spawn(async move {
                 _app.meta_cache_manager().launch_background_tasks().await;
-                // ignore scanning errors instead of taking down the launcher
-                let _ = _app.clone().instance_manager().scan_instances().await;
+                _app.clone()
+                    .instance_manager()
+                    .launch_background_tasks()
+                    .await;
             });
 
             let _app = app.clone();

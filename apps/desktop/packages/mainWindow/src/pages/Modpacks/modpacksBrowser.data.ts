@@ -2,15 +2,15 @@ import { rspc } from "@/utils/rspcClient";
 
 const fetchData = () => {
   const forgeCategories = rspc.createQuery(() => [
-    "modplatforms.curseforge.getCategories",
+    "modplatforms.curseforge.getCategories"
   ]);
 
   const modrinthCategories = rspc.createQuery(() => [
-    "modplatforms.modrinth.getCategories",
+    "modplatforms.modrinth.getCategories"
   ]);
 
   const modrinthModloaders = rspc.createQuery(() => [
-    "modplatforms.modrinth.getLoaders",
+    "modplatforms.modrinth.getLoaders"
   ]);
 
   const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
@@ -19,7 +19,7 @@ const fetchData = () => {
     forgeCategories,
     modrinthCategories,
     modrinthModloaders,
-    defaultGroup,
+    defaultGroup
   };
 };
 

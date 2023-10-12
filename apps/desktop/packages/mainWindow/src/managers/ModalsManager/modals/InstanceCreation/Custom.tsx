@@ -1,13 +1,14 @@
-import { Button, Checkbox, Dropdown, Input, createNotification } from "@gd/ui";
+import { Button, Checkbox, createNotification, Dropdown, Input } from "@gd/ui";
 import { ModalProps, useModal } from "../..";
 import { Trans, useTransContext } from "@gd/i18n";
-import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
+import { createEffect, createSignal, For, Match, Show, Switch } from "solid-js";
 import { port, rspc } from "@/utils/rspcClient";
 import {
+  CFFEModLoaderType,
   FEModdedManifestLoaderVersion,
   ManifestVersion,
   McType,
-  CFFEModLoaderType,
+  ModLoader
 } from "@gd/core_module/bindings";
 import { blobToBase64 } from "@/utils/helpers";
 import { mcVersions } from "@/utils/mcVersion";
@@ -30,7 +31,7 @@ type Instancetype = {
 enum Modloaders {
   _Quilt = "quilt",
   _Forge = "forge",
-  _Fabric = "fabric",
+  _Fabric = "fabric"
 }
 
 const Custom = (props: Pick<ModalProps, "data">) => {
@@ -58,7 +59,6 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     instanceData()?.mcVersion || ""
   );
   const [title, setTitle] = createSignal(instanceData()?.title || "");
-  const [releaseVersionFilter, setReleaseVersionFilter] = createSignal(true);
   const [snapshotVersionFilter, setSnapshotVersionFilter] = createSignal(false);
   const [oldBetaVersionFilter, setOldBetaVersionFilter] = createSignal(false);
   const [oldAlphaVersionFilter, setOldAlphaVersionFilter] = createSignal(false);
@@ -77,7 +77,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
       data.gameVersions.forEach((version) => {
         forgeHashmap.set(version.id, version.loaders);
       });
-    },
+    }
   });
 
   const fabricVersionsQuery = rspc.createQuery(() => ["mc.getFabricVersions"], {
@@ -86,7 +86,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
       data.gameVersions.forEach((version) => {
         fabricHashmap.set(version.id, version.loaders);
       });
-    },
+    }
   });
 
   const quiltVersionsQuery = rspc.createQuery(() => ["mc.getQuiltVersions"], {
@@ -95,7 +95,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
       data.gameVersions.forEach((version) => {
         quiltHashmap.set(version.id, version.loaders);
       });
-    },
+    }
   });
 
   const DUMMY_META_VERSION = "${gdlauncher.gameVersion}";
@@ -161,7 +161,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
   createEffect(() => {
     const filteredData = mcVersions().filter(
       (item) =>
-        (item.type === "release" && releaseVersionFilter()) ||
+        item.type === "release" ||
         (item.type === "snapshot" && snapshotVersionFilter()) ||
         (item.type === "old_beta" && oldBetaVersionFilter()) ||
         (item.type === "old_alpha" && oldAlphaVersionFilter())
@@ -195,7 +195,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     { label: t("instance.vanilla"), key: undefined },
     { label: t("instance.forge"), key: "forge" },
     { label: t("instance.fabric"), key: "fabric" },
-    { label: t("instance.quilt"), key: "quilt" },
+    { label: t("instance.quilt"), key: "quilt" }
   ];
 
   const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
@@ -212,7 +212,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
       onError() {
         addNotification("Error while creating the instance.", "error");
         modalsContext?.closeModal();
-      },
+      }
     }
   );
 
@@ -233,7 +233,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
         setBgPreview(null);
         setMcVersion("");
         setChosenLoaderVersion("");
-      },
+      }
     }
   );
   const updateInstanceMutation = rspc.createMutation(
@@ -254,7 +254,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
         setBgPreview(null);
         setMcVersion("");
         setChosenLoaderVersion("");
-      },
+      }
     }
   );
 
@@ -334,7 +334,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
 
       trackEvent("instanceCreate", {
         loader: loader(),
-        mcVersion: mcVersion() || (mappedMcVersions()?.[0]?.id as string),
+        mcVersion: mcVersion() || (mappedMcVersions()?.[0]?.id as string)
       });
 
       createInstanceMutation.mutate({
@@ -350,13 +350,13 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 ? [
                     {
                       type_: loader() as CFFEModLoaderType,
-                      version: chosenLoaderVersion() || versions[0].id,
-                    },
+                      version: chosenLoaderVersion() || versions[0].id
+                    } as ModLoader
                   ]
-                : [],
-            },
-          },
-        },
+                : []
+            }
+          }
+        }
       });
     }
   };
@@ -376,16 +376,16 @@ const Custom = (props: Pick<ModalProps, "data">) => {
         use_loaded_icon: { Set: !!bgPreview() },
         name: { Set: title() },
         version: {
-          Set: mcVersion() || (mappedMcVersions()?.[0]?.id as string),
+          Set: mcVersion() || (mappedMcVersions()?.[0]?.id as string)
         },
         modloader: {
           Set: loader()
-            ? {
+            ? ({
                 type_: loader() as CFFEModLoaderType,
-                version: chosenLoaderVersion() || versions[0].id,
-              }
-            : null,
-        },
+                version: chosenLoaderVersion() || versions[0].id
+              } as ModLoader)
+            : null
+        }
       });
     }
   };
@@ -412,13 +412,16 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             <div
               class="relative flex justify-center items-center bg-darkSlate-900 cursor-pointer bg-center bg-cover h-20 rounded-xl w-20"
               style={{
-                "background-image": `url("${bgPreview()}")`,
+                "background-image": `url("${bgPreview()}")`
               }}
               onClick={() => {
                 window
-                  .openFileDialog([
-                    { name: "Image", extensions: ["png", "jpg", "jpeg"] },
-                  ])
+                  .openFileDialog({
+                    title: "Select Icon",
+                    filters: [
+                      { name: "Image", extensions: ["png", "jpg", "jpeg"] }
+                    ]
+                  })
                   .then((files) => {
                     if (!files.filePaths[0]) return;
                     loadIcon(files.filePaths[0]);
@@ -475,7 +478,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                     "border-2 border-solid border-transparent":
                       loader() !== modloader.key,
                     "border-2 border-solid border-primary-500":
-                      loader() === modloader.key,
+                      loader() === modloader.key
                   }}
                   onClick={() => {
                     if (modloader.key === "forge") {
@@ -518,7 +521,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                       classList={{
                         "text-darkSlate-500": Boolean(
                           !v.hasModloader && loader()
-                        ),
+                        )
                       }}
                     >
                       <span>{v.id}</span>
@@ -528,7 +531,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                       )}
                     </div>
                   ),
-                  key: v.id,
+                  key: v.id
                 }))}
                 bgColorClass="bg-darkSlate-800"
                 containerClass="w-full"
@@ -580,15 +583,6 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 }}
               />
               <div class="flex gap-4 mt-2">
-                <div class="flex gap-2">
-                  <Checkbox
-                    checked={releaseVersionFilter()}
-                    onChange={(e) => setReleaseVersionFilter(e)}
-                  />
-                  <h6 class="m-0 flex items-center">
-                    <Trans key="instance.instance_version_release" />
-                  </h6>
-                </div>
                 <div class="flex gap-2 items-center">
                   <Checkbox
                     checked={snapshotVersionFilter()}
@@ -635,7 +629,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                     }
                     options={loaderVersions()?.map((v) => ({
                       label: v.id,
-                      key: v.id,
+                      key: v.id
                     }))}
                     bgColorClass="bg-darkSlate-800"
                     containerClass="w-full"
@@ -674,7 +668,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             <Trans
               key="instance.instance_modal_instance_creation_cancel"
               options={{
-                defaultValue: "Cancel",
+                defaultValue: "Cancel"
               }}
             />
           </Button>
@@ -695,7 +689,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 <Trans
                   key="instance.instance_modal_instance_creation_create"
                   options={{
-                    defaultValue: "Create",
+                    defaultValue: "Create"
                   }}
                 />
               </Match>

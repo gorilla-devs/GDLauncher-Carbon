@@ -14,7 +14,7 @@ const ListItem = (props: Props) => {
     <div
       class="w-full cursor-pointer py-2 hover:bg-darkSlate-600 pl-2"
       classList={{
-        "bg-darkSlate-600": !!match(),
+        "bg-darkSlate-600": !!match()
       }}
       onClick={() => {
         navigate(props.item.path);
