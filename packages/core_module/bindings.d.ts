@@ -74,7 +74,7 @@ export type Procedures = {
         { key: "instance.disableMod", input: InstanceMod, result: null } | 
         { key: "instance.duplicateInstance", input: DuplicateInstance, result: FEInstanceId } | 
         { key: "instance.enableMod", input: InstanceMod, result: null } | 
-        { key: "instance.importInstance", input: number, result: FETaskId } | 
+        { key: "instance.importInstance", input: ImportRequest, result: FETaskId } | 
         { key: "instance.installMod", input: InstallMod, result: FETaskId } | 
         { key: "instance.killInstance", input: FEInstanceId, result: null } | 
         { key: "instance.launchInstance", input: FEInstanceId, result: null } | 
@@ -437,6 +437,8 @@ export type StandardVersion = { release: string; modloaders: ModLoader[] }
 export type FESubtaskProgress = { download: { downloaded: number; total: number } } | { item: { current: number; total: number } } | "opaque"
 
 export type CFFEModSearchParametersQuery = { gameId: number; searchFilter: string | null; gameVersion: string | null; categoryIds: number[] | null; sortOrder: CFFEModSearchSortOrder | null; sortField: CFFEModSearchSortField | null; classId: CFFEClassId | null; modLoaderTypes: CFFEModLoaderType[] | null; gameVersionTypeId: number | null; authorId: number | null; slug: string | null; index: number | null; pageSize: number | null }
+
+export type ImportRequest = { index: number; name: string | null }
 
 export type InstanceMod = { instance_id: FEInstanceId; mod_id: string }
 

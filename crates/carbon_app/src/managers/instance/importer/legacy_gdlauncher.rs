@@ -141,7 +141,12 @@ impl InstanceImporter for LegacyGDLauncherImporter {
         self.state.read().await.clone().into()
     }
 
-    async fn begin_import(&self, app: &Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId> {
+    async fn begin_import(
+        &self,
+        app: &Arc<AppInner>,
+        index: u32,
+        name: Option<String>,
+    ) -> anyhow::Result<VisualTaskId> {
         let instance = self
             .state
             .read()
@@ -240,7 +245,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             .instance_manager()
             .create_instance_ext(
                 app.instance_manager().get_default_group().await?,
-                instance.filename.clone(),
+                name.unwrap_or_else(|| instance.filename.clone()),
                 instance.config.background.is_some(),
                 instance_version_source,
                 String::new(),

@@ -312,10 +312,10 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .map(|status| FullImportScanStatus::from(status))
         }
 
-        mutation IMPORT_INSTANCE[app, index: u32] {
+        mutation IMPORT_INSTANCE[app, req: ImportRequest] {
             app.instance_manager()
                 .import_manager()
-                .begin_import(index)
+                .begin_import(req.index, req.name)
                 .await
                 .map(|task| FETaskId::from(task))
         }
@@ -881,6 +881,12 @@ struct FullImportScanStatus {
 struct ImportEntityStatus {
     entity: ImportEntity,
     supported: bool,
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct ImportRequest {
+    index: u32,
+    name: Option<String>,
 }
 
 impl From<domain::InstanceDetails> for InstanceDetails {

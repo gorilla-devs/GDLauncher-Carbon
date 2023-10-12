@@ -210,7 +210,12 @@ impl InstanceImporter for CurseforgeArchiveImporter {
         self.state.read().await.clone().into()
     }
 
-    async fn begin_import(&self, app: &Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId> {
+    async fn begin_import(
+        &self,
+        app: &Arc<AppInner>,
+        index: u32,
+        name: Option<String>,
+    ) -> anyhow::Result<VisualTaskId> {
         let instance = self
             .state
             .read()
@@ -262,7 +267,7 @@ impl InstanceImporter for CurseforgeArchiveImporter {
             .instance_manager()
             .create_instance_ext(
                 app.instance_manager().get_default_group().await?,
-                instance.manifest.name.clone(),
+                name.unwrap_or_else(|| instance.manifest.name.clone()),
                 use_icon,
                 instance_version_source,
                 String::new(),

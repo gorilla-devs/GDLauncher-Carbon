@@ -124,9 +124,13 @@ impl ManagerRef<'_, InstanceImportManager> {
         }
     }
 
-    pub async fn begin_import(self, index: u32) -> anyhow::Result<VisualTaskId> {
+    pub async fn begin_import(
+        self,
+        index: u32,
+        name: Option<String>,
+    ) -> anyhow::Result<VisualTaskId> {
         match self.scanner.read().await.as_ref() {
-            Some((_, scanner)) => Ok(scanner.begin_import(self.app, index).await?),
+            Some((_, scanner)) => Ok(scanner.begin_import(self.app, index, name).await?),
             None => Err(anyhow!("scan target is not set")),
         }
     }
@@ -218,7 +222,12 @@ pub struct FullImportScanStatus {
 pub trait InstanceImporter: std::fmt::Debug + Send + Sync {
     async fn scan(&self, app: &Arc<AppInner>, scan_path: PathBuf) -> anyhow::Result<()>;
     async fn get_status(&self) -> ImportScanStatus;
-    async fn begin_import(&self, app: &Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId>;
+    async fn begin_import(
+        &self,
+        app: &Arc<AppInner>,
+        index: u32,
+        name: Option<String>,
+    ) -> anyhow::Result<VisualTaskId>;
 }
 
 #[derive(Debug, Clone)]
