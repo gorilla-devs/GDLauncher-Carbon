@@ -162,7 +162,7 @@ impl From<crate::managers::java::managed::ManagedJavaOsMap> for FEManagedJavaOsM
     }
 }
 
-#[derive(Type, Deserialize)]
+#[derive(Type, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FEManagedJavaSetupArgs {
     pub os: FEManagedJavaOs,

@@ -2,17 +2,12 @@ import {
   AccountEntry,
   DeviceCode,
   EnrollmentError,
-  Procedures,
+  EnrollmentStatus
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 import { CreateQueryResult } from "@tanstack/solid-query";
 
-type EnrollStatusResult = Extract<
-  Procedures["queries"],
-  { key: "account.enroll.getStatus" }
->["result"];
-
-type RouteData = CreateQueryResult<EnrollStatusResult, RSPCError>;
+type RouteData = CreateQueryResult<EnrollmentStatus | null, RSPCError>;
 
 type EventsCallbacks = {
   onPolling?: (_info: DeviceCode) => void;
@@ -23,7 +18,7 @@ type EventsCallbacks = {
 };
 
 export const handleStatus = (
-  routeData: RouteData,
+  routeData: RouteData | CreateQueryResult<any, RSPCError>,
   callbacks: EventsCallbacks
 ) => {
   if (routeData.isSuccess) {

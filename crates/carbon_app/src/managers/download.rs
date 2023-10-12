@@ -20,7 +20,7 @@ use uuid::Uuid;
 
 use crate::{
     db::read_filters::StringFilter,
-    error::request::{RequestContext, RequestError, RequestErrorDetails},
+    error::request::{MalformedResponseDetails, RequestContext, RequestError, RequestErrorDetails},
     once_send::OnceSend,
 };
 
@@ -245,9 +245,15 @@ impl ManagerRef<'_, DownloadManager> {
                                     _ => return Err(()),
                                 }
 
-                                let Some((range, _)) = header_str.split_once('/') else { return Err(()) };
-                                let Some((start, _)) = range.split_once('-') else { return Err(()) };
-                                let Ok(start) = u64::from_str(start) else { return Err(()) };
+                                let Some((range, _)) = header_str.split_once('/') else {
+                                    return Err(());
+                                };
+                                let Some((start, _)) = range.split_once('-') else {
+                                    return Err(());
+                                };
+                                let Ok(start) = u64::from_str(start) else {
+                                    return Err(());
+                                };
 
                                 Ok(start)
                             };
@@ -271,7 +277,9 @@ impl ManagerRef<'_, DownloadManager> {
                                 Err(()) => {
                                     bail!(RequestError {
                                         context: RequestContext::from_response(&response),
-                                        error: RequestErrorDetails::MalformedResponse,
+                                        error: RequestErrorDetails::MalformedResponse {
+                                            details: MalformedResponseDetails::UnknownDecodeError
+                                        },
                                     });
                                 }
                             }
@@ -500,12 +508,11 @@ pub enum DownloadError {
 #[cfg(test)]
 #[cfg(not(target_os = "windows"))] // conflicts with task cleanup
 mod test {
-    use ntest::timeout;
+    use tracing::error;
 
     use crate::managers::download::{DownloadError, DownloadStartError};
 
     #[tokio::test]
-    #[timeout(120_000)]
     async fn attempt_download() -> Result<(), DownloadError> {
         let app = crate::setup_managers_for_test().await;
 
@@ -521,14 +528,13 @@ mod test {
                     .get_temp()
                     .to_path()
                     .join("gdl.html"),
-                &mut |downloaded, total| println!("Downloaded {downloaded}/{total:?}"),
+                &mut |downloaded, total| error!("Downloaded {downloaded}/{total:?}"),
             )
             .await
     }
 
     #[tokio::test]
     #[should_panic]
-    #[timeout(120_000)]
     async fn attempt_download_twice() {
         let app = crate::setup_managers_for_test().await;
 
@@ -550,7 +556,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[timeout(120_000)]
     async fn attempt_download_after_cancel() -> Result<(), DownloadStartError> {
         let app = crate::setup_managers_for_test().await;
 
@@ -569,7 +574,6 @@ mod test {
     }
 
     #[tokio::test]
-    #[timeout(120_000)]
     async fn attempt_cancel_download() {
         let app = crate::setup_managers_for_test().await;
 

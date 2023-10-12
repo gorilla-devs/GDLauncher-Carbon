@@ -2,21 +2,20 @@ use std::collections::HashMap;
 
 use rspc::Type;
 use serde::{Deserialize, Serialize};
+use strum_macros::EnumIter;
+
+use crate::domain::modplatforms::curseforge as mpcf;
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEFeaturedModsResponse {
-    pub featured: Vec<FEMod>,
-    pub popular: Vec<FEMod>,
-    pub recently_updated: Vec<FEMod>,
+pub struct CFFEFeaturedModsResponse {
+    pub featured: Vec<CFFEMod>,
+    pub popular: Vec<CFFEMod>,
+    pub recently_updated: Vec<CFFEMod>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FeaturedModsResponse>
-    for FEFeaturedModsResponse
-{
-    fn from(
-        featured_mods_response: crate::domain::modplatforms::curseforge::FeaturedModsResponse,
-    ) -> Self {
+impl From<mpcf::FeaturedModsResponse> for CFFEFeaturedModsResponse {
+    fn from(featured_mods_response: mpcf::FeaturedModsResponse) -> Self {
         Self {
             featured: featured_mods_response
                 .featured
@@ -39,23 +38,23 @@ impl From<crate::domain::modplatforms::curseforge::FeaturedModsResponse>
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEFile {
+pub struct CFFEFile {
     pub id: i32,
     pub game_id: i32,
     pub mod_id: i32,
     pub is_available: bool,
     pub display_name: String,
     pub file_name: String,
-    pub release_type: FEFileReleaseType,
-    pub file_status: FEFileStatus,
-    pub hashes: Vec<FEFileHash>,
+    pub release_type: CFFEFileReleaseType,
+    pub file_status: CFFEFileStatus,
+    pub hashes: Vec<CFFEFileHash>,
     pub file_date: String, // Consider using a datetime library for date-time representation
     pub file_length: u32,
     pub download_count: u32,
     pub download_url: Option<String>,
     pub game_versions: Vec<String>,
-    pub sortable_game_versions: Vec<FESortableGameVersion>,
-    pub dependencies: Vec<FEFileDependency>,
+    pub sortable_game_versions: Vec<CFFESortableGameVersion>,
+    pub dependencies: Vec<CFFEFileDependency>,
     pub expose_as_alternative: Option<bool>,
     pub parent_project_file_id: Option<i32>,
     pub alternate_file_id: Option<i32>,
@@ -64,11 +63,11 @@ pub struct FEFile {
     pub is_early_access_content: Option<bool>,
     pub early_access_end_date: Option<String>, // Consider using a datetime library for date-time representation
     pub file_fingerprint: String,
-    pub modules: Vec<FEFileModule>,
+    pub modules: Vec<CFFEFileModule>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::File> for FEFile {
-    fn from(file: crate::domain::modplatforms::curseforge::File) -> Self {
+impl From<mpcf::File> for CFFEFile {
+    fn from(file: mpcf::File) -> Self {
         Self {
             id: file.id,
             game_id: file.game_id,
@@ -113,13 +112,13 @@ impl From<crate::domain::modplatforms::curseforge::File> for FEFile {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEFileDependency {
+pub struct CFFEFileDependency {
     pub mod_id: i32,
-    pub relation_type: FEFileRelationType,
+    pub relation_type: CFFEFileRelationType,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FileDependency> for FEFileDependency {
-    fn from(dependency: crate::domain::modplatforms::curseforge::FileDependency) -> Self {
+impl From<mpcf::FileDependency> for CFFEFileDependency {
+    fn from(dependency: mpcf::FileDependency) -> Self {
         Self {
             mod_id: dependency.mod_id,
             relation_type: dependency.relation_type.into(),
@@ -129,13 +128,13 @@ impl From<crate::domain::modplatforms::curseforge::FileDependency> for FEFileDep
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEFileHash {
+pub struct CFFEFileHash {
     pub value: String,
-    pub algo: FEHashAlgo,
+    pub algo: CFFEHashAlgo,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FileHash> for FEFileHash {
-    fn from(hash: crate::domain::modplatforms::curseforge::FileHash) -> Self {
+impl From<mpcf::FileHash> for CFFEFileHash {
+    fn from(hash: mpcf::FileHash) -> Self {
         Self {
             value: hash.value,
             algo: hash.algo.into(),
@@ -145,31 +144,25 @@ impl From<crate::domain::modplatforms::curseforge::FileHash> for FEFileHash {
 
 #[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub enum FEFileReleaseType {
+pub enum CFFEFileReleaseType {
     Stable,
     Beta,
     Alpha,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FileReleaseType> for FEFileReleaseType {
-    fn from(release_type: crate::domain::modplatforms::curseforge::FileReleaseType) -> Self {
+impl From<mpcf::FileReleaseType> for CFFEFileReleaseType {
+    fn from(release_type: mpcf::FileReleaseType) -> Self {
         match release_type {
-            crate::domain::modplatforms::curseforge::FileReleaseType::Stable => {
-                FEFileReleaseType::Stable
-            }
-            crate::domain::modplatforms::curseforge::FileReleaseType::Beta => {
-                FEFileReleaseType::Beta
-            }
-            crate::domain::modplatforms::curseforge::FileReleaseType::Alpha => {
-                FEFileReleaseType::Alpha
-            }
+            mpcf::FileReleaseType::Stable => CFFEFileReleaseType::Stable,
+            mpcf::FileReleaseType::Beta => CFFEFileReleaseType::Beta,
+            mpcf::FileReleaseType::Alpha => CFFEFileReleaseType::Alpha,
         }
     }
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub enum FEFileStatus {
+pub enum CFFEFileStatus {
     Processing,
     ChangesRequired,
     UnderReview,
@@ -187,47 +180,31 @@ pub enum FEFileStatus {
     FailedPublishing,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FileStatus> for FEFileStatus {
-    fn from(file_status: crate::domain::modplatforms::curseforge::FileStatus) -> Self {
+impl From<mpcf::FileStatus> for CFFEFileStatus {
+    fn from(file_status: mpcf::FileStatus) -> Self {
         match file_status {
-            crate::domain::modplatforms::curseforge::FileStatus::Processing => {
-                FEFileStatus::Processing
-            }
-            crate::domain::modplatforms::curseforge::FileStatus::ChangesRequired => {
-                FEFileStatus::ChangesRequired
-            }
-            crate::domain::modplatforms::curseforge::FileStatus::UnderReview => {
-                FEFileStatus::UnderReview
-            }
-            crate::domain::modplatforms::curseforge::FileStatus::Approved => FEFileStatus::Approved,
-            crate::domain::modplatforms::curseforge::FileStatus::Rejected => FEFileStatus::Rejected,
-            crate::domain::modplatforms::curseforge::FileStatus::MalwareDetected => {
-                FEFileStatus::MalwareDetected
-            }
-            crate::domain::modplatforms::curseforge::FileStatus::Deleted => FEFileStatus::Deleted,
-            crate::domain::modplatforms::curseforge::FileStatus::Archived => FEFileStatus::Archived,
-            crate::domain::modplatforms::curseforge::FileStatus::Testing => FEFileStatus::Testing,
-            crate::domain::modplatforms::curseforge::FileStatus::Released => FEFileStatus::Released,
-            crate::domain::modplatforms::curseforge::FileStatus::ReadyForReview => {
-                FEFileStatus::ReadyForReview
-            }
-            crate::domain::modplatforms::curseforge::FileStatus::Deprecated => {
-                FEFileStatus::Deprecated
-            }
-            crate::domain::modplatforms::curseforge::FileStatus::Baking => FEFileStatus::Baking,
-            crate::domain::modplatforms::curseforge::FileStatus::AwaitingPublishing => {
-                FEFileStatus::AwaitingPublishing
-            }
-            crate::domain::modplatforms::curseforge::FileStatus::FailedPublishing => {
-                FEFileStatus::FailedPublishing
-            }
+            mpcf::FileStatus::Processing => CFFEFileStatus::Processing,
+            mpcf::FileStatus::ChangesRequired => CFFEFileStatus::ChangesRequired,
+            mpcf::FileStatus::UnderReview => CFFEFileStatus::UnderReview,
+            mpcf::FileStatus::Approved => CFFEFileStatus::Approved,
+            mpcf::FileStatus::Rejected => CFFEFileStatus::Rejected,
+            mpcf::FileStatus::MalwareDetected => CFFEFileStatus::MalwareDetected,
+            mpcf::FileStatus::Deleted => CFFEFileStatus::Deleted,
+            mpcf::FileStatus::Archived => CFFEFileStatus::Archived,
+            mpcf::FileStatus::Testing => CFFEFileStatus::Testing,
+            mpcf::FileStatus::Released => CFFEFileStatus::Released,
+            mpcf::FileStatus::ReadyForReview => CFFEFileStatus::ReadyForReview,
+            mpcf::FileStatus::Deprecated => CFFEFileStatus::Deprecated,
+            mpcf::FileStatus::Baking => CFFEFileStatus::Baking,
+            mpcf::FileStatus::AwaitingPublishing => CFFEFileStatus::AwaitingPublishing,
+            mpcf::FileStatus::FailedPublishing => CFFEFileStatus::FailedPublishing,
         }
     }
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub enum FEFileRelationType {
+pub enum CFFEFileRelationType {
     EmbeddedLibrary,
     OptionalDependency,
     RequiredDependency,
@@ -236,57 +213,45 @@ pub enum FEFileRelationType {
     Include,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FileRelationType> for FEFileRelationType {
-    fn from(relation_type: crate::domain::modplatforms::curseforge::FileRelationType) -> Self {
+impl From<mpcf::FileRelationType> for CFFEFileRelationType {
+    fn from(relation_type: mpcf::FileRelationType) -> Self {
         match relation_type {
-            crate::domain::modplatforms::curseforge::FileRelationType::EmbeddedLibrary => {
-                FEFileRelationType::EmbeddedLibrary
-            }
-            crate::domain::modplatforms::curseforge::FileRelationType::OptionalDependency => {
-                FEFileRelationType::OptionalDependency
-            }
-            crate::domain::modplatforms::curseforge::FileRelationType::RequiredDependency => {
-                FEFileRelationType::RequiredDependency
-            }
-            crate::domain::modplatforms::curseforge::FileRelationType::Tool => {
-                FEFileRelationType::Tool
-            }
-            crate::domain::modplatforms::curseforge::FileRelationType::Incompatible => {
-                FEFileRelationType::Incompatible
-            }
-            crate::domain::modplatforms::curseforge::FileRelationType::Include => {
-                FEFileRelationType::Include
-            }
+            mpcf::FileRelationType::EmbeddedLibrary => CFFEFileRelationType::EmbeddedLibrary,
+            mpcf::FileRelationType::OptionalDependency => CFFEFileRelationType::OptionalDependency,
+            mpcf::FileRelationType::RequiredDependency => CFFEFileRelationType::RequiredDependency,
+            mpcf::FileRelationType::Tool => CFFEFileRelationType::Tool,
+            mpcf::FileRelationType::Incompatible => CFFEFileRelationType::Incompatible,
+            mpcf::FileRelationType::Include => CFFEFileRelationType::Include,
         }
     }
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub enum FEHashAlgo {
+pub enum CFFEHashAlgo {
     Sha1,
     Md5,
 }
 
-impl From<crate::domain::modplatforms::curseforge::HashAlgo> for FEHashAlgo {
-    fn from(hash_algo: crate::domain::modplatforms::curseforge::HashAlgo) -> Self {
+impl From<mpcf::HashAlgo> for CFFEHashAlgo {
+    fn from(hash_algo: mpcf::HashAlgo) -> Self {
         match hash_algo {
-            crate::domain::modplatforms::curseforge::HashAlgo::Sha1 => FEHashAlgo::Sha1,
-            crate::domain::modplatforms::curseforge::HashAlgo::Md5 => FEHashAlgo::Md5,
+            mpcf::HashAlgo::Sha1 => CFFEHashAlgo::Sha1,
+            mpcf::HashAlgo::Md5 => CFFEHashAlgo::Md5,
         }
     }
 }
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEFileModule {
+pub struct CFFEFileModule {
     pub name: String,
     pub fingerprint: String,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FileModule> for FEFileModule {
-    fn from(file_module: crate::domain::modplatforms::curseforge::FileModule) -> Self {
-        FEFileModule {
+impl From<mpcf::FileModule> for CFFEFileModule {
+    fn from(file_module: mpcf::FileModule) -> Self {
+        CFFEFileModule {
             name: file_module.name,
             fingerprint: file_module.fingerprint.to_string(),
         }
@@ -295,18 +260,16 @@ impl From<crate::domain::modplatforms::curseforge::FileModule> for FEFileModule 
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEFingerprintFuzzyMatch {
+pub struct CFFEFingerprintFuzzyMatch {
     pub id: i32,
-    pub file: FEFile,
-    pub latest_files: Vec<FEFile>,
+    pub file: CFFEFile,
+    pub latest_files: Vec<CFFEFile>,
     pub fingerprints: Vec<String>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FingerprintFuzzyMatch>
-    for FEFingerprintFuzzyMatch
-{
-    fn from(fuzzy_match: crate::domain::modplatforms::curseforge::FingerprintFuzzyMatch) -> Self {
-        FEFingerprintFuzzyMatch {
+impl From<mpcf::FingerprintFuzzyMatch> for CFFEFingerprintFuzzyMatch {
+    fn from(fuzzy_match: mpcf::FingerprintFuzzyMatch) -> Self {
+        CFFEFingerprintFuzzyMatch {
             id: fuzzy_match.id,
             file: fuzzy_match.file.into(),
             latest_files: fuzzy_match
@@ -325,17 +288,13 @@ impl From<crate::domain::modplatforms::curseforge::FingerprintFuzzyMatch>
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEFingerprintFuzzyMatchResult {
-    pub fuzzy_matches: Vec<FEFingerprintFuzzyMatch>,
+pub struct CFFEFingerprintFuzzyMatchResult {
+    pub fuzzy_matches: Vec<CFFEFingerprintFuzzyMatch>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FingerprintFuzzyMatchResult>
-    for FEFingerprintFuzzyMatchResult
-{
-    fn from(
-        fuzzy_match_result: crate::domain::modplatforms::curseforge::FingerprintFuzzyMatchResult,
-    ) -> Self {
-        FEFingerprintFuzzyMatchResult {
+impl From<mpcf::FingerprintFuzzyMatchResult> for CFFEFingerprintFuzzyMatchResult {
+    fn from(fuzzy_match_result: mpcf::FingerprintFuzzyMatchResult) -> Self {
+        CFFEFingerprintFuzzyMatchResult {
             fuzzy_matches: fuzzy_match_result
                 .fuzzy_matches
                 .into_iter()
@@ -347,15 +306,15 @@ impl From<crate::domain::modplatforms::curseforge::FingerprintFuzzyMatchResult>
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEFingerprintMatch {
+pub struct CFFEFingerprintMatch {
     pub id: i32,
-    pub file: FEFile,
-    pub latest_files: Vec<FEFile>,
+    pub file: CFFEFile,
+    pub latest_files: Vec<CFFEFile>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FingerprintMatch> for FEFingerprintMatch {
-    fn from(match_: crate::domain::modplatforms::curseforge::FingerprintMatch) -> Self {
-        FEFingerprintMatch {
+impl From<mpcf::FingerprintMatch> for CFFEFingerprintMatch {
+    fn from(match_: mpcf::FingerprintMatch) -> Self {
+        CFFEFingerprintMatch {
             id: match_.id,
             file: match_.file.into(),
             latest_files: match_.latest_files.into_iter().map(|f| f.into()).collect(),
@@ -365,23 +324,19 @@ impl From<crate::domain::modplatforms::curseforge::FingerprintMatch> for FEFinge
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEFingerprintsMatchesResult {
+pub struct CFFEFingerprintsMatchesResult {
     pub is_cache_built: bool,
-    pub exact_matches: Vec<FEFingerprintMatch>,
+    pub exact_matches: Vec<CFFEFingerprintMatch>,
     pub exact_fingerprints: Vec<String>,
-    pub partial_matches: Vec<FEFingerprintMatch>,
+    pub partial_matches: Vec<CFFEFingerprintMatch>,
     pub partial_match_fingerprints: HashMap<String, Vec<String>>,
     pub installed_fingerprints: Vec<String>,
     pub unmatched_fingerprints: Vec<String>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FingerprintsMatchesResult>
-    for FEFingerprintsMatchesResult
-{
-    fn from(
-        matches_result: crate::domain::modplatforms::curseforge::FingerprintsMatchesResult,
-    ) -> Self {
-        FEFingerprintsMatchesResult {
+impl From<mpcf::FingerprintsMatchesResult> for CFFEFingerprintsMatchesResult {
+    fn from(matches_result: mpcf::FingerprintsMatchesResult) -> Self {
+        CFFEFingerprintsMatchesResult {
             is_cache_built: matches_result.is_cache_built,
             exact_matches: matches_result
                 .exact_matches
@@ -411,6 +366,7 @@ impl From<crate::domain::modplatforms::curseforge::FingerprintsMatchesResult>
             unmatched_fingerprints: matches_result
                 .unmatched_fingerprints
                 .into_iter()
+                .flat_map(|uf| uf.into_iter())
                 .map(|f| f.to_string())
                 .collect(),
         }
@@ -419,16 +375,14 @@ impl From<crate::domain::modplatforms::curseforge::FingerprintsMatchesResult>
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEFolderFingerprint {
+pub struct CFFEFolderFingerprint {
     pub foldername: String,
     pub fingerprints: Vec<String>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FolderFingerprint> for FEFolderFingerprint {
-    fn from(
-        folder_fingerprint: crate::domain::modplatforms::curseforge::FolderFingerprint,
-    ) -> Self {
-        FEFolderFingerprint {
+impl From<mpcf::FolderFingerprint> for CFFEFolderFingerprint {
+    fn from(folder_fingerprint: mpcf::FolderFingerprint) -> Self {
+        CFFEFolderFingerprint {
             foldername: folder_fingerprint.foldername,
             fingerprints: folder_fingerprint
                 .fingerprints
@@ -441,19 +395,19 @@ impl From<crate::domain::modplatforms::curseforge::FolderFingerprint> for FEFold
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEGame {
+pub struct CFFEGame {
     pub id: i32,
     pub name: String,
     pub slug: String,
     pub date_modified: String, // date-time
-    pub assets: FEGameAssets,
-    pub status: FECoreStatus,
-    pub api_status: FECoreApiStatus,
+    pub assets: CFFEGameAssets,
+    pub status: CFFECoreStatus,
+    pub api_status: CFFECoreApiStatus,
 }
 
-impl From<crate::domain::modplatforms::curseforge::Game> for FEGame {
-    fn from(game: crate::domain::modplatforms::curseforge::Game) -> Self {
-        FEGame {
+impl From<mpcf::Game> for CFFEGame {
+    fn from(game: mpcf::Game) -> Self {
+        CFFEGame {
             id: game.id,
             name: game.name,
             slug: game.slug,
@@ -467,7 +421,7 @@ impl From<crate::domain::modplatforms::curseforge::Game> for FEGame {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEMinecraftGameVersion {
+pub struct CFFEMinecraftGameVersion {
     pub id: i32,
     pub game_version_id: i32,
     pub version_string: String,
@@ -476,17 +430,13 @@ pub struct FEMinecraftGameVersion {
     pub approved: bool,
     pub date_modified: String, // date-time
     pub game_version_type_id: i32,
-    pub game_version_status: FEGameVersionStatus,
-    pub game_version_type_status: FEGameVersionTypeStatus,
+    pub game_version_status: CFFEGameVersionStatus,
+    pub game_version_type_status: CFFEGameVersionTypeStatus,
 }
 
-impl From<crate::domain::modplatforms::curseforge::MinecraftGameVersion>
-    for FEMinecraftGameVersion
-{
-    fn from(
-        minecraft_game_version: crate::domain::modplatforms::curseforge::MinecraftGameVersion,
-    ) -> Self {
-        FEMinecraftGameVersion {
+impl From<mpcf::MinecraftGameVersion> for CFFEMinecraftGameVersion {
+    fn from(minecraft_game_version: mpcf::MinecraftGameVersion) -> Self {
+        CFFEMinecraftGameVersion {
             id: minecraft_game_version.id,
             game_version_id: minecraft_game_version.game_version_id,
             version_string: minecraft_game_version.version_string,
@@ -503,22 +453,18 @@ impl From<crate::domain::modplatforms::curseforge::MinecraftGameVersion>
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEMinecraftModLoaderIndex {
+pub struct CFFEMinecraftModLoaderIndex {
     pub name: String,
     pub game_version: String,
     pub latest: bool,
     pub recommended: bool,
     pub date_modified: String, // date-time
-    pub mod_loader_type: FEModLoaderType,
+    pub mod_loader_type: CFFEModLoaderType,
 }
 
-impl From<crate::domain::modplatforms::curseforge::MinecraftModLoaderIndex>
-    for FEMinecraftModLoaderIndex
-{
-    fn from(
-        minecraft_mod_loader_index: crate::domain::modplatforms::curseforge::MinecraftModLoaderIndex,
-    ) -> Self {
-        FEMinecraftModLoaderIndex {
+impl From<mpcf::MinecraftModLoaderIndex> for CFFEMinecraftModLoaderIndex {
+    fn from(minecraft_mod_loader_index: mpcf::MinecraftModLoaderIndex) -> Self {
+        CFFEMinecraftModLoaderIndex {
             name: minecraft_mod_loader_index.name,
             game_version: minecraft_mod_loader_index.game_version,
             latest: minecraft_mod_loader_index.latest,
@@ -531,16 +477,16 @@ impl From<crate::domain::modplatforms::curseforge::MinecraftModLoaderIndex>
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEMinecraftModLoaderVersion {
+pub struct CFFEMinecraftModLoaderVersion {
     pub id: i32,
     pub game_version_id: i32,
     pub minecraft_game_version_id: i32,
     pub forge_version: String,
     pub name: String,
-    pub mod_loader_type: FEModLoaderType,
+    pub mod_loader_type: CFFEModLoaderType,
     pub download_url: String,
     pub filename: String,
-    pub install_method: FEModLoaderInstallMethod,
+    pub install_method: CFFEModLoaderInstallMethod,
     pub latest: bool,
     pub recommended: bool,
     pub approved: bool,
@@ -552,22 +498,18 @@ pub struct FEMinecraftModLoaderVersion {
     pub additional_files_json: String,
     pub mod_loader_game_version_id: i32,
     pub mod_loader_game_version_type_id: i32,
-    pub mod_loader_game_version_status: FEGameVersionStatus,
-    pub mod_loader_game_version_type_status: FEGameVersionTypeStatus,
+    pub mod_loader_game_version_status: CFFEGameVersionStatus,
+    pub mod_loader_game_version_type_status: CFFEGameVersionTypeStatus,
     pub mc_game_version_id: i32,
     pub mc_game_version_type_id: i32,
-    pub mc_game_version_status: FEGameVersionStatus,
-    pub mc_game_version_type_status: FEGameVersionTypeStatus,
+    pub mc_game_version_status: CFFEGameVersionStatus,
+    pub mc_game_version_type_status: CFFEGameVersionTypeStatus,
     pub install_profile_json: String,
 }
 
-impl From<crate::domain::modplatforms::curseforge::MinecraftModLoaderVersion>
-    for FEMinecraftModLoaderVersion
-{
-    fn from(
-        minecraft_mod_loader_version: crate::domain::modplatforms::curseforge::MinecraftModLoaderVersion,
-    ) -> Self {
-        FEMinecraftModLoaderVersion {
+impl From<mpcf::MinecraftModLoaderVersion> for CFFEMinecraftModLoaderVersion {
+    fn from(minecraft_mod_loader_version: mpcf::MinecraftModLoaderVersion) -> Self {
+        CFFEMinecraftModLoaderVersion {
             id: minecraft_mod_loader_version.id,
             game_version_id: minecraft_mod_loader_version.game_version_id,
             minecraft_game_version_id: minecraft_mod_loader_version.minecraft_game_version_id,
@@ -608,25 +550,25 @@ impl From<crate::domain::modplatforms::curseforge::MinecraftModLoaderVersion>
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEMod {
+pub struct CFFEMod {
     pub id: i32,
     pub game_id: i32,
     pub name: String,
     pub slug: String,
-    pub links: FEModLinks,
+    pub links: CFFEModLinks,
     pub summary: String,
-    pub status: FEModStatus,
+    pub status: CFFEModStatus,
     pub download_count: u32,
     pub is_featured: bool,
     pub primary_category_id: i32,
-    pub categories: Vec<FECategory>,
+    pub categories: Vec<CFFECategory>,
     pub class_id: Option<i32>, // TODO: Add all options to enum and use it
-    pub authors: Vec<FEModAuthor>,
-    pub logo: FEModAsset,
-    pub screenshots: Vec<FEModAsset>,
+    pub authors: Vec<CFFEModAuthor>,
+    pub logo: Option<CFFEModAsset>,
+    pub screenshots: Vec<CFFEModAsset>,
     pub main_file_id: i32,
-    pub latest_files: Vec<FEFile>,
-    pub latest_files_indexes: Vec<FEFileIndex>,
+    pub latest_files: Vec<CFFEFile>,
+    pub latest_files_indexes: Vec<CFFEFileIndex>,
     pub date_created: String,  // date-time
     pub date_modified: String, // date-time
     pub date_released: String, // date-time
@@ -636,9 +578,9 @@ pub struct FEMod {
     pub thumbs_up_count: i32,
 }
 
-impl From<crate::domain::modplatforms::curseforge::Mod> for FEMod {
-    fn from(minecraft_mod: crate::domain::modplatforms::curseforge::Mod) -> Self {
-        FEMod {
+impl From<mpcf::Mod> for CFFEMod {
+    fn from(minecraft_mod: mpcf::Mod) -> Self {
+        CFFEMod {
             id: minecraft_mod.id,
             game_id: minecraft_mod.game_id,
             name: minecraft_mod.name,
@@ -660,7 +602,7 @@ impl From<crate::domain::modplatforms::curseforge::Mod> for FEMod {
                 .into_iter()
                 .map(|a| a.into())
                 .collect(),
-            logo: minecraft_mod.logo.into(),
+            logo: minecraft_mod.logo.map(Into::into),
             screenshots: minecraft_mod
                 .screenshots
                 .into_iter()
@@ -690,45 +632,46 @@ impl From<crate::domain::modplatforms::curseforge::Mod> for FEMod {
 
 #[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub enum FEClassId {
+pub enum CFFEClassId {
     Mods,
     Modpacks,
+    Other(u16),
 }
 
-impl From<crate::domain::modplatforms::curseforge::ClassId> for FEClassId {
-    fn from(class_id: crate::domain::modplatforms::curseforge::ClassId) -> Self {
+impl From<mpcf::ClassId> for CFFEClassId {
+    fn from(class_id: mpcf::ClassId) -> Self {
         match class_id {
-            crate::domain::modplatforms::curseforge::ClassId::Mods => FEClassId::Mods,
-            crate::domain::modplatforms::curseforge::ClassId::Modpacks => FEClassId::Modpacks,
+            mpcf::ClassId::Mods => CFFEClassId::Mods,
+            mpcf::ClassId::Modpacks => CFFEClassId::Modpacks,
+            mpcf::ClassId::Other(other) => CFFEClassId::Other(other),
         }
     }
 }
 
-impl From<FEClassId> for crate::domain::modplatforms::curseforge::ClassId {
-    fn from(class_id: FEClassId) -> Self {
+impl From<CFFEClassId> for mpcf::ClassId {
+    fn from(class_id: CFFEClassId) -> Self {
         match class_id {
-            FEClassId::Mods => crate::domain::modplatforms::curseforge::ClassId::Mods,
-            FEClassId::Modpacks => crate::domain::modplatforms::curseforge::ClassId::Modpacks,
+            CFFEClassId::Mods => mpcf::ClassId::Mods,
+            CFFEClassId::Modpacks => mpcf::ClassId::Modpacks,
+            CFFEClassId::Other(other) => mpcf::ClassId::Other(other),
         }
     }
 }
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEModDependencies {
+pub struct CFFEModDependencies {
     pub id: i32,
     pub mod_id: i32,
     pub file_id: i32,
     pub file_dependency_id: i32,
     pub type_id: i32,
-    pub dependency_type: FEDependencyType,
+    pub dependency_type: CFFEDependencyType,
 }
 
-impl From<crate::domain::modplatforms::curseforge::ModDependencies> for FEModDependencies {
-    fn from(
-        minecraft_mod_dependencies: crate::domain::modplatforms::curseforge::ModDependencies,
-    ) -> Self {
-        FEModDependencies {
+impl From<mpcf::ModDependencies> for CFFEModDependencies {
+    fn from(minecraft_mod_dependencies: mpcf::ModDependencies) -> Self {
+        CFFEModDependencies {
             id: minecraft_mod_dependencies.id,
             mod_id: minecraft_mod_dependencies.mod_id,
             file_id: minecraft_mod_dependencies.file_id,
@@ -741,16 +684,14 @@ impl From<crate::domain::modplatforms::curseforge::ModDependencies> for FEModDep
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEModFileModule {
+pub struct CFFEModFileModule {
     pub folder_name: String,
     pub fingerprint: String,
 }
 
-impl From<crate::domain::modplatforms::curseforge::ModFileModule> for FEModFileModule {
-    fn from(
-        minecraft_mod_file_module: crate::domain::modplatforms::curseforge::ModFileModule,
-    ) -> Self {
-        FEModFileModule {
+impl From<mpcf::ModFileModule> for CFFEModFileModule {
+    fn from(minecraft_mod_file_module: mpcf::ModFileModule) -> Self {
+        CFFEModFileModule {
             folder_name: minecraft_mod_file_module.folder_name,
             fingerprint: minecraft_mod_file_module.fingerprint.to_string(),
         }
@@ -759,7 +700,7 @@ impl From<crate::domain::modplatforms::curseforge::ModFileModule> for FEModFileM
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEModFileStat {
+pub struct CFFEModFileStat {
     pub mod_id: i32,
     pub file_id: i32,
     pub timestamp: String, // date-time
@@ -768,9 +709,9 @@ pub struct FEModFileStat {
     pub update_count: i32,
 }
 
-impl From<crate::domain::modplatforms::curseforge::ModFileStat> for FEModFileStat {
-    fn from(minecraft_mod_file_stat: crate::domain::modplatforms::curseforge::ModFileStat) -> Self {
-        FEModFileStat {
+impl From<mpcf::ModFileStat> for CFFEModFileStat {
+    fn from(minecraft_mod_file_stat: mpcf::ModFileStat) -> Self {
+        CFFEModFileStat {
             mod_id: minecraft_mod_file_stat.mod_id,
             file_id: minecraft_mod_file_stat.file_id,
             timestamp: minecraft_mod_file_stat.timestamp,
@@ -783,7 +724,7 @@ impl From<crate::domain::modplatforms::curseforge::ModFileStat> for FEModFileSta
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEModFileVersion {
+pub struct CFFEModFileVersion {
     pub id: i32,
     pub mod_id: i32,
     pub file_id: i32,
@@ -791,11 +732,9 @@ pub struct FEModFileVersion {
     pub game_version: String,
 }
 
-impl From<crate::domain::modplatforms::curseforge::ModFileVersion> for FEModFileVersion {
-    fn from(
-        minecraft_mod_file_version: crate::domain::modplatforms::curseforge::ModFileVersion,
-    ) -> Self {
-        FEModFileVersion {
+impl From<mpcf::ModFileVersion> for CFFEModFileVersion {
+    fn from(minecraft_mod_file_version: mpcf::ModFileVersion) -> Self {
+        CFFEModFileVersion {
             id: minecraft_mod_file_version.id,
             mod_id: minecraft_mod_file_version.mod_id,
             file_id: minecraft_mod_file_version.file_id,
@@ -807,7 +746,7 @@ impl From<crate::domain::modplatforms::curseforge::ModFileVersion> for FEModFile
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FESortableGameVersion {
+pub struct CFFESortableGameVersion {
     pub game_version_name: String,
     pub game_version_padded: String,
     pub game_version: String,
@@ -815,11 +754,9 @@ pub struct FESortableGameVersion {
     pub game_version_type_id: Option<i32>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::SortableGameVersion> for FESortableGameVersion {
-    fn from(
-        minecraft_sortable_game_version: crate::domain::modplatforms::curseforge::SortableGameVersion,
-    ) -> Self {
-        FESortableGameVersion {
+impl From<mpcf::SortableGameVersion> for CFFESortableGameVersion {
+    fn from(minecraft_sortable_game_version: mpcf::SortableGameVersion) -> Self {
+        CFFESortableGameVersion {
             game_version_name: minecraft_sortable_game_version.game_version_name,
             game_version_padded: minecraft_sortable_game_version.game_version_padded,
             game_version: minecraft_sortable_game_version.game_version,
@@ -831,14 +768,14 @@ impl From<crate::domain::modplatforms::curseforge::SortableGameVersion> for FESo
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEGameAssets {
+pub struct CFFEGameAssets {
     pub game: String,
     pub logo: String,
 }
 
-impl From<crate::domain::modplatforms::curseforge::GameAssets> for FEGameAssets {
-    fn from(minecraft_game_assets: crate::domain::modplatforms::curseforge::GameAssets) -> Self {
-        FEGameAssets {
+impl From<mpcf::GameAssets> for CFFEGameAssets {
+    fn from(minecraft_game_assets: mpcf::GameAssets) -> Self {
+        CFFEGameAssets {
             game: minecraft_game_assets.game,
             logo: minecraft_game_assets.logo,
         }
@@ -847,7 +784,7 @@ impl From<crate::domain::modplatforms::curseforge::GameAssets> for FEGameAssets 
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum FECoreStatus {
+pub enum CFFECoreStatus {
     Draft,
     Test,
     PendingReview,
@@ -856,166 +793,127 @@ pub enum FECoreStatus {
     Live,
 }
 
-impl From<crate::domain::modplatforms::curseforge::CoreStatus> for FECoreStatus {
-    fn from(minecraft_core_status: crate::domain::modplatforms::curseforge::CoreStatus) -> Self {
+impl From<mpcf::CoreStatus> for CFFECoreStatus {
+    fn from(minecraft_core_status: mpcf::CoreStatus) -> Self {
         match minecraft_core_status {
-            crate::domain::modplatforms::curseforge::CoreStatus::Draft => FECoreStatus::Draft,
-            crate::domain::modplatforms::curseforge::CoreStatus::Test => FECoreStatus::Test,
-            crate::domain::modplatforms::curseforge::CoreStatus::PendingReview => {
-                FECoreStatus::PendingReview
-            }
-            crate::domain::modplatforms::curseforge::CoreStatus::Rejected => FECoreStatus::Rejected,
-            crate::domain::modplatforms::curseforge::CoreStatus::Approved => FECoreStatus::Approved,
-            crate::domain::modplatforms::curseforge::CoreStatus::Live => FECoreStatus::Live,
+            mpcf::CoreStatus::Draft => CFFECoreStatus::Draft,
+            mpcf::CoreStatus::Test => CFFECoreStatus::Test,
+            mpcf::CoreStatus::PendingReview => CFFECoreStatus::PendingReview,
+            mpcf::CoreStatus::Rejected => CFFECoreStatus::Rejected,
+            mpcf::CoreStatus::Approved => CFFECoreStatus::Approved,
+            mpcf::CoreStatus::Live => CFFECoreStatus::Live,
         }
     }
 }
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum FECoreApiStatus {
+pub enum CFFECoreApiStatus {
     Private,
     Public,
 }
 
-impl From<crate::domain::modplatforms::curseforge::CoreApiStatus> for FECoreApiStatus {
-    fn from(
-        minecraft_core_api_status: crate::domain::modplatforms::curseforge::CoreApiStatus,
-    ) -> Self {
+impl From<mpcf::CoreApiStatus> for CFFECoreApiStatus {
+    fn from(minecraft_core_api_status: mpcf::CoreApiStatus) -> Self {
         match minecraft_core_api_status {
-            crate::domain::modplatforms::curseforge::CoreApiStatus::Private => {
-                FECoreApiStatus::Private
-            }
-            crate::domain::modplatforms::curseforge::CoreApiStatus::Public => {
-                FECoreApiStatus::Public
-            }
+            mpcf::CoreApiStatus::Private => CFFECoreApiStatus::Private,
+            mpcf::CoreApiStatus::Public => CFFECoreApiStatus::Public,
         }
     }
 }
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum FEGameVersionStatus {
+pub enum CFFEGameVersionStatus {
     Approved,
     Deleted,
     New,
 }
 
-impl From<crate::domain::modplatforms::curseforge::GameVersionStatus> for FEGameVersionStatus {
-    fn from(
-        minecraft_game_version_status: crate::domain::modplatforms::curseforge::GameVersionStatus,
-    ) -> Self {
+impl From<mpcf::GameVersionStatus> for CFFEGameVersionStatus {
+    fn from(minecraft_game_version_status: mpcf::GameVersionStatus) -> Self {
         match minecraft_game_version_status {
-            crate::domain::modplatforms::curseforge::GameVersionStatus::Approved => {
-                FEGameVersionStatus::Approved
-            }
-            crate::domain::modplatforms::curseforge::GameVersionStatus::Deleted => {
-                FEGameVersionStatus::Deleted
-            }
-            crate::domain::modplatforms::curseforge::GameVersionStatus::New => {
-                FEGameVersionStatus::New
-            }
+            mpcf::GameVersionStatus::Approved => CFFEGameVersionStatus::Approved,
+            mpcf::GameVersionStatus::Deleted => CFFEGameVersionStatus::Deleted,
+            mpcf::GameVersionStatus::New => CFFEGameVersionStatus::New,
         }
     }
 }
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum FEGameVersionTypeStatus {
+pub enum CFFEGameVersionTypeStatus {
     Normal,
     Deleted,
 }
 
-impl From<crate::domain::modplatforms::curseforge::GameVersionTypeStatus>
-    for FEGameVersionTypeStatus
-{
-    fn from(
-        minecraft_game_version_type_status: crate::domain::modplatforms::curseforge::GameVersionTypeStatus,
-    ) -> Self {
+impl From<mpcf::GameVersionTypeStatus> for CFFEGameVersionTypeStatus {
+    fn from(minecraft_game_version_type_status: mpcf::GameVersionTypeStatus) -> Self {
         match minecraft_game_version_type_status {
-            crate::domain::modplatforms::curseforge::GameVersionTypeStatus::Normal => {
-                FEGameVersionTypeStatus::Normal
-            }
-            crate::domain::modplatforms::curseforge::GameVersionTypeStatus::Deleted => {
-                FEGameVersionTypeStatus::Deleted
-            }
+            mpcf::GameVersionTypeStatus::Normal => CFFEGameVersionTypeStatus::Normal,
+            mpcf::GameVersionTypeStatus::Deleted => CFFEGameVersionTypeStatus::Deleted,
         }
     }
 }
 
-#[derive(Type, Debug, Deserialize, Serialize)]
+#[derive(Type, Debug, Deserialize, Serialize, EnumIter)]
 #[serde(rename_all = "camelCase")]
-pub enum FEModLoaderType {
+pub enum CFFEModLoaderType {
     Forge,
+    NeoForge,
     Cauldron,
     LiteLoader,
     Fabric,
     Quilt,
+    Unknown,
 }
 
-impl From<crate::domain::modplatforms::curseforge::ModLoaderType> for FEModLoaderType {
-    fn from(
-        minecraft_mod_loader_type: crate::domain::modplatforms::curseforge::ModLoaderType,
-    ) -> Self {
+use mpcf::ModLoaderType as CFModLoaderType;
+impl From<CFModLoaderType> for CFFEModLoaderType {
+    fn from(minecraft_mod_loader_type: CFModLoaderType) -> Self {
         match minecraft_mod_loader_type {
-            crate::domain::modplatforms::curseforge::ModLoaderType::Forge => FEModLoaderType::Forge,
-            crate::domain::modplatforms::curseforge::ModLoaderType::Cauldron => {
-                FEModLoaderType::Cauldron
-            }
-            crate::domain::modplatforms::curseforge::ModLoaderType::LiteLoader => {
-                FEModLoaderType::LiteLoader
-            }
-            crate::domain::modplatforms::curseforge::ModLoaderType::Fabric => {
-                FEModLoaderType::Fabric
-            }
-            crate::domain::modplatforms::curseforge::ModLoaderType::Quilt => FEModLoaderType::Quilt,
+            CFModLoaderType::Forge => CFFEModLoaderType::Forge,
+            CFModLoaderType::NeoForge => CFFEModLoaderType::NeoForge,
+            CFModLoaderType::Cauldron => CFFEModLoaderType::Cauldron,
+            CFModLoaderType::LiteLoader => CFFEModLoaderType::LiteLoader,
+            CFModLoaderType::Fabric => CFFEModLoaderType::Fabric,
+            CFModLoaderType::Quilt => CFFEModLoaderType::Quilt,
+            CFModLoaderType::Other(_) => CFFEModLoaderType::Unknown,
         }
     }
 }
 
-impl From<FEModLoaderType> for crate::domain::modplatforms::curseforge::ModLoaderType {
-    fn from(
-        minecraft_mod_loader_type: FEModLoaderType,
-    ) -> crate::domain::modplatforms::curseforge::ModLoaderType {
+impl From<CFFEModLoaderType> for CFModLoaderType {
+    fn from(minecraft_mod_loader_type: CFFEModLoaderType) -> CFModLoaderType {
         match minecraft_mod_loader_type {
-            FEModLoaderType::Forge => crate::domain::modplatforms::curseforge::ModLoaderType::Forge,
-            FEModLoaderType::Cauldron => {
-                crate::domain::modplatforms::curseforge::ModLoaderType::Cauldron
-            }
-            FEModLoaderType::LiteLoader => {
-                crate::domain::modplatforms::curseforge::ModLoaderType::LiteLoader
-            }
-            FEModLoaderType::Fabric => {
-                crate::domain::modplatforms::curseforge::ModLoaderType::Fabric
-            }
-            FEModLoaderType::Quilt => crate::domain::modplatforms::curseforge::ModLoaderType::Quilt,
+            CFFEModLoaderType::Forge => CFModLoaderType::Forge,
+            CFFEModLoaderType::NeoForge => CFModLoaderType::NeoForge,
+            CFFEModLoaderType::Cauldron => CFModLoaderType::Cauldron,
+            CFFEModLoaderType::LiteLoader => CFModLoaderType::LiteLoader,
+            CFFEModLoaderType::Fabric => CFModLoaderType::Fabric,
+            CFFEModLoaderType::Quilt => CFModLoaderType::Quilt,
+            CFFEModLoaderType::Unknown => CFModLoaderType::Other(0),
         }
     }
 }
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum FEModLoaderInstallMethod {
+pub enum CFFEModLoaderInstallMethod {
     ForgeInstaller,
     ForgeJarInstall,
     ForgeInstallerV2,
 }
-
-impl From<crate::domain::modplatforms::curseforge::ModLoaderInstallMethod>
-    for FEModLoaderInstallMethod
-{
-    fn from(
-        minecraft_mod_loader_install_method: crate::domain::modplatforms::curseforge::ModLoaderInstallMethod,
-    ) -> Self {
+use mpcf::ModLoaderInstallMethod as CFModLoaderInstallMethod;
+impl From<CFModLoaderInstallMethod> for CFFEModLoaderInstallMethod {
+    fn from(minecraft_mod_loader_install_method: CFModLoaderInstallMethod) -> Self {
         match minecraft_mod_loader_install_method {
-            crate::domain::modplatforms::curseforge::ModLoaderInstallMethod::ForgeInstaller => {
-                FEModLoaderInstallMethod::ForgeInstaller
+            CFModLoaderInstallMethod::ForgeInstaller => CFFEModLoaderInstallMethod::ForgeInstaller,
+            CFModLoaderInstallMethod::ForgeJarInstall => {
+                CFFEModLoaderInstallMethod::ForgeJarInstall
             }
-            crate::domain::modplatforms::curseforge::ModLoaderInstallMethod::ForgeJarInstall => {
-                FEModLoaderInstallMethod::ForgeJarInstall
-            }
-            crate::domain::modplatforms::curseforge::ModLoaderInstallMethod::ForgeInstallerV2 => {
-                FEModLoaderInstallMethod::ForgeInstallerV2
+            CFModLoaderInstallMethod::ForgeInstallerV2 => {
+                CFFEModLoaderInstallMethod::ForgeInstallerV2
             }
         }
     }
@@ -1023,16 +921,16 @@ impl From<crate::domain::modplatforms::curseforge::ModLoaderInstallMethod>
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEModLinks {
+pub struct CFFEModLinks {
     pub website_url: Option<String>,
     pub wiki_url: Option<String>,
     pub issues_url: Option<String>,
     pub source_url: Option<String>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::ModLinks> for FEModLinks {
-    fn from(minecraft_mod_links: crate::domain::modplatforms::curseforge::ModLinks) -> Self {
-        FEModLinks {
+impl From<mpcf::ModLinks> for CFFEModLinks {
+    fn from(minecraft_mod_links: mpcf::ModLinks) -> Self {
+        CFFEModLinks {
             website_url: minecraft_mod_links.website_url,
             wiki_url: minecraft_mod_links.wiki_url,
             issues_url: minecraft_mod_links.issues_url,
@@ -1043,7 +941,7 @@ impl From<crate::domain::modplatforms::curseforge::ModLinks> for FEModLinks {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum FEModStatus {
+pub enum CFFEModStatus {
     New,
     ChangesRequired,
     UnderSoftReview,
@@ -1056,39 +954,32 @@ pub enum FEModStatus {
     UnderReview,
 }
 
-impl From<crate::domain::modplatforms::curseforge::ModStatus> for FEModStatus {
-    fn from(minecraft_mod_status: crate::domain::modplatforms::curseforge::ModStatus) -> Self {
+use mpcf::ModStatus as CFModStatus;
+impl From<CFModStatus> for CFFEModStatus {
+    fn from(minecraft_mod_status: CFModStatus) -> Self {
         match minecraft_mod_status {
-            crate::domain::modplatforms::curseforge::ModStatus::New => FEModStatus::New,
-            crate::domain::modplatforms::curseforge::ModStatus::ChangesRequired => {
-                FEModStatus::ChangesRequired
-            }
-            crate::domain::modplatforms::curseforge::ModStatus::UnderSoftReview => {
-                FEModStatus::UnderSoftReview
-            }
-            crate::domain::modplatforms::curseforge::ModStatus::Approved => FEModStatus::Approved,
-            crate::domain::modplatforms::curseforge::ModStatus::Rejected => FEModStatus::Rejected,
-            crate::domain::modplatforms::curseforge::ModStatus::ChangesMade => {
-                FEModStatus::ChangesMade
-            }
-            crate::domain::modplatforms::curseforge::ModStatus::Inactive => FEModStatus::Inactive,
-            crate::domain::modplatforms::curseforge::ModStatus::Abandoned => FEModStatus::Abandoned,
-            crate::domain::modplatforms::curseforge::ModStatus::Deleted => FEModStatus::Deleted,
-            crate::domain::modplatforms::curseforge::ModStatus::UnderReview => {
-                FEModStatus::UnderReview
-            }
+            CFModStatus::New => CFFEModStatus::New,
+            CFModStatus::ChangesRequired => CFFEModStatus::ChangesRequired,
+            CFModStatus::UnderSoftReview => CFFEModStatus::UnderSoftReview,
+            CFModStatus::Approved => CFFEModStatus::Approved,
+            CFModStatus::Rejected => CFFEModStatus::Rejected,
+            CFModStatus::ChangesMade => CFFEModStatus::ChangesMade,
+            CFModStatus::Inactive => CFFEModStatus::Inactive,
+            CFModStatus::Abandoned => CFFEModStatus::Abandoned,
+            CFModStatus::Deleted => CFFEModStatus::Deleted,
+            CFModStatus::UnderReview => CFFEModStatus::UnderReview,
         }
     }
 }
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FECategory {
+pub struct CFFECategory {
     pub id: i32,
     pub name: String,
     pub slug: String,
     pub url: String,
-    pub icon_url: String,
+    pub icon_url: Option<String>,
     pub date_modified: String,
     pub is_class: Option<bool>,
     pub class_id: Option<i32>,
@@ -1096,9 +987,9 @@ pub struct FECategory {
     pub display_index: Option<i32>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::Category> for FECategory {
-    fn from(minecraft_category: crate::domain::modplatforms::curseforge::Category) -> Self {
-        FECategory {
+impl From<mpcf::Category> for CFFECategory {
+    fn from(minecraft_category: mpcf::Category) -> Self {
+        CFFECategory {
             id: minecraft_category.id,
             name: minecraft_category.name,
             slug: minecraft_category.slug,
@@ -1115,15 +1006,15 @@ impl From<crate::domain::modplatforms::curseforge::Category> for FECategory {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEModAuthor {
+pub struct CFFEModAuthor {
     pub id: i32,
     pub name: String,
     pub url: String,
 }
 
-impl From<crate::domain::modplatforms::curseforge::ModAuthor> for FEModAuthor {
-    fn from(minecraft_mod_author: crate::domain::modplatforms::curseforge::ModAuthor) -> Self {
-        FEModAuthor {
+impl From<mpcf::ModAuthor> for CFFEModAuthor {
+    fn from(minecraft_mod_author: mpcf::ModAuthor) -> Self {
+        CFFEModAuthor {
             id: minecraft_mod_author.id,
             name: minecraft_mod_author.name,
             url: minecraft_mod_author.url,
@@ -1133,7 +1024,7 @@ impl From<crate::domain::modplatforms::curseforge::ModAuthor> for FEModAuthor {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEModAsset {
+pub struct CFFEModAsset {
     pub id: i32,
     pub mod_id: i32,
     pub title: String,
@@ -1142,9 +1033,9 @@ pub struct FEModAsset {
     pub url: String,
 }
 
-impl From<crate::domain::modplatforms::curseforge::ModAsset> for FEModAsset {
-    fn from(minecraft_mod_asset: crate::domain::modplatforms::curseforge::ModAsset) -> Self {
-        FEModAsset {
+impl From<mpcf::ModAsset> for CFFEModAsset {
+    fn from(minecraft_mod_asset: mpcf::ModAsset) -> Self {
+        CFFEModAsset {
             id: minecraft_mod_asset.id,
             mod_id: minecraft_mod_asset.mod_id,
             title: minecraft_mod_asset.title,
@@ -1157,18 +1048,18 @@ impl From<crate::domain::modplatforms::curseforge::ModAsset> for FEModAsset {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEFileIndex {
+pub struct CFFEFileIndex {
     pub game_version: String,
     pub file_id: i32,
     pub filename: String,
-    pub release_type: FEFileReleaseType,
+    pub release_type: CFFEFileReleaseType,
     pub game_version_type_id: Option<i32>,
-    pub mod_loader: Option<FEModLoaderType>,
+    pub mod_loader: Option<CFFEModLoaderType>,
 }
 
-impl From<crate::domain::modplatforms::curseforge::FileIndex> for FEFileIndex {
-    fn from(minecraft_file_index: crate::domain::modplatforms::curseforge::FileIndex) -> Self {
-        FEFileIndex {
+impl From<mpcf::FileIndex> for CFFEFileIndex {
+    fn from(minecraft_file_index: mpcf::FileIndex) -> Self {
+        CFFEFileIndex {
             game_version: minecraft_file_index.game_version,
             file_id: minecraft_file_index.file_id,
             filename: minecraft_file_index.filename,
@@ -1183,7 +1074,7 @@ impl From<crate::domain::modplatforms::curseforge::FileIndex> for FEFileIndex {
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum FEDependencyType {
+pub enum CFFEDependencyType {
     EmbeddedLibrary,
     OptionalDependency,
     RequiredDependency,
@@ -1192,43 +1083,31 @@ pub enum FEDependencyType {
     Include,
 }
 
-impl From<crate::domain::modplatforms::curseforge::DependencyType> for FEDependencyType {
-    fn from(
-        minecraft_dependency_type: crate::domain::modplatforms::curseforge::DependencyType,
-    ) -> Self {
+impl From<mpcf::DependencyType> for CFFEDependencyType {
+    fn from(minecraft_dependency_type: mpcf::DependencyType) -> Self {
         match minecraft_dependency_type {
-            crate::domain::modplatforms::curseforge::DependencyType::EmbeddedLibrary => {
-                FEDependencyType::EmbeddedLibrary
-            }
-            crate::domain::modplatforms::curseforge::DependencyType::OptionalDependency => {
-                FEDependencyType::OptionalDependency
-            }
-            crate::domain::modplatforms::curseforge::DependencyType::RequiredDependency => {
-                FEDependencyType::RequiredDependency
-            }
-            crate::domain::modplatforms::curseforge::DependencyType::Tool => FEDependencyType::Tool,
-            crate::domain::modplatforms::curseforge::DependencyType::Incompatible => {
-                FEDependencyType::Incompatible
-            }
-            crate::domain::modplatforms::curseforge::DependencyType::Include => {
-                FEDependencyType::Include
-            }
+            mpcf::DependencyType::EmbeddedLibrary => CFFEDependencyType::EmbeddedLibrary,
+            mpcf::DependencyType::OptionalDependency => CFFEDependencyType::OptionalDependency,
+            mpcf::DependencyType::RequiredDependency => CFFEDependencyType::RequiredDependency,
+            mpcf::DependencyType::Tool => CFFEDependencyType::Tool,
+            mpcf::DependencyType::Incompatible => CFFEDependencyType::Incompatible,
+            mpcf::DependencyType::Include => CFFEDependencyType::Include,
         }
     }
 }
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FEPagination {
+pub struct CFFEPagination {
     pub index: i32,
     pub page_size: i32,
     pub result_count: i32,
     pub total_count: i32,
 }
 
-impl From<crate::domain::modplatforms::curseforge::Pagination> for FEPagination {
-    fn from(minecraft_pagination: crate::domain::modplatforms::curseforge::Pagination) -> Self {
-        FEPagination {
+impl From<mpcf::Pagination> for CFFEPagination {
+    fn from(minecraft_pagination: mpcf::Pagination) -> Self {
+        CFFEPagination {
             index: minecraft_pagination.index,
             page_size: minecraft_pagination.page_size,
             result_count: minecraft_pagination.result_count,

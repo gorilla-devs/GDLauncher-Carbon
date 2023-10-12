@@ -1,8 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{
-    parse_macro_input, spanned::Spanned, Data, DeriveInput, Fields, FieldsNamed, Ident, Variant,
-};
+use syn::{parse_macro_input, Data, DeriveInput, Fields};
 
 #[proc_macro_attribute]
 pub fn into_query_parameters(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -25,8 +23,8 @@ pub fn into_query_parameters(_attr: TokenStream, item: TokenStream) -> TokenStre
         }
 
         impl #struct_name {
-            pub fn into_query_parameters(&self) -> Result<String, serde_urlencoded::ser::Error> {
-                serde_urlencoded::to_string(self)
+            pub fn into_query_parameters(&self) -> Result<String, serde_qs::Error> {
+                serde_qs::to_string(self)
             }
         }
     };

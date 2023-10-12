@@ -1,114 +1,275 @@
 /* eslint-disable i18next/no-literal-string */
 import ContentWrapper from "@/components/ContentWrapper";
 import { useGDNavigate } from "@/managers/NavigationManager";
-import { FEModResponse } from "@gd/core_module/bindings";
+import { FEModResponse, MRFEProject, Mod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { Button, Skeleton, Tab, TabList, Tabs } from "@gd/ui";
-import { Link, Outlet, useParams, useRouteData } from "@solidjs/router";
-import { For, Match, Show, Switch } from "solid-js";
+import {
+  Button,
+  Skeleton,
+  Spinner,
+  Tab,
+  TabList,
+  Tabs,
+  createNotification
+} from "@gd/ui";
+import {
+  Link,
+  Outlet,
+  useLocation,
+  useParams,
+  useRouteData,
+  useSearchParams
+} from "@solidjs/router";
+import { For, Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import fetchData from "../modpack.overview";
 import { format } from "date-fns";
+import { rspc } from "@/utils/rspcClient";
+import Authors from "@/pages/Library/Instance/Info/Authors";
+import { getUrlType } from "@/utils/instances";
+
+const getTabIndexFromPath = (path: string) => {
+  if (path.match(/\/(modpacks|mods)\/.+\/.+/g)) {
+    if (path.endsWith("/changelog")) {
+      return 1;
+    } else if (path.endsWith("/screenshots")) {
+      return 2;
+    } else if (path.endsWith("/versions")) {
+      return 3;
+    } else {
+      return 0;
+    }
+  }
+
+  return 0;
+};
 
 const Modpack = () => {
+  const [loading, setLoading] = createSignal(false);
   const navigate = useGDNavigate();
   const params = useParams();
+  const addNotification = createNotification();
   const routeData: ReturnType<typeof fetchData> = useRouteData();
+  const [instanceMods, setInstanceMods] = createSignal<Mod[]>([]);
+
+  const location = useLocation();
+
+  const indexTab = () => getTabIndexFromPath(location.pathname);
+
+  const [searchParams] = useSearchParams();
+
+  const instanceId = () => parseInt(searchParams.instanceId, 10);
+
+  const isModpack = () => getUrlType(location.pathname) === "modpacks";
+
+  const detailsType = () => (isModpack() ? "modpacks" : "mods");
 
   const instancePages = () => [
     {
       label: "Overview",
-      path: `/modpacks/${params.id}`,
+      path: `/${detailsType()}/${params.id}/${params.platform}`
     },
     {
       label: "Changelog",
-      path: `/modpacks/${params.id}/changelog`,
+      path: `/${detailsType()}/${params.id}/${params.platform}/changelog`
     },
     {
       label: "Screenshots",
-      path: `/modpacks/${params.id}/screenshots`,
+      path: `/${detailsType()}/${params.id}/${params.platform}/screenshots`
     },
     {
       label: "Versions",
-      path: `/modpacks/${params.id}/versions`,
-    },
+      path: `/${detailsType()}/${params.id}/${params.platform}/versions`
+    }
   ];
 
-  // eslint-disable-next-line no-unused-vars
-  // let containerRef: HTMLDivElement;
-  // let bgRef: HTMLDivElement;
-  // let innerContainerRef: HTMLDivElement;
-  // let refStickyContainer: HTMLDivElement;
+  let refStickyTabs: HTMLDivElement;
+  const [isSticky, setIsSticky] = createSignal(false);
 
-  const isFetching = () => routeData.modpackDetails?.isFetching;
+  const isFetching = () => routeData.modpackDetails?.isLoading;
+
+  const loadIconMutation = rspc.createMutation(["instance.loadIconUrl"]);
+
+  const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
+
+  const prepareInstanceMutation = rspc.createMutation(
+    ["instance.prepareInstance"],
+    {
+      onSuccess() {
+        addNotification("Instance successfully created.");
+      },
+      onError() {
+        setLoading(false);
+        addNotification("Error while creating the instance.", "error");
+      },
+      onSettled() {
+        navigate(`/library`);
+      }
+    }
+  );
+
+  const createInstanceMutation = rspc.createMutation(
+    ["instance.createInstance"],
+    {
+      onSuccess(instanceId) {
+        setLoading(true);
+        prepareInstanceMutation.mutate(instanceId);
+      },
+      onError() {
+        setLoading(false);
+        addNotification("Error while downloading the modpack.", "error");
+      }
+    }
+  );
+
+  const generateModpackObj = () => {
+    const isCurseforge = routeData.isCurseforge;
+
+    if (isCurseforge) {
+      if (!routeData.modpackDetails.data) {
+        setLoading(false);
+        return addNotification("Error while downloading the modpack.", "error");
+      }
+      return {
+        Curseforge: {
+          file_id: routeData.modpackDetails.data.data.mainFileId,
+          project_id: routeData.modpackDetails.data.data.id
+        }
+      };
+    } else {
+      const versions = routeData.modrinthProjectVersions.data;
+
+      if (!versions || !routeData.modpackDetails.data) {
+        setLoading(false);
+        return addNotification("Error while downloading the modpack.", "error");
+      }
+
+      const versionId = versions[versions.length - 1];
+
+      const modrinth = {
+        Modrinth: {
+          project_id: routeData.modpackDetails.data.id,
+          version_id: versionId.id
+        }
+      };
+
+      return modrinth;
+    }
+  };
+
+  const instanceName = () =>
+    routeData.isCurseforge
+      ? routeData.modpackDetails.data?.data.name
+      : routeData.modpackDetails.data?.title;
+
+  const icon = () =>
+    routeData.isCurseforge
+      ? (routeData.modpackDetails?.data as FEModResponse).data.logo?.url
+      : (routeData.modpackDetails?.data as MRFEProject).icon_url;
+
+  const handleDownload = () => {
+    setLoading(true);
+    const instanceIcon = icon();
+
+    if (instanceIcon) loadIconMutation.mutate(instanceIcon);
+
+    const name = instanceName();
+    const modpackObj = generateModpackObj();
+
+    if (name && modpackObj) {
+      createInstanceMutation.mutate({
+        group: defaultGroup.data || 1,
+        use_loaded_icon: true,
+        notes: "",
+        name: name,
+        version: {
+          Modpack: modpackObj
+        }
+      });
+    }
+  };
+
+  createEffect(() => {
+    if (instanceId() !== undefined && !isNaN(instanceId())) {
+      const mods = rspc.createQuery(() => [
+        "instance.getInstanceMods",
+        instanceId() as number
+      ]);
+
+      if (mods.data) setInstanceMods(mods.data);
+    }
+  });
+
+  const projectId = () =>
+    routeData.isCurseforge
+      ? routeData.modpackDetails.data?.data.id
+      : routeData.modpackDetails.data?.id;
+
+  const isModInstalled = () =>
+    instanceMods()?.find(
+      (mod) =>
+        (routeData.isCurseforge
+          ? mod.curseforge?.project_id
+          : mod.modrinth?.project_id) === projectId()
+    ) !== undefined;
 
   return (
     <ContentWrapper>
       <div
-        class="relative h-full bg-darkSlate-800 overflow-auto max-h-full overflow-x-hidden"
+        class="relative h-full bg-darkSlate-800 overflow-x-hidden overflow-auto max-h-full"
         style={{
-          "scrollbar-gutter": "stable",
+          "scrollbar-gutter": "stable"
+        }}
+        onScroll={() => {
+          const rect = refStickyTabs.getBoundingClientRect();
+          setIsSticky(rect.top <= 104);
         }}
       >
-        <div
-          class="flex flex-col justify-between ease-in-out transition-all h-52 items-stretch"
-          // ref={(el) => {
-          //   containerRef = el;
-          // }}
-        >
-          <div
-            class="relative h-full"
-            // ref={(el) => {
-            //   innerContainerRef = el;
-            // }}
-          >
+        <div class="flex flex-col justify-between ease-in-out transition-all items-stretch h-58">
+          <div class="relative h-full">
+            <div class="h-full absolute left-0 right-0 top-0 bg-gradient-to-t from-darkSlate-700 z-20 from-30%" />
             <div
-              class="h-full absolute left-0 right-0 top-0 bg-fixed bg-cover bg-center bg-no-repeat"
+              class="h-full absolute left-0 right-0 top-0 z-10 bg-cover bg-center bg-fixed bg-no-repeat"
               style={{
                 "background-image": `url("${
-                  (routeData.modpackDetails?.data as FEModResponse)?.data.logo
-                    .url
+                  routeData.isCurseforge
+                    ? routeData.modpackDetails.data?.data.logo?.thumbnailUrl
+                    : routeData.modpackDetails.data?.icon_url
                 }")`,
-                "background-position": "right-5rem",
+                "background-position": "right-5rem"
               }}
-              // ref={(el) => {
-              //   bgRef = el;
-              // }}
             />
-            <div class="z-10 top-5 sticky left-5 w-fit">
+            <div class="z-20 top-5 sticky left-5 w-fit">
               <Button
-                onClick={() => navigate("/modpacks")}
+                onClick={() =>
+                  navigate(`/${detailsType()}?instanceId=${instanceId()}`)
+                }
                 icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
                 size="small"
-                variant="transparent"
+                type="secondary"
               >
-                <Trans
-                  key="instance.step_back"
-                  options={{
-                    defaultValue: "Back",
-                  }}
-                />
+                <Trans key="instance.step_back" />
               </Button>
             </div>
-            <div class="flex justify-center sticky px-4 h-24 top-52 z-20 bg-gradient-to-t from-darkSlate-800 from-10%">
+            <div class="flex justify-center sticky px-4 z-20 bg-gradient-to-t h-24 top-52 from-darkSlate-800 from-10% z-40">
               <div class="flex gap-4 w-full lg:flex-row">
                 <div
                   class="bg-darkSlate-800 h-16 w-16 rounded-xl bg-center bg-cover"
                   style={{
                     "background-image": `url("${
-                      (routeData.modpackDetails?.data as FEModResponse)?.data
-                        .logo.thumbnailUrl
-                    }")`,
+                      routeData.isCurseforge
+                        ? routeData.modpackDetails.data?.data.logo?.thumbnailUrl
+                        : routeData.modpackDetails.data?.icon_url
+                    }")`
                   }}
                 />
-                <div class="flex flex-1 flex-col max-w-185">
+                <div class="flex flex-1 flex-col">
                   <div class="flex gap-4 items-center cursor-pointer">
                     <Switch>
                       <Match when={!isFetching()}>
                         <h1 class="m-0 h-9">
-                          {
-                            (routeData.modpackDetails?.data as FEModResponse)
-                              ?.data.name
-                          }
+                          {routeData.isCurseforge
+                            ? routeData.modpackDetails.data?.data.name
+                            : routeData.modpackDetails.data?.title}
                         </h1>
                       </Match>
                       <Match when={isFetching()}>
@@ -119,36 +280,40 @@ const Modpack = () => {
                     </Switch>
                   </div>
                   <div class="flex flex-col lg:flex-row justify-between cursor-default">
-                    <div class="flex flex-col lg:flex-row text-darkSlate-50 gap-1 items-start lg:items-center lg:gap-0">
-                      <div class="p-0 lg:pr-4 border-0 lg:border-r-2 border-darkSlate-500">
+                    <div class="flex flex-col lg:flex-row text-darkSlate-50 items-start gap-1 lg:items-center lg:gap-0">
+                      <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 lg:pr-2">
                         <Switch>
                           <Match when={!isFetching()}>
-                            {
-                              routeData.modpackDetails.data?.data
-                                .latestFilesIndexes[0].gameVersion
-                            }
+                            {routeData.isCurseforge
+                              ? routeData.modpackDetails.data?.data
+                                  .latestFilesIndexes[0].gameVersion
+                              : routeData.modpackDetails.data?.game_versions[0]}
                           </Match>
                           <Match when={isFetching()}>
                             <Skeleton />
                           </Match>
                         </Switch>
                       </div>
-                      <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-4">
+                      <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-2">
                         <div class="i-ri:time-fill" />
 
                         <Switch>
                           <Match when={!isFetching()}>
                             <Show
                               when={
-                                routeData.modpackDetails.data?.data.dateCreated
+                                routeData.isCurseforge
+                                  ? routeData.modpackDetails.data?.data
+                                      .dateCreated
+                                  : routeData.modpackDetails.data?.published
                               }
                             >
                               {format(
                                 new Date(
-                                  (
-                                    routeData.modpackDetails
-                                      .data as FEModResponse
-                                  ).data.dateCreated
+                                  routeData.isCurseforge
+                                    ? (routeData.modpackDetails.data?.data
+                                        .dateCreated as string)
+                                    : (routeData.modpackDetails.data
+                                        ?.published as string)
                                 ).getTime(),
                                 "P"
                               )}
@@ -159,18 +324,15 @@ const Modpack = () => {
                           </Match>
                         </Switch>
                       </div>
-                      <div class="p-0 lg:px-4 flex gap-2 items-center">
-                        <div class="i-ri:user-fill" />
-                        <div class="text-sm flex gap-2 overflow-x-auto whitespace-nowrap max-w-52">
+                      <div class="p-0 lg:px-2 flex gap-2 items-center">
+                        <div class="text-sm flex gap-2 whitespace-nowrap overflow-x-auto max-w-52">
                           <Switch>
                             <Match when={!isFetching()}>
-                              <For
-                                each={
-                                  routeData.modpackDetails.data?.data.authors
-                                }
-                              >
-                                {(author) => <p class="m-0">{author.name}</p>}
-                              </For>
+                              <Authors
+                                isCurseforge={routeData.isCurseforge}
+                                isModrinth={routeData.isModrinth}
+                                modpackDetails={routeData.modpackDetails.data}
+                              />
                             </Match>
                             <Match when={isFetching()}>
                               <Skeleton />
@@ -180,14 +342,38 @@ const Modpack = () => {
                       </div>
                     </div>
                     <div class="flex items-center gap-2 mt-2 lg:mt-0">
-                      <Button uppercase variant="glow" size="large">
-                        <Trans
-                          key="modpack.download"
-                          options={{
-                            defaultValue: "Download",
-                          }}
-                        />
-                      </Button>
+                      <Switch>
+                        <Match when={!isModInstalled()}>
+                          <Button
+                            uppercase
+                            size="large"
+                            disabled={
+                              routeData.modpackDetails.isInitialLoading ||
+                              (!isModpack() && !instanceId())
+                            }
+                            onClick={() => handleDownload()}
+                          >
+                            <Show when={loading()}>
+                              <Spinner />
+                            </Show>
+                            <Show when={!loading()}>
+                              <Trans key="modpack.download" />
+                            </Show>
+                          </Button>
+                        </Match>
+                        <Match when={isModInstalled()}>
+                          <Button
+                            variant={isModInstalled() ? "green" : "primary"}
+                          >
+                            <Trans
+                              key="mod.downloaded"
+                              options={{
+                                defaultValue: "Downloaded"
+                              }}
+                            />
+                          </Button>
+                        </Match>
+                      </Switch>
                     </div>
                   </div>
                 </div>
@@ -196,22 +382,67 @@ const Modpack = () => {
           </div>
         </div>
         <div class="bg-darkSlate-800">
-          <div class="flex justify-center px-4 pb-4">
+          <div class="flex justify-center pb-4">
             <div class="bg-darkSlate-800 w-full">
-              <div class="sticky top-0 flex flex-col mb-4 z-0">
-                <Tabs>
+              <div
+                ref={(el) => {
+                  refStickyTabs = el;
+                }}
+                class="sticky top-0 flex items-center justify-between px-4 z-10 bg-darkSlate-800 mb-4"
+              >
+                <span class="mr-4">
+                  <Show when={isSticky()}>
+                    <Button
+                      onClick={() =>
+                        navigate(`/${detailsType()}?instanceId=${instanceId()}`)
+                      }
+                      size="small"
+                      type="secondary"
+                    >
+                      <div class="text-2xl i-ri:arrow-drop-left-line" />
+                      <Trans key="instance.step_back" />
+                    </Button>
+                  </Show>
+                </span>
+                <Tabs index={indexTab()}>
                   <TabList>
                     <For each={instancePages()}>
                       {(page) => (
-                        <Link href={page.path} class="no-underline">
+                        <Link
+                          href={`${page.path}${location.search}`}
+                          class="no-underline"
+                        >
                           <Tab class="bg-transparent">{page.label}</Tab>
                         </Link>
                       )}
                     </For>
                   </TabList>
                 </Tabs>
+                <Show when={isSticky()}>
+                  <Button
+                    uppercase
+                    size="small"
+                    disabled={
+                      routeData.modpackDetails.isInitialLoading ||
+                      (!isModpack() && !instanceId())
+                    }
+                    onClick={() => handleDownload()}
+                  >
+                    <Show when={loading()}>
+                      <Spinner />
+                    </Show>
+                    <Show when={!loading()}>
+                      <Trans
+                        key="modpack.download"
+                        options={{
+                          defaultValue: "Download"
+                        }}
+                      />
+                    </Show>
+                  </Button>
+                </Show>
               </div>
-              <div>
+              <div class="px-4 z-0">
                 <Outlet />
               </div>
             </div>

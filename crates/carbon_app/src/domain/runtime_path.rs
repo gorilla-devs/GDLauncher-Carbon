@@ -1,4 +1,5 @@
 use std::{
+    marker::PhantomData,
     mem::ManuallyDrop,
     ops::Deref,
     path::{Path, PathBuf},
@@ -19,8 +20,13 @@ impl RootPath {
 
 pub struct LibrariesPath(PathBuf);
 
-// TODO: Ideally maven_coordinate should be its own type that we can sanitise
 impl LibrariesPath {
+    pub fn get_mc_client(&self, id: &str) -> PathBuf {
+        self.0
+            .join("net/minecraft/client")
+            .join(id)
+            .join(format!("{}.jar", id))
+    }
     pub fn get_library_path(&self, library_path: String) -> PathBuf {
         self.0.join(library_path)
     }
@@ -41,24 +47,12 @@ impl AssetsPath {
         self.0.join("indexes")
     }
 
-    pub fn get_legacy_path(&self) -> PathBuf {
-        self.0.join("virtual").join("legacy")
+    pub fn get_virtual_path(&self) -> PathBuf {
+        self.0.join("virtual")
     }
 
     pub fn get_objects_path(&self) -> PathBuf {
         self.0.join("objects")
-    }
-}
-
-pub struct VersionsPath(PathBuf);
-
-impl VersionsPath {
-    pub fn get_clients_path(&self) -> PathBuf {
-        self.0.join("clients")
-    }
-
-    pub fn get_servers_path(&self) -> PathBuf {
-        self.0.join("servers")
     }
 }
 
@@ -79,12 +73,20 @@ impl ManagedJavasPath {
     }
 }
 
+pub struct LoggingConfigsPath(PathBuf);
+
+impl LoggingConfigsPath {
+    pub fn get_client_path(&self, id: &str) -> PathBuf {
+        self.0.clone().join(&id)
+    }
+}
+
 // TODO: WIP
 pub struct InstancesPath(PathBuf);
 
 impl InstancesPath {
     pub fn subpath() -> InstancesPath {
-        Self(PathBuf::new())
+        Self(PathBuf::from("instances"))
     }
 
     pub fn to_path(&self) -> PathBuf {
@@ -96,7 +98,7 @@ impl InstancesPath {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct InstancePath(PathBuf);
 
 impl InstancePath {
@@ -110,6 +112,10 @@ impl InstancePath {
 
     pub fn get_data_path(&self) -> PathBuf {
         self.0.join("instance")
+    }
+
+    pub fn get_resources_path(&self) -> PathBuf {
+        self.get_data_path().join("resources")
     }
 
     pub fn get_mods_path(&self) -> PathBuf {
@@ -160,7 +166,7 @@ impl TempPath {
         self.0.clone()
     }
 
-    pub async fn maketmp(&self) -> anyhow::Result<Tempfolder> {
+    pub async fn maketmp<T: tempentry::TempEntryType>(&self) -> anyhow::Result<TempEntry<T>> {
         let time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("time is somehow pre-epoch")
@@ -175,8 +181,13 @@ impl TempPath {
                 path.push(format!("{time}{i}"));
             }
 
-            if tokio::fs::create_dir_all(&path).await.is_ok() {
-                return Ok(Tempfolder(path));
+            let path_copy = path.clone();
+
+            if tokio::task::spawn_blocking(move || T::create(&path_copy))
+                .await
+                .is_ok()
+            {
+                return Ok(TempEntry(path, PhantomData));
             }
 
             path.pop();
@@ -184,11 +195,65 @@ impl TempPath {
 
         Err(anyhow!("Could not create tmpdir"))
     }
+
+    pub async fn maketmpdir(&self) -> anyhow::Result<TempEntry<tempentry::Folder>> {
+        self.maketmp().await
+    }
+
+    pub async fn maketmpfile(&self) -> anyhow::Result<TempEntry<tempentry::File>> {
+        self.maketmp().await
+    }
+
+    pub async fn write_file_atomic(
+        &self,
+        path: impl AsRef<Path>,
+        data: impl AsRef<[u8]>,
+    ) -> anyhow::Result<()> {
+        let tmp = self.maketmpfile().await?;
+        tokio::fs::write(&*tmp, data).await?;
+        tmp.rename(path).await?;
+
+        Ok(())
+    }
 }
 
-pub struct Tempfolder(PathBuf);
+pub struct TempEntry<T: tempentry::TempEntryType>(PathBuf, PhantomData<T>);
 
-impl Tempfolder {
+pub mod tempentry {
+    use std::{io, path::Path};
+
+    pub trait TempEntryType {
+        // tokio::fs is just implemented as a spawn_blocking wrapper for the most part.
+        fn create(path: &Path) -> io::Result<()>;
+        fn drop_for(path: &Path);
+    }
+
+    pub struct Folder;
+    pub struct File;
+
+    impl TempEntryType for Folder {
+        fn create(path: &Path) -> io::Result<()> {
+            std::fs::create_dir_all(path)
+        }
+
+        fn drop_for(path: &Path) {
+            let _ = std::fs::remove_dir_all(path);
+        }
+    }
+
+    impl TempEntryType for File {
+        fn create(_path: &Path) -> io::Result<()> {
+            // files will be created on write
+            Ok(())
+        }
+
+        fn drop_for(path: &Path) {
+            let _ = std::fs::remove_file(path);
+        }
+    }
+}
+
+impl<T: tempentry::TempEntryType> TempEntry<T> {
     /// Extract the contained path without deleting the tmpdir.
     pub fn into_path(self) -> PathBuf {
         let v = ManuallyDrop::new(self);
@@ -204,7 +269,7 @@ impl Tempfolder {
     }
 }
 
-impl Deref for Tempfolder {
+impl<T: tempentry::TempEntryType> Deref for TempEntry<T> {
     type Target = Path;
 
     fn deref(&self) -> &Self::Target {
@@ -212,9 +277,9 @@ impl Deref for Tempfolder {
     }
 }
 
-impl Drop for Tempfolder {
+impl<T: tempentry::TempEntryType> Drop for TempEntry<T> {
     fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.0);
+        T::drop_for(&*self)
     }
 }
 
@@ -243,10 +308,6 @@ impl RuntimePath {
         AssetsPath(self.0.join("assets"))
     }
 
-    pub fn get_versions(&self) -> VersionsPath {
-        VersionsPath(self.0.join("versions"))
-    }
-
     pub fn get_natives(&self) -> NativesPath {
         NativesPath(self.0.join("natives"))
     }
@@ -257,6 +318,10 @@ impl RuntimePath {
 
     pub fn get_instances(&self) -> InstancesPath {
         InstancesPath(self.0.join("instances"))
+    }
+
+    pub fn get_logging_configs(&self) -> LoggingConfigsPath {
+        LoggingConfigsPath(self.0.join("logging_configs"))
     }
 
     pub fn get_temp(&self) -> TempPath {
@@ -274,4 +339,42 @@ impl Deref for RuntimePath {
     fn deref(&self) -> &Self::Target {
         &self.0
     }
+}
+
+/// Recursivley copy from `from` to `to` except when excluded by `filter`.
+/// Overwrites existing files. May fail if a parent directory is filtered but children are not.
+pub async fn copy_dir_filter<F>(from: &Path, to: &Path, filter: F) -> anyhow::Result<()>
+where
+    F: for<'a> Fn(&'a Path) -> bool,
+{
+    let entries = walkdir::WalkDir::new(from).into_iter().filter_map(|entry| {
+        let Ok(entry) = entry else { return None };
+
+        let srcpath = entry.path().to_path_buf();
+        let relpath = srcpath.strip_prefix(from).unwrap();
+
+        if !filter(&relpath) {
+            return None;
+        }
+
+        let destpath = to.join(relpath);
+
+        Some(async move {
+            if entry.metadata()?.is_dir() {
+                tokio::fs::create_dir_all(destpath).await?;
+            } else {
+                tokio::fs::create_dir_all(destpath.parent().unwrap()).await?;
+                tokio::fs::copy(srcpath, destpath).await?;
+            }
+
+            Ok::<_, anyhow::Error>(())
+        })
+    });
+
+    futures::future::join_all(entries)
+        .await
+        .into_iter()
+        .collect::<Result<_, _>>()?;
+
+    Ok(())
 }

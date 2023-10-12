@@ -14,7 +14,7 @@ use crate::managers::{account, App, AppInner};
 
 pub(super) fn mount() -> impl RouterBuilderLike<App, Meta = ()> {
     router! {
-        query GET_ACTIVE_UUID[app, _: ()] {
+        query GET_ACTIVE_UUID[app, args: ()] {
             app.account_manager().get_active_uuid().await
         }
 
@@ -22,7 +22,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App, Meta = ()> {
             app.account_manager().set_active_uuid(uuid).await
         }
 
-        query GET_ACCOUNTS[app, _: ()] {
+        query GET_ACCOUNTS[app, args: ()] {
             Ok(app.account_manager()
                .get_account_list()
                .await?
@@ -40,15 +40,15 @@ pub(super) fn mount() -> impl RouterBuilderLike<App, Meta = ()> {
             app.account_manager().delete_account(uuid).await
         }
 
-        mutation ENROLL_BEGIN[app, _: ()] {
+        mutation ENROLL_BEGIN[app, args: ()] {
             app.account_manager().begin_enrollment().await
         }
 
-        mutation ENROLL_CANCEL[app, _: ()] {
+        mutation ENROLL_CANCEL[app, args: ()] {
             app.account_manager().cancel_enrollment().await
         }
 
-        query(*) ENROLL_GET_STATUS[app, _: ()] {
+        query(*) ENROLL_GET_STATUS[app, args: ()] {
             let r = app.account_manager().get_enrollment_status(|s| Result::<EnrollmentStatus, FeError>::from(s)).await;
 
             match r {
@@ -58,7 +58,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App, Meta = ()> {
             }
         }
 
-        mutation ENROLL_FINALIZE[app, _: ()] {
+        mutation ENROLL_FINALIZE[app, args: ()] {
             app.account_manager().finalize_enrollment().await
         }
 

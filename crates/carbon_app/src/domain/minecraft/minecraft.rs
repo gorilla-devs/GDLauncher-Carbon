@@ -4,17 +4,20 @@ use daedalus::minecraft::{
 use std::path::PathBuf;
 use sysinfo::SystemExt;
 
-use crate::domain::{java::JavaArch, maven::MavenCoordinates, runtime_path::AssetsPath};
+use crate::domain::{
+    java::JavaArch,
+    runtime_path::{AssetsPath, LibrariesPath, RuntimePath},
+};
 
 pub fn libraries_into_vec_downloadable(
-    libraries: Vec<Library>,
+    libraries: &[Library],
     base_path: &std::path::Path,
     java_arch: &JavaArch,
 ) -> Vec<carbon_net::Downloadable> {
     let mut files = vec![];
 
     for library in libraries {
-        if !library_is_allowed(library.clone(), java_arch) {
+        if !library_is_allowed(library, java_arch) {
             continue;
         }
 
@@ -32,15 +35,13 @@ pub fn libraries_into_vec_downloadable(
         if let Some(base_url) = &library.url {
             let checksum = None;
 
-            // It's ok here to use MavenCoordinates::try_from, since it's the only way to get the path
-            let Ok(maven_path) = MavenCoordinates::try_from(library.name, None) else {
-                continue
+            let maven_path = library.name.into_path();
+            let Ok(maven_url) = library.name.into_url(base_url) else {
+                continue;
             };
 
-            let maven_path = maven_path.into_path();
-
             files.push(carbon_net::Downloadable {
-                url: format!("{}/{}", base_url, maven_path.to_string_lossy()),
+                url: maven_url.to_string(),
                 path: PathBuf::from(base_path).join(maven_path),
                 checksum,
                 size: None,
@@ -52,15 +53,14 @@ pub fn libraries_into_vec_downloadable(
 }
 
 // Use java arch instead of system arch
-pub fn is_rule_allowed(rule: Rule, java_arch: &JavaArch) -> bool {
+pub fn is_rule_allowed(rule: &Rule, java_arch: &JavaArch) -> bool {
     let res = match rule {
         Rule {
             os: Some(ref os), ..
         } => os_rule(os, java_arch),
         Rule {
-            features: Some(ref features),
-            ..
-        } => features.has_demo_resolution.unwrap_or(false),
+            features: Some(_), ..
+        } => false,
         _ => true,
     };
 
@@ -110,8 +110,14 @@ pub fn library_into_lib_downloadable(
             checksum,
             size: Some(artifact.size as u64),
         });
+    } else if let Some(base_url) = &library.url {
+        return Some(carbon_net::Downloadable {
+            url: format!("{}{}", base_url, library.name.path()),
+            path: base_path.join(library.name.path()),
+            checksum: None,
+            size: None,
+        });
     }
-
     None
 }
 
@@ -132,7 +138,7 @@ pub fn library_into_natives_downloadable(
         return None;
     };
 
-    let Some(mapping_class) = classifiers.get(&natives_name.clone()) else {
+    let Some(mapping_class) = classifiers.get(&natives_name.replace("${arch}", ARCH_WIDTH)) else {
         return None;
     };
 
@@ -148,13 +154,68 @@ pub fn library_into_natives_downloadable(
 
 pub fn version_download_into_downloadable(
     version_download: Download,
-    base_path: &std::path::Path,
+    version_id: &str,
+    runtime_path: &RuntimePath,
 ) -> carbon_net::Downloadable {
-    let jar_path = base_path.join(format!("{}.jar", &version_download.sha1));
+    let jar_path = runtime_path.get_libraries().get_mc_client(version_id);
 
     carbon_net::Downloadable::new(version_download.url, jar_path)
         .with_checksum(Some(carbon_net::Checksum::Sha1(version_download.sha1)))
         .with_size(version_download.size as u64)
+}
+
+pub fn chain_lwjgl_libs_with_base_libs(
+    lwjgl_libs: &[Library],
+    all_libs: &[Library],
+    java_component_arch: &JavaArch,
+    libraries_path: &LibrariesPath,
+    only_classpath_visible: bool,
+) -> Vec<String> {
+    let mut libraries = all_libs
+        .iter()
+        .chain(lwjgl_libs.iter())
+        .filter_map(|library| {
+            if !library_is_allowed(library, java_component_arch)
+                || (only_classpath_visible && !library.include_in_classpath)
+            {
+                return None;
+            }
+
+            let path = libraries_path.get_library_path({
+                if let Some(downloads) = library.downloads.as_ref() {
+                    if let Some(artifact) = downloads.artifact.as_ref() {
+                        artifact.path.clone()
+                    } else if let Some(classifiers) = downloads.classifiers.as_ref() {
+                        let Some(native_name) = library
+                            .natives
+                            .as_ref()
+                            .and_then(|natives| natives.get(&Os::native()))
+                        else {
+                            return None;
+                        };
+
+                        classifiers
+                            .get(&native_name.replace("${arch}", ARCH_WIDTH))
+                            .unwrap()
+                            .path
+                            .clone()
+                    } else {
+                        panic!("Library has no artifact or classifier");
+                    }
+                } else if library.url.is_some() {
+                    library.name.into_path().to_string_lossy().to_string()
+                } else {
+                    panic!("Library has no method of retrieval");
+                }
+            });
+
+            Some(path.display().to_string())
+        })
+        .collect::<Vec<String>>();
+
+    libraries.dedup();
+
+    libraries
 }
 
 pub fn assets_index_into_vec_downloadable(
@@ -163,13 +224,11 @@ pub fn assets_index_into_vec_downloadable(
 ) -> Vec<carbon_net::Downloadable> {
     let mut files: Vec<carbon_net::Downloadable> = vec![];
 
-    for (key, object) in assets_index.objects.iter() {
-        // TODO: handle directories for different versions (virtual legacy)
+    for (_, object) in assets_index.objects.iter() {
         let asset_path = assets_path
             .get_objects_path()
             .join(&object.hash[0..2])
             .join(&object.hash);
-        let _virtual_asset_path = assets_path.get_legacy_path().join(key);
 
         files.push(
             carbon_net::Downloadable::new(
@@ -183,25 +242,13 @@ pub fn assets_index_into_vec_downloadable(
             .with_checksum(Some(carbon_net::Checksum::Sha1(object.hash.clone())))
             .with_size(object.size as u64),
         );
-        // files.push(
-        //     carbon_net::Downloadable::new(
-        //         format!(
-        //             "https://resources.download.minecraft.net/{}/{}",
-        //             &object.hash[0..2],
-        //             &object.hash
-        //         ),
-        //         virtual_asset_path,
-        //     )
-        //     .with_checksum(Some(carbon_net::Checksum::Sha1(object.hash.clone())))
-        //     .with_size(object.size as u64),
-        // );
     }
 
     files
 }
 
-pub fn library_is_allowed(library: Library, java_arch: &JavaArch) -> bool {
-    let Some(rules) = library.rules else {
+pub fn library_is_allowed(library: &Library, java_arch: &JavaArch) -> bool {
+    let Some(rules) = library.rules.as_ref() else {
         return true;
     };
 
@@ -290,6 +337,7 @@ pub fn get_default_jvm_args() -> Vec<Argument> {
                 "-Dos.version=10.0".to_string(),
             ]),
         },
+        Argument::Normal("-Dfml.ignoreInvalidMinecraftCertificates=true".to_string()),
         Argument::Normal("-Djava.library.path=${natives_directory}".to_string()),
         Argument::Normal("-Dminecraft.launcher.brand=${launcher_name}".to_string()),
         Argument::Normal("-Dminecraft.launcher.version=${launcher_version}".to_string()),

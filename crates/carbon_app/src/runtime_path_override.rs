@@ -1,37 +1,29 @@
-use std::path::PathBuf;
-
-use tokio::io::AsyncReadExt;
+use std::{env, fs, path::PathBuf};
 
 pub(crate) async fn get_runtime_path_override() -> PathBuf {
-    let mut base_path = directories::ProjectDirs::from("com", "gorilladevs", "gdlauncher_carbon")
-        .unwrap()
-        .data_dir()
-        .to_path_buf();
-
-    let override_path = base_path.join("runtime_path_override.txt");
-
-    if override_path.exists() {
-        let mut file = tokio::fs::File::open(&override_path).await.unwrap();
-        let mut contents = String::new();
-        file.read_to_string(&mut contents).await.unwrap();
-        let path = PathBuf::from(contents.trim());
-
-        if !path.exists() {
-            tokio::fs::create_dir_all(&path).await.unwrap();
+    #[allow(unused_assignments)]
+    let mut path: Option<PathBuf> = None;
+    #[cfg(debug_assertions)]
+    {
+        path = Some(PathBuf::from(env!("RUNTIME_PATH")));
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        let mut args = env::args();
+        while let Some(arg) = args.next() {
+            if arg == "--runtime_path" {
+                if let Some(_path) = args.next() {
+                    path = Some(PathBuf::from(_path));
+                    break;
+                }
+            }
         }
-        base_path = path;
-    } else {
-        // open finder to this directory
-        #[cfg(target_os = "macos")]
-        {
-            let _ = std::process::Command::new("open")
-                .arg(&base_path)
-                .output()
-                .expect("failed to open finder");
-        }
-
-        tokio::fs::create_dir_all(&base_path).await.unwrap();
     }
 
-    base_path
+    let data_path = path.expect("Runtime path not found").join("data");
+
+    fs::create_dir_all(&data_path)
+        .expect(format!("Failed to create data directory: {:?}", data_path).as_str());
+
+    dunce::canonicalize(data_path).unwrap()
 }

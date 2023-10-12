@@ -12,15 +12,16 @@ use std::sync::{Arc, Weak};
 use thiserror::Error;
 
 use tokio::sync::broadcast::{self, error::RecvError};
+use tracing::error;
 
 use self::account::AccountManager;
 use self::download::DownloadManager;
 use self::instance::InstanceManager;
 use self::minecraft::MinecraftManager;
+use self::rich_presence::RichPresenceManager;
 use self::vtask::VisualTaskManager;
 
 pub mod account;
-mod cache_manager;
 pub mod download;
 pub mod instance;
 pub mod java;
@@ -29,6 +30,7 @@ mod metrics;
 mod minecraft;
 mod modplatforms;
 mod prisma_client;
+pub mod rich_presence;
 mod settings;
 pub mod system_info;
 pub mod vtask;
@@ -44,6 +46,10 @@ pub enum AppError {
 pub const GDL_API_BASE: &str = env!("BASE_API");
 
 mod app {
+    use tracing::error;
+
+    use crate::cache_middleware;
+
     use super::{
         java::JavaManager, metadata::cache::MetaCacheManager, metrics::MetricsManager,
         modplatforms::ModplatformsManager, system_info::SystemInfoManager, *,
@@ -56,14 +62,15 @@ mod app {
         account_manager: AccountManager,
         pub(crate) invalidation_channel: broadcast::Sender<InvalidationEvent>,
         download_manager: DownloadManager,
-        instance_manager: InstanceManager,
+        pub(crate) instance_manager: InstanceManager,
         meta_cache_manager: MetaCacheManager,
         pub(crate) metrics_manager: MetricsManager,
         pub(crate) modplatforms_manager: ModplatformsManager,
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
         pub(crate) prisma_client: Arc<PrismaClient>,
-        pub(crate) task_manager: VisualTaskManager,
-        pub(crate) system_info_manager: SystemInfoManager,
+        task_manager: VisualTaskManager,
+        system_info_manager: SystemInfoManager,
+        rich_presence_manager: rich_presence::RichPresenceManager,
     }
 
     macro_rules! manager_getter {
@@ -90,7 +97,12 @@ mod app {
             let unsaferef = UnsafeAppRef(Arc::downgrade(&app));
 
             // SAFETY: cannot be used until after the ref is initialized.
-            let reqwest = cache_manager::new_client(unsaferef);
+            let client = reqwest::Client::builder().build().unwrap();
+
+            let reqwest = cache_middleware::new_client(
+                unsaferef.clone(),
+                reqwest_middleware::ClientBuilder::new(client),
+            );
 
             let app = unsafe {
                 let inner = Arc::into_raw(app);
@@ -100,7 +112,7 @@ mod app {
                     java_manager: JavaManager::new(),
                     minecraft_manager: MinecraftManager::new(),
                     account_manager: AccountManager::new(),
-                    modplatforms_manager: ModplatformsManager::new(),
+                    modplatforms_manager: ModplatformsManager::new(unsaferef),
                     download_manager: DownloadManager::new(),
                     instance_manager: InstanceManager::new(),
                     meta_cache_manager: MetaCacheManager::new(),
@@ -110,6 +122,7 @@ mod app {
                     prisma_client: Arc::new(db_client),
                     task_manager: VisualTaskManager::new(),
                     system_info_manager: SystemInfoManager::new(),
+                    rich_presence_manager: rich_presence::RichPresenceManager::new(),
                 }));
 
                 // SAFETY: This pointer cast is safe because UnsafeCell and MaybeUninit do not
@@ -119,10 +132,18 @@ mod app {
 
             account::AccountRefreshService::start(Arc::downgrade(&app));
 
-            let app2 = app.clone();
+            let _app = app.clone();
             tokio::spawn(async move {
-                // ignore scanning errors instead of taking down the launcher
-                let _ = app2.clone().instance_manager().scan_instances().await;
+                _app.meta_cache_manager().launch_background_tasks().await;
+                _app.clone()
+                    .instance_manager()
+                    .launch_background_tasks()
+                    .await;
+            });
+
+            let _app = app.clone();
+            tokio::spawn(async move {
+                let _ = _app.clone().rich_presence_manager().start_presence().await;
             });
 
             app
@@ -139,15 +160,16 @@ mod app {
         manager_getter!(instance_manager: InstanceManager);
         manager_getter!(meta_cache_manager: MetaCacheManager);
         manager_getter!(system_info_manager: SystemInfoManager);
+        manager_getter!(rich_presence_manager: RichPresenceManager);
 
         pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
             match self
                 .invalidation_channel
                 .send(InvalidationEvent::new(key.full, args))
             {
-                Ok(_) => (),
+                Ok(_) => {}
                 Err(e) => {
-                    println!("Error sending invalidation request: {e}");
+                    error!("Error sending invalidation request: {e}");
                 }
             }
         }
@@ -175,6 +197,7 @@ impl Drop for AppInner {
             use crate::domain::metrics::{Event, EventName};
             use crate::iridium_client::get_client;
             use std::collections::HashMap;
+            use tracing::debug;
 
             let close_event = Event {
                 name: EventName::AppClosed,
@@ -184,11 +207,11 @@ impl Drop for AppInner {
             let client = get_client();
 
             tokio::runtime::Handle::current().block_on(async move {
-                println!("Collecting metric for app close");
-                let res = self.metrics_manager.track_event(client, close_event).await;
+                debug!("Collecting metric for app close");
+                let res = self.metrics_manager.track_event(close_event).await;
                 match res {
-                    Ok(_) => println!("Successfully collected metric for app close"),
-                    Err(e) => println!("Error collecting metric for app close: {e}"),
+                    Ok(_) => debug!("Successfully collected metric for app close"),
+                    Err(e) => error!("Error collecting metric for app close: {e}"),
                 }
             });
         }
@@ -230,6 +253,7 @@ impl AppRef {
 //
 // SAFETY:
 // This type (both MaybeUninits) must be initialized before it is used or dropped.
+#[derive(Clone)]
 pub struct UnsafeAppRef(Weak<UnsafeCell<MaybeUninit<AppInner>>>);
 
 unsafe impl Send for UnsafeAppRef {}

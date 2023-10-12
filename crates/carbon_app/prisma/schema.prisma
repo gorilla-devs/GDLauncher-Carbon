@@ -9,22 +9,30 @@ generator client {
 }
 
 model AppConfiguration {
-  id                  Int     @id @unique @default(0)
-  theme               String  @default("main")
-  reducedMotion       Boolean @default(false)
-  language            String  @default("en")
-  discordIntegration  Boolean @default(true)
-  releaseChannel      String  @default("stable")
-  activeAccountUuid   String?
-  concurrentDownloads Int     @default(8)
-  showNews            Boolean @default(true)
-  startupResolution   String  @default("854x480")
-  javaCustomArgs      String  @default("")
-  xmx                 Int     @default(1024)
-  xms                 Int     @default(1024)
-  defaultInstanceGroup Int?
-  isFirstLaunch       Boolean @default(true)
-  autoManageJava      Boolean @default(true)
+  id                              Int       @id @unique @default(0)
+  theme                           String    @default("main")
+  reducedMotion                   Boolean   @default(false)
+  language                        String    @default("english")
+  discordIntegration              Boolean   @default(true)
+  releaseChannel                  String
+  activeAccountUuid               String?
+  concurrentDownloads             Int       @default(8)
+  showNews                        Boolean   @default(true)
+  startupResolution               String    @default("854x480")
+  javaCustomArgs                  String    @default("")
+  xmx                             Int
+  xms                             Int       @default(1024)
+  defaultInstanceGroup            Int?
+  isFirstLaunch                   Boolean   @default(true)
+  autoManageJava                  Boolean   @default(true)
+  preferredModChannel             Int       @default(2) // 0 = >= alpha, 1 = >= beta, 2 = stable
+  // Legal / metrics
+  randomUserUuid                  String    @default(uuid())
+  secret                          Bytes
+  termsAndPrivacyAccepted         Boolean   @default(false)
+  termsAndPrivacyAcceptedChecksum String? // Should ask again if this changes
+  metricsEnabled                  Boolean   @default(false)
+  metricsEnabledLastUpdate        DateTime? // should ask again after 12 months
 }
 
 model Java {
@@ -85,6 +93,7 @@ model Instance {
   index     Int
   group     InstanceGroup  @relation(fields: [groupId], references: [id])
   groupId   Int
+  mods      ModFileCache[]
 }
 
 model InstanceGroup {
@@ -94,34 +103,92 @@ model InstanceGroup {
   instances  Instance[]
 }
 
+// this one
 model ModFileCache {
-  instance_id Int
-  path        String
-  filesize    Int
-  md5         Bytes
-  metadata    ModMetadata @relation(fields: [md5], references: [md5])
+  id         String      @id @default(uuid())
+  instanceId Int
+  instance   Instance    @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  filename   String
+  filesize   Int
+  enabled    Boolean
+  metadataId String
+  metadata   ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Restrict)
 
-  @@unique([instance_id, path])
+  @@unique([instanceId, filename])
 }
 
+// this one
 model ModMetadata {
-  md5         Bytes @id
+  id          String              @id
   murmur2     Int
+  sha512      Bytes
   name        String?
   modid       String?
   version     String?
   description String?
   authors     String?
-  curseforge  CurseForgeModCache? @relation(fields: [murmur2], references: [murmur2])
+  modloaders  String
+	logoImage   LocalModImageCache?
+  curseforge  CurseForgeModCache?
+  modrinth    ModrinthModCache?
   cachedFiles ModFileCache[]
 }
 
+// this one
 model CurseForgeModCache {
-  murmur2     Int @id
-  project_id  Int
-  file_id     Int
-  name        String
+  metadataId String      @id
+  murmur2    Int
+  projectId  Int
+  fileId     Int
+  name       String
+  urlslug    String
+  summary    String
+  authors    String
+  cachedAt   DateTime
+	logoImage  CurseForgeModImageCache?
+  metadata   ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, fileId])
+}
+
+// this one
+model ModrinthModCache {
+  metadataId  String      @id
+  sha512      String
+  projectId   String
+  versionId   String
+  title       String
   urlslug     String
-  summary     String
-  metadata    ModMetadata[]
+  description String
+  authors     String
+  cachedAt    DateTime
+	logoImage   ModrinthModImageCache?
+  metadata    ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, versionId])
+}
+
+// this one
+model LocalModImageCache {
+  metadataId String @id
+	data       Bytes
+	metadata   ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Cascade)
+}
+
+// this one
+model CurseForgeModImageCache {
+  metadataId String @id
+	url        String
+	data       Bytes?
+	upToDate   Int @default(0)
+	metadata   CurseForgeModCache @relation(fields: [metadataId], references: [metadataId], onDelete: Cascade)
+}
+
+// this one
+model ModrinthModImageCache {
+  metadataId String @id
+	url        String
+	data       Bytes?
+	upToDate   Int @default(0)
+	metadata   ModrinthModCache @relation(fields: [metadataId], references: [metadataId], onDelete: Cascade)
 }

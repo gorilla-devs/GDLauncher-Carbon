@@ -10,14 +10,9 @@ fn main() {
     println!("cargo:rerun-if-changed=../../.git/HEAD");
     println!("cargo:rerun-if-changed={}", parent_env_path.display());
     println!("cargo:rerun-if-changed=../../packages/config/version.json");
-    let git_hash = Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .output()
-        .unwrap();
-    let git_hash = String::from_utf8(git_hash.stdout).unwrap();
 
     let git_commit_author_date = Command::new("git")
-        .args(["log", "-1", "--format=%at"])
+        .args(["log", "-1", "--format=%ct"])
         .output()
         .unwrap();
     let git_commit_author_date = String::from_utf8(git_commit_author_date.stdout).unwrap();
@@ -37,7 +32,7 @@ fn main() {
         })
         .unwrap_or("".to_string());
 
-    println!("cargo:rustc-env=APP_VERSION={version}{channel}+{git_hash}");
+    println!("cargo:rustc-env=APP_VERSION={version}{channel}");
 
     if parent_env_path.exists() {
         for file in dotenvy::from_filename_iter(parent_env_path).unwrap() {

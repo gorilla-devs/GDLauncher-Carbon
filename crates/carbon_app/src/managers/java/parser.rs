@@ -98,6 +98,14 @@ mod test {
                 }),
             },
             TestCase {
+                output: "os.arch=aarch64\njava.version=21\njava.vendor=AdoptOpenJDK",
+                expected: Some(JavaCmdParsedOutput {
+                    version: JavaVersion::try_from("21").unwrap(),
+                    arch: super::JavaArch::Arm64,
+                    vendor: "AdoptOpenJDK".to_string(),
+                }),
+            },
+            TestCase {
                 output: "java.version=19.0.1\njava.vendor=AdoptOpenJDK",
                 expected: None,
             },

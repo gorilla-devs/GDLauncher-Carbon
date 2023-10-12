@@ -1,7 +1,7 @@
 import { mergeProps } from "solid-js";
 
-export interface Props {
-  percentage: number;
+interface Props {
+  percentage: number | string;
 }
 
 const Progressbar = (props: Props) => {

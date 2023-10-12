@@ -1,6 +1,7 @@
 import { app } from "electron";
 import * as Sentry from "@sentry/electron/main";
 import handleUncaughtException from "./handleUncaughtException";
+import { getCurrentRTPath, initRTPath } from "./runtimePath";
 
 const args = process.argv.slice(1);
 
@@ -16,24 +17,34 @@ function validateArgument(arg: string): Argument | null {
   if (hasValue) {
     return {
       argument: arg,
-      value: args[args.indexOf(arg) + 1],
+      value: args[args.indexOf(arg) + 1]
     };
   }
 
   if (args.includes(arg)) {
     return {
       argument: arg,
-      value: null,
+      value: null
     };
   }
 
   return null;
 }
 
-const overrideDataPath = validateArgument("--gdl_override_data_path");
-if (overrideDataPath?.value) {
-  app.setPath("userData", overrideDataPath?.value);
+if (app.isPackaged) {
+  const overrideCLIDataPath = validateArgument("--runtime_path");
+  const overrideEnvDataPath = process.env.GDL_RUNTIME_PATH;
+
+  initRTPath(overrideCLIDataPath?.value || overrideEnvDataPath);
+} else {
+  const rtPath = import.meta.env.RUNTIME_PATH;
+  if (!rtPath) {
+    throw new Error("Missing runtime path");
+  }
+  initRTPath(rtPath);
 }
+
+console.log("Runtime path:", getCurrentRTPath());
 
 const allowMultipleInstances = validateArgument(
   "--gdl_allow_multiple_instances"
@@ -54,7 +65,7 @@ if (!disableSentry) {
     process.removeListener("uncaughtException", handleUncaughtException);
 
     Sentry.init({
-      dsn: import.meta.env.VITE_MAIN_DSN,
+      dsn: import.meta.env.VITE_MAIN_DSN
     });
   }
 }

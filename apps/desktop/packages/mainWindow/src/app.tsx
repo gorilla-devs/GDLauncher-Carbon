@@ -1,11 +1,12 @@
-import { Show, createEffect, untrack } from "solid-js";
+import { createEffect, untrack } from "solid-js";
 import { useLocation, useRoutes } from "@solidjs/router";
 import { routes } from "./route";
-import { Trans } from "@gd/i18n";
 import initThemes from "./utils/theme";
 import { rspc } from "@/utils/rspcClient";
-import { useGDNavigate } from "./managers/NavigationManager";
 import { useModal } from "./managers/ModalsManager";
+import { useKeyDownEvent } from "@solid-primitives/keyboard";
+import initAnalytics from "@/utils/analytics";
+import { checkForUpdates } from "./utils/updater";
 
 type Props = {
   createInvalidateQuery: () => void;
@@ -13,7 +14,6 @@ type Props = {
 
 const App = (props: Props) => {
   const Route = useRoutes(routes);
-  const navigate = useGDNavigate();
   const modalsContext = useModal();
   const currentRoute = useLocation();
 
@@ -22,8 +22,11 @@ const App = (props: Props) => {
 
   initThemes();
 
-  const isFirstRun = rspc.createQuery(() => ["settings.getSettings"]);
+  initAnalytics();
+  checkForUpdates();
+
   const setIsFirstRun = rspc.createMutation(["settings.setSettings"]);
+  const isFirstRun = rspc.createQuery(() => ["settings.getSettings"]);
 
   createEffect(() => {
     if (isFirstRun.data?.isFirstLaunch && currentRoute.pathname !== "/") {
@@ -34,39 +37,24 @@ const App = (props: Props) => {
     }
   });
 
+  const event = useKeyDownEvent();
+
+  createEffect(() => {
+    // close modal clicking Escape
+    const e = event();
+    if (e) {
+      if (e.key === "Escape") {
+        untrack(() => {
+          modalsContext?.closeModal();
+        });
+      }
+    }
+  });
+
   return (
-    <div class="w-screen relative">
-      <Show when={process.env.NODE_ENV === "development"}>
-        <div class="absolute gap-4 flex justify-center items-center cursor-pointer h-10 bottom-10 right-0 p-2 z-50 bg-light-600">
-          <div
-            onClick={() => {
-              navigate("/library");
-            }}
-          >
-            <Trans
-              key="login.login"
-              options={{
-                defaultValue: "login",
-              }}
-            />
-          </div>
-          <div
-            onClick={() => {
-              // deleteMutation.mutate();
-              navigate("/");
-            }}
-          >
-            <Trans
-              key="login.logout"
-              options={{
-                defaultValue: "logout",
-              }}
-            />
-          </div>
-        </div>
-      </Show>
-      <div class="flex w-screen h-auto z-10">
-        <main class="relative overflow-hidden flex-1">
+    <div class="relative w-screen select-none">
+      <div class="w-screen flex z-10 h-auto">
+        <main class="relative flex-grow max-w-screen">
           {/* <Suspense fallback={<></>}> */}
           <Route />
           {/* </Suspense> */}

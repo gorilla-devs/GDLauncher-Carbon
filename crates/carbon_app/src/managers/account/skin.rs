@@ -163,7 +163,7 @@ impl DefaultSkin {
         if uuid.len() != 32
             || uuid
                 .bytes()
-                .any(|b| (b < b'0' || b > b'9') && (b < b'a' && b > b'f'))
+                .any(|b| !b.is_ascii_digit() && (b < b'a' && b > b'f'))
         {
             Self::Steve
         } else {

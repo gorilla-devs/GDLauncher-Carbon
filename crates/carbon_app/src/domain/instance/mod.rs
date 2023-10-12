@@ -1,5 +1,7 @@
-use crate::domain::vtask::VisualTaskId;
 use chrono::{DateTime, Utc};
+use uuid::Uuid;
+
+use crate::domain::vtask::VisualTaskId;
 
 pub mod info;
 
@@ -11,6 +13,9 @@ pub struct InstanceId(pub i32);
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
 pub struct GameLogId(pub i32);
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
+pub struct InstanceModId(pub Uuid);
 
 #[derive(Clone, Debug)]
 pub struct GameLogEntry {
@@ -27,14 +32,15 @@ pub struct InstanceDetails {
     pub global_java_args: bool,
     pub extra_java_args: Option<String>,
     pub memory: Option<(u16, u16)>,
-    pub last_played: DateTime<Utc>,
+    pub last_played: Option<DateTime<Utc>>,
     pub seconds_played: u32,
     pub modloaders: Vec<info::ModLoader>,
     pub state: LaunchState,
     pub notes: String,
-    pub mods: Vec<Mod>,
+    pub icon_revision: u32,
 }
 
+#[derive(Debug)]
 pub struct InstanceSettingsUpdate {
     pub instance_id: InstanceId,
     pub name: Option<String>,
@@ -59,21 +65,47 @@ pub enum LaunchState {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Mod {
     pub id: String,
     pub filename: String,
     pub enabled: bool,
-    pub modloader: info::ModLoaderType,
-    pub metadata: ModFileMetadata,
+    pub metadata: Option<ModFileMetadata>,
+    pub curseforge: Option<CurseForgeModMetadata>,
+    pub modrinth: Option<ModrinthModMetadata>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModFileMetadata {
-    pub modid: String,
+    pub modid: Option<String>,
     pub name: Option<String>,
     pub version: Option<String>,
     pub description: Option<String>,
     pub authors: Option<String>,
+    pub modloaders: Vec<info::ModLoaderType>,
+    pub has_image: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CurseForgeModMetadata {
+    pub project_id: u32,
+    pub file_id: u32,
+    pub name: String,
+    pub urlslug: String,
+    pub summary: String,
+    pub authors: String,
+    pub has_image: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModrinthModMetadata {
+    pub project_id: String,
+    pub version_id: String,
+    pub title: String,
+    pub urlslug: String,
+    pub description: String,
+    pub authors: String,
+    pub has_image: bool,
 }
 
 #[derive(Debug, Copy, Clone)]

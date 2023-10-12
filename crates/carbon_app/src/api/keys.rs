@@ -9,6 +9,7 @@ macro_rules! keys {
                 pub const $name: $crate::api::keys::Key = $crate::api::keys::Key {
                     local: $value,
                     full: concat!(stringify!($group), ".", $value),
+                    span_key: concat!("api::", stringify!($group), ".", $value)
                 };
             )*
         })*
@@ -22,6 +23,8 @@ pub struct Key {
     pub local: &'static str,
     /// full keypath `mygroup.mykey`
     pub full: &'static str,
+    /// span key `api::mygroup.mykey`
+    pub span_key: &'static str,
 }
 
 impl Display for Key {
@@ -61,6 +64,8 @@ keys! {
     mc {
         GET_MINECRAFT_VERSIONS                      = "getMinecraftVersions";
         GET_FORGE_VERSIONS                          = "getForgeVersions";
+        GET_FABRIC_VERSIONS                         = "getFabricVersions";
+        GET_QUILT_VERSIONS                          = "getQuiltVersions";
     }
 
     instance {
@@ -74,9 +79,11 @@ keys! {
         DELETE_INSTANCE                             = "deleteInstance";
         MOVE_GROUP                                  = "moveGroup";
         MOVE_INSTANCE                               = "moveInstance";
+        DUPLICATE_INSTANCE                          = "duplicateInstance";
         UPDATE_INSTANCE                             = "updateInstance";
         SET_FAVORITE                                = "setFavorite";
         INSTANCE_DETAILS                            = "getInstanceDetails";
+        INSTANCE_MODS                               = "getInstanceMods";
         PREPARE_INSTANCE                            = "prepareInstance";
         LAUNCH_INSTANCE                             = "launchInstance";
         KILL_INSTANCE                               = "killInstance";
@@ -87,6 +94,10 @@ keys! {
         DISABLE_MOD                                 = "disableMod";
         DELETE_MOD                                  = "deleteMod";
         INSTALL_MOD                                 = "installMod";
+        GET_IMPORTABLE_ENTITIES                     = "getImportableEntities";
+        SCAN_IMPORTABLE_INSTANCES                   = "scanImportableInstances";
+        GET_IMPORTABLE_INSTANCES                    = "getImportableInstances";
+        IMPORT_INSTANCE                             = "importInstance";
     }
 
     vtask {
@@ -98,8 +109,8 @@ keys! {
     settings {
         GET_SETTINGS                                = "getSettings";
         SET_SETTINGS                                = "setSettings";
-        GET_IS_FIRST_LAUNCH                         = "getIsFirstLaunch";
-        SET_IS_FIRST_LAUNCH                         = "setIsFirstLaunch";
+        GET_TERMS_OF_SERVICE_BODY                   = "getTermsOfServiceBody";
+        GET_PRIVACY_STATEMENT_BODY                  = "getPrivacyStatementBody";
     }
 
     metrics {
@@ -113,14 +124,28 @@ keys! {
     }
 
     modplatforms {
-        CURSEFORGE_GET_CATEGORIES                   = "curseforgeGetCategories";
-        CURSEFORGE_SEARCH                           = "curseforgeSearch";
-        CURSEFORGE_GET_MOD                          = "curseforgeGetMod";
-        CURSEFORGE_GET_MODS                         = "curseforgeGetMods";
-        CURSEFORGE_GET_MOD_DESCRIPTION              = "curseforgeGetModDescription";
-        CURSEFORGE_GET_MOD_FILE                     = "curseforgeGetModFile";
-        CURSEFORGE_GET_MOD_FILES                    = "curseforgeGetModFiles";
-        CURSEFORGE_GET_FILES                        = "curseforgeGetFiles";
-        CURSEFORGE_GET_MOD_FILE_CHANGELOG           = "curseforgeGetModFileChangelog";
+        CURSEFORGE_GET_MODLOADERS                   = "curseforge.getModloaders";
+        CURSEFORGE_GET_CATEGORIES                   = "curseforge.getCategories";
+        CURSEFORGE_SEARCH                           = "curseforge.search";
+        CURSEFORGE_GET_MOD                          = "curseforge.getMod";
+        CURSEFORGE_GET_MODS                         = "curseforge.getMods";
+        CURSEFORGE_GET_MOD_DESCRIPTION              = "curseforge.getModDescription";
+        CURSEFORGE_GET_MOD_FILE                     = "curseforge.getModFile";
+        CURSEFORGE_GET_MOD_FILES                    = "curseforge.getModFiles";
+        CURSEFORGE_GET_FILES                        = "curseforge.getFiles";
+        CURSEFORGE_GET_MOD_FILE_CHANGELOG           = "curseforge.getModFileChangelog";
+
+        MODRINTH_GET_LOADERS                        = "modrinth.getLoaders";
+        MODRINTH_GET_CATEGORIES                     = "modrinth.getCategories";
+        MODRINTH_SEARCH                             = "modrinth.search";
+        MODRINTH_GET_PROJECT                        = "modrinth.getProject";
+        MODRINTH_GET_PROJECTS                       = "modrinth.getProjects";
+        MODRINTH_GET_PROJECT_VERSIONS               = "modrinth.getProjectVersions";
+        MODRINTH_GET_VERSION                        = "modrinth.getVersion";
+        MODRINTH_GET_VERSIONS                       = "modrinth.getVersions";
+        MODRINTH_GET_PROJECT_TEAM                   = "modrinth.getProjectTeam";
+        MODRINTH_GET_TEAM                           = "modrinth.getTeam";
+
+        UNIFIED_SEARCH                              = "unifiedSearch";
     }
 }

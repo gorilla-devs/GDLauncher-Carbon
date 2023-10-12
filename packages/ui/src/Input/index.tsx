@@ -1,8 +1,7 @@
 import { Show, JSX, splitProps } from "solid-js";
 
-export interface Props extends JSX.InputHTMLAttributes<HTMLInputElement> {
-  placeholder?: string;
-  error?: string;
+interface Props extends JSX.InputHTMLAttributes<HTMLInputElement> {
+  error?: string | boolean;
   disabled?: boolean;
   class?: string;
   inputClass?: string;
@@ -11,51 +10,52 @@ export interface Props extends JSX.InputHTMLAttributes<HTMLInputElement> {
 }
 
 function Input(props: Props) {
-  const [_, others] = splitProps(props, [
-    "error",
-    "inputClass",
+  const [local, otherProps] = splitProps(props, [
     "class",
-    "inputColor",
     "icon",
+    "inputClass",
+    "disabled",
+    "error",
+    "inputColor",
   ]);
 
   return (
     <>
       <div
-        class={`h-10 gap-2 box-border transition-all duration-100 ease-in-out ${
-          props.class || ""
+        class={`h-10 gap-2 box-border transition-all duration-100 rounded-md ease-in-out ${
+          local.class || ""
         }`}
         classList={{
-          "bg-darkSlate-700 rounded-full px-4 flex items-center max-w-max":
-            props.icon,
-          "rounded-md": !props.icon,
+          "bg-darkSlate-700 px-4 flex items-center": local.icon,
         }}
       >
-        <Show when={props.icon}>
-          <span class="text-darkSlate-500">{props.icon}</span>
-        </Show>
         <input
-          class={`border-0 border-transparent h-full w-full box-border py-2 rounded-md placeholder:text-darkSlate-500 ${
-            props.inputClass || ""
-          } ${props.inputColor}
+          class={`h-full w-full box-border py-2 rounded-md placeholder:text-darkSlate-400 ${
+            local.inputClass || ""
+          } ${local.inputColor}
            outline-none focus-viible:outline-none
           `}
           classList={{
             "bg-darkSlate-700 focus-visible:outline-none focus-visible:border-0":
-              props.icon,
-            "px-4 focus-visible:outline-darkSlate-500 hover:border-darkSlate-500 active:border-darkSlate-500":
-              !props.icon,
-            "text-darkSlate-700": props.disabled,
-            "text-white": !props.disabled,
-            "border-red-500": !!props.error,
-            "bg-darkSlate-600": !props.inputColor,
+              local.icon,
+            "px-4 focus-visible:outline-darkSlate-500 ": !local.icon,
+            "text-darkSlate-300": local.disabled,
+            "text-white": !local.disabled,
+            "border-2 border-solid border-red-500": !!local.error,
+            "border-0 border-transparent hover:border-darkSlate-500 active:border-darkSlate-500":
+              !local.error,
+            "bg-darkSlate-600": !local.inputColor,
           }}
-          {...others}
+          disabled={local.disabled}
+          {...otherProps}
         />
+        <Show when={local.icon}>
+          <span class="text-darkSlate-300">{local.icon}</span>
+        </Show>
       </div>
 
-      <Show when={props.error}>
-        <div class="text-red-500 text-left">{props.error}</div>
+      <Show when={local.error}>
+        <div class="text-red-500 text-left mt-2 font-light">{local.error}</div>
       </Show>
     </>
   );

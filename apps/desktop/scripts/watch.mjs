@@ -13,11 +13,11 @@ function watchMain(mainWindow) {
   const addressMainWindow = mainWindow.httpServer.address();
   const env = Object.assign(process.env, {
     VITE_DEV_SERVER_HOST: "localhost",
-    VITE_DEV_MAIN_WINDOW_PORT: addressMainWindow.port,
+    VITE_DEV_MAIN_WINDOW_PORT: addressMainWindow.port
   });
 
   return build({
-    configFile: "packages/main/vite.config.js",
+    configFile: "packages/main/vite.config.cjs",
     mode: "development",
     plugins: [
       {
@@ -27,14 +27,14 @@ function watchMain(mainWindow) {
           // Add "--inspect-brk=5858",  to debug main process
           electronProcess = spawn(electron, [".", "--test-ad"], {
             stdio: "inherit",
-            env,
+            env
           });
-        },
-      },
+        }
+      }
     ],
     build: {
-      watch: true,
-    },
+      watch: true
+    }
   });
 }
 
@@ -50,17 +50,17 @@ function watchPreload(mainWindow) {
         name: "electron-preload-watcher",
         writeBundle() {
           mainWindow.ws.send({ type: "full-reload" });
-        },
-      },
+        }
+      }
     ],
     build: {
-      watch: true,
-    },
+      watch: true
+    }
   });
 }
 
 const mainWindow = await createServer({
-  configFile: "packages/mainWindow/vite.config.cjs",
+  configFile: "packages/mainWindow/vite.config.cjs"
 });
 
 await mainWindow.listen();

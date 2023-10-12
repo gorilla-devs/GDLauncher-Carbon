@@ -82,14 +82,17 @@ target
 .turbo
 packages/ui/src/style.dist.css
 apps/desktop/data
-packages/core_module/data
-packages/core_module/bindings.d.ts
+apps/desktop/binaries
+# packages/core_module/bindings.d.ts
 MC_TEST
 tests_decompressed
 java_runtimes
+playwright-report
+test-results
 
 **/.idea
 crates/carbon_app/src/db.rs
 /crates/carbon_app/prisma/dev.db
 /crates/carbon_app/prisma/dev.db-journal
 /crates/iridium
+.vscode

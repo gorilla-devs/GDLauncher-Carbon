@@ -25,7 +25,7 @@ const Tags = (props: Props) => {
       </div>
       <Button
         class="h-8"
-        variant="secondary"
+        type="secondary"
         textColor="text-red-500"
         rounded={false}
         onClick={() => props.onClearAll()}
@@ -33,7 +33,7 @@ const Tags = (props: Props) => {
         <Trans
           key="instance.clear_filters_modpacks"
           options={{
-            defaultValue: "Clear filters",
+            defaultValue: "Clear filters"
           }}
         />
       </Button>

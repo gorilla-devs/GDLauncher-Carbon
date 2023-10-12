@@ -14,6 +14,7 @@ use crate::{
 
 use super::InstanceManager;
 
+#[derive(Debug)]
 pub struct GameLog {
     // buffer holding the full log
     log: String,
@@ -22,6 +23,7 @@ pub struct GameLog {
     last_was_terminated: bool,
 }
 
+#[derive(Debug)]
 // Note: Option<LogEntry> shares a repr with LogEntry due to enum optimization
 pub struct InternalLogEntry {
     type_: EntryType,
@@ -42,6 +44,12 @@ pub enum EntryType {
     StdOut,
     StdErr,
     // more entries once log levels are handled
+}
+
+impl Default for GameLog {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl GameLog {
@@ -133,7 +141,9 @@ impl GameLog {
     /// Get the first log entry before the given line
     pub fn get_entry(&self, line: usize) -> Option<LogEntry> {
         for i in (0..=line).rev() {
-            let Some(entry) = self.lines.get(i) else { return None };
+            let Some(entry) = self.lines.get(i) else {
+                return None;
+            };
 
             if let Some(entry) = entry {
                 return Some(LogEntry {
@@ -164,7 +174,9 @@ impl GameLog {
         };
 
         for i in (0..end).rev() {
-            let Some(entry) = self.lines.get(i) else { continue };
+            let Some(entry) = self.lines.get(i) else {
+                continue;
+            };
 
             if let Some(entry) = entry {
                 entries.push(LogEntry {

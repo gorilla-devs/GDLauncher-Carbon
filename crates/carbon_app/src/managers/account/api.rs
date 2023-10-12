@@ -9,10 +9,11 @@ use rspc::Type;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
+use tracing::info;
 
-use crate::error::request::{censor_error, RequestContext, RequestError, RequestErrorDetails};
-
-const MS_KEY: &str = "221e73fa-365e-4263-9e06-7a0a1f277960";
+use crate::error::request::{
+    censor_error, MalformedResponseDetails, RequestContext, RequestError, RequestErrorDetails,
+};
 
 #[derive(Debug, Clone)]
 pub struct DeviceCode {
@@ -38,7 +39,7 @@ impl DeviceCode {
         let response = client
             .get("https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode")
             .query(&[
-                ("client_id", MS_KEY),
+                ("client_id", env!("MS_AUTH_CLIENT_ID")),
                 (
                     "scope",
                     "XboxLive.signin XboxLive.offline_access profile openid email",
@@ -74,7 +75,7 @@ impl DeviceCode {
             let response = client
                 .post("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
                 .form(&[
-                    ("client_id", MS_KEY),
+                    ("client_id", env!("MS_AUTH_CLIENT_ID")),
                     (
                         "scope",
                         "XboxLive.signin XboxLive.offline_access profile openid email",
@@ -167,7 +168,7 @@ impl MsAuth {
             .post("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
             //.post("https://login.live.com/oauth20_token.srf")
             .form(&[
-                ("client_id", MS_KEY),
+                ("client_id", env!("MS_AUTH_CLIENT_ID")),
                 ("refresh_token", refresh_token),
                 ("grant_type", "refresh_token"),
                 (
@@ -279,7 +280,9 @@ impl XboxAuth {
                         .ok_or_else(|| {
                             anyhow!(RequestError {
                                 context: RequestContext::none(),
-                                error: RequestErrorDetails::MalformedResponse,
+                                error: RequestErrorDetails::MalformedResponse {
+                                    details: MalformedResponseDetails::UnknownDecodeError
+                                },
                             })
                         })?
                         .uhs
@@ -427,7 +430,7 @@ impl McAuth {
             }
         };
 
-        println!("Entitlements: {entitlements:#?}");
+        info!("Entitlements: {entitlements:#?}");
 
         // likely will not work for gamepass
         let owns_game = entitlements

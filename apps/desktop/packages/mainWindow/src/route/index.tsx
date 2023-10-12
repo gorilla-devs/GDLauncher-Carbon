@@ -1,22 +1,24 @@
 import { lazy } from "solid-js";
 import { RouteDefinition } from "@solidjs/router";
 import SettingsJavaData from "@/pages/Settings/settings.java.data";
-import HomeData from "@/pages/home.data";
 import SettingsGeneralData from "@/pages/Settings/settings.general.data";
 import LoginData from "@/pages/Login/auth.login.data";
 import AppData from "@/pages/app.data";
-import BrowserData from "@/pages/Modpacks/browser.data";
+import ModpackBrowserData from "@/pages/Modpacks/modpacksBrowser.data";
+import ModsBrowserData from "@/pages/Mods/modsBrowser.data";
 import ModpackData from "@/pages/Modpacks/modpack.overview";
 import ModpackVersionsData from "@/pages/Modpacks/modpack.versions";
-import ModpackChangelogData from "@/pages/Modpacks/modpack.changelog";
 import ModpackScreenshotsData from "@/pages/Modpacks/modpack.screenshots";
+import InstanceData from "@/pages/Library/Instance/instance.data";
+import InstanceLogsData from "@/pages/Library/Instance/instance.logs.data";
+import LibraryData from "@/pages/Library/library.data";
 /* Defining the routes for the application. */
 
 export const routes: RouteDefinition[] = [
   {
     path: "/",
     component: lazy(() => import("@/pages/Login")),
-    data: LoginData,
+    data: LoginData
   },
   {
     path: "/",
@@ -26,104 +28,139 @@ export const routes: RouteDefinition[] = [
       {
         path: "/library",
         component: lazy(() => import("@/pages/Library")),
-        data: () => {
-          console.log("Fetching all instances...");
-        },
+        data: LibraryData,
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Library/Home")),
-            data: HomeData,
+            component: lazy(() => import("@/pages/Library/Home"))
           },
           {
             path: "/:id",
             component: lazy(() => import("@/pages/Library/Instance")),
-            data: () => {
-              console.log("Fetching specific instance data...");
-            },
+            data: InstanceData,
             children: [
               {
                 path: "/",
                 component: lazy(
                   () => import("@/pages/Library/Instance/Overview")
-                ),
+                )
               },
               {
                 path: "/mods",
-                component: lazy(() => import("@/pages/Library/Instance/Mods")),
-                data: () => {
-                  console.log("Fetching mods data...");
-                },
+                component: lazy(
+                  () => import("@/pages/Library/Instance/Tabs/Mods")
+                )
               },
               {
                 path: "/settings",
                 component: lazy(
-                  () => import("@/pages/Library/Instance/Settings")
+                  () => import("@/pages/Library/Instance/Tabs/Settings")
+                )
+              },
+              {
+                path: "/logs",
+                component: lazy(
+                  () => import("@/pages/Library/Instance/Tabs/Log")
                 ),
-                data: () => {
-                  console.log("Fetching instance settings data...");
-                },
+                data: InstanceLogsData
               },
               {
                 path: "/resourcepacks",
                 component: lazy(
-                  () => import("@/pages/Library/Instance/ResourcePacks")
-                ),
+                  () => import("@/pages/Library/Instance/Tabs/ResourcePacks")
+                )
               },
               {
                 path: "/screenshots",
                 component: lazy(
-                  () => import("@/pages/Library/Instance/Screenshots")
-                ),
+                  () => import("@/pages/Library/Instance/Tabs/Screenshots")
+                )
               },
               {
                 path: "/versions",
                 component: lazy(
-                  () => import("@/pages/Library/Instance/Versions")
-                ),
-              },
-            ],
-          },
-        ],
+                  () => import("@/pages/Library/Instance/Tabs/Versions")
+                )
+              }
+            ]
+          }
+        ]
       },
       {
         path: "/modpacks",
         component: lazy(() => import("@/pages/Modpacks")),
-        data: BrowserData,
+        data: ModpackBrowserData,
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Modpacks/Browser")),
-          },
-        ],
+            component: lazy(() => import("@/pages/Modpacks/ModpacksBrowser"))
+          }
+        ]
       },
       {
-        path: "/modpacks/:id",
+        path: "/mods",
+        component: lazy(() => import("@/pages/Mods")),
+        data: ModsBrowserData,
+        children: [
+          {
+            path: "/",
+            component: lazy(() => import("@/pages/Mods/ModsBrowser"))
+          }
+        ]
+      },
+      {
+        path: "/mods/:id/:platform",
         component: lazy(() => import("@/pages/Modpacks/Explore")),
         data: ModpackData,
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Modpacks/Explore/Overview")),
+            component: lazy(() => import("@/pages/Modpacks/Explore/Overview"))
           },
           {
             path: "/versions",
             component: lazy(() => import("@/pages/Modpacks/Explore/Versions")),
-            data: ModpackVersionsData,
+            data: ModpackVersionsData
           },
           {
             path: "/changelog",
-            component: lazy(() => import("@/pages/Modpacks/Explore/Changelog")),
-            data: ModpackChangelogData,
+            component: lazy(() => import("@/pages/Modpacks/Explore/Changelog"))
           },
           {
             path: "/screenshots",
             component: lazy(
               () => import("@/pages/Modpacks/Explore/Screenshots")
             ),
-            data: ModpackScreenshotsData,
+            data: ModpackScreenshotsData
+          }
+        ]
+      },
+      {
+        path: "/modpacks/:id/:platform",
+        component: lazy(() => import("@/pages/Modpacks/Explore")),
+        data: ModpackData,
+        children: [
+          {
+            path: "/",
+            component: lazy(() => import("@/pages/Modpacks/Explore/Overview"))
           },
-        ],
+          {
+            path: "/versions",
+            component: lazy(() => import("@/pages/Modpacks/Explore/Versions")),
+            data: ModpackVersionsData
+          },
+          {
+            path: "/changelog",
+            component: lazy(() => import("@/pages/Modpacks/Explore/Changelog"))
+          },
+          {
+            path: "/screenshots",
+            component: lazy(
+              () => import("@/pages/Modpacks/Explore/Screenshots")
+            ),
+            data: ModpackScreenshotsData
+          }
+        ]
       },
       {
         path: "/settings",
@@ -132,23 +169,35 @@ export const routes: RouteDefinition[] = [
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Settings/General")),
+            component: lazy(() => import("@/pages/Settings/General"))
+          },
+          {
+            path: "/language",
+            component: lazy(() => import("@/pages/Settings/Language"))
           },
           {
             path: "/appearance",
-            component: lazy(() => import("@/pages/Settings/Appearance")),
+            component: lazy(() => import("@/pages/Settings/Appearance"))
           },
           {
             path: "/java",
             component: lazy(() => import("@/pages/Settings/Java")),
-            data: SettingsJavaData,
+            data: SettingsJavaData
           },
-        ],
+          {
+            path: "/privacy",
+            component: lazy(() => import("@/pages/Settings/Privacy"))
+          },
+          {
+            path: "/runtime-path",
+            component: lazy(() => import("@/pages/Settings/RuntimePath"))
+          }
+        ]
       },
       {
         path: "**",
-        component: lazy(() => import("@/errors/404")),
-      },
-    ],
-  },
+        component: lazy(() => import("@/errors/404"))
+      }
+    ]
+  }
 ];

@@ -19,6 +19,18 @@ pub(super) fn mount() -> impl RouterBuilderLike<App, Meta = ()> {
 
             Ok(FEModdedManifest::from(res))
         }
+
+        query GET_FABRIC_VERSIONS[app, _args: ()] {
+            let res = app.minecraft_manager().get_fabric_manifest().await?;
+
+            Ok(FEModdedManifest::from(res))
+        }
+
+        query GET_QUILT_VERSIONS[app, _args: ()] {
+            let res = app.minecraft_manager().get_quilt_manifest().await?;
+
+            Ok(FEModdedManifest::from(res))
+        }
     }
 }
 

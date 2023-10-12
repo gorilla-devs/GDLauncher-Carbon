@@ -1,20 +1,20 @@
 import { useLocation, useSearchParams } from "@solidjs/router";
 import {
-  Accessor,
   createContext,
   createSignal,
+  For,
   JSX,
   lazy,
-  Show,
-  Suspense,
-  useContext,
+  useContext
 } from "solid-js";
 import { Dynamic, Portal } from "solid-js/web";
 import { useGDNavigate } from "../NavigationManager";
+import adSize from "@/utils/adhelper";
 
 export type ModalProps = {
   title: string;
   noHeader?: boolean;
+  data?: any;
 };
 
 type Hash = {
@@ -22,128 +22,200 @@ type Hash = {
     component: ((_props: ModalProps) => JSX.Element) & {
       preload: () => Promise<{ default: (_props: ModalProps) => JSX.Element }>;
     };
-
+    preventClose?: boolean;
     title?: string;
     noHeader?: boolean;
   };
 };
 
 const defaultModals: Hash = {
-  privacyPolicy: {
-    component: lazy(() => import("./modals/Privacypolicy")),
-    title: "Privacy Policy",
+  privacyStatement: {
+    component: lazy(() => import("./modals/PrivacyStatement")),
+    title: "Privacy Statement"
   },
   termsAndConditions: {
     component: lazy(() => import("./modals/TermsAndConditions")),
-    title: "Terms and Conditions",
+    title: "Terms and Conditions"
   },
   addJava: {
     component: lazy(() => import("./modals/Java/AddJava")),
-    title: "Add java version",
+    title: "Add java version"
+  },
+  modDetails: {
+    component: lazy(() => import("./modals/ModDetails")),
+    title: "Mod Details"
   },
   javaSetup: {
     component: lazy(() => import("./modals/Java/JavaSetup")),
-    title: "Java Setup",
-  },
-  acceptableUsePolicy: {
-    component: lazy(() => import("./modals/AcceptableUsePolicy")),
-    title: "Acceptable Use Policy",
+    title: "Java Setup"
   },
   instanceCreation: {
     component: lazy(() => import("./modals/InstanceCreation")),
-    title: "New Instance",
+    title: "New Instance"
   },
-  logViewer: {
-    component: lazy(() => import("./modals/LogViewer")),
-    title: "Logs",
+  notification: {
+    component: lazy(() => import("./modals/Notification")),
+    title: "Notification"
+  },
+  confirmInstanceDeletion: {
+    component: lazy(() => import("./modals/ConfirmInstanceDeletion")),
+    title: "Confirm Instance Deletion"
+  },
+  ConfirmChangeRuntimePath: {
+    component: lazy(() => import("./modals/ConfirmChangeRuntimePath")),
+    title: "Confirm Change RuntimePath"
+  },
+  appUpdate: {
+    component: lazy(() => import("./modals/AppUpdate")),
+    title: "New App Version Available"
   },
   onBoarding: {
     component: lazy(() => import("./modals/OnBoarding")),
-    noHeader: true,
-  },
+    noHeader: true
+  }
 };
 
-type ModalName = string;
+type ModalName = {
+  [K in keyof typeof defaultModals as string extends K ? K : never]: K;
+}[keyof typeof defaultModals];
 
 type Modal = { name: ModalName; url?: string };
 
 type Context = {
-  openModal: (_modal: Modal) => void;
+  openModal: (_modal: Modal, _data?: any) => void;
   closeModal: () => void;
-  isVisible: Accessor<boolean>;
 };
+
+type Stack = Array<{ name: ModalName; data: any }>;
 
 const ModalsContext = createContext<Context>();
 
 export const ModalProvider = (props: { children: JSX.Element }) => {
   const navigate = useGDNavigate();
-  const [isVisible, setIsVisible] = createSignal(false);
   const location = useLocation();
   const queryParams = () => location.search as ModalName;
   const urlSearchParams = () => new URLSearchParams(queryParams());
-  const mParam = () => urlSearchParams().get("m");
+  const [modalStack, setModalStack] = createSignal<Stack>([]);
 
   const [_searchParams, setSearchParams] = useSearchParams();
 
-  const modalTypeIndex = () => mParam() || "";
-  const noHeader = () => defaultModals[modalTypeIndex()]?.noHeader || false;
+  const closeModal = (name?: ModalName) => {
+    setModalStack((currentStack) => {
+      const newStack = currentStack.slice();
 
-  const ModalComponent: any = () => defaultModals[modalTypeIndex()]?.component;
+      // Remove the specific modal or the top modal
+      let indexToRemove: number;
+      if (name) {
+        indexToRemove = currentStack.findIndex((modal) => modal.name === name);
+      } else {
+        indexToRemove = currentStack.length - 1;
+      }
 
-  const title = () => defaultModals[modalTypeIndex()]?.title;
+      if (indexToRemove >= 0) {
+        newStack.splice(indexToRemove, 1);
+        const newParams: { [k: string]: string | null } = Object.fromEntries(
+          urlSearchParams()
+        );
 
-  const closeModal = () => {
-    setIsVisible(false);
-    setTimeout(() => {
-      urlSearchParams()?.delete("m");
+        for (let key in Object.fromEntries(urlSearchParams())) {
+          if (key !== `m[${indexToRemove + 1}]`) {
+            newParams[`m[${indexToRemove + 1}]`] = null;
+          }
+        }
+
+        setSearchParams(newParams);
+      }
+
+      return newStack;
+    });
+
+    if (modalStack().length === 0) {
       const overlay = document.getElementById("overlay") as HTMLElement;
       overlay.style.display = "none";
-    }, 100);
+    }
   };
 
   const manager = {
-    openModal: (modal: Modal) => {
+    openModal: (modal: Modal, data: any) => {
       const overlay = document.getElementById("overlay") as HTMLElement;
       overlay.style.display = "flex";
+      overlay.style.opacity = "0"; // Set initial opacity to 0
+      setTimeout(() => (overlay.style.opacity = "1"), 10); // Transition to opacity 1
+      setModalStack((currentStack) => [
+        ...currentStack,
+        { name: modal.name, data }
+      ]);
+
+      // Update URL params
       if (modal.url) {
         const url = new URLSearchParams(modal.url);
-        url.append("m", modal.name);
+
+        url.append(`m[${modalStack().length}]`, modal.name);
 
         const decodedParamString = decodeURIComponent(url.toString());
         navigate(decodedParamString.replace("=&", "?"));
-        setIsVisible(false);
-        setTimeout(() => {
-          setIsVisible(true);
-        }, 100);
       } else {
-        setSearchParams({ m: modal.name });
-        setTimeout(() => {
-          setIsVisible(true);
-        }, 100);
+        setSearchParams({
+          [`m[${modalStack().length}]`]: modal.name
+        });
       }
     },
-    closeModal,
-    isVisible,
+    closeModal
   };
 
   return (
     <ModalsContext.Provider value={manager}>
       {props.children}
       <Portal mount={document.getElementById("overlay") as HTMLElement}>
-        <Show when={mParam()}>
-          <Suspense fallback={<p>Loading...</p>}>
-            <div class="h-screen w-screen">
-              <Dynamic
-                component={ModalComponent({
-                  noHeader,
-                  title,
-                })}
-                noHeader={noHeader()}
-                title={title()}
-              />
-            </div>
-          </Suspense>
-        </Show>
+        <div class="w-screen h-screen">
+          <For each={modalStack()}>
+            {(modal, index) => {
+              const ModalComponent = defaultModals[modal.name].component;
+              const noHeader = defaultModals[modal.name].noHeader || false;
+              const title = defaultModals[modal.name].title || "";
+              const preventClose = defaultModals[modal.name].preventClose;
+
+              return (
+                <div class="h-screen w-screen absolute inset-0 flex">
+                  <div
+                    class="relative flex flex-grow h-full justify-center items-center z-999"
+                    onMouseDown={() => {
+                      if (!preventClose) {
+                        closeModal();
+                      }
+                    }}
+                  >
+                    <div
+                      style={{ "z-index": `${index() + 1}` }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      class="duration-100 ease-in-out animate-enterScaleIn h-3/4"
+                    >
+                      <Dynamic
+                        component={ModalComponent}
+                        data={modal.data}
+                        noHeader={noHeader}
+                        title={title}
+                      />
+                    </div>
+                    <div class="absolute inset-0 bg-darkSlate-900 backdrop-blur-sm opacity-80" />
+                  </div>
+
+                  <div
+                    class="h-screen duration-100 ease-in-out text-white transition-all grid place-items-center z-99 origin-center"
+                    style={{
+                      width: `${adSize.width + 40}px`
+                    }}
+                    onClick={() => {
+                      if (!preventClose) {
+                        closeModal();
+                      }
+                    }}
+                  />
+                </div>
+              );
+            }}
+          </For>
+        </div>
       </Portal>
     </ModalsContext.Provider>
   );

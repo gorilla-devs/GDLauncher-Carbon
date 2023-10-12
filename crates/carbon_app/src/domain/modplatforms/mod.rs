@@ -1,4 +1,13 @@
 pub mod curseforge;
+pub mod modrinth;
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(i32)]
+pub enum ModChannel {
+    Alpha = 0,
+    Beta,
+    Stable,
+}
 
 #[cfg(test)]
 mod test {

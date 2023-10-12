@@ -52,7 +52,12 @@ impl AccountManager {
 
 impl<'s> ManagerRef<'s, AccountManager> {
     pub async fn get_active_uuid(self) -> anyhow::Result<Option<String>> {
-        Ok(self.app.settings_manager().get().await?.active_account_uuid)
+        Ok(self
+            .app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .active_account_uuid)
     }
 
     pub async fn set_active_uuid(self, uuid: Option<String>) -> anyhow::Result<()> {
@@ -90,7 +95,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
     pub async fn get_active_account(&self) -> anyhow::Result<Option<FullAccount>> {
         use db::account::WhereParam::Uuid;
 
-        let Some(uuid) = self.get_active_uuid().await? else { return Ok(None) };
+        let Some(uuid) = self.get_active_uuid().await? else {
+            return Ok(None);
+        };
 
         let account = self
             .app
@@ -150,7 +157,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .exec()
             .await?;
 
-        let Some(account) = account else { return Ok(None) };
+        let Some(account) = account else {
+            return Ok(None);
+        };
         let account = FullAccount::try_from(account)?;
         let account = AccountWithStatus::from(account);
 
@@ -158,7 +167,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
     }
 
     pub async fn get_account_status(self, uuid: String) -> anyhow::Result<Option<AccountStatus>> {
-        let Some(mut account) = self.get_account(uuid).await? else { return Ok(None) };
+        let Some(mut account) = self.get_account(uuid).await? else {
+            return Ok(None);
+        };
 
         if let AccountType::Microsoft = &account.account.type_ {
             let refreshing = self
@@ -305,7 +316,13 @@ impl<'s> ManagerRef<'s, AccountManager> {
                         refreshing.remove(&self.account.uuid);
                     }
                     EnrollmentStatus::Failed(_) => {
-                        let FullAccountType::Microsoft { access_token, token_expires, skin_id, .. } = &self.account.type_ else {
+                        let FullAccountType::Microsoft {
+                            access_token,
+                            token_expires,
+                            skin_id,
+                            ..
+                        } = &self.account.type_
+                        else {
                             panic!("account type was not microsoft during refresh");
                         };
 
@@ -348,7 +365,12 @@ impl<'s> ManagerRef<'s, AccountManager> {
     pub async fn delete_account(self, uuid: String) -> anyhow::Result<()> {
         use db::account::{OrderByParam, UniqueWhereParam};
 
-        let active_account = self.app.settings_manager().get().await?.active_account_uuid;
+        let active_account = self
+            .app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .active_account_uuid;
 
         if let Some(active_account) = active_account {
             if active_account == uuid {
@@ -485,7 +507,12 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .await?
             .ok_or_else(|| ValidateAccountError::AccountMissing(uuid.clone()))?;
 
-        let AccountStatus::Ok { access_token: Some(access_token) } = account.status else { return Ok(()) };
+        let AccountStatus::Ok {
+            access_token: Some(access_token),
+        } = account.status
+        else {
+            return Ok(());
+        };
         let profile = api::get_profile(&self.app.reqwest_client, &access_token).await;
 
         if let Some(refresh_lock) = &mut refresh_lock {
@@ -627,8 +654,12 @@ impl AccountRefreshService {
                 if let Ok(accounts) = account_manager.get_account_entries().await {
                     for account in accounts {
                         // ignore badly formed account entries since we can't handle them
-                        let Ok(account) = FullAccount::try_from(account) else { continue };
-                        let FullAccountType::Microsoft { token_expires, .. } = account.type_ else { continue };
+                        let Ok(account) = FullAccount::try_from(account) else {
+                            continue;
+                        };
+                        let FullAccountType::Microsoft { token_expires, .. } = account.type_ else {
+                            continue;
+                        };
 
                         if token_expires < Utc::now() - chrono::Duration::hours(1) {
                             // still can't handle errors
@@ -720,6 +751,7 @@ pub enum ValidateAccountError {
     AccountMissing(String),
 }
 
+#[derive(Debug)]
 pub struct FullAccount {
     pub username: String,
     pub uuid: String,
@@ -727,6 +759,7 @@ pub struct FullAccount {
     pub last_used: DateTime<FixedOffset>,
 }
 
+#[derive(Debug)]
 pub enum FullAccountType {
     Offline,
     Microsoft {

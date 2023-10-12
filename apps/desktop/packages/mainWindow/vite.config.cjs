@@ -28,38 +28,39 @@ export default defineConfig({
                   : `url('./images/${img}')`,
               "background-size": "cover",
               "background-repeat": "no-repeat",
-              "box-sizing": "border-box",
+              "box-sizing": "border-box"
             };
-          },
+          }
         ],
         [
           /^content-\[(.*)\]$/,
-          ([, content]) => ({ content: JSON.stringify(content) }),
-        ],
-      ],
-    }),
+          ([, content]) => ({ content: JSON.stringify(content) })
+        ]
+      ]
+    })
   ],
+  assetsInclude: "**/*.riv",
   envDir: resolve(__dirname, "../../../../"),
   define: {
-    __APP_VERSION__: JSON.stringify(appVersion),
+    __APP_VERSION__: JSON.stringify(appVersion)
   },
   base: "./",
   optimizeDeps: {
-    exclude: ["@tanstack/solid-query", "path", "fs", "promises"],
+    exclude: ["@tanstack/solid-query", "path", "fs", "promises"]
   },
   build: {
     target: "esnext",
     emptyOutDir: true,
     outDir: "../../dist/mainWindow",
-    sourcemap: true,
+    sourcemap: true
   },
   resolve: {
     alias: {
       "@": join(__dirname, "src"),
-      "@package_json": resolve(__dirname, "../../package.json"),
-    },
+      "@package_json": resolve(__dirname, "../../package.json")
+    }
   },
   server: {
-    port: pkg.env.PORT,
-  },
+    port: pkg.env.PORT
+  }
 });

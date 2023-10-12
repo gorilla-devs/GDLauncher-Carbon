@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::{
     path::{Path, PathBuf},
@@ -9,6 +10,7 @@ use reqwest::Client;
 use reqwest_middleware::ClientBuilder;
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 
+use md5::Md5;
 use sha1::Digest as _;
 use sha1::Sha1;
 use sha2::Sha256;
@@ -23,10 +25,11 @@ use error::DownloadError;
 
 mod error;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Checksum {
     Sha1(String),
     Sha256(String),
+    Md5(String),
 }
 
 pub trait IntoVecDownloadable {
@@ -37,12 +40,18 @@ pub trait IntoDownloadable {
     fn into_downloadable(self, base_path: &Path) -> Downloadable;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Downloadable {
     pub url: String,
     pub path: PathBuf,
     pub checksum: Option<Checksum>,
     pub size: Option<u64>,
+}
+
+impl Display for Downloadable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} -> {}", self.url, self.path.display())
+    }
 }
 
 impl Downloadable {
@@ -95,7 +104,10 @@ pub async fn download_file(
     let mut response = client.get(&downloadable_file.url).send().await?;
 
     if !response.status().is_success() {
-        return Err(DownloadError::Non200StatusCode(response.status().as_u16()));
+        return Err(DownloadError::Non200StatusCode(
+            downloadable_file.clone(),
+            response.status().as_u16(),
+        ));
     }
 
     // Ensure the parent directory exists
@@ -164,6 +176,19 @@ pub async fn download_file(
                     });
                 }
             }
+            Checksum::Md5(expected) => {
+                let mut hasher = Md5::new();
+                hasher.update(&buf);
+                let actual = hasher.finalize();
+                let actual = hex::encode(actual);
+
+                if expected != &actual {
+                    return Err(DownloadError::ChecksumMismatch {
+                        expected: expected.clone(),
+                        actual,
+                    });
+                }
+            }
         }
     }
 
@@ -184,6 +209,7 @@ pub async fn download_file(
 pub async fn download_multiple(
     files: Vec<Downloadable>,
     progress: watch::Sender<Progress>,
+    concurrency: usize,
 ) -> Result<(), DownloadError> {
     let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
     let reqwest_client = Client::builder().build().unwrap();
@@ -191,7 +217,7 @@ pub async fn download_multiple(
         .with(RetryTransientMiddleware::new_with_policy(retry_policy))
         .build();
 
-    let downloads = Arc::new(tokio::sync::Semaphore::new(10));
+    let downloads = Arc::new(tokio::sync::Semaphore::new(concurrency));
 
     let mut tasks: Vec<tokio::task::JoinHandle<Result<_, DownloadError>>> = vec![];
 
@@ -199,7 +225,7 @@ pub async fn download_multiple(
 
     let progress_counter = Arc::new(AtomicU64::new(0));
     let file_counter = Arc::new(AtomicU64::new(0));
-    let total_size = Arc::new(AtomicU64::new(files.iter().map(|f| f.size).flatten().sum()));
+    let total_size = Arc::new(AtomicU64::new(files.iter().filter_map(|f| f.size).sum()));
 
     let total_count = files.len() as u64;
 
@@ -238,6 +264,7 @@ pub async fn download_multiple(
             if file_looks_good {
                 let mut sha1 = Sha1::new();
                 let mut sha256 = Sha256::new();
+                let mut md5 = Md5::new();
 
                 let mut fs_file = tokio::fs::File::open(&path).await?;
 
@@ -247,6 +274,7 @@ pub async fn download_multiple(
                 match file.checksum {
                     Some(Checksum::Sha1(_)) => sha1.update(&buf),
                     Some(Checksum::Sha256(_)) => sha256.update(&buf),
+                    Some(Checksum::Md5(_)) => md5.update(&buf),
                     None => {}
                 }
 
@@ -297,6 +325,29 @@ pub async fn download_multiple(
                             );
                         }
                     }
+                    Some(Checksum::Md5(ref hash)) => {
+                        let finalized = md5.finalize();
+                        if hash == &format!("{finalized:x}") {
+                            // unwraps will be fine because file_looks_good can't happen without it
+                            let downloaded =
+                                progress_counter.fetch_add(file.size.unwrap(), Ordering::SeqCst);
+
+                            progress.send(Progress {
+                                current_count: file_counter.load(Ordering::SeqCst),
+                                total_count,
+                                current_size: downloaded,
+                                total_size: size.load(Ordering::SeqCst),
+                            })?;
+
+                            return Ok(());
+                        } else {
+                            trace!(
+                                "Hash mismatch md5 for file: {} - expected: {hash} - got: {}",
+                                path.display(),
+                                &format!("{finalized:x}")
+                            );
+                        }
+                    }
                     None => {}
                 }
             }
@@ -304,8 +355,16 @@ pub async fn download_multiple(
             let mut file_downloaded = 0u64;
             let mut file_size_reported = file.size.unwrap_or(0);
 
-            let mut resp_stream = client.get(&url).send().await?.bytes_stream();
+            let resp = client.get(&url).send().await?;
 
+            if !resp.status().is_success() {
+                return Err(DownloadError::Non200StatusCode(
+                    file.clone(),
+                    resp.status().as_u16(),
+                ));
+            }
+
+            let mut resp_stream = resp.bytes_stream();
             tokio::fs::create_dir_all(path.parent().ok_or(DownloadError::GenericDownload(
                 "Can't create folder".to_owned(),
             ))?)
@@ -313,6 +372,7 @@ pub async fn download_multiple(
 
             let mut sha1 = Sha1::new();
             let mut sha256 = Sha256::new();
+            let mut md5 = Md5::new();
 
             let mut fs_file = OpenOptions::new()
                 .create(!path.exists())
@@ -326,6 +386,7 @@ pub async fn download_multiple(
                 match file.checksum {
                     Some(Checksum::Sha1(_)) => sha1.update(&res),
                     Some(Checksum::Sha256(_)) => sha256.update(&res),
+                    Some(Checksum::Md5(_)) => md5.update(&res),
                     None => {}
                 }
 
@@ -368,6 +429,13 @@ pub async fn download_multiple(
                 }
                 Some(Checksum::Sha256(hash)) => {
                     if hash != hex::encode(sha256.finalize().as_slice()) {
+                        return Err(DownloadError::GenericDownload(
+                            "Checksum mismatch".to_owned(),
+                        ));
+                    }
+                }
+                Some(Checksum::Md5(hash)) => {
+                    if hash != hex::encode(md5.finalize().as_slice()) {
                         return Err(DownloadError::GenericDownload(
                             "Checksum mismatch".to_owned(),
                         ));

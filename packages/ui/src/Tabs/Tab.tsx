@@ -15,6 +15,8 @@ interface Props extends JSX.HTMLAttributes<HTMLDivElement> {
   children: JSXElement | string | number;
   onClick?: () => void;
   ignored?: boolean;
+  noPointer?: boolean;
+  noPadding?: boolean;
 }
 
 const Tab = (_props: Props) => {
@@ -60,11 +62,11 @@ const Tab = (_props: Props) => {
 
   return (
     <div
-      class="cursor-pointer"
       classList={{
-        "w-full":
-          tabsContext?.variant === "block" ||
-          tabsContext?.variant === "traditional",
+        "w-full": tabsContext?.variant() === "block",
+        "w-auto": tabsContext?.variant() === "traditional",
+        "cursor-pointer": !props.noPointer,
+        "flex flex-col justify-center": props.noPadding,
       }}
       ref={(el) => {
         ref = el;
@@ -76,22 +78,24 @@ const Tab = (_props: Props) => {
       {...props}
     >
       <Switch>
-        <Match when={tabsContext?.variant === "underline"}>
+        <Match when={tabsContext?.variant() === "underline"}>
           <div
-            class={`cursor-pointer bg-darkSlate-800 font-500 capitalize ${
-              tabsContext?.paddingX || ""
-            } ${tabsContext?.paddingY || ""}`}
+            class={`bg-darkSlate-800 font-500 capitalize ${
+              tabsContext?.paddingX?.() || ""
+            } ${tabsContext?.paddingY?.() || ""}`}
             classList={{
               "py-5":
-                tabsContext?.orientation === "horizontal" &&
-                !tabsContext?.paddingY,
-              "border-box": tabsContext?.orientation === "horizontal",
+                tabsContext?.orientation() === "horizontal" &&
+                !tabsContext?.paddingY?.() &&
+                !props.noPadding,
+              "border-box": tabsContext?.orientation() === "horizontal",
               "py-2":
-                tabsContext?.orientation === "vertical" &&
-                !tabsContext?.paddingY,
+                tabsContext?.orientation() === "vertical" &&
+                !tabsContext?.paddingY?.() &&
+                !props.noPadding,
               "px-5":
-                tabsContext?.orientation === "vertical" &&
-                !tabsContext?.paddingX,
+                tabsContext?.orientation() === "vertical" &&
+                !tabsContext?.paddingX?.(),
               "text-white": tabsContext?.isSelectedIndex(index()),
               "text-darkSlate-50": !tabsContext?.isSelectedIndex(index()),
             }}
@@ -99,24 +103,24 @@ const Tab = (_props: Props) => {
             {props.children}
           </div>
         </Match>
-        <Match when={tabsContext?.variant === "block"}>
+        <Match when={tabsContext?.variant() === "block"}>
           <div
             class={`flex gap-1 justify-center items-center flex-1 h-full cursor-pointer rounded-xl font-500 capitalize box-border ${
-              tabsContext?.paddingX || ""
-            } ${tabsContext?.paddingY || ""}`}
+              tabsContext?.paddingX?.() || ""
+            } ${tabsContext?.paddingY?.() || ""}`}
             classList={{
               "py-5":
-                tabsContext?.orientation === "horizontal" &&
-                !tabsContext?.paddingY,
+                tabsContext?.orientation() === "horizontal" &&
+                !tabsContext?.paddingY?.(),
               "px-2":
-                tabsContext?.orientation === "horizontal" &&
-                !tabsContext?.paddingX,
+                tabsContext?.orientation() === "horizontal" &&
+                !tabsContext?.paddingX?.(),
               "px-4":
-                tabsContext?.orientation === "vertical" &&
-                !tabsContext?.paddingX,
+                tabsContext?.orientation() === "vertical" &&
+                !tabsContext?.paddingX?.(),
               "py-2":
-                tabsContext?.orientation === "vertical" &&
-                !tabsContext?.paddingY,
+                tabsContext?.orientation() === "vertical" &&
+                !tabsContext?.paddingY?.(),
               "text-white bg-darkSlate-800": tabsContext?.isSelectedIndex(
                 index()
               ),
@@ -126,13 +130,13 @@ const Tab = (_props: Props) => {
             {props.children}
           </div>
         </Match>
-        <Match when={tabsContext?.variant === "traditional"}>
+        <Match when={tabsContext?.variant() === "traditional"}>
           <div
-            class={`flex gap-1 justify-center items-center bg-darkSlate-800 flex-1 max-w-52 h-full cursor-pointer font-500 capitalize box-border rounded-t-xl ${
-              tabsContext?.paddingX || ""
-            } ${tabsContext?.paddingY || ""}`}
+            class={`flex gap-1 justify-center items-center bg-darkSlate-800 flex-1 h-full font-500 capitalize box-border rounded-t-xl ${
+              tabsContext?.paddingX?.() || ""
+            } ${tabsContext?.paddingY?.() || ""}`}
             classList={{
-              "px-2": !tabsContext?.paddingX,
+              "px-2": !tabsContext?.paddingX?.(),
               "text-white": tabsContext?.isSelectedIndex(index()),
               "text-darkSlate-50": !tabsContext?.isSelectedIndex(index()),
               "bg-darkSlate-700": tabsContext?.isSelectedIndex(index()),

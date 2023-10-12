@@ -13,8 +13,8 @@ export default function getAdSize() {
       height: 500,
       adSize: {
         width: 160,
-        height: 600,
-      },
+        height: 600
+      }
     };
   } else if (width < 1000 || height < 800) {
     // Smaller ads (160/600)
@@ -25,8 +25,8 @@ export default function getAdSize() {
       height: 600,
       adSize: {
         width: 160,
-        height: 600,
-      },
+        height: 600
+      }
     };
   } else if (width < 1500 || height < 870) {
     // Smaller ads (160/600)
@@ -37,19 +37,19 @@ export default function getAdSize() {
       height: 670,
       adSize: {
         width: 160,
-        height: 600,
-      },
+        height: 600
+      }
     };
   } else {
     return {
-      minWidth: 1280,
+      minWidth: 1300,
       minHeight: 740,
       width: 1560,
       height: 740,
       adSize: {
-        width: 300,
-        height: 250,
-      },
+        width: 400,
+        height: 300
+      }
     };
   }
 }
