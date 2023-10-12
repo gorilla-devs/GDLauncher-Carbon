@@ -144,10 +144,10 @@ impl<'a> ManagerRef<'a, InstanceManager> {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, EnumIter, Eq, PartialEq)]
 pub enum Entity {
     LegacyGDLauncher,
-    MRPack,
-    Modrinth,
     CurseForgeZip,
     CurseForge,
+    MRPack,
+    Modrinth,
     ATLauncher,
     Technic,
     FTB,
@@ -161,8 +161,8 @@ impl Entity {
 
         const SUPPORT: [Entity; 3] = [
             Entity::LegacyGDLauncher,
-            Entity::MRPack,
             Entity::CurseForgeZip,
+            Entity::MRPack,
         ];
 
         Self::iter().map(|v| (v, SUPPORT.contains(&v))).collect()
