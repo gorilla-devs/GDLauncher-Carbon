@@ -39,7 +39,7 @@ GDLauncher is a custom Minecraft launcher written from the ground up in rust and
 </p>
 
 ## 🎉 Join our community
-Jour our official GDLauncher discord server. There you'll find all our community and you'll be able to find friends to play with or find support for issues you're having with the launcher!
+Join our official GDLauncher discord server. There you'll find our community and friends to play with along with support for any issues you may have.
 
 <a href='https://discord.gdlauncher.com' target='_blank'><img height='40' style='border:0px;height:50px;' src='https://cdn.gdl.gg/github-readme/Discord-Logo-Wordmark-Color.png' border='0' alt='GDLauncher Discord Server' /></a>
 
@@ -50,8 +50,8 @@ Jour our official GDLauncher discord server. There you'll find all our community
 - ☕ Automatic **Java Manager**. You don't need to have java installed on your system, the launcher will take care of installing the correct java version for you!
 - 🔄 Built-in **auto updater**
 - 👥 **Multi account** support
-- 🐢 Still playing on your grandma pc from the 80s? Don't worry, we got you covered with our `Potato PC Mode`!
-- ⬇️ Import/export instances from/to other launchers like **Curseforge**, **MultiMC**, **ATLauncher**, **Technic**, **Prism**, **Modrinth**, **FTB** and more!
+- 🐢 Still playing on your grandma's pc from the 80s? Don't worry, we got you covered with **Potato PC Mode**!
+- ⬇️ Import/export instances from/to other launchers like **Curseforge**, **MultiMC**, **ATLauncher**, **Technic**, **Prism**, **Modrinth**, **FTB** and more! (WIP)
 
 
 <!-- Track https://github.com/cawa-93/vite-electron-builder and https://github.com/electron-vite/electron-vite-boilerplate for electron v20 update.
@@ -64,7 +64,7 @@ Check https://github.com/vercel/turborepo/tree/main/examples/with-docker for tur
 ## ▶️ Development
 ### Requirements
 - Node 18.x.x
-- Rust ~ 1.73.0
+- Rust >= 1.73.0
 
 ### Pnpm
 At this point make sure you have pnpm installed:
