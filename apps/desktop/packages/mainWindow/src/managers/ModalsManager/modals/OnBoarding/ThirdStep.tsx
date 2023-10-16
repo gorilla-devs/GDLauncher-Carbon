@@ -7,6 +7,7 @@ import { rspc } from "@/utils/rspcClient";
 import {
   For,
   Match,
+  Show,
   Switch,
   createEffect,
   createSignal,
@@ -14,16 +15,15 @@ import {
 } from "solid-js";
 import { ImportEntityStatus } from "@gd/core_module/bindings";
 import EntityCard from "@/components/Card/EntityCard";
+import SingleEntity from "./SingleEntity";
 
 type Props = {
   prevStep: () => void;
 };
 
 const ThirdStep = (props: Props) => {
-  // const [entities, setEntities] = createSignal<
-  //   ImportEntityStatus[] | undefined
-  // >([]);
   const modalsContext = useModal();
+  const [entity, setEntity] = createSignal<ImportEntityStatus>();
   const [isLoading, setIsLoading] = createSignal(false);
 
   const legacyGDLauncherEntity = "legacygdlauncher";
@@ -40,21 +40,6 @@ const ThirdStep = (props: Props) => {
   // createEffect(() => {
   //   scanImportableInstancesMutation.mutate(legacyGDLauncherEntity);
   // });
-  // createEffect(() => {
-  //   const entities = rspc.createQuery(() => [
-  //     "instance.getImportableEntities"
-  //   ]).data;
-  //   setEntities(
-  //     entities?.sort(
-  //       (a, b) =>
-  //         (b.supported === true ? 1 : 0) - (a.supported === true ? 1 : 0)
-  //     )
-  //   );
-  //   onCleanup(() => {
-  //     setEntities([]);
-  //   });
-  // });
-  // console.log(entities());
   const entities = rspc.createQuery(() => ["instance.getImportableEntities"]);
   const icons = [
     "i-mdi:axe-battle",
@@ -68,81 +53,103 @@ const ThirdStep = (props: Props) => {
     "i-game-icons:shard-sword",
     "i-iconoir:arcade"
   ];
-  const CreateInstance = () => {
-    return (
-      <div class="flex flex-col items-center justify-between lg:w-160 h-full box-border">
-        <div class="lg:w-[35rem]">
-          <div class="flex justify-center items-center flex-col mt-20">
-            <img class="w-50" src={Logo} />
-          </div>
-          <div class="absolute right-5 top-5">
-            <div
-              class="i-ri:close-fill text-2xl text-darkSlate-50 cursor-pointer"
-              onClick={() => modalsContext?.closeModal()}
-            />
-          </div>
-          <div class="flex flex-col mt-10">
-            <p class="text-left text-darkSlate-50 mb-8 leading-6">
-              <Trans
-                key="onboarding.import_instance_text"
-                options={{
-                  defaultValue:
-                    "To start enjoying your favorite game you will need to create an instance. You can do this by selecting one of the modpacks available or by importing a zip or an instance from another launcher on your computer"
-                }}
-              />
-            </p>
-          </div>
-          <div class="flex flex-col items-center gap-6">
-            <Button
-              type="outline"
-              style={{ width: "100%", "max-width": "200px" }}
-              onClick={() => {
-                modalsContext?.closeModal();
-                modalsContext?.openModal({
-                  name: "instanceCreation",
-                  url: "/modpacks"
-                });
-              }}
-            >
-              <Trans
-                key="onboarding.add_instance"
-                options={{
-                  defaultValue: "+ Add Instance"
-                }}
-              />
-            </Button>
-            {/* <div class="flex items-center gap-2 cursor-pointer transition ease-in-out text-primary-300 hover:text-primary-500">
-        <div class="text-2xl i-ri:download-2-line" />
-        <Trans
-        key="onboarding.import_instance_or_zip"
-        options={{
-          defaultValue: "Import instance / Zip",
-        }}
-      />
-      </div> */}
-          </div>
-        </div>
-      </div>
-    );
+  const handleClickEntity = (entity: ImportEntityStatus) => {
+    if (entity.supported) {
+      setEntity(entity);
+    }
   };
+  // const CreateInstance = () => {
+  //   return (
+  //     <div class="flex flex-col items-center justify-between lg:w-160 h-full box-border">
+  //       <div class="lg:w-[35rem]">
+  //         <div class="flex justify-center items-center flex-col mt-20">
+  //           <img class="w-50" src={Logo} />
+  //         </div>
+  //         <div class="absolute right-5 top-5">
+  //           <div
+  //             class="i-ri:close-fill text-2xl text-darkSlate-50 cursor-pointer"
+  //             onClick={() => modalsContext?.closeModal()}
+  //           />
+  //         </div>
+  //         <div class="flex flex-col mt-10">
+  //           <p class="text-left text-darkSlate-50 mb-8 leading-6">
+  //             <Trans
+  //               key="onboarding.import_instance_text"
+  //               options={{
+  //                 defaultValue:
+  //                   "To start enjoying your favorite game you will need to create an instance. You can do this by selecting one of the modpacks available or by importing a zip or an instance from another launcher on your computer"
+  //               }}
+  //             />
+  //           </p>
+  //         </div>
+  //         <div class="flex flex-col items-center gap-6">
+  //           <Button
+  //             type="outline"
+  //             style={{ width: "100%", "max-width": "200px" }}
+  //             onClick={() => {
+  //               modalsContext?.closeModal();
+  //               modalsContext?.openModal({
+  //                 name: "instanceCreation",
+  //                 url: "/modpacks"
+  //               });
+  //             }}
+  //           >
+  //             <Trans
+  //               key="onboarding.add_instance"
+  //               options={{
+  //                 defaultValue: "+ Add Instance"
+  //               }}
+  //             />
+  //           </Button>
+  //           {/* <div class="flex items-center gap-2 cursor-pointer transition ease-in-out text-primary-300 hover:text-primary-500">
+  //       <div class="text-2xl i-ri:download-2-line" />
+  //       <Trans
+  //       key="onboarding.import_instance_or_zip"
+  //       options={{
+  //         defaultValue: "Import instance / Zip",
+  //       }}
+  //     />
+  //     </div> */}
+  //         </div>
+  //       </div>
+  //     </div>
+  //   );
+  // };
 
   return (
     <div class="flex flex-col items-center justify-between w-120 lg:w-160 h-full box-border h-120">
-      <div class="w-full flex justify-end pt-5">
-        <Button type="primary">Done</Button>
-      </div>
-      <div class=" flex-1 w-full">
-        <ul class="grid grid-cols-3 gap-2 p-0">
-          <For
-            each={entities.data?.sort(
-              (a, b) =>
-                (b.supported === true ? 1 : 0) - (a.supported === true ? 1 : 0)
-            )}
-          >
-            {(entity, i) => <EntityCard entity={entity} icon={icons[i()]} />}
-          </For>
-        </ul>
-      </div>
+      <Switch>
+        <Match when={entity()}>
+          <SingleEntity
+            entity={entity() as ImportEntityStatus}
+            setEntity={setEntity}
+          />
+        </Match>
+        <Match when={!entity()}>
+          <div class="w-full flex justify-end pt-5">
+            <Button type="primary">Done</Button>
+          </div>
+          <div class=" flex-1 w-full">
+            <ul class="grid grid-cols-3 gap-2 p-0">
+              <For
+                each={entities.data?.sort(
+                  (a, b) =>
+                    (b.supported === true ? 1 : 0) -
+                    (a.supported === true ? 1 : 0)
+                )}
+              >
+                {(entity, i) => (
+                  <EntityCard
+                    entity={entity}
+                    icon={icons[i()]}
+                    onClick={[handleClickEntity, entity]}
+                  />
+                )}
+              </For>
+            </ul>
+          </div>
+        </Match>
+      </Switch>
 
       {/* <Switch>
         <Match when={instances.data && instances.data?.length > 0}>
