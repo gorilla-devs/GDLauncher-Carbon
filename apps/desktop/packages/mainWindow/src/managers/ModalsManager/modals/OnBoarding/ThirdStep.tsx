@@ -4,31 +4,70 @@ import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 import { Button } from "@gd/ui";
 import Import from "../InstanceCreation/Import";
 import { rspc } from "@/utils/rspcClient";
-import { Match, Switch, createEffect, createSignal } from "solid-js";
+import {
+  For,
+  Match,
+  Switch,
+  createEffect,
+  createSignal,
+  onCleanup
+} from "solid-js";
+import { ImportEntityStatus } from "@gd/core_module/bindings";
+import EntityCard from "@/components/Card/EntityCard";
 
 type Props = {
   prevStep: () => void;
 };
 
 const ThirdStep = (props: Props) => {
+  // const [entities, setEntities] = createSignal<
+  //   ImportEntityStatus[] | undefined
+  // >([]);
   const modalsContext = useModal();
   const [isLoading, setIsLoading] = createSignal(false);
 
   const legacyGDLauncherEntity = "legacygdlauncher";
 
-  const instances = rspc.createQuery(() => [
-    "instance.getImportableInstances",
-    legacyGDLauncherEntity
-  ]);
+  // const instances = rspc.createQuery(() => [
+  //   "instance.getImportableInstances",
+  //   legacyGDLauncherEntity
+  // ]);
 
-  const scanImportableInstancesMutation = rspc.createMutation([
-    "instance.scanImportableInstances"
-  ]);
+  // const scanImportableInstancesMutation = rspc.createMutation([
+  //   "instance.scanImportableInstances"
+  // ]);
 
-  createEffect(() => {
-    scanImportableInstancesMutation.mutate(legacyGDLauncherEntity);
-  });
-
+  // createEffect(() => {
+  //   scanImportableInstancesMutation.mutate(legacyGDLauncherEntity);
+  // });
+  // createEffect(() => {
+  //   const entities = rspc.createQuery(() => [
+  //     "instance.getImportableEntities"
+  //   ]).data;
+  //   setEntities(
+  //     entities?.sort(
+  //       (a, b) =>
+  //         (b.supported === true ? 1 : 0) - (a.supported === true ? 1 : 0)
+  //     )
+  //   );
+  //   onCleanup(() => {
+  //     setEntities([]);
+  //   });
+  // });
+  // console.log(entities());
+  const entities = rspc.createQuery(() => ["instance.getImportableEntities"]);
+  const icons = [
+    "i-mdi:axe-battle",
+    "i-memory:battle-axe",
+    "i-game-icons:battle-mech",
+    "i-game-icons:battle-tank",
+    "i-game-icons:battle-gear",
+    "i-game-icons:battle-axe",
+    "i-mdi:sword-fight",
+    "i-mdi:sword",
+    "i-game-icons:shard-sword",
+    "i-iconoir:arcade"
+  ];
   const CreateInstance = () => {
     return (
       <div class="flex flex-col items-center justify-between lg:w-160 h-full box-border">
@@ -89,7 +128,23 @@ const ThirdStep = (props: Props) => {
 
   return (
     <div class="flex flex-col items-center justify-between w-120 lg:w-160 h-full box-border h-120">
-      <Switch>
+      <div class="w-full flex justify-end pt-5">
+        <Button type="primary">Done</Button>
+      </div>
+      <div class=" flex-1 w-full">
+        <ul class="grid grid-cols-3 gap-2 p-0">
+          <For
+            each={entities.data?.sort(
+              (a, b) =>
+                (b.supported === true ? 1 : 0) - (a.supported === true ? 1 : 0)
+            )}
+          >
+            {(entity, i) => <EntityCard entity={entity} icon={icons[i()]} />}
+          </For>
+        </ul>
+      </div>
+
+      {/* <Switch>
         <Match when={instances.data && instances.data?.length > 0}>
           <div class="mt-10 h-full max-w-full">
             <Import setIsLoading={setIsLoading} />
@@ -98,8 +153,8 @@ const ThirdStep = (props: Props) => {
         <Match when={instances.data && instances.data?.length === 0}>
           <CreateInstance />
         </Match>
-      </Switch>
-      <div class="flex justify-between w-full">
+      </Switch> */}
+      {/* <div class="flex justify-between w-full">
         <Button
           disabled={isLoading()}
           type="secondary"
@@ -119,7 +174,7 @@ const ThirdStep = (props: Props) => {
         >
           <Trans key="onboarding.start_playing" />
         </Button>
-      </div>
+      </div> */}
     </div>
   );
 };
