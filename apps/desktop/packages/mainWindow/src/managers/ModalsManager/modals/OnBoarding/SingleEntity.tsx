@@ -13,10 +13,6 @@ const SingleEntity = (props: {
   const [initialRuntimePath] = createResource(() => {
     return window.getInitialRuntimePath();
   });
-
-  const [currentRuntimePath] = createResource(() => {
-    return window.getRuntimePath();
-  });
   const entityDefaultPath = rspc.createQuery(() => [
     "instance.getImportEntityDefaultPath",
     props.entity.entity
@@ -24,12 +20,7 @@ const SingleEntity = (props: {
 
   createEffect(() => {
     if (!entityDefaultPath.data) {
-      if (currentRuntimePath() === undefined) {
-        return;
-      } else {
-        setRuntimePath(currentRuntimePath()!);
-        return;
-      }
+      setRuntimePath("");
     }
 
     setRuntimePath(entityDefaultPath.data!);
@@ -45,9 +36,9 @@ const SingleEntity = (props: {
         <span class="font-bold">{props.entity.entity}</span>
         <div></div>
       </div>
-      <div class="border-red-400 border-2 border-solid flex-1 w-full flex flex-col items-center justify-center">
-        <div class="flex items-center justify-between w-full gap-2">
-          <span>Scan target path:</span>
+      <div class=" flex-1 w-full flex flex-col items-center justify-center">
+        <div class="flex items-center justify-between w-full gap-2 flex-1">
+          <span class="font-bold">Scan target path:</span>
           <Input
             value={runtimePath()}
             class="flex-1 border-2 border-solid border-zinc-500"
@@ -56,6 +47,7 @@ const SingleEntity = (props: {
             }
           />
         </div>
+        <div class="flex-1">infos</div>
       </div>
     </>
   );
