@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use itertools::Itertools;
 
 use tokio::sync::mpsc;
 use tracing::debug;
@@ -19,10 +20,12 @@ use super::BundleSender;
 use super::ModplatformCacher;
 use crate::db::{curse_forge_mod_cache as cfdb, curse_forge_mod_image_cache as cfimgdb, mod_file_cache as fcdb, mod_metadata as metadb};
 
-struct CurseforgeModCacher;
+pub struct CurseforgeModCacher;
 
 #[async_trait::async_trait]
 impl ModplatformCacher for CurseforgeModCacher {
+    const NAME: &'static str = "curseforge";
+
     type SaveBundle = (
         Vec<u32>,
         Vec<(String, u32)>,
@@ -33,7 +36,7 @@ impl ModplatformCacher for CurseforgeModCacher {
     async fn query_platform(
         app: &App,
         instance_id: InstanceId,
-        sender: &BundleSender<Self::SaveBundle>,
+        sender: &mut BundleSender<Self::SaveBundle>,
     ) -> anyhow::Result<()> {
         let modlist = app
             .prisma_client
@@ -99,9 +102,7 @@ impl ModplatformCacher for CurseforgeModCacher {
                 .await?
                 .data;
 
-            sender
-                .send((fingerprints, metadata, fp_response, mods_response))
-                .expect("batch processor should not drop until the transmitter is dropped");
+            sender.send((fingerprints, metadata, fp_response, mods_response));
         }
 
         Ok::<_, anyhow::Error>(())
@@ -130,14 +131,13 @@ impl ModplatformCacher for CurseforgeModCacher {
         let futures = batch.into_iter().filter_map(|(metadata_id, murmur2)| {
             let fpmatch = matches.remove(&murmur2);
             fpmatch.map(|(fileinfo, modinfo)| async move {
-                let r = app
-                    .meta_cache_manager()
-                    .cache_curseforge_meta_unchecked(
-                        metadata_id,
-                        fileinfo.file.id,
-                        murmur2,
-                        modinfo,
-                    )
+                let r = cache_curseforge_meta_unchecked(
+                    app,
+                    metadata_id,
+                    fileinfo.file.id,
+                    murmur2,
+                    modinfo,
+                )
                     .await;
 
                 if let Err(e) = r {
@@ -284,8 +284,100 @@ impl ModplatformCacher for CurseforgeModCacher {
 
         futures::future::join_all(futures).await.into_iter();
     }
+}
 
-    fn print_error(instance_id: InstanceId, error: &anyhow::Error) {
-        error!({ ?error }, "Could not query curseforge mod metadata for instance {instance_id}");
+// Cache curseforge metadata for a mod without downloading the icon
+async fn cache_curseforge_meta_unchecked(
+    app: &App,
+    metadata_id: String,
+    file_id: i32,
+    murmur2: u32,
+    modinfo: Mod,
+) -> anyhow::Result<()> {
+    let prev = app
+        .prisma_client
+        .curse_forge_mod_cache()
+        .find_unique(cfdb::UniqueWhereParam::MetadataIdEquals(
+            metadata_id.clone(),
+        ))
+        .with(cfdb::logo_image::fetch())
+        .exec()
+        .await?;
+
+    let mut o_delete_cfmeta = None;
+    let mut o_insert_logo = None;
+    let mut o_update_logo = None;
+    let mut o_delete_logo = None;
+
+    let o_insert_cfmeta = app.prisma_client.curse_forge_mod_cache().create(
+        murmur2 as i32,
+        modinfo.id,
+        file_id,
+        modinfo.name,
+        modinfo.slug,
+        modinfo.summary,
+        modinfo.authors.into_iter().map(|a| a.name).join(", "),
+        chrono::Utc::now().into(),
+        metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),
+        Vec::new(),
+    );
+
+    if let Some(prev) = prev {
+        o_delete_cfmeta = Some(app.prisma_client.curse_forge_mod_cache().delete(
+            cfdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+        ));
+
+        if let Some(prev) = prev
+            .logo_image
+            .expect("logo_image was requesred but not returned by prisma")
+            {
+                match modinfo.logo.as_ref().map(|it| &it.url) {
+                    Some(url) => {
+                        if *url != prev.url {
+                            o_update_logo =
+                                Some(app.prisma_client.curse_forge_mod_image_cache().update(
+                                    cfimgdb::UniqueWhereParam::MetadataIdEquals(
+                                        metadata_id.clone(),
+                                    ),
+                                    vec![
+                                        cfimgdb::SetParam::SetUrl(url.clone()),
+                                        cfimgdb::SetParam::SetUpToDate(0),
+                                    ],
+                                ));
+                        }
+                    }
+                    None => {
+                        o_delete_logo =
+                            Some(app.prisma_client.curse_forge_mod_image_cache().delete(
+                                cfimgdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+                            ));
+                    }
+                }
+            }
     }
+
+    if o_update_logo.is_none() && o_delete_logo.is_none() {
+        if let Some(url) = modinfo.logo.map(|it| it.url) {
+            o_insert_logo = Some(app.prisma_client.curse_forge_mod_image_cache().create(
+                url,
+                cfdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+                Vec::new(),
+            ));
+        }
+    }
+
+    debug!("updating curseforge metadata entry for {metadata_id}");
+
+    app
+        .prisma_client
+        ._batch((
+                o_delete_cfmeta.into_iter().collect::<Vec<_>>(),
+                o_insert_cfmeta,
+                o_delete_logo.into_iter().collect::<Vec<_>>(),
+                o_insert_logo.into_iter().collect::<Vec<_>>(),
+                o_update_logo.into_iter().collect::<Vec<_>>(),
+        ))
+        .await?;
+
+    Ok(())
 }

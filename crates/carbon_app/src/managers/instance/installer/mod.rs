@@ -724,7 +724,7 @@ impl ResourceInstaller for CurseforgeModInstaller {
         _downloadable: Option<Downloadable>,
     ) -> anyhow::Result<()> {
         app.meta_cache_manager()
-            .queue_local_caching(instance_id, true)
+            .queue_caching(instance_id, true)
             .await;
         Ok(())
     }
@@ -1006,7 +1006,7 @@ impl ResourceInstaller for ModrinthModInstaller {
         _downloadable: Option<Downloadable>,
     ) -> anyhow::Result<()> {
         app.meta_cache_manager()
-            .queue_local_caching(instance_id, true)
+            .queue_caching(instance_id, true)
             .await;
         Ok(())
     }

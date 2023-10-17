@@ -49,11 +49,7 @@ pub struct InstanceManager {
     path_lock: Mutex<()>,
     loaded_icon: Mutex<Option<(String, Vec<u8>)>>,
     persistence_manager: PersistenceManager,
-<<<<<<< HEAD
-    export_manager: ExportManager,
-=======
     import_manager: InstanceImportManager,
->>>>>>> origin/develop
     game_logs: RwLock<HashMap<GameLogId, (InstanceId, watch::Receiver<GameLog>)>>,
 }
 
@@ -154,7 +150,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
             self.app
                 .meta_cache_manager()
-                .queue_local_caching(instance_id, false)
+                .queue_caching(instance_id, false)
                 .await;
         }
 
@@ -1264,7 +1260,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
         self.app
             .meta_cache_manager()
-            .queue_local_caching(id, false)
+            .queue_caching(id, false)
             .await;
 
         Ok(id)

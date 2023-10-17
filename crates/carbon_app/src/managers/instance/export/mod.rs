@@ -1,6 +1,6 @@
 use crate::managers::ManagerRef;
 
-mod curseforge_archive;
+//mod curseforge_archive;
 
 #[derive(Debug)]
 pub struct InstanceExportManager {}
