@@ -32,7 +32,7 @@ pub(crate) struct MinecraftManager {
 impl MinecraftManager {
     pub fn new() -> Self {
         Self {
-            meta_base_url: Url::parse("https://meta.gdl.gg/").unwrap(),
+            meta_base_url: Url::parse(env!("META_BASE_URL")).unwrap(),
         }
     }
 }
