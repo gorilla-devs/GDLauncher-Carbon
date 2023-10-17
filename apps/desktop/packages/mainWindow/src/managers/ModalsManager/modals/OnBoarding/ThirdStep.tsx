@@ -23,7 +23,7 @@ type Props = {
 
 const ThirdStep = (props: Props) => {
   const modalsContext = useModal();
-  const [entity, setEntity] = createSignal<ImportEntityStatus>();
+  const [entity, setEntity] = createSignal<ImportEntityStatus | undefined>();
   const [isLoading, setIsLoading] = createSignal(false);
 
   const legacyGDLauncherEntity = "legacygdlauncher";

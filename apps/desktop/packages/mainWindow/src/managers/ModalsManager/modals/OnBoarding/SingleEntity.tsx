@@ -1,31 +1,48 @@
-import { rspc } from "@/utils/rspcClient";
+import { rspc, queryClient } from "@/utils/rspcClient";
 import { ImportEntityStatus } from "@gd/core_module/bindings";
 import { Input } from "@gd/ui";
-import { Setter, createEffect, createResource, createSignal } from "solid-js";
+import {
+  Match,
+  Setter,
+  createEffect,
+  createResource,
+  createSignal
+} from "solid-js";
 
 const SingleEntity = (props: {
   entity: ImportEntityStatus;
   setEntity: Setter<ImportEntityStatus | undefined>;
 }) => {
-  const [runtimePath, setRuntimePath] = createSignal<string | undefined>(
-    undefined
-  );
-  const [initialRuntimePath] = createResource(() => {
-    return window.getInitialRuntimePath();
-  });
+  const [path, setPath] = createSignal<string | undefined>(undefined);
+
   const entityDefaultPath = rspc.createQuery(() => [
     "instance.getImportEntityDefaultPath",
     props.entity.entity
   ]);
-
+  const scanImportableInstancesMutation = rspc.createMutation([
+    "instance.setImportScanTarget"
+  ]);
+  const importScanStatus = rspc.createQuery(() => [
+    "instance.getImportScanStatus"
+  ]);
   createEffect(() => {
     if (!entityDefaultPath.data) {
-      setRuntimePath("");
+      setPath("");
     }
 
-    setRuntimePath(entityDefaultPath.data!);
+    setPath(entityDefaultPath.data!);
   });
-
+  createEffect(() => {
+    if (path()) {
+      console.log("path ==>", path());
+      console.log("entity ==> ", props.entity.entity);
+      scanImportableInstancesMutation.mutate([
+        props.entity.entity,
+        path() as string
+      ]);
+    }
+  });
+  console.log(importScanStatus.data);
   return (
     <>
       <div class="w-full flex justify-between items-center pt-6">
@@ -40,14 +57,30 @@ const SingleEntity = (props: {
         <div class="flex items-center justify-between w-full gap-2 flex-1">
           <span class="font-bold">Scan target path:</span>
           <Input
-            value={runtimePath()}
+            value={path()}
             class="flex-1 border-2 border-solid border-zinc-500"
             icon={
-              <div class="i-ic:round-folder text-2xl text-yellow-300 cursor-pointer"></div>
+              <div
+                onClick={async () => {
+                  const result = await window.openFileDialog({
+                    title: "Select Runtime Path",
+                    defaultPath: path(),
+                    properties: ["openDirectory"]
+                  });
+
+                  if (result.canceled) {
+                    return;
+                  }
+
+                  setPath(result.filePaths[0]);
+                }}
+                class="i-ic:round-folder text-2xl text-yellow-300 cursor-pointer"
+              ></div>
             }
           />
         </div>
-        <div class="flex-1">infos</div>
+
+        <div>{typeof importScanStatus.data?.scanning}</div>
       </div>
     </>
   );
