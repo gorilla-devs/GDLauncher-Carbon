@@ -2,7 +2,6 @@ use itertools::Itertools;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 
-use tokio::sync::mpsc;
 use tracing::debug;
 use tracing::error;
 use tracing::trace;
@@ -18,6 +17,7 @@ use crate::managers::App;
 
 use super::BundleSender;
 use super::ModplatformCacher;
+use super::UpdateNotifier;
 use crate::db::{
     curse_forge_mod_cache as cfdb, curse_forge_mod_image_cache as cfimgdb, mod_file_cache as fcdb,
     mod_metadata as metadb,
@@ -152,11 +152,7 @@ impl ModplatformCacher for CurseforgeModCacher {
         futures::future::join_all(futures).await;
     }
 
-    async fn cache_icons(
-        app: &App,
-        instance_id: InstanceId,
-        update_notifier: &mpsc::UnboundedSender<InstanceId>,
-    ) {
+    async fn cache_icons(app: &App, instance_id: InstanceId, update_notifier: &UpdateNotifier) {
         let modlist = app
             .prisma_client
             .mod_file_cache()

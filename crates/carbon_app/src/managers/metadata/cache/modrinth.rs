@@ -1,7 +1,6 @@
 use std::collections::{HashMap, VecDeque};
 
 use itertools::Itertools;
-use tokio::sync::mpsc;
 use tracing::{debug, error, trace};
 
 use crate::db::{
@@ -22,7 +21,7 @@ use crate::{
     managers::App,
 };
 
-use super::{BundleSender, ModplatformCacher};
+use super::{BundleSender, ModplatformCacher, UpdateNotifier};
 
 pub struct ModrinthModCacher;
 
@@ -190,11 +189,7 @@ impl ModplatformCacher for ModrinthModCacher {
         futures::future::join_all(futures).await;
     }
 
-    async fn cache_icons(
-        app: &App,
-        instance_id: InstanceId,
-        update_notifier: &mpsc::UnboundedSender<InstanceId>,
-    ) {
+    async fn cache_icons(app: &App, instance_id: InstanceId, update_notifier: &UpdateNotifier) {
         let modlist = app
             .prisma_client
             .mod_file_cache()

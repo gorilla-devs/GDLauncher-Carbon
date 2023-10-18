@@ -5,6 +5,8 @@ use std::ffi::OsStr;
 use std::io::Cursor;
 use std::io::Read;
 use std::path::PathBuf;
+use std::sync::atomic;
+use std::sync::atomic::AtomicI32;
 use std::sync::Arc;
 use std::usize;
 
@@ -76,6 +78,22 @@ impl MetaCacheManager {
             image_scale_semaphore: Semaphore::new(num_cpus::get()),
             image_download_semaphore: Semaphore::new(10),
             watched_instance: watch::channel(None).0,
+        }
+    }
+}
+
+#[derive(Clone)]
+struct UpdateNotifier {
+    target: Arc<AtomicI32>,
+    sender: Arc<watch::Sender<()>>,
+}
+
+impl UpdateNotifier {
+    fn send(&self, instance_id: InstanceId) {
+        let target = self.target.load(atomic::Ordering::SeqCst);
+
+        if target == *instance_id {
+            let _ = self.sender.send(());
         }
     }
 }
@@ -362,12 +380,6 @@ impl LoopValue for Option<InstanceId> {
     }
 
     fn loop_cmp(&self, token: Self::Token) -> Option<(Self::Value, bool)> {
-        trace!(
-            "Option<InstanceId> loopcmp: current: {:?}, last: {:?}, eq: {}",
-            self,
-            token,
-            *self == token
-        );
         match self {
             Some(v) => Some((*v, token == Some(*v))),
             None => None,
@@ -391,7 +403,6 @@ impl<T: LoopValue> LoopWatcher<T> {
 
             let watcher = self.watcher.borrow().await;
             if let Some(v) = watcher.loop_cmp(self.token) {
-                trace!("changed; matches last: {}", v.1);
                 self.token = watcher.token();
                 return Some(v);
             }
@@ -447,11 +458,7 @@ trait ModplatformCacher {
 
     async fn save_batch(app: &App, instance_id: InstanceId, batch: Self::SaveBundle);
 
-    async fn cache_icons(
-        app: &App,
-        instance_id: InstanceId,
-        update_notifier: &mpsc::UnboundedSender<InstanceId>,
-    );
+    async fn cache_icons(app: &App, instance_id: InstanceId, update_notifier: &UpdateNotifier);
 }
 
 type ModplatformCacheBundle<T> = (InstanceId, bool, Option<T>, Option<oneshot::Sender<()>>);
@@ -514,7 +521,7 @@ impl<'a, T> BundleSender<'a, T> {
 fn cache_modplatform<C: ModplatformCacher>(
     app: App,
     rx: LockNotify<CacheTargets>,
-    update_notifier: mpsc::UnboundedSender<InstanceId>,
+    update_notifier: UpdateNotifier,
 ) {
     tokio::spawn(async move {
         let app = &app;
@@ -674,7 +681,13 @@ impl ManagerRef<'_, MetaCacheManager> {
     }
 
     pub async fn launch_background_tasks(self) {
-        let (list_debounce_tx, mut list_debounce_rx) = mpsc::unbounded_channel::<InstanceId>();
+        let (list_debounce_tx, mut list_debounce_rx) = watch::channel(());
+
+        let debounce_target = Arc::new(AtomicI32::new(-1));
+        let debounce_notifier = UpdateNotifier {
+            target: debounce_target.clone(),
+            sender: Arc::new(list_debounce_tx),
+        };
 
         let app_debounce = self.app.clone();
         let mut debounce_watch_rx = self.watched_instance.subscribe();
@@ -684,6 +697,15 @@ impl ManagerRef<'_, MetaCacheManager> {
             // note: the various `return`s will only be hit if the cache manager is dropped somehow. they prevent a spinloop.
             loop {
                 let watched = *debounce_watch_rx.borrow();
+
+                debounce_target.store(
+                    match watched {
+                        Some(id) => *id,
+                        None => -1,
+                    },
+                    atomic::Ordering::SeqCst,
+                );
+
                 let Some(watched) = watched else {
                     if debounce_watch_rx.changed().await.is_err() {
                         return;
@@ -692,19 +714,10 @@ impl ManagerRef<'_, MetaCacheManager> {
                     continue;
                 };
 
-                trace!("Watching instance {watched} for modlist debounce requests");
-
                 tokio::select! {
-                    instance_id = list_debounce_rx.recv() => {
-                        let Some(instance_id) = instance_id else { return };
-
-                        trace!("Received modlist debounce request for instance {instance_id}, currently watched instance is {watched}");
-
-                        // just loop again if we get a debounce for an instance we don't care about
-                        if instance_id == watched {
-                            app_debounce.invalidate(INSTANCE_MODS, Some(watched.0.into()));
-                            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                        }
+                    _ = list_debounce_rx.changed() => {
+                        app_debounce.invalidate(INSTANCE_MODS, Some(watched.0.into()));
+                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                     },
                     r = debounce_watch_rx.changed() => {
                         if r.is_err() {
@@ -718,17 +731,17 @@ impl ManagerRef<'_, MetaCacheManager> {
         cache_local(
             self.app.clone(),
             self.local_targets.clone(),
-            list_debounce_tx.clone(),
+            debounce_notifier.clone(),
         );
         cache_modplatform::<CurseforgeModCacher>(
             self.app.clone(),
             self.curseforge_targets.clone(),
-            list_debounce_tx.clone(),
+            debounce_notifier.clone(),
         );
         cache_modplatform::<ModrinthModCacher>(
             self.app.clone(),
             self.modrinth_targets.clone(),
-            list_debounce_tx,
+            debounce_notifier,
         );
     }
 
@@ -946,11 +959,7 @@ fn scale_mod_image(image: &[u8]) -> anyhow::Result<Vec<u8>> {
     Ok(output)
 }
 
-fn cache_local(
-    app: App,
-    rx: LockNotify<CacheTargets>,
-    update_notifier: mpsc::UnboundedSender<InstanceId>,
-) {
+fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNotifier) {
     tokio::spawn(async move {
         let app = &app;
         let update_notifier = &update_notifier;
