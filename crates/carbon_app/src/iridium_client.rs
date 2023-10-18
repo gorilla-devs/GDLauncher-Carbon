@@ -32,7 +32,7 @@ pub fn get_client() -> reqwest_middleware::ClientBuilder {
     }
 
     let client = reqwest::Client::builder()
-        .user_agent("GDLauncher App Dev")
+        .user_agent(env!("USER_AGENT_PREFIX"))
         .build()
         .unwrap();
     reqwest_middleware::ClientBuilder::new(client).with(AddHeaderMiddleware)

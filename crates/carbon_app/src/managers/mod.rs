@@ -98,7 +98,11 @@ mod app {
 
             // SAFETY: cannot be used until after the ref is initialized.
             let client = reqwest::Client::builder()
-                .user_agent("GDLauncher App")
+                .user_agent(format!(
+                    "{} {}",
+                    env!("USER_AGENT_PREFIX"),
+                    env!("APP_VERSION")
+                ))
                 .build()
                 .unwrap();
 
@@ -111,7 +115,7 @@ mod app {
                 let inner = Arc::into_raw(app);
 
                 (*inner).get().write(MaybeUninit::new(AppInner {
-                    settings_manager: SettingsManager::new(runtime_path),
+                    settings_manager: SettingsManager::new(runtime_path, reqwest.clone()),
                     java_manager: JavaManager::new(),
                     minecraft_manager: MinecraftManager::new(),
                     account_manager: AccountManager::new(),

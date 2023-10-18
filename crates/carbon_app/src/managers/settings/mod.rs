@@ -8,6 +8,7 @@ use crate::{
 };
 use anyhow::anyhow;
 use chrono::Utc;
+use reqwest_middleware::ClientWithMiddleware;
 use std::path::PathBuf;
 
 mod terms_and_privacy;
@@ -18,10 +19,10 @@ pub(crate) struct SettingsManager {
 }
 
 impl SettingsManager {
-    pub fn new(runtime_path: PathBuf) -> Self {
+    pub fn new(runtime_path: PathBuf, reqwest_client: ClientWithMiddleware) -> Self {
         Self {
             runtime_path: runtime_path::RuntimePath::new(runtime_path),
-            terms_and_privacy: TermsAndPrivacy::new(),
+            terms_and_privacy: TermsAndPrivacy::new(reqwest_client),
         }
     }
 }
