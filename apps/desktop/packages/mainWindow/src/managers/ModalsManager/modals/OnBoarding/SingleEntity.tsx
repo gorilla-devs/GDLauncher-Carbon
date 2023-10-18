@@ -1,6 +1,6 @@
 import { rspc, queryClient } from "@/utils/rspcClient";
 import { ImportEntityStatus } from "@gd/core_module/bindings";
-import { Input } from "@gd/ui";
+import { Checkbox, Input } from "@gd/ui";
 import {
   Match,
   Setter,
@@ -40,9 +40,10 @@ const SingleEntity = (props: {
         props.entity.entity,
         path() as string
       ]);
+      console.log(importScanStatus.data);
     }
   });
-  console.log(importScanStatus.data);
+
   return (
     <>
       <div class="w-full flex justify-between items-center pt-6">
@@ -80,7 +81,9 @@ const SingleEntity = (props: {
           />
         </div>
 
-        <div>{typeof importScanStatus.data?.scanning}</div>
+        <div>
+          <Checkbox />
+        </div>
       </div>
     </>
   );
