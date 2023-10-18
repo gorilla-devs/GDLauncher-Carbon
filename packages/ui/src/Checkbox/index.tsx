@@ -5,6 +5,7 @@ interface Props {
   disabled?: boolean;
   onChange?: (_checked: boolean) => void;
   title?: string;
+  titleStyle?: string;
 }
 
 function Checkbox(props: Props) {
@@ -43,7 +44,7 @@ function Checkbox(props: Props) {
         </Show>
       </div>
       <Show when={props.title}>
-        <span>{props.title}</span>
+        <span class={props.titleStyle}>{props.title}</span>
       </Show>
     </div>
   );
