@@ -16,6 +16,14 @@ import {
 import { ImportEntityStatus } from "@gd/core_module/bindings";
 import EntityCard from "@/components/Card/EntityCard";
 import SingleEntity from "./SingleEntity";
+import GdLauncherLogo from "/assets/images/gdlauncher_logo.svg";
+import CurseForgeLogo from "/assets/images/icons/curseforge_logo.svg";
+import ATLauncherLogo from "/assets/images/icons/atlauncher_logo.svg";
+import FTBLogo from "/assets/images/icons/ftb_logo.svg";
+import MultiMCLogo from "/assets/images/icons/multimc_logo.png";
+import TechnicLogo from "/assets/images/icons/technic_logo.svg";
+import PrismLogo from "/assets/images/icons/prism_logo.svg";
+import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg";
 
 type Props = {
   prevStep: () => void;
@@ -42,16 +50,16 @@ const ThirdStep = (props: Props) => {
   // });
   const entities = rspc.createQuery(() => ["instance.getImportableEntities"]);
   const icons = [
-    "i-mdi:axe-battle",
-    "i-memory:battle-axe",
+    GdLauncherLogo,
+    CurseForgeLogo,
     "i-game-icons:battle-mech",
-    "i-game-icons:battle-tank",
-    "i-game-icons:battle-gear",
-    "i-game-icons:battle-axe",
-    "i-mdi:sword-fight",
-    "i-mdi:sword",
-    "i-game-icons:shard-sword",
-    "i-iconoir:arcade"
+    CurseForgeLogo,
+    ModrinthLogo,
+    ATLauncherLogo,
+    TechnicLogo,
+    FTBLogo,
+    MultiMCLogo,
+    PrismLogo
   ];
   const handleClickEntity = (entity: ImportEntityStatus) => {
     if (entity.supported) {
@@ -117,7 +125,7 @@ const ThirdStep = (props: Props) => {
   // };
 
   return (
-    <div class="flex flex-col items-center justify-between w-120 lg:w-160 h-full box-border h-120">
+    <div class="flex flex-col items-center justify-between w-120 lg:w-160 h-full box-border pt-6">
       <Switch>
         <Match when={entity()}>
           <SingleEntity
