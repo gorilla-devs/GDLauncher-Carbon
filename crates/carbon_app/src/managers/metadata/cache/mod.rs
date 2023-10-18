@@ -5,8 +5,6 @@ use std::ffi::OsStr;
 use std::io::Cursor;
 use std::io::Read;
 use std::path::PathBuf;
-use std::sync::atomic;
-use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use std::usize;
 
@@ -19,12 +17,11 @@ use md5::Digest;
 use sha2::Sha512;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
-use tokio::sync::watch;
-use tokio::sync::Mutex;
 use tokio::sync::Notify;
 use tokio::sync::RwLock;
 use tokio::sync::RwLockReadGuard;
 use tokio::sync::Semaphore;
+use tokio::sync::watch;
 use tracing::debug;
 use tracing::error;
 use tracing::info;
@@ -34,12 +31,11 @@ use uuid::Uuid;
 
 use crate::api::keys::instance::INSTANCE_MODS;
 use crate::db::read_filters::BytesFilter;
-use crate::db::read_filters::DateTimeFilter;
 use crate::db::read_filters::IntFilter;
 use crate::db::read_filters::StringFilter;
 use crate::db::{
-    curse_forge_mod_cache as cfdb, curse_forge_mod_image_cache as cfimgdb, mod_file_cache as fcdb,
-    mod_metadata as metadb, modrinth_mod_cache as mrdb, modrinth_mod_image_cache as mrimgdb,
+    mod_file_cache as fcdb,
+    mod_metadata as metadb
 };
 use crate::domain::instance::InstanceId;
 
@@ -65,7 +61,7 @@ pub struct MetaCacheManager {
     modrinth_targets: LockNotify<CacheTargets>,
     image_scale_semaphore: Semaphore,
     image_download_semaphore: Semaphore,
-    watched_instance: RwLock<Option<InstanceId>>,
+    watched_instance: watch::Sender<Option<InstanceId>>,
 }
 
 impl MetaCacheManager {
@@ -82,7 +78,7 @@ impl MetaCacheManager {
             modrinth_targets: LockNotify::new(CacheTargets::new()),
             image_scale_semaphore: Semaphore::new(num_cpus::get()),
             image_download_semaphore: Semaphore::new(10),
-            watched_instance: RwLock::new(None),
+            watched_instance: watch::channel(None).0,
         }
     }
 }
@@ -122,21 +118,21 @@ impl<T: Send + Sync> LockNotify<T> {
         self.send_modify(|v| {
             f(v);
             true
-        });
+        }).await;
     }
 
     async fn send(&self, value: T) {
         self.send_modify(|v| {
             *v = value;
             true
-        });
+        }).await;
     }
 
     async fn send_silent(&self, value: T) {
         self.send_modify(|v| {
             *v = value;
             false
-        });
+        }).await;
     }
 
     async fn borrow(&self) -> RwLockReadGuard<T> {
@@ -145,7 +141,7 @@ impl<T: Send + Sync> LockNotify<T> {
 
     /// Note: will hang forever if all senders drop
     async fn await_change(&mut self) {
-        self.notify.notified();
+        self.notify.notified().await;
     }
 }
 
@@ -232,7 +228,7 @@ impl CacheTargets {
             }
         };
 
-        let mut release_target = |target_option: &mut Option<CacheTarget>| {
+        let release_target = |target_option: &mut Option<CacheTarget>| {
             if let Some(target) = target_option {
                 if check_target_callback(target) {
                     *target_option = None;
@@ -361,6 +357,7 @@ impl LoopValue for Option<InstanceId> {
     }
 
     fn loop_cmp(&self, token: Self::Token) -> Option<(Self::Value, bool)> {
+        trace!("Option<InstanceId> loopcmp: current: {:?}, last: {:?}, eq: {}", self, token, *self == token);
         match self {
             Some(v) => Some((*v, token == Some(*v))),
             None => None,
@@ -380,11 +377,14 @@ impl<T: LoopValue> LoopWatcher<T> {
     // Option<(value, value matches last)>
     async fn next(&mut self) -> Option<(T::Value, bool)> {
         loop {
-            if let Some(v) = self.watcher.borrow().await.loop_cmp(self.token) {
+            self.watcher.await_change().await;
+
+            let watcher = self.watcher.borrow().await;
+            if let Some(v) = watcher.loop_cmp(self.token) {
+                trace!("changed; matches last: {}", v.1);
+                self.token = watcher.token();
                 return Some(v);
             }
-
-            self.watcher.await_change().await;
         }
     }
 
@@ -444,7 +444,7 @@ trait ModplatformCacher {
     );
 }
 
-type ModplatformCacheBundle<T> = (InstanceId, bool, T, Option<oneshot::Sender<()>>);
+type ModplatformCacheBundle<T> = (InstanceId, bool, Option<T>, Option<oneshot::Sender<()>>);
 
 struct BundleSender<'a, T> {
     should_wait: bool,
@@ -482,12 +482,19 @@ impl<'a, T> BundleSender<'a, T> {
         self.active_wait = rx;
         let _ = self
             .sender
-            .send((self.instance_id, self.update_images, bundle, tx));
+            .send((self.instance_id, self.update_images, Some(bundle), tx));
     }
 
     async fn wait(self) {
-        if let Some(wait) = self.active_wait {
-            let _ = wait.await;
+        match self.active_wait {
+            Some(wait) => {
+                let _ = wait.await;
+            },
+            None => {
+                if self.update_images {
+                    let _ = self.sender.send((self.instance_id, self.update_images, None, None));
+                }
+            },
         }
     }
 }
@@ -511,10 +518,10 @@ fn cache_modplatform<C: ModplatformCacher>(
         let query_loop = query_loop_watcher.loop_interrupt(
             |CacheTargetInfo {
                 instance_id,
-                is_override,
                 is_priority,
+                is_override,
             }| async move {
-                debug!("Beginning {} mod caching for instance {instance_id}", C::NAME);
+                debug!({ is_priority, is_override }, "Beginning {} mod caching for instance {instance_id}", C::NAME);
 
                 // true could be optimized to "if there is a callback" if this is a bottleneck
                 let mut sender = BundleSender::new(instance_id, true, is_priority, batch_tx);
@@ -524,7 +531,7 @@ fn cache_modplatform<C: ModplatformCacher>(
                     tracing::error!({ error = ?e }, "Could not query {} mod metadata for instance {instance_id}", C::NAME);
                 }
 
-                sender.wait();
+                sender.wait().await;
 
                 move |targets: &mut CacheTargets| targets.release_target(instance_id, r)
             },
@@ -532,25 +539,31 @@ fn cache_modplatform<C: ModplatformCacher>(
 
         let save_loop = async {
             while let Some((instance_id, update_images, bundle, notify)) = batch_rx.recv().await {
-                C::save_batch(&app, instance_id, bundle).await;
+                if let Some(bundle) = bundle {
+                    debug!("Saving {} mod cache update bundle for instance {instance_id}", C::NAME);
+                    C::save_batch(&app, instance_id, bundle).await;
+
+                    if let Some(notify) = notify {
+                        let _ = notify.send(());
+                    }
+
+                    let _ = update_notifier.send(instance_id);
+                }
 
                 if update_images {
                     image_tx.send(Some(instance_id)).await;
                 }
-
-                if let Some(notify) = notify {
-                    let _ = notify.send(());
-                }
-
-                update_notifier.send(instance_id);
             }
         };
 
         let mut image_loop_watcher = LoopWatcher::new(image_rx).await;
         let image_loop = image_loop_watcher.loop_interrupt(|instance_id| async move {
-                C::cache_icons(&app, instance_id, &update_notifier).await;
-                |_: &mut Option<InstanceId>| false
-            });
+            debug!("Caching {} mod icons for instance {instance_id}", C::NAME);
+
+            C::cache_icons(&app, instance_id, &update_notifier).await;
+
+            |_: &mut Option<InstanceId>| false
+        });
 
         // None of the futures should ever exit.
         // This join polls both while allowing them to share variables in this scope.
@@ -624,7 +637,7 @@ impl ManagerRef<'_, MetaCacheManager> {
     }
 
     pub async fn watch_and_prioritize(self, instance_id: Option<InstanceId>) {
-        *self.watched_instance.write().await = instance_id;
+        let _ = self.watched_instance.send(instance_id);
 
         if let Some(instance_id) = instance_id {
             self.cache_with_priority(instance_id).await;
@@ -641,9 +654,42 @@ impl ManagerRef<'_, MetaCacheManager> {
     pub async fn launch_background_tasks(self) {
         let (list_debounce_tx, mut list_debounce_rx) = mpsc::unbounded_channel::<InstanceId>();
 
+        let app_debounce = self.app.clone();
+        let mut debounce_watch_rx = self.watched_instance.subscribe();
         tokio::spawn(async move {
-            while let Some(instance_id) = list_debounce_rx.recv().await {
-                // todo
+            // wait until watched is some, then wait until we get a list debounce that matches.
+            // Then wait 2 seconds, interrupted if the watch changes.
+            // note: the various `return`s will only be hit if the cache manager is dropped somehow. they prevent a spinloop.
+            loop {
+                let watched = *debounce_watch_rx.borrow();
+                let Some(watched) = watched else {
+                    if debounce_watch_rx.changed().await.is_err() {
+                        return;
+                    }
+
+                    continue;
+                };
+
+                trace!("Watching instance {watched} for modlist debounce requests");
+
+                tokio::select! {
+                    instance_id = list_debounce_rx.recv() => {
+                        let Some(instance_id) = instance_id else { return };
+
+                        trace!("Received modlist debounce request for instance {instance_id}, currently watched instance is {watched}");
+
+                        // just loop again if we get a debounce for an instance we don't care about
+                        if instance_id == watched {
+                            app_debounce.invalidate(INSTANCE_MODS, Some(watched.0.into()));
+                            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                        }
+                    },
+                    r = debounce_watch_rx.changed() => {
+                        if r.is_err() {
+                            return;
+                        }
+                    },
+                };
             }
         });
 
@@ -959,21 +1005,24 @@ fn cache_local(
                 );
             }
 
+            let mut has_outdated_entries = false;
+
             if let Ok(Ok(cached_entries)) = cached_entries.await {
                 for entry in cached_entries {
                     if let Some((enabled, real_size)) = modpaths.get(&entry.filename) {
                         // enabled probably shouldn't be here
                         if *real_size == entry.filesize as u64 && *enabled == entry.enabled
-                    {
-                        modpaths.remove(&entry.filename);
-                        trace!(
-                            "up to data metadata entry for mod `{}`, skipping",
-                            &entry.filename
-                        );
-                        continue;
-                    }
+                        {
+                            modpaths.remove(&entry.filename);
+                            trace!(
+                                "up to data metadata entry for mod `{}`, skipping",
+                                &entry.filename
+                            );
+                            continue;
+                        }
                     }
 
+                    has_outdated_entries = true;
                     trace!(
                         "outdated metadata entry for mod `{}`, adding to update list",
                         &entry.filename
@@ -1001,7 +1050,9 @@ fn cache_local(
                 error!({ error = ?e }, "could not store mod scan results for instance {instance_id} in db");
             }
 
-            update_notifier.send(instance_id);
+            if has_outdated_entries {
+                let _ = update_notifier.send(instance_id);
+            }
 
             Ok(())
         };
