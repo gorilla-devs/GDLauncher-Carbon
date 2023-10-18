@@ -1,13 +1,25 @@
 use std::collections::{HashMap, VecDeque};
 
-use tokio::sync::mpsc;
-use tracing::{trace, debug, error};
 use itertools::Itertools;
+use tokio::sync::mpsc;
+use tracing::{debug, error, trace};
 
-use crate::{managers::App, domain::{instance::InstanceId, modplatforms::modrinth::{responses::{VersionHashesResponse, ProjectsResponse, TeamResponse}, version::HashAlgorithm, search::{TeamIDs, ProjectIDs, VersionHashesQuery}, project::Project}}, db::read_filters::{IntFilter, DateTimeFilter}};
 use crate::db::{
-    mod_file_cache as fcdb,
-    mod_metadata as metadb, modrinth_mod_cache as mrdb, modrinth_mod_image_cache as mrimgdb,
+    mod_file_cache as fcdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
+    modrinth_mod_image_cache as mrimgdb,
+};
+use crate::{
+    db::read_filters::{DateTimeFilter, IntFilter},
+    domain::{
+        instance::InstanceId,
+        modplatforms::modrinth::{
+            project::Project,
+            responses::{ProjectsResponse, TeamResponse, VersionHashesResponse},
+            search::{ProjectIDs, TeamIDs, VersionHashesQuery},
+            version::HashAlgorithm,
+        },
+    },
+    managers::App,
 };
 
 use super::{BundleSender, ModplatformCacher};
@@ -35,22 +47,20 @@ impl ModplatformCacher for ModrinthModCacher {
             .mod_file_cache()
             .find_many(vec![
                 fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-                fcdb::WhereParam::MetadataIs(vec![
-                    metadb::WhereParam::ModrinthIsNot(vec![
-                        mrdb::WhereParam::CachedAt(DateTimeFilter::Gt(
-                            (chrono::Utc::now() - chrono::Duration::days(1)).into(),
-                        )),
-                    ]),
-                ]),
+                fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::ModrinthIsNot(vec![
+                    mrdb::WhereParam::CachedAt(DateTimeFilter::Gt(
+                        (chrono::Utc::now() - chrono::Duration::days(1)).into(),
+                    )),
+                ])]),
             ])
             .with(fcdb::metadata::fetch())
             .exec()
             .await?
             .into_iter()
             .map(|m| {
-                let metadata = m.metadata.expect(
-                    "metadata was queried with mod cache yet is not present",
-                );
+                let metadata = m
+                    .metadata
+                    .expect("metadata was queried with mod cache yet is not present");
                 let sha512 = hex::encode(&metadata.sha_512);
 
                 (sha512.clone(), (metadata.id, sha512))
@@ -100,7 +110,13 @@ impl ModplatformCacher for ModrinthModCacher {
                 })
                 .await?;
 
-            sender.send((sha512_hashes, metadata, versions_response, projects_response, teams_response));
+            sender.send((
+                sha512_hashes,
+                metadata,
+                versions_response,
+                projects_response,
+                teams_response,
+            ));
         }
 
         Ok::<_, anyhow::Error>(())
@@ -135,40 +151,41 @@ impl ModplatformCacher for ModrinthModCacher {
         );
         drop(ignored_hashes);
 
-        let futures = batch
-            .into_iter()
-            .filter_map(|(metadata_id, sha512)| {
-                let sha512_match = matches.remove(&sha512);
-                sha512_match.map(|(project, team, version)| async move {
-                    let file = version
-                        .files
-                        .iter()
-                        .find(|file| file.hashes.sha512 == sha512)
-                        .expect("file to be present in it's response");
+        let futures = batch.into_iter().filter_map(|(metadata_id, sha512)| {
+            let sha512_match = matches.remove(&sha512);
+            sha512_match.map(|(project, team, version)| async move {
+                let file = version
+                    .files
+                    .iter()
+                    .find(|file| file.hashes.sha512 == sha512)
+                    .expect("file to be present in it's response");
 
-                    let authors = team
-                        .iter()
-                        .map(|member| {
-                            member.user.name.clone().unwrap_or_else(|| {
-                                member.user.username.clone()
-                            })
-                        })
-                        .join(", ");
+                let authors = team
+                    .iter()
+                    .map(|member| {
+                        member
+                            .user
+                            .name
+                            .clone()
+                            .unwrap_or_else(|| member.user.username.clone())
+                    })
+                    .join(", ");
 
-                    let r = cache_modrinth_meta_unchecked(
-                        app,
-                        metadata_id,
-                        version.id.clone(),
-                        file.hashes.sha512.clone(),
-                        project.clone(),
-                        authors,
-                    ).await;
+                let r = cache_modrinth_meta_unchecked(
+                    app,
+                    metadata_id,
+                    version.id.clone(),
+                    file.hashes.sha512.clone(),
+                    project.clone(),
+                    authors,
+                )
+                .await;
 
-                    if let Err(e) = r {
-                        error!({ error = ?e }, "Could not store modrinth mod metadata");
-                    }
-                })
-            });
+                if let Err(e) = r {
+                    error!({ error = ?e }, "Could not store modrinth mod metadata");
+                }
+            })
+        });
 
         futures::future::join_all(futures).await;
     }
@@ -183,16 +200,15 @@ impl ModplatformCacher for ModrinthModCacher {
             .mod_file_cache()
             .find_many(vec![
                 fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-                fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::ModrinthIs(
-                    vec![mrdb::WhereParam::LogoImageIs(vec![
-                        mrimgdb::WhereParam::UpToDate(IntFilter::Equals(0)),
-                    ])],
-                )]),
+                fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::ModrinthIs(vec![
+                    mrdb::WhereParam::LogoImageIs(vec![mrimgdb::WhereParam::UpToDate(
+                        IntFilter::Equals(0),
+                    )]),
+                ])]),
             ])
             .with(
-                fcdb::metadata::fetch().with(
-                    metadb::modrinth::fetch().with(mrdb::logo_image::fetch()),
-                ),
+                fcdb::metadata::fetch()
+                    .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
             )
             .exec()
             .await;
@@ -218,12 +234,7 @@ impl ModplatformCacher for ModrinthModCacher {
                 .flatten()
                 .expect("mod image was ensured present but not returned");
 
-            (
-                file.filename,
-                mr.project_id,
-                mr.version_id,
-                row,
-            )
+            (file.filename, mr.project_id, mr.version_id, row)
         });
 
         let app = &app;
@@ -315,99 +326,94 @@ impl ModplatformCacher for ModrinthModCacher {
     }
 }
 
-    // Cache modrinth metadata for a mod without downloading the icon
-    async fn cache_modrinth_meta_unchecked(
-        app: &App,
-        metadata_id: String,
-        version_id: String,
-        sha512: String,
-        project: Project,
-        authors: String,
-    ) -> anyhow::Result<()> {
-        let prev = app
-            .prisma_client
-            .modrinth_mod_cache()
-            .find_unique(mrdb::UniqueWhereParam::MetadataIdEquals(
-                metadata_id.clone(),
-            ))
-            .with(mrdb::logo_image::fetch())
-            .exec()
-            .await?;
+// Cache modrinth metadata for a mod without downloading the icon
+async fn cache_modrinth_meta_unchecked(
+    app: &App,
+    metadata_id: String,
+    version_id: String,
+    sha512: String,
+    project: Project,
+    authors: String,
+) -> anyhow::Result<()> {
+    let prev = app
+        .prisma_client
+        .modrinth_mod_cache()
+        .find_unique(mrdb::UniqueWhereParam::MetadataIdEquals(
+            metadata_id.clone(),
+        ))
+        .with(mrdb::logo_image::fetch())
+        .exec()
+        .await?;
 
-        let mut o_delete_mrmeta = None;
-        let mut o_insert_logo = None;
-        let mut o_update_logo = None;
-        let mut o_delete_logo = None;
+    let mut o_delete_mrmeta = None;
+    let mut o_insert_logo = None;
+    let mut o_update_logo = None;
+    let mut o_delete_logo = None;
 
-        let o_insert_mrmeta = app.prisma_client.modrinth_mod_cache().create(
-            sha512.clone(),
-            project.id,
-            version_id,
-            project.title,
-            project.slug,
-            project.description,
-            authors,
-            chrono::Utc::now().into(),
-            metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),
-            Vec::new(),
-        );
+    let o_insert_mrmeta = app.prisma_client.modrinth_mod_cache().create(
+        sha512.clone(),
+        project.id,
+        version_id,
+        project.title,
+        project.slug,
+        project.description,
+        authors,
+        chrono::Utc::now().into(),
+        metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),
+        Vec::new(),
+    );
 
-        if let Some(prev) = prev {
-            o_delete_mrmeta = Some(app.prisma_client.modrinth_mod_cache().delete(
-                mrdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
-            ));
+    if let Some(prev) = prev {
+        o_delete_mrmeta = Some(app.prisma_client.modrinth_mod_cache().delete(
+            mrdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+        ));
 
-            if let Some(prev) = prev
-                .logo_image
-                .expect("logo_image was requesred but not returned by prisma")
-            {
-                match project.icon_url.as_ref() {
-                    Some(url) => {
-                        if *url != prev.url {
-                            o_update_logo =
-                                Some(app.prisma_client.modrinth_mod_image_cache().update(
-                                    mrimgdb::UniqueWhereParam::MetadataIdEquals(
-                                        metadata_id.clone(),
-                                    ),
-                                    vec![
-                                        mrimgdb::SetParam::SetUrl(url.clone()),
-                                        mrimgdb::SetParam::SetUpToDate(0),
-                                    ],
-                                ));
-                        }
+        if let Some(prev) = prev
+            .logo_image
+            .expect("logo_image was requesred but not returned by prisma")
+        {
+            match project.icon_url.as_ref() {
+                Some(url) => {
+                    if *url != prev.url {
+                        o_update_logo = Some(app.prisma_client.modrinth_mod_image_cache().update(
+                            mrimgdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+                            vec![
+                                mrimgdb::SetParam::SetUrl(url.clone()),
+                                mrimgdb::SetParam::SetUpToDate(0),
+                            ],
+                        ));
                     }
-                    None => {
-                        o_delete_logo =
-                            Some(app.prisma_client.modrinth_mod_image_cache().delete(
-                                mrimgdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
-                            ));
-                    }
+                }
+                None => {
+                    o_delete_logo = Some(app.prisma_client.modrinth_mod_image_cache().delete(
+                        mrimgdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+                    ));
                 }
             }
         }
-
-        if o_update_logo.is_none() && o_delete_logo.is_none() {
-            if let Some(url) = project.icon_url {
-                o_insert_logo = Some(app.prisma_client.modrinth_mod_image_cache().create(
-                    url,
-                    mrdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
-                    Vec::new(),
-                ));
-            }
-        }
-
-        debug!("updating modrinth metadata entry for {metadata_id}");
-
-        app
-            .prisma_client
-            ._batch((
-                o_delete_mrmeta.into_iter().collect::<Vec<_>>(),
-                o_insert_mrmeta,
-                o_delete_logo.into_iter().collect::<Vec<_>>(),
-                o_insert_logo.into_iter().collect::<Vec<_>>(),
-                o_update_logo.into_iter().collect::<Vec<_>>(),
-            ))
-            .await?;
-
-        Ok(())
     }
+
+    if o_update_logo.is_none() && o_delete_logo.is_none() {
+        if let Some(url) = project.icon_url {
+            o_insert_logo = Some(app.prisma_client.modrinth_mod_image_cache().create(
+                url,
+                mrdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+                Vec::new(),
+            ));
+        }
+    }
+
+    debug!("updating modrinth metadata entry for {metadata_id}");
+
+    app.prisma_client
+        ._batch((
+            o_delete_mrmeta.into_iter().collect::<Vec<_>>(),
+            o_insert_mrmeta,
+            o_delete_logo.into_iter().collect::<Vec<_>>(),
+            o_insert_logo.into_iter().collect::<Vec<_>>(),
+            o_update_logo.into_iter().collect::<Vec<_>>(),
+        ))
+        .await?;
+
+    Ok(())
+}

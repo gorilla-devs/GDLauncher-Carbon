@@ -1258,10 +1258,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
-        self.app
-            .meta_cache_manager()
-            .queue_caching(id, false)
-            .await;
+        self.app.meta_cache_manager().queue_caching(id, false).await;
 
         Ok(id)
     }

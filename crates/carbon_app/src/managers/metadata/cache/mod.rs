@@ -9,19 +9,19 @@ use std::sync::Arc;
 use std::usize;
 
 use anyhow::anyhow;
-use futures::Future;
 use futures::join;
+use futures::Future;
 use image::ImageOutputFormat;
 use itertools::Itertools;
 use md5::Digest;
 use sha2::Sha512;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
+use tokio::sync::watch;
 use tokio::sync::Notify;
 use tokio::sync::RwLock;
 use tokio::sync::RwLockReadGuard;
 use tokio::sync::Semaphore;
-use tokio::sync::watch;
 use tracing::debug;
 use tracing::error;
 use tracing::info;
@@ -33,10 +33,7 @@ use crate::api::keys::instance::INSTANCE_MODS;
 use crate::db::read_filters::BytesFilter;
 use crate::db::read_filters::IntFilter;
 use crate::db::read_filters::StringFilter;
-use crate::db::{
-    mod_file_cache as fcdb,
-    mod_metadata as metadb
-};
+use crate::db::{mod_file_cache as fcdb, mod_metadata as metadb};
 use crate::domain::instance::InstanceId;
 
 use crate::domain::runtime_path::InstancesPath;
@@ -118,21 +115,24 @@ impl<T: Send + Sync> LockNotify<T> {
         self.send_modify(|v| {
             f(v);
             true
-        }).await;
+        })
+        .await;
     }
 
     async fn send(&self, value: T) {
         self.send_modify(|v| {
             *v = value;
             true
-        }).await;
+        })
+        .await;
     }
 
     async fn send_silent(&self, value: T) {
         self.send_modify(|v| {
             *v = value;
             false
-        }).await;
+        })
+        .await;
     }
 
     async fn borrow(&self) -> RwLockReadGuard<T> {
@@ -190,7 +190,9 @@ impl CacheTargets {
             } => Some(CacheTargetInfo {
                 instance_id: *instance_id,
                 is_override: true,
-                is_priority: priority.as_ref().is_some_and(|v| *instance_id == v.instance_id),
+                is_priority: priority
+                    .as_ref()
+                    .is_some_and(|v| *instance_id == v.instance_id),
             }),
             Self {
                 backend_override: None,
@@ -209,7 +211,7 @@ impl CacheTargets {
                 instance_id: *instance_id,
                 is_override: false,
                 is_priority: false,
-            })
+            }),
         }
     }
 
@@ -219,7 +221,11 @@ impl CacheTargets {
         let check_target_callback = |target: &mut CacheTarget| {
             if target.instance_id == instance_id {
                 if let Some(callback) = target.callback.take() {
-                    callback.complete(r.as_ref().map(|_| ()).map_err(|_| anyhow!("error caching mods for instance")));
+                    callback.complete(
+                        r.as_ref()
+                            .map(|_| ())
+                            .map_err(|_| anyhow!("error caching mods for instance")),
+                    );
                 }
 
                 true
@@ -233,7 +239,7 @@ impl CacheTargets {
                 if check_target_callback(target) {
                     *target_option = None;
 
-                    return true
+                    return true;
                 }
             }
 
@@ -340,11 +346,10 @@ impl LoopValue for CacheTargets {
     }
 
     fn loop_cmp(&self, token: Self::Token) -> Option<(Self::Value, bool)> {
-        self.target()
-            .map(|target| {
-                let instance_id = target.instance_id;
-                (target, token == Some(instance_id))
-            })
+        self.target().map(|target| {
+            let instance_id = target.instance_id;
+            (target, token == Some(instance_id))
+        })
     }
 }
 
@@ -357,7 +362,12 @@ impl LoopValue for Option<InstanceId> {
     }
 
     fn loop_cmp(&self, token: Self::Token) -> Option<(Self::Value, bool)> {
-        trace!("Option<InstanceId> loopcmp: current: {:?}, last: {:?}, eq: {}", self, token, *self == token);
+        trace!(
+            "Option<InstanceId> loopcmp: current: {:?}, last: {:?}, eq: {}",
+            self,
+            token,
+            *self == token
+        );
         match self {
             Some(v) => Some((*v, token == Some(*v))),
             None => None,
@@ -489,12 +499,14 @@ impl<'a, T> BundleSender<'a, T> {
         match self.active_wait {
             Some(wait) => {
                 let _ = wait.await;
-            },
+            }
             None => {
                 if self.update_images {
-                    let _ = self.sender.send((self.instance_id, self.update_images, None, None));
+                    let _ = self
+                        .sender
+                        .send((self.instance_id, self.update_images, None, None));
                 }
-            },
+            }
         }
     }
 }
@@ -540,7 +552,10 @@ fn cache_modplatform<C: ModplatformCacher>(
         let save_loop = async {
             while let Some((instance_id, update_images, bundle, notify)) = batch_rx.recv().await {
                 if let Some(bundle) = bundle {
-                    debug!("Saving {} mod cache update bundle for instance {instance_id}", C::NAME);
+                    debug!(
+                        "Saving {} mod cache update bundle for instance {instance_id}",
+                        C::NAME
+                    );
                     C::save_batch(&app, instance_id, bundle).await;
 
                     if let Some(notify) = notify {
@@ -574,9 +589,12 @@ fn cache_modplatform<C: ModplatformCacher>(
 impl ManagerRef<'_, MetaCacheManager> {
     pub async fn instance_removed(self, instance_id: InstanceId) {
         join!(
-            self.local_targets.send_modify(|targets| targets.revoke_target(instance_id)),
-            self.curseforge_targets.send_modify(|targets| targets.revoke_target(instance_id)),
-            self.modrinth_targets.send_modify(|targets| targets.revoke_target(instance_id)),
+            self.local_targets
+                .send_modify(|targets| targets.revoke_target(instance_id)),
+            self.curseforge_targets
+                .send_modify(|targets| targets.revoke_target(instance_id)),
+            self.modrinth_targets
+                .send_modify(|targets| targets.revoke_target(instance_id)),
         );
 
         let _ = self
@@ -607,33 +625,35 @@ impl ManagerRef<'_, MetaCacheManager> {
         let app = self.app.clone();
 
         // todo: trace scanned instances, but not here as we also need to account for waiting instances.
-        self.local_targets.send_modify_always(move |targets| {
-            targets.set_priority(CacheTarget {
-                instance_id,
-                callback: Some(Box::new(move |r: anyhow::Result<()>| {
-                    if r.is_ok() {
-                        tokio::spawn(async move {
-                            let mcm = app.meta_cache_manager();
+        self.local_targets
+            .send_modify_always(move |targets| {
+                targets.set_priority(CacheTarget {
+                    instance_id,
+                    callback: Some(Box::new(move |r: anyhow::Result<()>| {
+                        if r.is_ok() {
+                            tokio::spawn(async move {
+                                let mcm = app.meta_cache_manager();
 
-                            join!(
-                                mcm.curseforge_targets.send_modify_always(move |targets| {
-                                    targets.set_priority(CacheTarget {
-                                        instance_id,
-                                        callback: None,
+                                join!(
+                                    mcm.curseforge_targets.send_modify_always(move |targets| {
+                                        targets.set_priority(CacheTarget {
+                                            instance_id,
+                                            callback: None,
+                                        })
+                                    }),
+                                    mcm.modrinth_targets.send_modify_always(move |targets| {
+                                        targets.set_priority(CacheTarget {
+                                            instance_id,
+                                            callback: None,
+                                        })
                                     })
-                                }),
-                                mcm.modrinth_targets.send_modify_always(move |targets| {
-                                    targets.set_priority(CacheTarget {
-                                        instance_id,
-                                        callback: None,
-                                    })
-                                })
-                            );
-                        });
-                    }
-                })),
-            });
-        }).await;
+                                );
+                            });
+                        }
+                    })),
+                });
+            })
+            .await;
     }
 
     pub async fn watch_and_prioritize(self, instance_id: Option<InstanceId>) {
@@ -646,9 +666,11 @@ impl ManagerRef<'_, MetaCacheManager> {
 
     pub async fn queue_caching(self, instance_id: InstanceId, _force: bool) {
         // TODO: make track scanned instances for _force
-        self.local_targets.send_modify_always(|targets| {
-            targets.waiting.push_back(instance_id);
-        }).await;
+        self.local_targets
+            .send_modify_always(|targets| {
+                targets.waiting.push_back(instance_id);
+            })
+            .await;
     }
 
     pub async fn launch_background_tasks(self) {
@@ -693,9 +715,21 @@ impl ManagerRef<'_, MetaCacheManager> {
             }
         });
 
-        cache_local(self.app.clone(), self.local_targets.clone(), list_debounce_tx.clone());
-        cache_modplatform::<CurseforgeModCacher>(self.app.clone(), self.curseforge_targets.clone(), list_debounce_tx.clone());
-        cache_modplatform::<ModrinthModCacher>(self.app.clone(), self.modrinth_targets.clone(), list_debounce_tx);
+        cache_local(
+            self.app.clone(),
+            self.local_targets.clone(),
+            list_debounce_tx.clone(),
+        );
+        cache_modplatform::<CurseforgeModCacher>(
+            self.app.clone(),
+            self.curseforge_targets.clone(),
+            list_debounce_tx.clone(),
+        );
+        cache_modplatform::<ModrinthModCacher>(
+            self.app.clone(),
+            self.modrinth_targets.clone(),
+            list_debounce_tx,
+        );
     }
 
     /// Cache a mod file without first checking the validity of the instance
@@ -711,10 +745,7 @@ impl ManagerRef<'_, MetaCacheManager> {
         let prev_ext = path
             .extension()
             .and_then(OsStr::to_str)
-            .ok_or(anyhow!(
-                "mod file `{}` has no extension",
-                mod_filename
-            ))?;
+            .ok_or(anyhow!("mod file `{}` has no extension", mod_filename))?;
 
         if !enabled {
             path.set_extension(format!("{prev_ext}.disabled"));
@@ -915,7 +946,6 @@ fn scale_mod_image(image: &[u8]) -> anyhow::Result<Vec<u8>> {
     Ok(output)
 }
 
-
 fn cache_local(
     app: App,
     rx: LockNotify<CacheTargets>,
@@ -925,14 +955,10 @@ fn cache_local(
         let app = &app;
         let update_notifier = &update_notifier;
 
-        let cache_instance = |CacheTargetInfo {
-            instance_id,
-            ..
-        }| async move {
+        let cache_instance = |CacheTargetInfo { instance_id, .. }| async move {
             let app2 = app.clone();
             let cached_entries = tokio::spawn(async move {
-                app2
-                    .prisma_client
+                app2.prisma_client
                     .mod_file_cache()
                     .find_many(vec![fcdb::WhereParam::InstanceId(IntFilter::Equals(
                         *instance_id,
@@ -958,7 +984,7 @@ fn cache_local(
 
             if !pathbuf.is_dir() {
                 info!("skipping instance {instance_id} for local caching because it does not have a mods folder");
-                return Ok(())
+                return Ok(());
             }
 
             trace!({ dir = ?pathbuf }, "scanning mods dir for instance {instance_id}");
@@ -967,7 +993,7 @@ fn cache_local(
                 Ok(entries) => entries,
                 Err(e) => {
                     error!({ dir = ?pathbuf, error = ?e }, "could not read instance {instance_id} for mod scanning");
-                    return Ok(())
+                    return Ok(());
                 }
             };
 
@@ -978,8 +1004,7 @@ fn cache_local(
                     continue;
                 };
 
-                let allowed_base_ext =
-                    [".jar", ".zip"].iter().any(|&ext| utf8_name.ends_with(ext));
+                let allowed_base_ext = [".jar", ".zip"].iter().any(|&ext| utf8_name.ends_with(ext));
                 let allowed_disabled_ext = [".jar.disabled", ".zip.disabled"]
                     .iter()
                     .any(|&ext| utf8_name.ends_with(ext));
@@ -1011,8 +1036,7 @@ fn cache_local(
                 for entry in cached_entries {
                     if let Some((enabled, real_size)) = modpaths.get(&entry.filename) {
                         // enabled probably shouldn't be here
-                        if *real_size == entry.filesize as u64 && *enabled == entry.enabled
-                        {
+                        if *real_size == entry.filesize as u64 && *enabled == entry.enabled {
                             modpaths.remove(&entry.filename);
                             trace!(
                                 "up to data metadata entry for mod `{}`, skipping",

@@ -1,6 +1,6 @@
+use itertools::Itertools;
 use std::collections::HashMap;
 use std::collections::VecDeque;
-use itertools::Itertools;
 
 use tokio::sync::mpsc;
 use tracing::debug;
@@ -18,7 +18,10 @@ use crate::managers::App;
 
 use super::BundleSender;
 use super::ModplatformCacher;
-use crate::db::{curse_forge_mod_cache as cfdb, curse_forge_mod_image_cache as cfimgdb, mod_file_cache as fcdb, mod_metadata as metadb};
+use crate::db::{
+    curse_forge_mod_cache as cfdb, curse_forge_mod_image_cache as cfimgdb, mod_file_cache as fcdb,
+    mod_metadata as metadb,
+};
 
 pub struct CurseforgeModCacher;
 
@@ -138,7 +141,7 @@ impl ModplatformCacher for CurseforgeModCacher {
                     murmur2,
                     modinfo,
                 )
-                    .await;
+                .await;
 
                 if let Err(e) = r {
                     error!({ error = ?e }, "Could not store curseforge mod metadata");
@@ -149,7 +152,11 @@ impl ModplatformCacher for CurseforgeModCacher {
         futures::future::join_all(futures).await;
     }
 
-    async fn cache_icons(app: &App, instance_id: InstanceId, update_notifier: &mpsc::UnboundedSender<InstanceId>) {
+    async fn cache_icons(
+        app: &App,
+        instance_id: InstanceId,
+        update_notifier: &mpsc::UnboundedSender<InstanceId>,
+    ) {
         let modlist = app
             .prisma_client
             .mod_file_cache()
@@ -189,12 +196,7 @@ impl ModplatformCacher for CurseforgeModCacher {
                 .flatten()
                 .expect("mod image was ensured present but not returned");
 
-            (
-                file.filename,
-                cf.project_id,
-                cf.file_id,
-                row,
-            )
+            (file.filename, cf.project_id, cf.file_id, row)
         });
 
         let app = &app;
@@ -330,30 +332,27 @@ async fn cache_curseforge_meta_unchecked(
         if let Some(prev) = prev
             .logo_image
             .expect("logo_image was requesred but not returned by prisma")
-            {
-                match modinfo.logo.as_ref().map(|it| &it.url) {
-                    Some(url) => {
-                        if *url != prev.url {
-                            o_update_logo =
-                                Some(app.prisma_client.curse_forge_mod_image_cache().update(
-                                    cfimgdb::UniqueWhereParam::MetadataIdEquals(
-                                        metadata_id.clone(),
-                                    ),
-                                    vec![
-                                        cfimgdb::SetParam::SetUrl(url.clone()),
-                                        cfimgdb::SetParam::SetUpToDate(0),
-                                    ],
-                                ));
-                        }
-                    }
-                    None => {
-                        o_delete_logo =
-                            Some(app.prisma_client.curse_forge_mod_image_cache().delete(
+        {
+            match modinfo.logo.as_ref().map(|it| &it.url) {
+                Some(url) => {
+                    if *url != prev.url {
+                        o_update_logo =
+                            Some(app.prisma_client.curse_forge_mod_image_cache().update(
                                 cfimgdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+                                vec![
+                                    cfimgdb::SetParam::SetUrl(url.clone()),
+                                    cfimgdb::SetParam::SetUpToDate(0),
+                                ],
                             ));
                     }
                 }
+                None => {
+                    o_delete_logo = Some(app.prisma_client.curse_forge_mod_image_cache().delete(
+                        cfimgdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+                    ));
+                }
             }
+        }
     }
 
     if o_update_logo.is_none() && o_delete_logo.is_none() {
@@ -368,14 +367,13 @@ async fn cache_curseforge_meta_unchecked(
 
     debug!("updating curseforge metadata entry for {metadata_id}");
 
-    app
-        .prisma_client
+    app.prisma_client
         ._batch((
-                o_delete_cfmeta.into_iter().collect::<Vec<_>>(),
-                o_insert_cfmeta,
-                o_delete_logo.into_iter().collect::<Vec<_>>(),
-                o_insert_logo.into_iter().collect::<Vec<_>>(),
-                o_update_logo.into_iter().collect::<Vec<_>>(),
+            o_delete_cfmeta.into_iter().collect::<Vec<_>>(),
+            o_insert_cfmeta,
+            o_delete_logo.into_iter().collect::<Vec<_>>(),
+            o_insert_logo.into_iter().collect::<Vec<_>>(),
+            o_update_logo.into_iter().collect::<Vec<_>>(),
         ))
         .await?;
 
