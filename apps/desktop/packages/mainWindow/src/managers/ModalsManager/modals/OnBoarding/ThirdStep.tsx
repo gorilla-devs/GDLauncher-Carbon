@@ -24,6 +24,7 @@ import MultiMCLogo from "/assets/images/icons/multimc_logo.png";
 import TechnicLogo from "/assets/images/icons/technic_logo.svg";
 import PrismLogo from "/assets/images/icons/prism_logo.svg";
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg";
+import LegacyGDL from "/assets/images/icons/legacy_gdlauncher.svg";
 
 type Props = {
   prevStep: () => void;
@@ -50,9 +51,9 @@ const ThirdStep = (props: Props) => {
   // });
   const entities = rspc.createQuery(() => ["instance.getImportableEntities"]);
   const icons = [
-    GdLauncherLogo,
+    LegacyGDL,
     CurseForgeLogo,
-    "i-game-icons:battle-mech",
+    ModrinthLogo,
     CurseForgeLogo,
     ModrinthLogo,
     ATLauncherLogo,
