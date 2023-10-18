@@ -97,7 +97,10 @@ mod app {
             let unsaferef = UnsafeAppRef(Arc::downgrade(&app));
 
             // SAFETY: cannot be used until after the ref is initialized.
-            let client = reqwest::Client::builder().build().unwrap();
+            let client = reqwest::Client::builder()
+                .user_agent("GDLauncher App")
+                .build()
+                .unwrap();
 
             let reqwest = cache_middleware::new_client(
                 unsaferef.clone(),

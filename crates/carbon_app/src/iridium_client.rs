@@ -31,6 +31,9 @@ pub fn get_client() -> reqwest_middleware::ClientBuilder {
         }
     }
 
-    let client = reqwest::Client::builder().build().unwrap();
+    let client = reqwest::Client::builder()
+        .user_agent("GDLauncher App Dev")
+        .build()
+        .unwrap();
     reqwest_middleware::ClientBuilder::new(client).with(AddHeaderMiddleware)
 }
