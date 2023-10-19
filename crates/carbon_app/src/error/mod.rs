@@ -1,5 +1,6 @@
 pub mod json;
 pub mod request;
+pub mod sentry;
 
 use std::fmt::{Debug, Display};
 

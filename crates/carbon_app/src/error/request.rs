@@ -1,6 +1,7 @@
 use std::fmt::{self, Display, Formatter};
 
 use super::json::get_json_context;
+use anyhow::anyhow;
 use reqwest::{Response, StatusCode, Url};
 use rspc::Type;
 use serde::Serialize;
@@ -181,11 +182,23 @@ impl RequestError {
             error: RequestErrorDetails::from_error_censored(value),
         }
     }
+
+    pub fn report_volatile_malformed(self, ty: &'static str) -> Self {
+        if matches!(self.error, RequestErrorDetails::MalformedResponse { .. }) {
+            super::sentry::report_volatile_error(ty, anyhow!(self.clone()));
+        }
+
+        self
+    }
 }
 
 #[async_trait::async_trait]
 pub trait GoodJsonRequestError {
     async fn json_with_context<T: serde::de::DeserializeOwned>(self) -> Result<T, RequestError>;
+    async fn json_with_context_reporting<T: serde::de::DeserializeOwned>(
+        self,
+        ty: &'static str,
+    ) -> Result<T, RequestError>;
 }
 
 #[async_trait::async_trait]
@@ -200,6 +213,15 @@ impl GoodJsonRequestError for reqwest::Response {
             .map_err(RequestError::from_error)?;
         Ok(serde_json::from_str::<T>(&body)
             .map_err(|err| RequestError::from_json_decode_error(err, &body, &url))?)
+    }
+
+    async fn json_with_context_reporting<T: serde::de::DeserializeOwned>(
+        self,
+        ty: &'static str,
+    ) -> Result<T, RequestError> {
+        self.json_with_context()
+            .await
+            .map_err(|e| e.report_volatile_malformed(ty))
     }
 }
 

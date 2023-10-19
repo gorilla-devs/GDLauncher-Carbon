@@ -43,8 +43,11 @@ impl CurseForge {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context::<CurseForgeResponse<Vec<Category>>>()
+            .json_with_context_reporting::<CurseForgeResponse<Vec<Category>>>(
+                "curseforge::get_categories",
+            )
             .await?;
+
         Ok(resp)
     }
 
@@ -75,8 +78,9 @@ impl CurseForge {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context::<CurseForgeResponse<Vec<Mod>>>()
+            .json_with_context_reporting::<CurseForgeResponse<Vec<Mod>>>("curseforge::search")
             .await?;
+
         Ok(resp)
     }
 
@@ -96,8 +100,9 @@ impl CurseForge {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context::<CurseForgeResponse<Mod>>()
+            .json_with_context_reporting::<CurseForgeResponse<Mod>>("curseforge::get_mod")
             .await?;
+
         Ok(resp)
     }
 
@@ -118,7 +123,7 @@ impl CurseForge {
             .body(body.to_string())
             .send()
             .await?
-            .json_with_context::<CurseForgeResponse<Vec<Mod>>>()
+            .json_with_context_reporting::<CurseForgeResponse<Vec<Mod>>>("curseforge::get_mods")
             .await?;
 
         Ok(resp)
@@ -141,7 +146,9 @@ impl CurseForge {
             .body(body.to_string())
             .send()
             .await?
-            .json_with_context::<CurseForgeResponse<FingerprintsMatchesResult>>()
+            .json_with_context_reporting::<CurseForgeResponse<FingerprintsMatchesResult>>(
+                "curseforge::get_fingerprints",
+            )
             .await?;
 
         Ok(resp)
@@ -164,7 +171,9 @@ impl CurseForge {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context::<CurseForgeResponse<String>>()
+            .json_with_context_reporting::<CurseForgeResponse<String>>(
+                "curseforge::get_mod_description",
+            )
             .await?;
         Ok(resp)
     }
@@ -187,7 +196,7 @@ impl CurseForge {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context::<CurseForgeResponse<File>>()
+            .json_with_context_reporting::<CurseForgeResponse<File>>("curseforge::get_mod_file")
             .await?;
         Ok(resp)
     }
@@ -212,7 +221,9 @@ impl CurseForge {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context::<CurseForgeResponse<Vec<File>>>()
+            .json_with_context_reporting::<CurseForgeResponse<Vec<File>>>(
+                "curseforge::get_mod_files",
+            )
             .await?;
         Ok(resp)
     }
@@ -234,7 +245,7 @@ impl CurseForge {
             .json(&body)
             .send()
             .await?
-            .json_with_context::<CurseForgeResponse<Vec<File>>>()
+            .json_with_context_reporting::<CurseForgeResponse<Vec<File>>>("curseforge::get_files")
             .await?;
 
         Ok(resp)
@@ -258,7 +269,9 @@ impl CurseForge {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context::<CurseForgeResponse<String>>()
+            .json_with_context_reporting::<CurseForgeResponse<String>>(
+                "curseforge::get_mod_file_changelog",
+            )
             .await?;
         Ok(resp)
     }
