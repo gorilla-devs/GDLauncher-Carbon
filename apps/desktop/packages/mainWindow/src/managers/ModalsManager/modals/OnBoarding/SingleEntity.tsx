@@ -1,19 +1,39 @@
 import { rspc, queryClient } from "@/utils/rspcClient";
-import { ImportEntityStatus } from "@gd/core_module/bindings";
+import {
+  ImportEntityStatus,
+  ImportEntry,
+  ImportableInstance,
+  InvalidImportEntry
+} from "@gd/core_module/bindings";
 import { Checkbox, Input } from "@gd/ui";
 import {
+  For,
   Match,
   Setter,
+  Switch,
   createEffect,
   createResource,
   createSignal
 } from "solid-js";
+import { createStore } from "solid-js/store";
+import SingleCheckBox from "./SingleCheckBox";
 
 const SingleEntity = (props: {
   entity: ImportEntityStatus;
   setEntity: Setter<ImportEntityStatus | undefined>;
 }) => {
   const [path, setPath] = createSignal<string | undefined>(undefined);
+  const [instances, setInstances] = createSignal([]);
+  const [singleInstance, setSingleInstance] = createSignal("");
+  const [instance, setInstance] = createStore<{
+    noResult: string | undefined;
+    singleResult: ImportableInstance | undefined;
+    multiResult: (ImportableInstance | InvalidImportEntry)[] | undefined;
+  }>({
+    noResult: undefined,
+    singleResult: undefined,
+    multiResult: undefined
+  });
 
   const entityDefaultPath = rspc.createQuery(() => [
     "instance.getImportEntityDefaultPath",
@@ -34,16 +54,53 @@ const SingleEntity = (props: {
   });
   createEffect(() => {
     if (path()) {
-      console.log("path ==>", path());
-      console.log("entity ==> ", props.entity.entity);
       scanImportableInstancesMutation.mutate([
         props.entity.entity,
         path() as string
       ]);
-      console.log(importScanStatus.data);
     }
   });
+  createEffect(() => {
+    const status = importScanStatus.data;
+    if (status) {
+      const data = status.status;
 
+      if (typeof data === "object") {
+        if ("SingleResult" in data) {
+          if ("Valid" in data.SingleResult) {
+            const res = data.SingleResult;
+            setInstance({
+              singleResult: res.Valid,
+              multiResult: undefined,
+              noResult: undefined
+            });
+          }
+        } else if ("MultiResult" in data) {
+          const res = data.MultiResult;
+          setInstance({
+            multiResult: res.map((e) => {
+              if ("Valid" in e) {
+                return e.Valid;
+              } else {
+                return e.Invalid;
+              }
+            }),
+            singleResult: undefined,
+            noResult: undefined
+          });
+        }
+      } else {
+        setInstance({
+          noResult: data,
+          singleResult: undefined,
+          multiResult: undefined
+        });
+      }
+    }
+  });
+  createEffect(() => {
+    console.log(singleInstance());
+  });
   return (
     <>
       <div class="w-full flex justify-between items-center pt-6">
@@ -54,8 +111,8 @@ const SingleEntity = (props: {
         <span class="font-bold">{props.entity.entity}</span>
         <div></div>
       </div>
-      <div class=" flex-1 w-full flex flex-col items-center justify-center">
-        <div class="flex items-center justify-between w-full gap-2 flex-1">
+      <div class=" flex-1 w-full flex flex-col items-center justify-center p-4">
+        <div class="flex items-center justify-between w-full gap-2">
           <span class="font-bold">Scan target path:</span>
           <Input
             value={path()}
@@ -81,8 +138,30 @@ const SingleEntity = (props: {
           />
         </div>
 
-        <div>
-          <Checkbox />
+        <div class="flex-1 border-2 border-red-400 border-solid w-full flex items-start justify-start">
+          <Switch fallback={<p>No Instances found on this path</p>}>
+            <Match when={typeof instance.multiResult !== "undefined"}>
+              <For each={instance.multiResult}>
+                {(entry) => (
+                  <SingleCheckBox
+                    title={(() => {
+                      if ("instance_name" in entry) {
+                        return entry.instance_name;
+                      }
+                    })()}
+                    setList={setInstances}
+                  />
+                )}
+              </For>
+            </Match>
+            <Match when={typeof instance.singleResult !== "undefined"}>
+              <SingleCheckBox
+                title={instance.singleResult?.instance_name}
+                setInstance={setSingleInstance}
+                isSingleInstance
+              />
+            </Match>
+          </Switch>
         </div>
       </div>
     </>
