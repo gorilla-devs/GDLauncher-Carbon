@@ -98,9 +98,6 @@ const SingleEntity = (props: {
       }
     }
   });
-  createEffect(() => {
-    console.log(singleInstance());
-  });
   return (
     <>
       <div class="w-full flex justify-between items-center pt-6">
