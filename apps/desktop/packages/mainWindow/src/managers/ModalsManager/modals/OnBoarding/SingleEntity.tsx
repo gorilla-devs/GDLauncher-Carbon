@@ -13,7 +13,8 @@ import {
   Switch,
   createEffect,
   createResource,
-  createSignal
+  createSignal,
+  onCleanup
 } from "solid-js";
 import { createStore } from "solid-js/store";
 import SingleCheckBox from "./SingleCheckBox";
@@ -39,9 +40,16 @@ const SingleEntity = (props: {
     "instance.getImportEntityDefaultPath",
     props.entity.entity
   ]);
-  const scanImportableInstancesMutation = rspc.createMutation([
-    "instance.setImportScanTarget"
-  ]);
+  const scanImportableInstancesMutation = rspc.createMutation(
+    ["instance.setImportScanTarget"],
+    {
+      onSettled: () => {
+        queryClient.invalidateQueries({
+          queryKey: ["instance.getImportScanStatus"]
+        });
+      }
+    }
+  );
   const importScanStatus = rspc.createQuery(() => [
     "instance.getImportScanStatus"
   ]);
@@ -53,15 +61,14 @@ const SingleEntity = (props: {
     setPath(entityDefaultPath.data!);
   });
   createEffect(() => {
-    if (path()) {
-      scanImportableInstancesMutation.mutate([
-        props.entity.entity,
-        path() as string
-      ]);
-    }
+    scanImportableInstancesMutation.mutate([
+      props.entity.entity,
+      (path() as string) || ""
+    ]);
   });
   createEffect(() => {
     const status = importScanStatus.data;
+    console.log(status);
     if (status) {
       const data = status.status;
 
@@ -119,7 +126,7 @@ const SingleEntity = (props: {
                 onClick={async () => {
                   const result = await window.openFileDialog({
                     title: "Select Runtime Path",
-                    defaultPath: path(),
+                    defaultPath: path() || "",
                     properties: ["openDirectory"]
                   });
 
