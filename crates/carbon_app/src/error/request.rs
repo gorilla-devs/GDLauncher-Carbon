@@ -76,7 +76,7 @@ impl Display for MalformedResponseDetails {
             } => {
                 write!(
                     f,
-                    "Unable to deserialise json object at {}:{}. Context `{}` Caused by: {}",
+                    "Unable to deserialise json object at {}:{}. Context (failure point marked by `<~~`) `{}` Caused by: {}",
                     line, column, ctx, source
                 )
             }

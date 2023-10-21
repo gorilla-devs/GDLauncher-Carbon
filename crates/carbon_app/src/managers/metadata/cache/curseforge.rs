@@ -1,6 +1,9 @@
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::time::Duration;
+use std::time::Instant;
+use tracing::warn;
 
 use tracing::debug;
 use tracing::error;
@@ -76,36 +79,70 @@ impl ModplatformCacher for CurseforgeModCacher {
 
         drop(ignored_hashes);
 
-        while !modlist.is_empty() {
-            let (fingerprints, metadata) = modlist
-                .drain(0..usize::min(1000, modlist.len()))
-                .unzip::<_, _, Vec<_>, Vec<_>>();
+        if modlist.is_empty() {
+            return Ok(());
+        }
 
-            trace!("querying curseforge mod batch for instance {instance_id}");
+        let failed_instances = mcm.failed_cf_instances.read().await;
+        let delay = failed_instances.get(&instance_id);
 
-            let fp_response = app
-                .modplatforms_manager()
-                .curseforge
-                .get_fingerprints(&fingerprints[..])
-                .await?
-                .data;
+        if let Some((end_time, _)) = delay {
+            if Instant::now() < *end_time {
+                warn!("Not attempting to cache curseforge mods for {instance_id} as too many attempts have failed recently");
+                return Ok(());
+            }
+        }
 
-            let mods_response = app
-                .modplatforms_manager()
-                .curseforge
-                .get_mods(ModsParameters {
-                    body: ModsParametersBody {
-                        mod_ids: fp_response
-                            .exact_matches
-                            .iter()
-                            .map(|m| m.file.mod_id)
-                            .collect::<Vec<_>>(),
-                    },
-                })
-                .await?
-                .data;
+        drop(failed_instances);
 
-            sender.send((fingerprints, metadata, fp_response, mods_response));
+        let fut = async {
+            while !modlist.is_empty() {
+                let (fingerprints, metadata) = modlist
+                    .drain(0..usize::min(1000, modlist.len()))
+                    .unzip::<_, _, Vec<_>, Vec<_>>();
+
+                trace!("querying curseforge mod batch for instance {instance_id}");
+
+                let fp_response = app
+                    .modplatforms_manager()
+                    .curseforge
+                    .get_fingerprints(&fingerprints[..])
+                    .await?
+                    .data;
+
+                let mods_response = app
+                    .modplatforms_manager()
+                    .curseforge
+                    .get_mods(ModsParameters {
+                        body: ModsParametersBody {
+                            mod_ids: fp_response
+                                .exact_matches
+                                .iter()
+                                .map(|m| m.file.mod_id)
+                                .collect::<Vec<_>>(),
+                        },
+                    })
+                    .await?
+                    .data;
+
+                sender.send((fingerprints, metadata, fp_response, mods_response));
+            }
+
+            Ok::<_, anyhow::Error>(())
+        };
+
+        if let Err(e) = fut.await {
+            error!({ error = ?e }, "Error occured while caching curseforge mods for instance {instance_id}");
+
+            let mut failed_instances = mcm.failed_cf_instances.write().await;
+            let entry = failed_instances
+                .entry(instance_id)
+                .or_insert((Instant::now(), 0));
+            entry.0 = Instant::now() + Duration::from_secs(u64::pow(2, entry.1));
+            entry.1 += 1;
+        } else {
+            let mut failed_instances = mcm.failed_cf_instances.write().await;
+            failed_instances.remove(&instance_id);
         }
 
         Ok::<_, anyhow::Error>(())
@@ -136,7 +173,7 @@ impl ModplatformCacher for CurseforgeModCacher {
             fpmatch.map(|(fileinfo, modinfo)| async move {
                 let r = cache_curseforge_meta_unchecked(
                     app,
-                    metadata_id,
+                    metadata_id.clone(),
                     fileinfo.file.id,
                     murmur2,
                     modinfo,
@@ -144,7 +181,9 @@ impl ModplatformCacher for CurseforgeModCacher {
                 .await;
 
                 if let Err(e) = r {
-                    error!({ error = ?e }, "Could not store curseforge mod metadata");
+                    error!({ error = ?e, metadata_id, file_id = ?fileinfo.file.id }, "Could not store curseforge mod metadata. Will not attempt to download again for this session.");
+
+                    mcm.ignored_remote_cf_hashes.write().await.insert(murmur2);
                 }
             })
         });
@@ -302,11 +341,6 @@ async fn cache_curseforge_meta_unchecked(
         .exec()
         .await?;
 
-    let mut o_delete_cfmeta = None;
-    let mut o_insert_logo = None;
-    let mut o_update_logo = None;
-    let mut o_delete_logo = None;
-
     let o_insert_cfmeta = app.prisma_client.curse_forge_mod_cache().create(
         murmur2 as i32,
         modinfo.id,
@@ -320,46 +354,38 @@ async fn cache_curseforge_meta_unchecked(
         Vec::new(),
     );
 
-    if let Some(prev) = prev {
-        o_delete_cfmeta = Some(app.prisma_client.curse_forge_mod_cache().delete(
-            cfdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
-        ));
-
-        if let Some(prev) = prev
-            .logo_image
-            .expect("logo_image was requesred but not returned by prisma")
-        {
-            match modinfo.logo.as_ref().map(|it| &it.url) {
-                Some(url) => {
-                    if *url != prev.url {
-                        o_update_logo =
-                            Some(app.prisma_client.curse_forge_mod_image_cache().update(
-                                cfimgdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
-                                vec![
-                                    cfimgdb::SetParam::SetUrl(url.clone()),
-                                    cfimgdb::SetParam::SetUpToDate(0),
-                                ],
-                            ));
-                    }
-                }
-                None => {
-                    o_delete_logo = Some(app.prisma_client.curse_forge_mod_image_cache().delete(
-                        cfimgdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
-                    ));
-                }
-            }
-        }
-    }
-
-    if o_update_logo.is_none() && o_delete_logo.is_none() {
-        if let Some(url) = modinfo.logo.map(|it| it.url) {
-            o_insert_logo = Some(app.prisma_client.curse_forge_mod_image_cache().create(
-                url,
+    let o_delete_cfmeta =
+        prev.as_ref().map(|_| {
+            app.prisma_client.curse_forge_mod_cache().delete(
                 cfdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
-                Vec::new(),
-            ));
-        }
-    }
+            )
+        });
+
+    let old_image = prev
+        .map(|p| {
+            p.logo_image
+                .expect("logo_image was requested but not returned by prisma")
+        })
+        .flatten();
+    let new_image = modinfo.logo.map(|it| it.url);
+
+    let image = match (new_image, old_image) {
+        (Some(new), Some(old)) => Some((new == old.url, new, old.data)),
+        (Some(new), None) => Some((false, new, None)),
+        (None, Some(old)) => Some((old.up_to_date == 1, old.url, old.data)),
+        (None, None) => None,
+    };
+
+    let o_insert_logo = image.map(|(up_to_date, url, data)| {
+        app.prisma_client.curse_forge_mod_image_cache().create(
+            url,
+            cfdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+            vec![
+                cfimgdb::SetParam::SetUpToDate(if up_to_date { 1 } else { 0 }),
+                cfimgdb::SetParam::SetData(data),
+            ],
+        )
+    });
 
     debug!("updating curseforge metadata entry for {metadata_id}");
 
@@ -367,9 +393,7 @@ async fn cache_curseforge_meta_unchecked(
         ._batch((
             o_delete_cfmeta.into_iter().collect::<Vec<_>>(),
             o_insert_cfmeta,
-            o_delete_logo.into_iter().collect::<Vec<_>>(),
             o_insert_logo.into_iter().collect::<Vec<_>>(),
-            o_update_logo.into_iter().collect::<Vec<_>>(),
         ))
         .await?;
 

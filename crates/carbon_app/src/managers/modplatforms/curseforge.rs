@@ -78,6 +78,7 @@ impl CurseForge {
             .get(url.as_str())
             .send()
             .await?
+            .error_for_status()?
             .json_with_context_reporting::<CurseForgeResponse<Vec<Mod>>>("curseforge::search")
             .await?;
 
@@ -111,8 +112,14 @@ impl CurseForge {
         &self,
         mod_parameters: ModsParameters,
     ) -> anyhow::Result<CurseForgeResponse<Vec<Mod>>> {
-        let url = self.base_url.join("mods")?;
+        if mod_parameters.body.mod_ids.is_empty() {
+            return Ok(CurseForgeResponse {
+                data: Vec::new(),
+                pagination: None,
+            });
+        }
 
+        let url = self.base_url.join("mods")?;
         let body = serde_json::to_string(&mod_parameters.body)?;
 
         trace!("POST {url} - {body:?}");
@@ -135,7 +142,6 @@ impl CurseForge {
         hashes: &[u32],
     ) -> anyhow::Result<CurseForgeResponse<FingerprintsMatchesResult>> {
         let url = self.base_url.join("fingerprints")?;
-
         let body = json!({ "fingerprints": hashes });
 
         trace!("POST {url} - {body:?}");

@@ -184,7 +184,7 @@ pub fn get_json_context(err: &serde_json::Error, body: &str, max_len: usize) -> 
     let obj_before = read_json_context_back(&ctx_before, max_len, string_can_end);
     let obj_after = read_json_context_forward(&ctx_after, max_len, string_can_end);
 
-    obj_before + obj_after.as_str()
+    obj_before + "<~~ " + obj_after.as_str()
 }
 
 fn json_matching_brace(c: char) -> char {

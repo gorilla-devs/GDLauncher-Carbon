@@ -1,7 +1,8 @@
 use std::collections::{HashMap, VecDeque};
+use std::time::{Duration, Instant};
 
 use itertools::Itertools;
-use tracing::{debug, error, trace};
+use tracing::{debug, error, trace, warn};
 
 use crate::db::{
     mod_file_cache as fcdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
@@ -72,50 +73,84 @@ impl ModplatformCacher for ModrinthModCacher {
             .filter(|(_, (_, sha512))| !ignored_hashes.contains(sha512))
             .collect::<VecDeque<_>>();
 
-        while !modlist.is_empty() {
-            let (sha512_hashes, metadata) = modlist
-                .drain(0..usize::min(1000, modlist.len()))
-                .unzip::<_, _, Vec<_>, Vec<_>>();
-            trace!("querying modrinth mod batch for instance {instance_id}");
+        if modlist.is_empty() {
+            return Ok(());
+        }
 
-            let versions_response = app
-                .modplatforms_manager()
-                .modrinth
-                .get_versions_from_hash(&VersionHashesQuery {
-                    hashes: sha512_hashes.clone(),
-                    algorithm: HashAlgorithm::SHA512,
-                })
-                .await?;
+        let failed_instances = mcm.failed_mr_instances.read().await;
+        let delay = failed_instances.get(&instance_id);
 
-            let projects_response = app
-                .modplatforms_manager()
-                .modrinth
-                .get_projects(ProjectIDs {
-                    ids: versions_response
-                        .iter()
-                        .map(|(_, ver)| ver.project_id.clone())
-                        .collect(),
-                })
-                .await?;
+        if let Some((end_time, _)) = delay {
+            if Instant::now() < *end_time {
+                warn!("Not attempting to cache modrinth mods for {instance_id} as too many attempts have failed recently");
+                return Ok(());
+            }
+        }
 
-            let teams_response = app
-                .modplatforms_manager()
-                .modrinth
-                .get_teams(TeamIDs {
-                    ids: projects_response
-                        .iter()
-                        .map(|proj| proj.team.clone())
-                        .collect(),
-                })
-                .await?;
+        drop(failed_instances);
 
-            sender.send((
-                sha512_hashes,
-                metadata,
-                versions_response,
-                projects_response,
-                teams_response,
-            ));
+        let fut = async {
+            while !modlist.is_empty() {
+                let (sha512_hashes, metadata) = modlist
+                    .drain(0..usize::min(1000, modlist.len()))
+                    .unzip::<_, _, Vec<_>, Vec<_>>();
+                trace!("querying modrinth mod batch for instance {instance_id}");
+
+                let versions_response = app
+                    .modplatforms_manager()
+                    .modrinth
+                    .get_versions_from_hash(&VersionHashesQuery {
+                        hashes: sha512_hashes.clone(),
+                        algorithm: HashAlgorithm::SHA512,
+                    })
+                    .await?;
+
+                let projects_response = app
+                    .modplatforms_manager()
+                    .modrinth
+                    .get_projects(ProjectIDs {
+                        ids: versions_response
+                            .iter()
+                            .map(|(_, ver)| ver.project_id.clone())
+                            .collect(),
+                    })
+                    .await?;
+
+                let teams_response = app
+                    .modplatforms_manager()
+                    .modrinth
+                    .get_teams(TeamIDs {
+                        ids: projects_response
+                            .iter()
+                            .map(|proj| proj.team.clone())
+                            .collect(),
+                    })
+                    .await?;
+
+                sender.send((
+                    sha512_hashes,
+                    metadata,
+                    versions_response,
+                    projects_response,
+                    teams_response,
+                ));
+            }
+
+            Ok::<_, anyhow::Error>(())
+        };
+
+        if let Err(e) = fut.await {
+            error!({ error = ?e }, "Error occured while caching modrinth mods for instance {instance_id}");
+
+            let mut failed_instances = mcm.failed_cf_instances.write().await;
+            let entry = failed_instances
+                .entry(instance_id)
+                .or_insert((Instant::now(), 0));
+            entry.0 = Instant::now() + Duration::from_secs(u64::pow(2, entry.1));
+            entry.1 += 1;
+        } else {
+            let mut failed_instances = mcm.failed_cf_instances.write().await;
+            failed_instances.remove(&instance_id);
         }
 
         Ok::<_, anyhow::Error>(())
@@ -340,11 +375,6 @@ async fn cache_modrinth_meta_unchecked(
         .exec()
         .await?;
 
-    let mut o_delete_mrmeta = None;
-    let mut o_insert_logo = None;
-    let mut o_update_logo = None;
-    let mut o_delete_logo = None;
-
     let o_insert_mrmeta = app.prisma_client.modrinth_mod_cache().create(
         sha512.clone(),
         project.id,
@@ -358,45 +388,39 @@ async fn cache_modrinth_meta_unchecked(
         Vec::new(),
     );
 
-    if let Some(prev) = prev {
-        o_delete_mrmeta = Some(app.prisma_client.modrinth_mod_cache().delete(
+    let o_delete_mrmeta = prev.as_ref().map(|_| {
+        app.prisma_client
+            .modrinth_mod_cache()
+            .delete(mrdb::UniqueWhereParam::MetadataIdEquals(
+                metadata_id.clone(),
+            ))
+    });
+
+    let old_image = prev
+        .map(|p| {
+            p.logo_image
+                .expect("logo_image was requested but not returned by prisma")
+        })
+        .flatten();
+    let new_image = project.icon_url;
+
+    let image = match (new_image, old_image) {
+        (Some(new), Some(old)) => Some((new == old.url, new, old.data)),
+        (Some(new), None) => Some((false, new, None)),
+        (None, Some(old)) => Some((old.up_to_date == 1, old.url, old.data)),
+        (None, None) => None,
+    };
+
+    let o_insert_logo = image.map(|(up_to_date, url, data)| {
+        app.prisma_client.modrinth_mod_image_cache().create(
+            url,
             mrdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
-        ));
-
-        if let Some(prev) = prev
-            .logo_image
-            .expect("logo_image was requesred but not returned by prisma")
-        {
-            match project.icon_url.as_ref() {
-                Some(url) => {
-                    if *url != prev.url {
-                        o_update_logo = Some(app.prisma_client.modrinth_mod_image_cache().update(
-                            mrimgdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
-                            vec![
-                                mrimgdb::SetParam::SetUrl(url.clone()),
-                                mrimgdb::SetParam::SetUpToDate(0),
-                            ],
-                        ));
-                    }
-                }
-                None => {
-                    o_delete_logo = Some(app.prisma_client.modrinth_mod_image_cache().delete(
-                        mrimgdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
-                    ));
-                }
-            }
-        }
-    }
-
-    if o_update_logo.is_none() && o_delete_logo.is_none() {
-        if let Some(url) = project.icon_url {
-            o_insert_logo = Some(app.prisma_client.modrinth_mod_image_cache().create(
-                url,
-                mrdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
-                Vec::new(),
-            ));
-        }
-    }
+            vec![
+                mrimgdb::SetParam::SetUpToDate(if up_to_date { 1 } else { 0 }),
+                mrimgdb::SetParam::SetData(data),
+            ],
+        )
+    });
 
     debug!("updating modrinth metadata entry for {metadata_id}");
 
@@ -404,9 +428,7 @@ async fn cache_modrinth_meta_unchecked(
         ._batch((
             o_delete_mrmeta.into_iter().collect::<Vec<_>>(),
             o_insert_mrmeta,
-            o_delete_logo.into_iter().collect::<Vec<_>>(),
             o_insert_logo.into_iter().collect::<Vec<_>>(),
-            o_update_logo.into_iter().collect::<Vec<_>>(),
         ))
         .await?;
 
