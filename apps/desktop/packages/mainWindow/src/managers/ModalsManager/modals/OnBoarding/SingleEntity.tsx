@@ -143,7 +143,17 @@ const SingleEntity = (props: {
         </div>
 
         <div class="flex-1 w-full flex items-start justify-start">
-          <Switch fallback={<p>No Instances found on this path</p>}>
+          <Switch
+            fallback={
+              <div class="w-full  h-full flex items-center justify-center">
+                <p class="text-xl text-violet-500">
+                  {path()
+                    ? " No Instances found on this path"
+                    : "select a path"}
+                </p>
+              </div>
+            }
+          >
             <Match when={typeof instance.multiResult !== "undefined"}>
               <For each={instance.multiResult}>
                 {(entry) => (
