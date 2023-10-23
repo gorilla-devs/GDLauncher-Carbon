@@ -64,10 +64,14 @@ const SingleEntity = (props: {
     setPath(entityDefaultPath.data!);
   });
   createEffect(() => {
-    scanImportableInstancesMutation.mutate([
-      props.entity.entity,
-      path() as string
-    ]);
+    if (path()) {
+      scanImportableInstancesMutation.mutate([
+        props.entity.entity,
+        path() as string
+      ]);
+    } else {
+      scanImportableInstancesMutation.mutate([props.entity.entity, ""]);
+    }
   });
   createEffect(() => {
     const status = importScanStatus.data;
@@ -112,7 +116,10 @@ const SingleEntity = (props: {
     <>
       <div class="w-full flex justify-between items-center pt-6">
         <div
-          onClick={() => props.setEntity(undefined)}
+          onClick={() => {
+            props.setEntity(undefined);
+            setStep("selectionStep");
+          }}
           class="i-mingcute:arrow-left-fill text-zinc-400 text-xl font-bold cursor-pointer"
         ></div>
         <span class="font-bold">{props.entity.entity}</span>
