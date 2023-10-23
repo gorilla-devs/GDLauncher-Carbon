@@ -18,7 +18,10 @@ import {
 } from "solid-js";
 import { createStore } from "solid-js/store";
 import SingleCheckBox from "./SingleCheckBox";
+import BeginImportStep from "./BeginImportStep";
 
+const [step, setStep] = createSignal("selectionStep");
+export { step, setStep };
 const SingleEntity = (props: {
   entity: ImportEntityStatus;
   setEntity: Setter<ImportEntityStatus | undefined>;
@@ -143,42 +146,54 @@ const SingleEntity = (props: {
         </div>
 
         <div class="flex-1 w-full flex items-start justify-start">
-          <Switch
-            fallback={
-              <div class="w-full  h-full flex items-center justify-center">
-                <p class="text-xl text-violet-500">
-                  {path()
-                    ? " No Instances found on this path"
-                    : "select a path"}
-                </p>
-              </div>
-            }
-          >
-            <Match when={typeof instance.multiResult !== "undefined"}>
-              <div class="w-full h-full p-2 h-full w-full">
-                <div class="w-full h-[90%] overflow-hidden  flex flex-col gap-2 ">
-                  <For each={instance.multiResult}>
-                    {(entry) => (
-                      <SingleCheckBox
-                        title={(() => {
-                          if ("instance_name" in entry) {
-                            return entry.instance_name;
-                          }
-                        })()}
-                        setList={setInstances}
-                      />
-                    )}
-                  </For>
-                </div>
-                <Button type="primary">Begin import</Button>
-              </div>
+          <Switch>
+            <Match when={step() === "selectionStep"}>
+              <Switch
+                fallback={
+                  <div class="w-full  h-full flex items-center justify-center">
+                    <p class="text-xl text-violet-500">
+                      {path()
+                        ? " No Instances found on this path"
+                        : "select a path"}
+                    </p>
+                  </div>
+                }
+              >
+                <Match when={typeof instance.multiResult !== "undefined"}>
+                  <div class="w-full h-full p-2 h-full w-full">
+                    <div class="w-full h-[90%] overflow-hidden  flex flex-col gap-2 ">
+                      <For each={instance.multiResult}>
+                        {(entry) => (
+                          <SingleCheckBox
+                            title={(() => {
+                              if ("instance_name" in entry) {
+                                return entry.instance_name;
+                              }
+                            })()}
+                            setList={setInstances}
+                          />
+                        )}
+                      </For>
+                    </div>
+                    <Button
+                      type="primary"
+                      onClick={() => setStep("importStep")}
+                    >
+                      Begin import
+                    </Button>
+                  </div>
+                </Match>
+                <Match when={typeof instance.singleResult !== "undefined"}>
+                  <SingleCheckBox
+                    title={instance.singleResult?.instance_name}
+                    setInstance={setSingleInstance}
+                    isSingleInstance
+                  />
+                </Match>
+              </Switch>
             </Match>
-            <Match when={typeof instance.singleResult !== "undefined"}>
-              <SingleCheckBox
-                title={instance.singleResult?.instance_name}
-                setInstance={setSingleInstance}
-                isSingleInstance
-              />
+            <Match when={step() === "importStep"}>
+              <BeginImportStep />
             </Match>
           </Switch>
         </div>
