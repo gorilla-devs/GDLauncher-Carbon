@@ -1057,13 +1057,28 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                             );
                             continue;
                         }
+
+                        trace!(
+                            "outdated metadata entry for mod `{}`, adding to update list",
+                            &entry.filename
+                        );
+                    } else {
+                        trace!(
+                            "removed metadata entry for mod `{}`, removing",
+                            &entry.filename
+                        );
+
+                        app.prisma_client
+                            .mod_file_cache()
+                            .delete(fcdb::UniqueWhereParam::InstanceIdFilenameEquals(
+                                *instance_id,
+                                entry.filename,
+                            ))
+                            .exec()
+                            .await?;
                     }
 
                     has_outdated_entries = true;
-                    trace!(
-                        "outdated metadata entry for mod `{}`, adding to update list",
-                        &entry.filename
-                    );
                 }
             }
 
