@@ -5,7 +5,7 @@ import {
   ImportableInstance,
   InvalidImportEntry
 } from "@gd/core_module/bindings";
-import { Checkbox, Input } from "@gd/ui";
+import { Button, Checkbox, Input } from "@gd/ui";
 import {
   For,
   Match,
@@ -63,7 +63,7 @@ const SingleEntity = (props: {
   createEffect(() => {
     scanImportableInstancesMutation.mutate([
       props.entity.entity,
-      (path() as string) || ""
+      path() as string
     ]);
   });
   createEffect(() => {
@@ -155,18 +155,23 @@ const SingleEntity = (props: {
             }
           >
             <Match when={typeof instance.multiResult !== "undefined"}>
-              <For each={instance.multiResult}>
-                {(entry) => (
-                  <SingleCheckBox
-                    title={(() => {
-                      if ("instance_name" in entry) {
-                        return entry.instance_name;
-                      }
-                    })()}
-                    setList={setInstances}
-                  />
-                )}
-              </For>
+              <div class="w-full h-full p-2 h-full w-full">
+                <div class="w-full h-[90%] overflow-hidden  flex flex-col gap-2 ">
+                  <For each={instance.multiResult}>
+                    {(entry) => (
+                      <SingleCheckBox
+                        title={(() => {
+                          if ("instance_name" in entry) {
+                            return entry.instance_name;
+                          }
+                        })()}
+                        setList={setInstances}
+                      />
+                    )}
+                  </For>
+                </div>
+                <Button type="primary">Begin import</Button>
+              </div>
             </Match>
             <Match when={typeof instance.singleResult !== "undefined"}>
               <SingleCheckBox
