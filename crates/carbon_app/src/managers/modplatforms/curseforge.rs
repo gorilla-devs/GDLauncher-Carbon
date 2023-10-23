@@ -78,7 +78,6 @@ impl CurseForge {
             .get(url.as_str())
             .send()
             .await?
-            .error_for_status()?
             .json_with_context_reporting::<CurseForgeResponse<Vec<Mod>>>("curseforge::search")
             .await?;
 

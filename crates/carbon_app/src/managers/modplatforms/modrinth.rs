@@ -278,7 +278,6 @@ mod test {
     use tracing_test::traced_test;
 
     use crate::domain::modplatforms::modrinth::{
-        project::ProjectVersionsFilters,
         search::{SearchFacet, SearchIndex},
         version::HashAlgorithm,
     };

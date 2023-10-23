@@ -343,7 +343,7 @@ mod test {
             .await?;
 
         app.meta_cache_manager()
-            .prioritize_instance(instance_id)
+            .cache_with_priority(instance_id)
             .await;
 
         app.instance_manager()
