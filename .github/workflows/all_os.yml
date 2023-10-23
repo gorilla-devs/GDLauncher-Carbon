@@ -48,6 +48,8 @@ jobs:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
+          META_BASE_URL: ${{ vars.META_BASE_URL }}
+          USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
       - name: Lint
         run: pnpm lint
       - name: Clear target before tests to avoid folder getting too big
@@ -58,6 +60,8 @@ jobs:
           BASE_API: ${{ vars.BASE_API }}
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
           RUNTIME_PATH: ${{ vars.RUNTIME_PATH }}
+          META_BASE_URL: ${{ vars.META_BASE_URL }}
+          USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
         run: pnpm test
   ubuntu_x64:
     defaults:
@@ -97,6 +101,8 @@ jobs:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
+          META_BASE_URL: ${{ vars.META_BASE_URL }}
+          USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
       - name: Lint
         run: pnpm lint
       - name: Clear target before tests to avoid folder getting too big
@@ -107,6 +113,8 @@ jobs:
           BASE_API: ${{ vars.BASE_API }}
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
           RUNTIME_PATH: ${{ vars.RUNTIME_PATH }}
+          META_BASE_URL: ${{ vars.META_BASE_URL }}
+          USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
         run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test
   windows_x64:
     defaults:
@@ -151,6 +159,8 @@ jobs:
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
+          META_BASE_URL: ${{ vars.META_BASE_URL }}
+          USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           CARGO_NET_GIT_FETCH_WITH_CLI: true
       - name: Lint
         shell: bash
@@ -165,5 +175,7 @@ jobs:
           BASE_API: ${{ vars.BASE_API }}
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
           RUNTIME_PATH: ${{ vars.RUNTIME_PATH }}
+          META_BASE_URL: ${{ vars.META_BASE_URL }}
+          USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: pnpm test

@@ -1,7 +1,9 @@
 import { app } from "electron";
 import * as Sentry from "@sentry/electron/main";
+import os from "os";
+import path from "path";
 import handleUncaughtException from "./handleUncaughtException";
-import { getCurrentRTPath, initRTPath } from "./runtimePath";
+import { CURRENT_RUNTIME_PATH, initRTPath } from "./runtimePath";
 
 const args = process.argv.slice(1);
 
@@ -31,6 +33,27 @@ function validateArgument(arg: string): Argument | null {
   return null;
 }
 
+export function getPatchedUserData() {
+  let appData = null;
+
+  if (os.platform() !== "linux") {
+    appData = app.getPath("appData");
+  } else {
+    // monkey patch linux since it defaults to .config instead of .local/share
+    const xdgDataHome = process.env.XDG_DATA_HOME;
+    if (xdgDataHome) {
+      appData = xdgDataHome;
+    } else {
+      const homeDir = os.homedir();
+      appData = path.join(homeDir, ".local/share");
+    }
+  }
+
+  return path.join(appData, "gdlauncher_carbon");
+}
+
+app.setPath("userData", getPatchedUserData());
+
 if (app.isPackaged) {
   const overrideCLIDataPath = validateArgument("--runtime_path");
   const overrideEnvDataPath = process.env.GDL_RUNTIME_PATH;
@@ -44,7 +67,8 @@ if (app.isPackaged) {
   initRTPath(rtPath);
 }
 
-console.log("Runtime path:", getCurrentRTPath());
+console.log("Userdata path:", app.getPath("userData"));
+console.log("Runtime path:", CURRENT_RUNTIME_PATH);
 
 const allowMultipleInstances = validateArgument(
   "--gdl_allow_multiple_instances"

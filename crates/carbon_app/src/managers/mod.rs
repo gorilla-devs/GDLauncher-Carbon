@@ -97,7 +97,14 @@ mod app {
             let unsaferef = UnsafeAppRef(Arc::downgrade(&app));
 
             // SAFETY: cannot be used until after the ref is initialized.
-            let client = reqwest::Client::builder().build().unwrap();
+            let client = reqwest::Client::builder()
+                .user_agent(format!(
+                    "{} {}",
+                    env!("USER_AGENT_PREFIX"),
+                    env!("APP_VERSION")
+                ))
+                .build()
+                .unwrap();
 
             let reqwest = cache_middleware::new_client(
                 unsaferef.clone(),
@@ -108,7 +115,7 @@ mod app {
                 let inner = Arc::into_raw(app);
 
                 (*inner).get().write(MaybeUninit::new(AppInner {
-                    settings_manager: SettingsManager::new(runtime_path),
+                    settings_manager: SettingsManager::new(runtime_path, reqwest.clone()),
                     java_manager: JavaManager::new(),
                     minecraft_manager: MinecraftManager::new(),
                     account_manager: AccountManager::new(),

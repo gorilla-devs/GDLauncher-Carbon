@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
 use markdown::{CompileOptions, Options};
+use reqwest_middleware::ClientWithMiddleware;
 use serde::Serialize;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::managers::GDL_API_BASE;
+use crate::{app_version::APP_VERSION, managers::GDL_API_BASE};
 
 const BASE_GH_API_REPO_URL: &str = "https://api.github.com/repos/gorilla-devs/ToS-Privacy";
 const BASE_GH_REPO_URL: &str = "https://raw.githubusercontent.com/gorilla-devs/ToS-Privacy";
@@ -19,26 +20,23 @@ pub enum ConsentType {
 
 pub struct TermsAndPrivacy {
     latest_sha: Arc<Mutex<Option<String>>>,
-    reqwest_client: reqwest::Client,
+    reqwest_client: ClientWithMiddleware,
 }
 
 impl TermsAndPrivacy {
-    pub fn new() -> Self {
+    pub fn new(reqwest_client: ClientWithMiddleware) -> Self {
         Self {
             latest_sha: Arc::new(Mutex::new(None)),
-            reqwest_client: reqwest::Client::builder()
-                .user_agent("GDLauncher App")
-                .build()
-                .expect("Unreasonable to fail"),
+            reqwest_client,
         }
     }
 
-    pub async fn record_consent<'a>(
+    pub async fn record_consent<'b>(
         &self,
         consent_type: ConsentType,
         consented: bool,
-        user_id: &'a Uuid,
-        secret: &'a Vec<u8>,
+        user_id: &'b Uuid,
+        secret: &'b Vec<u8>,
     ) -> anyhow::Result<()> {
         let mut lock = self.latest_sha.lock().await;
         let latest_sha = match lock.as_ref() {
@@ -51,9 +49,9 @@ impl TermsAndPrivacy {
         };
 
         #[derive(Debug, Serialize)]
-        pub struct Body<'b> {
-            pub user_id: &'b Uuid,
-            pub secret: &'b Vec<u8>,
+        pub struct Body<'c> {
+            pub user_id: &'c Uuid,
+            pub secret: &'c Vec<u8>,
             pub consent_type: ConsentType,
             pub consented: bool,
             pub document_hash: String,
