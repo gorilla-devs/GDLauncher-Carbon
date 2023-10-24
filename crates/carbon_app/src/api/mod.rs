@@ -55,6 +55,7 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
                     loop {
                         match channel.recv().await {
                             Ok(event) => {
+                                tracing::trace!("Invalidated {}: {:?}", event.key, event.args);
                                 yield event;
                             }
                             Err(e) => {

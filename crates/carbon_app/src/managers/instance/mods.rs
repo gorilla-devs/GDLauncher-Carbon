@@ -162,7 +162,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         self.app
             .meta_cache_manager()
-            .queue_local_caching(instance_id, true)
+            .queue_caching(instance_id, true)
             .await;
 
         Ok(())
@@ -207,7 +207,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         self.app
             .meta_cache_manager()
-            .queue_local_caching(instance_id, true)
+            .queue_caching(instance_id, true)
             .await;
 
         Ok(())
@@ -343,7 +343,7 @@ mod test {
             .await?;
 
         app.meta_cache_manager()
-            .prioritize_instance(instance_id)
+            .cache_with_priority(instance_id)
             .await;
 
         app.instance_manager()

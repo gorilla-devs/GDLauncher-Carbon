@@ -46,8 +46,9 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context()
+            .json_with_context_reporting("modrinth::get_categories")
             .await?;
+
         Ok(categories)
     }
 
@@ -62,7 +63,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context()
+            .json_with_context_reporting("modrinth::get_loaders")
             .await?;
         Ok(categories)
     }
@@ -83,7 +84,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context()
+            .json_with_context_reporting("modrinth::search")
             .await?;
         Ok(search_results)
     }
@@ -99,7 +100,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context()
+            .json_with_context_reporting("modrinth::get_project")
             .await?;
         Ok(proj)
     }
@@ -131,7 +132,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context()
+            .json_with_context_reporting("modrinth::get_project_versions")
             .await?;
         Ok(proj)
     }
@@ -149,7 +150,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context()
+            .json_with_context_reporting("modrinth::get_projects")
             .await?;
         Ok(projects)
     }
@@ -165,7 +166,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context()
+            .json_with_context_reporting("modrinth::get_version")
             .await?;
         Ok(ver)
     }
@@ -183,7 +184,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context()
+            .json_with_context_reporting("modrinth::get_versions")
             .await?;
         Ok(versions)
     }
@@ -205,7 +206,7 @@ impl Modrinth {
             .json(&hashes_query)
             .send()
             .await?
-            .json_with_context()
+            .json_with_context_reporting("modrinth::get_versions_from_hash")
             .await?;
         Ok(versions)
     }
@@ -221,7 +222,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context::<TeamResponse>()
+            .json_with_context_reporting::<TeamResponse>("modrinth::get_team")
             .await?
             .into_iter()
             .filter(|member| member.accepted)
@@ -242,7 +243,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context::<Vec<TeamResponse>>()
+            .json_with_context_reporting::<Vec<TeamResponse>>("modrinth::get_teams")
             .await?
             .into_iter()
             .map(|team| team.into_iter().filter(|member| member.accepted).collect())
@@ -263,7 +264,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context::<TeamResponse>()
+            .json_with_context_reporting::<TeamResponse>("modrinth::get_project_team")
             .await?
             .into_iter()
             .filter(|member| member.accepted)
@@ -277,7 +278,6 @@ mod test {
     use tracing_test::traced_test;
 
     use crate::domain::modplatforms::modrinth::{
-        project::ProjectVersionsFilters,
         search::{SearchFacet, SearchIndex},
         version::HashAlgorithm,
     };

@@ -3488,6 +3488,7 @@ dependencies = [
  "httpdate",
  "native-tls",
  "reqwest",
+ "sentry-anyhow",
  "sentry-backtrace",
  "sentry-contexts",
  "sentry-core",
@@ -3496,6 +3497,17 @@ dependencies = [
  "sentry-tracing",
  "tokio",
  "ureq",
+]
+
+[[package]]
+name = "sentry-anyhow"
+version = "0.31.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4fd76cd5c14676228996a31aa214adb049920b103bbc5b5a4114d05323995c5"
+dependencies = [
+ "anyhow",
+ "sentry-backtrace",
+ "sentry-core",
 ]
 
 [[package]]

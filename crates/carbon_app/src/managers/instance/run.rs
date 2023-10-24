@@ -745,7 +745,7 @@ impl ManagerRef<'_, InstanceManager> {
                     tracing::info!("queueing metadata caching for running instance");
 
                     app.meta_cache_manager()
-                        .queue_local_caching(instance_id, true)
+                        .queue_caching(instance_id, true)
                         .await;
 
                     tracing::trace!("queued metadata caching");

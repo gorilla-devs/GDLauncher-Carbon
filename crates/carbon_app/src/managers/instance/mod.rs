@@ -33,6 +33,7 @@ use super::ManagerRef;
 use crate::domain::instance::{self as domain, GameLogId, GroupId, InstanceFolder, InstanceId};
 use domain::info;
 
+pub mod export;
 pub mod importer;
 pub mod installer;
 pub mod log;
@@ -149,7 +150,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
             self.app
                 .meta_cache_manager()
-                .queue_local_caching(instance_id, false)
+                .queue_caching(instance_id, false)
                 .await;
         }
 
@@ -1257,10 +1258,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
-        self.app
-            .meta_cache_manager()
-            .queue_local_caching(id, false)
-            .await;
+        self.app.meta_cache_manager().queue_caching(id, false).await;
 
         Ok(id)
     }

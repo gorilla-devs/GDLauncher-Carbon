@@ -6,6 +6,7 @@
     nodePackages.pnpm
     rustc
     cargo
+    rustfmt
 
     pkg-config
     gcc
