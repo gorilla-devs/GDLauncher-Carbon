@@ -21,13 +21,14 @@ import SingleCheckBox from "./SingleCheckBox";
 import BeginImportStep from "./BeginImportStep";
 
 const [step, setStep] = createSignal("selectionStep");
-export { step, setStep };
+const [instances, setInstances] = createSignal([]);
+export { step, setStep, instances, setInstances };
 const SingleEntity = (props: {
   entity: ImportEntityStatus;
   setEntity: Setter<ImportEntityStatus | undefined>;
 }) => {
   const [path, setPath] = createSignal<string | undefined>(undefined);
-  const [instances, setInstances] = createSignal([]);
+
   const [singleInstance, setSingleInstance] = createSignal("");
   const [instance, setInstance] = createStore<{
     noResult: string | undefined;
@@ -152,7 +153,7 @@ const SingleEntity = (props: {
           />
         </div>
 
-        <div class="flex-1 w-full flex items-start justify-start">
+        <div class="flex-1 w-full flex items-start justify-start border-2 border-gray-500 mt-2 py-2 rounded-md border-solid">
           <Switch>
             <Match when={step() === "selectionStep"}>
               <Switch
@@ -167,7 +168,24 @@ const SingleEntity = (props: {
                 }
               >
                 <Match when={typeof instance.multiResult !== "undefined"}>
-                  <div class="w-full h-full p-2 h-full w-full">
+                  <div class="w-full h-full p-2 h-full w-full flex flex-col gap-4">
+                    <Checkbox
+                      title="select all"
+                      checked={instances().length !== 0}
+                      onChange={(e) => {
+                        if (e) {
+                          setInstances(
+                            typeof instance.multiResult !== "undefined"
+                              ? (instance.multiResult.map(
+                                  (e: any) => e.instance_name
+                                ) as never[])
+                              : []
+                          );
+                        } else {
+                          setInstances([]);
+                        }
+                      }}
+                    />
                     <div class="w-full h-[90%] overflow-hidden  flex flex-col gap-2 ">
                       <For each={instance.multiResult}>
                         {(entry) => (
@@ -182,12 +200,21 @@ const SingleEntity = (props: {
                         )}
                       </For>
                     </div>
-                    <Button
-                      type="primary"
-                      onClick={() => setStep("importStep")}
-                    >
-                      Begin import
-                    </Button>
+                    <div class="flex w-full justify-between">
+                      <Button
+                        type="secondary"
+                        class="bg-red-500"
+                        onClick={() => {}}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="primary"
+                        onClick={() => setStep("importStep")}
+                      >
+                        Begin import
+                      </Button>
+                    </div>
                   </div>
                 </Match>
                 <Match when={typeof instance.singleResult !== "undefined"}>

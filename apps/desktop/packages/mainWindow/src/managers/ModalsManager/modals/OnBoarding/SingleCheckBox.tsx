@@ -1,5 +1,6 @@
 import { Checkbox } from "@gd/ui";
 import { Accessor, Setter, createEffect, createSignal } from "solid-js";
+import { instances } from "./SingleEntity";
 
 interface Props {
   title?: string;
@@ -32,7 +33,11 @@ const SingleCheckBox = (props: Props) => {
   });
 
   return (
-    <Checkbox title={props.title} checked={checked()} onChange={setChecked} />
+    <Checkbox
+      title={props.title}
+      checked={checked() || instances().find((e: any) => e === props.title)}
+      onChange={setChecked}
+    />
   );
 };
 export default SingleCheckBox;
