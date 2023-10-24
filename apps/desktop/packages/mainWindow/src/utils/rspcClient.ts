@@ -7,6 +7,7 @@ import {
 } from "@rspc/client";
 import { createSolidQueryHooks } from "@rspc/solid";
 import type { Procedures } from "@gd/core_module";
+import { createEffect } from "solid-js";
 
 export const rspc = createSolidQueryHooks<Procedures>();
 export const queryClient = new QueryClient({
@@ -69,4 +70,18 @@ export default function initRspc(_port: number) {
     client,
     createInvalidateQuery
   };
+}
+export async function rspcFetch(...args: any[]) {
+  // using .apply to avoid typescript error
+  const res = rspc.createQuery.apply(null, args as any);
+
+  return new Promise((resolve, reject) => {
+    createEffect(() => {
+      if (res.error) {
+        reject(res);
+      } else if (res.status === "success") {
+        resolve(res);
+      }
+    });
+  });
 }

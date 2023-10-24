@@ -1,6 +1,7 @@
 import { setTaskId, taskId } from "@/utils/import";
 import { isProgressFailed } from "@/utils/instances";
-import { rspc } from "@/utils/rspcClient";
+import { rspc, rspcFetch } from "@/utils/rspcClient";
+import { FETask } from "@gd/core_module/bindings";
 import { createEffect } from "solid-js";
 
 const SingleImport = (props: {
@@ -15,18 +16,23 @@ const SingleImport = (props: {
       }
     }
   );
-  createEffect(() => {
+  createEffect(async () => {
     if (taskId() !== undefined) {
-      const task = rspc.createQuery(() => [
+      const task: FETask = (await rspcFetch(() => [
         "vtask.getTask",
         taskId() as number
-      ]);
-      const isFailed = task.data && isProgressFailed(task.data.progress);
-      const isDownloaded = task.data === null;
+      ])) as FETask;
+      const isFailed = task && isProgressFailed(task.progress);
+      const isDownloaded = task === null;
 
       const currentInstance = props.instanceName;
       if (!currentInstance) return;
       const instanceIndex = props.instanceIndex;
+    } else {
+      importInstanceMutation.mutate({
+        name: props.instanceName,
+        index: props.instanceIndex
+      });
     }
   });
   return <div>singleImport</div>;
