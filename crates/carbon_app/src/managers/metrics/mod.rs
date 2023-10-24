@@ -1,9 +1,7 @@
 use reqwest_middleware::ClientWithMiddleware;
+use serde_json::json;
 
-use crate::{
-    domain::metrics::{Event, Pageview},
-    iridium_client::get_client,
-};
+use crate::{domain::metrics::Event, iridium_client::get_client};
 
 use super::{ManagerRef, GDL_API_BASE};
 
@@ -18,15 +16,6 @@ impl MetricsManager {
         }
     }
 
-    #[tracing::instrument(skip(self))]
-    pub async fn track_pageview(&self, page: Pageview) -> anyhow::Result<()> {
-        let endpoint = format!("{}/v1/metrics/pageview", GDL_API_BASE);
-        self.client.post(endpoint).json(&page).send().await?;
-
-        Ok(())
-    }
-
-    #[tracing::instrument(skip(self))]
     pub async fn track_event(&self, event: Event) -> anyhow::Result<()> {
         let endpoint = format!("{}/v1/metrics/event", GDL_API_BASE);
         self.client.post(endpoint).json(&event).send().await?;
@@ -36,10 +25,6 @@ impl MetricsManager {
 }
 
 impl ManagerRef<'_, MetricsManager> {
-    pub async fn track_pageview(&self, page: Pageview) -> anyhow::Result<()> {
-        self.manager.track_pageview(page).await
-    }
-
     pub async fn track_event(&self, event: Event) -> anyhow::Result<()> {
         self.manager.track_event(event).await
     }

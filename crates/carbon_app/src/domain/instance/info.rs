@@ -28,6 +28,15 @@ pub enum Modpack {
     Modrinth(ModrinthModpack),
 }
 
+impl ToString for Modpack {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Curseforge(_) => "curseforge".to_string(),
+            Self::Modrinth(_) => "modrinth".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ModpackPlatform {
     Curseforge,

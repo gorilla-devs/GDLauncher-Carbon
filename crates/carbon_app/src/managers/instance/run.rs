@@ -1,5 +1,6 @@
 use crate::domain::instance::info::{Modpack, StandardVersion};
 use crate::domain::java::SystemJavaProfileName;
+use crate::domain::metrics::Event;
 use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::modplatforms::modrinth::search::VersionID;
 use crate::domain::vtask::VisualTaskId;
@@ -23,7 +24,7 @@ use crate::api::translation::Translation;
 use crate::domain::instance::{self as domain, GameLogId};
 use crate::managers::instance::log::{EntryType, GameLog};
 use crate::managers::instance::schema::make_instance_config;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
 use futures::Future;
 use tokio::sync::{watch, Semaphore};
 use tokio::task::JoinHandle;
@@ -66,6 +67,8 @@ impl ManagerRef<'_, InstanceManager> {
         launch_account: Option<FullAccount>,
         callback_task: Option<InstanceCallback>,
     ) -> anyhow::Result<(JoinHandle<()>, VisualTaskId)> {
+        let initial_time = Utc::now();
+
         let mut instances = self.instances.write().await;
         let instance = instances
             .get_mut(&instance_id)
@@ -171,9 +174,11 @@ impl ManagerRef<'_, InstanceManager> {
                 .await
                 .expect("the ensure lock semaphore should never be closed");
 
+            let setup_path = instance_path.get_root().join(".setup");
+            let is_first_run = setup_path.is_dir();
+            let mut time_at_install = None;
+
             let try_result: anyhow::Result<_> = (|| async {
-                let setup_path = instance_path.get_root().join(".setup");
-                let is_first_run = setup_path.is_dir();
 
                 let do_modpack_install = is_first_run
                     && !setup_path.join("modpack-complete").is_dir();
@@ -805,6 +810,8 @@ impl ManagerRef<'_, InstanceManager> {
 
                 tokio::fs::remove_dir_all(setup_path).await?;
 
+                time_at_install = Some(Utc::now());
+
                 match launch_account {
                     Some(account) => Ok(Some(
                         managers::minecraft::minecraft::launch_minecraft(
@@ -856,6 +863,8 @@ impl ManagerRef<'_, InstanceManager> {
                 Ok(None) => {}
                 Ok(Some(mut child)) => {
                     drop(task);
+
+                    let time_at_launch = Utc::now();
 
                     let _ = app
                         .rich_presence_manager()
@@ -986,6 +995,77 @@ impl ManagerRef<'_, InstanceManager> {
                             LaunchState::Inactive { failed_task: None },
                         )
                         .await;
+
+                    let now = Utc::now();
+                    let offset_in_sec = Local::now().offset().local_minus_utc();
+
+                    let mods = app
+                        .instance_manager()
+                        .list_mods(instance_id)
+                        .await
+                        .unwrap_or_default()
+                        .len();
+
+                    let Ok(instance_details) =
+                        app.instance_manager().instance_details(instance_id).await
+                    else {
+                        return;
+                    };
+
+                    if is_first_run {
+                        let _ = app
+                            .metrics_manager()
+                            .track_event(Event::InstanceInstalled {
+                                mods_count: mods as u32,
+                                modloader_name: instance_details
+                                    .modloaders
+                                    .get(0)
+                                    .cloned()
+                                    .map(|v| v.type_.to_string()),
+                                modloader_version: instance_details
+                                    .modloaders
+                                    .get(0)
+                                    .cloned()
+                                    .map(|v| v.version),
+                                modplatform: instance_details.modpack.map(|v| v.to_string()),
+                                version: instance_details
+                                    .version
+                                    .unwrap_or(String::from("unknown")),
+                                seconds_taken: (time_at_install.unwrap() - start_time).num_seconds()
+                                    as u32,
+                            })
+                            .await;
+                    } else {
+                        let _ = app
+                            .metrics_manager()
+                            .track_event(Event::InstanceLaunched {
+                                mods_count: mods as u32,
+                                modloader_name: instance_details
+                                    .modloaders
+                                    .get(0)
+                                    .cloned()
+                                    .map(|v| v.type_.to_string()),
+                                modloader_version: instance_details
+                                    .modloaders
+                                    .get(0)
+                                    .cloned()
+                                    .map(|v| v.version),
+                                modplatform: instance_details.modpack.map(|v| v.to_string()),
+                                version: instance_details
+                                    .version
+                                    .unwrap_or(String::from("unknown")),
+                                xmx_memory: instance_details.memory.map(|v| v.0).unwrap_or(0)
+                                    as u32,
+                                xms_memory: instance_details.memory.map(|v| v.1).unwrap_or(0)
+                                    as u32,
+                                time_to_start_secs: (time_at_launch - start_time).num_seconds()
+                                    as u64,
+                                timestamp_start: start_time.timestamp(),
+                                timestamp_end: now.timestamp(),
+                                timezone_offset: offset_in_sec / 60,
+                            })
+                            .await;
+                    }
                 }
             }
         });

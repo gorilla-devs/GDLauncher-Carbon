@@ -196,35 +196,6 @@ mod app {
     }
 }
 
-impl Drop for AppInner {
-    fn drop(&mut self) {
-        #[cfg(feature = "production")]
-        #[cfg(not(test))]
-        {
-            use crate::domain::metrics::{Event, EventName};
-            use crate::iridium_client::get_client;
-            use std::collections::HashMap;
-            use tracing::debug;
-
-            let close_event = Event {
-                name: EventName::AppClosed,
-                properties: HashMap::new(),
-            };
-
-            let client = get_client();
-
-            tokio::runtime::Handle::current().block_on(async move {
-                debug!("Collecting metric for app close");
-                let res = self.metrics_manager.track_event(close_event).await;
-                match res {
-                    Ok(_) => debug!("Successfully collected metric for app close"),
-                    Err(e) => error!("Error collecting metric for app close: {e}"),
-                }
-            });
-        }
-    }
-}
-
 pub use app::AppInner;
 
 pub struct ManagerRef<'a, T> {
