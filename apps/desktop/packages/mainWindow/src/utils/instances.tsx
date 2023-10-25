@@ -179,7 +179,6 @@ export const isProgressKnown = (
 export const isProgressFailed = (
   progress: Progress
 ): progress is { Failed: FeError } => {
-  console.log("progress", progress);
   return (progress as { Failed: FeError })?.Failed !== undefined;
 };
 

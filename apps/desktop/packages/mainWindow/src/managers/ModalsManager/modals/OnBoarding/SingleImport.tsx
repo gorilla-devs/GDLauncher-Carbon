@@ -1,4 +1,5 @@
 import { setTaskId, taskId } from "@/utils/import";
+import { setTaskIds, taskIds } from "@/utils/import";
 import { isProgressFailed } from "@/utils/instances";
 import { rspc, rspcFetch } from "@/utils/rspcClient";
 import { FETask } from "@gd/core_module/bindings";
@@ -14,22 +15,24 @@ const SingleImport = (props: {
     ["instance.importInstance"],
     {
       onSuccess(taskId) {
-        setTaskId(taskId);
+        setTaskIds((prev) => ({ ...prev, [props.instanceName]: taskId }));
       }
     }
   );
-
   createEffect(() => {
     async function runner() {
-      if (taskId() !== undefined) {
+      if (taskIds() !== undefined) {
+        const taskId = (taskIds() as any)[props.instanceName];
         const task: any = (await rspcFetch(() => [
           "vtask.getTask",
-          taskId() as number
+          taskId as number
         ])) as any;
-        console.log("data ==>", task.data);
-
+        console.log("task id ==>", taskId);
+        console.log("task ==>", task.data);
         if (task.data && task.data.progress) {
-          setProgress(Math.floor(task.data.progress.Known * 100));
+          if (task.data.progress.Known) {
+            setProgress(Math.floor(task.data.progress.Known * 100));
+          }
         }
         const isFailed = task.data && isProgressFailed(task.data.progress);
         const isDownloaded = task.data === null;
@@ -48,12 +51,14 @@ const SingleImport = (props: {
     runner();
   });
   createEffect(() => {
+    console.log("index ==> ", props.instanceIndex);
+    console.log("name ==> ", props.instanceName);
     importInstanceMutation.mutate({
       name: props.instanceName,
       index: props.instanceIndex
     });
   });
-  onCleanup(() => {});
+
   return (
     <div class="flex gap-2 border-2 border-solid shadow-md border-neutral-800 p-4 justify-between rounded-md bg-gray-900 bg-opacity-60 backdrop-blur-lg">
       <span class="font-semibold">{props.instanceName}</span>
