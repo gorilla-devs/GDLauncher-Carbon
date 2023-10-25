@@ -87,8 +87,7 @@ export type Procedures = {
         { key: "java.deleteJavaVersion", input: string, result: null } | 
         { key: "java.setupManagedJava", input: FEManagedJavaSetupArgs, result: string } | 
         { key: "java.updateSystemJavaProfilePath", input: FEUpdateSystemJavaProfileArgs, result: null } | 
-        { key: "metrics.sendEvent", input: FEEvent, result: null } | 
-        { key: "metrics.sendPageview", input: FEPageview, result: null } | 
+        { key: "metrics.sendEvent", input: FEMetricsEvent, result: null } | 
         { key: "settings.setSettings", input: FESettingsUpdate, result: null } | 
         { key: "vtask.dismissTask", input: FETaskId, result: null },
     subscriptions: 
@@ -135,8 +134,6 @@ export type FEModDescriptionResponse = { data: string; pagination: CFFEPaginatio
 
 export type CurseForgeModMetadata = { project_id: number; file_id: number; name: string; urlslug: string; summary: string; authors: string; has_image: boolean }
 
-export type FEEventName = "AppClosed"
-
 export type MRFEVersionFile = { hashes: MRFEHashes; url: string; filename: string; primary: boolean; size: number; file_type: MRFEAdditionalFileType | null }
 
 export type MRFEDependency = { version_id: string | null; project_id: string | null; file_name: string | null; dependency_type: MRFEDependencyType }
@@ -173,7 +170,7 @@ export type ListGroup = { id: FEGroupId; name: string; instances: ListInstance[]
 
 export type ModrinthModpack = { project_id: string; version_id: string }
 
-export type FEPageview = { path: string }
+export type CauseSegment = { display: string; debug: string }
 
 export type FEUpdateSystemJavaProfileArgs = { profileName: FESystemJavaProfileName; javaId: string }
 
@@ -330,8 +327,6 @@ export type InstanceDetails = { name: string; favorite: boolean; version: string
 
 export type FEImportInstance = { entity: FEEntity; index: number }
 
-export type FEEvent = { name: FEEventName; properties: { [key: string]: string } }
-
 export type GameVersion = { Standard: StandardVersion }
 
 export type GameLogId = number
@@ -339,6 +334,8 @@ export type GameLogId = number
 export type FEUnifiedSearchCategoryID = { curseforge: number } | { modrinth: string }
 
 export type GameLogEntry = { id: GameLogId; instance_id: FEInstanceId; active: boolean }
+
+export type FeError = { cause: CauseSegment[]; backtrace: string }
 
 export type CFFEModFileChangelogParameters = { modId: number; fileId: number }
 
@@ -384,7 +381,7 @@ export type MoveInstance = { instance: FEInstanceId; target: MoveInstanceTarget 
 
 export type CFFEModSearchSortOrder = "ascending" | "descending"
 
-export type MRFEUser = { username: string; name: string | null; email: string | null; bio: string | null; id: string; github_id: number | null; avatar_url: string; created: string; role: MRFEUserRole; badges: number }
+export type MRFEUser = { username: string; name: string | null; email: string | null; bio: string | null; id: string; github_id: number | null; avatar_url: string | null; created: string; role: MRFEUserRole; badges: number }
 
 export type FEEntity = "legacygdlauncher" | "mrpack" | "modrinth" | "curseforgezip" | "curseforge" | "atlauncher" | "technic" | "ftb" | "multimc" | "prismlauncher"
 
@@ -402,13 +399,9 @@ export type MRFEProjectSearchResult = { slug: string; title: string; description
 
 export type CFFEFileStatus = "processing" | "changesRequired" | "underReview" | "approved" | "rejected" | "malwareDetected" | "deleted" | "archived" | "testing" | "released" | "readyForReview" | "deprecated" | "baking" | "awaitingPublishing" | "failedPublishing"
 
-export type CauseSegment = { display: string; debug: string }
-
 export type MRFEStatus = "listed" | "archived" | "draft" | "unlisted" | "scheduled" | "unknown"
 
 export type CFFEModsParametersBody = { modIds: number[] }
-
-export type FeError = { cause: CauseSegment[]; backtrace: string }
 
 export type Set<T> = { Set: T }
 
@@ -421,6 +414,8 @@ export type FEModdedManifestVersion = { id: string; stable: boolean; loaders: FE
 export type CFFEModFilesParameters = { modId: number; query: CFFEModFilesParametersQuery }
 
 export type MRFEProjectSupportRange = "required" | "optional" | "unsupported" | "unknown"
+
+export type FEMetricsEvent = { event_name: "page_view"; custom_metadata: string }
 
 export type FESettingsUpdate = { theme?: string | null; language?: string | null; reducedMotion?: boolean | null; discordIntegration?: boolean | null; releaseChannel?: FEReleaseChannel | null; concurrentDownloads?: number | null; showNews?: boolean | null; xmx?: number | null; xms?: number | null; isFirstLaunch?: boolean | null; startupResolution?: string | null; javaCustomArgs?: string | null; autoManageJava?: boolean | null; preferredModChannel?: ModChannel | null; termsAndPrivacyAccepted?: boolean | null; metricsEnabled?: boolean | null }
 

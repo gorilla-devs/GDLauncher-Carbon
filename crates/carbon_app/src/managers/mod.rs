@@ -89,9 +89,22 @@ mod app {
             invalidation_channel: broadcast::Sender<InvalidationEvent>,
             runtime_path: PathBuf,
         ) -> App {
-            let db_client = prisma_client::load_and_migrate(runtime_path.clone())
-                .await
-                .unwrap();
+            let db_client = match prisma_client::load_and_migrate(runtime_path.clone()).await {
+                Ok(client) => Arc::new(client),
+                Err(prisma_client::DatabaseError::Migration(err)) => {
+                    eprintln!(
+                        "[_GDL_DB_MIGRATION_FAILED_]: Database migration failed: {}",
+                        err
+                    );
+                    error!("Database migration failed: {}", err);
+                    std::process::exit(1);
+                }
+                Err(err) => {
+                    error!("Database connection failed: {}", err);
+                    eprintln!("Database connection failed: {}", err);
+                    std::process::exit(1);
+                }
+            };
 
             let app = Arc::new(UnsafeCell::new(MaybeUninit::<AppInner>::uninit()));
             let unsaferef = UnsafeAppRef(Arc::downgrade(&app));
@@ -123,10 +136,10 @@ mod app {
                     download_manager: DownloadManager::new(),
                     instance_manager: InstanceManager::new(),
                     meta_cache_manager: MetaCacheManager::new(),
-                    metrics_manager: MetricsManager::new(),
+                    metrics_manager: MetricsManager::new(Arc::clone(&db_client)),
                     invalidation_channel,
                     reqwest_client: reqwest,
-                    prisma_client: Arc::new(db_client),
+                    prisma_client: Arc::clone(&db_client),
                     task_manager: VisualTaskManager::new(),
                     system_info_manager: SystemInfoManager::new(),
                     rich_presence_manager: rich_presence::RichPresenceManager::new(),

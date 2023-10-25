@@ -1,11 +1,12 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "event_name", content = "custom_metadata")]
+#[serde(tag = "event_name", content = "data")]
 #[serde(rename_all = "snake_case")]
 pub enum Event {
+    PageView {
+        page_name: String,
+    },
     InstanceInstalled {
         mods_count: u32,
         #[serde(skip_serializing_if = "Option::is_none")]

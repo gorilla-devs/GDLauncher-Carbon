@@ -4,6 +4,21 @@ import { spawn } from "child_process";
 import type { ChildProcessWithoutNullStreams } from "child_process";
 import { app, ipcMain } from "electron";
 
+export enum KnownError {
+  // eslint-disable-next-line no-unused-vars
+  MigrationFailed = "MigrationFailed"
+}
+
+export type Log = {
+  type: "info" | "error";
+  message: string;
+};
+
+export type CoreModuleError = {
+  logs: Log[];
+  knownError: KnownError | null;
+};
+
 const isDev = import.meta.env.MODE === "development";
 
 const binaryName =
@@ -57,9 +72,15 @@ const loadCoreModule: CoreModule = () =>
       reject(err);
     });
 
+    let logs: Log[] = [];
     coreModule.stdout.on("data", (data) => {
       let dataString = data.toString();
       let rows = dataString.split(/\r?\n|\r|\n/g);
+
+      logs.push({
+        type: "info",
+        message: dataString
+      });
 
       for (let row of rows) {
         if (row.startsWith("_STATUS_:")) {
@@ -75,6 +96,10 @@ const loadCoreModule: CoreModule = () =>
     });
 
     coreModule.stderr.on("data", (data) => {
+      logs.push({
+        type: "error",
+        message: data.toString()
+      });
       console.error(`[CORE] Error: ${data.toString()}`);
     });
 
@@ -82,7 +107,10 @@ const loadCoreModule: CoreModule = () =>
       console.log(`[CORE] Exit with code: ${code}`);
 
       if (code !== 0) {
-        reject(new Error(`Core module exited with code ${code}`));
+        reject({
+          logs,
+          knownError: mapLogsToKnownError(logs)
+        } as CoreModuleError);
       }
 
       resolve({
@@ -91,6 +119,14 @@ const loadCoreModule: CoreModule = () =>
       });
     });
   });
+
+function mapLogsToKnownError(logs: Log[]): KnownError | null {
+  if (logs.some((log) => log.message.includes("[_GDL_DB_MIGRATION_FAILED_]"))) {
+    return KnownError.MigrationFailed;
+  }
+
+  return null;
+}
 
 const coreModule = loadCoreModule();
 
