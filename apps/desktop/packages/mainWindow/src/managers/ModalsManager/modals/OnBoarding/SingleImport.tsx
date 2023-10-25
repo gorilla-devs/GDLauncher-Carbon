@@ -27,8 +27,7 @@ const SingleImport = (props: {
           "vtask.getTask",
           taskId as number
         ])) as any;
-        console.log("task id ==>", taskId);
-        console.log("task ==>", task.data);
+
         if (task.data && task.data.progress) {
           if (task.data.progress.Known) {
             setProgress(Math.floor(task.data.progress.Known * 100));
@@ -51,8 +50,6 @@ const SingleImport = (props: {
     runner();
   });
   createEffect(() => {
-    console.log("index ==> ", props.instanceIndex);
-    console.log("name ==> ", props.instanceName);
     importInstanceMutation.mutate({
       name: props.instanceName,
       index: props.instanceIndex
