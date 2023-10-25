@@ -179,7 +179,8 @@ export const isProgressKnown = (
 export const isProgressFailed = (
   progress: Progress
 ): progress is { Failed: FeError } => {
-  return (progress as { Failed: FeError }).Failed !== undefined;
+  console.log("progress", progress);
+  return (progress as { Failed: FeError })?.Failed !== undefined;
 };
 
 export const isModpackCurseforge = (

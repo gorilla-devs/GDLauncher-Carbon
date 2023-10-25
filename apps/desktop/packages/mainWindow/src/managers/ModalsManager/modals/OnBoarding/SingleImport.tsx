@@ -2,12 +2,13 @@ import { setTaskId, taskId } from "@/utils/import";
 import { isProgressFailed } from "@/utils/instances";
 import { rspc, rspcFetch } from "@/utils/rspcClient";
 import { FETask } from "@gd/core_module/bindings";
-import { createEffect } from "solid-js";
+import { createEffect, createSignal, onCleanup } from "solid-js";
 
 const SingleImport = (props: {
   instanceIndex: number;
   instanceName: string;
 }) => {
+  const [progress, setProgress] = createSignal(0);
   const importInstanceMutation = rspc.createMutation(
     ["instance.importInstance"],
     {
@@ -16,25 +17,42 @@ const SingleImport = (props: {
       }
     }
   );
-  createEffect(async () => {
-    if (taskId() !== undefined) {
-      const task: FETask = (await rspcFetch(() => [
-        "vtask.getTask",
-        taskId() as number
-      ])) as FETask;
-      const isFailed = task && isProgressFailed(task.progress);
-      const isDownloaded = task === null;
 
-      const currentInstance = props.instanceName;
-      if (!currentInstance) return;
-      const instanceIndex = props.instanceIndex;
-    } else {
-      importInstanceMutation.mutate({
-        name: props.instanceName,
-        index: props.instanceIndex
-      });
+  createEffect(() => {
+    async function runner() {
+      if (taskId() !== undefined) {
+        const task: any = (await rspcFetch(() => [
+          "vtask.getTask",
+          taskId() as number
+        ])) as any;
+        console.log("data ==>", task.data);
+
+        if (task.data && task.data.progress) {
+          setProgress(Math.floor(task.data.progress.Known * 100));
+        }
+        const isFailed = task.data && isProgressFailed(task.data.progress);
+        const isDownloaded = task.data === null;
+        console.log("isFailed", isFailed);
+        console.log("isDownloaded", isDownloaded);
+        if (isDownloaded || isFailed) {
+          setTaskId(undefined);
+        }
+      }
     }
+    runner();
   });
-  return <div>singleImport</div>;
+  createEffect(() => {
+    importInstanceMutation.mutate({
+      name: props.instanceName,
+      index: props.instanceIndex
+    });
+  });
+  onCleanup(() => {});
+  return (
+    <div class="flex gap-2 border-2 border-solid shadow-md border-neutral-800 p-4 justify-between rounded-md bg-gray-900 bg-opacity-60 backdrop-blur-lg">
+      <span class="font-semibold">{props.instanceName}</span>
+      <span class="font-semibold">{progress()}%</span>
+    </div>
+  );
 };
 export default SingleImport;

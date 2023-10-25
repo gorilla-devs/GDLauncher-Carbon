@@ -35,7 +35,7 @@ const SingleCheckBox = (props: Props) => {
   return (
     <Checkbox
       title={props.title}
-      checked={checked() || instances().find((e: any) => e === props.title)}
+      checked={instances().find((e: any) => e === props.title)}
       onChange={setChecked}
     />
   );

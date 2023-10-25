@@ -10,6 +10,7 @@ import {
   For,
   Match,
   Setter,
+  Show,
   Switch,
   createEffect,
   createResource,
@@ -116,15 +117,23 @@ const SingleEntity = (props: {
   return (
     <>
       <div class="w-full flex justify-between items-center pt-6">
-        <div
+        <Button
+          type="secondary"
           onClick={() => {
             props.setEntity(undefined);
             setStep("selectionStep");
+            setInstances([]);
           }}
-          class="i-mingcute:arrow-left-fill text-zinc-400 text-xl font-bold cursor-pointer"
-        ></div>
+        >
+          Go back
+        </Button>
+
         <span class="font-bold">{props.entity.entity}</span>
-        <div></div>
+        <Show when={step() === "selectionStep"} fallback={<div></div>}>
+          <Button type="primary" onClick={() => setStep("importStep")}>
+            Begin import
+          </Button>
+        </Show>
       </div>
       <div class=" flex-1 w-full flex flex-col items-center justify-center p-4">
         <div class="flex items-center justify-between w-full gap-2">
@@ -200,21 +209,6 @@ const SingleEntity = (props: {
                         )}
                       </For>
                     </div>
-                    <div class="flex w-full justify-between">
-                      <Button
-                        type="secondary"
-                        class="bg-red-500"
-                        onClick={() => {}}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="primary"
-                        onClick={() => setStep("importStep")}
-                      >
-                        Begin import
-                      </Button>
-                    </div>
                   </div>
                 </Match>
                 <Match when={typeof instance.singleResult !== "undefined"}>
@@ -227,7 +221,7 @@ const SingleEntity = (props: {
               </Switch>
             </Match>
             <Match when={step() === "importStep"}>
-              <BeginImportStep />
+              <BeginImportStep instances={instances()} />
             </Match>
           </Switch>
         </div>
