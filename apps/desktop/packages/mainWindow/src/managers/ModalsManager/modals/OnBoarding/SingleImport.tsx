@@ -50,12 +50,19 @@ const SingleImport = (props: {
     runner();
   });
   createEffect(() => {
+    if (taskIds()) {
+      if ((taskIds() as any)[props.instanceName]) {
+        return;
+      }
+    }
     importInstanceMutation.mutate({
       name: props.instanceName,
       index: props.instanceIndex
     });
   });
-
+  createEffect(() => {
+    console.log("ids", taskIds());
+  });
   return (
     <div class="flex gap-2 border-2 border-solid shadow-md border-neutral-800 p-4 justify-between rounded-md bg-gray-900 bg-opacity-60 backdrop-blur-lg">
       <span class="font-semibold">{props.instanceName}</span>
