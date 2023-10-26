@@ -98,6 +98,7 @@ keys! {
         SCAN_IMPORTABLE_INSTANCES                   = "scanImportableInstances";
         GET_IMPORTABLE_INSTANCES                    = "getImportableInstances";
         IMPORT_INSTANCE                             = "importInstance";
+        EXPLORE                                     = "explore";
     }
 
     vtask {

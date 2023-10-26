@@ -294,6 +294,14 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         mutation IMPORT_INSTANCE[app, args: import::FEImportInstance] {
             import::import_instance(app, args).await
         }
+
+        query EXPLORE[app, args: ExploreQuery] {
+            app.instance_manager().explore_data(
+                args.instance_id.into(),
+                args.path,
+            ).await
+                .map(|entries| entries.into_iter().map(ExploreEntry::from).collect::<Vec<_>>())
+        }
     }
 }
 
@@ -807,6 +815,25 @@ struct ModrinthModMetadata {
     has_image: bool,
 }
 
+#[derive(Type, Deserialize, Debug)]
+struct ExploreQuery {
+    instance_id: FEInstanceId,
+    path: Vec<String>,
+}
+
+#[derive(Type, Serialize, Debug)]
+struct ExploreEntry {
+    name: String,
+    #[serde(rename = "type")]
+    type_: ExploreEntryType,
+}
+
+#[derive(Type, Serialize, Debug)]
+enum ExploreEntryType {
+    File,
+    Directory,
+}
+
 impl From<domain::InstanceDetails> for InstanceDetails {
     fn from(value: domain::InstanceDetails) -> Self {
         Self {
@@ -1172,6 +1199,24 @@ impl From<UpdateInstance> for domain::InstanceSettingsUpdate {
             global_java_args: value.global_java_args.map(|x| x.inner()),
             extra_java_args: value.extra_java_args.map(|x| x.inner()),
             memory: value.memory.map(|x| x.inner().map(Into::into)),
+        }
+    }
+}
+
+impl From<domain::ExploreEntry> for ExploreEntry {
+    fn from(value: domain::ExploreEntry) -> Self {
+        Self {
+            name: value.name,
+            type_: value.type_.into(),
+        }
+    }
+}
+
+impl From<domain::ExploreEntryType> for ExploreEntryType {
+    fn from(value: domain::ExploreEntryType) -> Self {
+        match value {
+            domain::ExploreEntryType::File => Self::File,
+            domain::ExploreEntryType::Directory => Self::Directory,
         }
     }
 }

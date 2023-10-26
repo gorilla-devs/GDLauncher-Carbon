@@ -122,3 +122,15 @@ pub enum InstanceFolder {
     TexturePacks,
     ShaderPacks,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExploreEntry {
+    pub name: String,
+    pub type_: ExploreEntryType,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ExploreEntryType {
+    File,
+    Directory,
+}
