@@ -212,11 +212,14 @@ const SingleEntity = (props: {
                   </div>
                 </Match>
                 <Match when={typeof instance.singleResult !== "undefined"}>
-                  <SingleCheckBox
-                    title={instance.singleResult?.instance_name}
-                    setInstance={setSingleInstance}
-                    isSingleInstance
-                  />
+                  <For each={[instance.singleResult]}>
+                    {(entry) => (
+                      <SingleCheckBox
+                        title={instance.singleResult?.instance_name}
+                        setList={setInstances}
+                      />
+                    )}
+                  </For>
                 </Match>
               </Switch>
             </Match>
