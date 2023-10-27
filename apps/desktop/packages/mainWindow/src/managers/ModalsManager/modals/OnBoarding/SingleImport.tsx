@@ -15,7 +15,22 @@ const SingleImport = (props: {
     ["instance.importInstance"],
     {
       onSuccess(taskId) {
-        setTaskIds((prev) => ({ ...prev, [props.instanceName]: taskId }));
+        setTaskIds((prev: any) => {
+          if (prev) {
+            if (props.instanceName in prev) {
+              return prev;
+            } else {
+              return {
+                ...prev,
+                [props.instanceName]: taskId
+              };
+            }
+          } else {
+            return {
+              [props.instanceName]: taskId
+            };
+          }
+        });
       }
     }
   );
@@ -50,18 +65,12 @@ const SingleImport = (props: {
     runner();
   });
   createEffect(() => {
-    if (taskIds()) {
-      if ((taskIds() as any)[props.instanceName]) {
-        return;
-      }
+    if (!taskIds()) {
+      importInstanceMutation.mutate({
+        name: props.instanceName,
+        index: props.instanceIndex
+      });
     }
-    importInstanceMutation.mutate({
-      name: props.instanceName,
-      index: props.instanceIndex
-    });
-  });
-  createEffect(() => {
-    console.log("ids", taskIds());
   });
   return (
     <div class="flex gap-2 border-2 border-solid shadow-md border-neutral-800 p-4 justify-between rounded-md bg-gray-900 bg-opacity-60 backdrop-blur-lg">

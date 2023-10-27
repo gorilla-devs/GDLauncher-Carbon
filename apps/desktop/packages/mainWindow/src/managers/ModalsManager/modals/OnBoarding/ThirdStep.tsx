@@ -67,10 +67,13 @@ const ThirdStep = (props: Props) => {
       setEntity(entity);
     }
   };
-
+  console.log(entities.isLoading);
   return (
     <div class="flex flex-col items-center justify-between w-120 lg:w-160 h-full box-border pt-6">
       <Switch>
+        <Match when={entities.isLoading}>
+          <div>searching ...</div>
+        </Match>
         <Match when={entity()}>
           <SingleEntity
             entity={entity() as ImportEntityStatus}
