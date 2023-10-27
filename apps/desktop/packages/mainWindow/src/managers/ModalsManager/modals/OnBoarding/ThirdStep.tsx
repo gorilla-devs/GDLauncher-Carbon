@@ -71,7 +71,9 @@ const ThirdStep = (props: Props) => {
     <div class="flex flex-col items-center justify-between w-120 lg:w-160 h-full box-border pt-6">
       <Switch>
         <Match when={entities.isLoading}>
-          <div>searching ...</div>
+          <div class="w-full h-full flex items-center justify-center">
+            <div class="i-formkit:spinner animate-spin w-10 h-10 text-sky-800"></div>
+          </div>
         </Match>
         <Match when={entity()}>
           <SingleEntity
