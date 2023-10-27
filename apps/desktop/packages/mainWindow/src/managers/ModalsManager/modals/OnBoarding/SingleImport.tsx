@@ -3,7 +3,10 @@ import { setTaskIds, taskIds } from "@/utils/import";
 import { isProgressFailed } from "@/utils/instances";
 import { rspc, rspcFetch } from "@/utils/rspcClient";
 import { FETask } from "@gd/core_module/bindings";
-import { createEffect, createSignal, onCleanup } from "solid-js";
+import { Button } from "@gd/ui";
+import { Match, Switch, createEffect, createSignal, onCleanup } from "solid-js";
+
+const DownloadState = (props: { state: string }) => {};
 
 const SingleImport = (props: {
   instanceIndex: number;
@@ -18,7 +21,16 @@ const SingleImport = (props: {
         setTaskIds((prev: any) => {
           if (prev) {
             if (props.instanceName in prev) {
-              return prev;
+              {
+                if (state() === "failed") {
+                  return {
+                    ...prev,
+                    [props.instanceName]: taskId
+                  };
+                } else {
+                  return prev;
+                }
+              }
             } else {
               return {
                 ...prev,
@@ -75,9 +87,34 @@ const SingleImport = (props: {
   return (
     <div class="flex gap-2 border-2 border-solid shadow-md border-neutral-800 p-4 justify-between rounded-md bg-gray-900 bg-opacity-60 backdrop-blur-lg">
       <span class="font-semibold">{props.instanceName}</span>
-      <span class="font-semibold">
+      <Switch>
+        <Match when={state() === "idle"}>
+          <div class="font-semibold">{progress()}%</div>
+        </Match>
+        <Match when={state() === "failed"}>
+          <div>
+            <Button
+              type="primary"
+              class="bg-red-500"
+              onClick={() => {
+                setProgress(0);
+                importInstanceMutation.mutate({
+                  name: props.instanceName,
+                  index: props.instanceIndex
+                });
+              }}
+            >
+              Retry
+            </Button>
+          </div>
+        </Match>
+        <Match when={state() === "completed"}>
+          <div class="i-ic:round-check text-2xl text-green-600"></div>
+        </Match>
+      </Switch>
+      {/* <span class="font-semibold">
         {state() !== "idle" ? state() : `${progress()}%`}
-      </span>
+      </span> */}
     </div>
   );
 };
