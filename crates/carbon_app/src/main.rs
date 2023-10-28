@@ -172,6 +172,7 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
 #[cfg(test)]
 struct TestEnv {
     tmpdir: PathBuf,
+    //log_guard: tracing_appender::non_blocking::WorkerGuard,
     app: App,
     invalidation_recv: tokio::sync::broadcast::Receiver<api::InvalidationEvent>,
 }
@@ -204,11 +205,13 @@ impl std::ops::Deref for TestEnv {
 async fn setup_managers_for_test() -> TestEnv {
     let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
     let temp_path = dunce::canonicalize(temp_dir.into_path()).unwrap();
-    info!("Test RTP: {}", temp_path.to_str().unwrap());
+    //let log_guard = logger::setup_logger(&temp_path).await;
+    println!("Test RTP: {}", temp_path.to_str().unwrap());
     let (invalidation_sender, invalidation_recv) = tokio::sync::broadcast::channel(200);
 
     TestEnv {
         tmpdir: temp_path.clone(),
+        // log_guard,
         invalidation_recv,
         app: AppInner::new(invalidation_sender, temp_path).await,
     }

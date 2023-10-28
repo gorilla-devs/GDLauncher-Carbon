@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
@@ -134,3 +136,11 @@ pub enum ExploreEntryType {
     File,
     Directory,
 }
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ExportTarget {
+    Curseforge,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExportEntry(pub HashMap<String, Option<ExportEntry>>);

@@ -8,6 +8,7 @@ use crate::domain::instance::info::{ModLoader, ModLoaderType, StandardVersion};
 pub struct Manifest {
     pub minecraft: Minecraft,
     pub manifest_type: String,
+    pub manifest_version: i32,
     pub name: String,
     pub version: Option<String>,
     pub author: String,

@@ -24,6 +24,7 @@ use tokio::sync::{watch, Mutex, MutexGuard, RwLock};
 use crate::db::{self, read_filters::IntFilter};
 use db::instance::Data as CachedInstance;
 
+use self::export::InstanceExportManager;
 use self::importer::InstanceImportManager;
 use self::log::GameLog;
 use self::run::PersistenceManager;
@@ -51,6 +52,7 @@ pub struct InstanceManager {
     loaded_icon: Mutex<Option<(String, Vec<u8>)>>,
     persistence_manager: PersistenceManager,
     import_manager: InstanceImportManager,
+    export_manager: InstanceExportManager,
     game_logs: RwLock<HashMap<GameLogId, (InstanceId, watch::Receiver<GameLog>)>>,
 }
 
@@ -69,6 +71,7 @@ impl InstanceManager {
             loaded_icon: Mutex::new(None),
             persistence_manager: PersistenceManager::new(),
             import_manager: InstanceImportManager::new(),
+            export_manager: InstanceExportManager::new(),
             game_logs: RwLock::new(HashMap::new()),
         }
     }

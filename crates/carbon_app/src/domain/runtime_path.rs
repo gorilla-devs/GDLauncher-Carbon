@@ -242,7 +242,11 @@ pub mod tempentry {
     }
 
     impl TempEntryType for File {
-        fn create(_path: &Path) -> io::Result<()> {
+        fn create(path: &Path) -> io::Result<()> {
+            path.parent()
+                .map(|path| std::fs::create_dir_all(path))
+                .transpose()?;
+
             // files will be created on write
             Ok(())
         }

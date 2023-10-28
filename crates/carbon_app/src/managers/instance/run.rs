@@ -171,7 +171,7 @@ impl ManagerRef<'_, InstanceManager> {
                 .await
                 .expect("the ensure lock semaphore should never be closed");
 
-            let try_result: anyhow::Result<_> = (|| async {
+            let try_result: anyhow::Result<_> = async {
                 let setup_path = instance_path.get_root().join(".setup");
                 let is_first_run = setup_path.is_dir();
 
@@ -836,8 +836,7 @@ impl ManagerRef<'_, InstanceManager> {
                         Ok(None)
                     }
                 }
-            })()
-            .await;
+            }.await;
 
             match try_result {
                 Err(e) => {

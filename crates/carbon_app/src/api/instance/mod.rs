@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -14,7 +14,7 @@ use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
 use crate::api::instance::import::FEEntity;
-use crate::domain::instance as domain;
+use crate::domain::instance::{self as domain};
 use crate::error::{AxumError, FeError};
 use crate::managers::instance as manager;
 use crate::managers::instance::log::EntryType;
@@ -301,6 +301,20 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 args.path,
             ).await
                 .map(|entries| entries.into_iter().map(ExploreEntry::from).collect::<Vec<_>>())
+        }
+
+        mutation EXPORT[app, args: ExportArgs] {
+            let task = app.instance_manager()
+                .export_manager()
+                .export_instance(
+                    args.instance_id.into(),
+                    args.target.into(),
+                    args.save_path.into(),
+                    args.link_mods,
+                    args.filter.into(),
+                ).await?;
+
+            Ok(FETaskId::from(task))
         }
     }
 }
@@ -834,6 +848,26 @@ enum ExploreEntryType {
     Directory,
 }
 
+#[derive(Type, Deserialize, Debug)]
+struct ExportEntry {
+    #[serde(flatten)]
+    entries: HashMap<String, Option<ExportEntry>>,
+}
+
+#[derive(Type, Deserialize, Debug)]
+enum ExportTarget {
+    Curseforge,
+}
+
+#[derive(Type, Deserialize, Debug)]
+struct ExportArgs {
+    instance_id: FEInstanceId,
+    target: ExportTarget,
+    save_path: String,
+    link_mods: bool,
+    filter: ExportEntry,
+}
+
 impl From<domain::InstanceDetails> for InstanceDetails {
     fn from(value: domain::InstanceDetails) -> Self {
         Self {
@@ -1218,5 +1252,25 @@ impl From<domain::ExploreEntryType> for ExploreEntryType {
             domain::ExploreEntryType::File => Self::File,
             domain::ExploreEntryType::Directory => Self::Directory,
         }
+    }
+}
+
+impl From<ExportTarget> for domain::ExportTarget {
+    fn from(value: ExportTarget) -> Self {
+        match value {
+            ExportTarget::Curseforge => Self::Curseforge,
+        }
+    }
+}
+
+impl From<ExportEntry> for domain::ExportEntry {
+    fn from(value: ExportEntry) -> Self {
+        Self(
+            value
+                .entries
+                .into_iter()
+                .map(|(k, v)| (k, v.map(Into::into)))
+                .collect(),
+        )
     }
 }

@@ -74,10 +74,7 @@ mod test {
                 InstanceVersionSource::Version(info::GameVersion::Standard(
                     info::StandardVersion {
                         release: String::from("1.7.10"),
-                        modloaders: HashSet::from([info::ModLoader {
-                            type_: info::ModLoaderType::Forge,
-                            version: String::from("10.13.4.1614"),
-                        }]),
+                        modloaders: HashSet::new(),
                     },
                 )),
                 String::new(),
@@ -90,6 +87,7 @@ mod test {
             .get_instances()
             .get_instance_path("test")
             .get_data_path();
+
         let folder = dir.join("folder");
         tokio::fs::create_dir(&folder).await?;
         tokio::fs::write(folder.join("file"), []).await?;

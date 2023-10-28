@@ -667,6 +667,95 @@ impl ManagerRef<'_, MetaCacheManager> {
             .await;
     }
 
+    pub async fn override_caching_and_wait(
+        self,
+        instance_id: InstanceId,
+        curseforge: bool,
+        modrinth: bool,
+    ) -> anyhow::Result<()> {
+        let app = self.app.clone();
+
+        let split = |c| match c {
+            Some((tx, rx)) => (Some(tx), Some(rx)),
+            None => (None, None),
+        };
+
+        let (local_tx, local_rx) = oneshot::channel::<anyhow::Result<()>>();
+        let (cf_tx, cf_rx) = split(curseforge.then(|| oneshot::channel::<anyhow::Result<()>>()));
+        let (mr_tx, mr_rx) = split(modrinth.then(|| oneshot::channel::<anyhow::Result<()>>()));
+
+        self.local_targets
+            .send_modify_always(move |targets| {
+                targets.set_override(CacheTarget {
+                    instance_id,
+                    callback: Some(Box::new(move |r: anyhow::Result<()>| match r {
+                        Ok(()) => {
+                            let _ = local_tx.send(Ok(()));
+
+                            tokio::spawn(async move {
+                                let mcm = app.meta_cache_manager();
+
+                                let cf = cf_tx.map(|tx| {
+                                    mcm.curseforge_targets.send_modify_always(move |targets| {
+                                        targets.set_priority(CacheTarget {
+                                            instance_id,
+                                            callback: Some(Box::new(
+                                                move |r: anyhow::Result<()>| {
+                                                    let _ = tx.send(r);
+                                                },
+                                            )),
+                                        })
+                                    })
+                                });
+
+                                let mr = mr_tx.map(|tx| {
+                                    mcm.modrinth_targets.send_modify_always(move |targets| {
+                                        targets.set_priority(CacheTarget {
+                                            instance_id,
+                                            callback: Some(Box::new(
+                                                move |r: anyhow::Result<()>| {
+                                                    let _ = tx.send(r);
+                                                },
+                                            )),
+                                        })
+                                    })
+                                });
+
+                                join!(
+                                    async {
+                                        if let Some(cf) = cf {
+                                            cf.await;
+                                        }
+                                    },
+                                    async {
+                                        if let Some(mr) = mr {
+                                            mr.await;
+                                        }
+                                    }
+                                );
+                            });
+                        }
+                        e @ Err(_) => {
+                            let _ = local_tx.send(e);
+                        }
+                    })),
+                });
+            })
+            .await;
+
+        local_rx.await??;
+
+        if let Some(rx) = cf_rx {
+            rx.await??;
+        }
+
+        if let Some(rx) = mr_rx {
+            rx.await??;
+        }
+
+        Ok(())
+    }
+
     pub async fn watch_and_prioritize(self, instance_id: Option<InstanceId>) {
         let _ = self.watched_instance.send(instance_id);
 

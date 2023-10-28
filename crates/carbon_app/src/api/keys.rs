@@ -99,6 +99,7 @@ keys! {
         GET_IMPORTABLE_INSTANCES                    = "getImportableInstances";
         IMPORT_INSTANCE                             = "importInstance";
         EXPLORE                                     = "explore";
+        EXPORT                                      = "export";
     }
 
     vtask {
