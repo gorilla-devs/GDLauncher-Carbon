@@ -20,6 +20,7 @@ import {
 import { createStore } from "solid-js/store";
 import SingleCheckBox from "./SingleCheckBox";
 import BeginImportStep from "./BeginImportStep";
+import { Trans } from "@gd/i18n";
 
 const [step, setStep] = createSignal("selectionStep");
 const [instances, setInstances] = createSignal([]);
@@ -30,7 +31,6 @@ const SingleEntity = (props: {
 }) => {
   const [path, setPath] = createSignal<string | undefined>(undefined);
 
-  const [singleInstance, setSingleInstance] = createSignal("");
   const [instance, setInstance] = createStore<{
     noResult: string | undefined;
     singleResult: ImportableInstance | undefined;
@@ -65,6 +65,7 @@ const SingleEntity = (props: {
 
     setPath(entityDefaultPath.data!);
   });
+
   createEffect(() => {
     if (path()) {
       scanImportableInstancesMutation.mutate([
@@ -77,7 +78,6 @@ const SingleEntity = (props: {
   });
   createEffect(() => {
     const status = importScanStatus.data;
-    console.log(status);
     if (status) {
       const data = status.status;
 
@@ -125,19 +125,30 @@ const SingleEntity = (props: {
             setInstances([]);
           }}
         >
-          Go back
+          <Trans
+            options={{ defaultValue: "Go back" }}
+            key="onboarding.go_back"
+          />
         </Button>
 
         <span class="font-bold">{props.entity.entity}</span>
         <Show when={step() === "selectionStep"} fallback={<div></div>}>
           <Button type="primary" onClick={() => setStep("importStep")}>
-            Begin import
+            <Trans
+              options={{ defaultValue: "Begin import" }}
+              key="onboarding.begin_import"
+            />
           </Button>
         </Show>
       </div>
       <div class=" flex-1 w-full flex flex-col items-center justify-center p-4">
         <div class="flex items-center justify-between w-full gap-2">
-          <span class="font-bold">Scan target path:</span>
+          <span class="font-bold">
+            <Trans
+              options={{ defaultValue: "Scan target path:" }}
+              key="onboarding.scan_target_path"
+            />
+          </span>
           <Input
             value={path()}
             class="flex-1 border-2 border-solid border-zinc-500"
