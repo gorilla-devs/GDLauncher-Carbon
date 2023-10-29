@@ -21,7 +21,6 @@ import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext
 import RiveAppWapper from "./utils/RiveAppWrapper";
 import GDAnimation from "./gd_logo_animation.riv";
 import "@/utils/analytics"; // preinit
-import { CoreModuleError, KnownError } from "../../main/coreModule";
 
 render(
   () => {
@@ -29,14 +28,11 @@ render(
       let port;
       try {
         port = await window.getCoreModulePort();
-      } catch (e) {
-        let error = e as CoreModuleError;
-
-        if (error.knownError === KnownError.MigrationFailed) {
-          window.fatalError("Failed to migrate data", "CoreModule");
-        } else {
-          window.fatalError(error.logs.join("\n"), "CoreModule");
+        if (typeof port !== "number") {
+          window.fatalError(port, "CoreModule");
         }
+      } catch (e) {
+        window.fatalError(e as any, "CoreModule");
         throw e;
       }
       return port;

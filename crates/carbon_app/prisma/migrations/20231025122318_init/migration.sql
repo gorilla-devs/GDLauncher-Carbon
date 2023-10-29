@@ -119,13 +119,12 @@ CREATE TABLE "ModMetadata" (
     "version" TEXT,
     "description" TEXT,
     "authors" TEXT,
-    "modloaders" TEXT NOT NULL,
-    "logoImage" BLOB
+    "modloaders" TEXT NOT NULL
 );
 
 -- CreateTable
 CREATE TABLE "CurseForgeModCache" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "metadataId" TEXT NOT NULL PRIMARY KEY,
     "murmur2" INTEGER NOT NULL,
     "projectId" INTEGER NOT NULL,
     "fileId" INTEGER NOT NULL,
@@ -134,16 +133,13 @@ CREATE TABLE "CurseForgeModCache" (
     "summary" TEXT NOT NULL,
     "authors" TEXT NOT NULL,
     "cachedAt" DATETIME NOT NULL,
-    "metadataId" TEXT NOT NULL,
     CONSTRAINT "CurseForgeModCache_metadataId_fkey" FOREIGN KEY ("metadataId") REFERENCES "ModMetadata" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateTable
 CREATE TABLE "ModrinthModCache" (
-    "id" TEXT NOT NULL PRIMARY KEY,
+    "metadataId" TEXT NOT NULL PRIMARY KEY,
     "sha512" TEXT NOT NULL,
-    "sha1" TEXT NOT NULL,
-    "filename" TEXT NOT NULL,
     "projectId" TEXT NOT NULL,
     "versionId" TEXT NOT NULL,
     "title" TEXT NOT NULL,
@@ -151,8 +147,32 @@ CREATE TABLE "ModrinthModCache" (
     "description" TEXT NOT NULL,
     "authors" TEXT NOT NULL,
     "cachedAt" DATETIME NOT NULL,
-    "metadataId" TEXT NOT NULL,
     CONSTRAINT "ModrinthModCache_metadataId_fkey" FOREIGN KEY ("metadataId") REFERENCES "ModMetadata" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "LocalModImageCache" (
+    "metadataId" TEXT NOT NULL PRIMARY KEY,
+    "data" BLOB NOT NULL,
+    CONSTRAINT "LocalModImageCache_metadataId_fkey" FOREIGN KEY ("metadataId") REFERENCES "ModMetadata" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "CurseForgeModImageCache" (
+    "metadataId" TEXT NOT NULL PRIMARY KEY,
+    "url" TEXT NOT NULL,
+    "data" BLOB,
+    "upToDate" INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT "CurseForgeModImageCache_metadataId_fkey" FOREIGN KEY ("metadataId") REFERENCES "CurseForgeModCache" ("metadataId") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "ModrinthModImageCache" (
+    "metadataId" TEXT NOT NULL PRIMARY KEY,
+    "url" TEXT NOT NULL,
+    "data" BLOB,
+    "upToDate" INTEGER NOT NULL DEFAULT 0,
+    CONSTRAINT "ModrinthModImageCache_metadataId_fkey" FOREIGN KEY ("metadataId") REFERENCES "ModrinthModCache" ("metadataId") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateIndex
@@ -165,7 +185,7 @@ CREATE UNIQUE INDEX "Java_id_key" ON "Java"("id");
 CREATE UNIQUE INDEX "Java_path_key" ON "Java"("path");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "JavaSystemProfile_id_key" ON "JavaSystemProfile"("id");
+CREATE UNIQUE INDEX "JavaSystemP∑rofile_id_key" ON "JavaSystemProfile"("id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "JavaSystemProfile_name_key" ON "JavaSystemProfile"("name");
@@ -180,13 +200,7 @@ CREATE UNIQUE INDEX "Instance_shortpath_key" ON "Instance"("shortpath");
 CREATE UNIQUE INDEX "ModFileCache_instanceId_filename_key" ON "ModFileCache"("instanceId", "filename");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "CurseForgeModCache_metadataId_key" ON "CurseForgeModCache"("metadataId");
-
--- CreateIndex
 CREATE UNIQUE INDEX "CurseForgeModCache_projectId_fileId_key" ON "CurseForgeModCache"("projectId", "fileId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "ModrinthModCache_metadataId_key" ON "ModrinthModCache"("metadataId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ModrinthModCache_projectId_versionId_key" ON "ModrinthModCache"("projectId", "versionId");

@@ -16,6 +16,8 @@ GDLauncher is a custom Minecraft launcher written from the ground up in rust and
   - [🎉 Join our community](#-join-our-community)
   - [🎁 Features](#-features)
   - [▶️ Development](#️-development)
+    - [A quick note](#a-quick-note)
+    - [Contributing](#contributing)
     - [Requirements](#requirements)
     - [Pnpm](#pnpm)
     - [Install Dependencies](#install-dependencies)
@@ -62,6 +64,13 @@ https://flowbite.com/
 Check https://github.com/vercel/turborepo/tree/main/examples/with-docker for turborepo examples. -->
 
 ## ▶️ Development
+
+### A quick note
+Local development is currently very hard as it requires a local instance of the GDL backend which is not public. We are currently working on making it easier.
+
+### Contributing
+To contribute, please see the [contributing](CONTRIBUTING.md) guide.
+
 ### Requirements
 - Node 18.x.x
 - Rust >= 1.73.0

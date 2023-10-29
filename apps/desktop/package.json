@@ -61,7 +61,7 @@
     "posthog-js": "^1.81.2",
     "prettier": "^3.0.3",
     "sanitize-html": "^2.11.0",
-    "solid-js": "^1.7.12",
+    "solid-js": "^1.8.3",
     "solid-transition-group": "^0.2.3",
     "typescript": "^5.2.2",
     "vite": "^4.4.9",

@@ -106,6 +106,9 @@ mod app {
                 }
             };
 
+            // eprintln!("[_GDL_DB_MIGRATION_FAILED_]: Database migration failed");
+            // std::process::exit(1);
+
             let app = Arc::new(UnsafeCell::new(MaybeUninit::<AppInner>::uninit()));
             let unsaferef = UnsafeAppRef(Arc::downgrade(&app));
 
