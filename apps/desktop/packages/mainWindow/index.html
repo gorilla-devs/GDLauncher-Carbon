@@ -74,13 +74,17 @@
       }
 
       #appFatalCrash {
+        display: none;
+      }
+
+      .appFatalCrash {
         position: fixed;
         top: 0;
         left: 0;
         width: 100vw;
         height: 100vh;
         background: var(--darkSlate-700);
-        display: flex;
+        display: none;
         flex-direction: column;
         justify-content: space-between;
         z-index: 9999;
@@ -89,7 +93,7 @@
         text-align: center;
         font-weight: 600;
       }
-      #appFatalCrash * {
+      .appFatalCrash * {
         user-select: text;
       }
     </style>

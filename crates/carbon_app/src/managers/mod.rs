@@ -169,6 +169,10 @@ mod app {
                 let _ = _app.clone().rich_presence_manager().start_presence().await;
             });
 
+            tokio::spawn(async move {
+                let _ = reqwest::get(format!("{}/v1/announcement", GDL_API_BASE)).await;
+            });
+
             app
         }
 
