@@ -6,12 +6,17 @@
 
 GDLauncher is a custom Minecraft launcher written from the ground up in rust and solidJS. Its main goal is to make it easy and enjoyable to manage different Minecraft versions, install modloaders, mods and modpacks from different platforms, bringing the playing and modding experience to the next level!
 
+## What happened to the old GDLauncher?
+The old GDLauncher has been rewritten and officially discontinued. You can still find the old code in the [legacy branch](#-history).
+You can read more [here](https://gdlauncher.com/en/blog/curseforge-partnership-announcement/)
+
 ## Table of Content
 <details>
  <summary><strong>Table of Contents</strong> (click to expand)</summary>
 
 - [GDLauncher (Carbon)](#gdlauncher-carbon)
   - [🎮 What is GDLauncher](#-what-is-gdlauncher)
+  - [What happened to the old GDLauncher?](#what-happened-to-the-old-gdlauncher)
   - [Table of Content](#table-of-content)
   - [🎉 Join our community](#-join-our-community)
   - [🎁 Features](#-features)
@@ -148,5 +153,6 @@ The GDLauncher name and logo are trademarks of GorillaDevs Inc. and may not be u
 
 Here you can find the previous versions of the code:
 
-- [Original C# Code](https://www.github.com/gorilla-devs/GDLauncher/tree/csharp_legacy_launcher)
-- [First Electron/React Version](https://www.github.com/gorilla-devs/GDLauncher/tree/GDLauncher_old)
+- [Original C# Code](https://github.com/gorilla-devs/GDLauncher_LEGACY-Full-History/tree/csharp_legacy_launcher)
+- [First Electron/React Version](https://github.com/gorilla-devs/GDLauncher_LEGACY-Full-History/tree/GDLauncher_old)
+- GDLauncher (Discontinued) [Legacy Branch](https://www.github.com/gorilla-devs/GDLauncher-discontinued)
