@@ -43,9 +43,9 @@ function useLoading() {
             <li>- Try to restart GDLauncher.</li>
             <li>- Try to restart your computer.</li>
             <li>- Try to reinstall GDLauncher.</li>
-            <li>- Join our <a style="color: #7289d9; font-weight: 600; cursor: pointer;">Discord</a> and ask for help.</li>
+            <li>- Join our <a id="discord-link" style="color: #7289d9; font-weight: 600; cursor: pointer;">Discord</a> and ask for help.</li>
             <li>- Delete the core module database at
-              <div style="margin-left: 24px;">
+              <div style="margin-left: 24px; font-style: italic;">
                 ${path.join(runtimePath, "gdl_conf.db")}
               </div>
             </li>
@@ -53,11 +53,20 @@ function useLoading() {
         </div>
       </div>
       <div style="font-size: 1rem; text-align: left; padding: 16px;">
-        <div>User data: <span style="font-weight: 300;">${userData}</span></div>
-        <div>Initial runtime path: <span style="font-weight: 300;">${initialRuntimePath}</span></div>
-        <div>Runtime path: <span style="font-weight: 300;">${runtimePath}</span></div>
+        <div>User data: <span style="font-weight: 300; font-style: italic;">${userData}</span></div>
+        <div>Initial runtime path: <span style="font-weight: 300; font-style: italic;">${initialRuntimePath}</span></div>
+        <div>Runtime path: <span style="font-weight: 300; font-style: italic;">${runtimePath}</span></div>
       </div>
       ${errorText}`;
+
+      const discordLink = document.querySelector("#discord-link")!;
+
+      discordLink.addEventListener("click", () => {
+        ipcRenderer.invoke(
+          "openExternalLink",
+          "https://discord.gdlauncher.com"
+        );
+      });
     }
   };
 }
