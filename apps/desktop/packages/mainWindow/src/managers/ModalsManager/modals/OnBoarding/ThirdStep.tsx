@@ -83,7 +83,14 @@ const ThirdStep = (props: Props) => {
         </Match>
         <Match when={!entity()}>
           <div class="w-full flex justify-end pt-5">
-            <Button type="primary">Done</Button>
+            <Button
+              onClick={() => {
+                modalsContext?.closeModal();
+              }}
+              type="primary"
+            >
+              Done
+            </Button>
           </div>
           <div class=" flex-1 w-full">
             <ul class="grid grid-cols-3 gap-2 p-0">
