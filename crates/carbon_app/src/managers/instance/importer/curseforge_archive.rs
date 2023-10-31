@@ -8,6 +8,7 @@ use anyhow::anyhow;
 use tokio::sync::RwLock;
 
 use crate::{
+    api::keys::instance::*,
     api::translation::Translation,
     domain::{
         instance::info::{CurseforgeModpack, GameVersion, Modpack},
@@ -181,6 +182,7 @@ impl InstanceImporter for CurseforgeArchiveImporter {
         if scan_path.is_file() {
             if let Ok(Some(entry)) = self.scan_archive(app, scan_path).await {
                 self.state.write().await.set_single(entry).await;
+                app.invalidate(GET_IMPORT_SCAN_STATUS, None);
             }
         } else if scan_path.is_dir() {
             let Ok(mut dir) = tokio::fs::read_dir(&scan_path).await else {
@@ -194,6 +196,7 @@ impl InstanceImporter for CurseforgeArchiveImporter {
                     futures.push(async move {
                         if let Ok(Some(entry)) = self.scan_archive(app, entry.path()).await {
                             self.state.write().await.push_multi(entry).await;
+                            app.invalidate(GET_IMPORT_SCAN_STATUS, None);
                         }
                     })
                 }
@@ -203,15 +206,16 @@ impl InstanceImporter for CurseforgeArchiveImporter {
         Ok(())
     }
 
-    async fn get_default_scan_path(&self, _app: &Arc<AppInner>) -> anyhow::Result<Option<PathBuf>> {
-        Ok(None)
-    }
-
     async fn get_status(&self) -> ImportScanStatus {
         self.state.read().await.clone().into()
     }
 
-    async fn begin_import(&self, app: &Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId> {
+    async fn begin_import(
+        &self,
+        app: &Arc<AppInner>,
+        index: u32,
+        name: Option<String>,
+    ) -> anyhow::Result<VisualTaskId> {
         let instance = self
             .state
             .read()
@@ -263,7 +267,7 @@ impl InstanceImporter for CurseforgeArchiveImporter {
             .instance_manager()
             .create_instance_ext(
                 app.instance_manager().get_default_group().await?,
-                instance.manifest.name.clone(),
+                name.unwrap_or_else(|| instance.manifest.name.clone()),
                 use_icon,
                 instance_version_source,
                 String::new(),
