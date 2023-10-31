@@ -1,7 +1,6 @@
 import { rspc, queryClient } from "@/utils/rspcClient";
 import {
   ImportEntityStatus,
-  ImportEntry,
   ImportableInstance,
   InvalidImportEntry
 } from "@gd/core_module/bindings";
@@ -13,9 +12,7 @@ import {
   Show,
   Switch,
   createEffect,
-  createResource,
-  createSignal,
-  onCleanup
+  createSignal
 } from "solid-js";
 import { createStore } from "solid-js/store";
 import SingleCheckBox from "./SingleCheckBox";
@@ -133,7 +130,16 @@ const SingleEntity = (props: {
 
         <span class="font-bold">{props.entity.entity}</span>
         <Show when={step() === "selectionStep"} fallback={<div></div>}>
-          <Button type="primary" onClick={() => setStep("importStep")}>
+          <Button
+            type="primary"
+            onClick={() => {
+              if (instances().length === 0) {
+                return;
+              } else {
+                setStep("importStep");
+              }
+            }}
+          >
             <Trans
               options={{ defaultValue: "Begin import" }}
               key="onboarding.begin_import"
