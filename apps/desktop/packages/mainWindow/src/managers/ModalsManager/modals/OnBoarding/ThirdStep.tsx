@@ -1,22 +1,13 @@
-import { Trans } from "@gd/i18n";
 import { useModal } from "../..";
-import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
+
 import { Button } from "@gd/ui";
-import Import from "../InstanceCreation/Import";
+
 import { rspc } from "@/utils/rspcClient";
-import {
-  For,
-  Match,
-  Show,
-  Switch,
-  createEffect,
-  createSignal,
-  onCleanup
-} from "solid-js";
+import { For, Match, Switch, createSignal } from "solid-js";
 import { ImportEntityStatus } from "@gd/core_module/bindings";
 import EntityCard from "@/components/Card/EntityCard";
 import SingleEntity from "./SingleEntity";
-import GdLauncherLogo from "/assets/images/gdlauncher_logo.svg";
+
 import CurseForgeLogo from "/assets/images/icons/curseforge_logo.svg";
 import ATLauncherLogo from "/assets/images/icons/atlauncher_logo.svg";
 import FTBLogo from "/assets/images/icons/ftb_logo.svg";
@@ -33,22 +24,7 @@ interface Props {
 const ThirdStep = (props: Props) => {
   const modalsContext = useModal();
   const [entity, setEntity] = createSignal<ImportEntityStatus | undefined>();
-  const [isLoading, setIsLoading] = createSignal(false);
 
-  const legacyGDLauncherEntity = "legacygdlauncher";
-
-  // const instances = rspc.createQuery(() => [
-  //   "instance.getImportableInstances",
-  //   legacyGDLauncherEntity
-  // ]);
-
-  // const scanImportableInstancesMutation = rspc.createMutation([
-  //   "instance.scanImportableInstances"
-  // ]);
-
-  // createEffect(() => {
-  //   scanImportableInstancesMutation.mutate(legacyGDLauncherEntity);
-  // });
   const entities = rspc.createQuery(() => ["instance.getImportableEntities"]);
   const icons = [
     LegacyGDL,
@@ -125,38 +101,6 @@ const ThirdStep = (props: Props) => {
           </div>
         </Match>
       </Switch>
-
-      {/* <Switch>
-        <Match when={instances.data && instances.data?.length > 0}>
-          <div class="mt-10 h-full max-w-full">
-            <Import setIsLoading={setIsLoading} />
-          </div>
-        </Match>
-        <Match when={instances.data && instances.data?.length === 0}>
-          <CreateInstance />
-        </Match>
-      </Switch> */}
-      {/* <div class="flex justify-between w-full">
-        <Button
-          disabled={isLoading()}
-          type="secondary"
-          size="large"
-          onClick={() => {
-            props.prevStep();
-          }}
-        >
-          <Trans key="onboarding.prev" />
-        </Button>
-        <Button
-          disabled={isLoading()}
-          onClick={() => {
-            modalsContext?.closeModal();
-          }}
-          size="large"
-        >
-          <Trans key="onboarding.start_playing" />
-        </Button>
-      </div> */}
     </div>
   );
 };
