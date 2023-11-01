@@ -1,7 +1,5 @@
 import { useModal } from "../..";
-
 import { Button } from "@gd/ui";
-
 import { rspc } from "@/utils/rspcClient";
 import { For, Match, Switch, createSignal } from "solid-js";
 import { ImportEntityStatus } from "@gd/core_module/bindings";
@@ -16,6 +14,7 @@ import TechnicLogo from "/assets/images/icons/technic_logo.svg";
 import PrismLogo from "/assets/images/icons/prism_logo.svg";
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg";
 import LegacyGDL from "/assets/images/icons/legacy_gdlauncher.svg";
+import { Trans } from "@gd/i18n";
 
 interface Props {
   prevStep: () => void;
@@ -52,7 +51,7 @@ const ThirdStep = (props: Props) => {
       <Switch>
         <Match when={entities.isLoading}>
           <div class="w-full h-full flex items-center justify-center">
-            <div class="i-formkit:spinner animate-spin w-10 h-10 text-sky-800"></div>
+            <div class="i-formkit:spinner animate-spin w-10 h-10 text-sky-800" />
           </div>
         </Match>
         <Match when={entity()}>
@@ -69,7 +68,7 @@ const ThirdStep = (props: Props) => {
               }}
               type="secondary"
             >
-              Back
+              <Trans key="onboarding.prev" />
             </Button>
             <Button
               onClick={() => {
@@ -77,7 +76,7 @@ const ThirdStep = (props: Props) => {
               }}
               type="primary"
             >
-              Done
+              <Trans key="onboarding.done" />
             </Button>
           </div>
           <div class=" flex-1 w-full">
