@@ -623,6 +623,9 @@ impl ResourceInstaller for CurseforgeModInstaller {
                                     let modloader_strings: Vec<String> = modloaders
                                         .iter()
                                         .map(|modloader| match modloader.type_ {
+                                            domain::instance::info::ModLoaderType::Neoforged => {
+                                                "neoforged".to_string()
+                                            }
                                             domain::instance::info::ModLoaderType::Forge => {
                                                 "forge".to_string()
                                             }
@@ -902,6 +905,9 @@ impl ResourceInstaller for ModrinthModInstaller {
                                         let modloader_strings: Vec<String> = modloaders
                                             .iter()
                                             .map(|modloader| match modloader.type_ {
+                                                domain::instance::info::ModLoaderType::Neoforged => {
+                                                    "neoforged".to_string()
+                                                }
                                                 domain::instance::info::ModLoaderType::Forge => {
                                                     "forge".to_string()
                                                 }

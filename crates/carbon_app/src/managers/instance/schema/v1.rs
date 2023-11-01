@@ -88,6 +88,7 @@ pub struct ModLoader {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ModLoaderType {
+    Neoforged,
     Forge,
     Fabric,
     Quilt,
@@ -290,6 +291,7 @@ impl From<ModLoaderType> for info::ModLoaderType {
         use ModLoaderType as Schema;
 
         match value {
+            Schema::Neoforged => Self::Neoforged,
             Schema::Forge => Self::Forge,
             Schema::Fabric => Self::Fabric,
             Schema::Quilt => Self::Quilt,
@@ -302,6 +304,7 @@ impl From<info::ModLoaderType> for ModLoaderType {
         use info::ModLoaderType as Info;
 
         match value {
+            Info::Neoforged => Self::Neoforged,
             Info::Forge => Self::Forge,
             Info::Fabric => Self::Fabric,
             Info::Quilt => Self::Quilt,

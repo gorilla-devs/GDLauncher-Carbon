@@ -860,7 +860,7 @@ impl From<mpcf::GameVersionTypeStatus> for CFFEGameVersionTypeStatus {
 #[serde(rename_all = "camelCase")]
 pub enum CFFEModLoaderType {
     Forge,
-    NeoForge,
+    Neoforged,
     Cauldron,
     LiteLoader,
     Fabric,
@@ -873,7 +873,7 @@ impl From<CFModLoaderType> for CFFEModLoaderType {
     fn from(minecraft_mod_loader_type: CFModLoaderType) -> Self {
         match minecraft_mod_loader_type {
             CFModLoaderType::Forge => CFFEModLoaderType::Forge,
-            CFModLoaderType::NeoForge => CFFEModLoaderType::NeoForge,
+            CFModLoaderType::Neoforged => CFFEModLoaderType::Neoforged,
             CFModLoaderType::Cauldron => CFFEModLoaderType::Cauldron,
             CFModLoaderType::LiteLoader => CFFEModLoaderType::LiteLoader,
             CFModLoaderType::Fabric => CFFEModLoaderType::Fabric,
@@ -887,7 +887,7 @@ impl From<CFFEModLoaderType> for CFModLoaderType {
     fn from(minecraft_mod_loader_type: CFFEModLoaderType) -> CFModLoaderType {
         match minecraft_mod_loader_type {
             CFFEModLoaderType::Forge => CFModLoaderType::Forge,
-            CFFEModLoaderType::NeoForge => CFModLoaderType::NeoForge,
+            CFFEModLoaderType::Neoforged => CFModLoaderType::Neoforged,
             CFFEModLoaderType::Cauldron => CFModLoaderType::Cauldron,
             CFFEModLoaderType::LiteLoader => CFModLoaderType::LiteLoader,
             CFFEModLoaderType::Fabric => CFModLoaderType::Fabric,

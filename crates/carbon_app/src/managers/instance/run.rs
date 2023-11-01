@@ -178,7 +178,7 @@ impl ManagerRef<'_, InstanceManager> {
             let is_first_run = setup_path.is_dir();
             let mut time_at_install = None;
 
-            let try_result: anyhow::Result<_> = (|| async {
+            let try_result: anyhow::Result<_> = async {
 
                 let do_modpack_install = is_first_run
                     && !setup_path.join("modpack-complete").is_dir();
@@ -208,6 +208,13 @@ impl ManagerRef<'_, InstanceManager> {
                 let t_forge_processors = match is_first_run {
                     true => Some(
                         task.subtask(Translation::InstanceTaskLaunchRunForgeProcessors),
+                    ),
+                    false => None,
+                };
+
+                let t_neoforge_processors = match is_first_run {
+                    true => Some(
+                        task.subtask(Translation::InstanceTaskLaunchRunNeoforgeProcessors),
                     ),
                     false => None,
                 };
@@ -595,6 +602,51 @@ impl ManagerRef<'_, InstanceManager> {
                                 daedalus::modded::merge_partial_version(forge_version, version_info);
                         }
                         ModLoader {
+                            type_: ModLoaderType::Neoforged,
+                            version: neoforged_version,
+                        } => {
+                            let neoforged_manifest = app.minecraft_manager().get_neoforged_manifest().await?;
+
+                            let neoforged_version =
+                                match neoforged_version.strip_prefix(&format!("{}-", version.release)) {
+                                    None => neoforged_version.clone(),
+                                    Some(sub) => sub.to_string(),
+                                };
+
+                            let neoforged_manifest_version = neoforged_manifest
+                                .game_versions
+                                .into_iter()
+                                .find(|v| v.id == version.release)
+                                .ok_or_else(|| {
+                                    anyhow!("Could not find any neoforged versions for mc version {}", version.release)
+                                })?
+                                .loaders
+                                .into_iter()
+                                .find(|v| {
+                                    let exact_match = v.id == format!("{}-{}", version.release, neoforged_version);
+                                    let fuzzy_match = v.id.starts_with(&format!("{}-{}", version.release, neoforged_version));
+
+                                    exact_match || fuzzy_match
+                                })
+                                .ok_or_else(|| {
+                                    anyhow!(
+                                        "Could not find neoforged version {}-{} for minecraft version {}",
+                                        version.release,
+                                        neoforged_version,
+                                        version.release,
+                                    )
+                                })?;
+
+                            let neoforged_version = crate::managers::minecraft::neoforged::get_version(
+                                &app.reqwest_client,
+                                neoforged_manifest_version,
+                            )
+                            .await?;
+
+                            version_info =
+                                daedalus::modded::merge_partial_version(neoforged_version, version_info);
+                        }
+                        ModLoader {
                             type_: ModLoaderType::Fabric,
                             version: fabric_version,
                         } => {
@@ -783,29 +835,73 @@ impl ManagerRef<'_, InstanceManager> {
                         .unwrap_or(&version_info.id),
                 );
 
-                if let Some(t_forge_processors) = &t_forge_processors {
-                    t_forge_processors.start_opaque();
+                for modloader in version.modloaders.iter() {
+                    let instance_path = instance_path.clone();
+                    let client_path = client_path.clone();
+                    let game_version = game_version.clone();
+                    let libraries_path = libraries_path.clone();
 
-                    if let Some(processors) = &version_info.processors {
-                        managers::minecraft::forge::execute_processors(
-                            processors,
-                            version_info
-                                .data
-                                .as_ref()
-                                .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
-                            PathBuf::from(&java.path),
-                            instance_path.clone(),
-                            client_path,
-                            game_version,
-                            libraries_path,
-                            Some(Box::new(|current, total| {
-                                t_forge_processors.update_items(current, total);
-                            })),
-                        )
-                        .await?;
+                    match modloader {
+                        ModLoader {
+                            type_: ModLoaderType::Forge,
+                            ..
+                        } => {
+                            if let Some(t_forge_processors) = &t_forge_processors {
+                                t_forge_processors.start_opaque();
+
+                                if let Some(processors) = &version_info.processors {
+                                    managers::minecraft::forge::execute_processors(
+                                        processors,
+                                        version_info
+                                            .data
+                                            .as_ref()
+                                            .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
+                                        PathBuf::from(&java.path),
+                                        instance_path,
+                                        client_path,
+                                        game_version,
+                                        libraries_path,
+                                        Some(Box::new(|current, total| {
+                                            t_forge_processors.update_items(current, total);
+                                        })),
+                                    )
+                                    .await?;
+                                }
+
+                                t_forge_processors.complete_opaque();
+                            }
+                        },
+                        ModLoader {
+                            type_: ModLoaderType::Neoforged,
+                            ..
+                        } => {
+                            if let Some(t_neoforge_processors) = &t_neoforge_processors {
+                                t_neoforge_processors.start_opaque();
+
+                                if let Some(processors) = &version_info.processors {
+                                    managers::minecraft::neoforged::execute_processors(
+                                        processors,
+                                        version_info
+                                            .data
+                                            .as_ref()
+                                            .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
+                                        PathBuf::from(&java.path),
+                                        instance_path.clone(),
+                                        client_path,
+                                        game_version,
+                                        libraries_path,
+                                        Some(Box::new(|current, total| {
+                                            t_neoforge_processors.update_items(current, total);
+                                        })),
+                                    )
+                                    .await?;
+                                }
+
+                                t_neoforge_processors.complete_opaque();
+                            }
+                        },
+                        _ => {}
                     }
-
-                    t_forge_processors.complete_opaque();
                 }
 
                 tokio::fs::remove_dir_all(setup_path).await?;
@@ -843,7 +939,7 @@ impl ManagerRef<'_, InstanceManager> {
                         Ok(None)
                     }
                 }
-            })()
+            }
             .await;
 
             match try_result {

@@ -83,6 +83,7 @@ pub struct ModLoader {
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum ModLoaderType {
+    Neoforged,
     Forge,
     Fabric,
     Quilt,
@@ -91,6 +92,7 @@ pub enum ModLoaderType {
 impl ToString for ModLoaderType {
     fn to_string(&self) -> String {
         match self {
+            Self::Neoforged => "neoforged",
             Self::Forge => "forge",
             Self::Fabric => "fabric",
             Self::Quilt => "quilt",
@@ -104,6 +106,7 @@ impl TryFrom<&str> for ModLoaderType {
 
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         match s {
+            "neoforged" | "neoforge" => Ok(Self::Neoforged),
             "forge" => Ok(Self::Forge),
             "fabric" => Ok(Self::Fabric),
             "quilt" => Ok(Self::Quilt),

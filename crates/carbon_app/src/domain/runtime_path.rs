@@ -18,6 +18,7 @@ impl RootPath {
     }
 }
 
+#[derive(Clone)]
 pub struct LibrariesPath(PathBuf);
 
 impl LibrariesPath {
