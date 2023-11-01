@@ -30,6 +30,7 @@
 //   createSignal
 // } from "solid-js";
 
+import { useModal } from "../..";
 import ThirdStep from "../OnBoarding/ThirdStep";
 
 // type Props = {
@@ -37,7 +38,15 @@ import ThirdStep from "../OnBoarding/ThirdStep";
 // };
 
 const Import = () => {
-  return <ThirdStep />;
+  const modalsContext = useModal();
+  return (
+    <ThirdStep
+      prevStep={() => {
+        modalsContext?.closeModal();
+      }}
+      isImportInstance={true}
+    />
+  );
   // const [selectedEntity, setSelectedEntity] =
   //   createSignal<FEEntity>("legacygdlauncher");
   // const [isLoading, setIsLoading] = createSignal(false);

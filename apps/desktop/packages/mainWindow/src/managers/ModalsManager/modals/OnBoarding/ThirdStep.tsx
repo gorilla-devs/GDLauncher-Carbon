@@ -28,6 +28,7 @@ import LegacyGDL from "/assets/images/icons/legacy_gdlauncher.svg";
 
 interface Props {
   prevStep: () => void;
+  isImportInstance?: boolean;
 }
 const ThirdStep = (props: Props) => {
   const modalsContext = useModal();
@@ -67,7 +68,11 @@ const ThirdStep = (props: Props) => {
     }
   };
   return (
-    <div class="flex flex-col items-center justify-between w-120 lg:w-160 h-full box-border pt-6">
+    <div
+      class={`flex flex-col items-center justify-between ${
+        props.isImportInstance ? "w-full p-4" : "w-120 lg:w-160"
+      } h-full box-border pt-6 border-2 border-red-400 border-solid`}
+    >
       <Switch>
         <Match when={entities.isLoading}>
           <div class="w-full h-full flex items-center justify-center">
