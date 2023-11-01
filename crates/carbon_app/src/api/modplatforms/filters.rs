@@ -161,7 +161,7 @@ impl TryFrom<FEUnifiedModLoaderType> for curseforge::structs::CFFEModLoaderType 
             FEUnifiedModLoaderType::Forge => Ok(curseforge::structs::CFFEModLoaderType::Forge),
 
             FEUnifiedModLoaderType::NeoForge => {
-                Ok(curseforge::structs::CFFEModLoaderType::Neoforged)
+                Ok(curseforge::structs::CFFEModLoaderType::Neoforge)
             }
             FEUnifiedModLoaderType::Fabric => Ok(curseforge::structs::CFFEModLoaderType::Fabric),
             FEUnifiedModLoaderType::Quilt => Ok(curseforge::structs::CFFEModLoaderType::Quilt),

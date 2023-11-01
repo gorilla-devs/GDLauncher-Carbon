@@ -95,7 +95,7 @@ impl TryFrom<ModrinthPackDependencies> for StandardVersion {
         }
         if let Some(neoforge_version) = value.neoforge {
             modloaders.insert(ModLoader {
-                type_: ModLoaderType::Neoforged,
+                type_: ModLoaderType::Neoforge,
                 version: format!("{}-{}", &minecraft_version, neoforge_version),
             });
         }

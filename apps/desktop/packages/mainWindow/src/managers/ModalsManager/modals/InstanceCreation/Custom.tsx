@@ -30,7 +30,7 @@ type Instancetype = {
 enum Modloaders {
   _Quilt = "quilt",
   _Forge = "forge",
-  _NeoForged = "neoforged",
+  _NeoForge = "neoforge",
   _Fabric = "fabric"
 }
 
@@ -64,7 +64,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
   const [oldAlphaVersionFilter, setOldAlphaVersionFilter] = createSignal(false);
 
   const forgeHashmap = new ReactiveMap();
-  const neoForgedHashmap = new ReactiveMap();
+  const neoForgeHashmap = new ReactiveMap();
   const fabricHashmap = new ReactiveMap();
   const quiltHashmap = new ReactiveMap();
 
@@ -81,13 +81,13 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     }
   });
 
-  const neoForgedVersionsQuery = rspc.createQuery(
-    () => ["mc.getNeoforgedVersions"],
+  const neoForgeVersionsQuery = rspc.createQuery(
+    () => ["mc.getNeoforgeVersions"],
     {
       enabled: false,
       onSuccess(data) {
         data.gameVersions.forEach((version) => {
-          neoForgedHashmap.set(version.id, version.loaders);
+          neoForgeHashmap.set(version.id, version.loaders);
         });
       }
     }
@@ -113,7 +113,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
 
   const DUMMY_META_VERSION = "${gdlauncher.gameVersion}";
 
-  const isNeoForged = () => loader() === Modloaders._NeoForged;
+  const isNeoForge = () => loader() === Modloaders._NeoForge;
   const isFabric = () => loader() === Modloaders._Fabric;
   const isForge = () => loader() === Modloaders._Forge;
   const isQuilt = () => loader() === Modloaders._Quilt;
@@ -125,8 +125,8 @@ const Custom = (props: Pick<ModalProps, "data">) => {
       )?.loaders;
 
       setLoaderVersions(versions || []);
-    } else if (neoForgedVersionsQuery.data && isNeoForged()) {
-      const versions = neoForgedVersionsQuery?.data?.gameVersions.find(
+    } else if (neoForgeVersionsQuery.data && isNeoForge()) {
+      const versions = neoForgeVersionsQuery?.data?.gameVersions.find(
         (v) => v.id === (mcVersion() || (mappedMcVersions()?.[0]?.id as string))
       )?.loaders;
 
@@ -187,8 +187,8 @@ const Custom = (props: Pick<ModalProps, "data">) => {
         (item.type === "old_alpha" && oldAlphaVersionFilter())
     );
 
-    const neoForgedMappedVersions = filteredData.map((item) => {
-      return { ...item, hasModloader: neoForgedHashmap.has(item.id) };
+    const neoForgeMappedVersions = filteredData.map((item) => {
+      return { ...item, hasModloader: neoForgeHashmap.has(item.id) };
     });
     const forgeMappedVersions = filteredData.map((item) => {
       return { ...item, hasModloader: forgeHashmap.has(item.id) };
@@ -201,7 +201,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     });
 
     if (isForge()) setMappedMcVersions(forgeMappedVersions);
-    else if (isNeoForged()) setMappedMcVersions(neoForgedMappedVersions);
+    else if (isNeoForge()) setMappedMcVersions(neoForgeMappedVersions);
     else if (isFabric()) setMappedMcVersions(fabricMappedVersions);
     else if (isQuilt()) setMappedMcVersions(quiltMappedVersions);
     else setMappedMcVersions(filteredData);
@@ -218,7 +218,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
   }[] = [
     { label: t("instance.vanilla"), key: undefined },
     { label: t("instance.forge"), key: "forge" },
-    { label: t("instance.neoforged"), key: "neoforged" },
+    { label: t("instance.neoforge"), key: "neoforge" },
     { label: t("instance.fabric"), key: "fabric" },
     { label: t("instance.quilt"), key: "quilt" }
   ];
@@ -386,8 +386,8 @@ const Custom = (props: Pick<ModalProps, "data">) => {
   createEffect(() => {
     if (instanceData()?.modloader === "forge") {
       forgeVersionsQuery.refetch();
-    } else if (instanceData()?.modloader === "neoforged") {
-      neoForgedVersionsQuery.refetch();
+    } else if (instanceData()?.modloader === "neoforge") {
+      neoForgeVersionsQuery.refetch();
     } else if (instanceData()?.modloader === "fabric") {
       fabricVersionsQuery.refetch();
     } else if (instanceData()?.modloader === "quilt") {
@@ -478,8 +478,8 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                   onClick={() => {
                     if (modloader.key === "forge") {
                       forgeVersionsQuery.refetch();
-                    } else if (modloader.key === "neoforged") {
-                      neoForgedVersionsQuery.refetch();
+                    } else if (modloader.key === "neoforge") {
+                      neoForgeVersionsQuery.refetch();
                     } else if (modloader.key === "fabric") {
                       fabricVersionsQuery.refetch();
                     } else if (modloader.key === "quilt") {
@@ -508,7 +508,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                   ((forgeVersionsQuery.isFetching ||
                     fabricVersionsQuery.isFetching ||
                     quiltVersionsQuery.isFetching ||
-                    neoForgedVersionsQuery.isFetching) &&
+                    neoForgeVersionsQuery.isFetching) &&
                     loader()) ||
                     mappedMcVersions().length === 0
                 )}
@@ -549,9 +549,9 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                       )?.loaders;
 
                     setLoaderVersions(versions || []);
-                  } else if (isNeoForged()) {
+                  } else if (isNeoForge()) {
                     const versions =
-                      neoForgedVersionsQuery?.data?.gameVersions.find(
+                      neoForgeVersionsQuery?.data?.gameVersions.find(
                         (v) => v.id === l.key
                       )?.loaders;
 
@@ -630,7 +630,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                       forgeVersionsQuery.isFetching ||
                       fabricVersionsQuery.isFetching ||
                       quiltVersionsQuery.isFetching ||
-                      neoForgedVersionsQuery.isFetching ||
+                      neoForgeVersionsQuery.isFetching ||
                       !loaderVersions()
                     }
                     options={loaderVersions()?.map((v) => ({

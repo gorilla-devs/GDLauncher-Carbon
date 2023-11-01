@@ -51,7 +51,7 @@ Join our official GDLauncher discord server. There you'll find our community and
 <a href='https://discord.gdlauncher.com' target='_blank'><img height='40' style='border:0px;height:50px;' src='https://cdn.gdl.gg/github-readme/Discord-Logo-Wordmark-Color.png' border='0' alt='GDLauncher Discord Server' /></a>
 
 ## 🎁 Features
-- 🎮 Easily install any minecraft version and **modloader**, including `forge`, `fabric`, `quilt`, `neoforged`
+- 🎮 Easily install any minecraft version and **modloader**, including `forge`, `fabric`, `quilt`, `neoforge`
 - 📦 Install `addons` from **CurseForge**, **Modrinth** and more!
 - 📦 Install `modpacks` from **CurseForge**, **Modrinth** and more!
 - ☕ Automatic **Java Manager**. You don't need to have java installed on your system, the launcher will take care of installing the correct java version for you!

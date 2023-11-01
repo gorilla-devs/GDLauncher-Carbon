@@ -20,8 +20,8 @@ use crate::{
 };
 
 #[derive(Error, Debug)]
-pub enum NeoForgedManifestError {
-    #[error("Could not fetch neoforged manifest from launchermeta: {0}")]
+pub enum NeoForgeManifestError {
+    #[error("Could not fetch neoforge manifest from launchermeta: {0}")]
     NetworkError(#[from] reqwest::Error),
     #[error("Manifest database query error: {0}")]
     DBQueryError(#[from] QueryError),
@@ -31,14 +31,14 @@ pub async fn get_manifest(
     reqwest_client: &reqwest_middleware::ClientWithMiddleware,
     meta_base_url: &reqwest::Url,
 ) -> anyhow::Result<Manifest> {
-    let server_url = meta_base_url.join("neoforged/v0/manifest.json")?;
+    let server_url = meta_base_url.join("neoforge/v0/manifest.json")?;
     let new_manifest = reqwest_client
         .get(server_url)
         .send()
         .await?
         .json::<Manifest>()
         .await
-        .map_err(NeoForgedManifestError::from)?;
+        .map_err(NeoForgeManifestError::from)?;
 
     Ok(new_manifest)
 }

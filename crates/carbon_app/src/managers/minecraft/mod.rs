@@ -23,7 +23,7 @@ pub mod fabric;
 pub mod forge;
 pub mod minecraft;
 pub mod modrinth;
-pub mod neoforged;
+pub mod neoforge;
 pub mod quilt;
 
 pub(crate) struct MinecraftManager {
@@ -54,8 +54,8 @@ impl ManagerRef<'_, MinecraftManager> {
         forge::get_manifest(&self.app.reqwest_client, &self.meta_base_url).await
     }
 
-    pub async fn get_neoforged_manifest(&self) -> anyhow::Result<Manifest> {
-        neoforged::get_manifest(&self.app.reqwest_client, &self.meta_base_url).await
+    pub async fn get_neoforge_manifest(&self) -> anyhow::Result<Manifest> {
+        neoforge::get_manifest(&self.app.reqwest_client, &self.meta_base_url).await
     }
 
     pub async fn get_fabric_manifest(&self) -> anyhow::Result<Manifest> {

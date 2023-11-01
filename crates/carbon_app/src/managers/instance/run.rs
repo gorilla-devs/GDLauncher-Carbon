@@ -602,49 +602,49 @@ impl ManagerRef<'_, InstanceManager> {
                                 daedalus::modded::merge_partial_version(forge_version, version_info);
                         }
                         ModLoader {
-                            type_: ModLoaderType::Neoforged,
-                            version: neoforged_version,
+                            type_: ModLoaderType::Neoforge,
+                            version: neoforge_version,
                         } => {
-                            let neoforged_manifest = app.minecraft_manager().get_neoforged_manifest().await?;
+                            let neoforge_manifest = app.minecraft_manager().get_neoforge_manifest().await?;
 
-                            let neoforged_version =
-                                match neoforged_version.strip_prefix(&format!("{}-", version.release)) {
-                                    None => neoforged_version.clone(),
+                            let neoforge_version =
+                                match neoforge_version.strip_prefix(&format!("{}-", version.release)) {
+                                    None => neoforge_version.clone(),
                                     Some(sub) => sub.to_string(),
                                 };
 
-                            let neoforged_manifest_version = neoforged_manifest
+                            let neoforge_manifest_version = neoforge_manifest
                                 .game_versions
                                 .into_iter()
                                 .find(|v| v.id == version.release)
                                 .ok_or_else(|| {
-                                    anyhow!("Could not find any neoforged versions for mc version {}", version.release)
+                                    anyhow!("Could not find any neoforge versions for mc version {}", version.release)
                                 })?
                                 .loaders
                                 .into_iter()
                                 .find(|v| {
-                                    let exact_match = v.id == format!("{}-{}", version.release, neoforged_version);
-                                    let fuzzy_match = v.id.starts_with(&format!("{}-{}", version.release, neoforged_version));
+                                    let exact_match = v.id == format!("{}-{}", version.release, neoforge_version);
+                                    let fuzzy_match = v.id.starts_with(&format!("{}-{}", version.release, neoforge_version));
 
                                     exact_match || fuzzy_match
                                 })
                                 .ok_or_else(|| {
                                     anyhow!(
-                                        "Could not find neoforged version {}-{} for minecraft version {}",
+                                        "Could not find neoforge version {}-{} for minecraft version {}",
                                         version.release,
-                                        neoforged_version,
+                                        neoforge_version,
                                         version.release,
                                     )
                                 })?;
 
-                            let neoforged_version = crate::managers::minecraft::neoforged::get_version(
+                            let neoforge_version = crate::managers::minecraft::neoforge::get_version(
                                 &app.reqwest_client,
-                                neoforged_manifest_version,
+                                neoforge_manifest_version,
                             )
                             .await?;
 
                             version_info =
-                                daedalus::modded::merge_partial_version(neoforged_version, version_info);
+                                daedalus::modded::merge_partial_version(neoforge_version, version_info);
                         }
                         ModLoader {
                             type_: ModLoaderType::Fabric,
@@ -872,14 +872,14 @@ impl ManagerRef<'_, InstanceManager> {
                             }
                         },
                         ModLoader {
-                            type_: ModLoaderType::Neoforged,
+                            type_: ModLoaderType::Neoforge,
                             ..
                         } => {
                             if let Some(t_neoforge_processors) = &t_neoforge_processors {
                                 t_neoforge_processors.start_opaque();
 
                                 if let Some(processors) = &version_info.processors {
-                                    managers::minecraft::neoforged::execute_processors(
+                                    managers::minecraft::neoforge::execute_processors(
                                         processors,
                                         version_info
                                             .data
