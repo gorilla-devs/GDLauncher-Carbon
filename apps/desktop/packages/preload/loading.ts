@@ -15,6 +15,7 @@ function useLoading() {
       const isString = typeof error === "string";
 
       if (typeof error !== "string") {
+        console.log("Error from preload", error);
         error = error.map((log) => log.message).join("<br /><br />");
       }
 

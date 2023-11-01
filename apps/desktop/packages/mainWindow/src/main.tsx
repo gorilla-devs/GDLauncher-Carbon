@@ -29,12 +29,19 @@ render(
       try {
         port = await window.getCoreModulePort();
         if (typeof port !== "number") {
+          console.log(port);
           window.fatalError(port, "CoreModule");
+          port = new Error("CoreModule");
         }
       } catch (e) {
         window.fatalError(e as any, "CoreModule");
-        throw e;
+        port = new Error("CoreModule");
       }
+
+      if (port instanceof Error) {
+        throw port;
+      }
+
       return port;
     });
 
