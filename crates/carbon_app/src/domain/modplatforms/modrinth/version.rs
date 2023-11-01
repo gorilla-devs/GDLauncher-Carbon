@@ -62,6 +62,7 @@ pub enum ModrinthEnvironmentSupport {
 pub struct ModrinthPackDependencies {
     pub minecraft: Option<String>,
     pub forge: Option<String>,
+    pub neoforge: Option<String>,
     pub fabric_loader: Option<String>,
     pub quilt_loader: Option<String>,
 }
@@ -90,6 +91,12 @@ impl TryFrom<ModrinthPackDependencies> for StandardVersion {
             modloaders.insert(ModLoader {
                 type_: ModLoaderType::Quilt,
                 version: format!("{}-{}", &minecraft_version, quilt_version),
+            });
+        }
+        if let Some(neoforge_version) = value.neoforge {
+            modloaders.insert(ModLoader {
+                type_: ModLoaderType::Neoforged,
+                version: format!("{}-{}", &minecraft_version, neoforge_version),
             });
         }
         Ok(StandardVersion {
