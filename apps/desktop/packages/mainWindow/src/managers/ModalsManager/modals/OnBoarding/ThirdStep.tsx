@@ -71,7 +71,7 @@ const ThirdStep = (props: Props) => {
     <div
       class={`flex flex-col items-center justify-between ${
         props.isImportInstance ? "w-full p-4" : "w-120 lg:w-160"
-      } h-full box-border pt-6 border-2 border-red-400 border-solid`}
+      } h-full box-border pt-6`}
     >
       <Switch>
         <Match when={entities.isLoading}>
