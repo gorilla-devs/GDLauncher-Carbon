@@ -26,10 +26,9 @@ import PrismLogo from "/assets/images/icons/prism_logo.svg";
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg";
 import LegacyGDL from "/assets/images/icons/legacy_gdlauncher.svg";
 
-type Props = {
+interface Props {
   prevStep: () => void;
-};
-
+}
 const ThirdStep = (props: Props) => {
   const modalsContext = useModal();
   const [entity, setEntity] = createSignal<ImportEntityStatus | undefined>();
@@ -82,7 +81,15 @@ const ThirdStep = (props: Props) => {
           />
         </Match>
         <Match when={!entity()}>
-          <div class="w-full flex justify-end pt-5">
+          <div class="w-full flex justify-between pt-5">
+            <Button
+              onClick={() => {
+                props.prevStep();
+              }}
+              type="secondary"
+            >
+              Back
+            </Button>
             <Button
               onClick={() => {
                 modalsContext?.closeModal();

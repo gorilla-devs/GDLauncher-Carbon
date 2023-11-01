@@ -75,6 +75,7 @@ const SingleEntity = (props: {
   });
   createEffect(() => {
     const status = importScanStatus.data;
+    console.log(status);
     if (status) {
       const data = status.status;
 
@@ -131,6 +132,7 @@ const SingleEntity = (props: {
         <span class="font-bold">{props.entity.entity}</span>
         <Show when={step() === "selectionStep"} fallback={<div></div>}>
           <Button
+            disabled={instances().length === 0}
             type="primary"
             onClick={() => {
               if (instances().length === 0) {
@@ -159,22 +161,44 @@ const SingleEntity = (props: {
             value={path()}
             class="flex-1 border-2 border-solid border-zinc-500"
             icon={
-              <div
-                onClick={async () => {
-                  const result = await window.openFileDialog({
-                    title: "Select Runtime Path",
-                    defaultPath: path() || "",
-                    properties: ["openDirectory"]
-                  });
+              <div class="flex gap-2">
+                <div
+                  onClick={async () => {
+                    const result = await window.openFileDialog({
+                      title: "Select Runtime Path",
+                      defaultPath: path() || "",
+                      properties: ["openFile", "openDirectory"]
+                    });
 
-                  if (result.canceled) {
-                    return;
-                  }
+                    if (result.canceled) {
+                      return;
+                    }
 
-                  setPath(result.filePaths[0]);
-                }}
-                class="i-ic:round-folder text-2xl text-yellow-300 cursor-pointer"
-              ></div>
+                    setPath(result.filePaths[0]);
+                  }}
+                  class="i-ic:round-folder text-2xl text-yellow-300 cursor-pointer"
+                ></div>
+                <div
+                  onClick={async () => {
+                    const result = await window.openFileDialog({
+                      title: "Select Runtime Path",
+                      defaultPath: path() || "",
+                      properties: ["openFile"],
+                      filters: [
+                        { name: "ZIP Files", extensions: ["zip"] },
+                        { name: "All Files", extensions: ["*"] }
+                      ]
+                    });
+
+                    if (result.canceled) {
+                      return;
+                    }
+
+                    setPath(result.filePaths[0]);
+                  }}
+                  class="i-solar:file-bold text-2xl text-blue-500 cursor-pointer"
+                ></div>
+              </div>
             }
           />
         </div>
