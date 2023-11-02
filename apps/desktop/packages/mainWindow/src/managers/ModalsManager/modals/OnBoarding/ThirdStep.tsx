@@ -1,7 +1,7 @@
 import { useModal } from "../..";
 import { Button } from "@gd/ui";
 import { rspc } from "@/utils/rspcClient";
-import { For, Match, Switch, createSignal } from "solid-js";
+import { For, Match, Show, Switch, createSignal } from "solid-js";
 import { ImportEntityStatus } from "@gd/core_module/bindings";
 import EntityCard from "@/components/Card/EntityCard";
 import SingleEntity from "./SingleEntity";
@@ -61,24 +61,27 @@ const ThirdStep = (props: Props) => {
           />
         </Match>
         <Match when={!entity()}>
-          <div class="w-full flex justify-between pt-5">
-            <Button
-              onClick={() => {
-                props.prevStep();
-              }}
-              type="secondary"
-            >
-              <Trans key="onboarding.prev" />
-            </Button>
-            <Button
-              onClick={() => {
-                modalsContext?.closeModal();
-              }}
-              type="primary"
-            >
-              <Trans key="onboarding.done" />
-            </Button>
-          </div>
+          <Show when={!props.isImportInstance}>
+            <div class="w-full flex justify-between pt-5">
+              <Button
+                onClick={() => {
+                  props.prevStep();
+                }}
+                type="secondary"
+              >
+                <Trans key="onboarding.prev" />
+              </Button>
+              <Button
+                onClick={() => {
+                  modalsContext?.closeModal();
+                }}
+                type="primary"
+              >
+                <Trans key="onboarding.done" />
+              </Button>
+            </div>
+          </Show>
+
           <div class=" flex-1 w-full">
             <ul class="grid grid-cols-3 gap-2 p-0">
               <For
