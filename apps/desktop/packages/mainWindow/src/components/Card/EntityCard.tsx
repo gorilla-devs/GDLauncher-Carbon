@@ -1,10 +1,14 @@
+import { keys } from "@/managers/ModalsManager/modals/OnBoarding/ThirdStep";
 import { ImportEntityStatus } from "@gd/core_module/bindings";
+import { useTransContext } from "@gd/i18n";
 
 const EntityCard = (props: {
   entity: ImportEntityStatus;
   icon: string;
   onClick?: [(_entity: ImportEntityStatus) => void, ImportEntityStatus];
+  index: number;
 }) => {
+  const [t] = useTransContext();
   return (
     <li
       class={`rounded-lg ${
@@ -21,7 +25,7 @@ const EntityCard = (props: {
         class={`w-10 h-10 ${props.entity.supported ? "" : "opacity-20"}`}
       />
       <span class={`${props.entity.supported ? "" : "opacity-20"}`}>
-        {props.entity.entity}
+        {t(keys[props.index])}
       </span>
     </li>
   );

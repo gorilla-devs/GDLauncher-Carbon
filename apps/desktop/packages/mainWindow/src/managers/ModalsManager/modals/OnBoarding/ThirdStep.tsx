@@ -17,6 +17,18 @@ import LegacyGDL from "/assets/images/icons/legacy_gdlauncher.svg";
 import { Trans } from "@gd/i18n";
 import { isDownloaded } from "./SingleImport";
 
+export const keys = [
+  "entity.legacygdlauncher",
+  "entity.curseforgezip",
+  "entity.mrpack",
+  "entity.curseforge",
+  "entity.modrinth",
+  "entity.atlauncher",
+  "entity.technic",
+  "entity.ftb",
+  "entity.multimc",
+  "entity.prismlauncher"
+];
 interface Props {
   prevStep: () => void;
   isImportInstance?: boolean;
@@ -38,6 +50,7 @@ const ThirdStep = (props: Props) => {
     MultiMCLogo,
     PrismLogo
   ];
+
   const handleClickEntity = (entity: ImportEntityStatus) => {
     if (entity.supported) {
       setEntity(entity);
@@ -76,6 +89,7 @@ const ThirdStep = (props: Props) => {
                     entity={entity}
                     icon={icons[i()]}
                     onClick={[handleClickEntity, entity]}
+                    index={i()}
                   />
                 )}
               </For>
