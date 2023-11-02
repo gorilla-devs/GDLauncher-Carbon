@@ -201,7 +201,10 @@ impl GameLog {
 }
 
 impl ManagerRef<'_, InstanceManager> {
-    pub async fn create_log(self, instance_id: InstanceId) -> (GameLogId, watch::Sender<GameLog>) {
+    pub async fn create_log(
+        self,
+        instance_id: InstanceId,
+    ) -> (GameLogId, watch::Sender<GameLog>) {
         static LOG_ID: AtomicI32 = AtomicI32::new(0);
         let (log_tx, log_rx) = watch::channel(GameLog::new());
         let id = GameLogId(LOG_ID.fetch_add(1, Ordering::Relaxed));

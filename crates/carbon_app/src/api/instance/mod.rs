@@ -981,8 +981,12 @@ impl From<manager::ListInstance> for ListInstance {
 impl From<manager::ListInstanceStatus> for ListInstanceStatus {
     fn from(value: manager::ListInstanceStatus) -> Self {
         match value {
-            manager::ListInstanceStatus::Valid(status) => Self::Valid(status.into()),
-            manager::ListInstanceStatus::Invalid(status) => Self::Invalid(status.into()),
+            manager::ListInstanceStatus::Valid(status) => {
+                Self::Valid(status.into())
+            }
+            manager::ListInstanceStatus::Invalid(status) => {
+                Self::Invalid(status.into())
+            }
         }
     }
 }
@@ -1021,7 +1025,9 @@ impl From<manager::ConfigurationParseError> for ConfigurationParseError {
     }
 }
 
-impl From<manager::ConfigurationParseErrorType> for ConfigurationParseErrorType {
+impl From<manager::ConfigurationParseErrorType>
+    for ConfigurationParseErrorType
+{
     fn from(value: manager::ConfigurationParseErrorType) -> Self {
         use manager::ConfigurationParseErrorType as manager;
 

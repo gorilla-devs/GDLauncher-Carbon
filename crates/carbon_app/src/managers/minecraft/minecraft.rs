@@ -8,15 +8,15 @@ use crate::{
     domain::{
         java::{JavaArch, JavaComponent},
         minecraft::minecraft::{
-            chain_lwjgl_libs_with_base_libs, get_default_jvm_args, is_rule_allowed,
-            library_is_allowed, OsExt, ARCH_WIDTH,
+            chain_lwjgl_libs_with_base_libs, get_default_jvm_args,
+            is_rule_allowed, library_is_allowed, OsExt, ARCH_WIDTH,
         },
     },
 };
 use anyhow::Context;
 use daedalus::minecraft::{
-    Argument, ArgumentType, ArgumentValue, Library, LibraryGroup, Os, Version, VersionInfo,
-    VersionManifest,
+    Argument, ArgumentType, ArgumentValue, Library, LibraryGroup, Os, Version,
+    VersionInfo, VersionManifest,
 };
 use prisma_client_rust::QueryError;
 use regex::{Captures, Regex};
@@ -213,7 +213,10 @@ struct ReplacerArgs {
     user_properties: String,
 }
 
-fn replace_placeholder(replacer_args: &ReplacerArgs, placeholder: ArgPlaceholder) -> String {
+fn replace_placeholder(
+    replacer_args: &ReplacerArgs,
+    placeholder: ArgPlaceholder,
+) -> String {
     match placeholder {
         ArgPlaceholder::AuthPlayerName => replacer_args.player_name.clone(),
         ArgPlaceholder::VersionName => replacer_args.version_name.clone(),
@@ -222,17 +225,27 @@ fn replace_placeholder(replacer_args: &ReplacerArgs, placeholder: ArgPlaceholder
             .get_data_path()
             .display()
             .to_string(),
-        ArgPlaceholder::AssetsRoot => replacer_args.assets_root.display().to_string(),
-        ArgPlaceholder::GameAssets => replacer_args.game_assets.display().to_string(),
-        ArgPlaceholder::AssetsIndexName => replacer_args.assets_index_name.clone(),
+        ArgPlaceholder::AssetsRoot => {
+            replacer_args.assets_root.display().to_string()
+        }
+        ArgPlaceholder::GameAssets => {
+            replacer_args.game_assets.display().to_string()
+        }
+        ArgPlaceholder::AssetsIndexName => {
+            replacer_args.assets_index_name.clone()
+        }
         ArgPlaceholder::AuthUuid => replacer_args.auth_uuid.clone(),
-        ArgPlaceholder::AuthAccessToken => replacer_args.auth_access_token.clone(),
+        ArgPlaceholder::AuthAccessToken => {
+            replacer_args.auth_access_token.clone()
+        }
         ArgPlaceholder::AuthSession => replacer_args.auth_session.clone(),
         ArgPlaceholder::UserType => replacer_args.user_type.clone(), // Hardcoded to mojang apparently ?????
         ArgPlaceholder::VersionType => replacer_args.version_type.clone(),
         ArgPlaceholder::UserProperties => replacer_args.user_properties.clone(), // Not sure what this is,
         ArgPlaceholder::ClassPath => replacer_args.libraries.clone(),
-        ArgPlaceholder::NativesDirectory => replacer_args.natives_path.display().to_string(),
+        ArgPlaceholder::NativesDirectory => {
+            replacer_args.natives_path.display().to_string()
+        }
         ArgPlaceholder::LauncherName => "GDLauncher".to_string(),
         ArgPlaceholder::LauncherVersion => APP_VERSION.to_string(),
         ArgPlaceholder::ClasspathSeparator => CLASSPATH_SEPARATOR.to_string(),
@@ -288,7 +301,8 @@ pub async fn generate_startup_command(
         Regex::new(r"--(?P<arg>\S+)\s+\$\{(?P<value>[^}]+)\}|(\$\{(?P<standalone>[^}]+)\})")
             .unwrap();
 
-    let extra_args_regex = Regex::new(r#"("(?P<quoted>(\\"|[^"])*)"|(?P<raw>([^ ]+)))"#).unwrap();
+    let extra_args_regex =
+        Regex::new(r#"("(?P<quoted>(\\"|[^"])*)"|(?P<raw>([^ ]+)))"#).unwrap();
 
     let player_token = match full_account.type_ {
         FullAccountType::Offline => "offline".to_owned(),
@@ -306,7 +320,8 @@ pub async fn generate_startup_command(
     )
     .await?;
 
-    let instance_mapped_assets = matches!(&assets_dir, super::assets::AssetsDir::InstanceMapped(_));
+    let instance_mapped_assets =
+        matches!(&assets_dir, super::assets::AssetsDir::InstanceMapped(_));
 
     let replacer_args = ReplacerArgs {
         player_name: full_account.username,
@@ -356,10 +371,16 @@ pub async fn generate_startup_command(
                             return String::new();
                         }
                     };
-                    return format!("--{} {}", caps.name("arg").unwrap().as_str(), value);
+                    return format!(
+                        "--{} {}",
+                        caps.name("arg").unwrap().as_str(),
+                        value
+                    );
                 } else if let Some(standalone) = caps.name("standalone") {
                     return match standalone.as_str().try_into() {
-                        Ok(standalone) => replace_placeholder(&replacer_args, standalone),
+                        Ok(standalone) => {
+                            replace_placeholder(&replacer_args, standalone)
+                        }
                         Err(err) => {
                             warn!("Failed to parse argument: {}", err);
                             return String::new();
@@ -376,39 +397,41 @@ pub async fn generate_startup_command(
             .replace("\\\\", "\\")
     };
 
-    let substitute_arguments = |command: &mut Vec<String>, arguments: &Vec<Argument>| {
-        for arg in arguments {
-            match arg {
-                Argument::Normal(arg) => {
-                    // fix for pre legacy 1.5.x and older minecraft
-                    // drop --assetsDir arg, they are found automatically inside the instance
-                    // resources folder
-                    if instance_mapped_assets
-                        && (arg.starts_with("--assetsDir") || arg.starts_with("${game_assets}"))
-                    {
-                        continue;
-                    }
-
-                    command.push(substitute_argument(arg))
-                }
-                Argument::Ruled { rules, value } => {
-                    let is_allowed = rules
-                        .iter()
-                        .all(|rule| is_rule_allowed(rule, &java_component.arch));
-
-                    match (is_allowed, value) {
-                        (false, _) => {}
-                        (true, ArgumentValue::Single(arg)) => {
-                            command.push(substitute_argument(arg))
+    let substitute_arguments =
+        |command: &mut Vec<String>, arguments: &Vec<Argument>| {
+            for arg in arguments {
+                match arg {
+                    Argument::Normal(arg) => {
+                        // fix for pre legacy 1.5.x and older minecraft
+                        // drop --assetsDir arg, they are found automatically inside the instance
+                        // resources folder
+                        if instance_mapped_assets
+                            && (arg.starts_with("--assetsDir")
+                                || arg.starts_with("${game_assets}"))
+                        {
+                            continue;
                         }
-                        (true, ArgumentValue::Many(arr)) => {
-                            command.extend(arr.iter().map(|arg| substitute_argument(arg)))
+
+                        command.push(substitute_argument(arg))
+                    }
+                    Argument::Ruled { rules, value } => {
+                        let is_allowed = rules.iter().all(|rule| {
+                            is_rule_allowed(rule, &java_component.arch)
+                        });
+
+                        match (is_allowed, value) {
+                            (false, _) => {}
+                            (true, ArgumentValue::Single(arg)) => {
+                                command.push(substitute_argument(arg))
+                            }
+                            (true, ArgumentValue::Many(arr)) => command.extend(
+                                arr.iter().map(|arg| substitute_argument(arg)),
+                            ),
                         }
                     }
                 }
             }
-        }
-    };
+        };
 
     let mut command = Vec::with_capacity(100);
 
@@ -416,7 +439,9 @@ pub async fn generate_startup_command(
     command.push(format!("-Xms{xms_memory}m"));
 
     if let Some(logging_xml) = version.logging {
-        if let Some(client) = logging_xml.get(&daedalus::minecraft::LoggingConfigName::Client) {
+        if let Some(client) =
+            logging_xml.get(&daedalus::minecraft::LoggingConfigName::Client)
+        {
             let logging_path = runtime_path
                 .get_logging_configs()
                 .get_client_path(&client.file.id);
@@ -477,7 +502,9 @@ pub async fn generate_startup_command(
     }
 
     for cap in extra_args_regex.captures_iter(extra_java_args) {
-        let ((Some(arg), _) | (_, Some(arg))) = (cap.name("quoted"), cap.name("raw")) else {
+        let ((Some(arg), _) | (_, Some(arg))) =
+            (cap.name("quoted"), cap.name("raw"))
+        else {
             continue;
         };
         command.push(arg.as_str().replace("\\\"", "\"").replace("\\\\", "\\"));
@@ -486,7 +513,9 @@ pub async fn generate_startup_command(
     if Os::native() == Os::Osx {
         let lwjgl_3 = version
             .requires
-            .map(|requires| requires.iter().any(|require| require.uid == "org.lwjgl3"))
+            .map(|requires| {
+                requires.iter().any(|require| require.uid == "org.lwjgl3")
+            })
             .unwrap_or(false);
 
         let can_find_start_on_first_thread = command
@@ -501,7 +530,10 @@ pub async fn generate_startup_command(
     command.push("-Dorg.lwjgl.util.Debug=true".to_string());
 
     command.push(version.main_class);
-    substitute_arguments(&mut command, arguments.get(&ArgumentType::Game).unwrap());
+    substitute_arguments(
+        &mut command,
+        arguments.get(&ArgumentType::Game).unwrap(),
+    );
 
     Ok(command)
 }
@@ -603,15 +635,22 @@ pub async fn extract_natives(
     {
         match &library.natives {
             Some(natives) => {
-                if let Some(native_name) = natives.get(&Os::native_arch(java_arch)) {
-                    extract_single_library_natives(runtime_path, library, &dest, native_name)
-                        .await
-                        .with_context(|| {
-                            format!(
-                                "Failed to extract native `{}` for library `{}`",
-                                &native_name, &library.name
-                            )
-                        })?;
+                if let Some(native_name) =
+                    natives.get(&Os::native_arch(java_arch))
+                {
+                    extract_single_library_natives(
+                        runtime_path,
+                        library,
+                        &dest,
+                        native_name,
+                    )
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "Failed to extract native `{}` for library `{}`",
+                            &native_name, &library.name
+                        )
+                    })?;
                 }
             }
             None => continue,
@@ -663,7 +702,8 @@ mod tests {
             .unwrap();
 
         let lwjgl_group = get_lwjgl_meta(
-            &reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
+            &reqwest_middleware::ClientBuilder::new(reqwest::Client::new())
+                .build(),
             &version,
             &app.minecraft_manager().meta_base_url,
         )
@@ -708,10 +748,11 @@ mod tests {
         let command = serde_json::to_string(&command).unwrap();
 
         // write to file
-        let mut file =
-            tokio::fs::File::create("./src/managers/minecraft/test_fixtures/test_command.json")
-                .await
-                .unwrap();
+        let mut file = tokio::fs::File::create(
+            "./src/managers/minecraft/test_fixtures/test_command.json",
+        )
+        .await
+        .unwrap();
 
         file.write_all(command.as_bytes()).await.unwrap();
     }
@@ -739,7 +780,8 @@ mod tests {
             .unwrap();
 
         let lwjgl_group = get_lwjgl_meta(
-            &reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
+            &reqwest_middleware::ClientBuilder::new(reqwest::Client::new())
+                .build(),
             &version,
             &app.minecraft_manager().meta_base_url,
         )
@@ -768,8 +810,13 @@ mod tests {
             .await
             .unwrap();
 
-        extract_natives(runtime_path, &version, &lwjgl_group, &JavaArch::X86_64)
-            .await
-            .unwrap();
+        extract_natives(
+            runtime_path,
+            &version,
+            &lwjgl_group,
+            &JavaArch::X86_64,
+        )
+        .await
+        .unwrap();
     }
 }

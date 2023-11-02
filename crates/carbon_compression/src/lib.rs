@@ -35,7 +35,9 @@ impl CompressionFormat {
     }
 }
 
-fn detect_compression_format<T>(file: &mut T) -> Result<CompressionFormat, CompressionError>
+fn detect_compression_format<T>(
+    file: &mut T,
+) -> Result<CompressionFormat, CompressionError>
 where
     T: Read,
 {
@@ -94,7 +96,10 @@ where
             use std::os::unix::fs::PermissionsExt;
 
             if let Some(mode) = file.unix_mode() {
-                std::fs::set_permissions(&outpath, std::fs::Permissions::from_mode(mode))?;
+                std::fs::set_permissions(
+                    &outpath,
+                    std::fs::Permissions::from_mode(mode),
+                )?;
             }
         }
     }
@@ -113,7 +118,10 @@ where
     Ok(())
 }
 
-fn decompress_gzip(archive_path: PathBuf, dest_folder: PathBuf) -> Result<(), CompressionError> {
+fn decompress_gzip(
+    archive_path: PathBuf,
+    dest_folder: PathBuf,
+) -> Result<(), CompressionError> {
     let archive_file = std::fs::File::open(&archive_path)?;
     let mut archive = flate2::read::GzDecoder::new(archive_file);
 
@@ -138,7 +146,10 @@ fn decompress_gzip(archive_path: PathBuf, dest_folder: PathBuf) -> Result<(), Co
 // TODO: Ideally decompression would recursively look for another compressed file until it can't find any more.
 
 // accept both paths and strings
-pub async fn decompress<T>(path: T, dest_folder: &Path) -> Result<(), CompressionError>
+pub async fn decompress<T>(
+    path: T,
+    dest_folder: &Path,
+) -> Result<(), CompressionError>
 where
     T: AsRef<Path> + Send + Sync,
 {
@@ -188,7 +199,8 @@ mod tests {
         let format = detect_compression_format(&mut file).unwrap();
         assert_eq!(CompressionFormat::Tar, format);
 
-        let mut file = std::fs::File::open("fixtures/compressed.tar.gz").unwrap();
+        let mut file =
+            std::fs::File::open("fixtures/compressed.tar.gz").unwrap();
         let format = detect_compression_format(&mut file).unwrap();
         assert_eq!(CompressionFormat::Gzip, format);
 

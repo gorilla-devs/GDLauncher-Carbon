@@ -2,8 +2,8 @@ use anyhow::bail;
 use thiserror::Error;
 
 use crate::db::{
-    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
-    modrinth_mod_cache as mrdb,
+    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb,
+    mod_metadata as metadb, modrinth_mod_cache as mrdb,
 };
 use crate::domain::instance as domain;
 use crate::domain::instance::info::ModLoaderType;
@@ -15,7 +15,10 @@ use super::{
 };
 
 impl ManagerRef<'_, InstanceManager> {
-    pub async fn list_mods(self, instance_id: InstanceId) -> anyhow::Result<Vec<domain::Mod>> {
+    pub async fn list_mods(
+        self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<Vec<domain::Mod>> {
         {
             let instances = self.instances.read().await;
             if instances.get(&instance_id).is_none() {
@@ -31,8 +34,14 @@ impl ManagerRef<'_, InstanceManager> {
             .with(
                 fcdb::metadata::fetch()
                     .with(metadb::logo_image::fetch())
-                    .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch()))
-                    .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
+                    .with(
+                        metadb::curseforge::fetch()
+                            .with(cfdb::logo_image::fetch()),
+                    )
+                    .with(
+                        metadb::modrinth::fetch()
+                            .with(mrdb::logo_image::fetch()),
+                    ),
             )
             .exec()
             .await?
@@ -41,24 +50,28 @@ impl ManagerRef<'_, InstanceManager> {
                 id: m.id,
                 filename: m.filename,
                 enabled: m.enabled,
-                metadata: m.metadata.as_ref().map(|m| domain::ModFileMetadata {
-                    modid: m.modid.clone(),
-                    name: m.name.clone(),
-                    version: m.version.clone(),
-                    description: m.description.clone(),
-                    authors: m.authors.clone(),
-                    modloaders: m
-                        .modloaders
-                        .split(',')
-                        // ignore unknown modloaders
-                        .flat_map(|loader| ModLoaderType::try_from(loader).ok())
-                        .collect::<Vec<_>>(),
-                    has_image: m
-                        .logo_image
-                        .as_ref()
-                        .map(|v| v.as_ref().map(|_| ()))
-                        .flatten()
-                        .is_some(),
+                metadata: m.metadata.as_ref().map(|m| {
+                    domain::ModFileMetadata {
+                        modid: m.modid.clone(),
+                        name: m.name.clone(),
+                        version: m.version.clone(),
+                        description: m.description.clone(),
+                        authors: m.authors.clone(),
+                        modloaders: m
+                            .modloaders
+                            .split(',')
+                            // ignore unknown modloaders
+                            .flat_map(|loader| {
+                                ModLoaderType::try_from(loader).ok()
+                            })
+                            .collect::<Vec<_>>(),
+                        has_image: m
+                            .logo_image
+                            .as_ref()
+                            .map(|v| v.as_ref().map(|_| ()))
+                            .flatten()
+                            .is_some(),
+                    }
                 }),
                 curseforge: m
                     .metadata
@@ -80,8 +93,8 @@ impl ManagerRef<'_, InstanceManager> {
                             .flatten()
                             .is_some(),
                     }),
-                modrinth: m.metadata.and_then(|m| m.modrinth).flatten().map(|m| {
-                    domain::ModrinthModMetadata {
+                modrinth: m.metadata.and_then(|m| m.modrinth).flatten().map(
+                    |m| domain::ModrinthModMetadata {
                         project_id: m.project_id,
                         version_id: m.version_id,
                         title: m.title,
@@ -95,8 +108,8 @@ impl ManagerRef<'_, InstanceManager> {
                             .map(|row| row.data.as_ref().map(|_| ()))
                             .flatten()
                             .is_some(),
-                    }
-                }),
+                    },
+                ),
             });
 
         Ok(mods.collect::<Vec<_>>())
@@ -168,7 +181,11 @@ impl ManagerRef<'_, InstanceManager> {
         Ok(())
     }
 
-    pub async fn delete_mod(self, instance_id: InstanceId, id: String) -> anyhow::Result<()> {
+    pub async fn delete_mod(
+        self,
+        instance_id: InstanceId,
+        id: String,
+    ) -> anyhow::Result<()> {
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
@@ -219,9 +236,10 @@ impl ManagerRef<'_, InstanceManager> {
         project_id: u32,
         file_id: u32,
     ) -> anyhow::Result<VisualTaskId> {
-        let installer = CurseforgeModInstaller::create(self.app, project_id, file_id)
-            .await?
-            .into_installer();
+        let installer =
+            CurseforgeModInstaller::create(self.app, project_id, file_id)
+                .await?
+                .into_installer();
 
         let task_id = installer.install(self.app, instance_id).await?;
 
@@ -234,9 +252,10 @@ impl ManagerRef<'_, InstanceManager> {
         project_id: String,
         version_id: String,
     ) -> anyhow::Result<VisualTaskId> {
-        let installer = ModrinthModInstaller::create(self.app, project_id, version_id)
-            .await?
-            .into_installer();
+        let installer =
+            ModrinthModInstaller::create(self.app, project_id, version_id)
+                .await?
+                .into_installer();
 
         let task_id = installer.install(self.app, instance_id).await?;
 
@@ -262,8 +281,14 @@ impl ManagerRef<'_, InstanceManager> {
             .with(
                 fcdb::metadata::fetch()
                     .with(metadb::logo_image::fetch())
-                    .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch()))
-                    .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
+                    .with(
+                        metadb::curseforge::fetch()
+                            .with(cfdb::logo_image::fetch()),
+                    )
+                    .with(
+                        metadb::modrinth::fetch()
+                            .with(mrdb::logo_image::fetch()),
+                    ),
             )
             .exec()
             .await?

@@ -237,17 +237,19 @@ impl CacheTargets {
         }
     }
 
-    fn release_target(&mut self, instance_id: InstanceId, r: anyhow::Result<()>) -> bool {
+    fn release_target(
+        &mut self,
+        instance_id: InstanceId,
+        r: anyhow::Result<()>,
+    ) -> bool {
         let mut changed = false;
 
         let check_target_callback = |target: &mut CacheTarget| {
             if target.instance_id == instance_id {
                 if let Some(callback) = target.callback.take() {
-                    callback.complete(
-                        r.as_ref()
-                            .map(|_| ())
-                            .map_err(|_| anyhow!("error caching mods for instance")),
-                    );
+                    callback.complete(r.as_ref().map(|_| ()).map_err(|_| {
+                        anyhow!("error caching mods for instance")
+                    }));
                 }
 
                 true
@@ -292,7 +294,9 @@ impl CacheTargets {
             if let Some(target) = target_option {
                 if target.instance_id == instance_id {
                     if let Some(callback) = target.callback.take() {
-                        callback.complete(Err(anyhow!("This cache target was revoked")));
+                        callback.complete(Err(anyhow!(
+                            "This cache target was revoked"
+                        )));
                     }
 
                     *target_option = None;
@@ -328,7 +332,8 @@ impl CacheTargets {
     fn cancel_override(&mut self) {
         if let Some(old) = self.priority.take() {
             if let Some(callback) = old.callback {
-                callback.complete(Err(anyhow!("Backend override was canceled")));
+                callback
+                    .complete(Err(anyhow!("Backend override was canceled")));
             }
         }
     }
@@ -460,12 +465,21 @@ trait ModplatformCacher {
         sender: &mut BundleSender<Self::SaveBundle>,
     ) -> anyhow::Result<()>;
 
-    async fn save_batch(app: &App, instance_id: InstanceId, batch: Self::SaveBundle);
+    async fn save_batch(
+        app: &App,
+        instance_id: InstanceId,
+        batch: Self::SaveBundle,
+    );
 
-    async fn cache_icons(app: &App, instance_id: InstanceId, update_notifier: &UpdateNotifier);
+    async fn cache_icons(
+        app: &App,
+        instance_id: InstanceId,
+        update_notifier: &UpdateNotifier,
+    );
 }
 
-type ModplatformCacheBundle<T> = (InstanceId, bool, Option<T>, Option<oneshot::Sender<()>>);
+type ModplatformCacheBundle<T> =
+    (InstanceId, bool, Option<T>, Option<oneshot::Sender<()>>);
 
 struct BundleSender<'a, T> {
     should_wait: bool,
@@ -501,9 +515,12 @@ impl<'a, T> BundleSender<'a, T> {
         };
 
         self.active_wait = rx;
-        let _ = self
-            .sender
-            .send((self.instance_id, self.update_images, Some(bundle), tx));
+        let _ = self.sender.send((
+            self.instance_id,
+            self.update_images,
+            Some(bundle),
+            tx,
+        ));
     }
 
     async fn wait(self) {
@@ -513,9 +530,12 @@ impl<'a, T> BundleSender<'a, T> {
             }
             None => {
                 if self.update_images {
-                    let _ = self
-                        .sender
-                        .send((self.instance_id, self.update_images, None, None));
+                    let _ = self.sender.send((
+                        self.instance_id,
+                        self.update_images,
+                        None,
+                        None,
+                    ));
                 }
             }
         }
@@ -561,7 +581,9 @@ fn cache_modplatform<C: ModplatformCacher>(
         );
 
         let save_loop = async {
-            while let Some((instance_id, update_images, bundle, notify)) = batch_rx.recv().await {
+            while let Some((instance_id, update_images, bundle, notify)) =
+                batch_rx.recv().await
+            {
                 if let Some(bundle) = bundle {
                     debug!(
                         "Saving {} mod cache update bundle for instance {instance_id}",
@@ -583,13 +605,17 @@ fn cache_modplatform<C: ModplatformCacher>(
         };
 
         let mut image_loop_watcher = LoopWatcher::new(image_rx).await;
-        let image_loop = image_loop_watcher.loop_interrupt(|instance_id| async move {
-            debug!("Caching {} mod icons for instance {instance_id}", C::NAME);
+        let image_loop =
+            image_loop_watcher.loop_interrupt(|instance_id| async move {
+                debug!(
+                    "Caching {} mod icons for instance {instance_id}",
+                    C::NAME
+                );
 
-            C::cache_icons(&app, instance_id, &update_notifier).await;
+                C::cache_icons(&app, instance_id, &update_notifier).await;
 
-            |_: &mut Option<InstanceId>| false
-        });
+                |_: &mut Option<InstanceId>| false
+            });
 
         // None of the futures should ever exit.
         // This join polls both while allowing them to share variables in this scope.
@@ -646,18 +672,22 @@ impl ManagerRef<'_, MetaCacheManager> {
                                 let mcm = app.meta_cache_manager();
 
                                 join!(
-                                    mcm.curseforge_targets.send_modify_always(move |targets| {
-                                        targets.set_priority(CacheTarget {
-                                            instance_id,
-                                            callback: None,
-                                        })
-                                    }),
-                                    mcm.modrinth_targets.send_modify_always(move |targets| {
-                                        targets.set_priority(CacheTarget {
-                                            instance_id,
-                                            callback: None,
-                                        })
-                                    })
+                                    mcm.curseforge_targets.send_modify_always(
+                                        move |targets| {
+                                            targets.set_priority(CacheTarget {
+                                                instance_id,
+                                                callback: None,
+                                            })
+                                        }
+                                    ),
+                                    mcm.modrinth_targets.send_modify_always(
+                                        move |targets| {
+                                            targets.set_priority(CacheTarget {
+                                                instance_id,
+                                                callback: None,
+                                            })
+                                        }
+                                    )
                                 );
                             });
                         }
@@ -770,18 +800,21 @@ impl ManagerRef<'_, MetaCacheManager> {
 
         let content = tokio::fs::read(path).await?;
         let content_len = content.len();
-        let (content, sha512, meta, murmur2) = tokio::task::spawn_blocking(move || {
-            let sha512: [u8; 64] = Sha512::new_with_prefix(&content).finalize().into();
-            let meta = super::mods::parse_metadata(Cursor::new(&content));
+        let (content, sha512, meta, murmur2) =
+            tokio::task::spawn_blocking(move || {
+                let sha512: [u8; 64] =
+                    Sha512::new_with_prefix(&content).finalize().into();
+                let meta = super::mods::parse_metadata(Cursor::new(&content));
 
-            // curseforge's api removes whitespace in murmur2 hashes
-            let mut murmur_content = content.clone();
-            murmur_content.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
-            let murmur2 = murmurhash32::murmurhash2(&murmur_content);
+                // curseforge's api removes whitespace in murmur2 hashes
+                let mut murmur_content = content.clone();
+                murmur_content
+                    .retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
+                let murmur2 = murmurhash32::murmurhash2(&murmur_content);
 
-            (content, sha512, meta, murmur2)
-        })
-        .await?;
+                (content, sha512, meta, murmur2)
+            })
+            .await?;
 
         let meta = match meta {
             Ok(meta) => meta,
@@ -797,7 +830,9 @@ impl ManagerRef<'_, MetaCacheManager> {
             .mod_metadata()
             // just check both hashes for now
             .find_first(vec![
-                metadb::WhereParam::Sha512(BytesFilter::Equals(Vec::from(sha512))),
+                metadb::WhereParam::Sha512(BytesFilter::Equals(Vec::from(
+                    sha512,
+                ))),
                 metadb::WhereParam::Murmur2(IntFilter::Equals(murmur2 as i32)),
             ])
             .exec()
@@ -816,18 +851,20 @@ impl ManagerRef<'_, MetaCacheManager> {
                     let logo_file = logo_file.to_string();
 
                     let mcm = self.app.meta_cache_manager();
-                    let guard = mcm
-                        .image_scale_semaphore
-                        .acquire()
-                        .await
-                        .expect("the image scale semaphore is never closed");
+                    let guard =
+                        mcm.image_scale_semaphore.acquire().await.expect(
+                            "the image scale semaphore is never closed",
+                        );
 
                     let logo = tokio::task::spawn_blocking(move || {
-                        let mut zip = zip::ZipArchive::new(Cursor::new(&content)).unwrap();
+                        let mut zip =
+                            zip::ZipArchive::new(Cursor::new(&content))
+                                .unwrap();
                         let Ok(mut file) = zip.by_name(&logo_file) else {
                             return Ok(None);
                         };
-                        let mut image = Vec::with_capacity(file.size() as usize);
+                        let mut image =
+                            Vec::with_capacity(file.size() as usize);
                         file.read_to_end(&mut image)?;
                         let scaled = scale_mod_image(&image[..])?;
                         Ok::<_, anyhow::Error>(Some(scaled))
@@ -837,13 +874,18 @@ impl ManagerRef<'_, MetaCacheManager> {
                     drop(guard);
 
                     match logo {
-                        Ok(Ok(Some(data))) => {
-                            Some(self.app.prisma_client.local_mod_image_cache().create(
-                                data,
-                                metadb::UniqueWhereParam::IdEquals(meta_id.clone()),
-                                Vec::new(),
-                            ))
-                        }
+                        Ok(Ok(Some(data))) => Some(
+                            self.app
+                                .prisma_client
+                                .local_mod_image_cache()
+                                .create(
+                                    data,
+                                    metadb::UniqueWhereParam::IdEquals(
+                                        meta_id.clone(),
+                                    ),
+                                    Vec::new(),
+                                ),
+                        ),
                         Ok(Ok(None)) => None,
                         Ok(Err(e)) => {
                             error!({ error = ?e }, "could not scale mod icon for {}", mod_filename);
@@ -862,7 +904,9 @@ impl ManagerRef<'_, MetaCacheManager> {
                     Vec::from(sha512),
                     meta.as_ref()
                         .map(|meta| &meta.modloaders)
-                        .map(|modloaders| modloaders.iter().map(ToString::to_string).join(","))
+                        .map(|modloaders| {
+                            modloaders.iter().map(ToString::to_string).join(",")
+                        })
                         .unwrap_or(String::new()),
                     match meta {
                         Some(meta) => vec![
@@ -889,10 +933,13 @@ impl ManagerRef<'_, MetaCacheManager> {
             }
         };
 
-        let filecache_delete = self.app.prisma_client.mod_file_cache().delete_many(vec![
-            fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-            fcdb::WhereParam::Filename(StringFilter::Equals(mod_filename.to_string())),
-        ]);
+        let filecache_delete =
+            self.app.prisma_client.mod_file_cache().delete_many(vec![
+                fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
+                fcdb::WhereParam::Filename(StringFilter::Equals(
+                    mod_filename.to_string(),
+                )),
+            ]);
 
         let filecache_insert = self.app.prisma_client.mod_file_cache().create(
             crate::db::instance::UniqueWhereParam::IdEquals(*instance_id),
@@ -963,7 +1010,11 @@ fn scale_mod_image(image: &[u8]) -> anyhow::Result<Vec<u8>> {
     Ok(output)
 }
 
-fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNotifier) {
+fn cache_local(
+    app: App,
+    rx: LockNotify<CacheTargets>,
+    update_notifier: UpdateNotifier,
+) {
     tokio::spawn(async move {
         let app = &app;
         let update_notifier = &update_notifier;
@@ -973,9 +1024,9 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
             let cached_entries = tokio::spawn(async move {
                 app2.prisma_client
                     .mod_file_cache()
-                    .find_many(vec![fcdb::WhereParam::InstanceId(IntFilter::Equals(
-                        *instance_id,
-                    ))])
+                    .find_many(vec![fcdb::WhereParam::InstanceId(
+                        IntFilter::Equals(*instance_id),
+                    )])
                     .exec()
                     .await
             });
@@ -992,7 +1043,8 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                 .get_mods_path();
 
             let mut pathbuf = PathBuf::new();
-            pathbuf.push(app.settings_manager().runtime_path.get_root().to_path());
+            pathbuf
+                .push(app.settings_manager().runtime_path.get_root().to_path());
             pathbuf.push(&subpath);
 
             if !pathbuf.is_dir() {
@@ -1017,7 +1069,9 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                     continue;
                 };
 
-                let allowed_base_ext = [".jar", ".zip"].iter().any(|&ext| utf8_name.ends_with(ext));
+                let allowed_base_ext = [".jar", ".zip"]
+                    .iter()
+                    .any(|&ext| utf8_name.ends_with(ext));
                 let allowed_disabled_ext = [".jar.disabled", ".zip.disabled"]
                     .iter()
                     .any(|&ext| utf8_name.ends_with(ext));
@@ -1026,7 +1080,8 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                     continue;
                 }
 
-                utf8_name = utf8_name.strip_suffix(".disabled").unwrap_or(utf8_name);
+                utf8_name =
+                    utf8_name.strip_suffix(".disabled").unwrap_or(utf8_name);
 
                 let Ok(metadata) = entry.metadata().await else {
                     continue;
@@ -1047,9 +1102,13 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
 
             if let Ok(Ok(cached_entries)) = cached_entries.await {
                 for entry in cached_entries {
-                    if let Some((enabled, real_size)) = modpaths.get(&entry.filename) {
+                    if let Some((enabled, real_size)) =
+                        modpaths.get(&entry.filename)
+                    {
                         // enabled probably shouldn't be here
-                        if *real_size == entry.filesize as u64 && *enabled == entry.enabled {
+                        if *real_size == entry.filesize as u64
+                            && *enabled == entry.enabled
+                        {
                             modpaths.remove(&entry.filename);
                             trace!(
                                 "up to data metadata entry for mod `{}`, skipping",
@@ -1082,16 +1141,22 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                 }
             }
 
-            let entry_futures = modpaths.into_iter().map(|(subpath, (enabled, _))| {
-                let pathbuf = &pathbuf;
+            let entry_futures =
+                modpaths.into_iter().map(|(subpath, (enabled, _))| {
+                    let pathbuf = &pathbuf;
 
-                async move {
-                    app.meta_cache_manager()
-                        .cache_mod_file_unchecked(instance_id, pathbuf, subpath, enabled)
-                        .await
-                        .map(|_| ())
-                }
-            });
+                    async move {
+                        app.meta_cache_manager()
+                            .cache_mod_file_unchecked(
+                                instance_id,
+                                pathbuf,
+                                subpath,
+                                enabled,
+                            )
+                            .await
+                            .map(|_| ())
+                    }
+                });
 
             let r = futures::future::join_all(entry_futures)
                 .await

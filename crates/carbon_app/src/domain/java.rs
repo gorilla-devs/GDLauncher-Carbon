@@ -87,7 +87,9 @@ impl ToString for JavaComponentType {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Hash, Copy, Clone, EnumIter)]
+#[derive(
+    Serialize, Deserialize, PartialEq, Eq, Debug, Hash, Copy, Clone, EnumIter,
+)]
 pub enum JavaArch {
     X86_64,
     X86_32,
@@ -132,7 +134,9 @@ impl<'a> TryFrom<&'a str> for JavaArch {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Hash, EnumIter, Copy, Clone)]
+#[derive(
+    Serialize, Deserialize, Debug, PartialEq, Eq, Hash, EnumIter, Copy, Clone,
+)]
 pub enum JavaOs {
     Windows,
     Linux,
@@ -242,22 +246,32 @@ impl TryFrom<&str> for JavaVersion {
                         }
                     }
                     "update_number" => {
-                        if let Some(update_number) = captures.name("update_number") {
-                            version.update_number = Some(update_number.as_str().parse()?);
+                        if let Some(update_number) =
+                            captures.name("update_number")
+                        {
+                            version.update_number =
+                                Some(update_number.as_str().parse()?);
                         }
                     }
                     "prerelease" => {
                         if let Some(prerelease) = captures.name("prerelease") {
-                            version.prerelease = Some(prerelease.as_str().to_string());
+                            version.prerelease =
+                                Some(prerelease.as_str().to_string());
                         }
                     }
                     "build_metadata" => {
-                        if let Some(build_metadata) = captures.name("build_metadata") {
-                            version.build_metadata = Some(build_metadata.as_str().to_string());
+                        if let Some(build_metadata) =
+                            captures.name("build_metadata")
+                        {
+                            version.build_metadata =
+                                Some(build_metadata.as_str().to_string());
                         }
                     }
                     _ => {
-                        unreachable!("Regex capture group not handled: {}", name)
+                        unreachable!(
+                            "Regex capture group not handled: {}",
+                            name
+                        )
                     }
                 }
             }
@@ -266,7 +280,8 @@ impl TryFrom<&str> for JavaVersion {
             if version.major == 1 {
                 version.major = version.minor;
                 version.minor = version.patch.parse()?;
-                version.patch = version.update_number.unwrap_or("0".to_string());
+                version.patch =
+                    version.update_number.unwrap_or("0".to_string());
                 version.update_number = None;
             }
 
@@ -312,7 +327,9 @@ impl JavaVersion {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone, EnumIter, Eq, PartialEq)]
+#[derive(
+    Serialize, Deserialize, Debug, Copy, Clone, EnumIter, Eq, PartialEq,
+)]
 pub enum SystemJavaProfileName {
     Legacy,
     Alpha,
@@ -323,7 +340,10 @@ pub enum SystemJavaProfileName {
 }
 
 impl SystemJavaProfileName {
-    pub fn is_java_version_compatible(&self, java_version: &JavaVersion) -> bool {
+    pub fn is_java_version_compatible(
+        &self,
+        java_version: &JavaVersion,
+    ) -> bool {
         match self {
             Self::Legacy => java_version.major == 8,
             Self::Alpha => java_version.major == 16,
@@ -342,7 +362,9 @@ impl From<MinecraftJavaProfile> for SystemJavaProfileName {
             MinecraftJavaProfile::JavaRuntimeAlpha => Self::Alpha,
             MinecraftJavaProfile::JavaRuntimeBeta => Self::Beta,
             MinecraftJavaProfile::JavaRuntimeGamma => Self::Gamma,
-            MinecraftJavaProfile::JavaRuntimeGammaSnapshot => Self::GammaSnapshot,
+            MinecraftJavaProfile::JavaRuntimeGammaSnapshot => {
+                Self::GammaSnapshot
+            }
             MinecraftJavaProfile::MinecraftJavaExe => Self::MinecraftJavaExe,
         }
     }
@@ -386,7 +408,9 @@ pub struct SystemJavaProfile {
 impl TryFrom<crate::db::java_system_profile::Data> for SystemJavaProfile {
     type Error = anyhow::Error;
 
-    fn try_from(data: crate::db::java_system_profile::Data) -> Result<Self, Self::Error> {
+    fn try_from(
+        data: crate::db::java_system_profile::Data,
+    ) -> Result<Self, Self::Error> {
         Ok(Self {
             name: data.name.as_str().try_into()?,
             java_id: data.java_id,

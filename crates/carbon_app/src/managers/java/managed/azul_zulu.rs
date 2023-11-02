@@ -18,10 +18,14 @@ use crate::{
         java::{JavaArch, JavaOs, JavaVersion},
         runtime_path::{ManagedJavasPath, TempPath},
     },
-    managers::java::{java_checker::JavaChecker, scan_and_sync::add_java_component_to_db},
+    managers::java::{
+        java_checker::JavaChecker, scan_and_sync::add_java_component_to_db,
+    },
 };
 
-use super::{Managed, ManagedJavaArchMap, ManagedJavaOsMap, ManagedJavaVersion, Step};
+use super::{
+    Managed, ManagedJavaArchMap, ManagedJavaOsMap, ManagedJavaVersion, Step,
+};
 
 #[derive(Debug, Default)]
 pub struct AzulZulu {
@@ -47,12 +51,14 @@ impl Managed for AzulZulu {
         let content_length = reqwest::get(download_url).await?.content_length();
 
         let downloadable = if let Some(content_length) = content_length {
-            Downloadable::new(download_url, download_temp_path).with_size(content_length)
+            Downloadable::new(download_url, download_temp_path)
+                .with_size(content_length)
         } else {
             Downloadable::new(download_url, download_temp_path)
         };
 
-        let (p_sender, mut p_recv) = tokio::sync::watch::channel(Progress::new());
+        let (p_sender, mut p_recv) =
+            tokio::sync::watch::channel(Progress::new());
 
         let progress_report_clone = progress_report.clone();
         let progress_proxy = tokio::spawn(async move {
@@ -210,7 +216,8 @@ impl Managed for AzulZulu {
             )
             .await?;
 
-        let java_id = add_java_component_to_db(db_client, java_component).await?;
+        let java_id =
+            add_java_component_to_db(db_client, java_component).await?;
 
         Ok(java_id)
     }
@@ -257,10 +264,19 @@ impl AzulAPI {
                             download_url: version.download_url.clone(),
                             id: version.package_uuid.clone(),
                             java_version: JavaVersion {
-                                major: version.java_version.first().cloned().ok_or(
-                                    anyhow::anyhow!("No major version found for {}", version.name),
-                                )?,
-                                minor: version.java_version.get(1).cloned().unwrap_or(0),
+                                major: version
+                                    .java_version
+                                    .first()
+                                    .cloned()
+                                    .ok_or(anyhow::anyhow!(
+                                        "No major version found for {}",
+                                        version.name
+                                    ))?,
+                                minor: version
+                                    .java_version
+                                    .get(1)
+                                    .cloned()
+                                    .unwrap_or(0),
                                 patch: version
                                     .java_version
                                     .get(2)

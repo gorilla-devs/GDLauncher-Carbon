@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::modplatforms::modrinth::{
     responses::{
-        CategoriesResponse, LoadersResponse, ProjectsResponse, TeamResponse, VersionHashesResponse,
-        VersionsResponse,
+        CategoriesResponse, LoadersResponse, ProjectsResponse, TeamResponse,
+        VersionHashesResponse, VersionsResponse,
     },
     search::ProjectSearchResponse,
 };
@@ -47,7 +47,9 @@ impl From<ProjectSearchResponse> for MRFEProjectSearchResponse {
 impl TryFrom<MRFEProjectSearchResponse> for ProjectSearchResponse {
     type Error = anyhow::Error;
 
-    fn try_from(results: MRFEProjectSearchResponse) -> Result<Self, Self::Error> {
+    fn try_from(
+        results: MRFEProjectSearchResponse,
+    ) -> Result<Self, Self::Error> {
         Ok(ProjectSearchResponse {
             hits: results
                 .hits
@@ -257,7 +259,9 @@ impl IntoIterator for MRFEVersionHashesResponse {
 }
 
 impl FromIterator<(String, MRFEVersion)> for MRFEVersionHashesResponse {
-    fn from_iter<I: IntoIterator<Item = (String, MRFEVersion)>>(iter: I) -> Self {
+    fn from_iter<I: IntoIterator<Item = (String, MRFEVersion)>>(
+        iter: I,
+    ) -> Self {
         let iter = iter.into_iter();
         let (size_lower, _) = iter.size_hint();
         let mut c = HashMap::with_capacity(size_lower);

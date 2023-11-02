@@ -12,7 +12,8 @@ use thiserror::Error;
 use tracing::info;
 
 use crate::error::request::{
-    censor_error, MalformedResponseDetails, RequestContext, RequestError, RequestErrorDetails,
+    censor_error, MalformedResponseDetails, RequestContext, RequestError,
+    RequestErrorDetails,
 };
 
 #[derive(Debug, Clone)]
@@ -25,7 +26,9 @@ pub struct DeviceCode {
 }
 
 impl DeviceCode {
-    pub async fn request_code(client: &ClientWithMiddleware) -> anyhow::Result<Self> {
+    pub async fn request_code(
+        client: &ClientWithMiddleware,
+    ) -> anyhow::Result<Self> {
         #[derive(Deserialize)]
         struct DeviceCodeResponse {
             user_code: String,
@@ -61,7 +64,8 @@ impl DeviceCode {
             verification_uri: response.verification_uri,
             // polling_interval: Duration::from_secs(response.interval.into()),
             polling_interval: Duration::from_secs(1),
-            expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
+            expires_at: Utc::now()
+                + chrono::Duration::seconds(response.expires_in),
         })
     }
 
@@ -101,7 +105,9 @@ impl DeviceCode {
 
                     match &error as &str {
                         "authorization_pending" => continue,
-                        "expired_token" => return Ok(Err(DeviceCodeExpiredError)),
+                        "expired_token" => {
+                            return Ok(Err(DeviceCodeExpiredError))
+                        }
                         _ => bail!(RequestError {
                             context: RequestContext::none(),
                             error: RequestErrorDetails::UnexpectedStatus {
@@ -129,7 +135,8 @@ impl DeviceCode {
                         access_token: response.access_token,
                         //id_token: response.id_token,
                         refresh_token: response.refresh_token,
-                        expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
+                        expires_at: Utc::now()
+                            + chrono::Duration::seconds(response.expires_in),
                     }));
                 }
                 _ => bail!(RequestError::from_status(&response,)),
@@ -185,7 +192,8 @@ impl MsAuth {
         Ok(Self {
             access_token: response.access_token,
             refresh_token: response.refresh_token,
-            expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
+            expires_at: Utc::now()
+                + chrono::Duration::seconds(response.expires_in),
         })
     }
 }
@@ -371,7 +379,8 @@ impl McAuth {
 
         Ok(Self {
             access_token: response.access_token,
-            expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
+            expires_at: Utc::now()
+                + chrono::Duration::seconds(response.expires_in),
         })
     }
 
@@ -416,10 +425,12 @@ impl McAuth {
             Ok(jwt) => jwt.claims,
             Err(e) => {
                 let error = match e.kind() {
-                    ErrorKind::InvalidSignature | ErrorKind::ImmatureSignature => {
+                    ErrorKind::InvalidSignature
+                    | ErrorKind::ImmatureSignature => {
                         McEntitlementError::InvalidSignature
                     }
-                    ErrorKind::InvalidToken | ErrorKind::MissingRequiredClaim(_) => {
+                    ErrorKind::InvalidToken
+                    | ErrorKind::MissingRequiredClaim(_) => {
                         McEntitlementError::InvalidData
                     }
                     ErrorKind::MissingAlgorithm => McEntitlementError::Outdated,
@@ -506,7 +517,8 @@ pub enum McEntitlement {
 impl McEntitlement {
     fn mojang_jwt_key() -> DecodingKey {
         // The test at the bottom of this file makes sure this unwrap is fine.
-        DecodingKey::from_rsa_pem(include_bytes!("mojang_jwt_signature.pem")).unwrap()
+        DecodingKey::from_rsa_pem(include_bytes!("mojang_jwt_signature.pem"))
+            .unwrap()
     }
 }
 

@@ -15,10 +15,13 @@ fn main() {
         .args(["log", "-1", "--format=%ct"])
         .output()
         .unwrap();
-    let git_commit_author_date = String::from_utf8(git_commit_author_date.stdout).unwrap();
+    let git_commit_author_date =
+        String::from_utf8(git_commit_author_date.stdout).unwrap();
 
-    let version_json = std::fs::read_to_string("../../packages/config/version.json").unwrap();
-    let version_json: serde_json::Value = serde_json::from_str(&version_json).unwrap();
+    let version_json =
+        std::fs::read_to_string("../../packages/config/version.json").unwrap();
+    let version_json: serde_json::Value =
+        serde_json::from_str(&version_json).unwrap();
 
     let version = version_json["version"].as_str().unwrap();
     let channel = version_json["channel"]

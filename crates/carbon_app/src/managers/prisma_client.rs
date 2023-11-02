@@ -26,7 +26,9 @@ pub enum DatabaseError {
 }
 
 #[instrument]
-pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClient, DatabaseError> {
+pub(super) async fn load_and_migrate(
+    runtime_path: PathBuf,
+) -> Result<PrismaClient, DatabaseError> {
     let runtime_path = dunce::simplified(&runtime_path);
 
     let db_uri = format!(
@@ -114,7 +116,9 @@ async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
         .metrics_enabled_last_update;
 
     if let Some(metrics_enabled_last_update) = metrics_enabled_last_update {
-        if metrics_enabled_last_update < chrono::Utc::now() - chrono::Duration::days(365) {
+        if metrics_enabled_last_update
+            < chrono::Utc::now() - chrono::Duration::days(365)
+        {
             db_client
                 .app_configuration()
                 .update(

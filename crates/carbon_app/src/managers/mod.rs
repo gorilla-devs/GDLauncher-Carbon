@@ -51,8 +51,9 @@ mod app {
     use crate::cache_middleware;
 
     use super::{
-        java::JavaManager, metadata::cache::MetaCacheManager, metrics::MetricsManager,
-        modplatforms::ModplatformsManager, system_info::SystemInfoManager, *,
+        java::JavaManager, metadata::cache::MetaCacheManager,
+        metrics::MetricsManager, modplatforms::ModplatformsManager,
+        system_info::SystemInfoManager, *,
     };
 
     pub struct AppInner {
@@ -75,7 +76,9 @@ mod app {
 
     macro_rules! manager_getter {
         ($manager:ident: $type:path) => {
-            pub(crate) fn $manager<'a>(self: &'a Arc<Self>) -> ManagerRef<'a, $type> {
+            pub(crate) fn $manager<'a>(
+                self: &'a Arc<Self>,
+            ) -> ManagerRef<'a, $type> {
                 ManagerRef {
                     manager: &self.$manager,
                     app: &self,
@@ -89,11 +92,13 @@ mod app {
             invalidation_channel: broadcast::Sender<InvalidationEvent>,
             runtime_path: PathBuf,
         ) -> App {
-            let db_client = prisma_client::load_and_migrate(runtime_path.clone())
-                .await
-                .unwrap();
+            let db_client =
+                prisma_client::load_and_migrate(runtime_path.clone())
+                    .await
+                    .unwrap();
 
-            let app = Arc::new(UnsafeCell::new(MaybeUninit::<AppInner>::uninit()));
+            let app =
+                Arc::new(UnsafeCell::new(MaybeUninit::<AppInner>::uninit()));
             let unsaferef = UnsafeAppRef(Arc::downgrade(&app));
 
             // SAFETY: cannot be used until after the ref is initialized.
@@ -115,7 +120,10 @@ mod app {
                 let inner = Arc::into_raw(app);
 
                 (*inner).get().write(MaybeUninit::new(AppInner {
-                    settings_manager: SettingsManager::new(runtime_path, reqwest.clone()),
+                    settings_manager: SettingsManager::new(
+                        runtime_path,
+                        reqwest.clone(),
+                    ),
                     java_manager: JavaManager::new(),
                     minecraft_manager: MinecraftManager::new(),
                     account_manager: AccountManager::new(),
@@ -129,7 +137,8 @@ mod app {
                     prisma_client: Arc::new(db_client),
                     task_manager: VisualTaskManager::new(),
                     system_info_manager: SystemInfoManager::new(),
-                    rich_presence_manager: rich_presence::RichPresenceManager::new(),
+                    rich_presence_manager:
+                        rich_presence::RichPresenceManager::new(),
                 }));
 
                 // SAFETY: This pointer cast is safe because UnsafeCell and MaybeUninit do not
@@ -150,7 +159,8 @@ mod app {
 
             let _app = app.clone();
             tokio::spawn(async move {
-                let _ = _app.clone().rich_presence_manager().start_presence().await;
+                let _ =
+                    _app.clone().rich_presence_manager().start_presence().await;
             });
 
             app
@@ -217,8 +227,12 @@ impl Drop for AppInner {
                 debug!("Collecting metric for app close");
                 let res = self.metrics_manager.track_event(close_event).await;
                 match res {
-                    Ok(_) => debug!("Successfully collected metric for app close"),
-                    Err(e) => error!("Error collecting metric for app close: {e}"),
+                    Ok(_) => {
+                        debug!("Successfully collected metric for app close")
+                    }
+                    Err(e) => {
+                        error!("Error collecting metric for app close: {e}")
+                    }
                 }
             });
         }

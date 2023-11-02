@@ -184,11 +184,15 @@ impl From<mpcf::FileStatus> for CFFEFileStatus {
     fn from(file_status: mpcf::FileStatus) -> Self {
         match file_status {
             mpcf::FileStatus::Processing => CFFEFileStatus::Processing,
-            mpcf::FileStatus::ChangesRequired => CFFEFileStatus::ChangesRequired,
+            mpcf::FileStatus::ChangesRequired => {
+                CFFEFileStatus::ChangesRequired
+            }
             mpcf::FileStatus::UnderReview => CFFEFileStatus::UnderReview,
             mpcf::FileStatus::Approved => CFFEFileStatus::Approved,
             mpcf::FileStatus::Rejected => CFFEFileStatus::Rejected,
-            mpcf::FileStatus::MalwareDetected => CFFEFileStatus::MalwareDetected,
+            mpcf::FileStatus::MalwareDetected => {
+                CFFEFileStatus::MalwareDetected
+            }
             mpcf::FileStatus::Deleted => CFFEFileStatus::Deleted,
             mpcf::FileStatus::Archived => CFFEFileStatus::Archived,
             mpcf::FileStatus::Testing => CFFEFileStatus::Testing,
@@ -196,8 +200,12 @@ impl From<mpcf::FileStatus> for CFFEFileStatus {
             mpcf::FileStatus::ReadyForReview => CFFEFileStatus::ReadyForReview,
             mpcf::FileStatus::Deprecated => CFFEFileStatus::Deprecated,
             mpcf::FileStatus::Baking => CFFEFileStatus::Baking,
-            mpcf::FileStatus::AwaitingPublishing => CFFEFileStatus::AwaitingPublishing,
-            mpcf::FileStatus::FailedPublishing => CFFEFileStatus::FailedPublishing,
+            mpcf::FileStatus::AwaitingPublishing => {
+                CFFEFileStatus::AwaitingPublishing
+            }
+            mpcf::FileStatus::FailedPublishing => {
+                CFFEFileStatus::FailedPublishing
+            }
         }
     }
 }
@@ -216,11 +224,19 @@ pub enum CFFEFileRelationType {
 impl From<mpcf::FileRelationType> for CFFEFileRelationType {
     fn from(relation_type: mpcf::FileRelationType) -> Self {
         match relation_type {
-            mpcf::FileRelationType::EmbeddedLibrary => CFFEFileRelationType::EmbeddedLibrary,
-            mpcf::FileRelationType::OptionalDependency => CFFEFileRelationType::OptionalDependency,
-            mpcf::FileRelationType::RequiredDependency => CFFEFileRelationType::RequiredDependency,
+            mpcf::FileRelationType::EmbeddedLibrary => {
+                CFFEFileRelationType::EmbeddedLibrary
+            }
+            mpcf::FileRelationType::OptionalDependency => {
+                CFFEFileRelationType::OptionalDependency
+            }
+            mpcf::FileRelationType::RequiredDependency => {
+                CFFEFileRelationType::RequiredDependency
+            }
             mpcf::FileRelationType::Tool => CFFEFileRelationType::Tool,
-            mpcf::FileRelationType::Incompatible => CFFEFileRelationType::Incompatible,
+            mpcf::FileRelationType::Incompatible => {
+                CFFEFileRelationType::Incompatible
+            }
             mpcf::FileRelationType::Include => CFFEFileRelationType::Include,
         }
     }
@@ -292,7 +308,9 @@ pub struct CFFEFingerprintFuzzyMatchResult {
     pub fuzzy_matches: Vec<CFFEFingerprintFuzzyMatch>,
 }
 
-impl From<mpcf::FingerprintFuzzyMatchResult> for CFFEFingerprintFuzzyMatchResult {
+impl From<mpcf::FingerprintFuzzyMatchResult>
+    for CFFEFingerprintFuzzyMatchResult
+{
     fn from(fuzzy_match_result: mpcf::FingerprintFuzzyMatchResult) -> Self {
         CFFEFingerprintFuzzyMatchResult {
             fuzzy_matches: fuzzy_match_result
@@ -317,7 +335,11 @@ impl From<mpcf::FingerprintMatch> for CFFEFingerprintMatch {
         CFFEFingerprintMatch {
             id: match_.id,
             file: match_.file.into(),
-            latest_files: match_.latest_files.into_iter().map(|f| f.into()).collect(),
+            latest_files: match_
+                .latest_files
+                .into_iter()
+                .map(|f| f.into())
+                .collect(),
         }
     }
 }
@@ -356,7 +378,9 @@ impl From<mpcf::FingerprintsMatchesResult> for CFFEFingerprintsMatchesResult {
             partial_match_fingerprints: matches_result
                 .partial_match_fingerprints
                 .into_iter()
-                .map(|(k, v)| (k, v.into_iter().map(|f| f.to_string()).collect()))
+                .map(|(k, v)| {
+                    (k, v.into_iter().map(|f| f.to_string()).collect())
+                })
                 .collect(),
             installed_fingerprints: matches_result
                 .installed_fingerprints
@@ -445,8 +469,12 @@ impl From<mpcf::MinecraftGameVersion> for CFFEMinecraftGameVersion {
             approved: minecraft_game_version.approved,
             date_modified: minecraft_game_version.date_modified,
             game_version_type_id: minecraft_game_version.game_version_type_id,
-            game_version_status: minecraft_game_version.game_version_status.into(),
-            game_version_type_status: minecraft_game_version.game_version_type_status.into(),
+            game_version_status: minecraft_game_version
+                .game_version_status
+                .into(),
+            game_version_type_status: minecraft_game_version
+                .game_version_type_status
+                .into(),
         }
     }
 }
@@ -508,14 +536,19 @@ pub struct CFFEMinecraftModLoaderVersion {
 }
 
 impl From<mpcf::MinecraftModLoaderVersion> for CFFEMinecraftModLoaderVersion {
-    fn from(minecraft_mod_loader_version: mpcf::MinecraftModLoaderVersion) -> Self {
+    fn from(
+        minecraft_mod_loader_version: mpcf::MinecraftModLoaderVersion,
+    ) -> Self {
         CFFEMinecraftModLoaderVersion {
             id: minecraft_mod_loader_version.id,
             game_version_id: minecraft_mod_loader_version.game_version_id,
-            minecraft_game_version_id: minecraft_mod_loader_version.minecraft_game_version_id,
+            minecraft_game_version_id: minecraft_mod_loader_version
+                .minecraft_game_version_id,
             forge_version: minecraft_mod_loader_version.forge_version,
             name: minecraft_mod_loader_version.name,
-            mod_loader_type: minecraft_mod_loader_version.mod_loader_type.into(),
+            mod_loader_type: minecraft_mod_loader_version
+                .mod_loader_type
+                .into(),
             download_url: minecraft_mod_loader_version.download_url,
             filename: minecraft_mod_loader_version.filename,
             install_method: minecraft_mod_loader_version.install_method.into(),
@@ -523,12 +556,16 @@ impl From<mpcf::MinecraftModLoaderVersion> for CFFEMinecraftModLoaderVersion {
             recommended: minecraft_mod_loader_version.recommended,
             approved: minecraft_mod_loader_version.approved,
             date_modified: minecraft_mod_loader_version.date_modified,
-            maven_version_string: minecraft_mod_loader_version.maven_version_string,
+            maven_version_string: minecraft_mod_loader_version
+                .maven_version_string,
             version_json: minecraft_mod_loader_version.version_json,
-            libraries_install_location: minecraft_mod_loader_version.libraries_install_location,
+            libraries_install_location: minecraft_mod_loader_version
+                .libraries_install_location,
             minecraft_version: minecraft_mod_loader_version.minecraft_version,
-            additional_files_json: minecraft_mod_loader_version.additional_files_json,
-            mod_loader_game_version_id: minecraft_mod_loader_version.mod_loader_game_version_id,
+            additional_files_json: minecraft_mod_loader_version
+                .additional_files_json,
+            mod_loader_game_version_id: minecraft_mod_loader_version
+                .mod_loader_game_version_id,
             mod_loader_game_version_type_id: minecraft_mod_loader_version
                 .mod_loader_game_version_type_id,
             mod_loader_game_version_status: minecraft_mod_loader_version
@@ -538,12 +575,16 @@ impl From<mpcf::MinecraftModLoaderVersion> for CFFEMinecraftModLoaderVersion {
                 .mod_loader_game_version_type_status
                 .into(),
             mc_game_version_id: minecraft_mod_loader_version.mc_game_version_id,
-            mc_game_version_type_id: minecraft_mod_loader_version.mc_game_version_type_id,
-            mc_game_version_status: minecraft_mod_loader_version.mc_game_version_status.into(),
+            mc_game_version_type_id: minecraft_mod_loader_version
+                .mc_game_version_type_id,
+            mc_game_version_status: minecraft_mod_loader_version
+                .mc_game_version_status
+                .into(),
             mc_game_version_type_status: minecraft_mod_loader_version
                 .mc_game_version_type_status
                 .into(),
-            install_profile_json: minecraft_mod_loader_version.install_profile_json,
+            install_profile_json: minecraft_mod_loader_version
+                .install_profile_json,
         }
     }
 }
@@ -755,13 +796,19 @@ pub struct CFFESortableGameVersion {
 }
 
 impl From<mpcf::SortableGameVersion> for CFFESortableGameVersion {
-    fn from(minecraft_sortable_game_version: mpcf::SortableGameVersion) -> Self {
+    fn from(
+        minecraft_sortable_game_version: mpcf::SortableGameVersion,
+    ) -> Self {
         CFFESortableGameVersion {
-            game_version_name: minecraft_sortable_game_version.game_version_name,
-            game_version_padded: minecraft_sortable_game_version.game_version_padded,
+            game_version_name: minecraft_sortable_game_version
+                .game_version_name,
+            game_version_padded: minecraft_sortable_game_version
+                .game_version_padded,
             game_version: minecraft_sortable_game_version.game_version,
-            game_version_release_date: minecraft_sortable_game_version.game_version_release_date,
-            game_version_type_id: minecraft_sortable_game_version.game_version_type_id,
+            game_version_release_date: minecraft_sortable_game_version
+                .game_version_release_date,
+            game_version_type_id: minecraft_sortable_game_version
+                .game_version_type_id,
         }
     }
 }
@@ -833,7 +880,9 @@ pub enum CFFEGameVersionStatus {
 impl From<mpcf::GameVersionStatus> for CFFEGameVersionStatus {
     fn from(minecraft_game_version_status: mpcf::GameVersionStatus) -> Self {
         match minecraft_game_version_status {
-            mpcf::GameVersionStatus::Approved => CFFEGameVersionStatus::Approved,
+            mpcf::GameVersionStatus::Approved => {
+                CFFEGameVersionStatus::Approved
+            }
             mpcf::GameVersionStatus::Deleted => CFFEGameVersionStatus::Deleted,
             mpcf::GameVersionStatus::New => CFFEGameVersionStatus::New,
         }
@@ -848,10 +897,16 @@ pub enum CFFEGameVersionTypeStatus {
 }
 
 impl From<mpcf::GameVersionTypeStatus> for CFFEGameVersionTypeStatus {
-    fn from(minecraft_game_version_type_status: mpcf::GameVersionTypeStatus) -> Self {
+    fn from(
+        minecraft_game_version_type_status: mpcf::GameVersionTypeStatus,
+    ) -> Self {
         match minecraft_game_version_type_status {
-            mpcf::GameVersionTypeStatus::Normal => CFFEGameVersionTypeStatus::Normal,
-            mpcf::GameVersionTypeStatus::Deleted => CFFEGameVersionTypeStatus::Deleted,
+            mpcf::GameVersionTypeStatus::Normal => {
+                CFFEGameVersionTypeStatus::Normal
+            }
+            mpcf::GameVersionTypeStatus::Deleted => {
+                CFFEGameVersionTypeStatus::Deleted
+            }
         }
     }
 }
@@ -906,9 +961,13 @@ pub enum CFFEModLoaderInstallMethod {
 }
 use mpcf::ModLoaderInstallMethod as CFModLoaderInstallMethod;
 impl From<CFModLoaderInstallMethod> for CFFEModLoaderInstallMethod {
-    fn from(minecraft_mod_loader_install_method: CFModLoaderInstallMethod) -> Self {
+    fn from(
+        minecraft_mod_loader_install_method: CFModLoaderInstallMethod,
+    ) -> Self {
         match minecraft_mod_loader_install_method {
-            CFModLoaderInstallMethod::ForgeInstaller => CFFEModLoaderInstallMethod::ForgeInstaller,
+            CFModLoaderInstallMethod::ForgeInstaller => {
+                CFFEModLoaderInstallMethod::ForgeInstaller
+            }
             CFModLoaderInstallMethod::ForgeJarInstall => {
                 CFFEModLoaderInstallMethod::ForgeJarInstall
             }
@@ -1086,11 +1145,19 @@ pub enum CFFEDependencyType {
 impl From<mpcf::DependencyType> for CFFEDependencyType {
     fn from(minecraft_dependency_type: mpcf::DependencyType) -> Self {
         match minecraft_dependency_type {
-            mpcf::DependencyType::EmbeddedLibrary => CFFEDependencyType::EmbeddedLibrary,
-            mpcf::DependencyType::OptionalDependency => CFFEDependencyType::OptionalDependency,
-            mpcf::DependencyType::RequiredDependency => CFFEDependencyType::RequiredDependency,
+            mpcf::DependencyType::EmbeddedLibrary => {
+                CFFEDependencyType::EmbeddedLibrary
+            }
+            mpcf::DependencyType::OptionalDependency => {
+                CFFEDependencyType::OptionalDependency
+            }
+            mpcf::DependencyType::RequiredDependency => {
+                CFFEDependencyType::RequiredDependency
+            }
             mpcf::DependencyType::Tool => CFFEDependencyType::Tool,
-            mpcf::DependencyType::Incompatible => CFFEDependencyType::Incompatible,
+            mpcf::DependencyType::Incompatible => {
+                CFFEDependencyType::Incompatible
+            }
             mpcf::DependencyType::Include => CFFEDependencyType::Include,
         }
     }

@@ -70,9 +70,9 @@ impl TryFrom<ModrinthPackDependencies> for StandardVersion {
     type Error = anyhow::Error;
 
     fn try_from(value: ModrinthPackDependencies) -> Result<Self, Self::Error> {
-        let minecraft_version = value
-            .minecraft
-            .ok_or_else(|| anyhow!("Modpack does not have a Minecraft version listed"))?;
+        let minecraft_version = value.minecraft.ok_or_else(|| {
+            anyhow!("Modpack does not have a Minecraft version listed")
+        })?;
         let mut modloaders = HashSet::new();
         if let Some(forge_version) = value.forge {
             modloaders.insert(ModLoader {

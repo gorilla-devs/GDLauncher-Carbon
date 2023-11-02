@@ -20,7 +20,10 @@ use uuid::Uuid;
 
 use crate::{
     db::read_filters::StringFilter,
-    error::request::{MalformedResponseDetails, RequestContext, RequestError, RequestErrorDetails},
+    error::request::{
+        MalformedResponseDetails, RequestContext, RequestError,
+        RequestErrorDetails,
+    },
     once_send::OnceSend,
 };
 
@@ -67,7 +70,10 @@ impl ManagerRef<'_, DownloadManager> {
     /// Cancel a download, deleting the file.
     ///
     /// If the download has already finished the files will be deleted anyway.
-    pub async fn cancel_download(self, handle: DownloadHandle) -> Result<(), DownloadCancelError> {
+    pub async fn cancel_download(
+        self,
+        handle: DownloadHandle,
+    ) -> Result<(), DownloadCancelError> {
         use crate::db::active_downloads::UniqueWhereParam;
 
         // stop the handle's drop() from being called
@@ -135,7 +141,10 @@ impl ManagerRef<'_, DownloadManager> {
         Ok(())
     }
 
-    pub async fn start_download(self, url: String) -> Result<DownloadHandle, DownloadStartError> {
+    pub async fn start_download(
+        self,
+        url: String,
+    ) -> Result<DownloadHandle, DownloadStartError> {
         use crate::db::active_downloads::WhereParam;
 
         // Lock active_downloads. Any future downloads will have to wait here.
@@ -152,7 +161,9 @@ impl ManagerRef<'_, DownloadManager> {
             .app
             .prisma_client
             .active_downloads()
-            .find_first(vec![WhereParam::Url(StringFilter::Equals(url.clone()))])
+            .find_first(vec![WhereParam::Url(StringFilter::Equals(
+                url.clone(),
+            ))])
             .exec()
             .await?;
 
@@ -180,9 +191,11 @@ impl ManagerRef<'_, DownloadManager> {
             .to_pathbuf()
             .join(&id);
 
-        let (status_send, status_recv) = watch::channel::<Option<DownloadStatus>>(None);
+        let (status_send, status_recv) =
+            watch::channel::<Option<DownloadStatus>>(None);
         let (cancel_send, mut cancel_recv) = mpsc::channel::<()>(1);
-        let (cancel_complete_send, cancel_complete_recv) = mpsc::channel::<()>(1);
+        let (cancel_complete_send, cancel_complete_recv) =
+            mpsc::channel::<()>(1);
         let (complete_send, complete_recv) = mpsc::channel::<()>(1);
 
         active_downloads.insert(url.clone());
@@ -200,7 +213,8 @@ impl ManagerRef<'_, DownloadManager> {
                 let app = &app;
                 async move {
                     tokio::fs::create_dir_all(
-                        path.parent().ok_or(ActiveDownloadError::MalformedPath)?,
+                        path.parent()
+                            .ok_or(ActiveDownloadError::MalformedPath)?,
                     )
                     .await?;
 
@@ -218,10 +232,12 @@ impl ManagerRef<'_, DownloadManager> {
                         url: &str,
                         start_loc: u64,
                     ) -> anyhow::Result<Response> {
-                        let mut builder = client.get(url).header("avoid-caching", "");
+                        let mut builder =
+                            client.get(url).header("avoid-caching", "");
 
                         if start_loc != 0 {
-                            builder = builder.header("Range", format!("bytes={start_loc}-"));
+                            builder = builder
+                                .header("Range", format!("bytes={start_loc}-"));
                         }
 
                         let response = builder.send().await?;
@@ -233,22 +249,30 @@ impl ManagerRef<'_, DownloadManager> {
                         Ok(response)
                     }
 
-                    let mut response = init_request(&app.reqwest_client, &url, start_loc).await?;
+                    let mut response =
+                        init_request(&app.reqwest_client, &url, start_loc)
+                            .await?;
 
                     match response.headers().get("content-range") {
                         Some(range_header) => {
                             let parse_start = || {
-                                let mut header_str = range_header.to_str().map_err(|_| ())?;
+                                let mut header_str =
+                                    range_header.to_str().map_err(|_| ())?;
 
                                 match header_str.get(0..6) {
-                                    Some("bytes ") => header_str = &header_str[6..],
+                                    Some("bytes ") => {
+                                        header_str = &header_str[6..]
+                                    }
                                     _ => return Err(()),
                                 }
 
-                                let Some((range, _)) = header_str.split_once('/') else {
+                                let Some((range, _)) =
+                                    header_str.split_once('/')
+                                else {
                                     return Err(());
                                 };
-                                let Some((start, _)) = range.split_once('-') else {
+                                let Some((start, _)) = range.split_once('-')
+                                else {
                                     return Err(());
                                 };
                                 let Ok(start) = u64::from_str(start) else {
@@ -265,8 +289,12 @@ impl ManagerRef<'_, DownloadManager> {
                                         // again if we re-request with our starting point, so start from 0.
                                         start_loc = 0;
                                         file.set_len(0).await?;
-                                        response =
-                                            init_request(&app.reqwest_client, &url, 0).await?;
+                                        response = init_request(
+                                            &app.reqwest_client,
+                                            &url,
+                                            0,
+                                        )
+                                        .await?;
                                     } else if start < start_loc {
                                         // server gave a resume point earlier than we have, truncate the file to the
                                         // server's position.
@@ -292,7 +320,8 @@ impl ManagerRef<'_, DownloadManager> {
 
                     let mut writebuf = BufWriter::new(file);
 
-                    let length = response.content_length().map(|x| x as u64 + start_loc);
+                    let length =
+                        response.content_length().map(|x| x as u64 + start_loc);
 
                     let mut downloaded = start_loc;
 
@@ -301,8 +330,10 @@ impl ManagerRef<'_, DownloadManager> {
                         total: length,
                     }));
 
-                    while let Some(chunk) =
-                        response.chunk().await.map_err(RequestError::from_error)?
+                    while let Some(chunk) = response
+                        .chunk()
+                        .await
+                        .map_err(RequestError::from_error)?
                     {
                         if let Ok(()) = cancel_recv.try_recv() {
                             *canceled_ref = true;
@@ -312,10 +343,11 @@ impl ManagerRef<'_, DownloadManager> {
                         writebuf.write_all(&chunk).await?;
 
                         downloaded += chunk.len() as u64;
-                        let _ = status_send.send(Some(DownloadStatus::Status {
-                            downloaded,
-                            total: length,
-                        }));
+                        let _ =
+                            status_send.send(Some(DownloadStatus::Status {
+                                downloaded,
+                                total: length,
+                            }));
                     }
 
                     // will NOT be flushed on drop, so it is done manually
@@ -325,7 +357,8 @@ impl ManagerRef<'_, DownloadManager> {
                     if !*canceled_ref {
                         // the complete flag is set first to avoid a possible race condition
                         let _ = complete_send.send(()).await;
-                        let _ = status_send.send(Some(DownloadStatus::Complete));
+                        let _ =
+                            status_send.send(Some(DownloadStatus::Complete));
                     }
 
                     Ok(())
@@ -350,7 +383,8 @@ impl ManagerRef<'_, DownloadManager> {
             match r {
                 Ok(()) => {}
                 Err(e) => {
-                    let _ = status_send.send(Some(DownloadStatus::Failed(OnceSend::new(e))));
+                    let _ = status_send
+                        .send(Some(DownloadStatus::Failed(OnceSend::new(e))));
                 }
             }
         };
@@ -516,7 +550,8 @@ mod test {
     async fn attempt_download() -> Result<(), DownloadError> {
         let app = crate::setup_managers_for_test().await;
 
-        let tmpfolder = app.settings_manager().runtime_path.get_temp().to_path();
+        let tmpfolder =
+            app.settings_manager().runtime_path.get_temp().to_path();
 
         tokio::fs::create_dir_all(tmpfolder).await.unwrap();
 
@@ -528,7 +563,9 @@ mod test {
                     .get_temp()
                     .to_path()
                     .join("gdl.html"),
-                &mut |downloaded, total| error!("Downloaded {downloaded}/{total:?}"),
+                &mut |downloaded, total| {
+                    error!("Downloaded {downloaded}/{total:?}")
+                },
             )
             .await
     }
@@ -538,7 +575,8 @@ mod test {
     async fn attempt_download_twice() {
         let app = crate::setup_managers_for_test().await;
 
-        let tmpfolder = app.settings_manager().runtime_path.get_temp().to_path();
+        let tmpfolder =
+            app.settings_manager().runtime_path.get_temp().to_path();
 
         tokio::fs::create_dir_all(tmpfolder).await.unwrap();
 
@@ -559,7 +597,8 @@ mod test {
     async fn attempt_download_after_cancel() -> Result<(), DownloadStartError> {
         let app = crate::setup_managers_for_test().await;
 
-        let tmpfolder = app.settings_manager().runtime_path.get_temp().to_path();
+        let tmpfolder =
+            app.settings_manager().runtime_path.get_temp().to_path();
 
         tokio::fs::create_dir_all(tmpfolder).await.unwrap();
 
@@ -577,7 +616,8 @@ mod test {
     async fn attempt_cancel_download() {
         let app = crate::setup_managers_for_test().await;
 
-        let tmpfolder = app.settings_manager().runtime_path.get_temp().to_path();
+        let tmpfolder =
+            app.settings_manager().runtime_path.get_temp().to_path();
 
         tokio::fs::create_dir_all(tmpfolder).await.unwrap();
 

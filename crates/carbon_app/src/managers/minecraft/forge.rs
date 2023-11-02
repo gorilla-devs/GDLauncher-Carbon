@@ -6,7 +6,9 @@ use std::{
 
 use anyhow::bail;
 use daedalus::{
-    modded::{LoaderVersion, Manifest, PartialVersionInfo, Processor, SidedDataEntry},
+    modded::{
+        LoaderVersion, Manifest, PartialVersionInfo, Processor, SidedDataEntry,
+    },
     GradleSpecifier,
 };
 use prisma_client_rust::QueryError;
@@ -58,7 +60,10 @@ pub async fn get_version(
     Ok(new_manifest)
 }
 
-fn get_class_paths_jar(libraries_path: &Path, libraries: &[String]) -> anyhow::Result<String> {
+fn get_class_paths_jar(
+    libraries_path: &Path,
+    libraries: &[String],
+) -> anyhow::Result<String> {
     let cps = libraries
         .iter()
         .map(|library| {
@@ -75,15 +80,18 @@ fn get_class_paths_jar(libraries_path: &Path, libraries: &[String]) -> anyhow::R
     Ok(cps.join(PATH_SEPARATOR))
 }
 
-async fn get_processor_main_class(path: String) -> anyhow::Result<Option<String>> {
+async fn get_processor_main_class(
+    path: String,
+) -> anyhow::Result<Option<String>> {
     let main_class = tokio::task::spawn_blocking(move || {
         let zipfile = std::fs::File::open(&path)?;
-        let mut archive = zip::ZipArchive::new(zipfile)
-            .map_err(|_| anyhow::anyhow!("Cannot read processor at {}", path))?;
+        let mut archive = zip::ZipArchive::new(zipfile).map_err(|_| {
+            anyhow::anyhow!("Cannot read processor at {}", path)
+        })?;
 
-        let file = archive
-            .by_name("META-INF/MANIFEST.MF")
-            .map_err(|_| anyhow::anyhow!("Cannot read processor manifest at {}", path))?;
+        let file = archive.by_name("META-INF/MANIFEST.MF").map_err(|_| {
+            anyhow::anyhow!("Cannot read processor manifest at {}", path)
+        })?;
 
         let reader = BufReader::new(file);
 
@@ -205,16 +213,26 @@ pub async fn execute_processors<'callback>(
         classpath.extend(processor.classpath.clone());
         classpath.push(processor.jar.clone());
 
-        let classpath = get_class_paths_jar(&libraries_path.to_path(), &classpath)?;
+        let classpath =
+            get_class_paths_jar(&libraries_path.to_path(), &classpath)?;
         let main_class_path = libraries_path
             .to_path()
             .join(processor.jar.parse::<GradleSpecifier>()?.into_path());
-        let main_class = get_processor_main_class(main_class_path.to_string_lossy().to_string())
-            .await?
-            .ok_or_else(|| {
-                anyhow::anyhow!("Could not find processor main class for {}", processor.jar)
-            })?;
-        let arguments = get_processor_arguments(&libraries_path.to_path(), &processor.args, &data)?;
+        let main_class = get_processor_main_class(
+            main_class_path.to_string_lossy().to_string(),
+        )
+        .await?
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Could not find processor main class for {}",
+                processor.jar
+            )
+        })?;
+        let arguments = get_processor_arguments(
+            &libraries_path.to_path(),
+            &processor.args,
+            &data,
+        )?;
 
         let child = Command::new(java_binary.to_string_lossy().to_string())
             .arg("-cp")
@@ -224,7 +242,11 @@ pub async fn execute_processors<'callback>(
             .output()
             .await
             .map_err(|err| {
-                anyhow::anyhow!("Could not execute processor {}: {}", processor.jar, err)
+                anyhow::anyhow!(
+                    "Could not execute processor {}: {}",
+                    processor.jar,
+                    err
+                )
             })?;
 
         info!("{}", String::from_utf8_lossy(&child.stdout));

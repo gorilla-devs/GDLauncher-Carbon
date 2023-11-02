@@ -141,19 +141,26 @@ impl ManagedService {
                 let versions = self.azul_zulu.fetch_all_versions().await?;
                 let version = versions
                     .get(&os)
-                    .ok_or_else(|| anyhow::anyhow!("No versions for os: {:?}", os))?
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("No versions for os: {:?}", os)
+                    })?
                     .get(&arch)
-                    .ok_or_else(|| anyhow::anyhow!("No versions for arch: {:?}", arch))?
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("No versions for arch: {:?}", arch)
+                    })?
                     .iter()
                     .find(|v| v.id == id)
-                    .ok_or_else(|| anyhow::anyhow!("No version for id: {}", id))?;
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("No version for id: {}", id)
+                    })?;
 
                 let tmp_path = app.settings_manager().runtime_path.get_temp();
                 let base_managed_java_path =
                     app.settings_manager().runtime_path.get_managed_javas();
                 let db_client = &app.prisma_client.clone();
 
-                let (sender, mut recv) = tokio::sync::watch::channel(Step::Idle);
+                let (sender, mut recv) =
+                    tokio::sync::watch::channel(Step::Idle);
 
                 let progress_ref = Arc::clone(&self.setup_progress);
 
@@ -168,7 +175,10 @@ impl ManagedService {
                         }
                         app.invalidate(GET_SETUP_MANAGED_JAVA_PROGRESS, None);
                         drop(progress_ref);
-                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                        tokio::time::sleep(std::time::Duration::from_millis(
+                            100,
+                        ))
+                        .await;
                     }
                 });
 

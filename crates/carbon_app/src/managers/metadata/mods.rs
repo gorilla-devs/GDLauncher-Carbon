@@ -50,10 +50,12 @@ struct NewMcModInfoObj {
 struct McModInfo {
     modid: Option<String>,
     name: Option<String>,
-    #[serde(alias = "mcversion")] // cccmod.info uses mcversion instead of version
+    #[serde(alias = "mcversion")]
+    // cccmod.info uses mcversion instead of version
     version: Option<String>,
     description: Option<String>,
-    #[serde(alias = "authorList")] // cccmod.info uses authorList instead of authors
+    #[serde(alias = "authorList")]
+    // cccmod.info uses authorList instead of authors
     authors: Option<Vec<String>>,
     #[serde(rename = "logoFile")]
     logo_file: Option<String>,
@@ -79,7 +81,9 @@ impl TryFrom<McModInfoContainer> for McModInfo {
         use McModInfoContainer as Container;
 
         let meta = match value {
-            Container::Old(mod_list) => mod_list.into_iter().next().map(Into::into),
+            Container::Old(mod_list) => {
+                mod_list.into_iter().next().map(Into::into)
+            }
             Container::New(NewMcModInfo { mod_list }) => {
                 mod_list.into_iter().next().map(Into::into)
             }
@@ -233,7 +237,9 @@ fn pick_best_icon(icons: HashMap<String, String>) -> Option<String> {
     for (width, path) in icons.into_iter().rev() {
         match best {
             None => best = Some((width, path)),
-            Some((old_width, _)) if width < old_width && width >= 45 => best = Some((width, path)),
+            Some((old_width, _)) if width < old_width && width >= 45 => {
+                best = Some((width, path))
+            }
             _ => {}
         }
     }
@@ -601,10 +607,12 @@ impl TryFrom<FabricModJson> for ModFileMetadata {
 
 impl From<QuiltModJson> for ModFileMetadata {
     fn from(value: QuiltModJson) -> Self {
-        let (name, description, authors, icon) = if let Some(metadata) = value.quilt_loader.metadata
+        let (name, description, authors, icon) = if let Some(metadata) =
+            value.quilt_loader.metadata
         {
             let authors = metadata.contributors.map(|contributors| {
-                let authors_string = contributors.keys().cloned().collect::<Vec<_>>().join(", ");
+                let authors_string =
+                    contributors.keys().cloned().collect::<Vec<_>>().join(", ");
                 authors_string
             });
             (
@@ -650,7 +658,9 @@ fn merge_mod_metadata(
     }
 }
 
-pub fn parse_metadata(reader: impl Read + Seek) -> anyhow::Result<Option<ModFileMetadata>> {
+pub fn parse_metadata(
+    reader: impl Read + Seek,
+) -> anyhow::Result<Option<ModFileMetadata>> {
     let mut zip = zip::ZipArchive::new(reader)?;
 
     let mut mod_metadata: Option<ModFileMetadata> = None;
@@ -677,7 +687,9 @@ pub fn parse_metadata(reader: impl Read + Seek) -> anyhow::Result<Option<ModFile
                 for line in buffered.lines() {
                     let line = line?;
 
-                    if let Some((_, version)) = line.split_once("Implementation-Version: ") {
+                    if let Some((_, version)) =
+                        line.split_once("Implementation-Version: ")
+                    {
                         modstoml.version = version.to_string();
                         break;
                     }
@@ -705,7 +717,8 @@ pub fn parse_metadata(reader: impl Read + Seek) -> anyhow::Result<Option<ModFile
 
         let fabric_mod_json = serde_json::from_str::<FabricModJson>(&content)?;
 
-        mod_metadata = merge_mod_metadata(mod_metadata, fabric_mod_json.try_into()?);
+        mod_metadata =
+            merge_mod_metadata(mod_metadata, fabric_mod_json.try_into()?);
     }
 
     'quilt_mod_json: {
@@ -740,10 +753,12 @@ pub fn parse_metadata(reader: impl Read + Seek) -> anyhow::Result<Option<ModFile
         }
 
         let mcmod: McModInfo =
-            serde_json::from_reader::<_, McModInfoContainer>(file.expect("we just checked this"))
-                .unwrap_or_default()
-                .try_into()
-                .unwrap_or_default();
+            serde_json::from_reader::<_, McModInfoContainer>(
+                file.expect("we just checked this"),
+            )
+            .unwrap_or_default()
+            .try_into()
+            .unwrap_or_default();
 
         mod_metadata = merge_mod_metadata(mod_metadata, mcmod.into());
     }
@@ -761,11 +776,15 @@ mod test {
 
     use super::{parse_metadata, ModFileMetadata};
 
-    pub fn parsemeta(path: &str, content: &str) -> anyhow::Result<Option<ModFileMetadata>> {
+    pub fn parsemeta(
+        path: &str,
+        content: &str,
+    ) -> anyhow::Result<Option<ModFileMetadata>> {
         // write meta zip
         let mut vec = Vec::<u8>::new();
         let mut zip = ZipWriter::new(Cursor::new(&mut vec));
-        let options = FileOptions::default().compression_method(CompressionMethod::Stored);
+        let options = FileOptions::default()
+            .compression_method(CompressionMethod::Stored);
         zip.start_file(path, options)?;
         zip.write(content.as_bytes())?;
         zip.finish()?;

@@ -166,7 +166,9 @@ impl TempPath {
         self.0.clone()
     }
 
-    pub async fn maketmp<T: tempentry::TempEntryType>(&self) -> anyhow::Result<TempEntry<T>> {
+    pub async fn maketmp<T: tempentry::TempEntryType>(
+        &self,
+    ) -> anyhow::Result<TempEntry<T>> {
         let time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("time is somehow pre-epoch")
@@ -196,11 +198,15 @@ impl TempPath {
         Err(anyhow!("Could not create tmpdir"))
     }
 
-    pub async fn maketmpdir(&self) -> anyhow::Result<TempEntry<tempentry::Folder>> {
+    pub async fn maketmpdir(
+        &self,
+    ) -> anyhow::Result<TempEntry<tempentry::Folder>> {
         self.maketmp().await
     }
 
-    pub async fn maketmpfile(&self) -> anyhow::Result<TempEntry<tempentry::File>> {
+    pub async fn maketmpfile(
+        &self,
+    ) -> anyhow::Result<TempEntry<tempentry::File>> {
         self.maketmp().await
     }
 
@@ -343,7 +349,11 @@ impl Deref for RuntimePath {
 
 /// Recursivley copy from `from` to `to` except when excluded by `filter`.
 /// Overwrites existing files. May fail if a parent directory is filtered but children are not.
-pub async fn copy_dir_filter<F>(from: &Path, to: &Path, filter: F) -> anyhow::Result<()>
+pub async fn copy_dir_filter<F>(
+    from: &Path,
+    to: &Path,
+    filter: F,
+) -> anyhow::Result<()>
 where
     F: for<'a> Fn(&'a Path) -> bool,
 {

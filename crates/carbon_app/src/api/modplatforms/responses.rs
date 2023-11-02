@@ -31,7 +31,9 @@ pub struct FEUnifiedSearchResponse {
     pub pagination: Option<FEUnifiedPagination>,
 }
 
-impl From<curseforge::responses::FEModSearchResponse> for FEUnifiedSearchResponse {
+impl From<curseforge::responses::FEModSearchResponse>
+    for FEUnifiedSearchResponse
+{
     fn from(value: curseforge::responses::FEModSearchResponse) -> Self {
         FEUnifiedSearchResponse {
             search_api: FESearchAPI::Curseforge,
@@ -40,17 +42,21 @@ impl From<curseforge::responses::FEModSearchResponse> for FEUnifiedSearchRespons
                 .into_iter()
                 .map(FEUnifiedSearchResult::Curseforge)
                 .collect(),
-            pagination: value.pagination.map(|pagination| FEUnifiedPagination {
-                index: pagination.index as u32,
-                page_size: pagination.page_size as u32,
-                result_count: pagination.result_count as u32,
-                total_count: pagination.total_count as u32,
+            pagination: value.pagination.map(|pagination| {
+                FEUnifiedPagination {
+                    index: pagination.index as u32,
+                    page_size: pagination.page_size as u32,
+                    result_count: pagination.result_count as u32,
+                    total_count: pagination.total_count as u32,
+                }
             }),
         }
     }
 }
 
-impl From<modrinth::responses::MRFEProjectSearchResponse> for FEUnifiedSearchResponse {
+impl From<modrinth::responses::MRFEProjectSearchResponse>
+    for FEUnifiedSearchResponse
+{
     fn from(value: modrinth::responses::MRFEProjectSearchResponse) -> Self {
         let result_count = value.hits.len();
         FEUnifiedSearchResponse {

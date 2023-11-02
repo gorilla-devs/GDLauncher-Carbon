@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::modplatforms::modrinth::{
     project::{
-        DonationLink, GalleryItem, License, ModeratorMessage, Project, ProjectStatus,
-        ProjectSupportRange, ProjectType,
+        DonationLink, GalleryItem, License, ModeratorMessage, Project,
+        ProjectStatus, ProjectSupportRange, ProjectType,
     },
     search::ProjectSearchResult,
     tag::{Category, Loader, LoaderType},
@@ -35,7 +35,9 @@ impl From<ProjectSupportRange> for MRFEProjectSupportRange {
     fn from(value: ProjectSupportRange) -> Self {
         match value {
             ProjectSupportRange::Required => MRFEProjectSupportRange::Required,
-            ProjectSupportRange::Unsupported => MRFEProjectSupportRange::Unsupported,
+            ProjectSupportRange::Unsupported => {
+                MRFEProjectSupportRange::Unsupported
+            }
             ProjectSupportRange::Optional => MRFEProjectSupportRange::Optional,
             ProjectSupportRange::Unknown => MRFEProjectSupportRange::Unknown,
         }
@@ -46,7 +48,9 @@ impl From<MRFEProjectSupportRange> for ProjectSupportRange {
     fn from(value: MRFEProjectSupportRange) -> Self {
         match value {
             MRFEProjectSupportRange::Required => ProjectSupportRange::Required,
-            MRFEProjectSupportRange::Unsupported => ProjectSupportRange::Unsupported,
+            MRFEProjectSupportRange::Unsupported => {
+                ProjectSupportRange::Unsupported
+            }
             MRFEProjectSupportRange::Optional => ProjectSupportRange::Optional,
             MRFEProjectSupportRange::Unknown => ProjectSupportRange::Unknown,
         }
@@ -389,7 +393,11 @@ impl From<Version> for MRFEVersion {
             name: value.name,
             version_number: value.version_number,
             changelog: value.changelog,
-            dependencies: value.dependencies.into_iter().map(Into::into).collect(),
+            dependencies: value
+                .dependencies
+                .into_iter()
+                .map(Into::into)
+                .collect(),
             game_versions: value.game_versions,
             version_type: value.version_type.into(),
             loaders: value.loaders,
@@ -415,7 +423,11 @@ impl TryFrom<MRFEVersion> for Version {
             name: value.name,
             version_number: value.version_number,
             changelog: value.changelog,
-            dependencies: value.dependencies.into_iter().map(Into::into).collect(),
+            dependencies: value
+                .dependencies
+                .into_iter()
+                .map(Into::into)
+                .collect(),
             game_versions: value.game_versions,
             version_type: value.version_type.into(),
             loaders: value.loaders,
@@ -671,10 +683,16 @@ pub enum MRFERequestedVersionStatus {
 impl From<RequestedVersionStatus> for MRFERequestedVersionStatus {
     fn from(value: RequestedVersionStatus) -> Self {
         match value {
-            RequestedVersionStatus::Listed => MRFERequestedVersionStatus::Listed,
-            RequestedVersionStatus::Archived => MRFERequestedVersionStatus::Archived,
+            RequestedVersionStatus::Listed => {
+                MRFERequestedVersionStatus::Listed
+            }
+            RequestedVersionStatus::Archived => {
+                MRFERequestedVersionStatus::Archived
+            }
             RequestedVersionStatus::Draft => MRFERequestedVersionStatus::Draft,
-            RequestedVersionStatus::Unlisted => MRFERequestedVersionStatus::Unlisted,
+            RequestedVersionStatus::Unlisted => {
+                MRFERequestedVersionStatus::Unlisted
+            }
         }
     }
 }
@@ -682,10 +700,16 @@ impl From<RequestedVersionStatus> for MRFERequestedVersionStatus {
 impl From<MRFERequestedVersionStatus> for RequestedVersionStatus {
     fn from(value: MRFERequestedVersionStatus) -> Self {
         match value {
-            MRFERequestedVersionStatus::Listed => RequestedVersionStatus::Listed,
-            MRFERequestedVersionStatus::Archived => RequestedVersionStatus::Archived,
+            MRFERequestedVersionStatus::Listed => {
+                RequestedVersionStatus::Listed
+            }
+            MRFERequestedVersionStatus::Archived => {
+                RequestedVersionStatus::Archived
+            }
             MRFERequestedVersionStatus::Draft => RequestedVersionStatus::Draft,
-            MRFERequestedVersionStatus::Unlisted => RequestedVersionStatus::Unlisted,
+            MRFERequestedVersionStatus::Unlisted => {
+                RequestedVersionStatus::Unlisted
+            }
         }
     }
 }
@@ -790,7 +814,11 @@ impl From<Project> for MRFEProject {
             source_url: value.source_url,
             wiki_url: value.wiki_url,
             discord_url: value.discord_url,
-            donation_urls: value.donation_urls.into_iter().map(Into::into).collect(),
+            donation_urls: value
+                .donation_urls
+                .into_iter()
+                .map(Into::into)
+                .collect(),
             project_type: value.project_type.into(),
             downloads: value.downloads,
             icon_url: value.icon_url,
@@ -829,7 +857,11 @@ impl TryFrom<MRFEProject> for Project {
             source_url: value.source_url,
             wiki_url: value.wiki_url,
             discord_url: value.discord_url,
-            donation_urls: value.donation_urls.into_iter().map(Into::into).collect(),
+            donation_urls: value
+                .donation_urls
+                .into_iter()
+                .map(Into::into)
+                .collect(),
             project_type: value.project_type.into(),
             downloads: value.downloads,
             icon_url: value.icon_url,

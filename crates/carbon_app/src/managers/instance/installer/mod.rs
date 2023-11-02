@@ -11,7 +11,10 @@ use crate::{
         modplatforms::{
             curseforge::{
                 self,
-                filters::{ModFileParameters, ModFilesParameters, ModFilesParametersQuery},
+                filters::{
+                    ModFileParameters, ModFilesParameters,
+                    ModFilesParametersQuery,
+                },
             },
             modrinth::{
                 self,
@@ -32,8 +35,12 @@ use futures::future::Future;
 
 type BoxedResourceInstaller = Box<dyn ResourceInstaller + Send>;
 type ResourceInstallerGetter = Box<
-    dyn FnOnce() -> Pin<Box<dyn Future<Output = anyhow::Result<BoxedResourceInstaller>> + Send>>
-        + Send,
+    dyn FnOnce() -> Pin<
+            Box<
+                dyn Future<Output = anyhow::Result<BoxedResourceInstaller>>
+                    + Send,
+            >,
+        > + Send,
 >;
 
 pub struct DependencyIterator<'iter> {
@@ -71,7 +78,10 @@ pub enum ResourceFingerprint {
 pub trait ResourceInstaller: Sync {
     /// a unique ID to identify dependency loops
     fn id(&self) -> String;
-    async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable>;
+    async fn downloadable(
+        &self,
+        instance_path: &InstancePath,
+    ) -> Option<Downloadable>;
     fn dependencies(
         &self,
         app: &Arc<AppInner>,
@@ -90,7 +100,10 @@ pub trait ResourceInstaller: Sync {
         instance_id: InstanceId,
         downloadable: Option<Downloadable>,
     ) -> anyhow::Result<()>;
-    async fn rollback(&self, instance_data: &mut InstanceData) -> anyhow::Result<()>;
+    async fn rollback(
+        &self,
+        instance_data: &mut InstanceData,
+    ) -> anyhow::Result<()>;
 }
 
 #[async_trait::async_trait]
@@ -101,7 +114,10 @@ impl<I: ResourceInstaller + ?Sized + Send> ResourceInstaller for Box<I> {
     }
 
     #[inline]
-    async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable> {
+    async fn downloadable(
+        &self,
+        instance_path: &InstancePath,
+    ) -> Option<Downloadable> {
         (**self).downloadable(instance_path).await
     }
 
@@ -141,7 +157,10 @@ impl<I: ResourceInstaller + ?Sized + Send> ResourceInstaller for Box<I> {
     }
 
     #[inline]
-    async fn rollback(&self, instance_data: &mut InstanceData) -> anyhow::Result<()> {
+    async fn rollback(
+        &self,
+        instance_data: &mut InstanceData,
+    ) -> anyhow::Result<()> {
         (**self).rollback(instance_data).await
     }
 }
@@ -162,13 +181,13 @@ impl InstallerRollbackContext {
     pub async fn rollback(&self, inciting_error: Option<&anyhow::Error>) {
         let instance_manager = self.app.instance_manager();
         let mut instances = instance_manager.instances.write().await;
-        let instance = instances
-            .get_mut(&self.instance_id)
-            .expect("rollback should be called only when operating on a valid instance");
+        let instance = instances.get_mut(&self.instance_id).expect(
+            "rollback should be called only when operating on a valid instance",
+        );
 
-        let data = instance
-            .data_mut()
-            .expect("rollback should be called only when operating on a valid instance");
+        let data = instance.data_mut().expect(
+            "rollback should be called only when operating on a valid instance",
+        );
 
         let parent_name = {
             let lock = self.inner.lock().await;
@@ -281,10 +300,11 @@ impl Installer {
                     bail!("resource is already installed");
                 }
 
-                let task = VisualTask::new(Translation::InstanceTaskInstallMod {
-                    mod_name: lock.display_name(),
-                    instance_name: data.config.name.clone(),
-                });
+                let task =
+                    VisualTask::new(Translation::InstanceTaskInstallMod {
+                        mod_name: lock.display_name(),
+                        instance_name: data.config.name.clone(),
+                    });
 
                 Ok::<VisualTask, anyhow::Error>(task)
             }?;
@@ -301,8 +321,14 @@ impl Installer {
         .await?;
         let visited_ids = Arc::new(Mutex::new(Vec::new()));
         let task = Arc::new(Mutex::new(task));
-        self.install_inner(app, instance_id, &instance_path, &task, &visited_ids)
-            .await?;
+        self.install_inner(
+            app,
+            instance_id,
+            &instance_path,
+            &task,
+            &visited_ids,
+        )
+        .await?;
 
         Ok(task_id)
     }
@@ -337,7 +363,8 @@ impl Installer {
                 let instance = instances
                     .get(&instance_id)
                     .expect("instance should still be valid");
-                let instance_data = instance.data().expect("instance should still be valid");
+                let instance_data =
+                    instance.data().expect("instance should still be valid");
 
                 lock.dependencies(app, instance_data, ModChannel::Stable)
             };
@@ -433,13 +460,17 @@ impl Installer {
 
                         if let Some(downloadable) = &downloadable {
                             let (progress_watch_tx, mut progress_watch_rx) =
-                                tokio::sync::watch::channel(carbon_net::Progress::new());
+                                tokio::sync::watch::channel(
+                                    carbon_net::Progress::new(),
+                                );
 
                             // dropped when the sender is dropped
                             tokio::spawn(async move {
-                                while progress_watch_rx.changed().await.is_ok() {
+                                while progress_watch_rx.changed().await.is_ok()
+                                {
                                     {
-                                        let progress = progress_watch_rx.borrow();
+                                        let progress =
+                                            progress_watch_rx.borrow();
                                         t_download_file.update_download(
                                             progress.current_size as u32,
                                             progress.total_size as u32,
@@ -447,31 +478,48 @@ impl Installer {
                                         );
                                     }
 
-                                    tokio::time::sleep(Duration::from_millis(200)).await;
+                                    tokio::time::sleep(Duration::from_millis(
+                                        200,
+                                    ))
+                                    .await;
                                 }
 
                                 t_download_file.complete_download();
                             });
 
-                            carbon_net::download_file(downloadable, Some(progress_watch_tx)).await?
+                            carbon_net::download_file(
+                                downloadable,
+                                Some(progress_watch_tx),
+                            )
+                            .await?
                         }
 
                         {
                             // context to drop instance lock after install attempt
                             let instance_manager = app_clone.instance_manager();
-                            let mut instances = instance_manager.instances.write().await;
+                            let mut instances =
+                                instance_manager.instances.write().await;
                             let instance = instances
                                 .get_mut(&instance_id)
                                 .expect("instance should still be valid");
 
-                            let _ = instance.data_mut().expect("instance should still be valid");
+                            let _ = instance
+                                .data_mut()
+                                .expect("instance should still be valid");
                             let lock = inner.lock().await;
 
-                            lock.finalize_install(&app_clone, instance_id, downloadable)
-                                .await
+                            lock.finalize_install(
+                                &app_clone,
+                                instance_id,
+                                downloadable,
+                            )
+                            .await
                         }?;
 
-                        app_clone.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
+                        app_clone.invalidate(
+                            INSTANCE_DETAILS,
+                            Some(instance_id.0.into()),
+                        );
                         Ok::<_, anyhow::Error>(())
                     })()
                     .await;
@@ -482,7 +530,9 @@ impl Installer {
                             let rollback_lock = rollback_context.lock().await;
                             rollback_lock
                                 .as_ref()
-                                .expect("valid rollback context in spawned task")
+                                .expect(
+                                    "valid rollback context in spawned task",
+                                )
                                 .rollback(Some(&e))
                                 .await;
 
@@ -523,7 +573,9 @@ impl CurseforgeModInstaller {
             .data;
 
         let download_url = file.download_url.clone().ok_or_else(|| {
-            anyhow::anyhow!("mod cannot be downloaded without privileged api key")
+            anyhow::anyhow!(
+                "mod cannot be downloaded without privileged api key"
+            )
         })?;
 
         Ok(Self {
@@ -533,9 +585,13 @@ impl CurseforgeModInstaller {
         })
     }
 
-    pub fn from_file(file: crate::domain::modplatforms::curseforge::File) -> anyhow::Result<Self> {
+    pub fn from_file(
+        file: crate::domain::modplatforms::curseforge::File,
+    ) -> anyhow::Result<Self> {
         let download_url = file.download_url.clone().ok_or_else(|| {
-            anyhow::anyhow!("mod cannot be downloaded without privileged api key")
+            anyhow::anyhow!(
+                "mod cannot be downloaded without privileged api key"
+            )
         })?;
 
         Ok(Self {
@@ -552,8 +608,12 @@ impl ResourceInstaller for CurseforgeModInstaller {
         format!("curseforge:{}:{}", &self.file.mod_id, &self.file.id)
     }
 
-    async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable> {
-        let install_path = instance_path.get_mods_path().join(&self.file.file_name);
+    async fn downloadable(
+        &self,
+        instance_path: &InstancePath,
+    ) -> Option<Downloadable> {
+        let install_path =
+            instance_path.get_mods_path().join(&self.file.file_name);
 
         let checksums = &self
             .file
@@ -599,7 +659,9 @@ impl ResourceInstaller for CurseforgeModInstaller {
             let mod_id = dep.mod_id;
             let game_version = game_version.clone();
 
-            if let curseforge::FileRelationType::RequiredDependency = dep.relation_type {
+            if let curseforge::FileRelationType::RequiredDependency =
+                dep.relation_type
+            {
                 installers.push(Box::new(move || {
                     Box::pin(async move {
                         app_clone
@@ -729,7 +791,10 @@ impl ResourceInstaller for CurseforgeModInstaller {
         Ok(())
     }
 
-    async fn rollback(&self, _instance_data: &mut InstanceData) -> anyhow::Result<()> {
+    async fn rollback(
+        &self,
+        _instance_data: &mut InstanceData,
+    ) -> anyhow::Result<()> {
         let mut lock = self.applied_data.lock().await;
         if let Some((_, downloadable)) = &*lock {
             match tokio::fs::try_exists(&downloadable.path).await {
@@ -835,12 +900,19 @@ impl ResourceInstaller for ModrinthModInstaller {
         format!("modrinth:{}:{}", &self.version.project_id, &self.version.id)
     }
 
-    async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable> {
-        let install_path = instance_path.get_mods_path().join(&self.file.filename);
+    async fn downloadable(
+        &self,
+        instance_path: &InstancePath,
+    ) -> Option<Downloadable> {
+        let install_path =
+            instance_path.get_mods_path().join(&self.file.filename);
 
         let checksum = Checksum::Sha1(self.file.hashes.sha1.clone());
 
-        Some(Downloadable::new(&self.download_url, install_path).with_checksum(Some(checksum)))
+        Some(
+            Downloadable::new(&self.download_url, install_path)
+                .with_checksum(Some(checksum)),
+        )
     }
 
     fn dependencies(
@@ -868,7 +940,9 @@ impl ResourceInstaller for ModrinthModInstaller {
             let project_id = dep.project_id.clone();
             let game_version = game_version.clone();
 
-            if let modrinth::version::DependencyType::Required = dep.dependency_type {
+            if let modrinth::version::DependencyType::Required =
+                dep.dependency_type
+            {
                 if let Some(version_id) = version_id {
                     installers.push(Box::new(move || {
                         Box::pin(async move {
@@ -879,9 +953,11 @@ impl ResourceInstaller for ModrinthModInstaller {
                                 .await
                                 .and_then(|version| {
                                     // let app_clone = Arc::clone(&self.app);
-                                    ModrinthModInstaller::from_version(version).map(|installer| {
-                                        Box::new(installer) as BoxedResourceInstaller
-                                    })
+                                    ModrinthModInstaller::from_version(version)
+                                        .map(|installer| {
+                                            Box::new(installer)
+                                                as BoxedResourceInstaller
+                                        })
                                 })
                         })
                     }));
@@ -1011,7 +1087,10 @@ impl ResourceInstaller for ModrinthModInstaller {
         Ok(())
     }
 
-    async fn rollback(&self, _instance_data: &mut InstanceData) -> anyhow::Result<()> {
+    async fn rollback(
+        &self,
+        _instance_data: &mut InstanceData,
+    ) -> anyhow::Result<()> {
         let mut lock = self.applied_data.lock().await;
         if let Some((_applied_mod_data, downloadable)) = &*lock {
             match tokio::fs::try_exists(&downloadable.path).await {

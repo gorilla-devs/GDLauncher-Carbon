@@ -22,8 +22,9 @@ pub(crate) async fn get_runtime_path_override() -> PathBuf {
 
     let data_path = path.expect("Runtime path not found").join("data");
 
-    fs::create_dir_all(&data_path)
-        .expect(format!("Failed to create data directory: {:?}", data_path).as_str());
+    fs::create_dir_all(&data_path).expect(
+        format!("Failed to create data directory: {:?}", data_path).as_str(),
+    );
 
     dunce::canonicalize(data_path).unwrap()
 }

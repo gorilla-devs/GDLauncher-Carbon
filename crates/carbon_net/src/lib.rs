@@ -219,13 +219,15 @@ pub async fn download_multiple(
 
     let downloads = Arc::new(tokio::sync::Semaphore::new(concurrency));
 
-    let mut tasks: Vec<tokio::task::JoinHandle<Result<_, DownloadError>>> = vec![];
+    let mut tasks: Vec<tokio::task::JoinHandle<Result<_, DownloadError>>> =
+        vec![];
 
     let arced_progress = Arc::new(progress);
 
     let progress_counter = Arc::new(AtomicU64::new(0));
     let file_counter = Arc::new(AtomicU64::new(0));
-    let total_size = Arc::new(AtomicU64::new(files.iter().filter_map(|f| f.size).sum()));
+    let total_size =
+        Arc::new(AtomicU64::new(files.iter().filter_map(|f| f.size).sum()));
 
     let total_count = files.len() as u64;
 

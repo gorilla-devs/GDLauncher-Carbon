@@ -79,7 +79,8 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
     axum::Router::new().route(
         "/headImage",
         axum::routing::get(
-            |State(app): State<Arc<AppInner>>, Query(query): Query<HeadQuery>| async move {
+            |State(app): State<Arc<AppInner>>,
+             Query(query): Query<HeadQuery>| async move {
                 app.account_manager()
                     .skin_manager()
                     .make_head(query.uuid)

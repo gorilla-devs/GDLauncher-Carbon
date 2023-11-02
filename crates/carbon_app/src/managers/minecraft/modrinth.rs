@@ -112,7 +112,9 @@ pub async fn download_mrpack(
     app: &App,
     mrpack_file: &VersionFile,
     target_path: &Path,
-    progress_percentage_sender: tokio::sync::watch::Sender<UpdateValue<(u64, u64)>>,
+    progress_percentage_sender: tokio::sync::watch::Sender<
+        UpdateValue<(u64, u64)>,
+    >,
 ) -> anyhow::Result<()> {
     let _pack_download_url = mrpack_file.url.clone();
 
@@ -123,8 +125,9 @@ pub async fn download_mrpack(
         .get_temp()
         .maketmpfile()
         .await?;
-    let file_downloadable = Downloadable::new(&mrpack_file.url.to_string(), file.to_path_buf())
-        .with_size(mrpack_file.size as u64);
+    let file_downloadable =
+        Downloadable::new(&mrpack_file.url.to_string(), file.to_path_buf())
+            .with_size(mrpack_file.size as u64);
 
     tokio::fs::create_dir_all(
         &file
@@ -139,14 +142,19 @@ pub async fn download_mrpack(
     tokio::spawn(async move {
         while download_progress_recv.borrow_mut().changed().await.is_ok() {
             let p = download_progress_recv.borrow();
-            progress_percentage_sender
-                .send_modify(|progress| progress.set((p.current_size, p.total_size)));
+            progress_percentage_sender.send_modify(|progress| {
+                progress.set((p.current_size, p.total_size))
+            });
         }
 
         Ok::<_, anyhow::Error>(progress_percentage_sender)
     });
 
-    carbon_net::download_file(&file_downloadable, Some(download_progress_sender)).await?;
+    carbon_net::download_file(
+        &file_downloadable,
+        Some(download_progress_sender),
+    )
+    .await?;
 
     file.rename(target_path).await?;
     Ok(())
@@ -202,7 +210,8 @@ pub async fn prepare_modpack_from_mrpack(
         let mut handles = Vec::new();
 
         let semaphore = Arc::new(tokio::sync::Semaphore::new(20));
-        let atomic_counter_download_metadata = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let atomic_counter_download_metadata =
+            Arc::new(std::sync::atomic::AtomicU64::new(0));
 
         let files_len = required_files.len() as u64;
 
@@ -213,7 +222,8 @@ pub async fn prepare_modpack_from_mrpack(
             let semaphore = semaphore.clone();
             let _app = app.clone();
             let instance_path = instance_path.clone();
-            let progress_percentage_sender_clone = progress_percentage_sender.clone();
+            let progress_percentage_sender_clone =
+                progress_percentage_sender.clone();
             let atomic_counter = atomic_counter_download_metadata.clone();
 
             let data_path = instance_path.get_data_path();
@@ -224,15 +234,20 @@ pub async fn prepare_modpack_from_mrpack(
                 let downloadable = Downloadable::new(
                     file.downloads
                         .first()
-                        .ok_or(anyhow::anyhow!("Failed to get download url for mod"))?
+                        .ok_or(anyhow::anyhow!(
+                            "Failed to get download url for mod"
+                        ))?
                         .to_string(),
                     target_path,
                 )
                 .with_size(file.file_size as u64);
-                progress_percentage_sender_clone.send(ProgressState::AcquiringPackMetadata(
-                    atomic_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-                    files_len,
-                ))?;
+                progress_percentage_sender_clone.send(
+                    ProgressState::AcquiringPackMetadata(
+                        atomic_counter
+                            .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+                        files_len,
+                    ),
+                )?;
 
                 Ok::<Downloadable, anyhow::Error>(downloadable)
             });

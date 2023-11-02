@@ -5,6 +5,7 @@ where
     S: Serializer,
     T: Serialize,
 {
-    let json = serde_json::to_string(&value).map_err(serde::ser::Error::custom)?;
+    let json =
+        serde_json::to_string(&value).map_err(serde::ser::Error::custom)?;
     s.serialize_str(&json)
 }

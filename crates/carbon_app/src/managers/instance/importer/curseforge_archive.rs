@@ -18,8 +18,8 @@ use crate::{
 };
 
 use super::{
-    ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter, InternalImportEntry,
-    InvalidImportEntry,
+    ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter,
+    InternalImportEntry, InvalidImportEntry,
 };
 
 #[derive(Debug, Clone)]
@@ -85,12 +85,14 @@ impl CurseforgeArchiveImporter {
                 .map_err(|_| Translation::InstanceImportCfZipMissingManifest)?;
 
             let mut data = Vec::new();
-            manifest
-                .read_to_end(&mut data)
-                .map_err(|_| Translation::InstanceImportCfZipMalformedManifest)?;
+            manifest.read_to_end(&mut data).map_err(|_| {
+                Translation::InstanceImportCfZipMalformedManifest
+            })?;
 
-            let manifest = serde_json::from_slice::<Manifest>(&data)
-                .map_err(|_| Translation::InstanceImportCfZipMalformedManifest)?;
+            let manifest =
+                serde_json::from_slice::<Manifest>(&data).map_err(|_| {
+                    Translation::InstanceImportCfZipMalformedManifest
+                })?;
 
             let murmur2 = murmurhash32::murmurhash2({
                 // drop whitespace
@@ -105,18 +107,19 @@ impl CurseforgeArchiveImporter {
         let (manifest, _murmur2) = match r {
             Ok(t) => t,
             Err(reason) => {
-                return Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
-                    name,
-                    reason,
-                })))
+                return Ok(Some(InternalImportEntry::Invalid(
+                    InvalidImportEntry { name, reason },
+                )))
             }
         };
 
         if manifest.manifest_type != "minecraftModpack" {
-            return Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
-                name,
-                reason: Translation::InstanceImportCfZipNotMinecraftModpack,
-            })));
+            return Ok(Some(InternalImportEntry::Invalid(
+                InvalidImportEntry {
+                    name,
+                    reason: Translation::InstanceImportCfZipNotMinecraftModpack,
+                },
+            )));
         }
 
         // does not seem to works with packs directly downloaded from curseforge. As that's already and edge case we ignore it for now
@@ -177,7 +180,11 @@ impl CurseforgeArchiveImporter {
 
 #[async_trait::async_trait]
 impl InstanceImporter for CurseforgeArchiveImporter {
-    async fn scan(&self, app: &Arc<AppInner>, scan_path: PathBuf) -> anyhow::Result<()> {
+    async fn scan(
+        &self,
+        app: &Arc<AppInner>,
+        scan_path: PathBuf,
+    ) -> anyhow::Result<()> {
         if scan_path.is_file() {
             if let Ok(Some(entry)) = self.scan_archive(app, scan_path).await {
                 self.state.write().await.set_single(entry).await;
@@ -192,7 +199,9 @@ impl InstanceImporter for CurseforgeArchiveImporter {
             while let Some(entry) = dir.next_entry().await? {
                 if entry.metadata().await?.is_file() {
                     futures.push(async move {
-                        if let Ok(Some(entry)) = self.scan_archive(app, entry.path()).await {
+                        if let Ok(Some(entry)) =
+                            self.scan_archive(app, entry.path()).await
+                        {
                             self.state.write().await.push_multi(entry).await;
                         }
                     })
@@ -203,7 +212,10 @@ impl InstanceImporter for CurseforgeArchiveImporter {
         Ok(())
     }
 
-    async fn get_default_scan_path(&self, _app: &Arc<AppInner>) -> anyhow::Result<Option<PathBuf>> {
+    async fn get_default_scan_path(
+        &self,
+        _app: &Arc<AppInner>,
+    ) -> anyhow::Result<Option<PathBuf>> {
         Ok(None)
     }
 
@@ -211,7 +223,11 @@ impl InstanceImporter for CurseforgeArchiveImporter {
         self.state.read().await.clone().into()
     }
 
-    async fn begin_import(&self, app: &Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId> {
+    async fn begin_import(
+        &self,
+        app: &Arc<AppInner>,
+        index: u32,
+    ) -> anyhow::Result<VisualTaskId> {
         let instance = self
             .state
             .read()
@@ -221,7 +237,9 @@ impl InstanceImporter for CurseforgeArchiveImporter {
             .cloned()
             .ok_or_else(|| anyhow!("invalid importable instance index"))?;
 
-        let version = GameVersion::Standard(instance.manifest.minecraft.clone().try_into()?);
+        let version = GameVersion::Standard(
+            instance.manifest.minecraft.clone().try_into()?,
+        );
 
         let instance_version_source = match &instance.meta {
             Some(meta) => InstanceVersionSource::ModpackWithKnownVersion(
@@ -253,7 +271,8 @@ impl InstanceImporter for CurseforgeArchiveImporter {
             async move {
                 let setupdir = instance_path.join(".setup");
                 tokio::fs::create_dir_all(&setupdir).await?;
-                tokio::fs::copy(&instance.path, setupdir.join("curseforge")).await?;
+                tokio::fs::copy(&instance.path, setupdir.join("curseforge"))
+                    .await?;
 
                 Ok(())
             }

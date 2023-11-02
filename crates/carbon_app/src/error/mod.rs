@@ -42,14 +42,16 @@ impl FeError {
     pub fn make_rspc(&self) -> rspc::Error {
         rspc::Error::new(
             rspc::ErrorCode::InternalServerError,
-            serde_json::to_string_pretty(self).expect("could not convert FeError to json"),
+            serde_json::to_string_pretty(self)
+                .expect("could not convert FeError to json"),
         )
     }
 
     pub fn make_axum(&self) -> AxumError {
         (
             axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            serde_json::to_string_pretty(self).expect("could not convert FeError to json"),
+            serde_json::to_string_pretty(self)
+                .expect("could not convert FeError to json"),
         )
     }
 }

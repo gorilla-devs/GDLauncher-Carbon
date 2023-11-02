@@ -1,4 +1,6 @@
-use crate::api::java::managed::{FEManagedJavaSetupArgs, FEManagedJavaSetupProgress};
+use crate::api::java::managed::{
+    FEManagedJavaSetupArgs, FEManagedJavaSetupProgress,
+};
 use crate::api::managers::App;
 use crate::api::router::router;
 use crate::domain::java::{JavaComponentType, JavaVendor};
@@ -7,7 +9,9 @@ use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use self::managed::{FEManagedJavaArch, FEManagedJavaOs, FEManagedJavaOsMap, FEVendor};
+use self::managed::{
+    FEManagedJavaArch, FEManagedJavaOs, FEManagedJavaOsMap, FEVendor,
+};
 
 mod managed;
 
@@ -78,7 +82,10 @@ fn get_managed_os(app: App, _args: ()) -> anyhow::Result<Vec<FEManagedJavaOs>> {
     Ok(all_os.into_iter().map(FEManagedJavaOs::from).collect())
 }
 
-fn get_managed_arch(app: App, _args: ()) -> anyhow::Result<Vec<FEManagedJavaArch>> {
+fn get_managed_arch(
+    app: App,
+    _args: (),
+) -> anyhow::Result<Vec<FEManagedJavaArch>> {
     let all_arch = app.java_manager().managed_service.get_all_archs();
 
     Ok(all_arch.into_iter().map(FEManagedJavaArch::from).collect())
@@ -103,7 +110,10 @@ async fn get_managed_versions_by_vendor(
     Ok(managed_java_map_os.into())
 }
 
-async fn setup_managed_java(app: App, args: FEManagedJavaSetupArgs) -> anyhow::Result<String> {
+async fn setup_managed_java(
+    app: App,
+    args: FEManagedJavaSetupArgs,
+) -> anyhow::Result<String> {
     app.java_manager()
         .managed_service
         .setup_managed(
@@ -132,7 +142,10 @@ async fn get_setup_managed_java_progress(
     Ok(res.into())
 }
 
-async fn get_system_java_profiles(app: App, _args: ()) -> anyhow::Result<Vec<FESystemJavaProfile>> {
+async fn get_system_java_profiles(
+    app: App,
+    _args: (),
+) -> anyhow::Result<Vec<FESystemJavaProfile>> {
     let profiles = app.java_manager().get_system_java_profiles().await?;
 
     Ok(profiles
@@ -224,7 +237,9 @@ pub enum FESystemJavaProfileName {
     MinecraftJavaExe,
 }
 
-impl From<crate::domain::java::SystemJavaProfileName> for FESystemJavaProfileName {
+impl From<crate::domain::java::SystemJavaProfileName>
+    for FESystemJavaProfileName
+{
     fn from(name: crate::domain::java::SystemJavaProfileName) -> Self {
         use crate::domain::java::SystemJavaProfileName;
         match name {
@@ -238,7 +253,9 @@ impl From<crate::domain::java::SystemJavaProfileName> for FESystemJavaProfileNam
     }
 }
 
-impl From<FESystemJavaProfileName> for crate::domain::java::SystemJavaProfileName {
+impl From<FESystemJavaProfileName>
+    for crate::domain::java::SystemJavaProfileName
+{
     fn from(name: FESystemJavaProfileName) -> Self {
         match name {
             FESystemJavaProfileName::Legacy => Self::Legacy,

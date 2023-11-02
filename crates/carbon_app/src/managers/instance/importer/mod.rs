@@ -13,7 +13,8 @@ use crate::{
 };
 
 use self::{
-    curseforge_archive::CurseforgeArchiveImporter, legacy_gdlauncher::LegacyGDLauncherImporter,
+    curseforge_archive::CurseforgeArchiveImporter,
+    legacy_gdlauncher::LegacyGDLauncherImporter,
     modrinth_archive::ModrinthArchiveImporter,
 };
 
@@ -39,7 +40,10 @@ impl InstanceImportManager {
 }
 
 impl ManagerRef<'_, InstanceImportManager> {
-    pub fn set_scan_target(self, path: Option<(Entity, PathBuf)>) -> anyhow::Result<()> {
+    pub fn set_scan_target(
+        self,
+        path: Option<(Entity, PathBuf)>,
+    ) -> anyhow::Result<()> {
         self.scan_path
             .send(path)
             .map_err(|_| anyhow!("import scanning background task has died"))?;
@@ -84,7 +88,8 @@ impl ManagerRef<'_, InstanceImportManager> {
 
                     let target_changed = async {
                         while rx.changed().await.is_ok() {
-                            if matches!(&*rx.borrow(), Some((e, p)) if e == &entity && p == &path) {
+                            if matches!(&*rx.borrow(), Some((e, p)) if e == &entity && p == &path)
+                            {
                                 break;
                             }
                         }
@@ -109,16 +114,23 @@ impl ManagerRef<'_, InstanceImportManager> {
         }
     }
 
-    pub async fn begin_import(self, index: u32) -> anyhow::Result<VisualTaskId> {
+    pub async fn begin_import(
+        self,
+        index: u32,
+    ) -> anyhow::Result<VisualTaskId> {
         match self.scanner.read().await.as_ref() {
-            Some((_, scanner)) => Ok(scanner.begin_import(self.app, index).await?),
+            Some((_, scanner)) => {
+                Ok(scanner.begin_import(self.app, index).await?)
+            }
             None => Err(anyhow!("scan target is not set")),
         }
     }
 
     pub async fn get_scan_path(self) -> anyhow::Result<Option<PathBuf>> {
         match self.scanner.read().await.as_ref() {
-            Some((_, scanner)) => Ok(scanner.get_default_scan_path(self.app).await?),
+            Some((_, scanner)) => {
+                Ok(scanner.get_default_scan_path(self.app).await?)
+            }
             None => Err(anyhow!("scan target is not set")),
         }
     }
@@ -133,7 +145,9 @@ impl<'a> ManagerRef<'a, InstanceManager> {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, EnumIter, Eq, PartialEq)]
+#[derive(
+    Debug, Clone, Copy, Serialize, Deserialize, EnumIter, Eq, PartialEq,
+)]
 pub enum Entity {
     LegacyGDLauncher,
     MRPack,
@@ -194,10 +208,21 @@ pub struct FullImportScanStatus {
 
 #[async_trait::async_trait]
 pub trait InstanceImporter: std::fmt::Debug + Send + Sync {
-    async fn scan(&self, app: &Arc<AppInner>, scan_path: PathBuf) -> anyhow::Result<()>;
-    async fn get_default_scan_path(&self, app: &Arc<AppInner>) -> anyhow::Result<Option<PathBuf>>;
+    async fn scan(
+        &self,
+        app: &Arc<AppInner>,
+        scan_path: PathBuf,
+    ) -> anyhow::Result<()>;
+    async fn get_default_scan_path(
+        &self,
+        app: &Arc<AppInner>,
+    ) -> anyhow::Result<Option<PathBuf>>;
     async fn get_status(&self) -> ImportScanStatus;
-    async fn begin_import(&self, app: &Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId>;
+    async fn begin_import(
+        &self,
+        app: &Arc<AppInner>,
+        index: u32,
+    ) -> anyhow::Result<VisualTaskId>;
 }
 
 #[derive(Debug, Clone)]
@@ -231,7 +256,9 @@ impl<T: Clone + Into<ImportableInstance>> ImporterState<T> {
 
     async fn get(&self, index: u32) -> Option<&T> {
         match self {
-            Self::SingleResult(InternalImportEntry::Valid(entry)) => Some(entry),
+            Self::SingleResult(InternalImportEntry::Valid(entry)) => {
+                Some(entry)
+            }
             Self::MultiResult(entries) => entries
                 .get(index as usize)
                 .map(|r| match r {
@@ -244,19 +271,25 @@ impl<T: Clone + Into<ImportableInstance>> ImporterState<T> {
     }
 }
 
-impl<T: Clone + Into<ImportableInstance>> From<ImporterState<T>> for ImportScanStatus {
+impl<T: Clone + Into<ImportableInstance>> From<ImporterState<T>>
+    for ImportScanStatus
+{
     fn from(value: ImporterState<T>) -> Self {
         match value {
             ImporterState::NoResults => ImportScanStatus::NoResults,
-            ImporterState::SingleResult(r) => ImportScanStatus::SingleResult(r.into()),
-            ImporterState::MultiResult(r) => {
-                ImportScanStatus::MultiResult(r.into_iter().map(Into::into).collect())
+            ImporterState::SingleResult(r) => {
+                ImportScanStatus::SingleResult(r.into())
             }
+            ImporterState::MultiResult(r) => ImportScanStatus::MultiResult(
+                r.into_iter().map(Into::into).collect(),
+            ),
         }
     }
 }
 
-impl<T: Clone + Into<ImportableInstance>> From<InternalImportEntry<T>> for ImportEntry {
+impl<T: Clone + Into<ImportableInstance>> From<InternalImportEntry<T>>
+    for ImportEntry
+{
     fn from(value: InternalImportEntry<T>) -> Self {
         match value {
             InternalImportEntry::Valid(t) => ImportEntry::Valid(t.into()),

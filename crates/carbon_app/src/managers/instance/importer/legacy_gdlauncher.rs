@@ -7,7 +7,8 @@ use crate::{
     api::translation::Translation,
     domain::{
         instance::info::{
-            CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
+            CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack,
+            StandardVersion,
         },
         vtask::VisualTaskId,
     },
@@ -15,8 +16,8 @@ use crate::{
 };
 
 use super::{
-    ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter, InternalImportEntry,
-    InvalidImportEntry,
+    ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter,
+    InternalImportEntry, InvalidImportEntry,
 };
 
 #[derive(Debug, Clone)]
@@ -70,17 +71,23 @@ impl LegacyGDLauncherImporter {
                 path,
                 config,
             }))),
-            Err(_) => Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
-                name: filename,
-                reason: Translation::InstanceImportLegacyBadConfigFile,
-            }))),
+            Err(_) => {
+                Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
+                    name: filename,
+                    reason: Translation::InstanceImportLegacyBadConfigFile,
+                })))
+            }
         }
     }
 }
 
 #[async_trait::async_trait]
 impl InstanceImporter for LegacyGDLauncherImporter {
-    async fn scan(&self, _app: &Arc<AppInner>, mut scan_path: PathBuf) -> anyhow::Result<()> {
+    async fn scan(
+        &self,
+        _app: &Arc<AppInner>,
+        mut scan_path: PathBuf,
+    ) -> anyhow::Result<()> {
         if !scan_path.is_dir() {
             return Ok(());
         }
@@ -108,7 +115,9 @@ impl InstanceImporter for LegacyGDLauncherImporter {
 
             while let Some(path) = dir.next_entry().await? {
                 if path.metadata().await?.is_dir() {
-                    if let Ok(Some(entry)) = self.scan_instance(path.path()).await {
+                    if let Ok(Some(entry)) =
+                        self.scan_instance(path.path()).await
+                    {
                         self.state.write().await.push_multi(entry).await;
                     }
                 }
@@ -122,8 +131,12 @@ impl InstanceImporter for LegacyGDLauncherImporter {
         Ok(()) // TODO: invalidate on iter
     }
 
-    async fn get_default_scan_path(&self, _app: &Arc<AppInner>) -> anyhow::Result<Option<PathBuf>> {
-        let basedirs = directories::BaseDirs::new().ok_or(anyhow!("Cannot build basedirs"))?;
+    async fn get_default_scan_path(
+        &self,
+        _app: &Arc<AppInner>,
+    ) -> anyhow::Result<Option<PathBuf>> {
+        let basedirs = directories::BaseDirs::new()
+            .ok_or(anyhow!("Cannot build basedirs"))?;
 
         // old gdl did not respect the xdg basedirs spec on linux
         #[cfg(target_os = "linux")]
@@ -138,7 +151,11 @@ impl InstanceImporter for LegacyGDLauncherImporter {
         self.state.read().await.clone().into()
     }
 
-    async fn begin_import(&self, app: &Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId> {
+    async fn begin_import(
+        &self,
+        app: &Arc<AppInner>,
+        index: u32,
+    ) -> anyhow::Result<VisualTaskId> {
         let instance = self
             .state
             .read()
@@ -155,7 +172,9 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                 _ => None,
             }
             .and_then(|loader_type| {
-                let Some(ref loader_version) = instance.config.loader.loader_version else {
+                let Some(ref loader_version) =
+                    instance.config.loader.loader_version
+                else {
                     return None;
                 };
 
@@ -209,24 +228,33 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             async move {
                 let path = instance_path.join("instance");
 
-                tokio::fs::create_dir_all(instance_path.join(".setup").join("modpack-complete"))
-                    .await?;
+                tokio::fs::create_dir_all(
+                    instance_path.join(".setup").join("modpack-complete"),
+                )
+                .await?;
 
                 // create copy-filter function in file utils for all importers
-                crate::domain::runtime_path::copy_dir_filter(&instance.path, &path, |path| {
-                    match path.to_str() {
-                        Some("config.json" | "manifest.json" | "installing.lock" | "natives") => {
-                            false
-                        }
+                crate::domain::runtime_path::copy_dir_filter(
+                    &instance.path,
+                    &path,
+                    |path| match path.to_str() {
+                        Some(
+                            "config.json" | "manifest.json" | "installing.lock"
+                            | "natives",
+                        ) => false,
                         Some(p)
                             if Some(p)
-                                == instance.config.background.as_ref().map(|x| x.as_str()) =>
+                                == instance
+                                    .config
+                                    .background
+                                    .as_ref()
+                                    .map(|x| x.as_str()) =>
                         {
                             false
                         }
                         _ => true,
-                    }
-                })
+                    },
+                )
                 .await?;
 
                 Ok(())

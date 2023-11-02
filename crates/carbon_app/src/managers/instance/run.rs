@@ -40,7 +40,9 @@ use crate::{
     },
 };
 
-use super::{InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError};
+use super::{
+    InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError,
+};
 
 #[derive(Debug)]
 pub struct PersistenceManager {
@@ -55,7 +57,11 @@ impl PersistenceManager {
     }
 }
 type InstanceCallback = Box<
-    dyn FnOnce(Subtask) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>> + Send,
+    dyn FnOnce(
+            Subtask,
+        ) -> Pin<
+            Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>,
+        > + Send,
 >;
 
 impl ManagerRef<'_, InstanceManager> {
@@ -72,7 +78,9 @@ impl ManagerRef<'_, InstanceManager> {
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
         let InstanceType::Valid(data) = &mut instance.type_ else {
-            return Err(anyhow!("Instance {instance_id} is not in a valid state"));
+            return Err(anyhow!(
+                "Instance {instance_id} is not in a valid state"
+            ));
         };
 
         match &data.state {
@@ -104,7 +112,8 @@ impl ManagerRef<'_, InstanceManager> {
                 .map(|c| (c.xms as u16, c.xmx as u16))?,
         };
 
-        let global_java_args = match config.game_configuration.global_java_args {
+        let global_java_args = match config.game_configuration.global_java_args
+        {
             true => self
                 .app
                 .settings_manager()
@@ -866,7 +875,8 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let start_time = Utc::now();
 
-                    let (log_id, log) = app.instance_manager().create_log(instance_id).await;
+                    let (log_id, log) =
+                        app.instance_manager().create_log(instance_id).await;
                     let _ = app.instance_manager()
                         .change_launch_state(
                             instance_id,
@@ -946,7 +956,10 @@ impl ManagerRef<'_, InstanceManager> {
                             last_stored_time = now;
                             let r = app
                                 .instance_manager()
-                                .update_playtime(instance_id, diff.num_seconds() as u64)
+                                .update_playtime(
+                                    instance_id,
+                                    diff.num_seconds() as u64,
+                                )
                                 .await;
                             if let Err(e) = r {
                                 tracing::error!({ error = ?e }, "error updating instance playtime");
@@ -966,7 +979,8 @@ impl ManagerRef<'_, InstanceManager> {
                         .instance_manager()
                         .update_playtime(
                             instance_id,
-                            (Utc::now() - last_stored_time).num_seconds() as u64,
+                            (Utc::now() - last_stored_time).num_seconds()
+                                as u64,
                         )
                         .await;
                     if let Err(e) = r {
@@ -974,7 +988,9 @@ impl ManagerRef<'_, InstanceManager> {
                     }
 
                     if let Ok(exitcode) = child.wait().await {
-                        log.send_modify(|log| log.push(EntryType::System, &exitcode.to_string()));
+                        log.send_modify(|log| {
+                            log.push(EntryType::System, &exitcode.to_string())
+                        });
                     }
 
                     let _ = app.rich_presence_manager().stop_activity().await;
@@ -1024,7 +1040,10 @@ impl ManagerRef<'_, InstanceManager> {
         Ok((&instance.data()?.state).into())
     }
 
-    pub async fn kill_instance(self, instance_id: InstanceId) -> anyhow::Result<()> {
+    pub async fn kill_instance(
+        self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<()> {
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
@@ -1108,10 +1127,12 @@ mod test {
                 app.instance_manager().get_default_group().await?,
                 String::from("test"),
                 false,
-                InstanceVersionSource::Version(info::GameVersion::Standard(StandardVersion {
-                    release: String::from("1.16.5"),
-                    modloaders: HashSet::new(),
-                })),
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    StandardVersion {
+                        release: String::from("1.16.5"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
                 String::new(),
             )
             .await?;
@@ -1127,23 +1148,25 @@ mod test {
             .prepare_game(instance_id, Some(account), None)
             .await?;
 
-        let task = match app.instance_manager().get_launch_state(instance_id).await? {
-            domain::LaunchState::Preparing(taskid) => taskid,
-            _ => unreachable!(),
-        };
+        let task =
+            match app.instance_manager().get_launch_state(instance_id).await? {
+                domain::LaunchState::Preparing(taskid) => taskid,
+                _ => unreachable!(),
+            };
 
         app.task_manager().wait_with_log(task).await?;
         app.wait_for_invalidation(keys::instance::INSTANCE_DETAILS)
             .await?;
         tracing::info!("Task exited");
-        let log_id = match app.instance_manager().get_launch_state(instance_id).await? {
-            domain::LaunchState::Inactive { .. } => {
-                tracing::info!("Game not running");
-                return Ok(());
-            }
-            domain::LaunchState::Running { log_id, .. } => log_id,
-            _ => unreachable!(),
-        };
+        let log_id =
+            match app.instance_manager().get_launch_state(instance_id).await? {
+                domain::LaunchState::Inactive { .. } => {
+                    tracing::info!("Game not running");
+                    return Ok(());
+                }
+                domain::LaunchState::Running { log_id, .. } => log_id,
+                _ => unreachable!(),
+            };
 
         let mut log = app.instance_manager().get_log(log_id).await?;
 

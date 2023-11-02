@@ -14,7 +14,9 @@ use crate::{
         instance::InstanceId,
         modplatforms::modrinth::{
             project::Project,
-            responses::{ProjectsResponse, TeamResponse, VersionHashesResponse},
+            responses::{
+                ProjectsResponse, TeamResponse, VersionHashesResponse,
+            },
             search::{ProjectIDs, TeamIDs, VersionHashesQuery},
             version::HashAlgorithm,
         },
@@ -47,20 +49,23 @@ impl ModplatformCacher for ModrinthModCacher {
             .mod_file_cache()
             .find_many(vec![
                 fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-                fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::ModrinthIsNot(vec![
-                    mrdb::WhereParam::CachedAt(DateTimeFilter::Gt(
-                        (chrono::Utc::now() - chrono::Duration::days(1)).into(),
-                    )),
-                ])]),
+                fcdb::WhereParam::MetadataIs(vec![
+                    metadb::WhereParam::ModrinthIsNot(vec![
+                        mrdb::WhereParam::CachedAt(DateTimeFilter::Gt(
+                            (chrono::Utc::now() - chrono::Duration::days(1))
+                                .into(),
+                        )),
+                    ]),
+                ]),
             ])
             .with(fcdb::metadata::fetch())
             .exec()
             .await?
             .into_iter()
             .map(|m| {
-                let metadata = m
-                    .metadata
-                    .expect("metadata was queried with mod cache yet is not present");
+                let metadata = m.metadata.expect(
+                    "metadata was queried with mod cache yet is not present",
+                );
                 let sha512 = hex::encode(&metadata.sha_512);
 
                 (sha512.clone(), (metadata.id, sha512))
@@ -94,7 +99,9 @@ impl ModplatformCacher for ModrinthModCacher {
                 let (sha512_hashes, metadata) = modlist
                     .drain(0..usize::min(1000, modlist.len()))
                     .unzip::<_, _, Vec<_>, Vec<_>>();
-                trace!("querying modrinth mod batch for instance {instance_id}");
+                trace!(
+                    "querying modrinth mod batch for instance {instance_id}"
+                );
 
                 let versions_response = app
                     .modplatforms_manager()
@@ -146,7 +153,8 @@ impl ModplatformCacher for ModrinthModCacher {
             let entry = failed_instances
                 .entry(instance_id)
                 .or_insert((Instant::now(), 0));
-            entry.0 = Instant::now() + Duration::from_secs(u64::pow(2, entry.1));
+            entry.0 =
+                Instant::now() + Duration::from_secs(u64::pow(2, entry.1));
             entry.1 += 1;
         } else {
             let mut failed_instances = mcm.failed_cf_instances.write().await;
@@ -224,22 +232,27 @@ impl ModplatformCacher for ModrinthModCacher {
         futures::future::join_all(futures).await;
     }
 
-    async fn cache_icons(app: &App, instance_id: InstanceId, update_notifier: &UpdateNotifier) {
+    async fn cache_icons(
+        app: &App,
+        instance_id: InstanceId,
+        update_notifier: &UpdateNotifier,
+    ) {
         let modlist = app
             .prisma_client
             .mod_file_cache()
             .find_many(vec![
                 fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-                fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::ModrinthIs(vec![
-                    mrdb::WhereParam::LogoImageIs(vec![mrimgdb::WhereParam::UpToDate(
-                        IntFilter::Equals(0),
-                    )]),
-                ])]),
+                fcdb::WhereParam::MetadataIs(vec![
+                    metadb::WhereParam::ModrinthIs(vec![
+                        mrdb::WhereParam::LogoImageIs(vec![
+                            mrimgdb::WhereParam::UpToDate(IntFilter::Equals(0)),
+                        ]),
+                    ]),
+                ]),
             ])
-            .with(
-                fcdb::metadata::fetch()
-                    .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
-            )
+            .with(fcdb::metadata::fetch().with(
+                metadb::modrinth::fetch().with(mrdb::logo_image::fetch()),
+            ))
             .exec()
             .await;
 
@@ -389,11 +402,9 @@ async fn cache_modrinth_meta_unchecked(
     );
 
     let o_delete_mrmeta = prev.as_ref().map(|_| {
-        app.prisma_client
-            .modrinth_mod_cache()
-            .delete(mrdb::UniqueWhereParam::MetadataIdEquals(
-                metadata_id.clone(),
-            ))
+        app.prisma_client.modrinth_mod_cache().delete(
+            mrdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+        )
     });
 
     let old_image = prev
