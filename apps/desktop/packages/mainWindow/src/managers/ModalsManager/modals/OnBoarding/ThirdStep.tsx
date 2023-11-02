@@ -62,31 +62,6 @@ const ThirdStep = (props: Props) => {
           />
         </Match>
         <Match when={!entity()}>
-          <Show when={!props.isImportInstance}>
-            <div class="w-full flex justify-between pt-5">
-              <Button
-                onClick={() => {
-                  props.prevStep();
-                }}
-                type="secondary"
-              >
-                <Trans key="onboarding.prev" />
-              </Button>
-              <Button
-                onClick={() => {
-                  modalsContext?.closeModal();
-                }}
-                type="primary"
-              >
-                {isDownloaded() ? (
-                  <Trans key="onboarding.done" />
-                ) : (
-                  <Trans key="onboarding.skip" />
-                )}
-              </Button>
-            </div>
-          </Show>
-
           <div class=" flex-1 w-full">
             <ul class="grid grid-cols-3 gap-2 p-0">
               <For
@@ -106,6 +81,32 @@ const ThirdStep = (props: Props) => {
               </For>
             </ul>
           </div>
+          <Show when={!props.isImportInstance}>
+            <div class="w-full flex justify-between">
+              <Button
+                onClick={() => {
+                  props.prevStep();
+                }}
+                size="large"
+                type="secondary"
+              >
+                <Trans key="onboarding.prev" />
+              </Button>
+              <Button
+                onClick={() => {
+                  modalsContext?.closeModal();
+                }}
+                size="large"
+                type="primary"
+              >
+                {isDownloaded() ? (
+                  <Trans key="onboarding.done" />
+                ) : (
+                  <Trans key="onboarding.skip" />
+                )}
+              </Button>
+            </div>
+          </Show>
         </Match>
       </Switch>
     </div>
