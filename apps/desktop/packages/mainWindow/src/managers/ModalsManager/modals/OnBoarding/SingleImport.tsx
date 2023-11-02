@@ -6,6 +6,9 @@ import { Trans } from "@gd/i18n";
 import { Button } from "@gd/ui";
 import { Match, Switch, createEffect, createSignal } from "solid-js";
 
+const [isDownloaded, setIsDownloaded] = createSignal(false);
+export { isDownloaded };
+
 const SingleImport = (props: {
   instanceIndex: number;
   instanceName: string;
@@ -60,8 +63,6 @@ const SingleImport = (props: {
         }
         const isFailed = task.data && isProgressFailed(task.data.progress);
         const isDownloaded = task.data === null;
-        console.log("isFailed", isFailed);
-        console.log("isDownloaded", isDownloaded);
         if (isDownloaded || isFailed) {
           setTaskId(undefined);
         }
@@ -69,6 +70,7 @@ const SingleImport = (props: {
           setState("failed");
         } else if (isDownloaded) {
           setState("completed");
+          setIsDownloaded(true);
         }
       }
     }

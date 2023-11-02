@@ -15,6 +15,7 @@ import PrismLogo from "/assets/images/icons/prism_logo.svg";
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg";
 import LegacyGDL from "/assets/images/icons/legacy_gdlauncher.svg";
 import { Trans } from "@gd/i18n";
+import { isDownloaded } from "./SingleImport";
 
 interface Props {
   prevStep: () => void;
@@ -77,7 +78,11 @@ const ThirdStep = (props: Props) => {
                 }}
                 type="primary"
               >
-                <Trans key="onboarding.done" />
+                {isDownloaded() ? (
+                  <Trans key="onboarding.done" />
+                ) : (
+                  <Trans key="onboarding.skip" />
+                )}
               </Button>
             </div>
           </Show>
