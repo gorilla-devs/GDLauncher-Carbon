@@ -130,7 +130,7 @@ const SingleEntity = (props: {
         </Button>
 
         <span class="font-bold">{props.entity.entity}</span>
-        <Show when={step() === "selectionStep"} fallback={<div></div>}>
+        <Show when={step() === "selectionStep"} fallback={<div />}>
           <Button
             disabled={instances().length === 0}
             type="primary"
@@ -149,7 +149,7 @@ const SingleEntity = (props: {
           </Button>
         </Show>
       </div>
-      <div class=" flex-1 w-full flex flex-col items-center justify-center p-4">
+      <div class="flex-1 w-full flex flex-col items-center justify-center p-4">
         <div class="flex items-center justify-between w-full gap-2">
           <span class="font-bold">
             <Trans
@@ -254,7 +254,7 @@ const SingleEntity = (props: {
                 </Match>
                 <Match when={typeof instance.singleResult !== "undefined"}>
                   <For each={[instance.singleResult]}>
-                    {(entry) => (
+                    {() => (
                       <SingleCheckBox
                         title={instance.singleResult?.instance_name}
                         setList={setInstances}

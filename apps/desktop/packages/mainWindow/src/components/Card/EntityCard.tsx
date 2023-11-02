@@ -3,7 +3,7 @@ import { ImportEntityStatus } from "@gd/core_module/bindings";
 const EntityCard = (props: {
   entity: ImportEntityStatus;
   icon: string;
-  onClick?: [(entity: ImportEntityStatus) => void, ImportEntityStatus];
+  onClick?: [(_entity: ImportEntityStatus) => void, ImportEntityStatus];
 }) => {
   return (
     <li

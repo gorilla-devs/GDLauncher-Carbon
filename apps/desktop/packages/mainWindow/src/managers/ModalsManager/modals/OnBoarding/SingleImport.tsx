@@ -1,12 +1,10 @@
-import { setTaskId, taskId } from "@/utils/import";
+import { setTaskId } from "@/utils/import";
 import { setTaskIds, taskIds } from "@/utils/import";
 import { isProgressFailed } from "@/utils/instances";
 import { rspc, rspcFetch } from "@/utils/rspcClient";
-import { FETask } from "@gd/core_module/bindings";
+import { Trans } from "@gd/i18n";
 import { Button } from "@gd/ui";
-import { Match, Switch, createEffect, createSignal, onCleanup } from "solid-js";
-
-const DownloadState = (props: { state: string }) => {};
+import { Match, Switch, createEffect, createSignal } from "solid-js";
 
 const SingleImport = (props: {
   instanceIndex: number;
@@ -104,7 +102,7 @@ const SingleImport = (props: {
                 });
               }}
             >
-              Retry
+              <Trans key="onboarding.retry" />
             </Button>
           </div>
         </Match>
@@ -112,9 +110,6 @@ const SingleImport = (props: {
           <div class="i-ic:round-check text-2xl text-green-600"></div>
         </Match>
       </Switch>
-      {/* <span class="font-semibold">
-        {state() !== "idle" ? state() : `${progress()}%`}
-      </span> */}
     </div>
   );
 };

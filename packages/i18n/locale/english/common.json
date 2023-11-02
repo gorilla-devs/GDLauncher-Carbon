@@ -189,6 +189,7 @@
   "onboarding.add_instance": "+ Add Instance",
   "onboarding.go_back": "Go back",
   "onboarding.done": "Done",
+  "onboarding.retry": "Retry",
   "onboarding.begin_import": "Begin import",
   "onboarding.scan_target_path": "Scan target path:",
   "onboarding.import_instance_or_zip": "Import instance / Zip",

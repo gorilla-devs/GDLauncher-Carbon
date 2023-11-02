@@ -1,11 +1,11 @@
 import { Checkbox } from "@gd/ui";
-import { Accessor, Setter, createEffect, createSignal } from "solid-js";
+import { Setter, createEffect, createSignal } from "solid-js";
 import { instances } from "./SingleEntity";
 
 interface Props {
   title?: string;
-  setList?: (list: Setter<never[]>) => void;
-  setInstance?: (instance: string | undefined) => void;
+  setList?: (_list: Setter<never[]>) => void;
+  setInstance?: (_instance: string | undefined) => void;
   isSingleInstance?: boolean;
 }
 
