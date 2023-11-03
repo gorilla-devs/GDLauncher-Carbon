@@ -114,41 +114,6 @@ const SingleEntity = (props: {
   });
   return (
     <>
-      <div class="w-full flex justify-between items-center pt-6">
-        <Button
-          type="secondary"
-          onClick={() => {
-            props.setEntity(undefined);
-            setStep("selectionStep");
-            setInstances([]);
-          }}
-        >
-          <Trans
-            options={{ defaultValue: "Go back" }}
-            key="onboarding.go_back"
-          />
-        </Button>
-
-        <span class="font-bold">{props.entity.entity}</span>
-        <Show when={step() === "selectionStep"} fallback={<div />}>
-          <Button
-            disabled={instances().length === 0}
-            type="primary"
-            onClick={() => {
-              if (instances().length === 0) {
-                return;
-              } else {
-                setStep("importStep");
-              }
-            }}
-          >
-            <Trans
-              options={{ defaultValue: "Begin import" }}
-              key="onboarding.begin_import"
-            />
-          </Button>
-        </Show>
-      </div>
       <div class="flex-1 w-full flex flex-col items-center justify-center p-4">
         <div class="flex items-center justify-between w-full gap-2">
           <span class="font-bold">
@@ -269,6 +234,41 @@ const SingleEntity = (props: {
             </Match>
           </Switch>
         </div>
+      </div>
+      <div class="w-full flex justify-between items-center pt-6">
+        <Button
+          type="secondary"
+          onClick={() => {
+            props.setEntity(undefined);
+            setStep("selectionStep");
+            setInstances([]);
+          }}
+        >
+          <Trans
+            options={{ defaultValue: "Go back" }}
+            key="onboarding.go_back"
+          />
+        </Button>
+
+        <span class="font-bold">{props.entity.entity}</span>
+        <Show when={step() === "selectionStep"} fallback={<div />}>
+          <Button
+            disabled={instances().length === 0}
+            type="primary"
+            onClick={() => {
+              if (instances().length === 0) {
+                return;
+              } else {
+                setStep("importStep");
+              }
+            }}
+          >
+            <Trans
+              options={{ defaultValue: "Begin import" }}
+              key="onboarding.begin_import"
+            />
+          </Button>
+        </Show>
       </div>
     </>
   );
