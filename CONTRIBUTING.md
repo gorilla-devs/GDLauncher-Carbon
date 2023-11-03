@@ -1,12 +1,12 @@
 # Contributing
 When contributing to this repository, please first discuss the change you wish to make via issue, discord, email, or any other method with the owners of this repository before making a change.
 
-Please note we have a code of conduct, please follow it in all your interactions with the project.
+Please note we have a code of conduct, follow it in all your interactions with the project.
 
 ## Pull Request Process
-Once you have made your changes, please open a Pull Request with a clear title and description of what you have done. Please include any relevant information that may be useful to the reviewer.
+Once you have made your changes, open a Pull Request with a clear title and description of what you have done. Please include any relevant information that may be useful to the reviewer.
 
-Please ensure that your code is properly formatted running rust fmt or any other applicable tools/commands, and that you have run the tests before submitting your Pull Request.
+Ensure that your code is properly formatted running rust fmt or any other applicable tools/commands, and that you have run the tests before submitting your Pull Request.
 
 Before a reviewer can take a look at your Pull Request, you must sign our CLA and add your github handle to our designated repo.
 Please follow the instructions at [https://github.com/gorilla-devs/clabot-config](https://github.com/gorilla-devs/clabot-config).
