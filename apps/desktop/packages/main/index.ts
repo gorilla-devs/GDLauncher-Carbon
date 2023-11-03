@@ -186,6 +186,9 @@ async function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Expose chrome's accessibility tree by default
+  app.setAccessibilitySupportEnabled(true);
+
   console.log("OVERWOLF APP ID", process.env.OVERWOLF_APP_UID);
   session.defaultSession.webRequest.onBeforeSendHeaders(
     {
