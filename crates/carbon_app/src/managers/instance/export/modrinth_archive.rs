@@ -161,6 +161,11 @@ pub async fn export_modrinth(
                         .iter()
                         .find(|loader| loader.type_ == ModLoaderType::Forge)
                         .map(|loader| loader.version.clone()),
+                    neoforge: version
+                        .modloaders
+                        .iter()
+                        .find(|loader| loader.type_ == ModLoaderType::Neoforge)
+                        .map(|loader| loader.version.clone()),
                     fabric_loader: version
                         .modloaders
                         .iter()

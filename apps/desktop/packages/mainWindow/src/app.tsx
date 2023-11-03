@@ -5,7 +5,6 @@ import initThemes from "./utils/theme";
 import { rspc } from "@/utils/rspcClient";
 import { useModal } from "./managers/ModalsManager";
 import { useKeyDownEvent } from "@solid-primitives/keyboard";
-import initAnalytics from "@/utils/analytics";
 import { checkForUpdates } from "./utils/updater";
 
 type Props = {
@@ -22,7 +21,6 @@ const App = (props: Props) => {
 
   initThemes();
 
-  initAnalytics();
   checkForUpdates();
 
   const setIsFirstRun = rspc.createMutation(["settings.setSettings"]);

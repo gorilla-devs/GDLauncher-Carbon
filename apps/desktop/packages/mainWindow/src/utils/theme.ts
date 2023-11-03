@@ -42,18 +42,17 @@ const initThemes = () => {
       }
     }
   });
-
-  function applyTheme(theme: UITheme) {
-    // Inject theme
-    for (const key in theme) {
-      document.documentElement.style.setProperty(
-        `--${key}`,
-        theme[key as keyof UITheme]
-      );
-    }
-  }
 };
 
+export function applyTheme(theme: UITheme) {
+  // Inject theme
+  for (const key in theme) {
+    document.documentElement.style.setProperty(
+      `--${key}`,
+      theme[key as keyof UITheme]
+    );
+  }
+}
 export function getAvailableThemes(): string[] {
   return Object.values(_Theme);
 }

@@ -27,6 +27,7 @@ pub enum Translation {
     InstanceTaskLaunchExtractNatives,
     InstanceTaskReconstructAssets,
     InstanceTaskLaunchRunForgeProcessors,
+    InstanceTaskLaunchRunNeoforgeProcessors,
     InstanceTaskInstallMod {
         mod_name: String,
         instance_name: String,

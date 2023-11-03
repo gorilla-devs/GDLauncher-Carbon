@@ -35,6 +35,10 @@ export function initRTPath(override: string | null | undefined) {
     path.join(app.getPath("userData"), RUNTIME_PATH_DEFAULT_NAME);
 }
 
+ipcMain.handle("getUserData", async () => {
+  return app.getPath("userData");
+});
+
 ipcMain.handle("getInitialRuntimePath", async () => {
   return path.join(app.getPath("userData"), RUNTIME_PATH_DEFAULT_NAME);
 });

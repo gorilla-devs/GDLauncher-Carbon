@@ -65,6 +65,8 @@ pub struct ModrinthPackDependencies {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub forge: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub neoforge: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub fabric_loader: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub quilt_loader: Option<String>,
@@ -94,6 +96,12 @@ impl TryFrom<ModrinthPackDependencies> for StandardVersion {
             modloaders.insert(ModLoader {
                 type_: ModLoaderType::Quilt,
                 version: format!("{}-{}", &minecraft_version, quilt_version),
+            });
+        }
+        if let Some(neoforge_version) = value.neoforge {
+            modloaders.insert(ModLoader {
+                type_: ModLoaderType::Neoforge,
+                version: format!("{}-{}", &minecraft_version, neoforge_version),
             });
         }
         Ok(StandardVersion {

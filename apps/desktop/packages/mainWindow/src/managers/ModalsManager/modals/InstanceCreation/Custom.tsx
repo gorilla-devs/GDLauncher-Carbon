@@ -13,7 +13,6 @@ import {
 import { blobToBase64 } from "@/utils/helpers";
 import { mcVersions } from "@/utils/mcVersion";
 import { useGDNavigate } from "@/managers/NavigationManager";
-import { trackEvent } from "@/utils/analytics";
 import { ReactiveMap } from "@solid-primitives/map";
 
 type MappedMcVersions = ManifestVersion & { hasModloader?: boolean };
@@ -31,6 +30,7 @@ type Instancetype = {
 enum Modloaders {
   _Quilt = "quilt",
   _Forge = "forge",
+  _NeoForge = "neoforge",
   _Fabric = "fabric"
 }
 
@@ -64,6 +64,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
   const [oldAlphaVersionFilter, setOldAlphaVersionFilter] = createSignal(false);
 
   const forgeHashmap = new ReactiveMap();
+  const neoForgeHashmap = new ReactiveMap();
   const fabricHashmap = new ReactiveMap();
   const quiltHashmap = new ReactiveMap();
 
@@ -79,6 +80,18 @@ const Custom = (props: Pick<ModalProps, "data">) => {
       });
     }
   });
+
+  const neoForgeVersionsQuery = rspc.createQuery(
+    () => ["mc.getNeoforgeVersions"],
+    {
+      enabled: false,
+      onSuccess(data) {
+        data.gameVersions.forEach((version) => {
+          neoForgeHashmap.set(version.id, version.loaders);
+        });
+      }
+    }
+  );
 
   const fabricVersionsQuery = rspc.createQuery(() => ["mc.getFabricVersions"], {
     enabled: false,
@@ -100,6 +113,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
 
   const DUMMY_META_VERSION = "${gdlauncher.gameVersion}";
 
+  const isNeoForge = () => loader() === Modloaders._NeoForge;
   const isFabric = () => loader() === Modloaders._Fabric;
   const isForge = () => loader() === Modloaders._Forge;
   const isQuilt = () => loader() === Modloaders._Quilt;
@@ -107,6 +121,12 @@ const Custom = (props: Pick<ModalProps, "data">) => {
   createEffect(() => {
     if (forgeVersionsQuery.data && isForge()) {
       const versions = forgeVersionsQuery?.data?.gameVersions.find(
+        (v) => v.id === (mcVersion() || (mappedMcVersions()?.[0]?.id as string))
+      )?.loaders;
+
+      setLoaderVersions(versions || []);
+    } else if (neoForgeVersionsQuery.data && isNeoForge()) {
+      const versions = neoForgeVersionsQuery?.data?.gameVersions.find(
         (v) => v.id === (mcVersion() || (mappedMcVersions()?.[0]?.id as string))
       )?.loaders;
 
@@ -167,6 +187,9 @@ const Custom = (props: Pick<ModalProps, "data">) => {
         (item.type === "old_alpha" && oldAlphaVersionFilter())
     );
 
+    const neoForgeMappedVersions = filteredData.map((item) => {
+      return { ...item, hasModloader: neoForgeHashmap.has(item.id) };
+    });
     const forgeMappedVersions = filteredData.map((item) => {
       return { ...item, hasModloader: forgeHashmap.has(item.id) };
     });
@@ -178,6 +201,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     });
 
     if (isForge()) setMappedMcVersions(forgeMappedVersions);
+    else if (isNeoForge()) setMappedMcVersions(neoForgeMappedVersions);
     else if (isFabric()) setMappedMcVersions(fabricMappedVersions);
     else if (isQuilt()) setMappedMcVersions(quiltMappedVersions);
     else setMappedMcVersions(filteredData);
@@ -194,6 +218,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
   }[] = [
     { label: t("instance.vanilla"), key: undefined },
     { label: t("instance.forge"), key: "forge" },
+    { label: t("instance.neoforge"), key: "neoforge" },
     { label: t("instance.fabric"), key: "fabric" },
     { label: t("instance.quilt"), key: "quilt" }
   ];
@@ -311,32 +336,6 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     } else {
       setError("");
 
-      let versions: FEModdedManifestLoaderVersion[];
-      if (isForge()) {
-        const mcVers = forgeVersionsQuery?.data?.gameVersions[0];
-        versions =
-          forgeVersionsQuery?.data?.gameVersions.find(
-            (v) => v.id === (mcVersion() || mcVers?.id)
-          )?.loaders || [];
-      } else if (isFabric()) {
-        versions =
-          fabricVersionsQuery?.data?.gameVersions.find(
-            (v) => v.id === DUMMY_META_VERSION
-          )?.loaders || [];
-      } else if (isQuilt()) {
-        versions =
-          quiltVersionsQuery?.data?.gameVersions.find(
-            (v) => v.id === DUMMY_META_VERSION
-          )?.loaders || [];
-      } else {
-        versions = [];
-      }
-
-      trackEvent("instanceCreate", {
-        loader: loader(),
-        mcVersion: mcVersion() || (mappedMcVersions()?.[0]?.id as string)
-      });
-
       createInstanceMutation.mutate({
         group: defaultGroup.data || 1,
         use_loaded_icon: true,
@@ -350,7 +349,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 ? [
                     {
                       type_: loader() as CFFEModLoaderType,
-                      version: chosenLoaderVersion() || versions[0].id
+                      version: chosenLoaderVersion()
                     } as ModLoader
                   ]
                 : []
@@ -365,12 +364,6 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     if (instanceData()?.id) {
       setError("");
 
-      const mcVers = forgeVersionsQuery?.data?.gameVersions[0];
-      const versions =
-        forgeVersionsQuery?.data?.gameVersions.find(
-          (v) => v.id === (mcVersion() || mcVers?.id)
-        )?.loaders || [];
-
       updateInstanceMutation.mutate({
         instance: parseInt((instanceData() as Instancetype).id, 10),
         use_loaded_icon: { Set: !!bgPreview() },
@@ -382,7 +375,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
           Set: loader()
             ? ({
                 type_: loader() as CFFEModLoaderType,
-                version: chosenLoaderVersion() || versions[0].id
+                version: chosenLoaderVersion()
               } as ModLoader)
             : null
         }
@@ -393,6 +386,8 @@ const Custom = (props: Pick<ModalProps, "data">) => {
   createEffect(() => {
     if (instanceData()?.modloader === "forge") {
       forgeVersionsQuery.refetch();
+    } else if (instanceData()?.modloader === "neoforge") {
+      neoForgeVersionsQuery.refetch();
     } else if (instanceData()?.modloader === "fabric") {
       fabricVersionsQuery.refetch();
     } else if (instanceData()?.modloader === "quilt") {
@@ -483,6 +478,8 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                   onClick={() => {
                     if (modloader.key === "forge") {
                       forgeVersionsQuery.refetch();
+                    } else if (modloader.key === "neoforge") {
+                      neoForgeVersionsQuery.refetch();
                     } else if (modloader.key === "fabric") {
                       fabricVersionsQuery.refetch();
                     } else if (modloader.key === "quilt") {
@@ -510,7 +507,8 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 disabled={Boolean(
                   ((forgeVersionsQuery.isFetching ||
                     fabricVersionsQuery.isFetching ||
-                    quiltVersionsQuery.isFetching) &&
+                    quiltVersionsQuery.isFetching ||
+                    neoForgeVersionsQuery.isFetching) &&
                     loader()) ||
                     mappedMcVersions().length === 0
                 )}
@@ -547,6 +545,13 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                   } else if (isForge()) {
                     const versions =
                       forgeVersionsQuery?.data?.gameVersions.find(
+                        (v) => v.id === l.key
+                      )?.loaders;
+
+                    setLoaderVersions(versions || []);
+                  } else if (isNeoForge()) {
+                    const versions =
+                      neoForgeVersionsQuery?.data?.gameVersions.find(
                         (v) => v.id === l.key
                       )?.loaders;
 
@@ -625,6 +630,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                       forgeVersionsQuery.isFetching ||
                       fabricVersionsQuery.isFetching ||
                       quiltVersionsQuery.isFetching ||
+                      neoForgeVersionsQuery.isFetching ||
                       !loaderVersions()
                     }
                     options={loaderVersions()?.map((v) => ({

@@ -6,16 +6,23 @@
 
 GDLauncher is a custom Minecraft launcher written from the ground up in rust and solidJS. Its main goal is to make it easy and enjoyable to manage different Minecraft versions, install modloaders, mods and modpacks from different platforms, bringing the playing and modding experience to the next level!
 
+## What happened to the old GDLauncher?
+The old GDLauncher has been rewritten and officially discontinued. You can still find the old code in the [legacy branch](#-history).
+You can read more [here](https://gdlauncher.com/en/blog/curseforge-partnership-announcement/)
+
 ## Table of Content
 <details>
  <summary><strong>Table of Contents</strong> (click to expand)</summary>
 
 - [GDLauncher (Carbon)](#gdlauncher-carbon)
   - [🎮 What is GDLauncher](#-what-is-gdlauncher)
+  - [What happened to the old GDLauncher?](#what-happened-to-the-old-gdlauncher)
   - [Table of Content](#table-of-content)
   - [🎉 Join our community](#-join-our-community)
   - [🎁 Features](#-features)
   - [▶️ Development](#️-development)
+    - [A quick note](#a-quick-note)
+    - [Contributing](#contributing)
     - [Requirements](#requirements)
     - [Pnpm](#pnpm)
     - [Install Dependencies](#install-dependencies)
@@ -44,7 +51,7 @@ Join our official GDLauncher discord server. There you'll find our community and
 <a href='https://discord.gdlauncher.com' target='_blank'><img height='40' style='border:0px;height:50px;' src='https://cdn.gdl.gg/github-readme/Discord-Logo-Wordmark-Color.png' border='0' alt='GDLauncher Discord Server' /></a>
 
 ## 🎁 Features
-- 🎮 Easily install any minecraft version and **modloader**, including `forge`, `fabric`, `quilt`, `neoforged`
+- 🎮 Easily install any minecraft version and **modloader**, including `forge`, `fabric`, `quilt`, `neoforge`
 - 📦 Install `addons` from **CurseForge**, **Modrinth** and more!
 - 📦 Install `modpacks` from **CurseForge**, **Modrinth** and more!
 - ☕ Automatic **Java Manager**. You don't need to have java installed on your system, the launcher will take care of installing the correct java version for you!
@@ -62,6 +69,13 @@ https://flowbite.com/
 Check https://github.com/vercel/turborepo/tree/main/examples/with-docker for turborepo examples. -->
 
 ## ▶️ Development
+
+### A quick note
+Local development is currently very hard as it requires a local instance of the GDL backend which is not public. We are currently working on making it easier.
+
+### Contributing
+To contribute, please see the [contributing](CONTRIBUTING.md) guide.
+
 ### Requirements
 - Node 18.x.x
 - Rust >= 1.73.0
@@ -139,5 +153,6 @@ The GDLauncher name and logo are trademarks of GorillaDevs Inc. and may not be u
 
 Here you can find the previous versions of the code:
 
-- [Original C# Code](https://www.github.com/gorilla-devs/GDLauncher/tree/csharp_legacy_launcher)
-- [First Electron/React Version](https://www.github.com/gorilla-devs/GDLauncher/tree/GDLauncher_old)
+- [Original C# Code](https://github.com/gorilla-devs/GDLauncher_LEGACY-Full-History/tree/csharp_legacy_launcher)
+- [First Electron/React Version](https://github.com/gorilla-devs/GDLauncher_LEGACY-Full-History/tree/GDLauncher_old)
+- GDLauncher (Discontinued) [Legacy Branch](https://www.github.com/gorilla-devs/GDLauncher-discontinued)

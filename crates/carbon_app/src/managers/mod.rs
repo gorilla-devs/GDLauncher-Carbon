@@ -89,9 +89,25 @@ mod app {
             invalidation_channel: broadcast::Sender<InvalidationEvent>,
             runtime_path: PathBuf,
         ) -> App {
-            let db_client = prisma_client::load_and_migrate(runtime_path.clone())
-                .await
-                .unwrap();
+            let db_client = match prisma_client::load_and_migrate(runtime_path.clone()).await {
+                Ok(client) => Arc::new(client),
+                Err(prisma_client::DatabaseError::Migration(err)) => {
+                    eprintln!(
+                        "[_GDL_DB_MIGRATION_FAILED_]: Database migration failed: {}",
+                        err
+                    );
+                    error!("Database migration failed: {}", err);
+                    std::process::exit(1);
+                }
+                Err(err) => {
+                    error!("Database connection failed: {}", err);
+                    eprintln!("Database connection failed: {}", err);
+                    std::process::exit(1);
+                }
+            };
+
+            // eprintln!("[_GDL_DB_MIGRATION_FAILED_]: Database migration failed");
+            // std::process::exit(1);
 
             let app = Arc::new(UnsafeCell::new(MaybeUninit::<AppInner>::uninit()));
             let unsaferef = UnsafeAppRef(Arc::downgrade(&app));
@@ -123,10 +139,10 @@ mod app {
                     download_manager: DownloadManager::new(),
                     instance_manager: InstanceManager::new(),
                     meta_cache_manager: MetaCacheManager::new(),
-                    metrics_manager: MetricsManager::new(),
+                    metrics_manager: MetricsManager::new(Arc::clone(&db_client)),
                     invalidation_channel,
                     reqwest_client: reqwest,
-                    prisma_client: Arc::new(db_client),
+                    prisma_client: Arc::clone(&db_client),
                     task_manager: VisualTaskManager::new(),
                     system_info_manager: SystemInfoManager::new(),
                     rich_presence_manager: rich_presence::RichPresenceManager::new(),
@@ -151,6 +167,10 @@ mod app {
             let _app = app.clone();
             tokio::spawn(async move {
                 let _ = _app.clone().rich_presence_manager().start_presence().await;
+            });
+
+            tokio::spawn(async move {
+                let _ = reqwest::get(format!("{}/v1/announcement", GDL_API_BASE)).await;
             });
 
             app
@@ -192,35 +212,6 @@ mod app {
                     return Ok(event);
                 }
             }
-        }
-    }
-}
-
-impl Drop for AppInner {
-    fn drop(&mut self) {
-        #[cfg(feature = "production")]
-        #[cfg(not(test))]
-        {
-            use crate::domain::metrics::{Event, EventName};
-            use crate::iridium_client::get_client;
-            use std::collections::HashMap;
-            use tracing::debug;
-
-            let close_event = Event {
-                name: EventName::AppClosed,
-                properties: HashMap::new(),
-            };
-
-            let client = get_client();
-
-            tokio::runtime::Handle::current().block_on(async move {
-                debug!("Collecting metric for app close");
-                let res = self.metrics_manager.track_event(close_event).await;
-                match res {
-                    Ok(_) => debug!("Successfully collected metric for app close"),
-                    Err(e) => error!("Error collecting metric for app close: {e}"),
-                }
-            });
         }
     }
 }
