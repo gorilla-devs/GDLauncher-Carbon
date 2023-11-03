@@ -41,7 +41,9 @@ pub async fn download_modpack_zip(
     app: &App,
     cf_addon: &File,
     target_path: &Path,
-    progress_percentage_sender: tokio::sync::watch::Sender<UpdateValue<(u64, u64)>>,
+    progress_percentage_sender: tokio::sync::watch::Sender<
+        UpdateValue<(u64, u64)>,
+    >,
 ) -> anyhow::Result<()> {
     let modpack_download_url = cf_addon
         .download_url
@@ -55,8 +57,9 @@ pub async fn download_modpack_zip(
         .get_temp()
         .maketmpfile()
         .await?;
-    let file_downloadable = Downloadable::new(&modpack_download_url, file.to_path_buf())
-        .with_size(cf_addon.file_length as u64);
+    let file_downloadable =
+        Downloadable::new(&modpack_download_url, file.to_path_buf())
+            .with_size(cf_addon.file_length as u64);
 
     tokio::fs::create_dir_all(
         &file
@@ -71,14 +74,19 @@ pub async fn download_modpack_zip(
     tokio::spawn(async move {
         while download_progress_recv.borrow_mut().changed().await.is_ok() {
             let p = download_progress_recv.borrow();
-            progress_percentage_sender
-                .send_modify(|progress| progress.set((p.current_size, p.total_size)));
+            progress_percentage_sender.send_modify(|progress| {
+                progress.set((p.current_size, p.total_size))
+            });
         }
 
         Ok::<_, anyhow::Error>(progress_percentage_sender)
     });
 
-    carbon_net::download_file(&file_downloadable, Some(download_progress_sender)).await?;
+    carbon_net::download_file(
+        &file_downloadable,
+        Some(download_progress_sender),
+    )
+    .await?;
 
     file.rename(target_path).await?;
     Ok(())
@@ -110,7 +118,8 @@ pub async fn prepare_modpack_from_zip(
         let mut handles = Vec::new();
 
         let semaphore = Arc::new(tokio::sync::Semaphore::new(20));
-        let atomic_counter_download_metadata = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let atomic_counter_download_metadata =
+            Arc::new(std::sync::atomic::AtomicU64::new(0));
 
         let files_len = manifest.files.len() as u64;
 
@@ -118,7 +127,8 @@ pub async fn prepare_modpack_from_zip(
             let semaphore = semaphore.clone();
             let app = app.clone();
             let instance_path = instance_path.clone();
-            let progress_percentage_sender_clone = progress_percentage_sender.clone();
+            let progress_percentage_sender_clone =
+                progress_percentage_sender.clone();
             let atomic_counter = atomic_counter_download_metadata.clone();
 
             let mod_id = file.project_id;
@@ -130,20 +140,25 @@ pub async fn prepare_modpack_from_zip(
                 let cf_manager = &app.modplatforms_manager().curseforge;
 
                 let CurseForgeResponse { data: mod_file, .. } = cf_manager
-                    .get_mod_file(curseforge::filters::ModFileParameters { mod_id, file_id })
+                    .get_mod_file(curseforge::filters::ModFileParameters {
+                        mod_id,
+                        file_id,
+                    })
                     .await?;
 
                 let instance_path = instance_path.get_mods_path(); // TODO: they could also be other things
                 let downloadable = Downloadable::new(
-                    mod_file
-                        .download_url
-                        .ok_or(anyhow::anyhow!("Failed to get download url for mod"))?,
+                    mod_file.download_url.ok_or(anyhow::anyhow!(
+                        "Failed to get download url for mod"
+                    ))?,
                     instance_path.join(mod_file.file_name),
                 )
                 .with_size(mod_file.file_length as u64);
                 progress_percentage_sender_clone.send_modify(|progress| {
                     progress.acquire_addon_metadata.set((
-                        atomic_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1,
+                        atomic_counter
+                            .fetch_add(1, std::sync::atomic::Ordering::SeqCst)
+                            + 1,
                         files_len,
                     ));
                 });
@@ -175,8 +190,9 @@ pub async fn prepare_modpack_from_zip(
                 }
 
                 let outpath = match file.enclosed_name() {
-                    Some(path) => Path::new(&override_full_path)
-                        .join(path.strip_prefix(&override_folder_name).unwrap()),
+                    Some(path) => Path::new(&override_full_path).join(
+                        path.strip_prefix(&override_folder_name).unwrap(),
+                    ),
                     None => continue,
                 };
 

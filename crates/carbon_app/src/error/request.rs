@@ -142,7 +142,10 @@ impl RequestErrorDetails {
         Self::from_error(error.without_url())
     }
 
-    pub fn from_json_decode_error(error: serde_json::Error, body: &str) -> Self {
+    pub fn from_json_decode_error(
+        error: serde_json::Error,
+        body: &str,
+    ) -> Self {
         Self::MalformedResponse {
             details: MalformedResponseDetails::JsonDecodeError {
                 ctx: get_json_context(&error, body, 400),
@@ -169,7 +172,11 @@ impl RequestError {
         }
     }
 
-    pub fn from_json_decode_error(error: serde_json::Error, body: &str, url: &Url) -> Self {
+    pub fn from_json_decode_error(
+        error: serde_json::Error,
+        body: &str,
+        url: &Url,
+    ) -> Self {
         Self {
             context: RequestContext::from_url(url),
             error: RequestErrorDetails::from_json_decode_error(error, body),
@@ -194,7 +201,9 @@ impl RequestError {
 
 #[async_trait::async_trait]
 pub trait GoodJsonRequestError {
-    async fn json_with_context<T: serde::de::DeserializeOwned>(self) -> Result<T, RequestError>;
+    async fn json_with_context<T: serde::de::DeserializeOwned>(
+        self,
+    ) -> Result<T, RequestError>;
     async fn json_with_context_reporting<T: serde::de::DeserializeOwned>(
         self,
         ty: &'static str,
@@ -203,7 +212,9 @@ pub trait GoodJsonRequestError {
 
 #[async_trait::async_trait]
 impl GoodJsonRequestError for reqwest::Response {
-    async fn json_with_context<T: serde::de::DeserializeOwned>(self) -> Result<T, RequestError> {
+    async fn json_with_context<T: serde::de::DeserializeOwned>(
+        self,
+    ) -> Result<T, RequestError> {
         let url = self.url().clone();
         let body = self
             .error_for_status()
@@ -211,8 +222,9 @@ impl GoodJsonRequestError for reqwest::Response {
             .text()
             .await
             .map_err(RequestError::from_error)?;
-        Ok(serde_json::from_str::<T>(&body)
-            .map_err(|err| RequestError::from_json_decode_error(err, &body, &url))?)
+        Ok(serde_json::from_str::<T>(&body).map_err(|err| {
+            RequestError::from_json_decode_error(err, &body, &url)
+        })?)
     }
 
     async fn json_with_context_reporting<T: serde::de::DeserializeOwned>(
@@ -258,13 +270,17 @@ impl From<RequestError> for FERequestError {
                     }
                 }
                 RequestErrorDetails::Timeout => FERequestErrorType::Timeout,
-                RequestErrorDetails::ConnectionFailed => FERequestErrorType::ConnectionFailed,
+                RequestErrorDetails::ConnectionFailed => {
+                    FERequestErrorType::ConnectionFailed
+                }
                 RequestErrorDetails::MalformedResponse { details } => {
                     FERequestErrorType::MalformedResponse {
                         details: details.into(),
                     }
                 }
-                RequestErrorDetails::Unknown(x) => FERequestErrorType::Unknown(x),
+                RequestErrorDetails::Unknown(x) => {
+                    FERequestErrorType::Unknown(x)
+                }
             },
         }
     }
@@ -295,12 +311,16 @@ impl From<MalformedResponseDetails> for FEMalformedResponseDetails {
                 column,
                 source,
             },
-            MalformedResponseDetails::UnknownDecodeError => Self::UnknownDecodeError,
+            MalformedResponseDetails::UnknownDecodeError => {
+                Self::UnknownDecodeError
+            }
         }
     }
 }
 
-pub fn censor_error(error: reqwest_middleware::Error) -> reqwest_middleware::Error {
+pub fn censor_error(
+    error: reqwest_middleware::Error,
+) -> reqwest_middleware::Error {
     match error {
         reqwest_middleware::Error::Reqwest(e) => {
             reqwest_middleware::Error::Reqwest(e.without_url())

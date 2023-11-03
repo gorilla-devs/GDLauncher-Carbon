@@ -98,7 +98,9 @@ impl From<domain::Progress> for Progress {
         match value {
             domain::Progress::Indeterminate => Self::Indeterminate,
             domain::Progress::Known(x) => Self::Known(x),
-            domain::Progress::Failed(err) => Self::Failed(FeError::from_anyhow(&*err)),
+            domain::Progress::Failed(err) => {
+                Self::Failed(FeError::from_anyhow(&*err))
+            }
         }
     }
 }
@@ -118,7 +120,9 @@ impl From<domain::SubtaskProgress> for FESubtaskProgress {
             domain::SubtaskProgress::Download { downloaded, total } => {
                 Self::Download { downloaded, total }
             }
-            domain::SubtaskProgress::Item { current, total } => Self::Item { current, total },
+            domain::SubtaskProgress::Item { current, total } => {
+                Self::Item { current, total }
+            }
             domain::SubtaskProgress::Opaque => Self::Opaque,
         }
     }

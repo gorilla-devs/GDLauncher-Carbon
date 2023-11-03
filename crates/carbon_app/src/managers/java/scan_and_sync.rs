@@ -6,7 +6,8 @@ use tracing::{trace, warn};
 use crate::{
     db::{read_filters::StringFilter, PrismaClient},
     domain::java::{
-        JavaArch, JavaComponent, JavaComponentType, JavaVersion, SystemJavaProfileName,
+        JavaArch, JavaComponent, JavaComponentType, JavaVersion,
+        SystemJavaProfileName,
     },
 };
 
@@ -118,7 +119,8 @@ where
 {
     let auto_manage_java = true;
     let local_javas = discovery.find_java_paths().await;
-    let java_profiles = db.java_system_profile().find_many(vec![]).exec().await?;
+    let java_profiles =
+        db.java_system_profile().find_many(vec![]).exec().await?;
 
     trace!("Auto Manage Java is {}", auto_manage_java);
 
@@ -138,12 +140,16 @@ where
             .get_bin_info(&resolved_java_path, JavaComponentType::Local)
             .await;
 
-        let db_entry =
-            get_java_component_from_db(db, resolved_java_path.to_string_lossy().to_string())
-                .await?;
+        let db_entry = get_java_component_from_db(
+            db,
+            resolved_java_path.to_string_lossy().to_string(),
+        )
+        .await?;
 
         if let Some(db_entry) = &db_entry {
-            if JavaComponentType::try_from(&*db_entry.r#type)? != JavaComponentType::Local {
+            if JavaComponentType::try_from(&*db_entry.r#type)?
+                != JavaComponentType::Local
+            {
                 continue;
             }
         }
@@ -157,16 +163,17 @@ where
             // If it isn't valid, check whether it's in the DB
             Err(err) => {
                 trace!("Java is invalid due to: {:?}", err);
-                let is_java_used_in_profile = java_profiles.iter().any(|profile| {
-                    let Some(java) = profile.java.as_ref() else {
-                        return false;
-                    };
-                    let Some(java) = java.as_ref() else {
-                        return false;
-                    };
-                    let java_path = java.path.clone();
-                    java_path == resolved_java_path.display().to_string()
-                });
+                let is_java_used_in_profile =
+                    java_profiles.iter().any(|profile| {
+                        let Some(java) = profile.java.as_ref() else {
+                            return false;
+                        };
+                        let Some(java) = java.as_ref() else {
+                            return false;
+                        };
+                        let java_path = java.path.clone();
+                        java_path == resolved_java_path.display().to_string()
+                    });
 
                 // If it is in the db, update it to invalid
                 if db_entry.is_some() {
@@ -178,9 +185,11 @@ where
                         .await?;
                     } else {
                         db.java()
-                            .delete(crate::db::java::UniqueWhereParam::PathEquals(
-                                resolved_java_path.display().to_string(),
-                            ))
+                            .delete(
+                                crate::db::java::UniqueWhereParam::PathEquals(
+                                    resolved_java_path.display().to_string(),
+                                ),
+                            )
                             .exec()
                             .await?;
                     }
@@ -199,9 +208,9 @@ where
         .await?;
 
     for local_java_from_db in local_javas_from_db {
-        let has_been_scanned = local_javas
-            .iter()
-            .any(|local_java| local_java_from_db.path == local_java.display().to_string());
+        let has_been_scanned = local_javas.iter().any(|local_java| {
+            local_java_from_db.path == local_java.display().to_string()
+        });
 
         if has_been_scanned {
             continue;
@@ -218,10 +227,13 @@ where
                 };
                 Some(java.path.clone())
             })
-            .any(|java_profile_path| local_java_from_db.path == java_profile_path);
+            .any(|java_profile_path| {
+                local_java_from_db.path == java_profile_path
+            });
 
         if is_used_in_profile && !auto_manage_java {
-            update_java_component_in_db_to_invalid(db, local_java_from_db.path).await?;
+            update_java_component_in_db_to_invalid(db, local_java_from_db.path)
+                .await?;
         } else {
             db.java()
                 .delete(crate::db::java::UniqueWhereParam::PathEquals(
@@ -236,7 +248,10 @@ where
 }
 
 #[tracing::instrument(level = "trace", skip_all)]
-pub async fn scan_and_sync_custom<G>(db: &Arc<PrismaClient>, java_checker: &G) -> anyhow::Result<()>
+pub async fn scan_and_sync_custom<G>(
+    db: &Arc<PrismaClient>,
+    java_checker: &G,
+) -> anyhow::Result<()>
 where
     G: JavaChecker,
 {
@@ -257,7 +272,8 @@ where
             .await;
 
         if java_bin_info.is_err() {
-            update_java_component_in_db_to_invalid(db, custom_java.path).await?;
+            update_java_component_in_db_to_invalid(db, custom_java.path)
+                .await?;
         }
     }
 
@@ -289,7 +305,8 @@ where
             .await;
 
         if java_bin_info.is_err() {
-            update_java_component_in_db_to_invalid(db, managed_java.path).await?;
+            update_java_component_in_db_to_invalid(db, managed_java.path)
+                .await?;
         }
     }
 
@@ -297,10 +314,13 @@ where
 }
 
 #[tracing::instrument(level = "trace", skip_all)]
-pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result<()> {
+pub async fn sync_system_java_profiles(
+    db: &Arc<PrismaClient>,
+) -> anyhow::Result<()> {
     let all_javas = db.java().find_many(vec![]).exec().await?;
 
-    let is32bit = std::env::consts::ARCH == "x86" || std::env::consts::ARCH == "arm";
+    let is32bit =
+        std::env::consts::ARCH == "x86" || std::env::consts::ARCH == "arm";
 
     for profile in SystemJavaProfileName::iter() {
         trace!("Syncing system java profile: {}", profile.to_string());
@@ -335,7 +355,8 @@ pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result
                 continue;
             }
 
-            let java_version = JavaVersion::try_from(java.full_version.as_str())?;
+            let java_version =
+                JavaVersion::try_from(java.full_version.as_str())?;
             let java_arch = JavaArch::try_from(java.arch.as_str())?;
 
             let is_arch_allowed = match java_arch {
@@ -343,7 +364,9 @@ pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result
                 _ => true,
             };
 
-            if profile.is_java_version_compatible(&java_version) && is_arch_allowed {
+            if profile.is_java_version_compatible(&java_version)
+                && is_arch_allowed
+            {
                 trace!(
                     "Java {} is compatible with profile {}",
                     java.path,
@@ -351,7 +374,9 @@ pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result
                 );
                 db.java_system_profile()
                     .update(
-                        crate::db::java_system_profile::name::equals(profile.to_string()),
+                        crate::db::java_system_profile::name::equals(
+                            profile.to_string(),
+                        ),
                         vec![crate::db::java_system_profile::java::connect(
                             crate::db::java::id::equals(java.id.clone()),
                         )],
@@ -372,14 +397,15 @@ mod test {
 
     use crate::{
         domain::java::{
-            JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaVersion, SystemJavaProfileName,
+            JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaVersion,
+            SystemJavaProfileName,
         },
         managers::java::{
             discovery::MockDiscovery,
             java_checker::{MockJavaChecker, MockJavaCheckerInvalid},
             scan_and_sync::{
-                add_java_component_to_db, scan_and_sync_custom, scan_and_sync_local,
-                sync_system_java_profiles,
+                add_java_component_to_db, scan_and_sync_custom,
+                scan_and_sync_local, sync_system_java_profiles,
             },
             JavaManager,
         },
@@ -441,7 +467,8 @@ mod test {
             vendor: "Azul Systems, Inc.".to_string(),
         };
 
-        let result = add_java_component_to_db(db, almost_equal_java_component).await;
+        let result =
+            add_java_component_to_db(db, almost_equal_java_component).await;
 
         assert!(result.is_err());
     }

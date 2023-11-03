@@ -45,9 +45,11 @@ pub fn replace_template(
 ) -> PartialVersionInfo {
     let mut version_info = template_info.clone();
     version_info.id = version_info.id.replace(template, game_version);
-    version_info.inherits_from = version_info.inherits_from.replace(template, game_version);
+    version_info.inherits_from =
+        version_info.inherits_from.replace(template, game_version);
     for library in version_info.libraries.iter_mut() {
-        library.name.version = library.name.version.replace(template, game_version);
+        library.name.version =
+            library.name.version.replace(template, game_version);
     }
 
     version_info

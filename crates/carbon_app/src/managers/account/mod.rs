@@ -8,7 +8,8 @@ use anyhow::ensure;
 use async_trait::async_trait;
 use chrono::{FixedOffset, Utc};
 use prisma_client_rust::{
-    chrono::DateTime, prisma_errors::query_engine::RecordNotFound, Direction, QueryError,
+    chrono::DateTime, prisma_errors::query_engine::RecordNotFound, Direction,
+    QueryError,
 };
 use std::{
     collections::HashMap,
@@ -60,7 +61,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .active_account_uuid)
     }
 
-    pub async fn set_active_uuid(self, uuid: Option<String>) -> anyhow::Result<()> {
+    pub async fn set_active_uuid(
+        self,
+        uuid: Option<String>,
+    ) -> anyhow::Result<()> {
         use db::account::WhereParam::Uuid;
         use db::app_configuration::SetParam::SetActiveAccountUuid;
 
@@ -92,7 +96,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
     /// Get the active account's details.
     ///
     /// Not exposed to the frontend on purpose. Will NOT be invalidated.
-    pub async fn get_active_account(&self) -> anyhow::Result<Option<FullAccount>> {
+    pub async fn get_active_account(
+        &self,
+    ) -> anyhow::Result<Option<FullAccount>> {
         use db::account::WhereParam::Uuid;
 
         let Some(uuid) = self.get_active_uuid().await? else {
@@ -106,12 +112,18 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .find_first(vec![Uuid(StringFilter::Equals(uuid))])
             .exec()
             .await?
-            .ok_or_else(|| anyhow!("currenly active account could not be read from database"))?;
+            .ok_or_else(|| {
+                anyhow!(
+                    "currenly active account could not be read from database"
+                )
+            })?;
 
         Ok(Some(account.try_into()?))
     }
 
-    async fn get_account_entries(self) -> anyhow::Result<Vec<db::account::Data>> {
+    async fn get_account_entries(
+        self,
+    ) -> anyhow::Result<Vec<db::account::Data>> {
         use db::account::OrderByParam;
 
         Ok(self
@@ -146,7 +158,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .collect())
     }
 
-    async fn get_account(self, uuid: String) -> anyhow::Result<Option<AccountWithStatus>> {
+    async fn get_account(
+        self,
+        uuid: String,
+    ) -> anyhow::Result<Option<AccountWithStatus>> {
         use db::account::UniqueWhereParam;
 
         let account = self
@@ -166,7 +181,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(Some(account))
     }
 
-    pub async fn get_account_status(self, uuid: String) -> anyhow::Result<Option<AccountStatus>> {
+    pub async fn get_account_status(
+        self,
+        uuid: String,
+    ) -> anyhow::Result<Option<AccountStatus>> {
         let Some(mut account) = self.get_account(uuid).await? else {
             return Ok(None);
         };
@@ -299,7 +317,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
             async fn invalidate(&self) {
                 let app = self.app.upgrade();
                 let account_manager = app.account_manager();
-                let mut refreshing = account_manager.currently_refreshing.write().await;
+                let mut refreshing =
+                    account_manager.currently_refreshing.write().await;
                 // this should never happen
                 let enrollment = refreshing.get(&self.account.uuid).expect("account refresh invalidator recieved an invalidation without an active enrollemt");
                 let status = enrollment.status.read().await;
@@ -323,7 +342,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
                             ..
                         } = &self.account.type_
                         else {
-                            panic!("account type was not microsoft during refresh");
+                            panic!(
+                                "account type was not microsoft during refresh"
+                            );
                         };
 
                         account_manager.add_account(FullAccount {
@@ -428,8 +449,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     }
                 }
 
-                let active_enrollment =
-                    EnrollmentTask::begin(client, Invalidator(AppRef(Arc::downgrade(self.app))));
+                let active_enrollment = EnrollmentTask::begin(
+                    client,
+                    Invalidator(AppRef(Arc::downgrade(self.app))),
+                );
 
                 *enrollment = Some(active_enrollment);
                 self.app.invalidate(ENROLL_GET_STATUS, None);
@@ -502,10 +525,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
             false => None,
         };
 
-        let account = self
-            .get_account(uuid.clone())
-            .await?
-            .ok_or_else(|| ValidateAccountError::AccountMissing(uuid.clone()))?;
+        let account =
+            self.get_account(uuid.clone()).await?.ok_or_else(|| {
+                ValidateAccountError::AccountMissing(uuid.clone())
+            })?;
 
         let AccountStatus::Ok {
             access_token: Some(access_token),
@@ -513,7 +536,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
         else {
             return Ok(());
         };
-        let profile = api::get_profile(&self.app.reqwest_client, &access_token).await;
+        let profile =
+            api::get_profile(&self.app.reqwest_client, &access_token).await;
 
         if let Some(refresh_lock) = &mut refresh_lock {
             **refresh_lock = Some(Instant::now() + Duration::from_secs(30));
@@ -530,7 +554,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     .account()
                     .update(
                         UniqueWhereParam::UuidEquals(uuid.clone()),
-                        vec![SetParam::SetTokenExpires(Some(Utc::now().into()))],
+                        vec![SetParam::SetTokenExpires(Some(
+                            Utc::now().into(),
+                        ))],
                     )
                     .exec()
                     .await?;
@@ -589,7 +615,8 @@ impl AccountRefreshService {
 
                 // wait for all additional refreshing delays to complete to avoid rate limiting
                 loop {
-                    let mut sleep_until = account_manager.refreshloop_sleep.lock().await;
+                    let mut sleep_until =
+                        account_manager.refreshloop_sleep.lock().await;
 
                     match &mut *sleep_until {
                         Some(time) => {
@@ -605,7 +632,9 @@ impl AccountRefreshService {
                 }
 
                 // TODO: there's not really a way to handle an error in here
-                if let Ok(accounts) = account_manager.get_account_entries().await {
+                if let Ok(accounts) =
+                    account_manager.get_account_entries().await
+                {
                     // discard deleted accounts
                     last_check_times = last_check_times
                         .into_iter()
@@ -624,7 +653,8 @@ impl AccountRefreshService {
                         if !last_check_times.contains_key(&account.uuid)
                             && account.access_token.is_some()
                         {
-                            last_check_times.insert(account.uuid, Instant::now());
+                            last_check_times
+                                .insert(account.uuid, Instant::now());
                         }
                     }
 
@@ -651,19 +681,28 @@ impl AccountRefreshService {
                 let account_manager = app.account_manager();
 
                 // TODO: there's not really a way to handle an error in here
-                if let Ok(accounts) = account_manager.get_account_entries().await {
+                if let Ok(accounts) =
+                    account_manager.get_account_entries().await
+                {
                     for account in accounts {
                         // ignore badly formed account entries since we can't handle them
                         let Ok(account) = FullAccount::try_from(account) else {
                             continue;
                         };
-                        let FullAccountType::Microsoft { token_expires, .. } = account.type_ else {
+                        let FullAccountType::Microsoft {
+                            token_expires, ..
+                        } = account.type_
+                        else {
                             continue;
                         };
 
-                        if token_expires < Utc::now() - chrono::Duration::hours(1) {
+                        if token_expires
+                            < Utc::now() - chrono::Duration::hours(1)
+                        {
                             // still can't handle errors
-                            let _ = account_manager.refresh_account(account.uuid).await;
+                            let _ = account_manager
+                                .refresh_account(account.uuid)
+                                .await;
                             break;
                         }
                     }
@@ -733,7 +772,9 @@ pub enum FinalizeEnrollmentError {
 
 #[derive(Error, Debug)]
 pub enum DeleteAccountError {
-    #[error("attempted to delete account that is not in the account list: {0}")]
+    #[error(
+        "attempted to delete account that is not in the account list: {0}"
+    )]
     AccountDoesNotExist(String),
 }
 
@@ -802,7 +843,9 @@ impl TryFrom<db::account::Data> for FullAccount {
                     access_token,
                     refresh_token: value.ms_refresh_token,
                     token_expires: value.token_expires.ok_or_else(|| {
-                        FullAccountLoadError::MissingExpiration(value.uuid.clone())
+                        FullAccountLoadError::MissingExpiration(
+                            value.uuid.clone(),
+                        )
                     })?,
                     skin_id: value.skin_id,
                 },
@@ -827,7 +870,9 @@ impl From<FullAccount> for AccountWithStatus {
                     FullAccountType::Offline => AccountType::Offline,
                 },
                 skin_id: match &value.type_ {
-                    FullAccountType::Microsoft { skin_id, .. } => skin_id.clone(),
+                    FullAccountType::Microsoft { skin_id, .. } => {
+                        skin_id.clone()
+                    }
                     _ => None,
                 },
             },
@@ -847,7 +892,9 @@ impl From<FullAccount> for AccountWithStatus {
                         access_token: Some(access_token),
                     },
                 },
-                FullAccountType::Offline => AccountStatus::Ok { access_token: None },
+                FullAccountType::Offline => {
+                    AccountStatus::Ok { access_token: None }
+                }
             },
         }
     }
@@ -861,7 +908,9 @@ impl From<api::FullAccount> for FullAccount {
             type_: FullAccountType::Microsoft {
                 access_token: value.mc.auth.access_token,
                 refresh_token: Some(value.ms.refresh_token),
-                token_expires: DateTime::<FixedOffset>::from(value.mc.auth.expires_at),
+                token_expires: DateTime::<FixedOffset>::from(
+                    value.mc.auth.expires_at,
+                ),
                 skin_id: value.mc.profile.skin.map(|skin| skin.id),
             },
             last_used: Utc::now().into(),

@@ -109,7 +109,8 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
     info!("Starting router");
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
 
-    let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router().expose().build().arced();
+    let router: Arc<rspc::Router<App>> =
+        crate::api::build_rspc_router().expose().build().arced();
 
     // We disable CORS because this is just an example. DON'T DO THIS IN PRODUCTION!
     let cors = CorsLayer::new()
@@ -138,7 +139,8 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
     // As soon as the server is ready, notify via stdout
     tokio::spawn(async move {
         let mut counter = 0;
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(200));
+        let mut interval =
+            tokio::time::interval(tokio::time::Duration::from_millis(200));
         let reqwest_client = reqwest::Client::new();
         loop {
             counter += 1;
@@ -180,7 +182,8 @@ struct TestEnv {
 impl TestEnv {
     async fn restart_in_place(&mut self) {
         let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
-        self.app = AppInner::new(invalidation_sender, self.tmpdir.clone()).await;
+        self.app =
+            AppInner::new(invalidation_sender, self.tmpdir.clone()).await;
     }
 }
 
@@ -205,7 +208,8 @@ async fn setup_managers_for_test() -> TestEnv {
     let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
     let temp_path = dunce::canonicalize(temp_dir.into_path()).unwrap();
     info!("Test RTP: {}", temp_path.to_str().unwrap());
-    let (invalidation_sender, invalidation_recv) = tokio::sync::broadcast::channel(200);
+    let (invalidation_sender, invalidation_recv) =
+        tokio::sync::broadcast::channel(200);
 
     TestEnv {
         tmpdir: temp_path.clone(),

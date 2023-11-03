@@ -43,7 +43,11 @@ pub struct FEModdedManifest {
 impl From<modded::Manifest> for FEModdedManifest {
     fn from(value: modded::Manifest) -> Self {
         FEModdedManifest {
-            game_versions: value.game_versions.into_iter().map(|v| v.into()).collect(),
+            game_versions: value
+                .game_versions
+                .into_iter()
+                .map(|v| v.into())
+                .collect(),
         }
     }
 }

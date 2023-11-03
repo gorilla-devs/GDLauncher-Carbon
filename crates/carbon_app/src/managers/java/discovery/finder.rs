@@ -10,7 +10,8 @@ async fn load_java_paths_from_env() -> anyhow::Result<Vec<PathBuf>> {
     for env_var in SEARCH_ENV_VARS.iter() {
         let env_path = std::env::var(env_var);
         if let Ok(env_path) = env_path {
-            let paths: Vec<_> = env_path.split(PATH_SEPARATOR).map(PathBuf::from).collect();
+            let paths: Vec<_> =
+                env_path.split(PATH_SEPARATOR).map(PathBuf::from).collect();
             for path in paths {
                 java_paths.extend(search_java_binary_in_path(path));
             }
@@ -45,8 +46,12 @@ pub(super) async fn find_java_paths() -> Vec<PathBuf> {
             let library_jvm_java = library_jvm_java.path();
             javas.extend(
                 vec![
-                    search_java_binary_in_path(library_jvm_java.join("Contents/Home")),
-                    search_java_binary_in_path(library_jvm_java.join("Contents/Home/jre")),
+                    search_java_binary_in_path(
+                        library_jvm_java.join("Contents/Home"),
+                    ),
+                    search_java_binary_in_path(
+                        library_jvm_java.join("Contents/Home/jre"),
+                    ),
                 ]
                 .concat(),
             );
@@ -54,7 +59,8 @@ pub(super) async fn find_java_paths() -> Vec<PathBuf> {
     }
 
     // System Library JVM
-    let system_library_jvm_dir = PathBuf::from("/System/Library/Java/JavaVirtualMachines");
+    let system_library_jvm_dir =
+        PathBuf::from("/System/Library/Java/JavaVirtualMachines");
     let system_library_jvm_javas = std::fs::read_dir(system_library_jvm_dir);
     if let Ok(system_library_jvm_javas) = system_library_jvm_javas {
         for system_library_jvm_java in system_library_jvm_javas.flatten() {
@@ -62,8 +68,12 @@ pub(super) async fn find_java_paths() -> Vec<PathBuf> {
 
             javas.extend(
                 vec![
-                    search_java_binary_in_path(system_library_jvm_java.join("Contents/Home")),
-                    search_java_binary_in_path(system_library_jvm_java.join("Contents/Commands")),
+                    search_java_binary_in_path(
+                        system_library_jvm_java.join("Contents/Home"),
+                    ),
+                    search_java_binary_in_path(
+                        system_library_jvm_java.join("Contents/Commands"),
+                    ),
                 ]
                 .concat(),
             );
@@ -118,11 +128,15 @@ fn read_registry_key(
     if let Some(additional_keypath) = additional_keypath {
         let subkeys = key_reg.enum_keys();
         for subkey in subkeys.flatten() {
-            let joined_subkey = format!("{}\\{}\\{}", key, subkey, additional_keypath);
+            let joined_subkey =
+                format!("{}\\{}\\{}", key, subkey, additional_keypath);
             let subkey_reg = hkcu.open_subkey(&joined_subkey)?;
-            let subkey_reg_value: std::result::Result<String, _> = subkey_reg.get_value(value);
+            let subkey_reg_value: std::result::Result<String, _> =
+                subkey_reg.get_value(value);
             if let Ok(registry_str) = subkey_reg_value {
-                results.extend(search_java_binary_in_path(PathBuf::from(registry_str)));
+                results.extend(search_java_binary_in_path(PathBuf::from(
+                    registry_str,
+                )));
             }
         }
     } else {
@@ -204,7 +218,8 @@ pub(super) async fn find_java_paths() -> Vec<PathBuf> {
     }
 
     // Load from disk options
-    let potential_parent_dirs = vec!["C:/Program Files/Java", "C:/Program Files (x86)/Java"];
+    let potential_parent_dirs =
+        vec!["C:/Program Files/Java", "C:/Program Files (x86)/Java"];
     for potential_parent_dir in potential_parent_dirs {
         let parent_dir = PathBuf::from(potential_parent_dir);
         if parent_dir.exists() {

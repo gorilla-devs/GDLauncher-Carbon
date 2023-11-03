@@ -41,15 +41,16 @@ pub async fn load_index(
     index_id: &str,
     asset_indexes_path: PathBuf,
 ) -> anyhow::Result<AssetsIndex> {
-    let asset_index_bytes = tokio::fs::read(asset_indexes_path.join(format!("{}.json", index_id)))
-        .await
-        .with_context(|| {
-            format!(
-                "Failed to read asset index `{}` from `{}`",
-                index_id,
-                asset_indexes_path.to_string_lossy()
-            )
-        })?;
+    let asset_index_bytes =
+        tokio::fs::read(asset_indexes_path.join(format!("{}.json", index_id)))
+            .await
+            .with_context(|| {
+                format!(
+                    "Failed to read asset index `{}` from `{}`",
+                    index_id,
+                    asset_indexes_path.to_string_lossy()
+                )
+            })?;
     Ok(serde_json::from_slice(&asset_index_bytes)?)
 }
 
@@ -74,7 +75,8 @@ pub async fn get_assets_dir(
     assets_path: AssetsPath,
     resources_dir: PathBuf,
 ) -> anyhow::Result<AssetsDir> {
-    let assets_index = load_index(index_id, assets_path.get_indexes_path()).await?;
+    let assets_index =
+        load_index(index_id, assets_path.get_indexes_path()).await?;
     if assets_index.map_virtual {
         Ok(AssetsDir::Virtual(
             assets_path.get_virtual_path().join(index_id),
@@ -91,7 +93,8 @@ pub async fn reconstruct_assets(
     assets_path: AssetsPath,
     resources_dir: PathBuf,
 ) -> anyhow::Result<()> {
-    let assets_index = load_index(index_id, assets_path.get_indexes_path()).await?;
+    let assets_index =
+        load_index(index_id, assets_path.get_indexes_path()).await?;
     let target_path = if assets_index.map_virtual {
         Some(assets_path.get_virtual_path().join(index_id))
     } else if assets_index.map_to_resources {
@@ -110,16 +113,18 @@ pub async fn reconstruct_assets(
                 )
             })?;
 
-        let mut existing_files: HashSet<PathBuf> = walkdir::WalkDir::new(&target_path)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .map(|e| e.path().to_path_buf())
-            .collect();
+        let mut existing_files: HashSet<PathBuf> =
+            walkdir::WalkDir::new(&target_path)
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .map(|e| e.path().to_path_buf())
+                .collect();
 
         let objects_path = assets_path.get_objects_path();
 
         for (path, object) in assets_index.objects.iter() {
-            let object_path = objects_path.join(&object.hash[0..2]).join(&object.hash);
+            let object_path =
+                objects_path.join(&object.hash[0..2]).join(&object.hash);
             let asset_path = target_path.join(path);
 
             existing_files.remove(&asset_path);
@@ -127,9 +132,14 @@ pub async fn reconstruct_assets(
             let exists = tokio::fs::try_exists(&asset_path).await.ok();
             if exists != Some(true) {
                 if let Some(parent) = asset_path.parent() {
-                    tokio::fs::create_dir_all(parent).await.with_context(|| {
-                        format!("Failed to create directory `{}`", parent.to_string_lossy())
-                    })?;
+                    tokio::fs::create_dir_all(parent).await.with_context(
+                        || {
+                            format!(
+                                "Failed to create directory `{}`",
+                                parent.to_string_lossy()
+                            )
+                        },
+                    )?;
                 }
                 tokio::fs::copy(&object_path, &asset_path)
                     .await

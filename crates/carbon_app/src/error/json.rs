@@ -2,7 +2,11 @@
 /// to provided context to a deserialization error. The context is only assured
 /// to be useful if the error was caused by a data mismatch not a syntax error or EOF.
 
-pub fn read_json_context_back(ctx: &str, max_len: usize, string_can_end: bool) -> String {
+pub fn read_json_context_back(
+    ctx: &str,
+    max_len: usize,
+    string_can_end: bool,
+) -> String {
     let mut ctx: String = ctx.to_owned();
 
     let mut token_contexts: Vec<char> = vec![];
@@ -14,7 +18,11 @@ pub fn read_json_context_back(ctx: &str, max_len: usize, string_can_end: bool) -
     let mut count_string_opens = 0;
     let mut count_objects_found = 0;
     for (i, c) in ctx.char_indices().rev() {
-        if c == ':' && in_str && count_string_opens == 1 && last_non_whitespace_char == Some('"') {
+        if c == ':'
+            && in_str
+            && count_string_opens == 1
+            && last_non_whitespace_char == Some('"')
+        {
             in_str = false;
             token_contexts.pop();
         }
@@ -80,7 +88,11 @@ pub fn read_json_context_back(ctx: &str, max_len: usize, string_can_end: bool) -
     ctx
 }
 
-pub fn read_json_context_forward(ctx: &str, max_len: usize, string_can_end: bool) -> String {
+pub fn read_json_context_forward(
+    ctx: &str,
+    max_len: usize,
+    string_can_end: bool,
+) -> String {
     let mut ctx: String = ctx.to_owned();
 
     let mut token_contexts: Vec<char> = vec![];
@@ -92,7 +104,11 @@ pub fn read_json_context_forward(ctx: &str, max_len: usize, string_can_end: bool
     let mut count_string_opens = 0;
     let mut count_objects_found = 0;
     for (i, c) in ctx.char_indices() {
-        if c == ':' && in_str && count_string_opens == 1 && last_non_whitespace_char == Some('"') {
+        if c == ':'
+            && in_str
+            && count_string_opens == 1
+            && last_non_whitespace_char == Some('"')
+        {
             in_str = false;
             token_contexts.pop();
         }
@@ -158,12 +174,18 @@ pub fn read_json_context_forward(ctx: &str, max_len: usize, string_can_end: bool
     ctx
 }
 
-pub fn get_json_context(err: &serde_json::Error, body: &str, max_len: usize) -> String {
+pub fn get_json_context(
+    err: &serde_json::Error,
+    body: &str,
+    max_len: usize,
+) -> String {
     if body.is_empty() {
         return body.to_owned();
     }
 
-    let string_can_end = body.chars().next().map(|char| char == '[' || char == '{') != Some(true);
+    let string_can_end =
+        body.chars().next().map(|char| char == '[' || char == '{')
+            != Some(true);
 
     let line_offset = body
         .char_indices()
@@ -181,8 +203,10 @@ pub fn get_json_context(err: &serde_json::Error, body: &str, max_len: usize) -> 
     let ctx_before = pre_line.to_owned() + ctx_split.0;
     let ctx_after = ctx_split.1.to_owned();
 
-    let obj_before = read_json_context_back(&ctx_before, max_len, string_can_end);
-    let obj_after = read_json_context_forward(&ctx_after, max_len, string_can_end);
+    let obj_before =
+        read_json_context_back(&ctx_before, max_len, string_can_end);
+    let obj_after =
+        read_json_context_forward(&ctx_after, max_len, string_can_end);
 
     obj_before + "<~~ " + obj_after.as_str()
 }

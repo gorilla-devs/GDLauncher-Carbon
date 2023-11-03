@@ -3,7 +3,10 @@ use quote::quote;
 use syn::{parse_macro_input, Data, DeriveInput, Fields};
 
 #[proc_macro_attribute]
-pub fn into_query_parameters(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn into_query_parameters(
+    _attr: TokenStream,
+    item: TokenStream,
+) -> TokenStream {
     let input = parse_macro_input!(item as DeriveInput);
     let struct_name = input.ident;
     let fields = match input.data {

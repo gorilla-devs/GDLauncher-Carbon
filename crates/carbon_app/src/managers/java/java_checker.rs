@@ -4,7 +4,9 @@ use anyhow::bail;
 use tokio::process::Command;
 use tracing::instrument;
 
-use crate::domain::java::{JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaVersion};
+use crate::domain::java::{
+    JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaVersion,
+};
 
 use super::{
     parser::parse_cmd_output_java,
@@ -31,7 +33,8 @@ impl JavaChecker for RealJavaChecker {
         _type: JavaComponentType,
     ) -> anyhow::Result<JavaComponent> {
         let java_checker_path = locate_java_check_class().await?;
-        if java_bin_path.to_string_lossy() != "java" && !java_bin_path.exists() {
+        if java_bin_path.to_string_lossy() != "java" && !java_bin_path.exists()
+        {
             bail!(
                 "Java binary not found at {}",
                 java_bin_path.to_string_lossy()

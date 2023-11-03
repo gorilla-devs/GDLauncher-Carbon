@@ -22,7 +22,9 @@ impl ManagerRef<'_, SkinManager> {
             .app
             .prisma_client
             .account()
-            .find_unique(db::account::UniqueWhereParam::UuidEquals(uuid.clone()))
+            .find_unique(db::account::UniqueWhereParam::UuidEquals(
+                uuid.clone(),
+            ))
             .exec()
             .await?
             .ok_or_else(|| GetSkinError::AccountDoesNotExist(uuid.clone()))?;
@@ -46,16 +48,23 @@ impl ManagerRef<'_, SkinManager> {
             },
             None => {
                 let skin = match account.access_token.as_ref() {
-                    Some(token) => super::api::get_profile(&self.app.reqwest_client, token)
-                        .await
-                        .ok()
-                        .map(Result::ok)
-                        .flatten()
-                        .map(|profile| profile.skin)
-                        // use the default if there is no skin or an error occured.
-                        .flatten()
-                        .unwrap_or_else(|| DefaultSkin::from_uuid(uuid.clone()).make_api_skin()),
-                    None => DefaultSkin::from_uuid(uuid.clone()).make_api_skin(),
+                    Some(token) => {
+                        super::api::get_profile(&self.app.reqwest_client, token)
+                            .await
+                            .ok()
+                            .map(Result::ok)
+                            .flatten()
+                            .map(|profile| profile.skin)
+                            // use the default if there is no skin or an error occured.
+                            .flatten()
+                            .unwrap_or_else(|| {
+                                DefaultSkin::from_uuid(uuid.clone())
+                                    .make_api_skin()
+                            })
+                    }
+                    None => {
+                        DefaultSkin::from_uuid(uuid.clone()).make_api_skin()
+                    }
                 };
 
                 let skin_data = self
@@ -71,12 +80,11 @@ impl ManagerRef<'_, SkinManager> {
                     .prisma_client
                     ._batch((
                         // won't error on 0 deleted
-                        self.app
-                            .prisma_client
-                            .skin()
-                            .delete_many(vec![WhereParam::Id(StringFilter::Equals(
+                        self.app.prisma_client.skin().delete_many(vec![
+                            WhereParam::Id(StringFilter::Equals(
                                 skin.id.clone(),
-                            ))]),
+                            )),
+                        ]),
                         self.app.prisma_client.skin().create(
                             skin.id.clone(),
                             skin_data.to_vec(),
@@ -84,7 +92,9 @@ impl ManagerRef<'_, SkinManager> {
                         ),
                         self.app.prisma_client.account().update(
                             db::account::UniqueWhereParam::UuidEquals(uuid),
-                            vec![db::account::SetParam::SetSkinId(Some(skin.id.clone()))],
+                            vec![db::account::SetParam::SetSkinId(Some(
+                                skin.id.clone(),
+                            ))],
                         ),
                     ))
                     .await?;
@@ -98,7 +108,8 @@ impl ManagerRef<'_, SkinManager> {
 
     pub async fn make_head(self, uuid: String) -> anyhow::Result<Vec<u8>> {
         let skin = self.get_skin(uuid).await?.data;
-        let head = tokio::task::spawn_blocking(move || stitch_head(&skin)).await??;
+        let head =
+            tokio::task::spawn_blocking(move || stitch_head(&skin)).await??;
         Ok(head)
     }
 }
@@ -177,7 +188,8 @@ impl DefaultSkin {
                 _ => unreachable!("all cases that don't match have been specifically excluded in the if statement above"),
             };
 
-            let alex = (is_even(7) != is_even(23)) != (is_even(15) != is_even(31));
+            let alex =
+                (is_even(7) != is_even(23)) != (is_even(15) != is_even(31));
 
             match alex {
                 true => Self::Alex,

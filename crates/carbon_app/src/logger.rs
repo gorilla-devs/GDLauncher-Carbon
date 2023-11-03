@@ -2,7 +2,8 @@ use std::path::Path;
 
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{
-    prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter,
+    prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt,
+    EnvFilter,
 };
 
 fn generate_logs_filters() -> String {
@@ -67,10 +68,13 @@ pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
     #[cfg(not(debug_assertions))]
     {
         let file_name = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
-        let file_appender =
-            tracing_appender::rolling::never(logs_path, format!("{}.log", file_name));
+        let file_appender = tracing_appender::rolling::never(
+            logs_path,
+            format!("{}.log", file_name),
+        );
 
-        let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+        let (non_blocking, guard) =
+            tracing_appender::non_blocking(file_appender);
 
         let printer = tracing_subscriber::fmt::layer()
             .with_target(true)

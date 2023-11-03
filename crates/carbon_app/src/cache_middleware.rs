@@ -1,7 +1,9 @@
 use anyhow::anyhow;
 use chrono::{DateTime, Duration, Utc};
 use reqwest::{Method, Request, Response, StatusCode};
-use reqwest_middleware::{ClientBuilder, ClientWithMiddleware, Middleware, Next, Result};
+use reqwest_middleware::{
+    ClientBuilder, ClientWithMiddleware, Middleware, Next, Result,
+};
 use task_local_extensions::Extensions;
 
 use crate::{
@@ -12,7 +14,10 @@ use crate::{
     managers::UnsafeAppRef,
 };
 
-pub fn new_client(app: UnsafeAppRef, client_builder: ClientBuilder) -> ClientWithMiddleware {
+pub fn new_client(
+    app: UnsafeAppRef,
+    client_builder: ClientBuilder,
+) -> ClientWithMiddleware {
     client_builder.with(CacheMiddleware { app }).build()
 }
 
@@ -41,8 +46,10 @@ impl Middleware for CacheMiddleware {
             body: Vec<u8>,
             cached: bool,
         ) -> std::result::Result<Response, ()> {
-            let mut response = hyper::Response::builder()
-                .status(StatusCode::from_u16(status.try_into().map_err(|_| ())?).map_err(|_| ())?);
+            let mut response = hyper::Response::builder().status(
+                StatusCode::from_u16(status.try_into().map_err(|_| ())?)
+                    .map_err(|_| ())?,
+            );
 
             if cached {
                 response = response.header("Cached", "true");
@@ -63,14 +70,19 @@ impl Middleware for CacheMiddleware {
                 ))])
                 .exec()
                 .await
-                .map_err(|e| reqwest_middleware::Error::Middleware(anyhow!(e)))?
+                .map_err(|e| {
+                    reqwest_middleware::Error::Middleware(anyhow!(e))
+                })?
         };
 
         // return the cached value if fresh
         if let Some(expires) = cached.as_ref().and_then(|c| c.expires_at) {
             if expires > Utc::now() {
-                let cached = cached.take().expect("cached was just asserted to be Some");
-                if let Ok(response) = build_cached(cached.status_code, cached.data, true) {
+                let cached =
+                    cached.take().expect("cached was just asserted to be Some");
+                if let Ok(response) =
+                    build_cached(cached.status_code, cached.data, true)
+                {
                     return Ok(response);
                 }
             }
@@ -84,9 +96,15 @@ impl Middleware for CacheMiddleware {
 
         'use_cache: {
             if let Some(cached) = cached {
-                if let (Some(cached_etag), Some(etag)) = (cached.etag, headers.get("etag")) {
+                if let (Some(cached_etag), Some(etag)) =
+                    (cached.etag, headers.get("etag"))
+                {
                     if Some(&cached_etag as &str) == etag.to_str().ok() {
-                        match build_cached(cached.status_code, cached.data, true) {
+                        match build_cached(
+                            cached.status_code,
+                            cached.data,
+                            true,
+                        ) {
                             Ok(response) => return Ok(response),
                             Err(_) => break 'use_cache,
                         }
@@ -96,8 +114,14 @@ impl Middleware for CacheMiddleware {
                 if let (Some(cached_last_modified), Some(last_modified)) =
                     (cached.last_modified, headers.get("last-modified"))
                 {
-                    if Some(&cached_last_modified as &str) == last_modified.to_str().ok() {
-                        match build_cached(cached.status_code, cached.data, true) {
+                    if Some(&cached_last_modified as &str)
+                        == last_modified.to_str().ok()
+                    {
+                        match build_cached(
+                            cached.status_code,
+                            cached.data,
+                            true,
+                        ) {
                             Ok(response) => return Ok(response),
                             Err(_) => break 'use_cache,
                         }
@@ -136,7 +160,9 @@ impl Middleware for CacheMiddleware {
                 }
 
                 if !no_store {
-                    expires = max_age.map(|offset| Utc::now() + Duration::seconds(offset as i64));
+                    expires = max_age.map(|offset| {
+                        Utc::now() + Duration::seconds(offset as i64)
+                    });
                 }
             }
 
@@ -171,7 +197,9 @@ impl Middleware for CacheMiddleware {
                         app.prisma_client
                             .http_cache()
                             // will not fail when not found
-                            .delete_many(vec![WhereParam::Url(StringFilter::Equals(url.clone()))]),
+                            .delete_many(vec![WhereParam::Url(
+                                StringFilter::Equals(url.clone()),
+                            )]),
                         app.prisma_client.http_cache().create(
                             url,
                             status,
@@ -188,9 +216,9 @@ impl Middleware for CacheMiddleware {
                 match build_cached(status, body.to_vec(), false) {
                     Ok(response) => return Ok(response),
                     Err(_) => {
-                        return Err(reqwest_middleware::Error::Middleware(anyhow!(
-                            "could not return cached response"
-                        )))
+                        return Err(reqwest_middleware::Error::Middleware(
+                            anyhow!("could not return cached response"),
+                        ))
                     }
                 }
             }
@@ -248,7 +276,9 @@ mod test {
 
         let port = launch_server![(
             header::EXPIRES,
-            httpdate::fmt_http_date(SystemTime::from(Utc::now() + Duration::seconds(2)))
+            httpdate::fmt_http_date(SystemTime::from(
+                Utc::now() + Duration::seconds(2)
+            ))
         )];
 
         assert!(!request_cached(&app, port).await);
@@ -293,7 +323,8 @@ mod test {
     async fn test_last_modified() {
         let app = crate::setup_managers_for_test().await;
 
-        let port = launch_server![(header::LAST_MODIFIED, "test_last_modified")];
+        let port =
+            launch_server![(header::LAST_MODIFIED, "test_last_modified")];
 
         assert!(!request_cached(&app, port).await);
         assert!(request_cached(&app, port).await);

@@ -1,5 +1,6 @@
 use daedalus::minecraft::{
-    Argument, ArgumentValue, AssetsIndex, Download, Library, Os, OsRule, Rule, RuleAction,
+    Argument, ArgumentValue, AssetsIndex, Download, Library, Os, OsRule, Rule,
+    RuleAction,
 };
 use std::path::PathBuf;
 use sysinfo::SystemExt;
@@ -21,13 +22,17 @@ pub fn libraries_into_vec_downloadable(
             continue;
         }
 
-        if let Some(downloadable) = library_into_lib_downloadable(library.clone(), base_path) {
+        if let Some(downloadable) =
+            library_into_lib_downloadable(library.clone(), base_path)
+        {
             files.push(downloadable);
         }
 
-        if let Some(downloadable) =
-            library_into_natives_downloadable(library.clone(), base_path, java_arch)
-        {
+        if let Some(downloadable) = library_into_natives_downloadable(
+            library.clone(),
+            base_path,
+            java_arch,
+        ) {
             files.push(downloadable);
         }
 
@@ -126,7 +131,8 @@ pub fn library_into_natives_downloadable(
     base_path: &std::path::Path,
     java_arch: &JavaArch,
 ) -> Option<carbon_net::Downloadable> {
-    let Some(classifiers) = library.downloads.and_then(|v| v.classifiers) else {
+    let Some(classifiers) = library.downloads.and_then(|v| v.classifiers)
+    else {
         return None;
     };
 
@@ -138,7 +144,9 @@ pub fn library_into_natives_downloadable(
         return None;
     };
 
-    let Some(mapping_class) = classifiers.get(&natives_name.replace("${arch}", ARCH_WIDTH)) else {
+    let Some(mapping_class) =
+        classifiers.get(&natives_name.replace("${arch}", ARCH_WIDTH))
+    else {
         return None;
     };
 
@@ -185,7 +193,9 @@ pub fn chain_lwjgl_libs_with_base_libs(
                 if let Some(downloads) = library.downloads.as_ref() {
                     if let Some(artifact) = downloads.artifact.as_ref() {
                         artifact.path.clone()
-                    } else if let Some(classifiers) = downloads.classifiers.as_ref() {
+                    } else if let Some(classifiers) =
+                        downloads.classifiers.as_ref()
+                    {
                         let Some(native_name) = library
                             .natives
                             .as_ref()
@@ -239,7 +249,9 @@ pub fn assets_index_into_vec_downloadable(
                 ),
                 asset_path,
             )
-            .with_checksum(Some(carbon_net::Checksum::Sha1(object.hash.clone())))
+            .with_checksum(Some(carbon_net::Checksum::Sha1(
+                object.hash.clone(),
+            )))
             .with_size(object.size as u64),
         );
     }

@@ -33,7 +33,9 @@ impl From<FEEvent> for crate::domain::metrics::Event {
     fn from(event: FEEvent) -> Self {
         Self {
             name: match event.name {
-                FEEventName::AppClosed => crate::domain::metrics::EventName::AppClosed,
+                FEEventName::AppClosed => {
+                    crate::domain::metrics::EventName::AppClosed
+                }
             },
             properties: event.properties,
         }

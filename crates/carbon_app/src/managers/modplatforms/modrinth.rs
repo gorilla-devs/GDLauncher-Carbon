@@ -7,12 +7,13 @@ use crate::{
     domain::modplatforms::modrinth::{
         project::{Project, ProjectVersionsFilters},
         responses::{
-            CategoriesResponse, LoadersResponse, ProjectsResponse, TeamResponse,
-            VersionHashesResponse, VersionsResponse,
+            CategoriesResponse, LoadersResponse, ProjectsResponse,
+            TeamResponse, VersionHashesResponse, VersionsResponse,
         },
         search::{
-            ProjectID, ProjectIDs, ProjectSearchParameters, ProjectSearchResponse, TeamID, TeamIDs,
-            VersionHashesQuery, VersionID, VersionIDs,
+            ProjectID, ProjectIDs, ProjectSearchParameters,
+            ProjectSearchResponse, TeamID, TeamIDs, VersionHashesQuery,
+            VersionID, VersionIDs,
         },
         version::Version,
     },
@@ -90,7 +91,10 @@ impl Modrinth {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn get_project(&self, project: ProjectID) -> anyhow::Result<Project> {
+    pub async fn get_project(
+        &self,
+        project: ProjectID,
+    ) -> anyhow::Result<Project> {
         let url = self.base_url.join(&format!("project/{}", &*project))?;
 
         trace!("GET {}", url);
@@ -117,11 +121,15 @@ impl Modrinth {
             let mut query_pairs = url.query_pairs_mut();
 
             if let Some(game_version) = filters.game_version {
-                query_pairs.append_pair("game_versions", &format!(r#"["{}"]"#, &game_version));
+                query_pairs.append_pair(
+                    "game_versions",
+                    &format!(r#"["{}"]"#, &game_version),
+                );
             }
 
             if let Some(loaders) = filters.loaders {
-                query_pairs.append_pair("loaders", &format!(r#"["{}"]"#, &loaders));
+                query_pairs
+                    .append_pair("loaders", &format!(r#"["{}"]"#, &loaders));
             }
         }
 
@@ -138,7 +146,10 @@ impl Modrinth {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn get_projects(&self, projects: ProjectIDs) -> anyhow::Result<ProjectsResponse> {
+    pub async fn get_projects(
+        &self,
+        projects: ProjectIDs,
+    ) -> anyhow::Result<ProjectsResponse> {
         let mut url = self.base_url.join("projects")?;
         let query = projects.into_query_parameters()?;
         url.set_query(Some(&query));
@@ -156,7 +167,10 @@ impl Modrinth {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn get_version(&self, version: VersionID) -> anyhow::Result<Version> {
+    pub async fn get_version(
+        &self,
+        version: VersionID,
+    ) -> anyhow::Result<Version> {
         let url = self.base_url.join(&format!("version/{}", &*version))?;
 
         trace!("GET {}", url);
@@ -172,7 +186,10 @@ impl Modrinth {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn get_versions(&self, version_ids: VersionIDs) -> anyhow::Result<VersionsResponse> {
+    pub async fn get_versions(
+        &self,
+        version_ids: VersionIDs,
+    ) -> anyhow::Result<VersionsResponse> {
         let mut url = self.base_url.join("versions")?;
         let query = version_ids.into_query_parameters()?;
         url.set_query(Some(&query));
@@ -231,7 +248,10 @@ impl Modrinth {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn get_teams(&self, team_ids: TeamIDs) -> anyhow::Result<Vec<TeamResponse>> {
+    pub async fn get_teams(
+        &self,
+        team_ids: TeamIDs,
+    ) -> anyhow::Result<Vec<TeamResponse>> {
         let mut url = self.base_url.join("teams")?;
         let query = team_ids.into_query_parameters()?;
         url.set_query(Some(&query));
@@ -243,16 +263,23 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context_reporting::<Vec<TeamResponse>>("modrinth::get_teams")
+            .json_with_context_reporting::<Vec<TeamResponse>>(
+                "modrinth::get_teams",
+            )
             .await?
             .into_iter()
-            .map(|team| team.into_iter().filter(|member| member.accepted).collect())
+            .map(|team| {
+                team.into_iter().filter(|member| member.accepted).collect()
+            })
             .collect::<Vec<TeamResponse>>();
         Ok(teams)
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn get_project_team(&self, project: ProjectID) -> anyhow::Result<TeamResponse> {
+    pub async fn get_project_team(
+        &self,
+        project: ProjectID,
+    ) -> anyhow::Result<TeamResponse> {
         let url = self
             .base_url
             .join(&format!("project/{}/members", &*project))?;
@@ -264,7 +291,9 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context_reporting::<TeamResponse>("modrinth::get_project_team")
+            .json_with_context_reporting::<TeamResponse>(
+                "modrinth::get_project_team",
+            )
             .await?
             .into_iter()
             .filter(|member| member.accepted)
@@ -488,7 +517,9 @@ mod test {
 
         let results = modrinth
             .get_versions_from_hash(&VersionHashesQuery {
-                hashes: vec!["09b63cb3bf2bf6ea89967684d352f58f7951b242".to_string()],
+                hashes: vec![
+                    "09b63cb3bf2bf6ea89967684d352f58f7951b242".to_string()
+                ],
                 algorithm: HashAlgorithm::SHA1,
             })
             .await?;

@@ -16,7 +16,9 @@ use crate::domain::modplatforms::modrinth::{
 };
 use anyhow::anyhow;
 use carbon_macro::into_query_parameters;
-use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{
+    de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer,
+};
 
 use super::version::HashAlgorithm;
 
@@ -91,7 +93,10 @@ impl FromStr for SearchFacet {
 
     fn from_str(facet: &str) -> Result<Self, Self::Err> {
         let Some((facet_type, value)) = facet.trim().split_once(':') else {
-            return Err(anyhow!("Improperly formatted search facet `{}`", facet));
+            return Err(anyhow!(
+                "Improperly formatted search facet `{}`",
+                facet
+            ));
         };
         match facet_type {
             "categories" => Ok(SearchFacet::Category(value.to_string())),
@@ -113,10 +118,14 @@ impl TryFrom<&str> for SearchFacet {
 impl Display for SearchFacet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let out = match self {
-            SearchFacet::Category(category) => format!("categories:{}", category),
+            SearchFacet::Category(category) => {
+                format!("categories:{}", category)
+            }
             SearchFacet::Version(version) => format!("versions:{}", version),
             SearchFacet::License(license) => format!("license:{}", license),
-            SearchFacet::ProjectType(project_type) => format!("project_type:{}", project_type),
+            SearchFacet::ProjectType(project_type) => {
+                format!("project_type:{}", project_type)
+            }
         };
         write!(f, "{}", out)
     }
@@ -147,7 +156,8 @@ where
     S: Serializer,
     T: Serialize,
 {
-    let json = serde_json::to_string(&value).map_err(serde::ser::Error::custom)?;
+    let json =
+        serde_json::to_string(&value).map_err(serde::ser::Error::custom)?;
     s.serialize_str(&json)
 }
 

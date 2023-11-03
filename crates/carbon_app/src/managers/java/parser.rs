@@ -9,7 +9,9 @@ pub struct JavaCmdParsedOutput {
     pub vendor: String,
 }
 
-pub fn parse_cmd_output_java(cmd_output: &str) -> anyhow::Result<JavaCmdParsedOutput> {
+pub fn parse_cmd_output_java(
+    cmd_output: &str,
+) -> anyhow::Result<JavaCmdParsedOutput> {
     let mut version = None;
     let mut arch = None;
     let mut vendor = None;
@@ -20,7 +22,8 @@ pub fn parse_cmd_output_java(cmd_output: &str) -> anyhow::Result<JavaCmdParsedOu
                 line.replace("java.version=", "").trim(),
             )?);
         } else if line.trim().starts_with("os.arch=") {
-            arch = Some(JavaArch::try_from(line.replace("os.arch=", "").trim())?);
+            arch =
+                Some(JavaArch::try_from(line.replace("os.arch=", "").trim())?);
         } else if line.trim().starts_with("java.vendor=") {
             vendor = Some(line.replace("java.vendor=", "").trim().to_string());
         }
@@ -47,7 +50,9 @@ pub fn parse_cmd_output_java(cmd_output: &str) -> anyhow::Result<JavaCmdParsedOu
 
 #[cfg(test)]
 mod test {
-    use crate::{domain::java::JavaVersion, managers::java::parser::JavaCmdParsedOutput};
+    use crate::{
+        domain::java::JavaVersion, managers::java::parser::JavaCmdParsedOutput,
+    };
 
     #[test]
     fn test_parse_cmd_output_java_arch() {

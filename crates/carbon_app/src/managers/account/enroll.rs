@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use super::api::{
-    get_profile, DeviceCode, DeviceCodeExpiredError, FullAccount, GetProfileError, McAccount,
-    McAuth, McEntitlementMissingError, MsAuth, XboxAuth, XboxError,
+    get_profile, DeviceCode, DeviceCodeExpiredError, FullAccount,
+    GetProfileError, McAccount, McAuth, McEntitlementMissingError, MsAuth,
+    XboxAuth, XboxError,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -47,7 +48,10 @@ impl EnrollmentTask {
                 let device_code = DeviceCode::request_code(&client).await?;
 
                 // poll ms auth
-                update_status(EnrollmentStatus::PollingCode(device_code.clone())).await;
+                update_status(EnrollmentStatus::PollingCode(
+                    device_code.clone(),
+                ))
+                .await;
                 let ms_auth = device_code.poll_ms_auth(&client).await??;
 
                 update_status(EnrollmentStatus::McLogin).await;
@@ -61,7 +65,8 @@ impl EnrollmentTask {
                 update_status(EnrollmentStatus::PopulateAccount).await;
                 let account = McAccount {
                     entitlement: mc_auth.get_entitlement(&client).await??,
-                    profile: get_profile(&client, &mc_auth.access_token).await??,
+                    profile: get_profile(&client, &mc_auth.access_token)
+                        .await??,
                     auth: mc_auth,
                 };
 
@@ -123,7 +128,8 @@ impl EnrollmentTask {
                 update_status(EnrollmentStatus::PopulateAccount).await;
                 let account = McAccount {
                     entitlement: mc_auth.get_entitlement(&client).await??,
-                    profile: get_profile(&client, &mc_auth.access_token).await??,
+                    profile: get_profile(&client, &mc_auth.access_token)
+                        .await??,
                     auth: mc_auth,
                 };
 

@@ -30,7 +30,9 @@ use self::run::PersistenceManager;
 
 use super::ManagerRef;
 
-use crate::domain::instance::{self as domain, GameLogId, GroupId, InstanceFolder, InstanceId};
+use crate::domain::instance::{
+    self as domain, GameLogId, GroupId, InstanceFolder, InstanceId,
+};
 use domain::info;
 
 pub mod export;
@@ -50,7 +52,8 @@ pub struct InstanceManager {
     loaded_icon: Mutex<Option<(String, Vec<u8>)>>,
     persistence_manager: PersistenceManager,
     import_manager: InstanceImportManager,
-    game_logs: RwLock<HashMap<GameLogId, (InstanceId, watch::Receiver<GameLog>)>>,
+    game_logs:
+        RwLock<HashMap<GameLogId, (InstanceId, watch::Receiver<GameLog>)>>,
 }
 
 impl Default for InstanceManager {
@@ -111,7 +114,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .iter()
                 .find(|instance| instance.shortpath == shortpath);
 
-            let Some(mut instance) = self.scan_instance(shortpath, path, cached).await? else {
+            let Some(mut instance) =
+                self.scan_instance(shortpath, path, cached).await?
+            else {
                 continue;
             };
             let InstanceType::Valid(data) = &instance.type_ else {
@@ -195,7 +200,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         match schema::parse_instance_config(&config_text) {
             Ok(config) => {
                 let instance = InstanceData {
-                    favorite: cached.map(|cached| cached.favorite).unwrap_or(false),
+                    favorite: cached
+                        .map(|cached| cached.favorite)
+                        .unwrap_or(false),
                     config,
                     state: run::LaunchState::Inactive { failed_task: None },
                     icon_revision: 0,
@@ -207,17 +214,24 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 }))
             }
             Err(e) => {
-                let error = InvalidConfiguration::Invalid(ConfigurationParseError {
-                    type_: match e.classify() {
-                        JsonErrorType::Data => ConfigurationParseErrorType::Data,
-                        JsonErrorType::Syntax => ConfigurationParseErrorType::Syntax,
-                        JsonErrorType::Eof => ConfigurationParseErrorType::Eof,
-                        JsonErrorType::Io => unreachable!(),
-                    },
-                    line: e.line() as u32, // will panic with more lines but that dosen't really seem like a problem
-                    message: e.to_string(),
-                    config_text,
-                });
+                let error =
+                    InvalidConfiguration::Invalid(ConfigurationParseError {
+                        type_: match e.classify() {
+                            JsonErrorType::Data => {
+                                ConfigurationParseErrorType::Data
+                            }
+                            JsonErrorType::Syntax => {
+                                ConfigurationParseErrorType::Syntax
+                            }
+                            JsonErrorType::Eof => {
+                                ConfigurationParseErrorType::Eof
+                            }
+                            JsonErrorType::Io => unreachable!(),
+                        },
+                        line: e.line() as u32, // will panic with more lines but that dosen't really seem like a problem
+                        message: e.to_string(),
+                        config_text,
+                    });
 
                 Ok(Some(Instance {
                     shortpath,
@@ -317,7 +331,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
     /// Move the given group to the index directly before `before`.
     /// If `before` is None, move to the end of the list.
-    pub async fn move_group(self, group: GroupId, before: Option<GroupId>) -> anyhow::Result<()> {
+    pub async fn move_group(
+        self,
+        group: GroupId,
+        before: Option<GroupId>,
+    ) -> anyhow::Result<()> {
         use db::instance_group::{SetParam, UniqueWhereParam, WhereParam};
 
         // lock indexes while we're changing them
@@ -330,20 +348,25 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .find_unique(UniqueWhereParam::IdEquals(*group))
             .exec()
             .await?
-            .ok_or_else(|| anyhow!("GroupId is not in database, this should never happen"))?
+            .ok_or_else(|| {
+                anyhow!("GroupId is not in database, this should never happen")
+            })?
             .group_index;
 
         let target_idx = match before {
-            Some(target) => {
-                self.app
-                    .prisma_client
-                    .instance_group()
-                    .find_unique(UniqueWhereParam::IdEquals(*target))
-                    .exec()
-                    .await?
-                    .ok_or_else(|| anyhow!("GroupId is not in database, this should never happen"))?
-                    .group_index
-            }
+            Some(target) => self
+                .app
+                .prisma_client
+                .instance_group()
+                .find_unique(UniqueWhereParam::IdEquals(*target))
+                .exec()
+                .await?
+                .ok_or_else(|| {
+                    anyhow!(
+                        "GroupId is not in database, this should never happen"
+                    )
+                })?
+                .group_index,
             None => {
                 self.app
                     .prisma_client
@@ -452,22 +475,30 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let index_shifts = if start_group == target_group {
             vec![match (start_idx, target_idx) {
-                (start, target) if start < target => self.app.prisma_client.instance().update_many(
-                    vec![
-                        WhereParam::GroupId(IntFilter::Equals(*target_group)),
-                        WhereParam::Index(IntFilter::Gt(start)),
-                        WhereParam::Index(IntFilter::Lte(target)),
-                    ],
-                    vec![SetParam::DecrementIndex(1)],
-                ),
-                (start, target) if start > target => self.app.prisma_client.instance().update_many(
-                    vec![
-                        WhereParam::GroupId(IntFilter::Equals(*target_group)),
-                        WhereParam::Index(IntFilter::Gte(target)),
-                        WhereParam::Index(IntFilter::Lt(start)),
-                    ],
-                    vec![SetParam::IncrementIndex(1)],
-                ),
+                (start, target) if start < target => {
+                    self.app.prisma_client.instance().update_many(
+                        vec![
+                            WhereParam::GroupId(IntFilter::Equals(
+                                *target_group,
+                            )),
+                            WhereParam::Index(IntFilter::Gt(start)),
+                            WhereParam::Index(IntFilter::Lte(target)),
+                        ],
+                        vec![SetParam::DecrementIndex(1)],
+                    )
+                }
+                (start, target) if start > target => {
+                    self.app.prisma_client.instance().update_many(
+                        vec![
+                            WhereParam::GroupId(IntFilter::Equals(
+                                *target_group,
+                            )),
+                            WhereParam::Index(IntFilter::Gte(target)),
+                            WhereParam::Index(IntFilter::Lt(start)),
+                        ],
+                        vec![SetParam::IncrementIndex(1)],
+                    )
+                }
                 _ => return Ok(()),
             }]
         } else {
@@ -527,7 +558,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         .app
                         .prisma_client
                         .instance_group()
-                        .find_first(vec![WhereParam::Id(IntFilter::Equals(groupid))])
+                        .find_first(vec![WhereParam::Id(IntFilter::Equals(
+                            groupid,
+                        ))])
                         .exec()
                         .await?;
 
@@ -590,7 +623,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .app
             .prisma_client
             .instance_group()
-            .find_first(vec![WhereParam::Name(StringFilter::Equals(name.clone()))])
+            .find_first(vec![WhereParam::Name(StringFilter::Equals(
+                name.clone(),
+            ))])
             .exec()
             .await?;
 
@@ -629,12 +664,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .prisma_client
             ._batch((
                 // delete any existing entry at the same shortpath
-                self.app
-                    .prisma_client
-                    .instance()
-                    .delete_many(vec![WhereParam::Shortpath(StringFilter::Contains(
+                self.app.prisma_client.instance().delete_many(vec![
+                    WhereParam::Shortpath(StringFilter::Contains(
                         shortpath.clone(),
-                    ))]),
+                    )),
+                ]),
                 self.app.prisma_client.instance().create(
                     name,
                     shortpath,
@@ -665,7 +699,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
-    pub async fn set_favorite(self, instance_id: InstanceId, favorite: bool) -> anyhow::Result<()> {
+    pub async fn set_favorite(
+        self,
+        instance_id: InstanceId,
+        favorite: bool,
+    ) -> anyhow::Result<()> {
         use db::instance::{SetParam, UniqueWhereParam};
 
         let mut instances = self.instances.write().await;
@@ -696,7 +734,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
-    async fn next_folder(self, name: &str) -> anyhow::Result<(String, PathBuf)> {
+    async fn next_folder(
+        self,
+        name: &str,
+    ) -> anyhow::Result<(String, PathBuf)> {
         if name.is_empty() {
             bail!("Attempted to find an instance directory name for an unnamed instance");
         }
@@ -727,10 +768,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let name = &name[0..usize::min(name.len(), 28)];
 
         // sanitize any illegal filenames
-        let mut name = match ILLEGAL_NAMES.contains(&(&name.to_lowercase() as &str)) {
-            true => format!("_{name}"),
-            false => name.to_string(),
-        };
+        let mut name =
+            match ILLEGAL_NAMES.contains(&(&name.to_lowercase() as &str)) {
+                true => format!("_{name}"),
+                false => name.to_string(),
+            };
 
         // stop us from making hidden files on macos/linux ('~' disallowed for sanity)
         if name.starts_with('.') || name.starts_with('~') {
@@ -787,9 +829,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     pub async fn load_icon(self, icon: PathBuf) -> anyhow::Result<Vec<u8>> {
-        let data = tokio::fs::read(icon.clone())
-            .await
-            .with_context(|| format!("Reading file `{}`", icon.to_string_lossy()))?;
+        let data = tokio::fs::read(icon.clone()).await.with_context(|| {
+            format!("Reading file `{}`", icon.to_string_lossy())
+        })?;
 
         let extension = match icon.extension() {
             Some(ext) => ext,
@@ -823,7 +865,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .bytes()
             .await?;
 
-        *self.loaded_icon.lock().await = Some((format!("icon.{extension}"), data.to_vec()));
+        *self.loaded_icon.lock().await =
+            Some((format!("icon.{extension}"), data.to_vec()));
 
         Ok(())
     }
@@ -836,9 +879,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         version: InstanceVersionSource,
         notes: String,
     ) -> anyhow::Result<InstanceId> {
-        self.create_instance_ext(group, name, use_loaded_icon, version, notes, |_| async {
-            Ok(())
-        })
+        self.create_instance_ext(
+            group,
+            name,
+            use_loaded_icon,
+            version,
+            notes,
+            |_| async { Ok(()) },
+        )
         .await
     }
 
@@ -865,7 +913,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         tokio::fs::create_dir(tmpdir.join("instance")).await?;
 
-        let icon = match (use_loaded_icon, self.loaded_icon.lock().await.take()) {
+        let icon = match (use_loaded_icon, self.loaded_icon.lock().await.take())
+        {
             (true, Some((path, data))) => {
                 tokio::fs::write(tmpdir.join(&path), data)
                     .await
@@ -879,9 +928,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let (version, modpack) = match version {
             InstanceVersionSource::Version(version) => (Some(version), None),
             InstanceVersionSource::Modpack(modpack) => (None, Some(modpack)),
-            InstanceVersionSource::ModpackWithKnownVersion(version, modpack) => {
-                (Some(version), Some(modpack))
-            }
+            InstanceVersionSource::ModpackWithKnownVersion(
+                version,
+                modpack,
+            ) => (Some(version), Some(modpack)),
         };
 
         let info = info::Instance {
@@ -973,24 +1023,26 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let mut info = data.config.clone();
 
         if let Some(use_loaded_icon) = update.use_loaded_icon {
-            let icon = match (use_loaded_icon, self.loaded_icon.lock().await.take()) {
-                (true, Some((ipath, data))) => {
-                    tokio::fs::write(path.join(&ipath), data)
-                        .await
-                        .context("saving instance icon")?;
+            let icon =
+                match (use_loaded_icon, self.loaded_icon.lock().await.take()) {
+                    (true, Some((ipath, data))) => {
+                        tokio::fs::write(path.join(&ipath), data)
+                            .await
+                            .context("saving instance icon")?;
 
-                    if let InstanceIcon::RelativePath(oldpath) = &info.icon {
-                        if *oldpath != ipath {
-                            tokio::fs::remove_file(path.join(oldpath))
-                                .await
-                                .context("removing old instance icon")?;
+                        if let InstanceIcon::RelativePath(oldpath) = &info.icon
+                        {
+                            if *oldpath != ipath {
+                                tokio::fs::remove_file(path.join(oldpath))
+                                    .await
+                                    .context("removing old instance icon")?;
+                            }
                         }
-                    }
 
-                    InstanceIcon::RelativePath(ipath)
-                }
-                _ => InstanceIcon::Default,
-            };
+                        InstanceIcon::RelativePath(ipath)
+                    }
+                    _ => InstanceIcon::Default,
+                };
 
             info.icon = icon;
             data.icon_revision += 1;
@@ -1011,10 +1063,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 Some(info::GameVersion::Standard(info::StandardVersion {
                     release: version,
                     modloaders: match &info.game_configuration.version {
-                        Some(info::GameVersion::Standard(info::StandardVersion {
-                            modloaders,
-                            ..
-                        })) => modloaders.clone(),
+                        Some(info::GameVersion::Standard(
+                            info::StandardVersion { modloaders, .. },
+                        )) => modloaders.clone(),
                         _ => HashSet::new(),
                     },
                 }));
@@ -1025,10 +1076,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             info.game_configuration.version =
                 Some(info::GameVersion::Standard(info::StandardVersion {
                     release: match &info.game_configuration.version {
-                        Some(info::GameVersion::Standard(info::StandardVersion {
-                            release,
-                            ..
-                        })) => release.clone(),
+                        Some(info::GameVersion::Standard(
+                            info::StandardVersion { release, .. },
+                        )) => release.clone(),
                         _ => bail!("custom versions are not yet supported"),
                     },
                     modloaders: match modloader {
@@ -1147,7 +1197,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
-    pub async fn delete_instance(self, instance_id: InstanceId) -> anyhow::Result<()> {
+    pub async fn delete_instance(
+        self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<()> {
         let mut instances = self.instances.write().await;
         let instance = instances
             .get(&instance_id)
@@ -1201,7 +1254,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .group_id;
 
         let mut new_info = instance.data()?.config.clone();
-        let (new_shortpath, new_path) = self.next_folder(&instance.shortpath).await?;
+        let (new_shortpath, new_path) =
+            self.next_folder(&instance.shortpath).await?;
         new_info.name = name;
 
         let path = self
@@ -1285,13 +1339,23 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             InstanceFolder::Data => path.get_data_path().to_path_buf(),
             InstanceFolder::Mods => path.get_mods_path().to_path_buf(),
             InstanceFolder::Configs => path.get_config_path().to_path_buf(),
-            InstanceFolder::Screenshots => path.get_screenshots_path().to_path_buf(),
+            InstanceFolder::Screenshots => {
+                path.get_screenshots_path().to_path_buf()
+            }
             InstanceFolder::Saves => path.get_saves_path().to_path_buf(),
             InstanceFolder::Logs => path.get_logs_path().to_path_buf(),
-            InstanceFolder::CrashReports => path.get_crash_reports_path().to_path_buf(),
-            InstanceFolder::ResourcePacks => path.get_resourcepacks_path().to_path_buf(),
-            InstanceFolder::TexturePacks => path.get_texturepacks_path().to_path_buf(),
-            InstanceFolder::ShaderPacks => path.get_shaderpacks_path().to_path_buf(),
+            InstanceFolder::CrashReports => {
+                path.get_crash_reports_path().to_path_buf()
+            }
+            InstanceFolder::ResourcePacks => {
+                path.get_resourcepacks_path().to_path_buf()
+            }
+            InstanceFolder::TexturePacks => {
+                path.get_texturepacks_path().to_path_buf()
+            }
+            InstanceFolder::ShaderPacks => {
+                path.get_shaderpacks_path().to_path_buf()
+            }
         };
 
         if !path.is_dir() {
@@ -1344,16 +1408,19 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .prisma_client
                 ._batch((
                     self.app.prisma_client.instance().update_many(
-                        vec![instance::WhereParam::GroupId(IntFilter::Equals(*group))],
+                        vec![instance::WhereParam::GroupId(IntFilter::Equals(
+                            *group,
+                        ))],
                         vec![
                             instance::SetParam::SetGroupId(*default_group),
-                            instance::SetParam::IncrementIndex(base_index as i32),
+                            instance::SetParam::IncrementIndex(
+                                base_index as i32,
+                            ),
                         ],
                     ),
-                    self.app
-                        .prisma_client
-                        .instance_group()
-                        .delete(instance_group::UniqueWhereParam::IdEquals(*group)),
+                    self.app.prisma_client.instance_group().delete(
+                        instance_group::UniqueWhereParam::IdEquals(*group),
+                    ),
                 ))
                 .await?;
         } else {
@@ -1388,13 +1455,22 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             favorite: instance.favorite,
             name: instance.config.name.clone(),
             version: match &instance.config.game_configuration.version {
-                Some(info::GameVersion::Standard(version)) => Some(version.release.clone()),
+                Some(info::GameVersion::Standard(version)) => {
+                    Some(version.release.clone())
+                }
                 Some(info::GameVersion::Custom(custom)) => Some(custom.clone()),
                 None => None,
             },
             modpack: instance.config.modpack.clone(),
-            global_java_args: instance.config.game_configuration.global_java_args,
-            extra_java_args: instance.config.game_configuration.extra_java_args.clone(),
+            global_java_args: instance
+                .config
+                .game_configuration
+                .global_java_args,
+            extra_java_args: instance
+                .config
+                .game_configuration
+                .extra_java_args
+                .clone(),
             memory: instance.config.game_configuration.memory,
             last_played: instance.config.last_played,
             seconds_played: instance.config.seconds_played as u32,
@@ -1460,7 +1536,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         })
     }
 
-    async fn next_instance_index(self, group: GroupId) -> anyhow::Result<IdLock<'s, i32>> {
+    async fn next_instance_index(
+        self,
+        group: GroupId,
+    ) -> anyhow::Result<IdLock<'s, i32>> {
         use db::instance::WhereParam;
 
         let guard = self.manager.index_lock.lock().await;
@@ -1577,7 +1656,9 @@ impl InstanceType {
         }
     }
 
-    pub fn data_mut(&mut self) -> Result<&mut InstanceData, InvalidInstanceDataError> {
+    pub fn data_mut(
+        &mut self,
+    ) -> Result<&mut InstanceData, InvalidInstanceDataError> {
         match self {
             Self::Valid(data) => Ok(data),
             Self::Invalid(_) => Err(InvalidInstanceDataError),
@@ -1590,7 +1671,9 @@ impl Instance {
         self.type_.data()
     }
 
-    pub fn data_mut(&mut self) -> Result<&mut InstanceData, InvalidInstanceDataError> {
+    pub fn data_mut(
+        &mut self,
+    ) -> Result<&mut InstanceData, InvalidInstanceDataError> {
         self.type_.data_mut()
     }
 }
@@ -1669,8 +1752,8 @@ mod test {
         db::{self, read_filters::IntFilter, PrismaClient},
         domain::instance::{info, InstanceSettingsUpdate},
         managers::instance::{
-            GroupId, InstanceId, InstanceMoveTarget, ListGroup, ListInstance, ListInstanceStatus,
-            ValidListInstance,
+            GroupId, InstanceId, InstanceMoveTarget, ListGroup, ListInstance,
+            ListInstanceStatus, ValidListInstance,
         },
     };
 
@@ -1680,7 +1763,9 @@ mod test {
     async fn move_groups() -> anyhow::Result<()> {
         let app = crate::setup_managers_for_test().await;
 
-        async fn get_ordered_groups(prisma_client: &PrismaClient) -> anyhow::Result<Vec<GroupId>> {
+        async fn get_ordered_groups(
+            prisma_client: &PrismaClient,
+        ) -> anyhow::Result<Vec<GroupId>> {
             use crate::db::instance_group::OrderByParam;
 
             Ok(prisma_client
@@ -1797,7 +1882,11 @@ mod test {
             async move {
                 let id = app
                     .instance_manager()
-                    .add_instance(shortpath.to_string(), shortpath.to_string(), group)
+                    .add_instance(
+                        shortpath.to_string(),
+                        shortpath.to_string(),
+                        group,
+                    )
                     .await?;
 
                 Ok::<_, anyhow::Error>(id)
@@ -1830,7 +1919,10 @@ mod test {
 
         // move 1 to end of list
         app.instance_manager()
-            .move_instance(group0_instances[1], InstanceMoveTarget::EndOfGroup(group0))
+            .move_instance(
+                group0_instances[1],
+                InstanceMoveTarget::EndOfGroup(group0),
+            )
             .await?;
 
         group0_instances = [
@@ -1846,7 +1938,10 @@ mod test {
 
         // move 0 to end of list
         app.instance_manager()
-            .move_instance(group0_instances[0], InstanceMoveTarget::EndOfGroup(group0))
+            .move_instance(
+                group0_instances[0],
+                InstanceMoveTarget::EndOfGroup(group0),
+            )
             .await?;
 
         group0_instances = [
@@ -1925,7 +2020,10 @@ mod test {
 
         // move 0:0 to end of group 1
         app.instance_manager()
-            .move_instance(group0_instances[0], InstanceMoveTarget::EndOfGroup(group1))
+            .move_instance(
+                group0_instances[0],
+                InstanceMoveTarget::EndOfGroup(group1),
+            )
             .await?;
 
         let group1_instances = [
@@ -1962,7 +2060,11 @@ mod test {
             .create_group(String::from("foo"))
             .await?;
         app.instance_manager()
-            .add_instance(String::from("baz"), String::from("baz"), default_group)
+            .add_instance(
+                String::from("baz"),
+                String::from("baz"),
+                default_group,
+            )
             .await?;
         app.instance_manager()
             .add_instance(String::from("bar"), String::from("bar"), group)
@@ -2048,7 +2150,8 @@ mod test {
         let mut app = crate::setup_managers_for_test().await;
 
         // create
-        let default_group_id = app.instance_manager().get_default_group().await?;
+        let default_group_id =
+            app.instance_manager().get_default_group().await?;
         let default_group = &app.instance_manager().list_groups().await?[0];
         let instance_id = app
             .instance_manager()

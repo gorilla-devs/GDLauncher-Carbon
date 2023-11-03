@@ -38,15 +38,19 @@ impl MinecraftManager {
 }
 
 impl ManagerRef<'_, MinecraftManager> {
-    pub async fn get_minecraft_manifest(&self) -> anyhow::Result<VersionManifest> {
-        minecraft::get_manifest(&self.app.reqwest_client, &self.meta_base_url).await
+    pub async fn get_minecraft_manifest(
+        &self,
+    ) -> anyhow::Result<VersionManifest> {
+        minecraft::get_manifest(&self.app.reqwest_client, &self.meta_base_url)
+            .await
     }
 
     pub async fn get_minecraft_version(
         self,
         manifest_version_meta: Version,
     ) -> anyhow::Result<VersionInfo> {
-        minecraft::get_version(&self.app.reqwest_client, manifest_version_meta).await
+        minecraft::get_version(&self.app.reqwest_client, manifest_version_meta)
+            .await
     }
 
     pub async fn get_forge_manifest(&self) -> anyhow::Result<Manifest> {
@@ -54,7 +58,8 @@ impl ManagerRef<'_, MinecraftManager> {
     }
 
     pub async fn get_fabric_manifest(&self) -> anyhow::Result<Manifest> {
-        fabric::get_manifest(&self.app.reqwest_client, &self.meta_base_url).await
+        fabric::get_manifest(&self.app.reqwest_client, &self.meta_base_url)
+            .await
     }
 
     pub async fn get_quilt_manifest(&self) -> anyhow::Result<Manifest> {
@@ -76,8 +81,12 @@ impl ManagerRef<'_, MinecraftManager> {
 
         let mut all_files = vec![];
 
-        let lwjgl =
-            get_lwjgl_meta(&self.app.reqwest_client, &version_info, &self.meta_base_url).await?;
+        let lwjgl = get_lwjgl_meta(
+            &self.app.reqwest_client,
+            &version_info,
+            &self.meta_base_url,
+        )
+        .await?;
 
         let tmp: Vec<_> = version_info
             .libraries
@@ -112,7 +121,9 @@ impl ManagerRef<'_, MinecraftManager> {
         );
 
         if let Some(logging_xml) = version_info.logging {
-            if let Some(client) = logging_xml.get(&daedalus::minecraft::LoggingConfigName::Client) {
+            if let Some(client) =
+                logging_xml.get(&daedalus::minecraft::LoggingConfigName::Client)
+            {
                 all_files.push(
                     Downloadable::new(
                         client.file.url.clone(),
@@ -121,7 +132,9 @@ impl ManagerRef<'_, MinecraftManager> {
                             .get_client_path(&client.file.id),
                     )
                     .with_size(client.file.size as u64)
-                    .with_checksum(Some(carbon_net::Checksum::Sha1(client.file.sha1.clone()))),
+                    .with_checksum(Some(
+                        carbon_net::Checksum::Sha1(client.file.sha1.clone()),
+                    )),
                 );
             }
         }
@@ -150,7 +163,11 @@ impl<T: Copy + Clone + Eq> UpdateValue<T> {
         &self.0
     }
 
-    pub fn update_from(&mut self, from: &Self, update_callback: impl FnOnce(T)) {
+    pub fn update_from(
+        &mut self,
+        from: &Self,
+        update_callback: impl FnOnce(T),
+    ) {
         if self.0 != from.0 {
             self.0 = from.0;
             update_callback(self.0);
@@ -191,7 +208,8 @@ mod tests {
             .unwrap();
 
         let runtime_path = &app.app.settings_manager().runtime_path;
-        let instance_path = runtime_path.get_instances().get_instance_path("test");
+        let instance_path =
+            runtime_path.get_instances().get_instance_path("test");
 
         std::fs::create_dir_all(instance_path.get_root()).unwrap();
 
@@ -217,7 +235,8 @@ mod tests {
         .unwrap();
 
         let lwjgl_group = get_lwjgl_meta(
-            &reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
+            &reqwest_middleware::ClientBuilder::new(reqwest::Client::new())
+                .build(),
             &version_info,
             &app.minecraft_manager().meta_base_url,
         )
@@ -241,12 +260,17 @@ mod tests {
             .clone();
 
         let forge_version_info =
-            crate::managers::minecraft::forge::get_version(&app.reqwest_client, forge_manifest)
-                .await
-                .unwrap();
+            crate::managers::minecraft::forge::get_version(
+                &app.reqwest_client,
+                forge_manifest,
+            )
+            .await
+            .unwrap();
 
-        let version_info =
-            daedalus::modded::merge_partial_version(forge_version_info, version_info);
+        let version_info = daedalus::modded::merge_partial_version(
+            forge_version_info,
+            version_info,
+        );
 
         // -----FORGE
 
@@ -261,7 +285,10 @@ mod tests {
 
         let vanilla_files = app
             .minecraft_manager()
-            .get_all_version_info_files(version_info.clone(), &java_component.arch)
+            .get_all_version_info_files(
+                version_info.clone(),
+                &java_component.arch,
+            )
             .await
             .unwrap();
 

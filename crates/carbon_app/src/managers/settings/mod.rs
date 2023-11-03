@@ -19,7 +19,10 @@ pub(crate) struct SettingsManager {
 }
 
 impl SettingsManager {
-    pub fn new(runtime_path: PathBuf, reqwest_client: ClientWithMiddleware) -> Self {
+    pub fn new(
+        runtime_path: PathBuf,
+        reqwest_client: ClientWithMiddleware,
+    ) -> Self {
         Self {
             runtime_path: runtime_path::RuntimePath::new(runtime_path),
             terms_and_privacy: TermsAndPrivacy::new(reqwest_client),
@@ -28,7 +31,9 @@ impl SettingsManager {
 }
 
 impl ManagerRef<'_, SettingsManager> {
-    pub async fn get_settings(self) -> anyhow::Result<crate::db::app_configuration::Data> {
+    pub async fn get_settings(
+        self,
+    ) -> anyhow::Result<crate::db::app_configuration::Data> {
         self.app
             .prisma_client
             .app_configuration()
@@ -39,7 +44,10 @@ impl ManagerRef<'_, SettingsManager> {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn set_settings(self, incoming_settings: FESettingsUpdate) -> anyhow::Result<()> {
+    pub async fn set_settings(
+        self,
+        incoming_settings: FESettingsUpdate,
+    ) -> anyhow::Result<()> {
         let db = &self.app.prisma_client;
 
         let crate::db::app_configuration::Data {
@@ -77,7 +85,8 @@ impl ManagerRef<'_, SettingsManager> {
             something_changed = true;
         }
 
-        if let Some(discord_integration) = incoming_settings.discord_integration {
+        if let Some(discord_integration) = incoming_settings.discord_integration
+        {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
                 vec![app_configuration::discord_integration::set(
@@ -97,7 +106,9 @@ impl ManagerRef<'_, SettingsManager> {
             something_changed = true;
         }
 
-        if let Some(concurrent_downloads) = incoming_settings.concurrent_downloads {
+        if let Some(concurrent_downloads) =
+            incoming_settings.concurrent_downloads
+        {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
                 vec![app_configuration::concurrent_downloads::set(
@@ -152,7 +163,9 @@ impl ManagerRef<'_, SettingsManager> {
         if let Some(java_custom_args) = incoming_settings.java_custom_args {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::java_custom_args::set(java_custom_args)],
+                vec![app_configuration::java_custom_args::set(
+                    java_custom_args,
+                )],
             ));
             something_changed = true;
         }
@@ -160,12 +173,16 @@ impl ManagerRef<'_, SettingsManager> {
         if let Some(auto_manage_java) = incoming_settings.auto_manage_java {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::auto_manage_java::set(auto_manage_java)],
+                vec![app_configuration::auto_manage_java::set(
+                    auto_manage_java,
+                )],
             ));
             something_changed = true;
         }
 
-        if let Some(preferred_mod_channel) = incoming_settings.preferred_mod_channel {
+        if let Some(preferred_mod_channel) =
+            incoming_settings.preferred_mod_channel
+        {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
                 vec![app_configuration::preferred_mod_channel::set(
@@ -174,7 +191,9 @@ impl ManagerRef<'_, SettingsManager> {
             ));
         }
 
-        if let Some(terms_and_privacy_accepted) = incoming_settings.terms_and_privacy_accepted {
+        if let Some(terms_and_privacy_accepted) =
+            incoming_settings.terms_and_privacy_accepted
+        {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
                 vec![app_configuration::terms_and_privacy_accepted::set(
@@ -199,7 +218,9 @@ impl ManagerRef<'_, SettingsManager> {
                 app_configuration::id::equals(0),
                 vec![
                     app_configuration::metrics_enabled::set(metrics_enabled),
-                    app_configuration::metrics_enabled_last_update::set(Some(Utc::now().into())),
+                    app_configuration::metrics_enabled_last_update::set(Some(
+                        Utc::now().into(),
+                    )),
                 ],
             ));
 
@@ -223,7 +244,10 @@ impl ManagerRef<'_, SettingsManager> {
         Ok(())
     }
 
-    pub async fn set(self, value: app_configuration::SetParam) -> anyhow::Result<()> {
+    pub async fn set(
+        self,
+        value: app_configuration::SetParam,
+    ) -> anyhow::Result<()> {
         self.app
             .prisma_client
             .app_configuration()

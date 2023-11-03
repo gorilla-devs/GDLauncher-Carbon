@@ -22,8 +22,8 @@ use crate::{
 };
 
 use super::{
-    ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter, InternalImportEntry,
-    InvalidImportEntry,
+    ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter,
+    InternalImportEntry, InvalidImportEntry,
 };
 
 #[derive(Debug, Clone)]
@@ -84,17 +84,20 @@ impl ModrinthArchiveImporter {
             let mut zip = zip::ZipArchive::new(Cursor::new(&content))
                 .map_err(|_| Translation::InstanceImportMrpackMalformed)?;
 
-            let mut manifest = zip
-                .by_name("modrinth.index.json")
-                .map_err(|_| Translation::InstanceImportMrpackMissingManifest)?;
+            let mut manifest =
+                zip.by_name("modrinth.index.json").map_err(|_| {
+                    Translation::InstanceImportMrpackMissingManifest
+                })?;
 
             let mut data = Vec::new();
-            manifest
-                .read_to_end(&mut data)
-                .map_err(|_| Translation::InstanceImportMrpackMalformedManifest)?;
+            manifest.read_to_end(&mut data).map_err(|_| {
+                Translation::InstanceImportMrpackMalformedManifest
+            })?;
 
             let manifest = serde_json::from_slice::<ModpackIndex>(&data)
-                .map_err(|_| Translation::InstanceImportMrpackMalformedManifest)?;
+                .map_err(|_| {
+                    Translation::InstanceImportMrpackMalformedManifest
+                })?;
 
             let sha512 = hex::encode(<[u8; 64] as From<_>>::from(
                 Sha512::new_with_prefix(&content).finalize(),
@@ -107,10 +110,9 @@ impl ModrinthArchiveImporter {
         let (index, sha512) = match r {
             Ok(t) => t,
             Err(reason) => {
-                return Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
-                    name,
-                    reason,
-                })))
+                return Ok(Some(InternalImportEntry::Invalid(
+                    InvalidImportEntry { name, reason },
+                )))
             }
         };
 
@@ -153,7 +155,11 @@ impl ModrinthArchiveImporter {
 
 #[async_trait::async_trait]
 impl InstanceImporter for ModrinthArchiveImporter {
-    async fn scan(&self, app: &Arc<AppInner>, scan_path: PathBuf) -> anyhow::Result<()> {
+    async fn scan(
+        &self,
+        app: &Arc<AppInner>,
+        scan_path: PathBuf,
+    ) -> anyhow::Result<()> {
         if scan_path.is_file() {
             if let Ok(Some(entry)) = self.scan_archive(app, scan_path).await {
                 self.state.write().await.set_single(entry).await;
@@ -168,7 +174,9 @@ impl InstanceImporter for ModrinthArchiveImporter {
             while let Some(entry) = dir.next_entry().await? {
                 if entry.metadata().await?.is_file() {
                     futures.push(async move {
-                        if let Ok(Some(entry)) = self.scan_archive(app, entry.path()).await {
+                        if let Ok(Some(entry)) =
+                            self.scan_archive(app, entry.path()).await
+                        {
                             self.state.write().await.push_multi(entry).await;
                         }
                     })
@@ -179,7 +187,10 @@ impl InstanceImporter for ModrinthArchiveImporter {
         Ok(())
     }
 
-    async fn get_default_scan_path(&self, _app: &Arc<AppInner>) -> anyhow::Result<Option<PathBuf>> {
+    async fn get_default_scan_path(
+        &self,
+        _app: &Arc<AppInner>,
+    ) -> anyhow::Result<Option<PathBuf>> {
         Ok(None)
     }
 
@@ -187,7 +198,11 @@ impl InstanceImporter for ModrinthArchiveImporter {
         self.state.read().await.clone().into()
     }
 
-    async fn begin_import(&self, app: &Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId> {
+    async fn begin_import(
+        &self,
+        app: &Arc<AppInner>,
+        index: u32,
+    ) -> anyhow::Result<VisualTaskId> {
         let instance = self
             .state
             .read()
@@ -197,7 +212,9 @@ impl InstanceImporter for ModrinthArchiveImporter {
             .cloned()
             .ok_or_else(|| anyhow!("invalid importable instance index"))?;
 
-        let version = GameVersion::Standard(instance.index.dependencies.clone().try_into()?);
+        let version = GameVersion::Standard(
+            instance.index.dependencies.clone().try_into()?,
+        );
 
         let instance_version_source = match &instance.meta {
             Some(meta) => InstanceVersionSource::ModpackWithKnownVersion(
@@ -229,7 +246,8 @@ impl InstanceImporter for ModrinthArchiveImporter {
             async move {
                 let setupdir = instance_path.join(".setup");
                 tokio::fs::create_dir_all(&setupdir).await?;
-                tokio::fs::copy(&instance.path, setupdir.join("modrinth")).await?;
+                tokio::fs::copy(&instance.path, setupdir.join("modrinth"))
+                    .await?;
 
                 Ok(())
             }

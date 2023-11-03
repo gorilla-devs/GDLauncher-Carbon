@@ -1,7 +1,8 @@
 use crate::{
     api::{
         keys::settings::{
-            GET_PRIVACY_STATEMENT_BODY, GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY, SET_SETTINGS,
+            GET_PRIVACY_STATEMENT_BODY, GET_SETTINGS,
+            GET_TERMS_OF_SERVICE_BODY, SET_SETTINGS,
         },
         router::router,
     },
@@ -141,7 +142,9 @@ impl Default for ModChannel {
 impl TryFrom<crate::db::app_configuration::Data> for FESettings {
     type Error = anyhow::Error;
 
-    fn try_from(data: crate::db::app_configuration::Data) -> Result<Self, Self::Error> {
+    fn try_from(
+        data: crate::db::app_configuration::Data,
+    ) -> Result<Self, Self::Error> {
         Ok(Self {
             theme: data.theme,
             language: data.language,

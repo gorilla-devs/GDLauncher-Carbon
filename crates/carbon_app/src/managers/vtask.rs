@@ -91,7 +91,10 @@ impl ManagerRef<'_, VisualTaskManager> {
         }
     }
 
-    pub async fn dismiss_task(self, task_id: VisualTaskId) -> anyhow::Result<()> {
+    pub async fn dismiss_task(
+        self,
+        task_id: VisualTaskId,
+    ) -> anyhow::Result<()> {
         let mut tasklist = self.tasks.write().await;
         let task = tasklist.get(&task_id).ok_or(InvalidTaskIdError)?;
 
@@ -110,7 +113,10 @@ impl ManagerRef<'_, VisualTaskManager> {
     }
 
     #[cfg(test)]
-    pub async fn wait_with_log(self, task_id: VisualTaskId) -> anyhow::Result<()> {
+    pub async fn wait_with_log(
+        self,
+        task_id: VisualTaskId,
+    ) -> anyhow::Result<()> {
         use tracing::info;
 
         let tasklist = self.tasks.read().await;
@@ -139,11 +145,13 @@ impl ManagerRef<'_, VisualTaskManager> {
             for task in domain.active_subtasks {
                 let progress = match task.progress {
                     domain::SubtaskProgress::Opaque => String::from("opaque"),
-                    domain::SubtaskProgress::Download { downloaded, total } => format!(
-                        "{}kb / {}kb",
-                        downloaded as f32 * 0.001,
-                        total as f32 * 0.001
-                    ),
+                    domain::SubtaskProgress::Download { downloaded, total } => {
+                        format!(
+                            "{}kb / {}kb",
+                            downloaded as f32 * 0.001,
+                            total as f32 * 0.001
+                        )
+                    }
                     domain::SubtaskProgress::Item { current, total } => {
                         format!("{current} / {total}")
                     }
@@ -333,7 +341,9 @@ impl VisualTask {
             name: name.into(),
             progress: match state {
                 TaskState::Indeterminate => domain::Progress::Indeterminate,
-                TaskState::KnownProgress => domain::Progress::Known(self.progress_float().await),
+                TaskState::KnownProgress => {
+                    domain::Progress::Known(self.progress_float().await)
+                }
                 TaskState::Failed(error) => domain::Progress::Failed(error),
             },
             downloaded,
@@ -377,7 +387,12 @@ impl Subtask {
 
     // complete_on_match is an explicit parameter instead of a following call to make sure
     // a conscious decision is made on a case by case basis.
-    pub fn update_download(&self, downloaded: u32, total: u32, complete_on_match: bool) {
+    pub fn update_download(
+        &self,
+        downloaded: u32,
+        total: u32,
+        complete_on_match: bool,
+    ) {
         self.update_progress(Progress::Download {
             downloaded,
             total,

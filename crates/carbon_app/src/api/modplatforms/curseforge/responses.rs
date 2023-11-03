@@ -1,7 +1,9 @@
 use rspc::Type;
 use serde::{Deserialize, Serialize};
 
-use crate::domain::modplatforms::curseforge::{Category, CurseForgeResponse, File, Mod};
+use crate::domain::modplatforms::curseforge::{
+    Category, CurseForgeResponse, File, Mod,
+};
 
 use super::structs::{CFFECategory, CFFEFile, CFFEMod, CFFEPagination};
 

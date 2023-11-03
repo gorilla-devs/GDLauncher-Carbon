@@ -7,9 +7,9 @@ use url::Url;
 use crate::{
     domain::modplatforms::curseforge::{
         filters::{
-            FilesParameters, ModDescriptionParameters, ModFileChangelogParameters,
-            ModFileParameters, ModFilesParameters, ModParameters, ModSearchParameters,
-            ModsParameters,
+            FilesParameters, ModDescriptionParameters,
+            ModFileChangelogParameters, ModFileParameters, ModFilesParameters,
+            ModParameters, ModSearchParameters, ModsParameters,
         },
         Category, CurseForgeResponse, File, FingerprintsMatchesResult, Mod,
     },
@@ -32,7 +32,9 @@ impl CurseForge {
     }
 
     #[tracing::instrument(skip(self))]
-    pub async fn get_categories(&self) -> anyhow::Result<CurseForgeResponse<Vec<Category>>> {
+    pub async fn get_categories(
+        &self,
+    ) -> anyhow::Result<CurseForgeResponse<Vec<Category>>> {
         let mut url = self.base_url.join("categories")?;
         url.set_query(Some("gameId=432"));
 
@@ -78,7 +80,9 @@ impl CurseForge {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context_reporting::<CurseForgeResponse<Vec<Mod>>>("curseforge::search")
+            .json_with_context_reporting::<CurseForgeResponse<Vec<Mod>>>(
+                "curseforge::search",
+            )
             .await?;
 
         Ok(resp)
@@ -100,7 +104,9 @@ impl CurseForge {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context_reporting::<CurseForgeResponse<Mod>>("curseforge::get_mod")
+            .json_with_context_reporting::<CurseForgeResponse<Mod>>(
+                "curseforge::get_mod",
+            )
             .await?;
 
         Ok(resp)
@@ -129,7 +135,9 @@ impl CurseForge {
             .body(body.to_string())
             .send()
             .await?
-            .json_with_context_reporting::<CurseForgeResponse<Vec<Mod>>>("curseforge::get_mods")
+            .json_with_context_reporting::<CurseForgeResponse<Vec<Mod>>>(
+                "curseforge::get_mods",
+            )
             .await?;
 
         Ok(resp)
@@ -201,7 +209,9 @@ impl CurseForge {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context_reporting::<CurseForgeResponse<File>>("curseforge::get_mod_file")
+            .json_with_context_reporting::<CurseForgeResponse<File>>(
+                "curseforge::get_mod_file",
+            )
             .await?;
         Ok(resp)
     }
@@ -250,7 +260,9 @@ impl CurseForge {
             .json(&body)
             .send()
             .await?
-            .json_with_context_reporting::<CurseForgeResponse<Vec<File>>>("curseforge::get_files")
+            .json_with_context_reporting::<CurseForgeResponse<Vec<File>>>(
+                "curseforge::get_files",
+            )
             .await?;
 
         Ok(resp)

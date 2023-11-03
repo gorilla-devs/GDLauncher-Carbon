@@ -22,8 +22,8 @@ use super::BundleSender;
 use super::ModplatformCacher;
 use super::UpdateNotifier;
 use crate::db::{
-    curse_forge_mod_cache as cfdb, curse_forge_mod_image_cache as cfimgdb, mod_file_cache as fcdb,
-    mod_metadata as metadb,
+    curse_forge_mod_cache as cfdb, curse_forge_mod_image_cache as cfimgdb,
+    mod_file_cache as fcdb, mod_metadata as metadb,
 };
 
 pub struct CurseforgeModCacher;
@@ -49,20 +49,23 @@ impl ModplatformCacher for CurseforgeModCacher {
             .mod_file_cache()
             .find_many(vec![
                 fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-                fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::CurseforgeIsNot(vec![
-                    cfdb::WhereParam::CachedAt(DateTimeFilter::Gt(
-                        (chrono::Utc::now() - chrono::Duration::days(1)).into(),
-                    )),
-                ])]),
+                fcdb::WhereParam::MetadataIs(vec![
+                    metadb::WhereParam::CurseforgeIsNot(vec![
+                        cfdb::WhereParam::CachedAt(DateTimeFilter::Gt(
+                            (chrono::Utc::now() - chrono::Duration::days(1))
+                                .into(),
+                        )),
+                    ]),
+                ]),
             ])
             .with(fcdb::metadata::fetch())
             .exec()
             .await?
             .into_iter()
             .map(|m| {
-                let metadata = m
-                    .metadata
-                    .expect("metadata was queried with mod cache yet is not present");
+                let metadata = m.metadata.expect(
+                    "metadata was queried with mod cache yet is not present",
+                );
 
                 (
                     metadata.murmur_2 as u32,
@@ -101,7 +104,9 @@ impl ModplatformCacher for CurseforgeModCacher {
                     .drain(0..usize::min(1000, modlist.len()))
                     .unzip::<_, _, Vec<_>, Vec<_>>();
 
-                trace!("querying curseforge mod batch for instance {instance_id}");
+                trace!(
+                    "querying curseforge mod batch for instance {instance_id}"
+                );
 
                 let fp_response = app
                     .modplatforms_manager()
@@ -125,7 +130,12 @@ impl ModplatformCacher for CurseforgeModCacher {
                     .await?
                     .data;
 
-                sender.send((fingerprints, metadata, fp_response, mods_response));
+                sender.send((
+                    fingerprints,
+                    metadata,
+                    fp_response,
+                    mods_response,
+                ));
             }
 
             Ok::<_, anyhow::Error>(())
@@ -138,7 +148,8 @@ impl ModplatformCacher for CurseforgeModCacher {
             let entry = failed_instances
                 .entry(instance_id)
                 .or_insert((Instant::now(), 0));
-            entry.0 = Instant::now() + Duration::from_secs(u64::pow(2, entry.1));
+            entry.0 =
+                Instant::now() + Duration::from_secs(u64::pow(2, entry.1));
             entry.1 += 1;
         } else {
             let mut failed_instances = mcm.failed_cf_instances.write().await;
@@ -160,12 +171,15 @@ impl ModplatformCacher for CurseforgeModCacher {
             .into_iter()
             .zip(fp_response.exact_matches.into_iter())
             .zip(mods_response.into_iter())
-            .map(|((fingerprint, fileinfo), modinfo)| (fingerprint, (fileinfo, modinfo)))
+            .map(|((fingerprint, fileinfo), modinfo)| {
+                (fingerprint, (fileinfo, modinfo))
+            })
             .collect::<HashMap<_, _>>();
 
         let mcm = app.meta_cache_manager();
         let mut ignored_hashes = mcm.ignored_remote_cf_hashes.write().await;
-        ignored_hashes.extend(fingerprints.iter().filter(|fp| !matches.contains_key(fp)));
+        ignored_hashes
+            .extend(fingerprints.iter().filter(|fp| !matches.contains_key(fp)));
         drop(ignored_hashes);
 
         let futures = batch.into_iter().filter_map(|(metadata_id, murmur2)| {
@@ -191,22 +205,27 @@ impl ModplatformCacher for CurseforgeModCacher {
         futures::future::join_all(futures).await;
     }
 
-    async fn cache_icons(app: &App, instance_id: InstanceId, update_notifier: &UpdateNotifier) {
+    async fn cache_icons(
+        app: &App,
+        instance_id: InstanceId,
+        update_notifier: &UpdateNotifier,
+    ) {
         let modlist = app
             .prisma_client
             .mod_file_cache()
             .find_many(vec![
                 fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-                fcdb::WhereParam::MetadataIs(vec![metadb::WhereParam::CurseforgeIs(vec![
-                    cfdb::WhereParam::LogoImageIs(vec![cfimgdb::WhereParam::UpToDate(
-                        IntFilter::Equals(0),
-                    )]),
-                ])]),
+                fcdb::WhereParam::MetadataIs(vec![
+                    metadb::WhereParam::CurseforgeIs(vec![
+                        cfdb::WhereParam::LogoImageIs(vec![
+                            cfimgdb::WhereParam::UpToDate(IntFilter::Equals(0)),
+                        ]),
+                    ]),
+                ]),
             ])
-            .with(
-                fcdb::metadata::fetch()
-                    .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch())),
-            )
+            .with(fcdb::metadata::fetch().with(
+                metadb::curseforge::fetch().with(cfdb::logo_image::fetch()),
+            ))
             .exec()
             .await;
 
@@ -354,12 +373,11 @@ async fn cache_curseforge_meta_unchecked(
         Vec::new(),
     );
 
-    let o_delete_cfmeta =
-        prev.as_ref().map(|_| {
-            app.prisma_client.curse_forge_mod_cache().delete(
-                cfdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
-            )
-        });
+    let o_delete_cfmeta = prev.as_ref().map(|_| {
+        app.prisma_client.curse_forge_mod_cache().delete(
+            cfdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+        )
+    });
 
     let old_image = prev
         .map(|p| {

@@ -6,8 +6,12 @@ use std::{
 
 /// Capture an error and send it to sentry.
 /// Will not send an erorr of the same type more than 3 times a day.
-pub fn report_volatile_error(ty: &'static str, error: anyhow::Error) -> anyhow::Error {
-    static TRACKER: Mutex<Option<HashMap<&'static str, (u8, SystemTime)>>> = Mutex::new(None);
+pub fn report_volatile_error(
+    ty: &'static str,
+    error: anyhow::Error,
+) -> anyhow::Error {
+    static TRACKER: Mutex<Option<HashMap<&'static str, (u8, SystemTime)>>> =
+        Mutex::new(None);
 
     let error = error.context(format!("Caught volatile error: '{ty}'"));
 

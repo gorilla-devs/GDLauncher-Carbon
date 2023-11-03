@@ -1,4 +1,6 @@
-use prisma_client_rust::{prisma_errors::query_engine::UniqueKeyViolation, QueryError};
+use prisma_client_rust::{
+    prisma_errors::query_engine::UniqueKeyViolation, QueryError,
+};
 use strum::IntoEnumIterator;
 use tokio::sync::watch;
 use tracing::{debug, error, trace};
@@ -14,8 +16,8 @@ use crate::{
     api::keys::java::GET_SYSTEM_JAVA_PROFILES,
     db::PrismaClient,
     domain::java::{
-        Java, JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaVendor, SystemJavaProfile,
-        SystemJavaProfileName,
+        Java, JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaVendor,
+        SystemJavaProfile, SystemJavaProfileName,
     },
     managers::java::java_checker::RealJavaChecker,
 };
@@ -44,10 +46,15 @@ impl JavaManager {
         }
     }
 
-    pub async fn ensure_profiles_in_db(db_client: &PrismaClient) -> anyhow::Result<()> {
+    pub async fn ensure_profiles_in_db(
+        db_client: &PrismaClient,
+    ) -> anyhow::Result<()> {
         debug!("Ensuring system java profiles are in db");
         for profile in SystemJavaProfileName::iter() {
-            let creation: Result<crate::db::java_system_profile::Data, QueryError> = db_client
+            let creation: Result<
+                crate::db::java_system_profile::Data,
+                QueryError,
+            > = db_client
                 .java_system_profile()
                 .create(profile.to_string(), vec![])
                 .exec()
@@ -90,7 +97,9 @@ impl JavaManager {
 }
 
 impl ManagerRef<'_, JavaManager> {
-    pub async fn get_available_javas(&self) -> anyhow::Result<HashMap<u8, Vec<Java>>> {
+    pub async fn get_available_javas(
+        &self,
+    ) -> anyhow::Result<HashMap<u8, Vec<Java>>> {
         let db = &self.app.prisma_client;
         let all_javas = db.java().find_many(vec![]).exec().await?;
 
@@ -105,7 +114,9 @@ impl ManagerRef<'_, JavaManager> {
         Ok(result)
     }
 
-    pub async fn get_system_java_profiles(&self) -> anyhow::Result<Vec<SystemJavaProfile>> {
+    pub async fn get_system_java_profiles(
+        &self,
+    ) -> anyhow::Result<Vec<SystemJavaProfile>> {
         let db = &self.app.prisma_client;
         let all_profiles = db
             .java_system_profile()
@@ -154,7 +165,10 @@ impl ManagerRef<'_, JavaManager> {
         Ok(())
     }
 
-    pub async fn delete_java_version(&self, java_id: String) -> anyhow::Result<()> {
+    pub async fn delete_java_version(
+        &self,
+        java_id: String,
+    ) -> anyhow::Result<()> {
         let auto_manage_java = self
             .app
             .settings_manager()
@@ -173,9 +187,12 @@ impl ManagerRef<'_, JavaManager> {
             .find_unique(crate::db::java::id::equals(java_id.clone()))
             .exec()
             .await?
-            .ok_or_else(|| anyhow::anyhow!("Java with id {} not found", java_id.clone()))?;
+            .ok_or_else(|| {
+                anyhow::anyhow!("Java with id {} not found", java_id.clone())
+            })?;
 
-        let java_component_type = JavaComponentType::try_from(&*java_from_db.r#type)?;
+        let java_component_type =
+            JavaComponentType::try_from(&*java_from_db.r#type)?;
 
         match java_component_type {
             JavaComponentType::Custom => {
@@ -201,7 +218,8 @@ impl ManagerRef<'_, JavaManager> {
                     .next()
                     .ok_or_else(|| anyhow::anyhow!("Could not strip prefix"))?;
 
-                let managed_java_dir = root_managed_path.join(managed_java_dir_name);
+                let managed_java_dir =
+                    root_managed_path.join(managed_java_dir_name);
 
                 if managed_java_dir.exists() {
                     std::fs::remove_dir_all(managed_java_dir)?;
@@ -215,7 +233,10 @@ impl ManagerRef<'_, JavaManager> {
                     .await?;
             }
             JavaComponentType::Local => {
-                anyhow::bail!("Java with id {} is local. Cannot delete.", java_id.clone());
+                anyhow::bail!(
+                    "Java with id {} is local. Cannot delete.",
+                    java_id.clone()
+                );
             }
         }
 
@@ -235,7 +256,9 @@ impl ManagerRef<'_, JavaManager> {
             .into_iter()
             .find(|profile| profile.name == target_profile)
             .ok_or_else(|| {
-                anyhow::anyhow!("system java profile not found for {target_profile:?}")
+                anyhow::anyhow!(
+                    "system java profile not found for {target_profile:?}"
+                )
             })?;
 
         let java = match profile.java_id {
@@ -271,9 +294,16 @@ impl ManagerRef<'_, JavaManager> {
                         self.app
                             .prisma_client
                             ._batch((
-                                self.app.prisma_client.java_system_profile().update(
-                                    java_system_profile::name::equals(profile.name.to_string()),
-                                    vec![java_system_profile::java::disconnect()],
+                                self.app
+                                    .prisma_client
+                                    .java_system_profile()
+                                    .update(
+                                    java_system_profile::name::equals(
+                                        profile.name.to_string(),
+                                    ),
+                                    vec![
+                                        java_system_profile::java::disconnect(),
+                                    ],
                                 ),
                                 self.app
                                     .prisma_client
@@ -360,7 +390,9 @@ impl ManagerRef<'_, JavaManager> {
                 .prisma_client
                 .java_system_profile()
                 .update(
-                    crate::db::java_system_profile::name::equals(target_profile.to_string()),
+                    crate::db::java_system_profile::name::equals(
+                        target_profile.to_string(),
+                    ),
                     vec![crate::db::java_system_profile::java::connect(
                         crate::db::java::id::equals(id.clone()),
                     )],
@@ -386,7 +418,9 @@ impl ManagerRef<'_, JavaManager> {
                     .prisma_client
                     .java_system_profile()
                     .update(
-                        crate::db::java_system_profile::name::equals(system_profile.to_string()),
+                        crate::db::java_system_profile::name::equals(
+                            system_profile.to_string(),
+                        ),
                         vec![crate::db::java_system_profile::java::connect(
                             crate::db::java::id::equals(id.clone()),
                         )],
@@ -422,7 +456,8 @@ mod test {
             .unwrap()
             .unwrap();
 
-        let profiles_in_db = java_manager.get_system_java_profiles().await.unwrap();
+        let profiles_in_db =
+            java_manager.get_system_java_profiles().await.unwrap();
 
         assert_eq!(
             profiles_in_db
@@ -466,7 +501,8 @@ mod test {
             )
             .await
             .unwrap();
-        let count = app.prisma_client.java().count(vec![]).exec().await.unwrap();
+        let count =
+            app.prisma_client.java().count(vec![]).exec().await.unwrap();
         assert_eq!(count, 1);
 
         let from_db = app
@@ -491,7 +527,9 @@ mod test {
             .app_configuration()
             .update(
                 crate::db::app_configuration::id::equals(0),
-                vec![crate::db::app_configuration::auto_manage_java::set(false)],
+                vec![crate::db::app_configuration::auto_manage_java::set(
+                    false,
+                )],
             )
             .exec()
             .await
@@ -504,7 +542,8 @@ mod test {
 
         assert!(result_second_delete.is_ok());
 
-        let count = app.prisma_client.java().count(vec![]).exec().await.unwrap();
+        let count =
+            app.prisma_client.java().count(vec![]).exec().await.unwrap();
         assert_eq!(count, 0);
 
         assert!(!std::path::Path::new(&from_db.path).exists());

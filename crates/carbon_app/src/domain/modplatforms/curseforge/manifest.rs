@@ -1,7 +1,9 @@
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
 
-use crate::domain::instance::info::{ModLoader, ModLoaderType, StandardVersion};
+use crate::domain::instance::info::{
+    ModLoader, ModLoaderType, StandardVersion,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

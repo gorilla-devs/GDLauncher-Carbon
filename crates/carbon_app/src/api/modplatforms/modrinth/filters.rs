@@ -10,8 +10,9 @@ use serde::{Deserialize, Serialize};
 use crate::domain::modplatforms::modrinth::{
     project::ProjectVersionsFilters,
     search::{
-        ProjectID, ProjectIDs, ProjectSearchParameters, SearchFacet, SearchFacetAnd, SearchFacetOr,
-        SearchIndex, TeamID, VersionID, VersionIDs,
+        ProjectID, ProjectIDs, ProjectSearchParameters, SearchFacet,
+        SearchFacetAnd, SearchFacetOr, SearchIndex, TeamID, VersionID,
+        VersionIDs,
     },
 };
 use anyhow::anyhow;
@@ -63,7 +64,10 @@ impl FromStr for MRFESearchFacet {
 
     fn from_str(facet: &str) -> Result<Self, Self::Err> {
         let Some((facet_type, value)) = facet.trim().split_once(':') else {
-            return Err(anyhow!("Improperly formatted search facet `{}`", facet));
+            return Err(anyhow!(
+                "Improperly formatted search facet `{}`",
+                facet
+            ));
         };
         match facet_type {
             "categories" => Ok(MRFESearchFacet::Category(value.to_string())),
@@ -85,7 +89,9 @@ impl TryFrom<&str> for MRFESearchFacet {
 impl Display for MRFESearchFacet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let out = match self {
-            MRFESearchFacet::Category(category) => format!("categories:{}", category),
+            MRFESearchFacet::Category(category) => {
+                format!("categories:{}", category)
+            }
             MRFESearchFacet::Version(version) => format!("version:{}", version),
             MRFESearchFacet::License(license) => format!("license:{}", license),
             MRFESearchFacet::ProjectType(project_type) => {
@@ -119,10 +125,14 @@ impl<'de> Deserialize<'de> for MRFESearchFacet {
 impl From<SearchFacet> for MRFESearchFacet {
     fn from(facet: SearchFacet) -> Self {
         match facet {
-            SearchFacet::Category(category) => MRFESearchFacet::Category(category),
+            SearchFacet::Category(category) => {
+                MRFESearchFacet::Category(category)
+            }
             SearchFacet::Version(version) => MRFESearchFacet::Version(version),
             SearchFacet::License(license) => MRFESearchFacet::License(license),
-            SearchFacet::ProjectType(project_type) => MRFESearchFacet::ProjectType(project_type),
+            SearchFacet::ProjectType(project_type) => {
+                MRFESearchFacet::ProjectType(project_type)
+            }
         }
     }
 }
@@ -130,10 +140,14 @@ impl From<SearchFacet> for MRFESearchFacet {
 impl From<MRFESearchFacet> for SearchFacet {
     fn from(facet: MRFESearchFacet) -> Self {
         match facet {
-            MRFESearchFacet::Category(category) => SearchFacet::Category(category),
+            MRFESearchFacet::Category(category) => {
+                SearchFacet::Category(category)
+            }
             MRFESearchFacet::Version(version) => SearchFacet::Version(version),
             MRFESearchFacet::License(license) => SearchFacet::License(license),
-            MRFESearchFacet::ProjectType(project_type) => SearchFacet::ProjectType(project_type),
+            MRFESearchFacet::ProjectType(project_type) => {
+                SearchFacet::ProjectType(project_type)
+            }
         }
     }
 }

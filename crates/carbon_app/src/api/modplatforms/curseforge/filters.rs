@@ -2,9 +2,10 @@ use rspc::Type;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::modplatforms::curseforge::filters::{
-    FilesParameters, FilesParametersBody, ModDescriptionParameters, ModFileChangelogParameters,
-    ModFileParameters, ModFilesParameters, ModFilesParametersQuery, ModParameters,
-    ModSearchParameters, ModSearchParametersQuery, ModSearchSortField, ModSearchSortOrder,
+    FilesParameters, FilesParametersBody, ModDescriptionParameters,
+    ModFileChangelogParameters, ModFileParameters, ModFilesParameters,
+    ModFilesParametersQuery, ModParameters, ModSearchParameters,
+    ModSearchParametersQuery, ModSearchSortField, ModSearchSortOrder,
     ModsParameters, ModsParametersBody,
 };
 
@@ -27,13 +28,21 @@ impl From<CFFEModSearchSortField> for ModSearchSortField {
     fn from(field: CFFEModSearchSortField) -> Self {
         match field {
             CFFEModSearchSortField::Featured => ModSearchSortField::Featured,
-            CFFEModSearchSortField::Popularity => ModSearchSortField::Popularity,
-            CFFEModSearchSortField::LastUpdated => ModSearchSortField::LastUpdated,
+            CFFEModSearchSortField::Popularity => {
+                ModSearchSortField::Popularity
+            }
+            CFFEModSearchSortField::LastUpdated => {
+                ModSearchSortField::LastUpdated
+            }
             CFFEModSearchSortField::Name => ModSearchSortField::Name,
             CFFEModSearchSortField::Author => ModSearchSortField::Author,
-            CFFEModSearchSortField::TotalDownloads => ModSearchSortField::TotalDownloads,
+            CFFEModSearchSortField::TotalDownloads => {
+                ModSearchSortField::TotalDownloads
+            }
             CFFEModSearchSortField::Category => ModSearchSortField::Category,
-            CFFEModSearchSortField::GameVersion => ModSearchSortField::GameVersion,
+            CFFEModSearchSortField::GameVersion => {
+                ModSearchSortField::GameVersion
+            }
         }
     }
 }
@@ -42,13 +51,21 @@ impl From<ModSearchSortField> for CFFEModSearchSortField {
     fn from(field: ModSearchSortField) -> Self {
         match field {
             ModSearchSortField::Featured => CFFEModSearchSortField::Featured,
-            ModSearchSortField::Popularity => CFFEModSearchSortField::Popularity,
-            ModSearchSortField::LastUpdated => CFFEModSearchSortField::LastUpdated,
+            ModSearchSortField::Popularity => {
+                CFFEModSearchSortField::Popularity
+            }
+            ModSearchSortField::LastUpdated => {
+                CFFEModSearchSortField::LastUpdated
+            }
             ModSearchSortField::Name => CFFEModSearchSortField::Name,
             ModSearchSortField::Author => CFFEModSearchSortField::Author,
-            ModSearchSortField::TotalDownloads => CFFEModSearchSortField::TotalDownloads,
+            ModSearchSortField::TotalDownloads => {
+                CFFEModSearchSortField::TotalDownloads
+            }
             ModSearchSortField::Category => CFFEModSearchSortField::Category,
-            ModSearchSortField::GameVersion => CFFEModSearchSortField::GameVersion,
+            ModSearchSortField::GameVersion => {
+                CFFEModSearchSortField::GameVersion
+            }
         }
     }
 }
@@ -64,7 +81,9 @@ impl From<CFFEModSearchSortOrder> for ModSearchSortOrder {
     fn from(order: CFFEModSearchSortOrder) -> Self {
         match order {
             CFFEModSearchSortOrder::Ascending => ModSearchSortOrder::Ascending,
-            CFFEModSearchSortOrder::Descending => ModSearchSortOrder::Descending,
+            CFFEModSearchSortOrder::Descending => {
+                ModSearchSortOrder::Descending
+            }
         }
     }
 }
@@ -73,7 +92,9 @@ impl From<ModSearchSortOrder> for CFFEModSearchSortOrder {
     fn from(order: ModSearchSortOrder) -> Self {
         match order {
             ModSearchSortOrder::Ascending => CFFEModSearchSortOrder::Ascending,
-            ModSearchSortOrder::Descending => CFFEModSearchSortOrder::Descending,
+            ModSearchSortOrder::Descending => {
+                CFFEModSearchSortOrder::Descending
+            }
         }
     }
 }
