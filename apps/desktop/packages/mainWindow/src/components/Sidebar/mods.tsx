@@ -149,7 +149,7 @@ const Sidebar = () => {
                         });
                       }}
                       checked={infiniteQuery.query.modloaders?.includes(
-                        modloader
+                        modloader as FEUnifiedModLoaderType
                       )}
                       disabled={!isNaN(instanceId())}
                     />
