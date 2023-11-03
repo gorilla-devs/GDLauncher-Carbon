@@ -209,7 +209,7 @@ const SingleEntity = (props: {
               <Switch
                 fallback={
                   <div class="w-full  h-full flex items-center justify-center">
-                    <p class="text-xl text-violet-500">
+                    <p class="text-xl text-gray-500">
                       {path()
                         ? " No Instances found on this path"
                         : "select a path"}
