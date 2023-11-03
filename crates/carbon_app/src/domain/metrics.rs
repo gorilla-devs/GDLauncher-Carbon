@@ -1,5 +1,9 @@
 use serde::{Deserialize, Serialize};
 
+fn skip_serializing_if_zero(value: &u32) -> bool {
+    *value == 0
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "event_name", content = "data")]
 #[serde(rename_all = "snake_case")]
@@ -8,6 +12,7 @@ pub enum Event {
         page_name: String,
     },
     InstanceInstalled {
+        #[serde(skip_serializing_if = "skip_serializing_if_zero")]
         mods_count: u32,
         #[serde(skip_serializing_if = "Option::is_none")]
         modloader_name: Option<String>,
@@ -19,6 +24,7 @@ pub enum Event {
         seconds_taken: u32,
     },
     InstanceLaunched {
+        #[serde(skip_serializing_if = "skip_serializing_if_zero")]
         mods_count: u32,
         #[serde(skip_serializing_if = "Option::is_none")]
         modloader_name: Option<String>,

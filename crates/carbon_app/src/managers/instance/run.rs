@@ -176,7 +176,8 @@ impl ManagerRef<'_, InstanceManager> {
 
             let setup_path = instance_path.get_root().join(".setup");
             let is_first_run = setup_path.is_dir();
-            let mut time_at_install = None;
+
+            let mut time_at_start = None;
 
             let try_result: anyhow::Result<_> = async {
 
@@ -904,9 +905,9 @@ impl ManagerRef<'_, InstanceManager> {
                     }
                 }
 
-                tokio::fs::remove_dir_all(setup_path).await?;
-
-                time_at_install = Some(Utc::now());
+                if is_first_run {
+                    tokio::fs::remove_dir_all(setup_path).await?;
+                }
 
                 match launch_account {
                     Some(account) => Ok(Some(
@@ -959,8 +960,6 @@ impl ManagerRef<'_, InstanceManager> {
                 Ok(None) => {}
                 Ok(Some(mut child)) => {
                     drop(task);
-
-                    let time_at_launch = Utc::now();
 
                     let _ = app
                         .rich_presence_manager()
@@ -1059,6 +1058,8 @@ impl ManagerRef<'_, InstanceManager> {
                         }
                     };
 
+                    time_at_start = Some(Utc::now());
+
                     tokio::select! {
                         _ = child.wait() => {},
                         _ = kill_rx.recv() => drop(child.kill().await),
@@ -1091,77 +1092,81 @@ impl ManagerRef<'_, InstanceManager> {
                             LaunchState::Inactive { failed_task: None },
                         )
                         .await;
+                }
+            }
 
-                    let now = Utc::now();
-                    let offset_in_sec = Local::now().offset().local_minus_utc();
+            let now = Utc::now();
+            let offset_in_sec = Local::now().offset().local_minus_utc();
 
-                    let mods = app
-                        .instance_manager()
-                        .list_mods(instance_id)
-                        .await
-                        .unwrap_or_default()
-                        .len();
+            let mods = app
+                .instance_manager()
+                .list_mods(instance_id)
+                .await
+                .unwrap_or_default()
+                .len();
 
-                    let Ok(instance_details) =
-                        app.instance_manager().instance_details(instance_id).await
-                    else {
-                        return;
-                    };
+            let Ok(instance_details) = app.instance_manager().instance_details(instance_id).await
+            else {
+                return;
+            };
 
-                    if is_first_run {
-                        let _ = app
-                            .metrics_manager()
-                            .track_event(Event::InstanceInstalled {
-                                mods_count: mods as u32,
-                                modloader_name: instance_details
-                                    .modloaders
-                                    .get(0)
-                                    .cloned()
-                                    .map(|v| v.type_.to_string()),
-                                modloader_version: instance_details
-                                    .modloaders
-                                    .get(0)
-                                    .cloned()
-                                    .map(|v| v.version),
-                                modplatform: instance_details.modpack.map(|v| v.to_string()),
-                                version: instance_details
-                                    .version
-                                    .unwrap_or(String::from("unknown")),
-                                seconds_taken: (time_at_install.unwrap() - start_time).num_seconds()
-                                    as u32,
-                            })
-                            .await;
-                    } else {
-                        let _ = app
-                            .metrics_manager()
-                            .track_event(Event::InstanceLaunched {
-                                mods_count: mods as u32,
-                                modloader_name: instance_details
-                                    .modloaders
-                                    .get(0)
-                                    .cloned()
-                                    .map(|v| v.type_.to_string()),
-                                modloader_version: instance_details
-                                    .modloaders
-                                    .get(0)
-                                    .cloned()
-                                    .map(|v| v.version),
-                                modplatform: instance_details.modpack.map(|v| v.to_string()),
-                                version: instance_details
-                                    .version
-                                    .unwrap_or(String::from("unknown")),
-                                xmx_memory: instance_details.memory.map(|v| v.0).unwrap_or(0)
-                                    as u32,
-                                xms_memory: instance_details.memory.map(|v| v.1).unwrap_or(0)
-                                    as u32,
-                                time_to_start_secs: (time_at_launch - start_time).num_seconds()
-                                    as u64,
-                                timestamp_start: start_time.timestamp(),
-                                timestamp_end: now.timestamp(),
-                                timezone_offset: offset_in_sec / 60,
-                            })
-                            .await;
-                    }
+            if is_first_run {
+                let res = app
+                    .metrics_manager()
+                    .track_event(Event::InstanceInstalled {
+                        mods_count: mods as u32,
+                        modloader_name: instance_details
+                            .modloaders
+                            .get(0)
+                            .cloned()
+                            .map(|v| v.type_.to_string()),
+                        modloader_version: instance_details
+                            .modloaders
+                            .get(0)
+                            .cloned()
+                            .map(|v| v.version),
+                        modplatform: instance_details.modpack.map(|v| v.to_string()),
+                        version: instance_details.version.unwrap_or(String::from("unknown")),
+                        seconds_taken: (now - initial_time).num_seconds() as u32,
+                    })
+                    .await;
+
+                if let Err(e) = res {
+                    tracing::error!({ error = ?e }, "failed to track instance installed event");
+                }
+            } else {
+                let Some(time_at_start) = time_at_start else {
+                    tracing::error!("time_at_start is None even though this is not the first run");
+                    return;
+                };
+
+                let res = app
+                    .metrics_manager()
+                    .track_event(Event::InstanceLaunched {
+                        mods_count: mods as u32,
+                        modloader_name: instance_details
+                            .modloaders
+                            .get(0)
+                            .cloned()
+                            .map(|v| v.type_.to_string()),
+                        modloader_version: instance_details
+                            .modloaders
+                            .get(0)
+                            .cloned()
+                            .map(|v| v.version),
+                        modplatform: instance_details.modpack.map(|v| v.to_string()),
+                        version: instance_details.version.unwrap_or(String::from("unknown")),
+                        xmx_memory: xmx_memory as u32,
+                        xms_memory: xms_memory as u32,
+                        time_to_start_secs: (now - time_at_start).num_seconds() as u64,
+                        timestamp_start: initial_time.timestamp(),
+                        timestamp_end: now.timestamp(),
+                        timezone_offset: offset_in_sec / 60 / 60,
+                    })
+                    .await;
+
+                if let Err(e) = res {
+                    tracing::error!({ error = ?e }, "failed to track instance installed event");
                 }
             }
         });

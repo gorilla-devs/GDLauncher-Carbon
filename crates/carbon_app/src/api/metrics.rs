@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
         mutation SEND_EVENT[app, event: FEMetricsEvent] {
-            app.metrics_manager().track_event(event.into()).await?;
+            tokio::spawn(async move {
+                let _ = app.metrics_manager().track_event(event.into()).await;
+            });
             Ok(())
          }
     }

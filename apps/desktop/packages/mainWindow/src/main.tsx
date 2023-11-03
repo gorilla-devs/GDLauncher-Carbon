@@ -20,7 +20,6 @@ import { NavigationManager } from "./managers/NavigationManager";
 import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
 import RiveAppWapper from "./utils/RiveAppWrapper";
 import GDAnimation from "./gd_logo_animation.riv";
-import "@/utils/analytics"; // preinit
 
 render(
   () => {
@@ -28,10 +27,14 @@ render(
       let port;
       try {
         port = await window.getCoreModulePort();
-        if (typeof port !== "number") {
-          console.log(port);
-          window.fatalError(port, "CoreModule");
+
+        const convertedPort = Number(port);
+
+        if (Number.isNaN(convertedPort)) {
+          window.fatalError(port as any, "CoreModule");
           port = new Error("CoreModule");
+        } else {
+          port = convertedPort;
         }
       } catch (e) {
         window.fatalError(e as any, "CoreModule");
@@ -108,6 +111,14 @@ const _i18nInstance = i18n.use(icu).createInstance();
 
 const TransWrapper = (props: TransWrapperProps) => {
   const [isI18nReady, setIsI18nReady] = createSignal(false);
+  const trackPageView = rspc.createMutation(["metrics.sendEvent"]);
+
+  window.addEventListener("hashchange", () => {
+    trackPageView.mutate({
+      event_name: "page_view",
+      data: window.location.hash
+    });
+  });
 
   const settings = rspc.createQuery(() => ["settings.getSettings"], {
     async onSuccess(settings) {

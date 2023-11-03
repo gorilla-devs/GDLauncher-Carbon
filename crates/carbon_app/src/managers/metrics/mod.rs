@@ -3,6 +3,7 @@ use std::sync::Arc;
 use reqwest_middleware::ClientWithMiddleware;
 use serde::Serialize;
 use serde_json::json;
+use tracing::info;
 use uuid::Uuid;
 
 use crate::{
@@ -57,14 +58,18 @@ impl ManagerRef<'_, MetricsManager> {
             event: Event,
         }
 
+        let serialized_event = json!(GDLAppEvent {
+            id: metrics_user_id,
+            domain: "gdl-carbon-app".to_string(),
+            domain_version: env!("APP_VERSION").to_string(),
+            event,
+        });
+
+        info!("Sending event: {:?}", serialized_event);
+
         self.client
             .post(endpoint)
-            .json(&GDLAppEvent {
-                id: metrics_user_id,
-                domain_version: env!("APP_VERSION").to_string(),
-                domain: "gdl-carbon-app".to_string(),
-                event,
-            })
+            .json(&serialized_event)
             .send()
             .await?;
 
