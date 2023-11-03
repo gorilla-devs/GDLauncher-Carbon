@@ -1,5 +1,6 @@
 use crate::domain::instance::info::{Modpack, StandardVersion};
 use crate::domain::java::SystemJavaProfileName;
+use crate::domain::metrics::Event;
 use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::modplatforms::modrinth::search::VersionID;
 use crate::domain::vtask::VisualTaskId;
@@ -23,7 +24,7 @@ use crate::api::translation::Translation;
 use crate::domain::instance::{self as domain, GameLogId};
 use crate::managers::instance::log::{EntryType, GameLog};
 use crate::managers::instance::schema::make_instance_config;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
 use futures::Future;
 use tokio::sync::{watch, Semaphore};
 use tokio::task::JoinHandle;
@@ -66,6 +67,8 @@ impl ManagerRef<'_, InstanceManager> {
         launch_account: Option<FullAccount>,
         callback_task: Option<InstanceCallback>,
     ) -> anyhow::Result<(JoinHandle<()>, VisualTaskId)> {
+        let initial_time = Utc::now();
+
         let mut instances = self.instances.write().await;
         let instance = instances
             .get_mut(&instance_id)
@@ -171,9 +174,12 @@ impl ManagerRef<'_, InstanceManager> {
                 .await
                 .expect("the ensure lock semaphore should never be closed");
 
-            let try_result: anyhow::Result<_> = (|| async {
-                let setup_path = instance_path.get_root().join(".setup");
-                let is_first_run = setup_path.is_dir();
+            let setup_path = instance_path.get_root().join(".setup");
+            let is_first_run = setup_path.is_dir();
+
+            let mut time_at_start = None;
+
+            let try_result: anyhow::Result<_> = async {
 
                 let do_modpack_install = is_first_run
                     && !setup_path.join("modpack-complete").is_dir();
@@ -203,6 +209,13 @@ impl ManagerRef<'_, InstanceManager> {
                 let t_forge_processors = match is_first_run {
                     true => Some(
                         task.subtask(Translation::InstanceTaskLaunchRunForgeProcessors),
+                    ),
+                    false => None,
+                };
+
+                let t_neoforge_processors = match is_first_run {
+                    true => Some(
+                        task.subtask(Translation::InstanceTaskLaunchRunNeoforgeProcessors),
                     ),
                     false => None,
                 };
@@ -590,6 +603,51 @@ impl ManagerRef<'_, InstanceManager> {
                                 daedalus::modded::merge_partial_version(forge_version, version_info);
                         }
                         ModLoader {
+                            type_: ModLoaderType::Neoforge,
+                            version: neoforge_version,
+                        } => {
+                            let neoforge_manifest = app.minecraft_manager().get_neoforge_manifest().await?;
+
+                            let neoforge_version =
+                                match neoforge_version.strip_prefix(&format!("{}-", version.release)) {
+                                    None => neoforge_version.clone(),
+                                    Some(sub) => sub.to_string(),
+                                };
+
+                            let neoforge_manifest_version = neoforge_manifest
+                                .game_versions
+                                .into_iter()
+                                .find(|v| v.id == version.release)
+                                .ok_or_else(|| {
+                                    anyhow!("Could not find any neoforge versions for mc version {}", version.release)
+                                })?
+                                .loaders
+                                .into_iter()
+                                .find(|v| {
+                                    let exact_match = v.id == format!("{}-{}", version.release, neoforge_version);
+                                    let fuzzy_match = v.id.starts_with(&format!("{}-{}", version.release, neoforge_version));
+
+                                    exact_match || fuzzy_match
+                                })
+                                .ok_or_else(|| {
+                                    anyhow!(
+                                        "Could not find neoforge version {}-{} for minecraft version {}",
+                                        version.release,
+                                        neoforge_version,
+                                        version.release,
+                                    )
+                                })?;
+
+                            let neoforge_version = crate::managers::minecraft::neoforge::get_version(
+                                &app.reqwest_client,
+                                neoforge_manifest_version,
+                            )
+                            .await?;
+
+                            version_info =
+                                daedalus::modded::merge_partial_version(neoforge_version, version_info);
+                        }
+                        ModLoader {
                             type_: ModLoaderType::Fabric,
                             version: fabric_version,
                         } => {
@@ -778,32 +836,78 @@ impl ManagerRef<'_, InstanceManager> {
                         .unwrap_or(&version_info.id),
                 );
 
-                if let Some(t_forge_processors) = &t_forge_processors {
-                    t_forge_processors.start_opaque();
+                for modloader in version.modloaders.iter() {
+                    let instance_path = instance_path.clone();
+                    let client_path = client_path.clone();
+                    let game_version = game_version.clone();
+                    let libraries_path = libraries_path.clone();
 
-                    if let Some(processors) = &version_info.processors {
-                        managers::minecraft::forge::execute_processors(
-                            processors,
-                            version_info
-                                .data
-                                .as_ref()
-                                .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
-                            PathBuf::from(&java.path),
-                            instance_path.clone(),
-                            client_path,
-                            game_version,
-                            libraries_path,
-                            Some(Box::new(|current, total| {
-                                t_forge_processors.update_items(current, total);
-                            })),
-                        )
-                        .await?;
+                    match modloader {
+                        ModLoader {
+                            type_: ModLoaderType::Forge,
+                            ..
+                        } => {
+                            if let Some(t_forge_processors) = &t_forge_processors {
+                                t_forge_processors.start_opaque();
+
+                                if let Some(processors) = &version_info.processors {
+                                    managers::minecraft::forge::execute_processors(
+                                        processors,
+                                        version_info
+                                            .data
+                                            .as_ref()
+                                            .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
+                                        PathBuf::from(&java.path),
+                                        instance_path,
+                                        client_path,
+                                        game_version,
+                                        libraries_path,
+                                        Some(Box::new(|current, total| {
+                                            t_forge_processors.update_items(current, total);
+                                        })),
+                                    )
+                                    .await?;
+                                }
+
+                                t_forge_processors.complete_opaque();
+                            }
+                        },
+                        ModLoader {
+                            type_: ModLoaderType::Neoforge,
+                            ..
+                        } => {
+                            if let Some(t_neoforge_processors) = &t_neoforge_processors {
+                                t_neoforge_processors.start_opaque();
+
+                                if let Some(processors) = &version_info.processors {
+                                    managers::minecraft::neoforge::execute_processors(
+                                        processors,
+                                        version_info
+                                            .data
+                                            .as_ref()
+                                            .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
+                                        PathBuf::from(&java.path),
+                                        instance_path.clone(),
+                                        client_path,
+                                        game_version,
+                                        libraries_path,
+                                        Some(Box::new(|current, total| {
+                                            t_neoforge_processors.update_items(current, total);
+                                        })),
+                                    )
+                                    .await?;
+                                }
+
+                                t_neoforge_processors.complete_opaque();
+                            }
+                        },
+                        _ => {}
                     }
-
-                    t_forge_processors.complete_opaque();
                 }
 
-                tokio::fs::remove_dir_all(setup_path).await?;
+                if is_first_run {
+                    tokio::fs::remove_dir_all(setup_path).await?;
+                }
 
                 match launch_account {
                     Some(account) => Ok(Some(
@@ -836,7 +940,7 @@ impl ManagerRef<'_, InstanceManager> {
                         Ok(None)
                     }
                 }
-            })()
+            }
             .await;
 
             match try_result {
@@ -954,6 +1058,8 @@ impl ManagerRef<'_, InstanceManager> {
                         }
                     };
 
+                    time_at_start = Some(Utc::now());
+
                     tokio::select! {
                         _ = child.wait() => {},
                         _ = kill_rx.recv() => drop(child.kill().await),
@@ -986,6 +1092,81 @@ impl ManagerRef<'_, InstanceManager> {
                             LaunchState::Inactive { failed_task: None },
                         )
                         .await;
+                }
+            }
+
+            let now = Utc::now();
+            let offset_in_sec = Local::now().offset().local_minus_utc();
+
+            let mods = app
+                .instance_manager()
+                .list_mods(instance_id)
+                .await
+                .unwrap_or_default()
+                .len();
+
+            let Ok(instance_details) = app.instance_manager().instance_details(instance_id).await
+            else {
+                return;
+            };
+
+            if is_first_run {
+                let res = app
+                    .metrics_manager()
+                    .track_event(Event::InstanceInstalled {
+                        mods_count: mods as u32,
+                        modloader_name: instance_details
+                            .modloaders
+                            .get(0)
+                            .cloned()
+                            .map(|v| v.type_.to_string()),
+                        modloader_version: instance_details
+                            .modloaders
+                            .get(0)
+                            .cloned()
+                            .map(|v| v.version),
+                        modplatform: instance_details.modpack.map(|v| v.to_string()),
+                        version: instance_details.version.unwrap_or(String::from("unknown")),
+                        seconds_taken: (now - initial_time).num_seconds() as u32,
+                    })
+                    .await;
+
+                if let Err(e) = res {
+                    tracing::error!({ error = ?e }, "failed to track instance installed event");
+                }
+            } else {
+                let Some(time_at_start) = time_at_start else {
+                    tracing::error!("time_at_start is None even though this is not the first run");
+                    return;
+                };
+
+                let res = app
+                    .metrics_manager()
+                    .track_event(Event::InstanceLaunched {
+                        mods_count: mods as u32,
+                        modloader_name: instance_details
+                            .modloaders
+                            .get(0)
+                            .cloned()
+                            .map(|v| v.type_.to_string()),
+                        modloader_version: instance_details
+                            .modloaders
+                            .get(0)
+                            .cloned()
+                            .map(|v| v.version),
+                        modplatform: instance_details.modpack.map(|v| v.to_string()),
+                        version: instance_details.version.unwrap_or(String::from("unknown")),
+                        xmx_memory: xmx_memory as u32,
+                        xms_memory: xms_memory as u32,
+                        time_to_start_secs: (now - time_at_start).num_seconds() as u64,
+                        timestamp_start: initial_time.timestamp(),
+                        timestamp_end: now.timestamp(),
+                        timezone_offset: offset_in_sec / 60 / 60,
+                    })
+                    .await;
+
+                if let Err(e) = res {
+                    tracing::error!({ error = ?e }, "failed to track instance installed event");
                 }
             }
         });

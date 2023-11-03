@@ -1,6 +1,6 @@
 import { FEReleaseChannel } from "@gd/core_module/bindings";
 import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron";
-import { ProgressInfo, UpdateInfo } from "electron-updater";
+import type { ProgressInfo, UpdateInfo } from "electron-updater";
 
 contextBridge.exposeInMainWorld(
   "checkForUpdates",

@@ -1,38 +1,43 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
-pub enum EventName {
-    AppClosed,
-}
-
-impl ToString for EventName {
-    fn to_string(&self) -> String {
-        match self {
-            EventName::AppClosed => "app_closed".to_string(),
-        }
-    }
-}
-
-impl TryFrom<String> for EventName {
-    type Error = String;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        match &*value {
-            "app_closed" => Ok(EventName::AppClosed),
-            _ => Err(format!("Unknown event name: {}", value)),
-        }
-    }
+fn skip_serializing_if_zero(value: &u32) -> bool {
+    *value == 0
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Event {
-    pub name: EventName,
-    pub properties: HashMap<String, String>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Pageview {
-    pub path: String,
+#[serde(tag = "event_name", content = "data")]
+#[serde(rename_all = "snake_case")]
+pub enum Event {
+    PageView {
+        page_name: String,
+    },
+    InstanceInstalled {
+        #[serde(skip_serializing_if = "skip_serializing_if_zero")]
+        mods_count: u32,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        modloader_name: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        modloader_version: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        modplatform: Option<String>,
+        version: String,
+        seconds_taken: u32,
+    },
+    InstanceLaunched {
+        #[serde(skip_serializing_if = "skip_serializing_if_zero")]
+        mods_count: u32,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        modloader_name: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        modloader_version: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        modplatform: Option<String>,
+        version: String,
+        xmx_memory: u32,
+        xms_memory: u32,
+        time_to_start_secs: u64,
+        timestamp_start: i64,
+        timestamp_end: i64,
+        timezone_offset: i32,
+    },
 }

@@ -28,6 +28,15 @@ pub enum Modpack {
     Modrinth(ModrinthModpack),
 }
 
+impl ToString for Modpack {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Curseforge(_) => "curseforge".to_string(),
+            Self::Modrinth(_) => "modrinth".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ModpackPlatform {
     Curseforge,
@@ -74,6 +83,7 @@ pub struct ModLoader {
 
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum ModLoaderType {
+    Neoforge,
     Forge,
     Fabric,
     Quilt,
@@ -82,6 +92,7 @@ pub enum ModLoaderType {
 impl ToString for ModLoaderType {
     fn to_string(&self) -> String {
         match self {
+            Self::Neoforge => "neoforge",
             Self::Forge => "forge",
             Self::Fabric => "fabric",
             Self::Quilt => "quilt",
@@ -95,6 +106,7 @@ impl TryFrom<&str> for ModLoaderType {
 
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         match s {
+            "neoforge" => Ok(Self::Neoforge),
             "forge" => Ok(Self::Forge),
             "fabric" => Ok(Self::Fabric),
             "quilt" => Ok(Self::Quilt),

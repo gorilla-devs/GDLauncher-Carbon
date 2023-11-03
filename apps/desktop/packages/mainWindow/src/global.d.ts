@@ -8,10 +8,11 @@ import type {
   UpdateCheckResult,
   UpdateInfo
 } from "electron-updater";
+import type { Log } from "../../main/coreModule";
 
 declare global {
   interface Window {
-    fatalError: (error: string, moduleName?: string) => void;
+    fatalError: (error: string | Log[], moduleName?: string) => void;
     ipcRenderer: import("electron").IpcRenderer;
     report: any;
     getAdSize: () => Promise<BoundsSize>;

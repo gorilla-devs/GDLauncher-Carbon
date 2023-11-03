@@ -747,6 +747,7 @@ struct ModLoader {
 #[derive(Type, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
 enum FEInstanceModloaderType {
+    Neoforge,
     Forge,
     Fabric,
     Quilt,
@@ -850,6 +851,7 @@ impl From<domain::info::ModLoaderType> for FEInstanceModloaderType {
         use domain::info::ModLoaderType as domain;
 
         match value {
+            domain::Neoforge => Self::Neoforge,
             domain::Forge => Self::Forge,
             domain::Fabric => Self::Fabric,
             domain::Quilt => Self::Quilt,
@@ -949,6 +951,7 @@ impl From<ModLoader> for domain::info::ModLoader {
 impl From<FEInstanceModloaderType> for domain::info::ModLoaderType {
     fn from(value: FEInstanceModloaderType) -> Self {
         match value {
+            FEInstanceModloaderType::Neoforge => Self::Neoforge,
             FEInstanceModloaderType::Forge => Self::Forge,
             FEInstanceModloaderType::Fabric => Self::Fabric,
             FEInstanceModloaderType::Quilt => Self::Quilt,
