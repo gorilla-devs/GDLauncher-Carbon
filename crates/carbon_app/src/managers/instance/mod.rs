@@ -20,6 +20,7 @@ use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
 use thiserror::Error;
 use tokio::sync::{watch, Mutex, MutexGuard, RwLock};
+use tracing::info;
 
 use crate::db::{self, read_filters::IntFilter};
 use db::instance::Data as CachedInstance;
@@ -931,12 +932,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await
             .context("moving tmpdir to instance location")?;
 
-        let id = self.add_instance(name, shortpath.clone(), group).await?;
+        let id = self
+            .add_instance(name.clone(), shortpath.clone(), group)
+            .await?;
 
         self.instances.write().await.insert(
             id,
             Instance {
-                shortpath,
+                shortpath: shortpath.clone(),
                 type_: InstanceType::Valid(InstanceData {
                     favorite: false,
                     config: info,
@@ -948,6 +951,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+
+        info!({ shortpath = ?shortpath }, "Created new instance '{name}' (id {})", *id);
 
         Ok(id)
     }

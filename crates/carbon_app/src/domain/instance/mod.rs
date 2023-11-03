@@ -140,6 +140,7 @@ pub enum ExploreEntryType {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ExportTarget {
     Curseforge,
+    Modrinth,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

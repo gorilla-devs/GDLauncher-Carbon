@@ -201,7 +201,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
         query GET_LOGS[app, args: ()] {
             Ok(app.instance_manager()
-                .get_logs()
+               .get_logs()
                .await
                .into_iter()
                .map(GameLogEntry::from)
@@ -850,7 +850,7 @@ enum ExploreEntryType {
 
 #[derive(Type, Deserialize, Debug)]
 struct ExportEntry {
-    #[serde(flatten)]
+    //#[serde(flatten)]
     entries: HashMap<String, Option<ExportEntry>>,
 }
 

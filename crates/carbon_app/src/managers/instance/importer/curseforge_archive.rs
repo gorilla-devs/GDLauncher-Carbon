@@ -6,6 +6,7 @@ use std::{
 
 use anyhow::anyhow;
 use tokio::sync::RwLock;
+use tracing::info;
 
 use crate::{
     api::translation::Translation,
@@ -198,6 +199,8 @@ impl InstanceImporter for CurseforgeArchiveImporter {
                     })
                 }
             }
+
+            futures::future::join_all(futures).await;
         }
 
         Ok(())
@@ -219,7 +222,9 @@ impl InstanceImporter for CurseforgeArchiveImporter {
             .get(index)
             .await
             .cloned()
-            .ok_or_else(|| anyhow!("invalid importable instance index"))?;
+            .ok_or_else(|| anyhow!("invalid importable instance index {index}"))?;
+
+        info!("Importing target {index} - '{}'", instance.manifest.name);
 
         let version = GameVersion::Standard(instance.manifest.minecraft.clone().try_into()?);
 

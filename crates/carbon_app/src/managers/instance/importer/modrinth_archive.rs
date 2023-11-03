@@ -174,6 +174,8 @@ impl InstanceImporter for ModrinthArchiveImporter {
                     })
                 }
             }
+
+            futures::future::join_all(futures).await;
         }
 
         Ok(())

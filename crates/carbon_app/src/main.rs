@@ -218,6 +218,20 @@ async fn setup_managers_for_test() -> TestEnv {
 }
 
 #[cfg(test)]
+#[macro_export]
+macro_rules! assert_eq_display {
+    ($a:expr, $b:expr) => {
+        if $a != $b {
+            panic!(
+                "Assertion failed: left == right\nleft:\n{a_val}\nright:\n{b_val}",
+                a_val = $a,
+                b_val = $b,
+            );
+        }
+    };
+}
+
+#[cfg(test)]
 mod test {
     use crate::get_available_port;
 

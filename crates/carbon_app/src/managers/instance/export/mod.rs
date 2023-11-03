@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use itertools::Itertools;
 use zip::{write::FileOptions, ZipWriter};
 
 use crate::{
@@ -15,6 +16,7 @@ use crate::{
 };
 
 mod curseforge_archive;
+mod modrinth_archive;
 
 #[derive(Debug)]
 pub struct InstanceExportManager {}
@@ -45,6 +47,16 @@ impl ManagerRef<'_, InstanceExportManager> {
                 )
                 .await
             }
+            ExportTarget::Modrinth => {
+                modrinth_archive::export_modrinth(
+                    self.app.clone(),
+                    instance_id,
+                    save_path,
+                    link_mods,
+                    filter,
+                )
+                .await
+            }
         }
     }
 }
@@ -53,12 +65,14 @@ fn zip_excluding<W: io::Write + io::Seek>(
     zip: &mut ZipWriter<W>,
     options: FileOptions,
     base_path: &Path,
+    prefix: &str,
     filter: &ExportEntry,
 ) -> anyhow::Result<()> {
     fn walk_recursive<W: io::Write + io::Seek>(
         zip: &mut ZipWriter<W>,
         options: FileOptions,
         path: &Path,
+        prefix: &str,
         relpath: &[&str],
         filter: Option<&ExportEntry>,
     ) -> anyhow::Result<()> {
@@ -75,12 +89,19 @@ fn zip_excluding<W: io::Write + io::Seek>(
                 continue;
             };
 
-            let path = PathBuf::from_iter(relpath.iter().chain([&*name].iter()));
-            let pathstr = path.to_str().unwrap();
+            let pathstr =
+                String::from(prefix) + "/" + &relpath.iter().chain([&*name].iter()).join("/");
 
             if entry.metadata()?.is_dir() {
                 let relpath = &[relpath, &[&*name][..]].concat()[..];
-                walk_recursive(zip, options, &entry.path(), relpath, subfilter.as_ref())?;
+                walk_recursive(
+                    zip,
+                    options,
+                    &entry.path(),
+                    prefix,
+                    relpath,
+                    subfilter.as_ref(),
+                )?;
             } else {
                 zip.start_file(pathstr, options)?;
                 io::copy(&mut File::open(entry.path())?, zip)?;
@@ -90,5 +111,5 @@ fn zip_excluding<W: io::Write + io::Seek>(
         Ok(())
     }
 
-    walk_recursive(zip, options, base_path, &[], Some(filter))
+    walk_recursive(zip, options, base_path, prefix, &[], Some(filter))
 }

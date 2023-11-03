@@ -43,5 +43,6 @@ pub enum Translation {
     InstanceImportMrpackMalformedManifest,
     InstanceExport,
     InstanceExportScanningMods,
+    InstanceExportCacheMods,
     InstanceExportCreatingBundle,
 }

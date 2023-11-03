@@ -1,14 +1,16 @@
 use std::{collections::HashMap, fs::File, io::Write, path::PathBuf, sync::Arc};
 
 use anyhow::anyhow;
-use tracing::trace;
 
 use crate::{
     api::translation::Translation,
     domain::{
-        instance::{info::GameVersion, ExportEntry, InstanceId},
-        modplatforms::curseforge::manifest::{
-            Manifest, ManifestFileReference, Minecraft, ModLoaders,
+        instance::{
+            info::{GameVersion, ModLoaderType},
+            ExportEntry, InstanceId,
+        },
+        modplatforms::modrinth::version::{
+            Hashes, ModpackIndex, ModrinthFile, ModrinthGame, ModrinthPackDependencies,
         },
         vtask::VisualTaskId,
     },
@@ -21,7 +23,7 @@ use crate::{
 
 use crate::db::{mod_file_cache as fcdb, mod_metadata as metadb};
 
-pub async fn export_curseforge(
+pub async fn export_modrinth(
     app: Arc<AppInner>,
     instance_id: InstanceId,
     save_path: PathBuf,
@@ -72,7 +74,6 @@ pub async fn export_curseforge(
                 let mods_filter = filter.0.get_mut("mods");
                 if let Some(mods_filter) = mods_filter {
                     let t_scan = vtask.subtask(Translation::InstanceExportScanningMods);
-                    let t_cache_mods = vtask.subtask(Translation::InstanceExportCacheMods);
                     t_scan.start_opaque();
 
                     if mods_filter.is_none() {
@@ -90,17 +91,15 @@ pub async fn export_curseforge(
 
                     let mods_filter = mods_filter.as_mut().map(|v| &mut v.0).unwrap();
 
-                    t_cache_mods.start_opaque();
                     app.meta_cache_manager()
-                        .override_caching_and_wait(instance_id, true, false)
+                        .override_caching_and_wait(instance_id, false, true)
                         .await?;
-                    t_cache_mods.complete_opaque();
 
                     let mods2 = app
                         .prisma_client
                         .mod_file_cache()
                         .find_many(vec![fcdb::instance_id::equals(*instance_id)])
-                        .with(fcdb::metadata::fetch().with(metadb::curseforge::fetch()))
+                        .with(fcdb::metadata::fetch().with(metadb::modrinth::fetch()))
                         .exec()
                         .await?
                         .into_iter()
@@ -109,12 +108,18 @@ pub async fn export_curseforge(
                                 return None;
                             };
 
-                            let Some(Some(curseforge)) = metadata.curseforge else {
+                            let Some(Some(modrinth)) = metadata.modrinth else {
                                 return None;
                             };
 
                             match mods_filter.remove(&m.filename) {
-                                Some(_) => Some((curseforge.project_id, curseforge.file_id)),
+                                Some(_) => Some((
+                                    m.filename.clone(),
+                                    m.filesize,
+                                    metadata.sha_512,
+                                    metadata.sha_1,
+                                    modrinth.file_url,
+                                )),
                                 None => None,
                             }
                         });
@@ -127,33 +132,46 @@ pub async fn export_curseforge(
             let t_create_bundle = vtask.subtask(Translation::InstanceExportCreatingBundle);
             t_create_bundle.start_opaque(); // TODO: track the total number of overrides and use update_items
 
-            let manifest = Manifest {
-                minecraft: Minecraft {
-                    version: version.release,
-                    mod_loaders: version
-                        .modloaders
-                        .into_iter()
-                        .enumerate()
-                        .map(|(i, loader)| ModLoaders {
-                            id: format!("{}-{}", loader.type_.to_string(), loader.version),
-                            primary: i == 0,
-                        })
-                        .collect(),
-                },
-                manifest_type: String::from("minecraftModpack"),
-                manifest_version: 1,
+            let manifest = ModpackIndex {
+                format_version: 1,
+                game: ModrinthGame::Minecraft,
+                version_id: String::new(),
                 name: config.name,
-                version: None,
-                author: String::new(),
-                overrides: String::from("overrides"),
+                summary: None,
                 files: mods
-                    .iter()
-                    .map(|(project_id, file_id)| ManifestFileReference {
-                        project_id: *project_id,
-                        file_id: *file_id,
-                        required: true,
-                    })
+                    .into_iter()
+                    .map(
+                        |(file_name, file_size, sha512, sha1, file_url)| ModrinthFile {
+                            path: format!("mods/{file_name}"),
+                            hashes: Hashes {
+                                sha512: hex::encode(sha512),
+                                sha1: hex::encode(sha1),
+                                others: HashMap::new(),
+                            },
+                            env: None,
+                            downloads: vec![file_url],
+                            file_size: file_size as u32,
+                        },
+                    )
                     .collect(),
+                dependencies: ModrinthPackDependencies {
+                    minecraft: Some(version.release),
+                    forge: version
+                        .modloaders
+                        .iter()
+                        .find(|loader| loader.type_ == ModLoaderType::Forge)
+                        .map(|loader| loader.version.clone()),
+                    fabric_loader: version
+                        .modloaders
+                        .iter()
+                        .find(|loader| loader.type_ == ModLoaderType::Fabric)
+                        .map(|loader| loader.version.clone()),
+                    quilt_loader: version
+                        .modloaders
+                        .iter()
+                        .find(|loader| loader.type_ == ModLoaderType::Quilt)
+                        .map(|loader| loader.version.clone()),
+                },
             };
 
             let tmpfile = app
@@ -165,24 +183,18 @@ pub async fn export_curseforge(
 
             let send_path = tmpfile.to_path_buf();
             tokio::task::spawn_blocking(move || {
-                let mut zip = zip::ZipWriter::new(File::create(&send_path)?);
+                let mut zip = zip::ZipWriter::new(File::create(send_path)?);
                 let options = zip::write::FileOptions::default();
-                zip.start_file("manifest.json", options)?;
+                zip.start_file("modrinth.index.json", options)?;
                 zip.write(&serde_json::to_vec_pretty(&manifest)?)?;
 
                 super::zip_excluding(&mut zip, options, &basepath, "overrides", &filter)?;
 
                 zip.finish()?;
-                trace!("finished writing `{}`", send_path.to_string_lossy());
                 Ok::<_, anyhow::Error>(())
             })
             .await??;
 
-            trace!(
-                "renaming export from `{}` to `{}`",
-                tmpfile.to_string_lossy(),
-                save_path.to_string_lossy()
-            );
             tmpfile.rename(save_path).await?;
 
             t_create_bundle.complete_opaque();
@@ -257,7 +269,11 @@ mod test {
 
             let task = app
                 .instance_manager()
-                .install_curseforge_mod(instance_id, 247560, 4024011)
+                .install_modrinth_mod(
+                    instance_id,
+                    String::from("fPetb5Kh"),
+                    String::from("o0SCfsMe"),
+                )
                 .await?;
 
             app.task_manager().wait_with_log(task).await?;
@@ -285,7 +301,7 @@ mod test {
             .export_manager()
             .export_instance(
                 instance_id,
-                ExportTarget::Curseforge,
+                ExportTarget::Modrinth,
                 target_file.clone(),
                 link_mods,
                 export_entry,
@@ -312,7 +328,7 @@ mod test {
         tokio::task::spawn_blocking(|| {
             let mut zip = ZipArchive::new(File::open(target_file)?)?;
 
-            let mut file = zip.by_name("manifest.json")?;
+            let mut file = zip.by_name("modrinth.index.json")?;
             let mut manifest = String::new();
             file.read_to_string(&mut manifest)?;
             drop(file);
@@ -340,28 +356,29 @@ mod test {
                 crate::assert_eq_display!(
                     manifest,
                     r#"{
-  "minecraft": {
-    "version": "1.16.5",
-    "modLoaders": [
-      {
-        "id": "forge-36.2.34",
-        "primary": true
-      }
-    ]
-  },
-  "manifestType": "minecraftModpack",
-  "manifestVersion": 1,
+  "formatVersion": 1,
+  "game": "minecraft",
+  "versionId": "",
   "name": "test",
-  "version": null,
-  "author": "",
-  "overrides": "overrides",
+  "summary": null,
   "files": [
     {
-      "projectID": 247560,
-      "fileID": 4024011,
-      "required": true
+      "path": "mods/NaturesCompass-1.16.5-1.9.1-forge.jar",
+      "hashes": {
+        "sha512": "bc99c1abb320f84ad7670f35649386855e877d8cce3aaeb12654107e4cdd52acb8475a2a66e6cb5f419dc8cc4d1ecf4c3f6d521e51ee9f1525d1403007e2c0b2",
+        "sha1": "38c37c257dcdcf47d5b363eb3e39eebc645b7be4"
+      },
+      "env": null,
+      "downloads": [
+        "https://cdn.modrinth.com/data/fPetb5Kh/versions/o0SCfsMe/NaturesCompass-1.16.5-1.9.1-forge.jar"
+      ],
+      "fileSize": 203573
     }
-  ]
+  ],
+  "dependencies": {
+    "minecraft": "1.16.5",
+    "forge": "36.2.34"
+  }
 }"#
                 );
 
@@ -392,26 +409,22 @@ mod test {
                 crate::assert_eq_display!(
                     manifest,
                     r#"{
-  "minecraft": {
-    "version": "1.16.5",
-    "modLoaders": [
-      {
-        "id": "forge-36.2.34",
-        "primary": true
-      }
-    ]
-  },
-  "manifestType": "minecraftModpack",
-  "manifestVersion": 1,
+  "formatVersion": 1,
+  "game": "minecraft",
+  "versionId": "",
   "name": "test",
-  "version": null,
-  "author": "",
-  "overrides": "overrides",
-  "files": []
+  "summary": null,
+  "files": [],
+  "dependencies": {
+    "minecraft": "1.16.5",
+    "forge": "36.2.34"
+  }
 }"#
                 );
 
-                assert!(zip.by_name("overrides/mods/byg-1.3.6.jar").is_ok());
+                assert!(zip
+                    .by_name("overrides/mods/NaturesCompass-1.16.5-1.9.1-forge.jar")
+                    .is_ok());
                 Ok(())
             })
             .await?;
@@ -438,22 +451,16 @@ mod test {
                 crate::assert_eq_display!(
                     manifest,
                     r#"{
-  "minecraft": {
-    "version": "1.16.5",
-    "modLoaders": [
-      {
-        "id": "forge-36.2.34",
-        "primary": true
-      }
-    ]
-  },
-  "manifestType": "minecraftModpack",
-  "manifestVersion": 1,
+  "formatVersion": 1,
+  "game": "minecraft",
+  "versionId": "",
   "name": "test",
-  "version": null,
-  "author": "",
-  "overrides": "overrides",
-  "files": []
+  "summary": null,
+  "files": [],
+  "dependencies": {
+    "minecraft": "1.16.5",
+    "forge": "36.2.34"
+  }
 }"#
                 );
 
@@ -484,22 +491,16 @@ mod test {
                 crate::assert_eq_display!(
                     manifest,
                     r#"{
-  "minecraft": {
-    "version": "1.16.5",
-    "modLoaders": [
-      {
-        "id": "forge-36.2.34",
-        "primary": true
-      }
-    ]
-  },
-  "manifestType": "minecraftModpack",
-  "manifestVersion": 1,
+  "formatVersion": 1,
+  "game": "minecraft",
+  "versionId": "",
   "name": "test",
-  "version": null,
-  "author": "",
-  "overrides": "overrides",
-  "files": []
+  "summary": null,
+  "files": [],
+  "dependencies": {
+    "minecraft": "1.16.5",
+    "forge": "36.2.34"
+  }
 }"#
                 );
 
@@ -536,22 +537,16 @@ mod test {
                 crate::assert_eq_display!(
                     manifest,
                     r#"{
-  "minecraft": {
-    "version": "1.16.5",
-    "modLoaders": [
-      {
-        "id": "forge-36.2.34",
-        "primary": true
-      }
-    ]
-  },
-  "manifestType": "minecraftModpack",
-  "manifestVersion": 1,
+  "formatVersion": 1,
+  "game": "minecraft",
+  "versionId": "",
   "name": "test",
-  "version": null,
-  "author": "",
-  "overrides": "overrides",
-  "files": []
+  "summary": null,
+  "files": [],
+  "dependencies": {
+    "minecraft": "1.16.5",
+    "forge": "36.2.34"
+  }
 }"#
                 );
 

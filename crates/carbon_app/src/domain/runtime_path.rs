@@ -3,9 +3,8 @@ use std::{
     mem::ManuallyDrop,
     ops::Deref,
     path::{Path, PathBuf},
+    sync::atomic::{self, AtomicUsize},
 };
-
-use anyhow::anyhow;
 
 #[derive(Clone)]
 pub struct RuntimePath(PathBuf);
@@ -170,15 +169,22 @@ impl TempPath {
         let time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("time is somehow pre-epoch")
-            .as_millis();
+            .as_millis() as usize;
 
         let mut path = self.to_path();
 
-        for i in 0..1000 {
+        loop {
+            static LAST_COUNT: AtomicUsize = AtomicUsize::new(0);
+            let i = LAST_COUNT.fetch_add(1, atomic::Ordering::Relaxed);
+
             if i == 0 {
                 path.push(time.to_string());
             } else {
                 path.push(format!("{time}{i}"));
+            }
+
+            if path.exists() {
+                continue;
             }
 
             let path_copy = path.clone();
@@ -192,8 +198,6 @@ impl TempPath {
 
             path.pop();
         }
-
-        Err(anyhow!("Could not create tmpdir"))
     }
 
     pub async fn maketmpdir(&self) -> anyhow::Result<TempEntry<tempentry::Folder>> {
