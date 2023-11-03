@@ -1,7 +1,15 @@
 import { contextBridge, ipcRenderer } from "electron";
-import path from "path";
 import { domReady } from "./utils";
-import { Log } from "../main/coreModule";
+import type { Log } from "../main/coreModule";
+
+function pathJoin(...paths: string[]) {
+  let pathSep = "/";
+  if (process.platform === "win32") {
+    pathSep = "\\";
+  }
+
+  return paths.join(pathSep);
+}
 
 let oDiv: HTMLDivElement;
 function useLoading() {
@@ -47,7 +55,7 @@ function useLoading() {
             <li>- Join our <a id="discord-link" style="color: #7289d9; font-weight: 600; cursor: pointer;">Discord</a> and ask for help.</li>
             <li>- Delete the core module database at
               <div style="margin-left: 24px; font-style: italic;">
-                ${path.join(runtimePath, "gdl_conf.db")}
+                ${pathJoin(runtimePath, "gdl_conf.db")}
               </div>
             </li>
           </ul>

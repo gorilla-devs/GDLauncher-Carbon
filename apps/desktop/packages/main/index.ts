@@ -68,7 +68,7 @@ async function createWindow() {
       preload: join(__dirname, "../preload/index.cjs"),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false // TODO: fix, see https://github.com/electron-react-boilerplate/electron-react-boilerplate/issues/3288
+      sandbox: app.isPackaged
     }
   });
 
