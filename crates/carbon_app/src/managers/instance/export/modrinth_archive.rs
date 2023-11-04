@@ -237,7 +237,7 @@ mod test {
     #[traced_test]
     #[test]
     #[flowtest]
-    fn setup() -> anyhow::Result<(
+    fn _setup() -> anyhow::Result<(
         Arc<tokio::runtime::Runtime>,
         Arc<crate::TestEnv>,
         InstanceId,
@@ -345,7 +345,7 @@ mod test {
 
     #[traced_test]
     #[test]
-    #[flowtest(setup: (rt, app, instance_id))]
+    #[flowtest(_setup: (rt, app, instance_id))]
     fn export_with_folder_linked() -> anyhow::Result<()> {
         rt.block_on(async {
             run_export(
@@ -398,7 +398,7 @@ mod test {
 
     #[traced_test]
     #[test]
-    #[flowtest(setup: (rt, app, instance_id))]
+    #[flowtest(_setup: (rt, app, instance_id))]
     fn export_with_folder_unlinked() -> anyhow::Result<()> {
         rt.block_on(async {
             run_export(
@@ -440,7 +440,7 @@ mod test {
 
     #[traced_test]
     #[test]
-    #[flowtest(setup: (rt, app, instance_id))]
+    #[flowtest(_setup: (rt, app, instance_id))]
     fn export_without_folder_linked() -> anyhow::Result<()> {
         rt.block_on(async {
             run_export(
@@ -480,7 +480,7 @@ mod test {
 
     #[traced_test]
     #[test]
-    #[flowtest(setup: (rt, app, instance_id))]
+    #[flowtest(_setup: (rt, app, instance_id))]
     fn export_without_folder_unlinked() -> anyhow::Result<()> {
         rt.block_on(async {
             run_export(
@@ -520,7 +520,7 @@ mod test {
 
     #[traced_test]
     #[test]
-    #[flowtest(setup: (rt, app, instance_id))]
+    #[flowtest(_setup: (rt, app, instance_id))]
     fn export_with_fake_folder_linked() -> anyhow::Result<()> {
         rt.block_on(async {
             run_export(
