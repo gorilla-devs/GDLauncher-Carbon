@@ -20,6 +20,12 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             Ok(FEModdedManifest::from(res))
         }
 
+        query GET_NEOFORGE_VERSIONS[app, _args: ()] {
+            let res = app.minecraft_manager().get_neoforge_manifest().await?;
+
+            Ok(FEModdedManifest::from(res))
+        }
+
         query GET_FABRIC_VERSIONS[app, _args: ()] {
             let res = app.minecraft_manager().get_fabric_manifest().await?;
 

@@ -64,6 +64,7 @@ keys! {
     mc {
         GET_MINECRAFT_VERSIONS                      = "getMinecraftVersions";
         GET_FORGE_VERSIONS                          = "getForgeVersions";
+        GET_NEOFORGE_VERSIONS                       = "getNeoforgeVersions";
         GET_FABRIC_VERSIONS                         = "getFabricVersions";
         GET_QUILT_VERSIONS                          = "getQuiltVersions";
     }

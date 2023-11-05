@@ -4,7 +4,6 @@ import { Trans } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
 import { Button } from "@gd/ui";
 import fetchData from "./auth.login.data";
-import { trackEvent } from "@/utils/analytics";
 
 const Auth = () => {
   const [error, setError] = createSignal<null | string>(null);
@@ -43,7 +42,6 @@ const Auth = () => {
   };
 
   const handleClick = async () => {
-    trackEvent("microsoft_auth");
     setClicked(true);
     if (!routeData.status.data) {
       accountEnrollBeginMutation.mutate(undefined);

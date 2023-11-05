@@ -920,7 +920,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         )
         .await?;
 
-        initializer((&*tmpdir).to_path_buf()).await?;
+        initializer(tmpdir.to_path_buf()).await?;
 
         tmpdir
             .rename(path)

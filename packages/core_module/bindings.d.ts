@@ -28,6 +28,7 @@ export type Procedures = {
         { key: "mc.getFabricVersions", input: never, result: FEModdedManifest } | 
         { key: "mc.getForgeVersions", input: never, result: FEModdedManifest } | 
         { key: "mc.getMinecraftVersions", input: never, result: ManifestVersion[] } | 
+        { key: "mc.getNeoforgeVersions", input: never, result: FEModdedManifest } | 
         { key: "mc.getQuiltVersions", input: never, result: FEModdedManifest } | 
         { key: "modplatforms.curseforge.getCategories", input: never, result: FECategoriesResponse } | 
         { key: "modplatforms.curseforge.getFiles", input: CFFEFilesParameters, result: FEFilesResponse } | 
@@ -89,8 +90,7 @@ export type Procedures = {
         { key: "java.deleteJavaVersion", input: string, result: null } | 
         { key: "java.setupManagedJava", input: FEManagedJavaSetupArgs, result: string } | 
         { key: "java.updateSystemJavaProfilePath", input: FEUpdateSystemJavaProfileArgs, result: null } | 
-        { key: "metrics.sendEvent", input: FEEvent, result: null } | 
-        { key: "metrics.sendPageview", input: FEPageview, result: null } | 
+        { key: "metrics.sendEvent", input: FEMetricsEvent, result: null } | 
         { key: "settings.setSettings", input: FESettingsUpdate, result: null } | 
         { key: "vtask.dismissTask", input: FETaskId, result: null },
     subscriptions: 

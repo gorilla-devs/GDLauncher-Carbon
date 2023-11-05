@@ -15,6 +15,7 @@ import {
 } from "electron";
 import os, { platform, release } from "os";
 import { join, resolve } from "path";
+import "./runtimePath";
 import "./cli"; // THIS MUST BE BEFORE "coreModule" IMPORT!
 import coreModule from "./coreModule";
 import "./preloadListeners";
@@ -22,7 +23,6 @@ import getAdSize from "./adSize";
 import handleUncaughtException from "./handleUncaughtException";
 import initAutoUpdater from "./autoUpdater";
 import "./appMenu";
-import "./runtimePath";
 
 if ((app as any).overwolf) {
   (app as any).overwolf.disableAnonymousAnalytics();
@@ -68,7 +68,7 @@ async function createWindow() {
       preload: join(__dirname, "../preload/index.cjs"),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false // TODO: fix, see https://github.com/electron-react-boilerplate/electron-react-boilerplate/issues/3288
+      sandbox: app.isPackaged
     }
   });
 
@@ -186,6 +186,9 @@ async function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Expose chrome's accessibility tree by default
+  app.setAccessibilitySupportEnabled(true);
+
   console.log("OVERWOLF APP ID", process.env.OVERWOLF_APP_UID);
   session.defaultSession.webRequest.onBeforeSendHeaders(
     {
