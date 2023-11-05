@@ -8,6 +8,7 @@ fn skip_serializing_if_zero(value: &u32) -> bool {
 #[serde(tag = "event_name", content = "data")]
 #[serde(rename_all = "snake_case")]
 pub enum Event {
+    LauncherStarted,
     PageView {
         page_name: String,
     },
