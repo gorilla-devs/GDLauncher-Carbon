@@ -82,10 +82,10 @@ const getVariant = (
   const variants = {
     primary: {
       ...commonStyle,
-      [`${!isDisabled ? `bg-${variant}-500` : "bg-[#404759F]"}`]: true,
+      [`${!isDisabled ? `bg-${variant}-500` : "bg-[#404759]"}`]: true,
       [`${!isDisabled ? `hover:bg-${variant}-300` : `hover:bg-[#434344]`}`]:
         true,
-      "filter brightness-75": isDisabled,
+      // "filter brightness-75": isDisabled,
       "text-[#8A8B8F]": isDisabled,
       "border-0": true,
     },
