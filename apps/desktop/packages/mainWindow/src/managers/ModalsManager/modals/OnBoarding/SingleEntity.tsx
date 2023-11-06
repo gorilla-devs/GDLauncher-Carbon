@@ -27,7 +27,7 @@ const SingleEntity = (props: {
   setEntity: Setter<ImportEntityStatus | undefined>;
 }) => {
   const [path, setPath] = createSignal<string | undefined>(undefined);
-
+  const [inputValue, setInputValue] = createSignal(path());
   const [instance, setInstance] = createStore<{
     noResult: string | undefined;
     singleResult: ImportableInstance | undefined;
@@ -124,6 +124,12 @@ const SingleEntity = (props: {
           </span>
           <Input
             value={path()}
+            onInput={(e) => {
+              setInputValue(e.currentTarget.value);
+            }}
+            onBlur={() => {
+              setPath(inputValue());
+            }}
             class="flex-1 border-2 border-solid border-zinc-500"
             icon={
               <div class="flex gap-2">
