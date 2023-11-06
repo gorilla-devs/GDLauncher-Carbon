@@ -87,7 +87,6 @@ const getVariant = (
         true,
       "filter brightness-75": isDisabled,
       "text-[#8A8B8F]": isDisabled,
-      "bg-gray-500": isDisabled,
       "border-0": true,
     },
     secondary: {
