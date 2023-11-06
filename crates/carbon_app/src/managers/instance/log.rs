@@ -14,28 +14,13 @@ use crate::{
 
 use super::InstanceManager;
 
-#[derive(Debug)]
-pub struct GameLog {
-    // buffer holding the full log
-    log: String,
-    lines: Vec<Option<InternalLogEntry>>,
-    last_entry: usize,
-    last_was_terminated: bool,
-}
+#[derive(Debug, Default)]
+pub struct GameLog(Vec<LogEntry>);
 
-#[derive(Debug)]
-// Note: Option<LogEntry> shares a repr with LogEntry due to enum optimization
-pub struct InternalLogEntry {
-    type_: EntryType,
-    start: usize,
-    end: usize,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct LogEntry<'a> {
-    pub type_: EntryType,
-    pub start_line: usize,
-    pub text: &'a str,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LogEntry {
+    pub kind: EntryType,
+    pub data: String,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -46,157 +31,48 @@ pub enum EntryType {
     // more entries once log levels are handled
 }
 
-impl Default for GameLog {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl GameLog {
     pub fn new() -> Self {
-        Self {
-            log: String::new(),
-            lines: Vec::new(),
-            last_entry: 0,
-            last_was_terminated: true,
-        }
+        Self::default()
     }
 
-    /// Push new text to the log.
-    ///
-    /// # Note
-    /// If this entry's type matches that of the last entry and
-    /// the last entry did not end in \n they will be merged.
-    pub fn push(&mut self, type_: EntryType, mut text: &str) {
-        fn push_newlines(self_: &mut GameLog, text: &str) {
-            let mut newline = false;
-            let mut newline_count = 0;
-
-            for c in text.chars() {
-                newline = c == '\n';
-
-                if newline {
-                    newline_count += 1;
-                }
-            }
-
-            self_.last_was_terminated = newline;
-
-            if newline {
-                self_.lines.extend((1..newline_count).map(|_| None));
-            }
-        }
-
-        let mut newline = false;
-        let mut newline_count = 0;
-
-        for c in text.chars() {
-            newline = c == '\n';
-
-            if newline {
-                newline_count += 1;
-            }
-        }
-
-        if newline {
-            text = &text[0..text.len() - 1];
-        }
-
-        if !self.last_was_terminated {
-            if let Some(Some(last)) = self.lines.get_mut(self.last_entry) {
-                if last.type_ == type_ {
-                    if text.is_empty() {
-                        return;
-                    }
-
-                    self.log.push_str(text);
-                    last.end = self.log.len();
-
-                    self.last_was_terminated = newline;
-
-                    if newline {
-                        self.lines.extend((1..newline_count).map(|_| None));
-                    }
-
-                    return;
-                }
-            }
-        }
-
-        let start = self.log.len();
-        self.log.push_str(text);
-        let end = self.log.len();
-
-        self.last_entry = self.lines.len(); // len == last + 1
-        self.lines
-            .push(Some(InternalLogEntry { type_, start, end }));
-
-        self.last_was_terminated = newline;
-
-        if newline {
-            self.lines.extend((1..newline_count).map(|_| None));
-        }
+    /// Inserts a new line into the log.
+    pub fn add_new_line(&mut self, kind: EntryType, line: impl ToString) {
+        self.0.push(LogEntry {
+            kind,
+            data: line.to_string(),
+        })
     }
 
-    /// Get the first log entry before the given line
-    pub fn get_entry(&self, line: usize) -> Option<LogEntry> {
-        for i in (0..=line).rev() {
-            let Some(entry) = self.lines.get(i) else {
-                return None;
-            };
-
-            if let Some(entry) = entry {
-                return Some(LogEntry {
-                    type_: entry.type_,
-                    start_line: i,
-                    text: &self.log[entry.start..entry.end],
-                });
-            }
-        }
-
-        return None;
+    /// Retrieves the requested line from the log.
+    pub fn get_line(&self, line: usize) -> Option<&LogEntry> {
+        self.0.get(line)
     }
 
     /// Get a region of log entries containing the given start and end lines
-    pub fn get_region(&self, lines: impl RangeBounds<usize>) -> Vec<LogEntry> {
-        let mut entries = Vec::<LogEntry>::new();
-
+    /// Truncates the range if it is out of bounds.
+    pub fn get_span(&self, lines: impl RangeBounds<usize>) -> &[LogEntry] {
         let start = match lines.start_bound() {
-            Bound::Included(&v) => v,
-            Bound::Excluded(&v) => v + 1,
+            Bound::Included(s) => *s,
             Bound::Unbounded => 0,
+            Bound::Excluded(_) => unreachable!("start bounds are never excluded"),
         };
 
         let end = match lines.end_bound() {
-            Bound::Included(&v) => v + 1,
-            Bound::Excluded(&v) => v,
-            Bound::Unbounded => self.lines.len(),
+            Bound::Included(e) if *e <= self.0.len() => *e + 1, // normalize to excluded
+            Bound::Excluded(e) if *e < self.0.len() => *e,
+            _ => self.0.len(),
         };
 
-        for i in (0..end).rev() {
-            let Some(entry) = self.lines.get(i) else {
-                continue;
-            };
-
-            if let Some(entry) = entry {
-                entries.push(LogEntry {
-                    type_: entry.type_,
-                    start_line: i,
-                    text: &self.log[entry.start..entry.end],
-                });
-
-                if i <= start {
-                    break;
-                }
-            }
+        if start >= end {
+            return Default::default();
         }
 
-        entries.reverse();
-        return entries;
+        &self.0[start..end]
     }
 
     pub fn len(&self) -> usize {
-        self.lines.len()
+        self.0.len()
     }
 }
 
@@ -272,9 +148,9 @@ mod test {
         assert_eq!(
             log.get_entry(0),
             Some(LogEntry {
-                type_: EntryType::StdOut,
-                start_line: 0,
-                text: "testing"
+                kind: EntryType::StdOut,
+                entry_number: 0,
+                data: "testing"
             }),
         );
     }
@@ -285,17 +161,17 @@ mod test {
         log.push(EntryType::StdOut, "testing1\n");
         log.push(EntryType::StdOut, "testing2\n");
         assert_eq!(
-            log.get_region(..),
+            log.get_span(..),
             vec![
                 LogEntry {
-                    type_: EntryType::StdOut,
-                    start_line: 0,
-                    text: "testing1"
+                    kind: EntryType::StdOut,
+                    entry_number: 0,
+                    data: "testing1"
                 },
                 LogEntry {
-                    type_: EntryType::StdOut,
-                    start_line: 1,
-                    text: "testing2"
+                    kind: EntryType::StdOut,
+                    entry_number: 1,
+                    data: "testing2"
                 },
             ],
         );
@@ -309,31 +185,31 @@ mod test {
         assert_eq!(
             log.get_entry(0),
             Some(LogEntry {
-                type_: EntryType::StdOut,
-                start_line: 0,
-                text: "testing1testing2"
+                kind: EntryType::StdOut,
+                entry_number: 0,
+                data: "testing1testing2"
             }),
         );
 
         log.push(EntryType::StdOut, "testing3");
         log.push(EntryType::StdErr, "testing4\n");
         assert_eq!(
-            log.get_region(..),
+            log.get_span(..),
             vec![
                 LogEntry {
-                    type_: EntryType::StdOut,
-                    start_line: 0,
-                    text: "testing1testing2"
+                    kind: EntryType::StdOut,
+                    entry_number: 0,
+                    data: "testing1testing2"
                 },
                 LogEntry {
-                    type_: EntryType::StdOut,
-                    start_line: 1,
-                    text: "testing3"
+                    kind: EntryType::StdOut,
+                    entry_number: 1,
+                    data: "testing3"
                 },
                 LogEntry {
-                    type_: EntryType::StdErr,
-                    start_line: 2,
-                    text: "testing4"
+                    kind: EntryType::StdErr,
+                    entry_number: 2,
+                    data: "testing4"
                 },
             ],
         );
@@ -345,20 +221,20 @@ mod test {
         log.push(EntryType::StdOut, "testing1\ntesting2\n");
 
         let entry = LogEntry {
-            type_: EntryType::StdOut,
-            start_line: 0,
-            text: "testing1\ntesting2",
+            kind: EntryType::StdOut,
+            entry_number: 0,
+            data: "testing1\ntesting2",
         };
 
         assert_eq!(log.get_entry(0), Some(entry));
         assert_eq!(log.get_entry(1), Some(entry));
-        assert_eq!(log.get_region(..), vec![entry]);
-        assert_eq!(log.get_region(..2), vec![entry]);
-        assert_eq!(log.get_region(..=1), vec![entry]);
-        assert_eq!(log.get_region(0..), vec![entry]);
-        assert_eq!(log.get_region(0..2), vec![entry]);
-        assert_eq!(log.get_region(0..=1), vec![entry]);
-        assert_eq!(log.get_region(0..1), vec![entry]);
-        assert_eq!(log.get_region(1..2), vec![entry]);
+        assert_eq!(log.get_span(..), vec![entry]);
+        assert_eq!(log.get_span(..2), vec![entry]);
+        assert_eq!(log.get_span(..=1), vec![entry]);
+        assert_eq!(log.get_span(0..), vec![entry]);
+        assert_eq!(log.get_span(0..2), vec![entry]);
+        assert_eq!(log.get_span(0..=1), vec![entry]);
+        assert_eq!(log.get_span(0..1), vec![entry]);
+        assert_eq!(log.get_span(1..2), vec![entry]);
     }
 }

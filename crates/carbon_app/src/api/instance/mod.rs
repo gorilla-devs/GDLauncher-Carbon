@@ -316,11 +316,6 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
         path: String,
     }
 
-    #[derive(Deserialize)]
-    struct LogQuery {
-        id: i32,
-    }
-
     axum::Router::new()
         .route(
             "/instanceIcon",
@@ -384,70 +379,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                 }
             )
         )
-        .route(
-            "/log",
-            axum::routing::get(
-                |State(app): State<Arc<AppInner>>, Query(query): Query<LogQuery>| async move {
-                    let log_rx = app.instance_manager()
-                        .get_log(domain::GameLogId(query.id))
-                        .await;
-
-                    let Ok(mut log_rx) = log_rx else {
-                        return IntoResponse::into_response(StatusCode::NOT_FOUND)
-                    };
-
-                    #[derive(Serialize)]
-                    enum LogEntryType {
-                        System,
-                        StdOut,
-                        StdErr,
-                    }
-
-                    #[derive(Serialize)]
-                    struct LogEntry<'a> {
-                        line: &'a str,
-                        type_: LogEntryType,
-                    }
-
-                    let s = async_stream::stream! {
-                        let mut last_idx = 0;
-
-                        loop {
-                            let new_lines = {
-                                let log = log_rx.borrow();
-
-                                let new_lines = log.get_region(last_idx..).into_iter().map(|line| {
-                                    let entry = LogEntry {
-                                        line: line.text,
-                                        type_: match line.type_ {
-                                            EntryType::System => LogEntryType::System,
-                                            EntryType::StdOut => LogEntryType::StdOut,
-                                            EntryType::StdErr => LogEntryType::StdErr,
-                                        }
-                                    };
-
-                                    serde_json::to_vec(&entry)
-                                        .expect("serialization of a log entry should be infallible")
-                                }).collect::<Vec<_>>();
-
-                                last_idx = log.len();
-                                new_lines
-                            };
-
-                            for line in new_lines {
-                                yield Ok::<_, Infallible>(line)
-                            }
-
-                            if let Err(_) = log_rx.changed().await {
-                                break
-                            }
-                        }
-                    };
-
-                    IntoResponse::into_response((StatusCode::OK, StreamBody::new(s)))
-                }
-            )
-        )
+        .route("/log", axum::routing::get(log::log_handler))
 }
 #[derive(Type, Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct FEGroupId(i32);
@@ -1176,5 +1108,99 @@ impl From<UpdateInstance> for domain::InstanceSettingsUpdate {
             extra_java_args: value.extra_java_args.map(|x| x.inner()),
             memory: value.memory.map(|x| x.inner().map(Into::into)),
         }
+    }
+}
+
+mod log {
+    use super::*;
+
+    #[derive(Deserialize)]
+    pub struct LogQuery {
+        id: i32,
+    }
+
+    #[derive(Serialize)]
+    enum LogEntryType {
+        System,
+        StdOut,
+        StdErr,
+    }
+
+    impl From<EntryType> for LogEntryType {
+        fn from(kind: EntryType) -> Self {
+            match kind {
+                EntryType::System => Self::System,
+                EntryType::StdOut => Self::StdOut,
+                EntryType::StdErr => Self::StdErr,
+            }
+        }
+    }
+
+    #[derive(Serialize)]
+    struct LogEntry<'a> {
+        data: &'a str,
+        type_: LogEntryType,
+    }
+
+    impl<'a> From<&'a crate::managers::instance::log::LogEntry> for LogEntry<'a> {
+        fn from(entry: &'a crate::managers::instance::log::LogEntry) -> Self {
+            Self {
+                data: &entry.data,
+                type_: entry.kind.into(),
+            }
+        }
+    }
+
+    pub async fn log_handler(
+        State(app): State<App>,
+        Query(query): Query<LogQuery>,
+    ) -> impl IntoResponse {
+        let log_rx = app
+            .instance_manager()
+            .get_log(domain::GameLogId(query.id))
+            .await;
+
+        let Ok(mut log_rx) = log_rx else {
+            return StatusCode::NOT_FOUND.into_response();
+        };
+
+        let s = async_stream::stream! {
+            let mut last_idx = 0;
+
+            loop {
+                let new_lines = {
+                    let log = log_rx.borrow();
+
+                    let new_lines
+                        = log
+                            .get_span(last_idx..)
+                            .into_iter()
+                            .map(LogEntry::from)
+                            .map(|entry| {
+                                serde_json::to_vec(&entry)
+                                    .expect(
+                                        "serialization of a log entry should be infallible"
+                                    )
+                            })
+                            .collect::<Vec<_>>();
+
+                    last_idx = log.len();
+
+                    new_lines
+                };
+
+                for line in new_lines {
+                    yield Ok::<_, Infallible>(line)
+                }
+
+
+
+                if let Err(_) = log_rx.changed().await {
+                    break
+                }
+            }
+        };
+
+        (StatusCode::OK, StreamBody::new(s)).into_response()
     }
 }
