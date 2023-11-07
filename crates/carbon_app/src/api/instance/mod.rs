@@ -845,7 +845,7 @@ struct ExploreEntry {
 
 #[derive(Type, Serialize, Debug)]
 enum ExploreEntryType {
-    File,
+    File { size: u32 },
     Directory,
 }
 
@@ -1252,7 +1252,7 @@ impl From<domain::ExploreEntry> for ExploreEntry {
 impl From<domain::ExploreEntryType> for ExploreEntryType {
     fn from(value: domain::ExploreEntryType) -> Self {
         match value {
-            domain::ExploreEntryType::File => Self::File,
+            domain::ExploreEntryType::File { size } => Self::File { size },
             domain::ExploreEntryType::Directory => Self::Directory,
         }
     }

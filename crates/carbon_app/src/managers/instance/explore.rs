@@ -38,11 +38,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let mut entries = Vec::<ExploreEntry>::new();
         while let Some(entry) = dir.next_entry().await? {
+            let meta = entry.metadata().await?;
             entries.push(ExploreEntry {
                 name: entry.file_name().to_string_lossy().to_string(),
-                type_: match entry.metadata().await?.is_dir() {
+                type_: match meta.is_dir() {
                     true => ExploreEntryType::Directory,
-                    false => ExploreEntryType::File,
+                    false => ExploreEntryType::File {
+                        size: meta.len() as u32,
+                    },
                 },
             })
         }
@@ -101,7 +104,7 @@ mod test {
         let expected = vec![
             ExploreEntry {
                 name: String::from("file"),
-                type_: ExploreEntryType::File,
+                type_: ExploreEntryType::File { size: 0 },
             },
             ExploreEntry {
                 name: String::from("subfolder"),

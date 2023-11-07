@@ -133,7 +133,7 @@ pub struct ExploreEntry {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ExploreEntryType {
-    File,
+    File { size: u32 },
     Directory,
 }
 
