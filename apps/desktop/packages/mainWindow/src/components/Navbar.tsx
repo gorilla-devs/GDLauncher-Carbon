@@ -141,8 +141,7 @@ const AppNavbar = () => {
                         class="text-darkSlate-50 text-2xl cursor-pointer i-ri:settings-3-fill"
                         classList={{
                           "bg-primary-500":
-                            !!isSettings() || !!isSettingsNested(),
-                          underline: !!isSettings() || !!isSettingsNested()
+                            !!isSettings() || !!isSettingsNested()
                         }}
                       />
                     </Tab>
