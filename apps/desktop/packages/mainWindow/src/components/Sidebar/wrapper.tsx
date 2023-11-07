@@ -17,22 +17,18 @@ interface Props {
 const SiderbarWrapper = (props: Props) => {
   const mergedProps = mergeProps({ collapsable: true }, props);
 
+  const handleOpenAndCloseSidebar = () => {
+    if (window.innerWidth < 873 && isSidebarOpened()) {
+      toggleSidebar();
+    } else if (window.innerWidth >= 873 && !isSidebarOpened()) {
+      toggleSidebar();
+    }
+  };
+
   createEffect(() => {
-    window.addEventListener("resize", () => {
-      if (window.innerWidth < 873 && isSidebarOpened()) {
-        toggleSidebar();
-      } else if (window.innerWidth >= 873 && !isSidebarOpened()) {
-        toggleSidebar();
-      }
-    });
+    window.addEventListener("resize", handleOpenAndCloseSidebar);
     return () => {
-      window.removeEventListener("resize", () => {
-        if (window.innerWidth < 873 && isSidebarOpened()) {
-          toggleSidebar();
-        } else if (window.innerWidth >= 873 && !isSidebarOpened()) {
-          toggleSidebar();
-        }
-      });
+      window.removeEventListener("resize", handleOpenAndCloseSidebar);
     };
   });
 
