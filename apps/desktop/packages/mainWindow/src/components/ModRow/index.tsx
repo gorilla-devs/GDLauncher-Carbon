@@ -409,6 +409,7 @@ const ModRow = (props: ModRowProps) => {
                         </Match>
                         <Match when={isModInstalled()}>
                           <Button
+                            size="small"
                             variant={isModInstalled() ? "green" : "primary"}
                           >
                             <Trans key="mod.downloaded" />
