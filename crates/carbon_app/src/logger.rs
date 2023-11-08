@@ -41,7 +41,13 @@ pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
         tokio::fs::create_dir_all(&logs_path).await.unwrap();
     }
 
-    let filter = EnvFilter::try_new(generate_logs_filters()).unwrap();
+    let filter = EnvFilter::builder();
+
+    let filter = if let Ok(filter) = filter.from_env() {
+        filter
+    } else {
+        filter.parse(generate_logs_filters()).unwrap()
+    };
 
     // let processor = tracing_forest::Printer::new()
     //     .formatter(tracing_forest::printer::Pretty)
