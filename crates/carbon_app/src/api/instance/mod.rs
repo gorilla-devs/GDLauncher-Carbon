@@ -1114,12 +1114,12 @@ impl From<UpdateInstance> for domain::InstanceSettingsUpdate {
 mod log {
     use super::*;
 
-    #[derive(Deserialize)]
+    #[derive(Debug, Deserialize)]
     pub struct LogQuery {
         id: i32,
     }
 
-    #[derive(Serialize)]
+    #[derive(Debug, Serialize)]
     enum LogEntryType {
         System,
         StdOut,
@@ -1136,7 +1136,7 @@ mod log {
         }
     }
 
-    #[derive(Serialize)]
+    #[derive(Debug, Serialize)]
     struct LogEntry<'a> {
         data: &'a str,
         type_: LogEntryType,
@@ -1151,23 +1151,32 @@ mod log {
         }
     }
 
+    #[tracing::instrument(skip(app))]
     pub async fn log_handler(
         State(app): State<App>,
         Query(query): Query<LogQuery>,
     ) -> impl IntoResponse {
+        tracing::info!("starting log stream");
+
         let log_rx = app
             .instance_manager()
             .get_log(domain::GameLogId(query.id))
             .await;
 
         let Ok(mut log_rx) = log_rx else {
+            tracing::warn!("log entry not found");
+
             return StatusCode::NOT_FOUND.into_response();
         };
 
         let s = async_stream::stream! {
+            tracing::trace!("starting log stream");
+
             let mut last_idx = 0;
 
             loop {
+                tracing::trace!("waiting for log data to come in");
+
                 let new_lines = {
                     let log = log_rx.borrow();
 
@@ -1176,6 +1185,7 @@ mod log {
                             .get_span(last_idx..)
                             .into_iter()
                             .map(LogEntry::from)
+                            .inspect(|entry| tracing::trace!(?entry, "received log entry"))
                             .map(|entry| {
                                 serde_json::to_vec(&entry)
                                     .expect(
@@ -1189,13 +1199,19 @@ mod log {
                     new_lines
                 };
 
+
+
                 for line in new_lines {
+                    tracing::trace!("yielding log entry");
+
                     yield Ok::<_, Infallible>(line)
                 }
 
 
 
                 if let Err(_) = log_rx.changed().await {
+                    tracing::error!("`log_rx` was closed, killing log stream");
+
                     break
                 }
             }

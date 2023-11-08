@@ -1336,7 +1336,7 @@ async fn read_pipe(
 
     match pipe.read(&mut buf).await {
         Ok(size) if size != 0 => {
-            let utf8 = String::from_utf8_lossy(&buf);
+            let utf8 = String::from_utf8_lossy(&buf[..size]);
 
             let mut line_iter = utf8.split('\n').peekable();
 
