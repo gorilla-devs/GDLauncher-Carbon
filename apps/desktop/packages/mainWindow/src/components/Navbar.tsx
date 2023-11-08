@@ -130,11 +130,12 @@ const AppNavbar = () => {
                 </Tab>
                 <div class="flex gap-6 items-center">
                   <div
-                    onClick={() =>
-                      navigate("/settings", {
-                        getLastInstance: true
-                      })
-                    }
+                    onClick={() => {
+                      if (!(!!isSettings() || !!isSettingsNested()))
+                        navigate("/settings", {
+                          getLastInstance: true
+                        });
+                    }}
                   >
                     <Tab>
                       <div
