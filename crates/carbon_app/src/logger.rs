@@ -43,10 +43,19 @@ pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
 
     let filter = EnvFilter::builder();
 
-    let filter = if let Ok(filter) = filter.from_env() {
-        filter
+    let filter = if std::env::var("RUST_LOG").is_ok() {
+        println!("loaded logger directives from `RUST_LOG` env");
+
+        filter.from_env().expect("logger directives are invalid")
     } else {
-        filter.parse(generate_logs_filters()).unwrap()
+        let directives = generate_logs_filters();
+
+        println!(
+            "loaded default logger directives, to override, set `RUST_LOG` env var\n\
+             RUST_LOG=\"{directives}\""
+        );
+
+        filter.parse(directives).unwrap()
     };
 
     // let processor = tracing_forest::Printer::new()
