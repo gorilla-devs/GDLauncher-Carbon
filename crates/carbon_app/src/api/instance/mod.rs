@@ -251,6 +251,8 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                             imod.instance_id.into(),
                             cf_mod.project_id,
                             cf_mod.file_id,
+                            imod.install_deps,
+                            imod.replaces_mod,
                         )
                         .await?
                 }
@@ -260,6 +262,8 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                             imod.instance_id.into(),
                             mdr_mod.project_id,
                             mdr_mod.version_id,
+                            imod.install_deps,
+                            imod.replaces_mod,
                         )
                         .await?
                 }
@@ -627,6 +631,8 @@ struct ModrinthMod {
 struct InstallMod {
     instance_id: FEInstanceId,
     mod_source: ModSource,
+    install_deps: bool,
+    replaces_mod: Option<String>,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]

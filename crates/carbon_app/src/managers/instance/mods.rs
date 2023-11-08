@@ -218,12 +218,14 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         project_id: u32,
         file_id: u32,
+        install_deps: bool,
+        replaces_mod_id: Option<String>,
     ) -> anyhow::Result<VisualTaskId> {
         let installer = CurseforgeModInstaller::create(self.app, project_id, file_id)
             .await?
             .into_installer();
 
-        let task_id = installer.install(self.app, instance_id).await?;
+        let task_id = installer.install(self.app, instance_id, install_deps, replaces_mod_id).await?;
 
         Ok(task_id)
     }
@@ -233,12 +235,14 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         project_id: String,
         version_id: String,
+        install_deps: bool,
+        replaces_mod_id: Option<String>,
     ) -> anyhow::Result<VisualTaskId> {
         let installer = ModrinthModInstaller::create(self.app, project_id, version_id)
             .await?
             .into_installer();
 
-        let task_id = installer.install(self.app, instance_id).await?;
+        let task_id = installer.install(self.app, instance_id, install_deps, replaces_mod_id).await?;
 
         Ok(task_id)
     }

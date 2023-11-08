@@ -312,6 +312,8 @@ export type CFFEFile = { id: number; gameId: number; modId: number; isAvailable:
 
 export type CFFEModStatus = "new" | "changesRequired" | "underSoftReview" | "approved" | "rejected" | "changesMade" | "inactive" | "abandoned" | "deleted" | "underReview"
 
+export type FEMetricsEvent = { event_name: "page_view"; data: string }
+
 export type MRFEVersionID = string
 
 export type CFFEModParameters = { modId: number }
@@ -415,8 +417,6 @@ export type FEInstanceModloaderType = "neoforge" | "forge" | "fabric" | "quilt"
 export type CFFEModFilesParameters = { modId: number; query: CFFEModFilesParametersQuery }
 
 export type MRFEProjectSupportRange = "required" | "optional" | "unsupported" | "unknown"
-
-export type FEMetricsEvent = { event_name: "page_view"; data: string }
 
 export type FESettingsUpdate = { theme?: string | null; language?: string | null; reducedMotion?: boolean | null; discordIntegration?: boolean | null; releaseChannel?: FEReleaseChannel | null; concurrentDownloads?: number | null; showNews?: boolean | null; xmx?: number | null; xms?: number | null; isFirstLaunch?: boolean | null; startupResolution?: string | null; javaCustomArgs?: string | null; autoManageJava?: boolean | null; preferredModChannel?: ModChannel | null; termsAndPrivacyAccepted?: boolean | null; metricsEnabled?: boolean | null }
 
