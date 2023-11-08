@@ -43,6 +43,10 @@ pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
 
     let filter = EnvFilter::builder();
 
+    // We need to check if the env is present, because, although
+    // `EnvFilter::from_env()` says in it's docs that it will return an error
+    // if the env is not set, reading the source of the method reveals this is
+    // not true :(
     let filter = if std::env::var("RUST_LOG").is_ok() {
         println!("loaded logger directives from `RUST_LOG` env");
 
