@@ -303,8 +303,16 @@ impl Installer {
         .await?;
         let visited_ids = Arc::new(Mutex::new(Vec::new()));
         let task = Arc::new(Mutex::new(task));
-        self.install_inner(app, instance_id, &instance_path, &task, &visited_ids, install_deps, replaces_mod_id)
-            .await?;
+        self.install_inner(
+            app,
+            instance_id,
+            &instance_path,
+            &task,
+            &visited_ids,
+            install_deps,
+            replaces_mod_id,
+        )
+        .await?;
 
         Ok(task_id)
     }
@@ -398,9 +406,9 @@ impl Installer {
                 .await
                 .is_already_installed(app, instance_id)
                 .await?
-        {
-            return Ok(());
-        }
+            {
+                return Ok(());
+            }
 
             {
                 let mut lock = self.rollback_context.lock().await;
@@ -474,7 +482,8 @@ impl Installer {
 
                             let _ = instance.data_mut().expect("instance should still be valid");
                             let lock = inner.lock().await;
-                            let r = lock.finalize_install(&app_clone, instance_id, downloadable)
+                            let r = lock
+                                .finalize_install(&app_clone, instance_id, downloadable)
                                 .await;
 
                             if let (Ok(_), Some(id)) = (&r, replaces_mod_id) {

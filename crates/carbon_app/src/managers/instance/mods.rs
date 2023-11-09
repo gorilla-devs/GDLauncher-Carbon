@@ -225,7 +225,9 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .into_installer();
 
-        let task_id = installer.install(self.app, instance_id, install_deps, replaces_mod_id).await?;
+        let task_id = installer
+            .install(self.app, instance_id, install_deps, replaces_mod_id)
+            .await?;
 
         Ok(task_id)
     }
@@ -242,7 +244,9 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .into_installer();
 
-        let task_id = installer.install(self.app, instance_id, install_deps, replaces_mod_id).await?;
+        let task_id = installer
+            .install(self.app, instance_id, install_deps, replaces_mod_id)
+            .await?;
 
         Ok(task_id)
     }
