@@ -1,7 +1,7 @@
 import { createStore } from "solid-js/store";
 
 export type Log = {
-  line: string;
+  data: string;
   type_: string;
 };
 

@@ -92,7 +92,7 @@ const Logs = () => {
 
   const copyLogsToClipboard = () => {
     const joinedLines = instanceLogss()
-      .map((log) => log.line)
+      .map((log) => log.data)
       .join("");
 
     window.copyToClipboard(joinedLines);
@@ -178,7 +178,7 @@ const Logs = () => {
                   <div class="flex flex-col justify-center items-center w-full overflow-x-auto scrollbar-hide">
                     <pre class="m-0 w-full box-border leading-8">
                       <code class="text-darkSlate-50 text-sm select-text">
-                        {log?.line}
+                        {log?.data}
                       </code>
                     </pre>
                   </div>
