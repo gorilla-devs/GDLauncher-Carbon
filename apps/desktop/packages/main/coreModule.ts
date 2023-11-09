@@ -2,7 +2,8 @@ import path from "path";
 import os from "os";
 import { spawn } from "child_process";
 import type { ChildProcessWithoutNullStreams } from "child_process";
-import { app, ipcMain } from "electron";
+import { ipcMain } from "electron";
+import { CURRENT_RUNTIME_PATH } from "./runtimePath";
 
 export type Log = {
   type: "info" | "error";
@@ -46,7 +47,7 @@ const loadCoreModule: CoreModule = () =>
     try {
       coreModule = spawn(
         coreModulePath,
-        ["--runtime_path", app.getPath("userData")],
+        ["--runtime_path", CURRENT_RUNTIME_PATH!],
         {
           shell: false,
           detached: false,

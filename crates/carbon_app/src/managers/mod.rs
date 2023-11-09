@@ -48,7 +48,7 @@ pub const GDL_API_BASE: &str = env!("BASE_API");
 mod app {
     use tracing::error;
 
-    use crate::cache_middleware;
+    use crate::{cache_middleware, domain};
 
     use super::{
         java::JavaManager, metadata::cache::MetaCacheManager, metrics::MetricsManager,
@@ -169,8 +169,12 @@ mod app {
                 let _ = _app.clone().rich_presence_manager().start_presence().await;
             });
 
+            let _app = app.clone();
             tokio::spawn(async move {
                 let _ = reqwest::get(format!("{}/v1/announcement", GDL_API_BASE)).await;
+                _app.metrics_manager()
+                    .track_event(domain::metrics::Event::LauncherStarted)
+                    .await;
             });
 
             app
