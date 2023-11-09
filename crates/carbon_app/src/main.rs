@@ -21,6 +21,7 @@ pub mod domain;
 mod error;
 pub mod iridium_client;
 pub mod managers;
+mod platform;
 // mod pprocess_keepalive;
 mod logger;
 mod once_send;

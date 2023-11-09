@@ -1338,7 +1338,7 @@ async fn read_pipe(
         Ok(size) if size != 0 => {
             let utf8 = String::from_utf8_lossy(&buf[..size]);
 
-            let mut line_iter = utf8.split('\n').peekable();
+            let mut line_iter = utf8.split(crate::platform::LINE_ENDING).peekable();
 
             // Read and flush each line part into the line buffer above,
             // flushing the line buffer to the log once we hit a `'n`
