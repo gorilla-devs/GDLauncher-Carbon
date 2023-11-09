@@ -32,9 +32,7 @@ pub enum LogEntryLevel {
     Error,
 }
 
-/// A combinator that takes a parser `inner` and produces a parser
-/// that also consumes both leading and trailing whitespace, returning
-/// the output of `inner`.
+/// A combinator that removes whitespace before and after the `inner` parser.
 fn whitespace<'a, F: 'a, O, E: ParseError<&'a str>>(
     inner: F,
 ) -> impl FnMut(&'a str) -> IResult<&'a str, O, E>
