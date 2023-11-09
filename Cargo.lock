@@ -505,6 +505,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "carbon_parsing"
+version = "0.1.0"
+dependencies = [
+ "nom",
+]
+
+[[package]]
 name = "cc"
 version = "1.0.83"
 source = "registry+https://github.com/rust-lang/crates.io-index"
