@@ -28,7 +28,7 @@
     "build:mac-universal-prod": "cargo build -p carbon_app --profile=production --features production --target x86_64-apple-darwin && pnpm prepare-release:mac-x64-prod && cargo build -p carbon_app --profile=production --features production --target aarch64-apple-darwin && pnpm prepare-release:mac-arm64-prod && turbo run build -- --universal --mac -- --production",
     "------divider-utils------": "------divider------",
     "lint": "turbo run lint --filter @gd/desktop --filter @gd/ui",
-    "test": "turbo run test && cargo test",
+    "test": "turbo run test && cargo test --nocapture",
     "test-prod": "turbo run test --filter @gd/desktop",
     "lint-desktop": "turbo run lint --filter @gd/desktop",
     "rspc-bindings:generate": "cargo run -p carbon_app -- --generate-ts-bindings",
