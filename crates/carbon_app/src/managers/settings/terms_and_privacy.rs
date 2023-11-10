@@ -6,7 +6,7 @@ use serde::Serialize;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::{app_version::APP_VERSION, managers::GDL_API_BASE};
+use crate::managers::GDL_API_BASE;
 
 const BASE_GH_API_REPO_URL: &str = "https://api.github.com/repos/gorilla-devs/ToS-Privacy";
 const BASE_GH_REPO_URL: &str = "https://raw.githubusercontent.com/gorilla-devs/ToS-Privacy";
@@ -20,14 +20,14 @@ pub enum ConsentType {
 
 pub struct TermsAndPrivacy {
     latest_sha: Arc<Mutex<Option<String>>>,
-    reqwest_client: ClientWithMiddleware,
+    http_client: ClientWithMiddleware,
 }
 
 impl TermsAndPrivacy {
-    pub fn new(reqwest_client: ClientWithMiddleware) -> Self {
+    pub fn new(http_client: ClientWithMiddleware) -> Self {
         Self {
             latest_sha: Arc::new(Mutex::new(None)),
-            reqwest_client,
+            http_client,
         }
     }
 
@@ -67,7 +67,7 @@ impl TermsAndPrivacy {
         };
 
         let res = self
-            .reqwest_client
+            .http_client
             .post(&consent_url)
             .json(&body)
             .send()
@@ -84,7 +84,7 @@ impl TermsAndPrivacy {
 
     pub async fn update_latest_commit_sha(&self) -> anyhow::Result<String> {
         let response = self
-            .reqwest_client
+            .http_client
             .get(&format!("{BASE_GH_API_REPO_URL}/commits/master"))
             .send()
             .await?
@@ -112,7 +112,7 @@ impl TermsAndPrivacy {
         };
 
         let response = self
-            .reqwest_client
+            .http_client
             .get(format!(
                 "{}/{}/terms-of-service.md",
                 BASE_GH_REPO_URL, latest_sha
@@ -137,7 +137,7 @@ impl TermsAndPrivacy {
         };
 
         let response = self
-            .reqwest_client
+            .http_client
             .get(format!(
                 "{}/{}/privacy-statement.md",
                 BASE_GH_REPO_URL, latest_sha
