@@ -3,7 +3,6 @@ import fss from "fs";
 import path from "path";
 import fs from "fs/promises";
 import fse from "fs-extra";
-import coreModule from "./coreModule";
 
 export const RUNTIME_PATH_OVERRIDE_NAME = "runtime_path_override";
 const RUNTIME_PATH_DEFAULT_NAME = "data";
@@ -66,13 +65,6 @@ ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
   });
 
   await fs.writeFile(runtimeOverridePath, newPath);
-
-  try {
-    let _coreModule = await coreModule;
-    _coreModule.kill();
-  } catch {
-    // No op
-  }
 
   await fse.remove(CURRENT_RUNTIME_PATH!);
 

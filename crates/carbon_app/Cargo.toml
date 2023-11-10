@@ -70,6 +70,7 @@ serde-enum-str = "0.3.2"
 markdown = { workspace = true }
 ring = { workspace = true }
 num_cpus = { workspace = true }
+display-info = "0.4.3"
 # libc = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]

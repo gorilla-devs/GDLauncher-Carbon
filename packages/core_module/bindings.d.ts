@@ -165,6 +165,8 @@ export type FEManagedJavaVersion = { id: string; name: string; downloadUrl: stri
 
 export type FETaskId = number
 
+export type ExportTarget = "Curseforge"
+
 export type FEModResponse = { data: CFFEMod; pagination: CFFEPagination | null }
 
 export type FEVendor = "azul"
@@ -240,11 +242,7 @@ export type MRFEVersionIDs = string[]
 
 export type EnrollmentError = "deviceCodeExpired" | { xboxAccount: XboxError } | "noGameOwnership" | "noGameProfile"
 
-export type ExportArgs = { instance_id: FEInstanceId; target: ExportTarget; save_path: string; link_mods: boolean; filter: ExportEntry }
-
 export type Modpack = { Curseforge: CurseforgeModpack } | { Modrinth: ModrinthModpack }
-
-export type ExportEntry = { entries: { [key: string]: ExportEntry | null } }
 
 export type CreateInstanceVersion = { Version: GameVersion } | { Modpack: Modpack }
 
@@ -257,6 +255,8 @@ export type FEUnifiedSearchType = "mod" | "modPack"
 export type CFFEModLoaderType = "forge" | "neoforge" | "cauldron" | "liteLoader" | "fabric" | "quilt" | "unknown"
 
 export type MRFECategoriesResponse = MRFECategory[]
+
+export type ExportEntry = { entries: { [key: string]: ExportEntry | null } }
 
 export type FEInstanceId = number
 
@@ -354,6 +354,8 @@ export type FEModsResponse = { data: CFFEMod[]; pagination: CFFEPagination | nul
 
 export type MRFEDependencyType = "required" | "optional" | "incompatible" | "embedded"
 
+export type ExportArgs = { instance_id: FEInstanceId; target: ExportTarget; save_path: string; link_mods: boolean; filter: ExportEntry }
+
 export type Progress = "Indeterminate" | { Known: number } | { Failed: FeError }
 
 export type ModChannel = "Alpha" | "Beta" | "Stable"
@@ -407,8 +409,6 @@ export type CFFEFileStatus = "processing" | "changesRequired" | "underReview" | 
 export type LaunchState = { Inactive: { failed_task: FETaskId | null } } | { Preparing: FETaskId } | { Running: { start_time: string; log_id: number } }
 
 export type FEInstanceModloaderType = "neoforge" | "forge" | "fabric" | "quilt"
-
-export type ExportTarget = "Curseforge"
 
 export type UpdateInstance = { instance: FEInstanceId; name?: Set<string> | null; use_loaded_icon?: Set<boolean> | null; notes?: Set<string> | null; version?: Set<string> | null; modloader?: Set<ModLoader | null> | null; global_java_args?: Set<boolean> | null; extra_java_args?: Set<string | null> | null; memory?: Set<MemoryRange | null> | null }
 

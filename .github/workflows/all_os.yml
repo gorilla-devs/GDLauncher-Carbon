@@ -26,7 +26,7 @@ jobs:
           node-version: "18.16.0"
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.70.0
+          toolchain: 1.73.0
           targets: aarch64-apple-darwin, x86_64-apple-darwin
           components: clippy, rustfmt
       - name: Prepare
@@ -50,6 +50,7 @@ jobs:
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
+          GDL_AUTH: ${{ vars.GDL_AUTH }}
       - name: Lint
         run: pnpm lint
       - name: Clear target before tests to avoid folder getting too big
@@ -62,6 +63,7 @@ jobs:
           RUNTIME_PATH: ${{ vars.RUNTIME_PATH }}
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
+          GDL_AUTH: ${{ vars.GDL_AUTH }}
         run: pnpm test
   ubuntu_x64:
     defaults:
@@ -79,7 +81,7 @@ jobs:
           node-version: "18.16.0"
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.70.0
+          toolchain: 1.73.0
           targets: x86_64-unknown-linux-gnu
           components: clippy, rustfmt
       - name: Prepare
@@ -103,6 +105,7 @@ jobs:
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
+          GDL_AUTH: ${{ vars.GDL_AUTH }}
       - name: Lint
         run: pnpm lint
       - name: Clear target before tests to avoid folder getting too big
@@ -115,6 +118,7 @@ jobs:
           RUNTIME_PATH: ${{ vars.RUNTIME_PATH }}
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
+          GDL_AUTH: ${{ vars.GDL_AUTH }}
         run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test
   windows_x64:
     defaults:
@@ -132,7 +136,7 @@ jobs:
           node-version: "18.16.0"
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.70.0
+          toolchain: 1.73.0
           targets: x86_64-pc-windows-msvc
           components: clippy, rustfmt
       - name: Prepare
@@ -161,6 +165,7 @@ jobs:
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
+          GDL_AUTH: ${{ vars.GDL_AUTH }}
           CARGO_NET_GIT_FETCH_WITH_CLI: true
       - name: Lint
         shell: bash
@@ -177,5 +182,6 @@ jobs:
           RUNTIME_PATH: ${{ vars.RUNTIME_PATH }}
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
+          GDL_AUTH: ${{ vars.GDL_AUTH }}
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: pnpm test
