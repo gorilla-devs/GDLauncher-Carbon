@@ -16,6 +16,7 @@ use std::{
     sync::{Arc, Weak},
     time::{Duration, Instant},
 };
+use tracing::{debug, error, info, warn};
 
 use thiserror::Error;
 use tokio::sync::{Mutex, RwLock};
@@ -79,6 +80,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 SetActiveUuidError::AccountDoesNotExist(uuid)
             );
         }
+
+        info!("Set active account to {uuid:?}");
 
         self.app
             .settings_manager()
@@ -221,6 +224,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 ]),
             }
 
+            info!("Updating account information for {:?}", &account.uuid);
+
             self.app
                 .prisma_client
                 .account()
@@ -249,6 +254,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 ],
             };
 
+            info!("Creating account {:?}", &account.uuid);
+
             self.app
                 .prisma_client
                 .account()
@@ -270,6 +277,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
     pub async fn refresh_account(self, uuid: String) -> anyhow::Result<()> {
         use db::account::UniqueWhereParam;
 
+        info!("Refreshing account {uuid}");
+
         let account = self
             .app
             .prisma_client
@@ -280,12 +289,14 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .ok_or(RefreshAccountError::NoAccount)?;
 
         let Some(refresh_token) = &account.ms_refresh_token else {
+            warn!("No refresh token, aborting refresh for {uuid}");
             bail!(RefreshAccountError::NoRefreshToken)
         };
 
         // stays locked until we insert an enrollment task
         let mut refreshing = self.currently_refreshing.write().await;
         if refreshing.contains_key(&uuid) {
+            warn!("{uuid} is already being refreshed");
             bail!(RefreshAccountError::AlreadyRefreshing);
         }
 
@@ -306,12 +317,15 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
                 match &*status {
                     EnrollmentStatus::Complete(account) => {
-                        account_manager
-                            .add_account(account.clone().into())
-                            .await
-                            .expect(
-                            "db error, this can't be handled in the account invalidator right now",
-                        );
+                        let r = account_manager.add_account(account.clone().into()).await;
+
+                        match r {
+                            Ok(_) => info!("Refreshed account {}", &self.account.uuid),
+                            Err(e) => {
+                                error!({ error = ?e }, "Failed to update account information {}", &self.account.uuid)
+                            }
+                        }
+
                         drop(status);
                         refreshing.remove(&self.account.uuid);
                     }
@@ -323,7 +337,11 @@ impl<'s> ManagerRef<'s, AccountManager> {
                             ..
                         } = &self.account.type_
                         else {
-                            panic!("account type was not microsoft during refresh");
+                            error!(
+                                "account type was not microsoft during refresh for {}",
+                                &self.account.uuid
+                            );
+                            return;
                         };
 
                         account_manager.add_account(FullAccount {
@@ -398,6 +416,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
         match result {
             Ok(_) => {
+                info!("Deleted account {uuid}");
+
                 self.app.invalidate(GET_ACCOUNTS, None);
                 self.app.invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
 
@@ -428,6 +448,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     }
                 }
 
+                info!("Beginning account enrollment");
+
                 let active_enrollment =
                     EnrollmentTask::begin(client, Invalidator(AppRef(Arc::downgrade(self.app))));
 
@@ -441,6 +463,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
     pub async fn cancel_enrollment(self) -> anyhow::Result<()> {
         let enrollment = self.active_enrollment.write().await.take();
         self.app.invalidate(ENROLL_GET_STATUS, None);
+
+        info!("Canceling account enrollment");
 
         match enrollment {
             Some(_) => Ok(()),
@@ -497,6 +521,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
     ) -> anyhow::Result<()> {
         use db::account::{SetParam, UniqueWhereParam};
 
+        info!("Checking account status for {uuid}");
+
         let mut refresh_lock = match lock_refresh {
             true => Some(self.refreshloop_sleep.lock().await),
             false => None,
@@ -535,10 +561,13 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     .exec()
                     .await?;
 
+                info!("Auth token was invalid for {uuid}");
+
                 self.app.invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
                 return Ok(());
             }
             Ok(Err(GetProfileError::GameProfileMissing)) => {
+                info!("Game profile is missing for {uuid}");
                 bail!(GetProfileError::GameProfileMissing)
             }
             Err(e) => bail!(e),
@@ -561,8 +590,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .await?;
 
         if skin_changed {
-            self.app.invalidate(GET_HEAD, Some(uuid.into()));
+            self.app.invalidate(GET_HEAD, Some(uuid.clone().into()));
         }
+
+        debug!("Account {uuid} is valid");
 
         Ok(())
     }
@@ -634,10 +665,16 @@ impl AccountRefreshService {
                         .map(|(uuid, _)| uuid);
 
                     if let Some(uuid) = least_recently_checked {
-                        // ignore the result since we can't do anything if it failed.
-                        let _ = account_manager
+                        debug!("Checking least recently checked account {uuid} validity");
+
+                        let r = account_manager
                             .refresh_account_status(uuid.clone(), false)
                             .await;
+
+                        if let Err(e) = r {
+                            error!({ error = ?e }, "Failed to check account status for {uuid}");
+                        }
+
                         last_check_times.insert(uuid.clone(), Instant::now());
                     }
                 }
@@ -662,8 +699,16 @@ impl AccountRefreshService {
                         };
 
                         if token_expires < Utc::now() - chrono::Duration::hours(1) {
-                            // still can't handle errors
-                            let _ = account_manager.refresh_account(account.uuid).await;
+                            debug!(
+                                "Attempting to refresh access token for expired account {}",
+                                &account.uuid
+                            );
+                            let r = account_manager.refresh_account(account.uuid.clone()).await;
+
+                            if let Err(e) = r {
+                                error!({ error = ?e }, "Failed to refresh access token for {}", &account.uuid);
+                            }
+
                             break;
                         }
                     }

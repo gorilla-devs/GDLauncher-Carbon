@@ -24,7 +24,7 @@ pub enum FEMetricsEvent {
 impl From<FEMetricsEvent> for crate::domain::metrics::Event {
     fn from(event: FEMetricsEvent) -> Self {
         match event {
-            FEMetricsEvent::PageView(page_name) => Self::PageView { page_name },
+            FEMetricsEvent::PageView(page_url) => Self::PageView { page_url },
         }
     }
 }
