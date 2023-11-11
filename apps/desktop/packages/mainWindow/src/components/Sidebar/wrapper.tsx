@@ -1,11 +1,5 @@
 import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
-import {
-  createEffect,
-  createSignal,
-  JSXElement,
-  mergeProps,
-  Show
-} from "solid-js";
+import { createEffect, JSXElement, mergeProps, Show } from "solid-js";
 
 interface Props {
   children: JSXElement;

@@ -1,4 +1,4 @@
-import { JSXElement, Match, Show, Switch, createEffect } from "solid-js";
+import { JSXElement, Match, Show, Switch } from "solid-js";
 import { SpacingTab, TabType, useTabsContext } from "./Tabs";
 
 interface Props {
