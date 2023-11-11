@@ -92,22 +92,14 @@ mod app {
             let db_client = match prisma_client::load_and_migrate(runtime_path.clone()).await {
                 Ok(client) => Arc::new(client),
                 Err(prisma_client::DatabaseError::Migration(err)) => {
-                    eprintln!(
-                        "[_GDL_DB_MIGRATION_FAILED_]: Database migration failed: {}",
-                        err
-                    );
                     error!("Database migration failed: {}", err);
-                    std::process::exit(1);
+                    panic!("Database migration failed: {}", err);
                 }
                 Err(err) => {
                     error!("Database connection failed: {}", err);
-                    eprintln!("Database connection failed: {}", err);
-                    std::process::exit(1);
+                    panic!("Database connection failed: {}", err);
                 }
             };
-
-            // eprintln!("[_GDL_DB_MIGRATION_FAILED_]: Database migration failed");
-            // std::process::exit(1);
 
             let app = Arc::new(UnsafeCell::new(MaybeUninit::<AppInner>::uninit()));
             let unsaferef = UnsafeAppRef(Arc::downgrade(&app));
