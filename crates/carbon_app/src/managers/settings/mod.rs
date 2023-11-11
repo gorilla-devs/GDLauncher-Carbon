@@ -19,10 +19,10 @@ pub(crate) struct SettingsManager {
 }
 
 impl SettingsManager {
-    pub fn new(runtime_path: PathBuf, reqwest_client: ClientWithMiddleware) -> Self {
+    pub fn new(runtime_path: PathBuf, http_client: ClientWithMiddleware) -> Self {
         Self {
             runtime_path: runtime_path::RuntimePath::new(runtime_path),
-            terms_and_privacy: TermsAndPrivacy::new(reqwest_client),
+            terms_and_privacy: TermsAndPrivacy::new(http_client),
         }
     }
 }

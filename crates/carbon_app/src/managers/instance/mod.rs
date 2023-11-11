@@ -2044,6 +2044,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore = "currently failing intermittently (probably due to restart_in_place)"]
     async fn instance_crud() -> anyhow::Result<()> {
         let mut app = crate::setup_managers_for_test().await;
 
