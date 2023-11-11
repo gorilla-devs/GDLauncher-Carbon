@@ -1011,7 +1011,7 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
             };
 
             while let Ok(Some(entry)) = entries.next_entry().await {
-                trace!("scanning mods folder entry `{:?}`", entry.file_name());
+                // trace!("scanning mods folder entry `{:?}`", entry.file_name());
                 let file_name = entry.file_name();
                 let Some(mut utf8_name) = file_name.to_str() else {
                     continue;
@@ -1051,10 +1051,10 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                         // enabled probably shouldn't be here
                         if *real_size == entry.filesize as u64 && *enabled == entry.enabled {
                             modpaths.remove(&entry.filename);
-                            trace!(
-                                "up to data metadata entry for mod `{}`, skipping",
-                                &entry.filename
-                            );
+                            // trace!(
+                            //     "up to data metadata entry for mod `{}`, skipping",
+                            //     &entry.filename
+                            // );
                             continue;
                         }
 
