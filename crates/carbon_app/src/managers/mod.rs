@@ -48,7 +48,7 @@ pub const GDL_API_BASE: &str = env!("BASE_API");
 mod app {
     use tracing::error;
 
-    use crate::{cache_middleware, domain};
+    use crate::{cache_middleware, domain, iridium_client::get_client};
 
     use super::{
         java::JavaManager, metadata::cache::MetaCacheManager, metrics::MetricsManager,
@@ -92,46 +92,25 @@ mod app {
             let db_client = match prisma_client::load_and_migrate(runtime_path.clone()).await {
                 Ok(client) => Arc::new(client),
                 Err(prisma_client::DatabaseError::Migration(err)) => {
-                    eprintln!(
-                        "[_GDL_DB_MIGRATION_FAILED_]: Database migration failed: {}",
-                        err
-                    );
                     error!("Database migration failed: {}", err);
-                    std::process::exit(1);
+                    panic!("Database migration failed: {}", err);
                 }
                 Err(err) => {
                     error!("Database connection failed: {}", err);
-                    eprintln!("Database connection failed: {}", err);
-                    std::process::exit(1);
+                    panic!("Database connection failed: {}", err);
                 }
             };
-
-            // eprintln!("[_GDL_DB_MIGRATION_FAILED_]: Database migration failed");
-            // std::process::exit(1);
 
             let app = Arc::new(UnsafeCell::new(MaybeUninit::<AppInner>::uninit()));
             let unsaferef = UnsafeAppRef(Arc::downgrade(&app));
 
-            // SAFETY: cannot be used until after the ref is initialized.
-            let client = reqwest::Client::builder()
-                .user_agent(format!(
-                    "{} {}",
-                    env!("USER_AGENT_PREFIX"),
-                    env!("APP_VERSION")
-                ))
-                .build()
-                .unwrap();
-
-            let reqwest = cache_middleware::new_client(
-                unsaferef.clone(),
-                reqwest_middleware::ClientBuilder::new(client),
-            );
+            let http_client = cache_middleware::new_client(unsaferef.clone(), get_client());
 
             let app = unsafe {
                 let inner = Arc::into_raw(app);
 
                 (*inner).get().write(MaybeUninit::new(AppInner {
-                    settings_manager: SettingsManager::new(runtime_path, reqwest.clone()),
+                    settings_manager: SettingsManager::new(runtime_path, http_client.clone()),
                     java_manager: JavaManager::new(),
                     minecraft_manager: MinecraftManager::new(),
                     account_manager: AccountManager::new(),
@@ -139,9 +118,12 @@ mod app {
                     download_manager: DownloadManager::new(),
                     instance_manager: InstanceManager::new(),
                     meta_cache_manager: MetaCacheManager::new(),
-                    metrics_manager: MetricsManager::new(Arc::clone(&db_client)),
+                    metrics_manager: MetricsManager::new(
+                        Arc::clone(&db_client),
+                        http_client.clone(),
+                    ),
                     invalidation_channel,
-                    reqwest_client: reqwest,
+                    reqwest_client: http_client.clone(),
                     prisma_client: Arc::clone(&db_client),
                     task_manager: VisualTaskManager::new(),
                     system_info_manager: SystemInfoManager::new(),
@@ -170,9 +152,14 @@ mod app {
             });
 
             let _app = app.clone();
+            let http_client = http_client.clone();
             tokio::spawn(async move {
-                let _ = reqwest::get(format!("{}/v1/announcement", GDL_API_BASE)).await;
-                _app.metrics_manager()
+                let _ = http_client
+                    .get(format!("{}/v1/announcement", GDL_API_BASE))
+                    .send()
+                    .await;
+                let _ = _app
+                    .metrics_manager()
                     .track_event(domain::metrics::Event::LauncherStarted)
                     .await;
             });
