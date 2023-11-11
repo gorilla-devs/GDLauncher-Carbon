@@ -8,10 +8,10 @@ import FirstStep from "./FirstStep";
 import { useTransContext } from "@gd/i18n";
 import mcCubes from "/assets/images/icons/mc-cubes.png";
 
+const [currentStep, setCurrentStep] = createSignal(0);
+export { currentStep, setCurrentStep };
 const OnBoarding = (props: ModalProps) => {
   const [t] = useTransContext();
-
-  const [currentStep, setCurrentStep] = createSignal(0);
 
   const onBoardingSteps = [
     {

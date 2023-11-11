@@ -94,7 +94,7 @@ export default function Login() {
             }}
             class="absolute left-0 right-0 bg-darkSlate-800 bottom-0 top-0 opacity-80"
           />
-          <div class="absolute top-0 z-10 left-1/2 -translate-x-1/2 top-5">
+          <div class="fixed right-6 bottom-6">
             <Dropdown
               value={routeData.settings.data?.language}
               options={Object.keys(supportedLanguages).map((lang) => ({

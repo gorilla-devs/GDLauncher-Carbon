@@ -487,7 +487,10 @@ impl Installer {
                                 .await;
 
                             if let (Ok(_), Some(id)) = (&r, replaces_mod_id) {
-                                app.instance_manager().delete_mod(instance_id, id).await?;
+                                app_clone
+                                    .instance_manager()
+                                    .delete_mod(instance_id, id)
+                                    .await?;
                             }
 
                             r

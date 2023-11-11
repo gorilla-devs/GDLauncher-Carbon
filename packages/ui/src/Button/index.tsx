@@ -82,9 +82,11 @@ const getVariant = (
   const variants = {
     primary: {
       ...commonStyle,
-      [`bg-${variant}-500`]: true,
-      [`hover:bg-${variant}-300`]: true,
-      "filter brightness-75": isDisabled,
+      [`${!isDisabled ? `bg-${variant}-500` : "bg-[#1D2028]"}`]: true,
+      [`${!isDisabled ? `hover:bg-${variant}-300` : `hover:bg-[#535c70]`}`]:
+        true,
+      // "filter brightness-75": isDisabled,
+      "text-[#404759]": isDisabled,
       "border-0": true,
     },
     secondary: {
@@ -112,8 +114,8 @@ const getVariant = (
       ...commonStyle,
       [`bg-${variant}-500`]: !isDisabled,
       [`drop-shadow-[0_0px_12px_var(--${variant}-500)]`]: !isDisabled,
-      "bg-darkSlate-500": isDisabled,
-      "text-darkSlate-50": isDisabled,
+      "bg-[#404759]": isDisabled,
+      "text-[#8A8B8F]": isDisabled,
       "border-0": true,
     },
     transparent: {

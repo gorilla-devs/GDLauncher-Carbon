@@ -20,3 +20,10 @@ export const Checked: Story = {
     disabled: false,
   },
 };
+export const WithTitle: Story = {
+  args: {
+    checked: true,
+    disabled: false,
+    title: "Checkbox",
+  },
+};
