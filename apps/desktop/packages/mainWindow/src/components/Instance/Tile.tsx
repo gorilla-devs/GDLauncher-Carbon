@@ -194,9 +194,9 @@ const Tile = (props: Props) => {
               }
             }}
           >
-            <div class="relative rounded-2xl overflow-hidden h-38 w-38 border-1 border-solid border-darkSlate-600 hover:shadow-md hover:shadow-gray-300">
+            <div class="relative rounded-2xl overflow-hidden h-38 w-38 border-1 border-solid border-darkSlate-600">
               <div
-                class="flex justify-center relative items-center rounded-2xl overflow-hidden h-38 w-38 bg-cover bg-center max-w-38 "
+                class="flex justify-center relative items-center rounded-2xl overflow-hidden h-38 w-38 bg-cover bg-center max-w-38 hover:bg-darkSlate-600 hover:opacity-50"
                 classList={{
                   grayscale: props.isLoading || isInQueue(),
                   "cursor-pointer":
