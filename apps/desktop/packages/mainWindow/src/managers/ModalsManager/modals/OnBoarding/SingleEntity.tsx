@@ -195,7 +195,11 @@ const SingleEntity = (props: {
                 <Match when={typeof instance.multiResult !== "undefined"}>
                   <div class="h-full p-2 w-full flex flex-col gap-4">
                     <Checkbox
-                      children={<span class="text-sm">select all</span>}
+                      children={
+                        <span class="text-sm">
+                          {t("instance.select_all_mods")}
+                        </span>
+                      }
                       checked={instances().length !== 0}
                       onChange={(e) => {
                         if (e) {
