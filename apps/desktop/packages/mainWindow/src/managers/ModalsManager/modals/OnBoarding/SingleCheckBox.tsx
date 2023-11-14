@@ -31,10 +31,12 @@ const SingleCheckBox = (props: Props) => {
       }
     }
   });
-
+  createEffect(() => {
+    instances();
+  });
   return (
     <Checkbox
-      title={props.title}
+      children={<span class="text-sm">{props.title}</span>}
       checked={instances().find((e: any) => e === props.title)}
       onChange={setChecked}
     />

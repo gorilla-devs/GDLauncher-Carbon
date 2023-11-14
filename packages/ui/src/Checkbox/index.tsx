@@ -2,14 +2,15 @@ import { createEffect, createSignal, Show } from "solid-js";
 
 interface Props {
   checked?: boolean;
+  indeterminate?: boolean;
   disabled?: boolean;
   onChange?: (_checked: boolean) => void;
-  title?: string;
-  titleStyle?: string;
+  children?: any;
 }
 
 function Checkbox(props: Props) {
   const isChecked = () => props.checked;
+
   // eslint-disable-next-line solid/reactivity
   const [checked, setChecked] = createSignal(isChecked());
 
@@ -33,7 +34,7 @@ function Checkbox(props: Props) {
           }
         }}
       >
-        <Show when={checked()}>
+        <Show when={checked() && !props.indeterminate}>
           <div
             class="i-ri:check-line text-white animate-bounce-scale"
             classList={{
@@ -42,10 +43,11 @@ function Checkbox(props: Props) {
             }}
           />
         </Show>
+        <Show when={checked() && props.indeterminate}>
+          <div class="h-7 w-7 min-w-7 min-h-7 rounded-md -z-10 opacity-20 bg-light-300" />
+        </Show>
       </div>
-      <Show when={props.title}>
-        <span class={props.titleStyle}>{props.title}</span>
-      </Show>
+      <Show when={props.children}>{props.children}</Show>
     </div>
   );
 }
