@@ -7,6 +7,7 @@ use tokio::sync::{watch, RwLock};
 use tracing::debug;
 
 use crate::{
+    api::keys::instance::*,
     api::translation::Translation,
     domain::vtask::VisualTaskId,
     managers::{AppInner, ManagerRef},
@@ -74,13 +75,27 @@ impl ManagerRef<'_, InstanceImportManager> {
                         .write()
                         .await = Some((true, scanner.clone()));
 
+                    app.invalidate(GET_IMPORT_SCAN_STATUS, None);
+
                     let fut = async {
                         let r = scanner.scan(&app, path.clone()).await;
+
+                        {
+                            let import_manager = app.instance_manager().import_manager();
+
+                            let mut scanner = import_manager.scanner.write().await;
+
+                            if let Some((scanning, _)) = &mut *scanner {
+                                *scanning = false;
+                            }
+                        }
 
                         if let Err(e) = r {
                             tracing::error!({ error = ?e }, "instance scanning failed for path {path:?}");
                         }
                     };
+
+                    app.invalidate(GET_IMPORT_SCAN_STATUS, None);
 
                     let target_changed = async {
                         while rx.changed().await.is_ok() {
@@ -109,16 +124,13 @@ impl ManagerRef<'_, InstanceImportManager> {
         }
     }
 
-    pub async fn begin_import(self, index: u32) -> anyhow::Result<VisualTaskId> {
+    pub async fn begin_import(
+        self,
+        index: u32,
+        name: Option<String>,
+    ) -> anyhow::Result<VisualTaskId> {
         match self.scanner.read().await.as_ref() {
-            Some((_, scanner)) => Ok(scanner.begin_import(self.app, index).await?),
-            None => Err(anyhow!("scan target is not set")),
-        }
-    }
-
-    pub async fn get_scan_path(self) -> anyhow::Result<Option<PathBuf>> {
-        match self.scanner.read().await.as_ref() {
-            Some((_, scanner)) => Ok(scanner.get_default_scan_path(self.app).await?),
+            Some((_, scanner)) => Ok(scanner.begin_import(self.app, index, name).await?),
             None => Err(anyhow!("scan target is not set")),
         }
     }
@@ -136,10 +148,10 @@ impl<'a> ManagerRef<'a, InstanceManager> {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, EnumIter, Eq, PartialEq)]
 pub enum Entity {
     LegacyGDLauncher,
-    MRPack,
-    Modrinth,
     CurseForgeZip,
     CurseForge,
+    MRPack,
+    Modrinth,
     ATLauncher,
     Technic,
     FTB,
@@ -148,9 +160,16 @@ pub enum Entity {
 }
 
 impl Entity {
-    pub fn get_available() -> Vec<Self> {
+    pub fn list() -> Vec<(Self, bool)> {
         use strum::IntoEnumIterator;
-        Self::iter().collect()
+
+        const SUPPORT: [Entity; 3] = [
+            Entity::LegacyGDLauncher,
+            Entity::CurseForgeZip,
+            Entity::MRPack,
+        ];
+
+        Self::iter().map(|v| (v, SUPPORT.contains(&v))).collect()
     }
 
     pub fn create_importer(self) -> Arc<dyn InstanceImporter> {
@@ -160,6 +179,13 @@ impl Entity {
             Self::MRPack => Arc::new(ModrinthArchiveImporter::new()),
             _ => todo!(),
         }
+    }
+
+    pub fn get_default_scan_path(self) -> anyhow::Result<Option<PathBuf>> {
+        Ok(match self {
+            Self::LegacyGDLauncher => Some(LegacyGDLauncherImporter::get_default_scan_path()?),
+            _ => None,
+        })
     }
 }
 
@@ -195,9 +221,13 @@ pub struct FullImportScanStatus {
 #[async_trait::async_trait]
 pub trait InstanceImporter: std::fmt::Debug + Send + Sync {
     async fn scan(&self, app: &Arc<AppInner>, scan_path: PathBuf) -> anyhow::Result<()>;
-    async fn get_default_scan_path(&self, app: &Arc<AppInner>) -> anyhow::Result<Option<PathBuf>>;
     async fn get_status(&self) -> ImportScanStatus;
-    async fn begin_import(&self, app: &Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId>;
+    async fn begin_import(
+        &self,
+        app: &Arc<AppInner>,
+        index: u32,
+        name: Option<String>,
+    ) -> anyhow::Result<VisualTaskId>;
 }
 
 #[derive(Debug, Clone)]
