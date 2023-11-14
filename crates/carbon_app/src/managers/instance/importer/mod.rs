@@ -181,9 +181,11 @@ impl Entity {
         }
     }
 
-    pub fn get_default_scan_path(self) -> anyhow::Result<Option<PathBuf>> {
+    pub async fn get_default_scan_path(self) -> anyhow::Result<Option<PathBuf>> {
         Ok(match self {
-            Self::LegacyGDLauncher => Some(LegacyGDLauncherImporter::get_default_scan_path()?),
+            Self::LegacyGDLauncher => {
+                Some(LegacyGDLauncherImporter::get_default_scan_path().await?)
+            }
             _ => None,
         })
     }

@@ -287,7 +287,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
         query GET_IMPORT_ENTITY_DEFAULT_PATH[_, entity: ImportEntity] {
             importer::Entity::from(entity)
-                .get_default_scan_path()
+                .get_default_scan_path().await
         }
 
         mutation SET_IMPORT_SCAN_TARGET[app, target: (ImportEntity, String)] {
