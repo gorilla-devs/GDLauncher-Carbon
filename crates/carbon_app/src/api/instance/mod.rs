@@ -282,16 +282,17 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         query GET_IMPORTABLE_ENTITIES[_, _args: ()] {
             anyhow::Result::Ok(importer::Entity::list()
                 .into_iter()
-                .map(|(e, support)| ImportEntityStatus {
+                .map(|(e, support, selection_type)| ImportEntityStatus {
                     entity: ImportEntity::from(e),
                     supported: support,
+                    selection_type: ImportEntitySelectionType::from(selection_type),
                 })
                 .collect::<Vec<_>>())
         }
 
         query GET_IMPORT_ENTITY_DEFAULT_PATH[_, entity: ImportEntity] {
             importer::Entity::from(entity)
-                .get_default_scan_path()
+                .get_default_scan_path().await
         }
 
         mutation SET_IMPORT_SCAN_TARGET[app, target: (ImportEntity, String)] {
@@ -311,7 +312,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .import_manager()
                 .scan_status()
                 .await
-                .map(|status| FullImportScanStatus::from(status))
+                .map(FullImportScanStatus::from)
         }
 
         mutation IMPORT_INSTANCE[app, req: ImportRequest] {
@@ -319,7 +320,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .import_manager()
                 .begin_import(req.index, req.name)
                 .await
-                .map(|task| FETaskId::from(task))
+                .map(FETaskId::from)
         }
     }
 }
@@ -883,9 +884,26 @@ struct FullImportScanStatus {
 }
 
 #[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+enum ImportEntitySelectionType {
+    File,
+    Directory,
+}
+
+impl From<importer::SelectionType> for ImportEntitySelectionType {
+    fn from(value: importer::SelectionType) -> Self {
+        match value {
+            importer::SelectionType::File => Self::File,
+            importer::SelectionType::Directory => Self::Directory,
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize)]
 struct ImportEntityStatus {
     entity: ImportEntity,
     supported: bool,
+    selection_type: ImportEntitySelectionType,
 }
 
 #[derive(Type, Debug, Deserialize)]
