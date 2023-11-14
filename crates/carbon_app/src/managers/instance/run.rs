@@ -1008,7 +1008,7 @@ impl ManagerRef<'_, InstanceManager> {
                         _ = child.wait() => {},
                         _ = kill_rx.recv() => drop(child.kill().await),
                         // infallible, canceled by the above tasks
-                        _ = read_logs(&log, stdout, stderr) => {},
+                        _ = read_logs(&log, &mut stdout,&mut  stderr) => {},
                         _ = update_playtime => {}
                     }
 
@@ -1289,8 +1289,8 @@ mod test {
 /// Reads `stdout` and `stderr`, sending each whole line to the log.
 async fn read_logs(
     log: &watch::Sender<GameLog>,
-    mut stdout: tokio::process::ChildStdout,
-    mut stderr: tokio::process::ChildStderr,
+    mut stdout: impl AsyncReadExt + Unpin,
+    mut stderr: impl AsyncReadExt + Unpin,
 ) {
     let mut stdout_line_buf = String::with_capacity(1024);
     let mut stderr_line_buf = String::with_capacity(1024);
@@ -1329,7 +1329,7 @@ async fn read_logs(
 async fn read_pipe(
     log: &watch::Sender<GameLog>,
     kind: EntryType,
-    pipe: &mut (impl AsyncReadExt + Unpin),
+    mut pipe: impl AsyncReadExt + Unpin,
     line_buf: &mut String,
 ) -> bool {
     let mut buf = [0; 1024];
@@ -1379,5 +1379,81 @@ async fn read_pipe(
 
             true
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn setup() -> (EntryType, watch::Sender<GameLog>, String) {
+        let kind = EntryType::StdOut;
+
+        let (log, _) = watch::channel(Default::default());
+
+        let mut line_buf = String::new();
+
+        (kind, log, line_buf)
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn unterminated_line() {
+        let (kind, log, mut line_buf) = setup();
+
+        let pipe = "I am a single line";
+
+        let modified = read_pipe(&log, kind, pipe.as_bytes(), &mut line_buf).await;
+
+        assert_eq!(line_buf, pipe);
+        assert!(!modified);
+        assert!(log.borrow().get_span(..).is_empty());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn single_line() {
+        let (kind, log, mut line_buf) = setup();
+
+        let pipe = format!("I am a single line{}", crate::platform::LINE_ENDING);
+
+        let modified = read_pipe(&log, kind, pipe.as_bytes(), &mut line_buf).await;
+
+        assert_eq!(line_buf, "");
+        assert!(modified);
+        assert_eq!(log.borrow().get_span(..).len(), 1);
+        assert_eq!(
+            log.borrow().get_line(0).unwrap().data,
+            pipe.split_once(crate::platform::LINE_ENDING).unwrap().0
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn two_lines_and_a_bit_more() {
+        let (kind, log, mut line_buf) = setup();
+
+        let pipe = format!(
+            "I am a single line{ln}\
+             I am a second line{ln}\
+             I am a bit more",
+            ln = crate::platform::LINE_ENDING
+        );
+
+        let modified = read_pipe(&log, kind, pipe.as_bytes(), &mut line_buf).await;
+
+        assert_eq!(
+            line_buf,
+            pipe.split(crate::platform::LINE_ENDING).last().unwrap()
+        );
+        assert!(modified);
+        assert_eq!(log.borrow().get_span(..).len(), 2);
+        assert_eq!(
+            log.borrow()
+                .get_span(..)
+                .iter()
+                .map(|entry| &entry.data)
+                .collect::<Vec<_>>(),
+            pipe.split(crate::platform::LINE_ENDING)
+                .take(2)
+                .collect::<Vec<_>>()
+        );
     }
 }
