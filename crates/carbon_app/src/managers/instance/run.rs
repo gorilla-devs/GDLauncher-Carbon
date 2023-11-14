@@ -1278,7 +1278,7 @@ mod test {
             let new_lines = log.get_span(idx..);
             idx = log.len();
             for line in new_lines {
-                tracing::info!("[{:?}]: {}", line.type_, line.text);
+                tracing::info!("[{:?}]: {}", line.kind, line.data);
             }
         }
 

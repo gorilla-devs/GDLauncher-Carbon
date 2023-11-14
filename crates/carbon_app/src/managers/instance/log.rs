@@ -139,102 +139,51 @@ pub struct InvalidGameLogIdError;
 
 #[cfg(test)]
 mod test {
-    use super::{EntryType, GameLog, LogEntry};
+    use super::*;
 
     #[test]
-    fn push() {
+    fn span() {
         let mut log = GameLog::new();
-        log.push(EntryType::StdOut, "testing\n");
-        assert_eq!(
-            log.get_entry(0),
-            Some(LogEntry {
-                kind: EntryType::StdOut,
-                entry_number: 0,
-                data: "testing"
-            }),
-        );
-    }
 
-    #[test]
-    fn region() {
-        let mut log = GameLog::new();
-        log.push(EntryType::StdOut, "testing1\n");
-        log.push(EntryType::StdOut, "testing2\n");
-        assert_eq!(
-            log.get_span(..),
-            vec![
-                LogEntry {
-                    kind: EntryType::StdOut,
-                    entry_number: 0,
-                    data: "testing1"
-                },
-                LogEntry {
-                    kind: EntryType::StdOut,
-                    entry_number: 1,
-                    data: "testing2"
-                },
-            ],
-        );
-    }
+        log.add_new_line(EntryType::StdOut, "item 1");
+        log.add_new_line(EntryType::StdOut, "item 2");
+        log.add_new_line(EntryType::StdOut, "item 3");
+        log.add_new_line(EntryType::StdOut, "item 4");
 
-    #[test]
-    fn line_merging() {
-        let mut log = GameLog::new();
-        log.push(EntryType::StdOut, "testing1");
-        log.push(EntryType::StdOut, "testing2\n");
-        assert_eq!(
-            log.get_entry(0),
-            Some(LogEntry {
-                kind: EntryType::StdOut,
-                entry_number: 0,
-                data: "testing1testing2"
-            }),
-        );
+        // Test each kind of range
 
-        log.push(EntryType::StdOut, "testing3");
-        log.push(EntryType::StdErr, "testing4\n");
-        assert_eq!(
-            log.get_span(..),
-            vec![
-                LogEntry {
-                    kind: EntryType::StdOut,
-                    entry_number: 0,
-                    data: "testing1testing2"
-                },
-                LogEntry {
-                    kind: EntryType::StdOut,
-                    entry_number: 1,
-                    data: "testing3"
-                },
-                LogEntry {
-                    kind: EntryType::StdErr,
-                    entry_number: 2,
-                    data: "testing4"
-                },
-            ],
-        );
-    }
+        #[track_caller]
+        fn test_span<R, const N: usize>(log: &GameLog, range: R, expected: [&str; N])
+        where
+            R: std::ops::RangeBounds<usize>,
+        {
+            let span = log
+                .get_span(range)
+                .iter()
+                .map(|entry| &entry.data)
+                .collect::<Vec<_>>();
 
-    #[test]
-    fn multiline_entry() {
-        let mut log = GameLog::new();
-        log.push(EntryType::StdOut, "testing1\ntesting2\n");
+            assert_eq!(span, expected);
+        }
 
-        let entry = LogEntry {
-            kind: EntryType::StdOut,
-            entry_number: 0,
-            data: "testing1\ntesting2",
-        };
+        // ..
+        test_span(&log, .., ["item 1", "item 2", "item 3", "item 4"]);
 
-        assert_eq!(log.get_entry(0), Some(entry));
-        assert_eq!(log.get_entry(1), Some(entry));
-        assert_eq!(log.get_span(..), vec![entry]);
-        assert_eq!(log.get_span(..2), vec![entry]);
-        assert_eq!(log.get_span(..=1), vec![entry]);
-        assert_eq!(log.get_span(0..), vec![entry]);
-        assert_eq!(log.get_span(0..2), vec![entry]);
-        assert_eq!(log.get_span(0..=1), vec![entry]);
-        assert_eq!(log.get_span(0..1), vec![entry]);
-        assert_eq!(log.get_span(1..2), vec![entry]);
+        // a..
+        test_span(&log, 1.., ["item 2", "item 3", "item 4"]);
+        test_span(&log, 3.., ["item 4"]);
+        test_span(&log, 5.., []);
+
+        //  ..b
+        test_span(&log, ..5, ["item 1", "item 2", "item 3", "item 4"]);
+        test_span(&log, ..=3, ["item 1", "item 2", "item 3", "item 4"]);
+        test_span(&log, ..3, ["item 1", "item 2", "item 3"]);
+        test_span(&log, ..0, []);
+
+        // a..b
+        test_span(&log, 1..1, []);
+        test_span(&log, 1..0, []);
+        test_span(&log, 1..2, ["item 2"]);
+        test_span(&log, 1..=3, ["item 2", "item 3", "item 4"]);
     }
 }
