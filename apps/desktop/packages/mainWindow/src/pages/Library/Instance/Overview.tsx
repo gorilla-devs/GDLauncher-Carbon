@@ -20,6 +20,7 @@ const Overview = () => {
               (routeData.instanceDetails.data as InstanceDetails).version || ""
             }
             icon="vanilla"
+            class="flex-1"
           />
         </Show>
         <Show when={routeData.instanceDetails.data?.modloaders}>
@@ -34,11 +35,13 @@ const Overview = () => {
                   title={`Modloader ${index() || ""}`}
                   text={modloader.type_}
                   icon="book"
+                  class="flex-1"
                 />
                 <Card
                   title={`Modloader ${index() || ""} version`}
                   text={modloader.version}
                   icon="pickaxe"
+                  class="flex-1"
                 />
               </>
             )}
@@ -55,6 +58,7 @@ const Overview = () => {
             title={t("instance.overview_card_mods_title")}
             text={routeData.instanceMods.data?.length || 0}
             icon="cart"
+            class="flex-1"
           />
         </Show>
         <Show when={routeData.instanceDetails.data?.seconds_played}>
@@ -67,6 +71,7 @@ const Overview = () => {
               Date.now()
             )}
             icon="clock"
+            class="flex-1"
           />
         </Show>
         <Show when={routeData.instanceDetails.data?.last_played}>
@@ -80,6 +85,7 @@ const Overview = () => {
               "PPP"
             )}
             icon="sign"
+            class="flex-1"
           />
         </Show>
       </div>

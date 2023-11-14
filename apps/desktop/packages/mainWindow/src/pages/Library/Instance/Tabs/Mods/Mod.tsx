@@ -4,7 +4,7 @@ import { getForgeModloaderIcon } from "@/utils/sidebar";
 import { Mod as ModType } from "@gd/core_module/bindings";
 import { Checkbox, Switch } from "@gd/ui";
 import { useLocation, useParams } from "@solidjs/router";
-import { SetStoreFunction } from "solid-js/store";
+import { SetStoreFunction, produce } from "solid-js/store";
 import { For, Show, createResource } from "solid-js";
 import { fetchModImage, getModpackPlatformIcon } from "@/utils/instances";
 
@@ -44,17 +44,29 @@ const Mod = (props: Props) => {
   const isCurseForge = () => props.mod.curseforge;
 
   return (
-    <div class="w-full h-14 flex items-center py-2 box-border">
-      <div class="flex gap-4 justify-between items-center w-full">
+    <div
+      class="w-full flex items-center py-2 px-6 box-border h-14 group hover:bg-darkSlate-700"
+      onClick={() => {
+        props.setSelectedMods(
+          produce((draft) => {
+            if (!draft[props.mod.id]) draft[props.mod.id] = true;
+            else delete draft[props.mod.id];
+          })
+        );
+      }}
+    >
+      <div class="flex justify-between items-center w-full gap-4">
         <div class="flex gap-4 justify-between items-center">
-          <Checkbox
-            checked={props.selectMods[props.mod.id]}
-            onChange={(e) => {
-              props.setSelectedMods(props.mod.id, e);
+          <div
+            class="opacity-0 group-hover:opacity-100 transition-opacity duration-100 ease-in-out"
+            classList={{
+              "opacity-100": props.selectMods[props.mod.id]
             }}
-          />
+          >
+            <Checkbox checked={props.selectMods[props.mod.id]} />
+          </div>
           <div class="flex items-center gap-2">
-            <div class="h-10 w-10 rounded-xl border-solid border-darkSlate-500 overflow-hidden flex items-center justify-center border">
+            <div class="flex items-center justify-center h-10 w-10 rounded-xl border-solid overflow-hidden border-darkSlate-500 border">
               <Show
                 when={imageResource()}
                 fallback={
@@ -101,15 +113,6 @@ const Mod = (props: Props) => {
         </div>
         <span class="flex gap-4 justify-center items-center">
           {/* //TODO: ADD CONFIRMATION MODAL */}
-          <div
-            class="text-2xl text-darkSlate-500 duration-100 ease-in-out cursor-pointer transition-color hover:text-red-500 i-ri:delete-bin-2-fill"
-            onClick={() => {
-              deleteModMutation.mutate({
-                instance_id: parseInt(params.id, 10),
-                mod_id: props.mod.id
-              });
-            }}
-          />
           <Switch
             checked={props.mod.enabled}
             onChange={(e) => {
@@ -125,6 +128,24 @@ const Mod = (props: Props) => {
                   mod_id: props.mod.id
                 });
               }
+            }}
+          />
+          <div
+            class="text-2xl text-darkSlate-500 duration-100 ease-in-out cursor-pointer transition-color hover:text-white i-ri:arrow-left-right-fill"
+            onClick={() => {
+              deleteModMutation.mutate({
+                instance_id: parseInt(params.id, 10),
+                mod_id: props.mod.id
+              });
+            }}
+          />
+          <div
+            class="text-2xl text-darkSlate-500 duration-100 ease-in-out cursor-pointer i-ri:delete-bin-2-fill transition-color hover:text-red-500"
+            onClick={() => {
+              deleteModMutation.mutate({
+                instance_id: parseInt(params.id, 10),
+                mod_id: props.mod.id
+              });
             }}
           />
         </span>

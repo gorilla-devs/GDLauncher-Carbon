@@ -54,6 +54,7 @@ const Instance = () => {
   const location = useLocation();
   const [editableName, setEditableName] = createSignal(false);
   const [isFavorite, setIsFavorite] = createSignal(false);
+  const [tabsTranslate, setTabsTranslate] = createSignal(0);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const [newName, setNewName] = createSignal(
     routeData.instanceDetails.data?.name || ""
@@ -68,6 +69,11 @@ const Instance = () => {
 
   const [t] = useTransContext();
   const modalsContext = useModal();
+  let backButtonRef: HTMLSpanElement;
+
+  onMount(() => {
+    setTabsTranslate(-backButtonRef.offsetWidth);
+  });
 
   const setFavoriteMutation = rspc.createMutation(["instance.setFavorite"], {
     onMutate: async (
@@ -152,7 +158,8 @@ const Instance = () => {
       ? [
           {
             label: "Mods",
-            path: `/library/${params.id}/mods`
+            path: `/library/${params.id}/mods`,
+            noPadding: true
           }
         ]
       : []),
@@ -343,17 +350,23 @@ const Instance = () => {
   return (
     <main
       id="main-container-instance-details"
-      class="relative h-full bg-darkSlate-800 overflow-x-hidden flex flex-col"
+      class="h-full bg-darkSlate-800 flex flex-col relative overflow-x-hidden"
       onScroll={() => {
         const rect = refStickyTabs.getBoundingClientRect();
         setIsSticky(rect.top <= 104);
+        // TODO FIX ME
+        if (rect.top <= 104) {
+          setTabsTranslate(0);
+        } else {
+          setTabsTranslate(-backButtonRef.offsetWidth);
+        }
       }}
     >
       <header
         ref={(el) => {
           headerRef = el;
         }}
-        class="relative flex flex-col justify-between ease-in-out transition-all items-stretch ease-in-out bg-cover bg-center min-h-60 transition-100"
+        class="relative flex flex-col justify-between ease-in-out transition-all ease-in-out items-stretch bg-cover bg-center min-h-60 transition-100"
         style={{
           transition: "height 0.2s",
           "background-image": imageUrl()
@@ -369,15 +382,10 @@ const Instance = () => {
               size="small"
               type="transparent"
             >
-              <Trans
-                key="instance.step_back"
-                options={{
-                  defaultValue: "Back"
-                }}
-              />
+              <Trans key="instance.step_back" />
             </Button>
           </div>
-          <div class="flex justify-center sticky h-24 top-52 z-20 w-full bg-gradient-to-t from-darkSlate-800 pb-2 box-border px-6">
+          <div class="flex justify-center sticky w-full bg-gradient-to-t from-darkSlate-800 box-border px-6 h-24 top-52 z-20 pb-2">
             <div class="flex w-full justify-start">
               <div class="flex justify-between w-full items-end">
                 <div class="flex flex-col gap-4 flex-1 lg:flex-row justify-end">
@@ -432,14 +440,14 @@ const Instance = () => {
                         classList={{ "bg-darkSlate-800 pl-2": editableName() }}
                       >
                         <div
-                          class="cursor-pointer ease-in-out z-10 text-white transition i-ri:check-fill text-3xl duration-50 hover:text-green-500"
+                          class="cursor-pointer ease-in-out z-10 transition text-white i-ri:check-fill text-3xl duration-50 hover:text-green-500"
                           classList={{
                             hidden: !editableName()
                           }}
                           onClick={() => handleNameChange()}
                         />
                         <div
-                          class="cursor-pointer ease-in-out text-white transition text-3xl duration-50 z-10 i-ri:close-fill hover:text-red-500"
+                          class="cursor-pointer ease-in-out text-white transition text-3xl duration-50 z-10 hover:text-red-500 i-ri:close-fill"
                           classList={{
                             hidden: !editableName()
                           }}
@@ -461,7 +469,7 @@ const Instance = () => {
                       ref={innerContainerRef}
                       class="flex justify-between cursor-default flex-row"
                     >
-                      <div class="flex flex-row gap-4 items-start mt-2 ml-2 flex-wrap text-lightGray-600">
+                      <div class="flex flex-row gap-4 flex-wrap items-start mt-2 ml-2 text-lightGray-600">
                         <div class="m-0 flex gap-2 items-center">
                           <For
                             each={routeData.instanceDetails.data?.modloaders}
@@ -573,69 +581,92 @@ const Instance = () => {
         </div>
       </header>
       <div class="bg-darkSlate-800 sticky">
-        <div class="flex justify-center p-6 min-h-150">
+        <div
+          class="flex justify-center min-h-150 py-6"
+          classList={{
+            "px-6": !instancePages()[selectedIndex()]?.noPadding
+          }}
+        >
           <div class="bg-darkSlate-800 w-full">
             <div
               class="sticky flex items-center justify-between z-10 bg-darkSlate-800 top-0 mb-4"
+              classList={{
+                "px-6": instancePages()[selectedIndex()]?.noPadding
+              }}
               ref={(el) => {
                 refStickyTabs = el;
               }}
             >
-              <span class="mr-4">
-                <Show when={isSticky()}>
+              <div class="flex items-center">
+                <span
+                  class="mr-4 transition-transform duration-100 ease-in-out origin-left"
+                  classList={{
+                    "scale-x-100": isSticky(),
+                    "scale-x-0": !isSticky()
+                  }}
+                  ref={(el) => {
+                    backButtonRef = el;
+                  }}
+                >
                   <Button
                     onClick={() => navigate("/library")}
                     icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
                     size="small"
                     type="secondary"
                   >
-                    <Trans
-                      key="instance.step_back"
-                      options={{
-                        defaultValue: "Back"
-                      }}
-                    />
-                  </Button>
-                </Show>
-              </span>
-              <Tabs index={selectedIndex()}>
-                <TabList>
-                  <For each={instancePages()}>
-                    {(page: InstancePage) => (
-                      <Link href={page.path} class="no-underline">
-                        <Tab class="bg-transparent">{page.label}</Tab>
-                      </Link>
-                    )}
-                  </For>
-                </TabList>
-              </Tabs>
-              <Show when={isSticky()}>
-                <span class="ml-4">
-                  <Button
-                    uppercase
-                    type="glow"
-                    size="small"
-                    variant={isRunning() && "red"}
-                    loading={isPreparing() !== undefined}
-                    onClick={() => {
-                      if (isRunning()) {
-                        killInstanceMutation.mutate(parseInt(params.id, 10));
-                      } else {
-                        launchInstanceMutation.mutate(parseInt(params.id, 10));
-                      }
-                    }}
-                  >
-                    <Switch>
-                      <Match when={!isRunning()}>
-                        <Trans key="instance.play" />
-                      </Match>
-                      <Match when={isRunning()}>
-                        <Trans key="instance.stop" />
-                      </Match>
-                    </Switch>
+                    <Trans key="instance.step_back" />
                   </Button>
                 </span>
-              </Show>
+                <div
+                  class="transition-transform duration-100 ease-in-out origin-left"
+                  style={{
+                    transform: `translateX(${tabsTranslate()}px)`
+                  }}
+                >
+                  <Tabs index={selectedIndex()}>
+                    <TabList>
+                      <For each={instancePages()}>
+                        {(page: InstancePage) => (
+                          <Link href={page.path} class="no-underline">
+                            <Tab class="bg-transparent">{page.label}</Tab>
+                          </Link>
+                        )}
+                      </For>
+                    </TabList>
+                  </Tabs>
+                </div>
+              </div>
+              <span
+                class="ml-4 transition-transform duration-100 ease-in-out origin-right"
+                classList={{
+                  "scale-x-100": isSticky(),
+                  "scale-x-0": !isSticky()
+                }}
+              >
+                <Button
+                  uppercase
+                  type="glow"
+                  size="small"
+                  variant={isRunning() && "red"}
+                  loading={isPreparing() !== undefined}
+                  onClick={() => {
+                    if (isRunning()) {
+                      killInstanceMutation.mutate(parseInt(params.id, 10));
+                    } else {
+                      launchInstanceMutation.mutate(parseInt(params.id, 10));
+                    }
+                  }}
+                >
+                  <Switch>
+                    <Match when={!isRunning()}>
+                      <Trans key="instance.play" />
+                    </Match>
+                    <Match when={isRunning()}>
+                      <Trans key="instance.stop" />
+                    </Match>
+                  </Switch>
+                </Button>
+              </span>
             </div>
             <Outlet />
           </div>
