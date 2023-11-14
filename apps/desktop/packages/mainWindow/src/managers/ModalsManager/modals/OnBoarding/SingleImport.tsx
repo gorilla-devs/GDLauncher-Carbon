@@ -3,7 +3,7 @@ import { setTaskIds, taskIds } from "@/utils/import";
 import { isProgressFailed } from "@/utils/instances";
 import { rspc, rspcFetch } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
-import { Button } from "@gd/ui";
+import { Button, Progressbar } from "@gd/ui";
 import { Match, Switch, createEffect, createSignal } from "solid-js";
 
 const [isDownloaded, setIsDownloaded] = createSignal(false);
@@ -74,7 +74,11 @@ const SingleImport = (props: {
         }
       }
     }
-    runner();
+    try {
+      runner();
+    } catch (err) {
+      console.error(err);
+    }
   });
   createEffect(() => {
     if (!taskIds()) {
@@ -85,11 +89,14 @@ const SingleImport = (props: {
     }
   });
   return (
-    <div class="flex gap-2 border-2 border-solid shadow-md border-neutral-800 p-4 justify-between rounded-md bg-gray-900 bg-opacity-60 backdrop-blur-lg">
+    <div class="flex gap-2 px-4 justify-between rounded-md">
       <span class="font-semibold">{props.instanceName}</span>
       <Switch>
         <Match when={state() === "idle"}>
-          <div class="font-semibold">{progress()}%</div>
+          <div class="flex w-30 items-center gap-4">
+            <Progressbar percentage={progress()} />
+            <div class="font-semibold">{progress()}%</div>
+          </div>
         </Match>
         <Match when={state() === "failed"}>
           <div>
@@ -109,7 +116,7 @@ const SingleImport = (props: {
           </div>
         </Match>
         <Match when={state() === "completed"}>
-          <div class="i-ic:round-check text-2xl text-green-600"></div>
+          <div class="i-ic:round-check text-2xl text-green-600" />
         </Match>
       </Switch>
     </div>

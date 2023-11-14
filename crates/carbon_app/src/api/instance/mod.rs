@@ -308,7 +308,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .import_manager()
                 .scan_status()
                 .await
-                .map(|status| FullImportScanStatus::from(status))
+                .map(FullImportScanStatus::from)
         }
 
         mutation IMPORT_INSTANCE[app, req: ImportRequest] {
@@ -316,7 +316,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .import_manager()
                 .begin_import(req.index, req.name)
                 .await
-                .map(|task| FETaskId::from(task))
+                .map(FETaskId::from)
         }
     }
 }
