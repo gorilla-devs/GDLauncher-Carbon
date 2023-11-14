@@ -185,8 +185,8 @@ const SingleEntity = (props: {
                   <div class="w-full h-full flex items-center justify-center">
                     <p class="text-xl text-gray-500">
                       {path()
-                        ? "No Instances found on this path"
-                        : "select a path"}
+                        ? t("instance.no_instance_found")
+                        : t("instance.select_path")}
                     </p>
                   </div>
                 }
