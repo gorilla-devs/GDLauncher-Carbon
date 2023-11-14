@@ -278,9 +278,10 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         query GET_IMPORTABLE_ENTITIES[_, _args: ()] {
             anyhow::Result::Ok(importer::Entity::list()
                 .into_iter()
-                .map(|(e, support)| ImportEntityStatus {
+                .map(|(e, support, selection_type)| ImportEntityStatus {
                     entity: ImportEntity::from(e),
                     supported: support,
+                    selection_type: ImportEntitySelectionType::from(selection_type),
                 })
                 .collect::<Vec<_>>())
         }
@@ -877,9 +878,26 @@ struct FullImportScanStatus {
 }
 
 #[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+enum ImportEntitySelectionType {
+    File,
+    Directory,
+}
+
+impl From<importer::SelectionType> for ImportEntitySelectionType {
+    fn from(value: importer::SelectionType) -> Self {
+        match value {
+            importer::SelectionType::File => Self::File,
+            importer::SelectionType::Directory => Self::Directory,
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize)]
 struct ImportEntityStatus {
     entity: ImportEntity,
     supported: bool,
+    selection_type: ImportEntitySelectionType,
 }
 
 #[derive(Type, Debug, Deserialize)]

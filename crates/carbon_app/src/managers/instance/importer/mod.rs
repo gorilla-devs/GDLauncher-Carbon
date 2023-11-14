@@ -145,6 +145,11 @@ impl<'a> ManagerRef<'a, InstanceManager> {
     }
 }
 
+pub enum SelectionType {
+    File,
+    Directory,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, EnumIter, Eq, PartialEq)]
 pub enum Entity {
     LegacyGDLauncher,
@@ -160,7 +165,22 @@ pub enum Entity {
 }
 
 impl Entity {
-    pub fn list() -> Vec<(Self, bool)> {
+    pub fn to_selection_type(self) -> SelectionType {
+        match self {
+            Self::LegacyGDLauncher => SelectionType::Directory,
+            Self::CurseForgeZip => SelectionType::File,
+            Self::CurseForge => SelectionType::Directory,
+            Self::MRPack => SelectionType::File,
+            Self::Modrinth => SelectionType::Directory,
+            Self::ATLauncher => SelectionType::Directory,
+            Self::Technic => SelectionType::Directory,
+            Self::FTB => SelectionType::Directory,
+            Self::MultiMC => SelectionType::Directory,
+            Self::PrismLauncher => SelectionType::Directory,
+        }
+    }
+
+    pub fn list() -> Vec<(Self, bool, SelectionType)> {
         use strum::IntoEnumIterator;
 
         const SUPPORT: [Entity; 3] = [
@@ -169,7 +189,9 @@ impl Entity {
             Entity::MRPack,
         ];
 
-        Self::iter().map(|v| (v, SUPPORT.contains(&v))).collect()
+        Self::iter()
+            .map(|v| (v, SUPPORT.contains(&v), v.to_selection_type()))
+            .collect()
     }
 
     pub fn create_importer(self) -> Arc<dyn InstanceImporter> {
