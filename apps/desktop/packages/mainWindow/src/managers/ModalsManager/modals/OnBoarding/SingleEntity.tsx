@@ -200,6 +200,7 @@ const SingleEntity = (props: {
                           {t("instance.select_all_mods")}
                         </span>
                       }
+                      indeterminate={true}
                       checked={instances().length !== 0}
                       onChange={(e) => {
                         if (e) {
