@@ -48,16 +48,29 @@ impl LegacyGDLauncherImporter {
         }
     }
 
-    pub fn get_default_scan_path() -> anyhow::Result<PathBuf> {
+    pub async fn get_default_scan_path() -> anyhow::Result<PathBuf> {
         let basedirs = directories::BaseDirs::new().ok_or(anyhow!("Cannot build basedirs"))?;
 
         // old gdl did not respect the xdg basedirs spec on linux
         #[cfg(target_os = "linux")]
-        let p = basedirs.config_dir().join("gdlauncher_next");
+        let p = basedirs.config_dir();
         #[cfg(not(target_os = "linux"))]
-        let p = basedirs.data_dir().join("gdlauncher_next");
+        let p = basedirs.data_dir();
 
-        Ok(p)
+        let mut p = p.join("gdlauncher_next");
+
+        let override_path = p.join("override.data");
+        if override_path.exists() {
+            let override_path = tokio::fs::read_to_string(override_path).await;
+            if let Ok(override_path) = override_path {
+                let override_path = PathBuf::from(override_path);
+                if override_path.is_dir() {
+                    p = override_path;
+                }
+            }
+        }
+
+        Ok(p.join("instances"))
     }
 
     async fn scan_instance(
@@ -93,29 +106,9 @@ impl LegacyGDLauncherImporter {
 
 #[async_trait::async_trait]
 impl InstanceImporter for LegacyGDLauncherImporter {
-    async fn scan(&self, app: &Arc<AppInner>, mut scan_path: PathBuf) -> anyhow::Result<()> {
-        if !scan_path.is_dir() {
-            return Ok(());
-        }
-
-        let override_path = scan_path.join("override.data");
-
-        if override_path.exists() {
-            let override_path = tokio::fs::read_to_string(override_path).await;
-
-            if let Ok(override_path) = override_path {
-                let override_path = PathBuf::from(override_path);
-
-                if override_path.is_dir() {
-                    scan_path = override_path;
-                }
-            }
-        }
-
-        let instances_path = scan_path.join("instances");
-
-        if instances_path.is_dir() {
-            let Ok(mut dir) = tokio::fs::read_dir(&instances_path).await else {
+    async fn scan(&self, app: &Arc<AppInner>, scan_path: PathBuf) -> anyhow::Result<()> {
+        if scan_path.is_dir() {
+            let Ok(mut dir) = tokio::fs::read_dir(&scan_path).await else {
                 return Ok(());
             };
 
@@ -127,11 +120,9 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                     }
                 }
             }
-        } else {
-            if let Ok(Some(entry)) = self.scan_instance(scan_path).await {
-                self.state.write().await.set_single(entry).await;
-                app.invalidate(GET_IMPORT_SCAN_STATUS, None);
-            }
+        } else if let Ok(Some(entry)) = self.scan_instance(scan_path).await {
+            self.state.write().await.set_single(entry).await;
+            app.invalidate(GET_IMPORT_SCAN_STATUS, None);
         }
 
         Ok(()) // TODO: invalidate on iter
