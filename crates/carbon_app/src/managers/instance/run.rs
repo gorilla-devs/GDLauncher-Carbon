@@ -14,7 +14,7 @@ use super::{InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError};
 use crate::api::keys::instance::*;
 use crate::api::translation::Translation;
 use crate::domain::instance::{self as domain, GameLogId};
-use crate::managers::instance::log::{EntryType, GameLog};
+use crate::managers::instance::log::{GameLog, LogEntry, LogEntrySourceKind};
 use crate::managers::instance::schema::make_instance_config;
 use crate::{
     domain::instance::info::{GameVersion, ModLoader, ModLoaderType},
@@ -1024,7 +1024,9 @@ impl ManagerRef<'_, InstanceManager> {
                     }
 
                     if let Ok(exitcode) = child.wait().await {
-                        log.send_modify(|log| log.add_new_line(EntryType::System, exitcode));
+                        log.send_modify(|log| {
+                            log.add_entry(LogEntry::system_message(format!("{exitcode}")))
+                        });
                     }
 
                     let _ = app.rich_presence_manager().stop_activity().await;
@@ -1278,7 +1280,7 @@ mod test {
             let new_lines = log.get_span(idx..);
             idx = log.len();
             for line in new_lines {
-                tracing::info!("[{:?}]: {}", line.kind, line.data);
+                tracing::info!("[{:?}]: {}", line.source_kind, line.message);
             }
         }
 
@@ -1302,13 +1304,13 @@ async fn read_logs(
         let modified = tokio::select! { biased;
             modified = read_pipe(
                     &log,
-                    EntryType::StdErr,
+                    LogEntrySourceKind::StdErr,
                     &mut stderr,
                     &mut stdout_line_buf
                 ) => { modified }
             modified = read_pipe(
                     &log,
-                    EntryType::StdOut,
+                    LogEntrySourceKind::StdOut,
                     &mut stdout,
                     &mut stderr_line_buf
                 ) => { modified }
@@ -1328,7 +1330,7 @@ async fn read_logs(
 /// at some point in the future if this function returns `true`.
 async fn read_pipe(
     log: &watch::Sender<GameLog>,
-    kind: EntryType,
+    kind: LogEntrySourceKind,
     mut pipe: impl AsyncReadExt + Unpin,
     line_buf: &mut String,
 ) -> bool {
@@ -1338,31 +1340,37 @@ async fn read_pipe(
         Ok(size) if size != 0 => {
             let utf8 = String::from_utf8_lossy(&buf[..size]);
 
-            let mut line_iter = utf8.split(crate::platform::LINE_ENDING).peekable();
+            line_buf.push_str(&utf8);
 
-            // Read and flush each line part into the line buffer above,
-            // flushing the line buffer to the log once we hit a `'n`
-            let mut modified = false;
-
-            while let Some(line_part) = line_iter.next() {
-                // Flush the line part
-                line_buf.push_str(line_part);
-
-                // If there's a `next` element, then we have a full line,
-                // flush it to the log
-                if line_iter.peek().is_some() {
+            match carbon_parsing::log::parse_log_entry(line_buf) {
+                Ok((rest, entry)) => {
                     log.send_if_modified(|log| {
-                        log.add_new_line(kind, &line_buf);
-                        line_buf.clear();
-
-                        modified = true;
+                        log.add_entry((kind, entry).into());
 
                         false
                     });
+
+                    let rest = rest.to_owned();
+                    *line_buf = rest;
+
+                    true
+                }
+                // do nothing, wait for more bytes
+                Err(nom::Err::Incomplete(_)) => false,
+                Err(err) => {
+                    tracing::error!("failed to parse log entry:\n{err:#?}");
+
+                    log.send_if_modified(|log| {
+                        log.add_entry(LogEntry::system_error(
+                            "failed to parse log entry from {kind:?}",
+                        ));
+
+                        false
+                    });
+
+                    true
                 }
             }
-
-            modified
         }
         Ok(_) => false,
         Err(err) => {
@@ -1371,7 +1379,10 @@ async fn read_pipe(
             // We might have missed some data, including a
             // `\n`, so give up on this line and flush it
             log.send_if_modified(|log| {
-                log.add_new_line(kind, line_buf.as_str());
+                log.add_entry(LogEntry::system_error(format!(
+                    "failed to receive data from `{kind:?}: {}`",
+                    line_buf.as_str()
+                )));
                 line_buf.clear();
 
                 false
@@ -1379,81 +1390,5 @@ async fn read_pipe(
 
             true
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn setup() -> (EntryType, watch::Sender<GameLog>, String) {
-        let kind = EntryType::StdOut;
-
-        let (log, _) = watch::channel(Default::default());
-
-        let mut line_buf = String::new();
-
-        (kind, log, line_buf)
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn unterminated_line() {
-        let (kind, log, mut line_buf) = setup();
-
-        let pipe = "I am a single line";
-
-        let modified = read_pipe(&log, kind, pipe.as_bytes(), &mut line_buf).await;
-
-        assert_eq!(line_buf, pipe);
-        assert!(!modified);
-        assert!(log.borrow().get_span(..).is_empty());
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn single_line() {
-        let (kind, log, mut line_buf) = setup();
-
-        let pipe = format!("I am a single line{}", crate::platform::LINE_ENDING);
-
-        let modified = read_pipe(&log, kind, pipe.as_bytes(), &mut line_buf).await;
-
-        assert_eq!(line_buf, "");
-        assert!(modified);
-        assert_eq!(log.borrow().get_span(..).len(), 1);
-        assert_eq!(
-            log.borrow().get_line(0).unwrap().data,
-            pipe.split_once(crate::platform::LINE_ENDING).unwrap().0
-        );
-    }
-
-    #[tokio::test(flavor = "multi_thread")]
-    async fn two_lines_and_a_bit_more() {
-        let (kind, log, mut line_buf) = setup();
-
-        let pipe = format!(
-            "I am a single line{ln}\
-             I am a second line{ln}\
-             I am a bit more",
-            ln = crate::platform::LINE_ENDING
-        );
-
-        let modified = read_pipe(&log, kind, pipe.as_bytes(), &mut line_buf).await;
-
-        assert_eq!(
-            line_buf,
-            pipe.split(crate::platform::LINE_ENDING).last().unwrap()
-        );
-        assert!(modified);
-        assert_eq!(log.borrow().get_span(..).len(), 2);
-        assert_eq!(
-            log.borrow()
-                .get_span(..)
-                .iter()
-                .map(|entry| &entry.data)
-                .collect::<Vec<_>>(),
-            pipe.split(crate::platform::LINE_ENDING)
-                .take(2)
-                .collect::<Vec<_>>()
-        );
     }
 }

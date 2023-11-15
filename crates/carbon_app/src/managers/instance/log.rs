@@ -1,3 +1,4 @@
+use serde::Serialize;
 use std::{
     ops::{Bound, RangeBounds},
     sync::atomic::{AtomicI32, Ordering},
@@ -17,35 +18,111 @@ use super::InstanceManager;
 #[derive(Debug, Default)]
 pub struct GameLog(Vec<LogEntry>);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Represents a log entry.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct LogEntry {
-    pub kind: EntryType,
-    pub data: String,
+    /// The source of the log entry.
+    pub source_kind: LogEntrySourceKind,
+    /// The name of the logger that emitted this entry.
+    pub logger: String,
+    /// The timestamp the entry was created.
+    pub timestamp: u64,
+    /// The name of the thread that created the entry.
+    pub thread: String,
+    /// The verbosity level of the entry.
+    pub level: LogEntryLevel,
+    /// The entry message itself.
+    pub message: String,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum EntryType {
+impl From<(LogEntrySourceKind, carbon_parsing::log::LogEntry<'_>)> for LogEntry {
+    fn from((source_kind, entry): (LogEntrySourceKind, carbon_parsing::log::LogEntry)) -> Self {
+        let carbon_parsing::log::LogEntry {
+            logger,
+            level,
+            timestamp,
+            thread_name,
+            message,
+        } = entry;
+
+        Self {
+            source_kind,
+            logger: logger.to_owned(),
+            timestamp,
+            thread: thread_name.to_owned(),
+            level: level.into(),
+            message: message.to_owned(),
+        }
+    }
+}
+
+impl LogEntry {
+    /// Create a new system message.
+    pub fn system_message(msg: impl ToString) -> Self {
+        Self {
+            source_kind: LogEntrySourceKind::System,
+            logger: "GDLauncher".into(),
+            timestamp: chrono::Local::now().timestamp_millis() as u64,
+            thread: "N/A".into(),
+            level: LogEntryLevel::Info,
+            message: msg.to_string(),
+        }
+    }
+
+    /// Create a new system message with an `error` level.
+    pub fn system_error(msg: impl ToString) -> Self {
+        let mut this = Self::system_message(msg);
+
+        this.level = LogEntryLevel::Error;
+
+        this
+    }
+}
+
+/// The level of the log entry.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum LogEntryLevel {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl From<carbon_parsing::log::LogEntryLevel> for LogEntryLevel {
+    fn from(level: carbon_parsing::log::LogEntryLevel) -> Self {
+        use carbon_parsing::log::LogEntryLevel as LogEntryLevel_;
+
+        match level {
+            LogEntryLevel_::Trace => Self::Trace,
+            LogEntryLevel_::Debug => Self::Debug,
+            LogEntryLevel_::Info => Self::Info,
+            LogEntryLevel_::Warn => Self::Warn,
+            LogEntryLevel_::Error => Self::Error,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize)]
+pub enum LogEntrySourceKind {
     System,
     StdOut,
     StdErr,
-    // more entries once log levels are handled
 }
 
 impl GameLog {
+    /// Creates a new game log.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Inserts a new line into the log.
-    pub fn add_new_line(&mut self, kind: EntryType, line: impl ToString) {
-        self.0.push(LogEntry {
-            kind,
-            data: line.to_string(),
-        })
+    /// Inserts a new entry into the log.
+    pub fn add_entry(&mut self, entry: LogEntry) {
+        self.0.push(entry)
     }
 
-    /// Retrieves the requested line from the log.
-    pub fn get_line(&self, line: usize) -> Option<&LogEntry> {
+    /// Retrieves the requested entry from the log.
+    pub fn get_entry(&self, line: usize) -> Option<&LogEntry> {
         self.0.get(line)
     }
 
@@ -71,6 +148,7 @@ impl GameLog {
         &self.0[start..end]
     }
 
+    /// Get the number of entries contained in the log.
     pub fn len(&self) -> usize {
         self.0.len()
     }
@@ -145,10 +223,10 @@ mod test {
     fn span() {
         let mut log = GameLog::new();
 
-        log.add_new_line(EntryType::StdOut, "item 1");
-        log.add_new_line(EntryType::StdOut, "item 2");
-        log.add_new_line(EntryType::StdOut, "item 3");
-        log.add_new_line(EntryType::StdOut, "item 4");
+        log.add_entry(LogEntry::system_message("item 1"));
+        log.add_entry(LogEntry::system_message("item 2"));
+        log.add_entry(LogEntry::system_message("item 3"));
+        log.add_entry(LogEntry::system_message("item 4"));
 
         // Test each kind of range
 
@@ -160,7 +238,7 @@ mod test {
             let span = log
                 .get_span(range)
                 .iter()
-                .map(|entry| &entry.data)
+                .map(|entry| &entry.message)
                 .collect::<Vec<_>>();
 
             assert_eq!(span, expected);

@@ -14,7 +14,7 @@ use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AxumError, FeError};
-use crate::managers::instance::log::EntryType;
+use crate::managers::instance::log::LogEntrySourceKind;
 use crate::managers::instance::InstanceMoveTarget;
 use crate::managers::{instance::importer, App, AppInner};
 
@@ -1290,12 +1290,12 @@ mod log {
         StdErr,
     }
 
-    impl From<EntryType> for LogEntryType {
-        fn from(kind: EntryType) -> Self {
+    impl From<LogEntrySourceKind> for LogEntryType {
+        fn from(kind: LogEntrySourceKind) -> Self {
             match kind {
-                EntryType::System => Self::System,
-                EntryType::StdOut => Self::StdOut,
-                EntryType::StdErr => Self::StdErr,
+                LogEntrySourceKind::System => Self::System,
+                LogEntrySourceKind::StdOut => Self::StdOut,
+                LogEntrySourceKind::StdErr => Self::StdErr,
             }
         }
     }
@@ -1309,8 +1309,8 @@ mod log {
     impl<'a> From<&'a crate::managers::instance::log::LogEntry> for LogEntry<'a> {
         fn from(entry: &'a crate::managers::instance::log::LogEntry) -> Self {
             Self {
-                data: &entry.data,
-                type_: entry.kind.into(),
+                data: &entry.message,
+                type_: entry.source_kind.into(),
             }
         }
     }
