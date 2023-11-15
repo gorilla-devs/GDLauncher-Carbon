@@ -2,14 +2,15 @@ import { createEffect, createSignal, Show } from "solid-js";
 
 interface Props {
   checked?: boolean;
+  indeterminate?: boolean;
   disabled?: boolean;
   onChange?: (_checked: boolean) => void;
-  title?: string;
-  titleStyle?: string;
+  children?: any;
 }
 
 function Checkbox(props: Props) {
   const isChecked = () => props.checked;
+
   // eslint-disable-next-line solid/reactivity
   const [checked, setChecked] = createSignal(isChecked());
 
@@ -20,11 +21,16 @@ function Checkbox(props: Props) {
   return (
     <div class="flex items-center gap-2 font-sans">
       <div
-        class="flex justify-center items-center h-5 w-5 min-w-5 min-h-5 rounded-md hover:border-lightGray hover:border-1 box-border cursor-pointer"
+        class={`flex justify-center items-center ${
+          !checked() || (checked() && !props.indeterminate)
+            ? "h-5 w-5 min-w-5 min-h-5 rounded-md"
+            : "rounded-sm"
+        } hover:border-lightGray hover:border-1 box-border cursor-pointer`}
         classList={{
           "bg-primary-500": checked() && !props.disabled,
           "bg-darkSlate-500": !checked(),
           "bg-darkSlate-900": props.disabled,
+          "h-3 w-3 min-w-3 min-h-3": props.indeterminate && checked(),
         }}
         onClick={() => {
           if (!props.disabled) {
@@ -33,7 +39,7 @@ function Checkbox(props: Props) {
           }
         }}
       >
-        <Show when={checked()}>
+        <Show when={checked() && !props.indeterminate}>
           <div
             class="i-ri:check-line text-white animate-bounce-scale"
             classList={{
@@ -42,10 +48,11 @@ function Checkbox(props: Props) {
             }}
           />
         </Show>
+        <Show when={checked() && props.indeterminate}>
+          <div class="h-5 w-5 min-w-5 min-h-5 rounded-md  opacity-20 bg-light-300" />
+        </Show>
       </div>
-      <Show when={props.title}>
-        <span class={props.titleStyle}>{props.title}</span>
-      </Show>
+      <Show when={props.children}>{props.children}</Show>
     </div>
   );
 }

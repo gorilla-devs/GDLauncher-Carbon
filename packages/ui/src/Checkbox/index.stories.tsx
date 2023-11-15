@@ -24,6 +24,6 @@ export const WithTitle: Story = {
   args: {
     checked: true,
     disabled: false,
-    title: "Checkbox",
+    children: "Checkbox",
   },
 };

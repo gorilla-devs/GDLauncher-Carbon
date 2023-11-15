@@ -17,15 +17,17 @@ import {
 import { createStore } from "solid-js/store";
 import SingleCheckBox from "./SingleCheckBox";
 import BeginImportStep from "./BeginImportStep";
-import { Trans } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 
 const [step, setStep] = createSignal("selectionStep");
 const [instances, setInstances] = createSignal([]);
 export { step, setStep, instances, setInstances };
+
 const SingleEntity = (props: {
   entity: ImportEntityStatus;
   setEntity: Setter<ImportEntityStatus | undefined>;
 }) => {
+  const [t] = useTransContext();
   const [path, setPath] = createSignal<string | undefined>(undefined);
   const [inputValue, setInputValue] = createSignal(path());
   const [instance, setInstance] = createStore<{
@@ -75,7 +77,6 @@ const SingleEntity = (props: {
   });
   createEffect(() => {
     const status = importScanStatus.data;
-    console.log(status);
     if (status) {
       const data = status.status;
 
@@ -112,6 +113,7 @@ const SingleEntity = (props: {
       }
     }
   });
+
   return (
     <>
       <div class="flex-1 w-full flex flex-col items-center justify-center p-4">
@@ -128,7 +130,9 @@ const SingleEntity = (props: {
               setInputValue(e.currentTarget.value);
             }}
             onBlur={() => {
-              setPath(inputValue());
+              if (inputValue() && inputValue() !== path()) {
+                setPath(inputValue());
+              }
             }}
             class="flex-1 border-2 border-solid border-zinc-500"
             icon={
@@ -148,7 +152,7 @@ const SingleEntity = (props: {
                     setPath(result.filePaths[0]);
                   }}
                   class="i-ic:round-folder text-2xl text-yellow-300 cursor-pointer"
-                ></div>
+                />
                 <div
                   onClick={async () => {
                     const result = await window.openFileDialog({
@@ -168,7 +172,7 @@ const SingleEntity = (props: {
                     setPath(result.filePaths[0]);
                   }}
                   class="i-solar:file-bold text-2xl text-blue-500 cursor-pointer"
-                ></div>
+                />
               </div>
             }
           />
@@ -179,19 +183,24 @@ const SingleEntity = (props: {
             <Match when={step() === "selectionStep"}>
               <Switch
                 fallback={
-                  <div class="w-full  h-full flex items-center justify-center">
+                  <div class="w-full h-full flex items-center justify-center">
                     <p class="text-xl text-gray-500">
                       {path()
-                        ? " No Instances found on this path"
+                        ? "No Instances found on this path"
                         : "select a path"}
                     </p>
                   </div>
                 }
               >
                 <Match when={typeof instance.multiResult !== "undefined"}>
-                  <div class="w-full h-full p-2 h-full w-full flex flex-col gap-4">
+                  <div class="h-full p-2 w-full flex flex-col gap-4">
                     <Checkbox
-                      title="select all"
+                      children={
+                        <span class="text-sm">
+                          {t("instance.select_all_mods")}
+                        </span>
+                      }
+                      indeterminate={true}
                       checked={instances().length !== 0}
                       onChange={(e) => {
                         if (e) {
@@ -207,7 +216,7 @@ const SingleEntity = (props: {
                         }
                       }}
                     />
-                    <div class="w-full h-[90%] overflow-hidden  flex flex-col gap-2 ">
+                    <div class="w-full h-[90%] overflow-hidden flex flex-col gap-2">
                       <For each={instance.multiResult}>
                         {(entry) => (
                           <SingleCheckBox
@@ -262,17 +271,10 @@ const SingleEntity = (props: {
             disabled={instances().length === 0}
             type="primary"
             onClick={() => {
-              if (instances().length === 0) {
-                return;
-              } else {
-                setStep("importStep");
-              }
+              setStep("importStep");
             }}
           >
-            <Trans
-              options={{ defaultValue: "Begin import" }}
-              key="onboarding.begin_import"
-            />
+            <Trans key="onboarding.begin_import" />
           </Button>
         </Show>
       </div>
