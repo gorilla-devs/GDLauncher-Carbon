@@ -3,10 +3,10 @@
 use nom::{
     branch::alt,
     bytes::streaming::{tag, take_until},
-    character::streaming::{anychar, char, multispace0, u64},
+    character::streaming::{char, multispace0, u64},
     combinator::{map, value},
     error::ParseError,
-    multi::{count, many_till},
+    multi::count,
     sequence::{delimited, preceded, separated_pair, tuple},
     IResult,
 };
