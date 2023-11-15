@@ -173,6 +173,16 @@ const Logs = () => {
                 let levelColorClass = "";
 
                 switch (log.level) {
+                  case LogEntryLevel.Trace: {
+                    levelColorClass = "text-gray-500";
+
+                    break;
+                  }
+                  case LogEntryLevel.Debug: {
+                    levelColorClass = "text-orange-500";
+
+                    break;
+                  }
                   case LogEntryLevel.Info: {
                     levelColorClass = "text-green-500";
 
