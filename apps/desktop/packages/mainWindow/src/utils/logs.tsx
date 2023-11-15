@@ -10,9 +10,9 @@ export type LogEntry = {
 };
 
 export enum LogEntrySourceKind {
-  System = "System",
-  StdOut = "StdOut",
-  StdErr = "StdErr"
+  _System = "System",
+  _StdOut = "StdOut",
+  _StdErr = "StdErr"
 }
 
 // eslint-disable-next-line no-unused-vars
