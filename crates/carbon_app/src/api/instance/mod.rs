@@ -1283,38 +1283,6 @@ mod log {
         id: i32,
     }
 
-    #[derive(Debug, Serialize)]
-    enum LogEntryType {
-        System,
-        StdOut,
-        StdErr,
-    }
-
-    impl From<LogEntrySourceKind> for LogEntryType {
-        fn from(kind: LogEntrySourceKind) -> Self {
-            match kind {
-                LogEntrySourceKind::System => Self::System,
-                LogEntrySourceKind::StdOut => Self::StdOut,
-                LogEntrySourceKind::StdErr => Self::StdErr,
-            }
-        }
-    }
-
-    #[derive(Debug, Serialize)]
-    struct LogEntry<'a> {
-        data: &'a str,
-        type_: LogEntryType,
-    }
-
-    impl<'a> From<&'a crate::managers::instance::log::LogEntry> for LogEntry<'a> {
-        fn from(entry: &'a crate::managers::instance::log::LogEntry) -> Self {
-            Self {
-                data: &entry.message,
-                type_: entry.source_kind.into(),
-            }
-        }
-    }
-
     #[tracing::instrument(skip(app))]
     pub async fn log_handler(
         State(app): State<App>,
@@ -1348,7 +1316,6 @@ mod log {
                         = log
                             .get_span(last_idx..)
                             .into_iter()
-                            .map(LogEntry::from)
                             .inspect(|entry| tracing::trace!(?entry, "received log entry"))
                             .map(|entry| {
                                 serde_json::to_vec(&entry)

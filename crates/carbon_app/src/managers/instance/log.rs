@@ -20,6 +20,7 @@ pub struct GameLog(Vec<LogEntry>);
 
 /// Represents a log entry.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LogEntry {
     /// The source of the log entry.
     pub source_kind: LogEntrySourceKind,
