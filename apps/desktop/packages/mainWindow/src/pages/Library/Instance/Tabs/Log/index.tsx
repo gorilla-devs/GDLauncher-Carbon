@@ -174,7 +174,8 @@ const Logs = () => {
                   <div class="flex flex-col justify-center items-center w-full overflow-x-auto scrollbar-hide">
                     <pre class="m-0 w-full box-border leading-8">
                       <code class="text-darkSlate-50 text-sm select-text">
-                        [{log.level.toUpperCase()}] {log.logger}@{log.thread}{" "}
+                        [{log.level.toUpperCase()}] {log.logger}@{log.thread}
+                        {": "}
                         {log?.message}
                       </code>
                     </pre>
