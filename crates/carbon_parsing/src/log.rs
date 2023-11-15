@@ -248,17 +248,6 @@ mod tests {
                 thread_name: "Datafixer Bootstrap"
             }
         );
-
-        #[test]
-        fn parse_sample_log_entries() {
-            let mut input = include_str!("../sample_log.xml");
-
-            while let Ok((o, _)) = parse_log_entry(input) {
-                input = o;
-            }
-
-            assert_eq!(input, "\nexit code: 1");
-        }
     }
 
     #[test]
@@ -327,5 +316,16 @@ mod tests {
                 message: "192 Datafixer optimizations took 1128 milliseconds".into(),
             }
         );
+    }
+
+    #[test]
+    fn parse_sample_log_entries() {
+        let mut input = include_str!("../sample_log.xml");
+
+        while let Ok((o, _)) = parse_log_entry(input) {
+            input = o;
+        }
+
+        assert_eq!(input, "\nexit code: 1");
     }
 }
