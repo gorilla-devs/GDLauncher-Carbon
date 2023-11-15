@@ -28,9 +28,9 @@ function Checkbox(props: Props) {
   };
 
   return (
-    <div class="flex items-center gap-2 font-sans">
+    <div class="flex justify-center items-center h-5 w-5 min-w-5 min-h-5 rounded-md gap-2 font-sans ">
       <div
-        class={`flex justify-center items-center ${
+        class={`flex justify-center items-center  ${
           !checked() || (checked() && !props.indeterminate)
             ? "h-5 w-5 min-w-5 min-h-5 rounded-md"
             : "rounded-sm"
@@ -58,7 +58,7 @@ function Checkbox(props: Props) {
           />
         </Show>
         <Show when={checked() && props.indeterminate}>
-          <div class="h-5 w-5 min-w-5 min-h-5 rounded-md  opacity-20 bg-light-300" />
+          <div class="h-5 w-5 min-w-5  min-h-5 rounded-md  opacity-20 bg-light-300" />
         </Show>
       </div>
       <Show when={props.children}>{props.children}</Show>
