@@ -7,23 +7,23 @@ use nom::{
     combinator::{map, value},
     error::ParseError,
     multi::{count, many_till},
-    sequence::{delimited, separated_pair, tuple},
+    sequence::{delimited, preceded, separated_pair, tuple},
     IResult,
 };
 
 /// Represents a parsed log4j message.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct LogEntry {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct LogEntry<'a> {
     /// The name of the logger.
-    pub logger: String,
+    pub logger: &'a str,
     /// The log level of the entry.
     pub level: LogEntryLevel,
     /// The time the event was logged.
     pub timestamp: u64,
     /// The name of the thread.
-    pub thread_name: String,
+    pub thread_name: &'a str,
     /// The log message.
-    pub message: String,
+    pub message: &'a str,
 }
 
 /// The log level of the log entry.
@@ -53,11 +53,14 @@ where
 
 /// Parses a log4j event.
 pub fn parse_log_entry(input: &str) -> IResult<&str, LogEntry> {
-    let (o, (attributes, _, message)) = whitespace(delimited(
-        tag("<log4j:Event"),
-        tuple((attributes, tag(">"), whitespace(message))),
-        tag("</log4j:Event>"),
-    ))(input)?;
+    let (o, (attributes, _, message)) = preceded(
+        multispace0,
+        delimited(
+            tag("<log4j:Event"),
+            tuple((attributes, tag(">"), whitespace(message))),
+            tag("</log4j:Event>"),
+        ),
+    )(input)?;
 
     let Attributes {
         logger,
@@ -73,22 +76,23 @@ pub fn parse_log_entry(input: &str) -> IResult<&str, LogEntry> {
             level,
             timestamp,
             thread_name,
-            message: message.into(),
+            message,
         },
     ))
 }
 
 /// The attributes of a log event.
-struct Attributes {
-    pub logger: String,
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Attributes<'a> {
+    pub logger: &'a str,
     pub level: LogEntryLevel,
     pub timestamp: u64,
-    pub thread_name: String,
+    pub thread_name: &'a str,
 }
 
 /// Parses the attributes of the event.
 fn attributes(input: &str) -> IResult<&str, Attributes> {
-    let (o, attributes) = count(attribute, 4)(input)?;
+    let (o, attributes) = count(whitespace(attribute), 4)(input)?;
 
     /// Macro to extract a field. Reduces boilerplate.
     macro_rules! extract_attribute {
@@ -101,13 +105,14 @@ fn attributes(input: &str) -> IResult<&str, Attributes> {
 
             let Attribute::$field(field) = attributes
                 .iter()
+                .copied()
                 .find(|attr| matches!(attr, Attribute::$field(_)))
                 .ok_or(err)?
             else {
                 unreachable!();
             };
 
-            field.to_owned()
+            field
         }};
     }
 
@@ -123,65 +128,68 @@ fn attributes(input: &str) -> IResult<&str, Attributes> {
 }
 
 /// The possible types of attributes a log event can have.
-enum Attribute {
-    Logger(String),
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Attribute<'a> {
+    Logger(&'a str),
     Level(LogEntryLevel),
     Timestamp(u64),
-    ThreadName(String),
+    ThreadName(&'a str),
 }
 
 fn attribute(input: &str) -> IResult<&str, Attribute> {
-    whitespace(alt((
+    alt((attr_logger, attr_timestamp, attr_level, attr_thread))(input)
+}
+
+fn attr_logger(input: &str) -> IResult<&str, Attribute> {
+    map(
         separated_pair(
             tag("logger"),
             whitespace(char('=')),
-            delimited(char('"'), map(quoted_string, Attribute::Logger), char('"')),
+            map(quoted_string, Attribute::Logger),
         ),
+        |(_, attr)| attr,
+    )(input)
+}
+
+fn attr_timestamp(input: &str) -> IResult<&str, Attribute> {
+    map(
         separated_pair(
             tag("timestamp"),
             whitespace(char('=')),
             delimited(char('"'), map(u64, Attribute::Timestamp), char('"')),
         ),
+        |(_, attr)| attr,
+    )(input)
+}
+
+fn attr_level(input: &str) -> IResult<&str, Attribute> {
+    map(
         separated_pair(
             tag("level"),
             whitespace(char('=')),
             delimited(char('"'), map(level, Attribute::Level), char('"')),
         ),
+        |(_, attr)| attr,
+    )(input)
+}
+
+fn attr_thread(input: &str) -> IResult<&str, Attribute> {
+    map(
         separated_pair(
             tag("thread"),
             whitespace(char('=')),
-            delimited(
-                char('"'),
-                map(quoted_string, Attribute::ThreadName),
-                char('"'),
-            ),
+            map(quoted_string, Attribute::ThreadName),
         ),
-    )))(input)?;
-
-    todo!()
+        |(_, attr)| attr,
+    )(input)
 }
 
 /// Parses a quoted string, i.e., "I am a quoted string".
 ///
-/// Note, this function will output escaped characters literally, as in,
+/// TODO: This fails when we have escaped `'`, i.e. `\"` in the middle of the string.
 /// "I \"quote this\"" will result in exactly that: I \"quote this\"
-fn quoted_string(input: &str) -> IResult<&str, String> {
-    let (input, (res, _)) =
-        delimited(char('"'), many_till(anychar, end_of_string), char('"'))(input)?;
-
-    Ok((input, res.into_iter().collect()))
-}
-
-/// Finds the end of a quoted string, i.e., ignores `\"`.
-fn end_of_string(input: &str) -> IResult<&str, &str> {
-    match char::<_, nom::error::Error<_>>('"')(input) {
-        Ok((o, _)) => return Ok((o, "\"")),
-        Err(nom::Err::Incomplete(n)) => return Err(nom::Err::Incomplete(n)),
-        _ => {}
-    }
-
-    tag::<_, _, nom::error::Error<_>>("\\\"")(input)
-        .and_then(|_| Err(nom::Err::Error(nom::error::Error::from_char(input, '\"'))))
+fn quoted_string(input: &str) -> IResult<&str, &str> {
+    delimited(char('"'), take_until("\""), char('"'))(input)
 }
 
 /// Parses a [`LogEntryLevel`].
@@ -202,4 +210,122 @@ fn message(input: &str) -> IResult<&str, &str> {
         whitespace(delimited(tag("<![CDATA["), take_until("]]>"), tag("]]>"))),
         tag("</log4j:Message>"),
     )(input)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_message() {
+        message(
+            r#"<log4j:Message>
+                <![CDATA[192 Datafixer optimizations took 1128 milliseconds]]>
+            </log4j:Message>"#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn parse_attributes() {
+        let (_, attributes) = attributes(
+            r#"
+            logger="com.mojang.datafixers.DataFixerBuilder"
+            timestamp="1699556020363"
+            level="INFO"
+            thread="Datafixer Bootstrap"            
+            >
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            attributes,
+            Attributes {
+                logger: "com.mojang.datafixers.DataFixerBuilder",
+                level: LogEntryLevel::Info,
+                timestamp: 1699556020363,
+                thread_name: "Datafixer Bootstrap"
+            }
+        );
+
+        #[test]
+        fn parse_sample_log_entries() {
+            let mut input = include_str!("../sample_log.xml");
+
+            while let Ok((o, _)) = parse_log_entry(input) {
+                input = o;
+            }
+
+            assert_eq!(input, "\nexit code: 1");
+        }
+    }
+
+    #[test]
+    fn parse_logger_attribute() {
+        let (_, attr) = attr_logger(r#"logger="com.mojang.datafixers.DataFixerBuilder""#).unwrap();
+
+        assert_eq!(
+            attr,
+            Attribute::Logger("com.mojang.datafixers.DataFixerBuilder")
+        );
+    }
+
+    #[test]
+    fn parse_level_attribute() {
+        let (_, attr) = attr_level(r#"level="INFO""#).unwrap();
+
+        assert_eq!(attr, Attribute::Level(LogEntryLevel::Info));
+    }
+
+    #[test]
+    fn parse_timestamp_attribute() {
+        let (_, attr) = attr_timestamp(r#"timestamp="1699556020363""#).unwrap();
+
+        assert_eq!(attr, Attribute::Timestamp(1699556020363));
+    }
+
+    #[test]
+    fn parse_thread_attribute() {
+        let (_, attr) = attr_thread(r#"thread="Datafixer Bootstrap""#).unwrap();
+
+        assert_eq!(attr, Attribute::ThreadName("Datafixer Bootstrap"));
+    }
+
+    #[test]
+    fn parse_quoted_string() {
+        let (_, res) = quoted_string(r#""I am a quoted string""#).unwrap();
+
+        assert_eq!(res, "I am a quoted string");
+    }
+
+    #[test]
+    fn parse_single_entry() {
+        let (_, entry) = parse_log_entry(
+            r#"
+            <log4j:Event
+                logger="com.mojang.datafixers.DataFixerBuilder"
+                timestamp="1699556020363"
+                level="INFO"
+                thread="Datafixer Bootstrap"
+            >
+                <log4j:Message>
+                    <![CDATA[192 Datafixer optimizations took 1128 milliseconds]]>
+                </log4j:Message>
+            </log4j:Event>
+            "#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            entry,
+            LogEntry {
+                logger: "com.mojang.datafixers.DataFixerBuilder".into(),
+                level: LogEntryLevel::Info,
+                timestamp: 1699556020363,
+                thread_name: "Datafixer Bootstrap".into(),
+                message: "192 Datafixer optimizations took 1128 milliseconds".into(),
+            }
+        );
+    }
 }
