@@ -55,11 +55,14 @@ where
 pub fn parse_log_entry(input: &str) -> IResult<&str, LogEntry> {
     let (o, (attributes, _, message)) = preceded(
         multispace0,
-        delimited(
-            tag("<log4j:Event"),
-            tuple((attributes, tag(">"), whitespace(message))),
-            tag("</log4j:Event>"),
-        ),
+        alt((
+            delimited(
+                tag("<log4j:Event"),
+                tuple((attributes, tag(">"), whitespace(message))),
+                tag("</log4j:Event>"),
+            ),
+            plain_text,
+        )),
     )(input)?;
 
     let Attributes {
@@ -212,6 +215,22 @@ fn message(input: &str) -> IResult<&str, &str> {
     )(input)
 }
 
+fn plain_text(input: &str) -> IResult<&str, (Attributes, &str, &str)> {
+    map(take_until("<"), |text| {
+        (
+            Attributes {
+                logger: "GDLauncher",
+                level: LogEntryLevel::Info,
+                timestamp: chrono::Local::now().timestamp_millis() as u64,
+                thread_name: "N/A",
+            },
+            //  this is just to satisfy the type checker for the `alt` this is used in
+            "",
+            text,
+        )
+    })(input)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -326,6 +345,6 @@ mod tests {
             input = o;
         }
 
-        assert_eq!(input, "\nexit code: 1");
+        assert_eq!(input, "exit code: 0");
     }
 }
