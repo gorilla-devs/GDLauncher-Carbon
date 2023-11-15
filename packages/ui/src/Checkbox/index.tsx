@@ -18,6 +18,15 @@ function Checkbox(props: Props) {
     setChecked(props.checked);
   });
 
+  const getColor = () => {
+    if (checked() && !props.disabled) {
+      return "bg-primary-500";
+    } else if (!checked()) {
+      return "bg-darkSlate-500";
+    }
+    return "bg-darkSlate-900";
+  };
+
   return (
     <div class="flex items-center gap-2 font-sans">
       <div
@@ -25,11 +34,11 @@ function Checkbox(props: Props) {
           !checked() || (checked() && !props.indeterminate)
             ? "h-5 w-5 min-w-5 min-h-5 rounded-md"
             : "rounded-sm"
-        } hover:border-lightGray hover:border-1 box-border cursor-pointer`}
+        } hover:border-lightGray hover:border-1 box-border cursor-pointer ${getColor()}`}
         classList={{
-          "bg-primary-500": checked() && !props.disabled,
-          "bg-darkSlate-500": !checked(),
-          "bg-darkSlate-900": props.disabled,
+          // "bg-primary-500": checked() && !props.disabled,
+          // "bg-darkSlate-500": !checked(),
+          // "bg-darkSlate-900": props.disabled,
           "h-3 w-3 min-w-3 min-h-3": props.indeterminate && checked(),
         }}
         onClick={() => {
