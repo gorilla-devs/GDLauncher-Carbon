@@ -71,4 +71,5 @@
 </log4j:Event>
 <log4j:Event logger="fzd" timestamp="1699556032906" level="INFO" thread="Render thread">
   <log4j:Message><![CDATA[Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas]]></log4j:Message>
-</log4j:Event>exit code: 1
+</log4j:Event>
+exit code: 1
