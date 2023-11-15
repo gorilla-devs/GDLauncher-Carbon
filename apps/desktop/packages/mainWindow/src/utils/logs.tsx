@@ -1,13 +1,19 @@
 import { createStore } from "solid-js/store";
 
 export type LogEntry = {
-  sourceKind: string;
+  sourceKind: LogEntrySourceKind;
   level: LogEntryLevel;
   timestamp: number;
   logger: string;
   thread: string;
   message: string;
 };
+
+export enum LogEntrySourceKind {
+  System = "System",
+  StdOut = "StdOut",
+  StdErr = "StdErr"
+}
 
 export enum LogEntryLevel {
   Trace = "Trace",
