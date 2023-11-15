@@ -117,26 +117,23 @@ const SingleEntity = (props: {
   return (
     <>
       <div class="flex-1 w-full flex flex-col items-center justify-center p-4">
-        <div class="flex items-center justify-between w-full gap-2">
-          <span class="font-bold">
-            <Trans
-              options={{ defaultValue: "Scan target path:" }}
-              key="onboarding.scan_target_path"
+        <div class="flex flex-col items-start justify-start w-full gap-2">
+          <span class="font-bold">{props.entity.entity} path:</span>
+          <div class="flex items-center w-full gap-2">
+            <Input
+              value={path()}
+              onInput={(e) => {
+                setInputValue(e.currentTarget.value);
+              }}
+              onBlur={() => {
+                if (inputValue() && inputValue() !== path()) {
+                  setPath(inputValue());
+                }
+              }}
+              class="flex-1 bg-[#1D2028]"
             />
-          </span>
-          <Input
-            value={path()}
-            onInput={(e) => {
-              setInputValue(e.currentTarget.value);
-            }}
-            onBlur={() => {
-              if (inputValue() && inputValue() !== path()) {
-                setPath(inputValue());
-              }
-            }}
-            class="flex-1 border-2 border-solid border-zinc-500"
-            icon={
-              <div class="flex gap-2">
+            <div class="flex gap-2">
+              <div class="flex items-center justify-center p-2 bg-[#1D2028] rounded-lg">
                 <div
                   onClick={async () => {
                     const result = await window.openFileDialog({
@@ -151,8 +148,10 @@ const SingleEntity = (props: {
 
                     setPath(result.filePaths[0]);
                   }}
-                  class="i-ic:round-folder text-2xl text-yellow-300 cursor-pointer"
+                  class="i-material-symbols:folder-open-outline text-2xl  cursor-pointer"
                 />
+              </div>
+              <div class="flex items-center justify-center p-2 bg-[#1D2028] rounded-lg">
                 <div
                   onClick={async () => {
                     const result = await window.openFileDialog({
@@ -171,14 +170,13 @@ const SingleEntity = (props: {
 
                     setPath(result.filePaths[0]);
                   }}
-                  class="i-solar:file-bold text-2xl text-blue-500 cursor-pointer"
+                  class="i-uil:file-alt text-2xl  cursor-pointer"
                 />
               </div>
-            }
-          />
+            </div>
+          </div>
         </div>
-
-        <div class="flex-1 w-full flex items-start justify-start border-2 border-gray-500 mt-2 py-2 rounded-md border-solid">
+        <div class="flex-1 w-full flex items-start justify-start  mt-2 py-2 rounded-md bg-[#1D2028]">
           <Switch>
             <Match when={step() === "selectionStep"}>
               <Switch
@@ -196,11 +194,10 @@ const SingleEntity = (props: {
                   <div class="h-full p-2 w-full flex flex-col gap-4">
                     <Checkbox
                       children={
-                        <span class="text-sm">
+                        <span class="text-sm text-[#8A8B8F]">
                           {t("instance.select_all_mods")}
                         </span>
                       }
-                      indeterminate={true}
                       checked={instances().length !== 0}
                       onChange={(e) => {
                         if (e) {
@@ -265,7 +262,7 @@ const SingleEntity = (props: {
           />
         </Button>
 
-        <span class="font-bold">{props.entity.entity}</span>
+        <span></span>
         <Show when={step() === "selectionStep"} fallback={<div />}>
           <Button
             disabled={instances().length === 0}
