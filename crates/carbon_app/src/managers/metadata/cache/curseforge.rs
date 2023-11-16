@@ -370,7 +370,7 @@ async fn cache_curseforge_meta_unchecked(
     let new_image = modinfo.logo.map(|it| it.url);
 
     let image = match (new_image, old_image) {
-        (Some(new), Some(old)) => Some((new == old.url, new, old.data)),
+        (Some(new), Some(old)) => Some((old.up_to_date == 1 && new == old.url, new, old.data)),
         (Some(new), None) => Some((false, new, None)),
         (None, Some(old)) => Some((old.up_to_date == 1, old.url, old.data)),
         (None, None) => None,
