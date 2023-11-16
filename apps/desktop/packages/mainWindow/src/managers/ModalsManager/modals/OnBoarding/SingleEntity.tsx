@@ -18,6 +18,7 @@ import { createStore } from "solid-js/store";
 import SingleCheckBox from "./SingleCheckBox";
 import BeginImportStep from "./BeginImportStep";
 import { Trans, useTransContext } from "@gd/i18n";
+import { setTaskIds } from "@/utils/import";
 
 const [step, setStep] = createSignal("selectionStep");
 const [instances, setInstances] = createSignal([]);
@@ -280,6 +281,7 @@ const SingleEntity = (props: {
             disabled={instances().length === 0}
             type="primary"
             onClick={() => {
+              setTaskIds(undefined);
               setStep("importStep");
             }}
           >
