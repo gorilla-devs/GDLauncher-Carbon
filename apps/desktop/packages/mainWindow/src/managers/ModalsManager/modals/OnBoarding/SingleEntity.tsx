@@ -130,7 +130,16 @@ const SingleEntity = (props: {
                   setPath(inputValue());
                 }
               }}
-              class="flex-1 bg-[#1D2028]"
+              class="flex-1"
+              inputColor="bg-[#1D2028]"
+              icon={
+                <div
+                  onClick={() => {
+                    setPath("");
+                  }}
+                  class="i-material-symbols:close"
+                ></div>
+              }
             />
             <div class="flex gap-2">
               <div class="flex items-center justify-center p-2 bg-[#1D2028] rounded-lg">

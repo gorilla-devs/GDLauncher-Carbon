@@ -31,6 +31,7 @@ const SingleCheckBox = (props: Props) => {
       }
     }
   });
+
   return (
     <Checkbox
       children={<span class="text-sm">{props.title}</span>}
