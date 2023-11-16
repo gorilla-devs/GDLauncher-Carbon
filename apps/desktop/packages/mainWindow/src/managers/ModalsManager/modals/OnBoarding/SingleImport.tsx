@@ -15,7 +15,7 @@ const SingleImport = (props: {
 }) => {
   const [t] = useTransContext();
   const [progress, setProgress] = createSignal(0);
-  const [state, setState] = createSignal(t("instance.idle"));
+  const [state, setState] = createSignal("idle");
   const importInstanceMutation = rspc.createMutation(
     ["instance.importInstance"],
     {
@@ -93,13 +93,13 @@ const SingleImport = (props: {
     <div class="flex gap-2 px-4 justify-between rounded-md">
       <span class="font-semibold">{props.instanceName}</span>
       <Switch>
-        <Match when={state() === "idle"}>
+        <Match when={state() === t("instance.idle")}>
           <div class="flex w-30 items-center gap-4">
             <Progressbar percentage={progress()} />
             <div class="font-semibold">{progress()}%</div>
           </div>
         </Match>
-        <Match when={state() === "failed"}>
+        <Match when={state() === t("instance.failed")}>
           <div>
             <Button
               type="primary"
@@ -116,7 +116,7 @@ const SingleImport = (props: {
             </Button>
           </div>
         </Match>
-        <Match when={state() === "completed"}>
+        <Match when={state() === t("instance.completed")}>
           <div class="i-ic:round-check text-2xl text-green-600" />
         </Match>
       </Switch>
