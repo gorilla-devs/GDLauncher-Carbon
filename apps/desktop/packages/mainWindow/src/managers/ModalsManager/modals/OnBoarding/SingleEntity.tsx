@@ -208,6 +208,9 @@ const SingleEntity = (props: {
                         </span>
                       }
                       checked={instances().length !== 0}
+                      indeterminate={
+                        instances().length !== instance.multiResult?.length
+                      }
                       onChange={(e) => {
                         if (e) {
                           setInstances(

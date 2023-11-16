@@ -31,7 +31,9 @@ const SingleCheckBox = (props: Props) => {
       }
     }
   });
-
+  createEffect(() => {
+    console.log(instances());
+  });
   return (
     <Checkbox
       children={<span class="text-sm">{props.title}</span>}
