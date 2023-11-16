@@ -68,9 +68,9 @@ const SingleImport = (props: {
           setTaskId(undefined);
         }
         if (isFailed) {
-          setState(t("instance.failed"));
+          setState("failed");
         } else if (isDownloaded) {
-          setState(t("instance.completed"));
+          setState("completed");
           setIsDownloaded(true);
         }
       }
@@ -93,7 +93,7 @@ const SingleImport = (props: {
     <div class="flex gap-2 px-4 justify-between rounded-md">
       <span class="font-semibold">{props.instanceName}</span>
       <Switch>
-        <Match when={state() === t("instance.idle")}>
+        <Match when={state() === "idle"}>
           <div class="flex w-30 items-center gap-4">
             <Progressbar percentage={progress()} />
             <div class="font-semibold">{progress()}%</div>
@@ -116,7 +116,7 @@ const SingleImport = (props: {
             </Button>
           </div>
         </Match>
-        <Match when={state() === t("instance.completed")}>
+        <Match when={state() === "completed"}>
           <div class="i-ic:round-check text-2xl text-green-600" />
         </Match>
       </Switch>
