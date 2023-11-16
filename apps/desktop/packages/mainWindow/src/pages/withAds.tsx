@@ -81,9 +81,9 @@ function withAdsLayout() {
             <Outlet />
             <div
               id="ads-layout-container"
-              class="flex flex-col gap-4   pt-5 bg-darkSlate-800 absolute inset-y-0 right-0"
+              class="flex flex-col gap-4 px-5 pt-5 bg-darkSlate-800 justify-start flex-initial"
               style={{
-                width: `${adSize.width}px`
+                width: `${adSize.width + 40}px`
               }}
             >
               <AdsBanner />
