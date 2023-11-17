@@ -8,7 +8,7 @@ use tracing_subscriber::{
 fn generate_logs_filters() -> String {
     let filters = &[
         "debug",
-        "carbon_app=trace",
+        "carbon_app=warn",
         "hyper::client::pool=warn",
         "reqwest::connect=warn",
         "hyper::proto::h1::conn=warn",
