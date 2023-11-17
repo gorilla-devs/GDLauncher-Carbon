@@ -9,68 +9,14 @@ import { createStore } from "solid-js/store";
 import fetchData from "../../instance.data";
 import { Mod as Modtype } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
+import { useRescroller, type RescrollerState } from "@/hooks/rescroll";
 
-type State = {
-  /** The element used to scroll relative to. */
-  scrollRef?: HTMLElement;
-  /** The position to scroll to when the component mounts. */
-  scrollTo?: number;
-};
-
-class Msg {}
-
-/** Sets the ref used to scroll.
- *
- * If the component is due for a rescroll, it will be scrolled to.
- */
-class MsgSetScrollRefAndScrollIfNeeded extends Msg {
-  ref: HTMLElement;
-
-  constructor(ref: HTMLElement) {
-    super();
-
-    this.ref = ref;
-  }
-}
-
-/** Sets the current scroll position. */
-class MsgSetScrollTo {}
-
-/** Notifies the component has unmounted. */
-class MsgCleanup extends Msg {}
-
-function update(state: State, msg: Msg): State {
-  if (msg instanceof MsgSetScrollRefAndScrollIfNeeded) {
-    state.scrollRef = msg.ref;
-
-    state.scrollTo && state.scrollRef.scrollTo(0, state.scrollTo);
-
-    state.scrollTo = undefined;
-  }
-
-  if (msg instanceof MsgSetScrollTo) {
-    state.scrollRef && (state.scrollTo = state.scrollRef.scrollTop);
-
-    console.log("scrollTo set:", state.scrollTo);
-  }
-
-  if (msg instanceof MsgCleanup) {
-    state.scrollRef = undefined;
-  }
-
-  return state;
-}
-
-function initState(initialState: State = {}): [State, (msg: Msg) => void] {
-  const [state, setState] = createStore(initialState);
-
-  return [state, (msg) => setState((state) => update(state, msg))];
-}
-
-const [state, msg] = initState();
+let rescrollerState: RescrollerState | undefined = undefined;
 
 const Mods = () => {
-  onCleanup(() => msg(new MsgCleanup()));
+  const [initRescrollerState, rescroller] = useRescroller(rescrollerState);
+
+  rescrollerState = initRescrollerState;
 
   const [t] = useTransContext();
   const params = useParams();
@@ -136,10 +82,8 @@ const Mods = () => {
     <div
       ref={(ref) =>
         queueMicrotask(() =>
-          msg(
-            new MsgSetScrollRefAndScrollIfNeeded(
-              ref.parentElement!.parentElement!.parentElement!.parentElement!
-            )
+          rescroller.setScrollRefAndScrollIfNeeded(
+            ref.parentElement!.parentElement!.parentElement!.parentElement!
           )
         )
       }
@@ -174,7 +118,7 @@ const Mods = () => {
             type="outline"
             size="medium"
             onClick={() => {
-              msg(new MsgSetScrollTo());
+              rescroller.setScrollToFromCurrentPosition();
 
               navigate(`/mods?instanceId=${params.id}`);
             }}
