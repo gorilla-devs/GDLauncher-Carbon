@@ -1,5 +1,5 @@
 import { Button, Checkbox, Dropdown, Input, Skeleton } from "@gd/ui";
-import { For, Show, createMemo, createSignal } from "solid-js";
+import { For, Show, createMemo, createSignal, onCleanup } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import Mod from "./Mod";
 import skull from "/assets/images/icons/skull.png";
@@ -10,7 +10,68 @@ import fetchData from "../../instance.data";
 import { Mod as Modtype } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
 
+type State = {
+  /** The element used to scroll relative to. */
+  scrollRef?: HTMLElement;
+  /** The position to scroll to when the component mounts. */
+  scrollTo?: number;
+};
+
+class Msg {}
+
+/** Sets the ref used to scroll.
+ *
+ * If the component is due for a rescroll, it will be scrolled to.
+ */
+class MsgSetScrollRefAndScrollIfNeeded extends Msg {
+  ref: HTMLElement;
+
+  constructor(ref: HTMLElement) {
+    super();
+
+    this.ref = ref;
+  }
+}
+
+/** Sets the current scroll position. */
+class MsgSetScrollTo {}
+
+/** Notifies the component has unmounted. */
+class MsgCleanup extends Msg {}
+
+function update(state: State, msg: Msg): State {
+  if (msg instanceof MsgSetScrollRefAndScrollIfNeeded) {
+    state.scrollRef = msg.ref;
+
+    state.scrollTo && state.scrollRef.scrollTo(0, state.scrollTo);
+
+    state.scrollTo = undefined;
+  }
+
+  if (msg instanceof MsgSetScrollTo) {
+    state.scrollRef && (state.scrollTo = state.scrollRef.scrollTop);
+
+    console.log("scrollTo set:", state.scrollTo);
+  }
+
+  if (msg instanceof MsgCleanup) {
+    state.scrollRef = undefined;
+  }
+
+  return state;
+}
+
+function initState(initialState: State = {}): [State, (msg: Msg) => void] {
+  const [state, setState] = createStore(initialState);
+
+  return [state, (msg) => setState((state) => update(state, msg))];
+}
+
+const [state, msg] = initState();
+
 const Mods = () => {
+  onCleanup(() => msg(new MsgCleanup()));
+
   const [t] = useTransContext();
   const params = useParams();
   const navigate = useGDNavigate();
@@ -72,7 +133,17 @@ const Mods = () => {
   };
 
   return (
-    <div>
+    <div
+      ref={(ref) =>
+        queueMicrotask(() =>
+          msg(
+            new MsgSetScrollRefAndScrollIfNeeded(
+              ref.parentElement!.parentElement!.parentElement!.parentElement!
+            )
+          )
+        )
+      }
+    >
       <div class="flex flex-col bg-darkSlate-800 z-10 transition-all duration-100 ease-in-out sticky top-14">
         <div class="flex justify-between items-center gap-1 pb-4 flex-wrap">
           <Input
@@ -103,6 +174,8 @@ const Mods = () => {
             type="outline"
             size="medium"
             onClick={() => {
+              msg(new MsgSetScrollTo());
+
               navigate(`/mods?instanceId=${params.id}`);
             }}
           >
