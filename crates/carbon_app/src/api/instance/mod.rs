@@ -14,7 +14,7 @@ use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AxumError, FeError};
-use crate::managers::instance::log::EntryType;
+use crate::managers::instance::log::LogEntrySourceKind;
 use crate::managers::instance::InstanceMoveTarget;
 use crate::managers::{instance::importer, App, AppInner};
 
@@ -344,11 +344,6 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
         path: String,
     }
 
-    #[derive(Deserialize)]
-    struct LogQuery {
-        id: i32,
-    }
-
     axum::Router::new()
         .route(
             "/instanceIcon",
@@ -412,70 +407,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                 }
             )
         )
-        .route(
-            "/log",
-            axum::routing::get(
-                |State(app): State<Arc<AppInner>>, Query(query): Query<LogQuery>| async move {
-                    let log_rx = app.instance_manager()
-                        .get_log(domain::GameLogId(query.id))
-                        .await;
-
-                    let Ok(mut log_rx) = log_rx else {
-                        return IntoResponse::into_response(StatusCode::NOT_FOUND)
-                    };
-
-                    #[derive(Serialize)]
-                    enum LogEntryType {
-                        System,
-                        StdOut,
-                        StdErr,
-                    }
-
-                    #[derive(Serialize)]
-                    struct LogEntry<'a> {
-                        line: &'a str,
-                        type_: LogEntryType,
-                    }
-
-                    let s = async_stream::stream! {
-                        let mut last_idx = 0;
-
-                        loop {
-                            let new_lines = {
-                                let log = log_rx.borrow();
-
-                                let new_lines = log.get_region(last_idx..).into_iter().map(|line| {
-                                    let entry = LogEntry {
-                                        line: line.text,
-                                        type_: match line.type_ {
-                                            EntryType::System => LogEntryType::System,
-                                            EntryType::StdOut => LogEntryType::StdOut,
-                                            EntryType::StdErr => LogEntryType::StdErr,
-                                        }
-                                    };
-
-                                    serde_json::to_vec(&entry)
-                                        .expect("serialization of a log entry should be infallible")
-                                }).collect::<Vec<_>>();
-
-                                last_idx = log.len();
-                                new_lines
-                            };
-
-                            for line in new_lines {
-                                yield Ok::<_, Infallible>(line)
-                            }
-
-                            if let Err(_) = log_rx.changed().await {
-                                break
-                            }
-                        }
-                    };
-
-                    IntoResponse::into_response((StatusCode::OK, StreamBody::new(s)))
-                }
-            )
-        )
+        .route("/log", axum::routing::get(log::log_handler))
 }
 #[derive(Type, Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct FEGroupId(i32);
@@ -1364,5 +1296,82 @@ impl From<importer::FullImportScanStatus> for FullImportScanStatus {
             scanning: value.scanning,
             status: value.status.into(),
         }
+    }
+}
+
+mod log {
+    use super::*;
+
+    #[derive(Debug, Deserialize)]
+    pub struct LogQuery {
+        id: i32,
+    }
+
+    #[tracing::instrument(skip(app))]
+    pub async fn log_handler(
+        State(app): State<App>,
+        Query(query): Query<LogQuery>,
+    ) -> impl IntoResponse {
+        tracing::info!("starting log stream");
+
+        let log_rx = app
+            .instance_manager()
+            .get_log(domain::GameLogId(query.id))
+            .await;
+
+        let Ok(mut log_rx) = log_rx else {
+            tracing::warn!("log entry not found");
+
+            return StatusCode::NOT_FOUND.into_response();
+        };
+
+        let s = async_stream::stream! {
+            tracing::trace!("starting log stream");
+
+            let mut last_idx = 0;
+
+            loop {
+                tracing::trace!("waiting for log data to come in");
+
+                let new_lines = {
+                    let log = log_rx.borrow();
+
+                    let new_lines
+                        = log
+                            .get_span(last_idx..)
+                            .into_iter()
+                            .inspect(|entry| tracing::trace!(?entry, "received log entry"))
+                            .map(|entry| {
+                                serde_json::to_vec(&entry)
+                                    .expect(
+                                        "serialization of a log entry should be infallible"
+                                    )
+                            })
+                            .collect::<Vec<_>>();
+
+                    last_idx = log.len();
+
+                    new_lines
+                };
+
+
+
+                for line in new_lines {
+                    tracing::trace!("yielding log entry");
+
+                    yield Ok::<_, Infallible>(line)
+                }
+
+
+
+                if let Err(_) = log_rx.changed().await {
+                    tracing::error!("`log_rx` was closed, killing log stream");
+
+                    break
+                }
+            }
+        };
+
+        (StatusCode::OK, StreamBody::new(s)).into_response()
     }
 }
