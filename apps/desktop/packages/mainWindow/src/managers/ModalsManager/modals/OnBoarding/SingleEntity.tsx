@@ -119,7 +119,7 @@ const SingleEntity = (props: {
     <>
       <div class="flex-1 w-full flex flex-col items-center justify-center p-4">
         <div class="flex flex-col items-start justify-start w-full gap-2">
-          <span class="font-bold">{props.entity.entity} path:</span>
+          <span class="font-bold">{`${props.entity.entity} path:`}</span>
           <div class="flex items-center w-full gap-2">
             <Input
               value={path()}
