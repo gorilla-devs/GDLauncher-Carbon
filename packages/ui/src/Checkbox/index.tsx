@@ -18,16 +18,6 @@ function Checkbox(props: Props) {
     setChecked(props.checked);
   });
 
-  const getColor = () => {
-    if (checked() && props.indeterminate) {
-      return "bg-light-300";
-    } else if (checked() && !props.disabled) {
-      return "bg-primary-500";
-    } else if (!checked()) {
-      return "bg-darkSlate-500";
-    }
-    return "bg-darkSlate-900";
-  };
   const getBackgroundColor = () => {
     if (checked() && props.indeterminate) {
       return "rgba(209, 213, 219, 0.2)"; // bg-light-300 with 20% opacity
