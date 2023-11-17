@@ -9,7 +9,7 @@ export type RescrollerState = {
 
 export type Rescroller = {
   /** Sets the element to scroll. */
-  setScrollRefAndScrollIfNeeded: (ref: HTMLElement) => void;
+  setScrollRefAndScrollIfNeeded: (_ref: HTMLElement) => void;
   /** Queues scrolling for this component on next remount. */
   setScrollToFromCurrentPosition: () => void;
 };

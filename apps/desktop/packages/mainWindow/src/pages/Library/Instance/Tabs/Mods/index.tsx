@@ -1,5 +1,5 @@
 import { Button, Checkbox, Dropdown, Input, Skeleton } from "@gd/ui";
-import { For, Show, createMemo, createSignal, onCleanup } from "solid-js";
+import { For, Show, createMemo, createSignal } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import Mod from "./Mod";
 import skull from "/assets/images/icons/skull.png";
