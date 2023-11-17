@@ -1,12 +1,12 @@
 import { getInstanceIdFromPath } from "@/utils/routes";
-import { rspc } from "@/utils/rspcClient";
+import { queryClient, rspc } from "@/utils/rspcClient";
 import { getForgeModloaderIcon } from "@/utils/sidebar";
 import { Mod as ModType } from "@gd/core_module/bindings";
-import { Checkbox, Switch } from "@gd/ui";
+import { Checkbox, Popover, Switch } from "@gd/ui";
 import { useLocation, useParams } from "@solidjs/router";
 import { SetStoreFunction, produce } from "solid-js/store";
 import { For, Show, createResource } from "solid-js";
-import { fetchModImage, getModpackPlatformIcon } from "@/utils/instances";
+import { getModImageUrl, getModpackPlatformIcon } from "@/utils/instances";
 
 type Props = {
   mod: ModType;
@@ -19,14 +19,54 @@ type Props = {
 };
 
 const Mod = (props: Props) => {
-  const enableModMutation = rspc.createMutation(["instance.enableMod"]);
-  const disableModMutation = rspc.createMutation(["instance.disableMod"]);
-  const deleteModMutation = rspc.createMutation(["instance.deleteMod"]);
   const params = useParams();
 
   const location = useLocation();
 
   const instanceId = () => getInstanceIdFromPath(location.pathname);
+
+  const enableModMutation = rspc.createMutation(["instance.enableMod"], {
+    onMutate: (data) => {
+      console.log(data.mod_id);
+
+      queryClient.setQueryData(
+        ["instance.getInstanceMods", data.instance_id],
+        (oldData: ModType[] | undefined) => {
+          const modIndex = oldData?.findIndex((mod) => mod.id === data.mod_id)!;
+          return [
+            ...oldData!.slice(0, modIndex),
+            {
+              ...oldData![modIndex],
+              enabled: true
+            },
+            ...oldData!.slice(modIndex + 1)
+          ];
+        }
+      );
+    }
+  });
+
+  const disableModMutation = rspc.createMutation(["instance.disableMod"], {
+    onMutate: (data) => {
+      console.log(data.mod_id);
+      queryClient.setQueryData(
+        ["instance.getInstanceMods", data.instance_id],
+        (oldData: ModType[] | undefined) => {
+          const modIndex = oldData?.findIndex((mod) => mod.id === data.mod_id)!;
+          return [
+            ...oldData!.slice(0, modIndex),
+            {
+              ...oldData![modIndex],
+              enabled: false
+            },
+            ...oldData!.slice(modIndex + 1)
+          ];
+        }
+      );
+    }
+  });
+
+  const deleteModMutation = rspc.createMutation(["instance.deleteMod"]);
 
   const imagePlatform = () => {
     if (props.mod.curseforge?.has_image) return "curseforge";
@@ -34,12 +74,6 @@ const Mod = (props: Props) => {
     else if (props.mod.metadata?.has_image) return "metadata";
     else return null;
   };
-
-  const [imageResource] = createResource(
-    () => [params.id, props.mod.id, imagePlatform()] as const,
-    ([instanceId, modId, platform]) =>
-      fetchModImage(instanceId, modId, platform)
-  );
 
   const isCurseForge = () => props.mod.curseforge;
 
@@ -68,7 +102,11 @@ const Mod = (props: Props) => {
           <div class="flex items-center gap-2">
             <div class="flex items-center justify-center h-10 w-10 rounded-xl border-solid overflow-hidden border-darkSlate-500 border">
               <Show
-                when={imageResource()}
+                when={
+                  props.mod.curseforge?.has_image ||
+                  props.mod.modrinth?.has_image ||
+                  props.mod.metadata?.has_image
+                }
                 fallback={
                   <img
                     class="w-full"
@@ -78,7 +116,10 @@ const Mod = (props: Props) => {
                   />
                 }
               >
-                <img class="w-full h-full" src={imageResource()} />
+                <img
+                  class="w-full h-full"
+                  src={getModImageUrl(params.id, props.mod.id, imagePlatform())}
+                />
               </Show>
             </div>
             <div class="flex flex-col">
@@ -113,6 +154,8 @@ const Mod = (props: Props) => {
         </div>
         <span class="flex gap-4 justify-center items-center">
           {/* //TODO: ADD CONFIRMATION MODAL */}
+          <Show when={props.mod.curseforge}>CF</Show>
+          <Show when={props.mod.modrinth}>MR</Show>
           <Switch
             checked={props.mod.enabled}
             onChange={(e) => {
@@ -131,15 +174,6 @@ const Mod = (props: Props) => {
             }}
           />
           <div
-            class="text-2xl text-darkSlate-500 duration-100 ease-in-out cursor-pointer transition-color hover:text-white i-ri:arrow-left-right-fill"
-            onClick={() => {
-              deleteModMutation.mutate({
-                instance_id: parseInt(params.id, 10),
-                mod_id: props.mod.id
-              });
-            }}
-          />
-          <div
             class="text-2xl text-darkSlate-500 duration-100 ease-in-out cursor-pointer i-ri:delete-bin-2-fill transition-color hover:text-red-500"
             onClick={() => {
               deleteModMutation.mutate({
@@ -148,6 +182,23 @@ const Mod = (props: Props) => {
               });
             }}
           />
+
+          <Popover
+            noPadding
+            noTip
+            content={
+              <div
+                onClick={(e) => e.stopPropagation()}
+                class="w-40 h-40 bg-red"
+              >
+                Hi
+              </div>
+            }
+            placement="left-end"
+            color="bg-darkSlate-900"
+          >
+            <div class="text-2xl text-darkSlate-500 duration-100 ease-in-out cursor-pointer i-ri:information-fill transition-color hover:text-white" />
+          </Popover>
         </span>
       </div>
     </div>

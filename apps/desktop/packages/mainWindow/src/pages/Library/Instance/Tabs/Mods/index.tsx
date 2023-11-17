@@ -1,18 +1,11 @@
-import { Button, Checkbox, Dropdown, Input, Skeleton } from "@gd/ui";
-import {
-  For,
-  Show,
-  batch,
-  createEffect,
-  createMemo,
-  createSignal
-} from "solid-js";
+import { Button, Checkbox, Input, Skeleton } from "@gd/ui";
+import { For, Show, batch, createMemo, createSignal } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import Mod from "./Mod";
 import skull from "/assets/images/icons/skull.png";
 import { useParams, useRouteData } from "@solidjs/router";
 import { rspc } from "@/utils/rspcClient";
-import { createStore, produce } from "solid-js/store";
+import { createStore, produce, reconcile } from "solid-js/store";
 import fetchData from "../../instance.data";
 import { Mod as Modtype } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
@@ -72,30 +65,37 @@ const Mods = () => {
     return 0;
   };
 
-  createEffect(() => {
-    console.log(
-      "Indeterminate",
+  const isSelectAllIndeterminate = () => {
+    return (
+      Object.keys(selectedMods).length > 0 &&
       Object.keys(selectedMods).length !== routeData.instanceMods.data?.length
     );
-    console.log("Cheecked", Object.keys(selectedMods).length > 0);
-  });
+  };
 
   return (
     <div>
       <div
-        class="flex items-center fixed opacity-0 justify-between bottom-4 h-16 bg-darkSlate-900 mx-auto left-1/2 -translate-x-1/2 rounded-md px-6 z-50 shadow-md shadow-darkSlate-900 transition-opacity duration-100 ease-in-out w-130 border-darkSlate-700 border-solid border-1"
+        class="flex items-center fixed justify-between bottom-4 h-16 bg-darkSlate-900 mx-auto left-1/2 -translate-x-1/2 rounded-md pr-6 z-50 shadow-md shadow-darkSlate-900 transition-transform duration-100 ease-in-out origin-left w-130 border-darkSlate-700 border-solid border-1"
         classList={{
-          "opacity-100": Object.keys(selectedMods).length > 0
+          "translate-y-24": Object.keys(selectedMods).length === 0
         }}
       >
-        <div>
-          <Trans
-            key="instance_selected_mods_count"
-            options={{
-              total: routeData.instanceMods.data?.length,
-              selected: Object.keys(selectedMods).length
-            }}
-          />
+        <div class="flex items-center h-full">
+          <div
+            class="flex items-center text-darkSlate-50 hover:text-white h-full px-6 mr-2"
+            onClick={() => setSelectedMods(reconcile({}))}
+          >
+            <div class="i-ri:close-fill text-2xl" />
+          </div>
+          <div class="text-darkSlate-50">
+            <Trans
+              key="instance_selected_mods_count"
+              options={{
+                total: routeData.instanceMods.data?.length,
+                selected: Object.keys(selectedMods).length
+              }}
+            />
+          </div>
         </div>
         <div
           class="flex items-center gap-2 cursor-pointer text-darkSlate-50 hover:text-red-500 transition duration-100 ease-in-out"
@@ -115,33 +115,37 @@ const Mods = () => {
 
       <div class="flex flex-col bg-darkSlate-800 transition-all duration-100 ease-in-out z-10 sticky top-14 px-6">
         <div class="flex justify-between items-center gap-1 pb-4 flex-wrap">
-          <div class="flex items-center gap-2 cursor-pointer">
+          <div class="flex items-center gap-4 cursor-pointer">
             <Checkbox
-              indeterminate={
-                Object.keys(selectedMods).length !==
-                routeData.instanceMods.data?.length
-              }
+              indeterminate={isSelectAllIndeterminate()}
               checked={Object.keys(selectedMods).length > 0}
               onChange={(checked) => {
-                batch(() => {
-                  routeData.instanceMods.data?.forEach((mod) => {
-                    if (checked) {
-                      setSelectedMods((prev) => ({ ...prev, [mod.id]: true }));
-                    } else
-                      setSelectedMods(produce((prev) => delete prev[mod.id]));
-                  });
-                });
+                let action = checked;
+
+                if (isSelectAllIndeterminate()) {
+                  action = true;
+                }
+
+                setSelectedMods(
+                  produce((prev) => {
+                    for (const mod of routeData.instanceMods.data || []) {
+                      prev[mod.id] = action || undefined!;
+                    }
+
+                    return prev;
+                  })
+                );
               }}
             />
+            <Input
+              onInput={(e) => setFilter(e.target.value)}
+              placeholder={t("instance.mods.search")}
+              icon={<div class="i-ri:search-line" />}
+              class="text-darkSlate-50 rounded-full"
+            />
           </div>
-          <Input
-            onInput={(e) => setFilter(e.target.value)}
-            placeholder={t("instance.mods.search")}
-            icon={<div class="i-ri:search-line" />}
-            class="text-darkSlate-50 rounded-full"
-          />
           <div class="flex items-center gap-3">
-            <p class="text-darkSlate-50">
+            {/* <p class="text-darkSlate-50">
               <Trans key="instance.sort_by" />
             </p>
             <Dropdown
@@ -151,7 +155,18 @@ const Mods = () => {
               ]}
               value={"asc"}
               rounded
-            />
+            /> */}
+            <div
+              class="flex items-center gap-2 cursor-pointer duration-100 ease-in-out transition hover:text-white text-darkSlate-50"
+              onClick={() => {
+                openFolderMutation.mutate({
+                  folder: "Mods",
+                  instance_id: parseInt(params.id, 10)
+                });
+              }}
+            >
+              <span class="text-2xl i-ri:filter-line" />
+            </div>
             <Button
               type="outline"
               size="medium"

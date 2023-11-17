@@ -47,8 +47,10 @@ export default function getAdSize() {
       width: 1560,
       height: 740,
       adSize: {
-        width: 400,
-        height: 300
+        // width: 400,
+        // height: 300
+        width: 160,
+        height: 600
       }
     };
   }
