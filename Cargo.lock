@@ -410,6 +410,7 @@ dependencies = [
  "carbon_compression",
  "carbon_macro",
  "carbon_net",
+ "carbon_parsing",
  "chrono",
  "daedalus",
  "derive_more",
@@ -430,6 +431,7 @@ dependencies = [
  "markdown",
  "md-5",
  "murmurhash32",
+ "nom",
  "num_cpus",
  "opener",
  "openssl",
@@ -503,6 +505,14 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "carbon_parsing"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "nom",
 ]
 
 [[package]]
