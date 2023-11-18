@@ -38,6 +38,7 @@ declare global {
     installUpdate: () => void;
     downloadUpdate: () => void;
     openExternalLink: (link: string) => void;
+    openFolder: (path: string) => void;
     copyToClipboard: (text: string) => void;
     openCMPWindow: () => void;
     getCoreModulePort: () => Promise<number>;

@@ -99,6 +99,10 @@ async function createWindow() {
     return { platform: os.platform(), arch: os.arch() };
   });
 
+  ipcMain.handle("openFolder", async (_, path) => {
+    shell.openPath(path);
+  });
+
   ipcMain.handle("openCMPWindow", async () => {
     // @ts-ignore
     app.overwolf.openCMPWindow();

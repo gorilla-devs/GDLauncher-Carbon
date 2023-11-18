@@ -195,6 +195,8 @@
   "onboarding.begin_import": "Begin import",
   "instance.no_instance_found": "No Instances found on this path",
   "instance.select_path": "select a path",
+  "instance.exported_to": "Exported correctly to",
+  "instance.open_folder": "Open the folder",
   "onboarding.scan_target_path": "Scan target path:",
   "onboarding.import_instance_or_zip": "Import instance / Zip",
   "onboarding.java_title": "Do you want the launcher to automatically handle java for you? It will also download a managed java version if you don't have a correct one",
