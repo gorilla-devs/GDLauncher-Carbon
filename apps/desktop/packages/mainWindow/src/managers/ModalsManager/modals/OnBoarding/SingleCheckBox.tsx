@@ -1,42 +1,35 @@
 import { Checkbox } from "@gd/ui";
-import { Setter, createEffect, createSignal } from "solid-js";
+import { Setter } from "solid-js";
 import { instances } from "./SingleEntity";
 
 interface Props {
   title?: string;
-  setList?: (_list: Setter<never[]>) => void;
+  setList?: Setter<never[]>;
   setInstance?: (_instance: string | undefined) => void;
   isSingleInstance?: boolean;
 }
 
 const SingleCheckBox = (props: Props) => {
-  const [checked, setChecked] = createSignal(false);
-
-  createEffect(() => {
-    if (props.isSingleInstance && props.setInstance) {
-      if (checked()) {
-        props.setInstance(props.title);
-      } else {
-        props.setInstance("");
-      }
-      return;
-    }
-    if (props.setList) {
-      if (checked()) {
-        props.setList((list: any) => [...list, props.title]);
-      } else {
-        props.setList((list: any) =>
-          list.filter((e: any) => e !== props.title)
+  const handleChange = () => {
+    if (instances().some((instance) => instance === props.title)) {
+      if (props.setList) {
+        props.setList((prev: any) =>
+          prev.filter((e: any) => e !== props.title)
         );
       }
+    } else {
+      if (props.setList) {
+        props.setList((prev: any) => [...prev, props.title] as never);
+      }
     }
-  });
+  };
   return (
     <Checkbox
       children={<span class="text-sm">{props.title}</span>}
-      checked={instances().find((e: any) => e === props.title)}
-      onChange={setChecked}
+      checked={instances().some((instance) => instance === props.title)}
+      onChange={handleChange}
     />
   );
 };
+
 export default SingleCheckBox;

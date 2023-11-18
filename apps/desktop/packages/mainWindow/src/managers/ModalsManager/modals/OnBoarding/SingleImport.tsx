@@ -2,7 +2,7 @@ import { setTaskId } from "@/utils/import";
 import { setTaskIds, taskIds } from "@/utils/import";
 import { isProgressFailed } from "@/utils/instances";
 import { rspc, rspcFetch } from "@/utils/rspcClient";
-import { Trans } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Progressbar } from "@gd/ui";
 import { Match, Switch, createEffect, createSignal } from "solid-js";
 
@@ -13,6 +13,7 @@ const SingleImport = (props: {
   instanceIndex: number;
   instanceName: string;
 }) => {
+  const [t] = useTransContext();
   const [progress, setProgress] = createSignal(0);
   const [state, setState] = createSignal("idle");
   const importInstanceMutation = rspc.createMutation(
@@ -98,7 +99,7 @@ const SingleImport = (props: {
             <div class="font-semibold">{progress()}%</div>
           </div>
         </Match>
-        <Match when={state() === "failed"}>
+        <Match when={state() === t("instance.failed")}>
           <div>
             <Button
               type="primary"
