@@ -18,28 +18,29 @@ function Checkbox(props: Props) {
     setChecked(props.checked);
   });
 
-  const getColor = () => {
-    if (checked() && !props.disabled) {
-      return "bg-primary-500";
+  const getBackgroundColor = () => {
+    if (checked() && props.indeterminate) {
+      return "rgba(209, 213, 219, 0.2)"; // bg-light-300 with 20% opacity
+    } else if (checked() && !props.disabled) {
+      return "rgba(43, 107, 177, 1.0)"; // bg-primary-500 with 100% opacity
     } else if (!checked()) {
-      return "bg-darkSlate-500";
+      return "rgba(64, 71, 89, 1.0)"; // bg-darkSlate-500 with 100% opacity
     }
-    return "bg-darkSlate-900";
+    return "hsla(224, 16%, 10%, 1)"; // bg-darkSlate-900 with 100% opacity
   };
-
   return (
-    <div class="flex justify-center items-center h-5 w-5 min-w-5 min-h-5 rounded-md gap-2 font-sans ">
+    <div class="flex  rounded-md items-center gap-2 font-sans">
       <div
-        class={`flex justify-center items-center  ${
-          !checked() || (checked() && !props.indeterminate)
-            ? "h-5 w-5 min-w-5 min-h-5 rounded-md"
-            : "rounded-sm"
-        } hover:border-lightGray hover:border-1 box-border cursor-pointer ${getColor()}`}
-        classList={{
-          // "bg-primary-500": checked() && !props.disabled,
-          // "bg-darkSlate-500": !checked(),
-          // "bg-darkSlate-900": props.disabled,
-          "h-3 w-3 min-w-3 min-h-3": props.indeterminate && checked(),
+        class={`flex justify-center items-center h-5 w-5 min-w-5 min-h-5 rounded-md hover:border-lightGray hover:border-1 box-border cursor-pointer `}
+        classList={
+          {
+            // "bg-primary-500": checked() && !props.disabled,
+            // "bg-darkSlate-500": !checked(),
+            // "bg-darkSlate-900": props.disabled,
+          }
+        }
+        style={{
+          "background-color": getBackgroundColor(),
         }}
         onClick={() => {
           if (!props.disabled) {
@@ -58,7 +59,7 @@ function Checkbox(props: Props) {
           />
         </Show>
         <Show when={checked() && props.indeterminate}>
-          <div class="h-5 w-5 min-w-5  min-h-5 rounded-md  opacity-20 bg-light-300" />
+          <div class="h-3 w-3 min-w-3 min-h-3 rounded-sm   bg-primary-500" />
         </Show>
       </div>
       <Show when={props.children}>{props.children}</Show>

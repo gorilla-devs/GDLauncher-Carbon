@@ -31,7 +31,7 @@ const Authors = (props: Props) => {
   return (
     <Switch>
       <Match when={isCurseForgeData(modProps())}>
-        <div class="text-sm whitespace-nowrap flex gap-2">
+        <div class="text-sm flex gap-2 whitespace-nowrap">
           <Switch>
             <Match when={!props?.isRowSmall?.()}>
               <For

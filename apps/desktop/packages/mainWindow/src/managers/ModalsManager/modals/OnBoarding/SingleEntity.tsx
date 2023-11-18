@@ -4,7 +4,7 @@ import {
   ImportableInstance,
   InvalidImportEntry
 } from "@gd/core_module/bindings";
-import { Button, Checkbox, Input } from "@gd/ui";
+import { Button, Checkbox, Input, Tooltip } from "@gd/ui";
 import {
   For,
   Match,
@@ -18,6 +18,7 @@ import { createStore } from "solid-js/store";
 import SingleCheckBox from "./SingleCheckBox";
 import BeginImportStep from "./BeginImportStep";
 import { Trans, useTransContext } from "@gd/i18n";
+import { setTaskIds } from "@/utils/import";
 
 const [step, setStep] = createSignal("selectionStep");
 const [instances, setInstances] = createSignal([]);
@@ -117,68 +118,97 @@ const SingleEntity = (props: {
   return (
     <>
       <div class="flex-1 w-full flex flex-col items-center justify-center p-4">
-        <div class="flex items-center justify-between w-full gap-2">
+        <div class="flex flex-col items-start justify-start w-full gap-2">
           <span class="font-bold">
-            <Trans
-              options={{ defaultValue: "Scan target path:" }}
-              key="onboarding.scan_target_path"
-            />
+            {props.entity.entity} <Trans key="instance.import_path" />:
           </span>
-          <Input
-            value={path()}
-            onInput={(e) => {
-              setInputValue(e.currentTarget.value);
-            }}
-            onBlur={() => {
-              if (inputValue() && inputValue() !== path()) {
-                setPath(inputValue());
+          <div class="flex items-center w-full gap-2">
+            <Input
+              value={path()}
+              onInput={(e) => {
+                setInputValue(e.currentTarget.value);
+              }}
+              onBlur={() => {
+                if (inputValue() && inputValue() !== path()) {
+                  setPath(inputValue());
+                }
+              }}
+              class="flex-1"
+              inputColor="bg-darkSlate-800"
+              icon={
+                <div
+                  onClick={() => {
+                    setPath("");
+                  }}
+                  class="i-ri:close-line bg-darkSlate-50 hover:bg-white"
+                />
               }
-            }}
-            class="flex-1 border-2 border-solid border-zinc-500"
-            icon={
-              <div class="flex gap-2">
-                <div
-                  onClick={async () => {
-                    const result = await window.openFileDialog({
-                      title: "Select Runtime Path",
-                      defaultPath: path() || "",
-                      properties: ["openFile", "openDirectory"]
-                    });
+            />
+            <div class="flex gap-2">
+              <Show when={entityDefaultPath.data}>
+                <Tooltip content={<Trans key="tooltip.reset" />}>
+                  <div class="flex items-center justify-center p-2 bg-darkSlate-800 rounded-lg text-darkSlate-50 hover:text-white">
+                    <div
+                      onClick={async () => {
+                        setPath(entityDefaultPath.data!);
+                      }}
+                      class="text-xl i-ri:arrow-go-back-fill"
+                    />
+                  </div>
+                </Tooltip>
+              </Show>
+              <Show when={props.entity.selection_type === "directory"}>
+                <Tooltip content={<Trans key="instance.select_path" />}>
+                  <div class="flex items-center justify-center p-2 bg-darkSlate-800 rounded-lg text-darkSlate-50 hover:text-white">
+                    <div
+                      onClick={async () => {
+                        const result = await window.openFileDialog({
+                          title: t("instance.select_path"),
+                          defaultPath: path() || "",
+                          properties: ["openFile", "openDirectory"]
+                        });
 
-                    if (result.canceled) {
-                      return;
-                    }
+                        if (result.canceled) {
+                          return;
+                        }
 
-                    setPath(result.filePaths[0]);
-                  }}
-                  class="i-ic:round-folder text-2xl text-yellow-300 cursor-pointer"
-                />
-                <div
-                  onClick={async () => {
-                    const result = await window.openFileDialog({
-                      title: "Select Runtime Path",
-                      defaultPath: path() || "",
-                      properties: ["openFile"],
-                      filters: [
-                        { name: "ZIP Files", extensions: ["zip"] },
-                        { name: "All Files", extensions: ["*"] }
-                      ]
-                    });
+                        setPath(result.filePaths[0]);
+                      }}
+                      class="text-xl i-ri:folder-line"
+                    />
+                  </div>
+                </Tooltip>
+              </Show>
+              <Show when={props.entity.selection_type === "file"}>
+                <Tooltip content={<Trans key="instance.select_zip" />}>
+                  <div class="flex items-center justify-center p-2 bg-darkSlate-800 rounded-lg text-darkSlate-50 hover:text-white">
+                    <div
+                      onClick={async () => {
+                        const result = await window.openFileDialog({
+                          title: t("instance.select_zip"),
+                          defaultPath: path() || "",
+                          properties: ["openFile"],
+                          filters: [
+                            { name: "ZIP Files", extensions: ["zip"] },
+                            { name: "All Files", extensions: ["*"] }
+                          ]
+                        });
 
-                    if (result.canceled) {
-                      return;
-                    }
+                        if (result.canceled) {
+                          return;
+                        }
 
-                    setPath(result.filePaths[0]);
-                  }}
-                  class="i-solar:file-bold text-2xl text-blue-500 cursor-pointer"
-                />
-              </div>
-            }
-          />
+                        setPath(result.filePaths[0]);
+                      }}
+                      class="text-xl i-ri:file-zip-line"
+                    />
+                  </div>
+                </Tooltip>
+              </Show>
+            </div>
+          </div>
         </div>
-
-        <div class="flex-1 w-full flex items-start justify-start border-2 border-gray-500 mt-2 py-2 rounded-md border-solid">
+        <div class="flex-1 w-full flex items-start justify-start mt-2 py-2 rounded-md bg-[#1D2028]">
           <Switch>
             <Match when={step() === "selectionStep"}>
               <Switch
@@ -186,8 +216,8 @@ const SingleEntity = (props: {
                   <div class="w-full h-full flex items-center justify-center">
                     <p class="text-xl text-gray-500">
                       {path()
-                        ? "No Instances found on this path"
-                        : "select a path"}
+                        ? t("instance.no_instance_found")
+                        : t("instance.select_path")}
                     </p>
                   </div>
                 }
@@ -196,12 +226,14 @@ const SingleEntity = (props: {
                   <div class="h-full p-2 w-full flex flex-col gap-4">
                     <Checkbox
                       children={
-                        <span class="text-sm">
+                        <span class="text-sm text-[#8A8B8F]">
                           {t("instance.select_all_mods")}
                         </span>
                       }
-                      indeterminate={true}
                       checked={instances().length !== 0}
+                      indeterminate={
+                        instances().length !== instance.multiResult?.length
+                      }
                       onChange={(e) => {
                         if (e) {
                           setInstances(
@@ -259,18 +291,15 @@ const SingleEntity = (props: {
             setInstances([]);
           }}
         >
-          <Trans
-            options={{ defaultValue: "Go back" }}
-            key="onboarding.go_back"
-          />
+          <Trans key="onboarding.go_back" />
         </Button>
 
-        <span class="font-bold">{props.entity.entity}</span>
         <Show when={step() === "selectionStep"} fallback={<div />}>
           <Button
             disabled={instances().length === 0}
             type="primary"
             onClick={() => {
+              setTaskIds(undefined);
               setStep("importStep");
             }}
           >
