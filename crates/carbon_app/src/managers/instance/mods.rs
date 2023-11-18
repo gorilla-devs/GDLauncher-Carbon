@@ -1,6 +1,7 @@
 use anyhow::bail;
 use thiserror::Error;
 
+use crate::api::keys::instance::INSTANCE_MODS;
 use crate::db::{
     curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
     modrinth_mod_cache as mrdb,
@@ -122,7 +123,7 @@ impl ManagerRef<'_, InstanceManager> {
             .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
             .exec()
             .await?
-            .ok_or(InvalidInstanceModIdError(instance_id, id))?;
+            .ok_or(InvalidInstanceModIdError(instance_id, id.clone()))?;
 
         let mut disabled_path = self
             .app
@@ -161,10 +162,17 @@ impl ManagerRef<'_, InstanceManager> {
         }
 
         self.app
-            .meta_cache_manager()
-            .queue_caching(instance_id, true)
-            .await;
+            .prisma_client
+            .mod_file_cache()
+            .update(
+                fcdb::UniqueWhereParam::IdEquals(id),
+                vec![fcdb::SetParam::SetEnabled(enabled)],
+            )
+            .exec()
+            .await?;
 
+        self.app
+            .invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
         Ok(())
     }
 
