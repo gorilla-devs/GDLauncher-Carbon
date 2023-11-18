@@ -1,8 +1,6 @@
 import { useTransContext } from "@gd/i18n";
 import { Button } from "@gd/ui";
-import { shell } from "electron";
 import CheckIcon from "./CheckIcon";
-import { pathExists } from "fs-extra";
 
 export default function ExportDone(props: { path: string }) {
   const [t] = useTransContext();
@@ -17,12 +15,9 @@ export default function ExportDone(props: { path: string }) {
       <Button
         style={{ width: "100%", "max-width": "100%" }}
         type="primary"
-        // onClick={async () => {
-        //   const exists = await pathExists(props.path);
-        //   if (exists) {
-        //     window.openFolder(props.path);
-        //   }
-        // }}
+        onClick={async () => {
+          window.openFolder(props.path);
+        }}
       >
         <div class="i-ri:folder-line" />
         <span>{t("instance.open_folder")}</span>
