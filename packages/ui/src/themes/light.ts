@@ -83,6 +83,8 @@ const lightTheme: Theme = {
   "green-700": "hsla(126, 60%, 42%, 1)",
   "green-800": "hsla(126, 60%, 38%, 1)",
   "green-900": "hsla(126, 60%, 34%, 1)",
+  "brands-curseforge": "#f16436",
+  "brands-modrinth": "#1bd96a",
 };
 
 export { lightTheme };

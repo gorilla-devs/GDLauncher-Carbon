@@ -235,7 +235,7 @@ const General = () => {
             />
           </Title>
           <RightHandSide>
-            <Switch checked={false} />
+            <Switch />
           </RightHandSide>
         </Row>
         <Row>

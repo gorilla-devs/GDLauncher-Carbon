@@ -388,7 +388,9 @@ const ModRow = (props: ModRowProps) => {
                                       fileId,
                                       getProjectId(props)
                                     ),
-                                    instance_id: instanceId() as number
+                                    instance_id: instanceId() as number,
+                                    install_deps: true,
+                                    replaces_mod: null
                                   });
                                 }
                               });

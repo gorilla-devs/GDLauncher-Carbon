@@ -206,10 +206,10 @@ const ModsBrowser = () => {
             <Skeleton.filters />
           </Match>
           <Match when={hasFiltersData()}>
-            <div class="flex flex-col bg-darkSlate-800 top-0 z-10 left-0 right-0 sticky">
+            <div class="flex flex-col bg-darkSlate-800 top-0 z-10 sticky left-0 right-0">
               <Show when={instanceDetails()}>
                 <div
-                  class="border-1 border-solid h-10 mb-4 rounded-lg overflow-hidden p-2 box-border flex items-center justify-between border-darkSlate-500 relative"
+                  class="border-1 border-solid h-10 mb-4 rounded-lg overflow-hidden box-border flex items-center justify-between border-darkSlate-500 relative p-2"
                   style={{
                     "background-image": imageResource()
                       ? `url("${imageResource()}")`
@@ -226,13 +226,13 @@ const ModsBrowser = () => {
                       type="outline"
                       size="small"
                       icon={
-                        <i class="i-ri:arrow-left-s-line text-darkSlate-50 cursor-pointer hover:text-white transition tranition-color" />
+                        <i class="text-darkSlate-50 cursor-pointer hover:text-white transition i-ri:arrow-left-s-line tranition-color" />
                       }
                     >
                       <Trans key="instance.go_to_installed_mods" />
                     </Button>
                     <div
-                      class="w-6 h-6 bg-center bg-cover"
+                      class="bg-center bg-cover w-6 h-6"
                       style={{
                         "background-image": imageResource()
                           ? `url("${imageResource()}")`
@@ -326,7 +326,7 @@ const ModsBrowser = () => {
           </Match>
         </Switch>
         <div
-          class="flex flex-col gap-2 left-0 right-0 absolute bottom-0 pb-5 overflow-y-hidden"
+          class="flex flex-col gap-2 left-0 right-0 absolute overflow-y-hidden bottom-0 pb-5"
           style={{
             top: `${headerHeight()}px`
           }}
@@ -339,7 +339,7 @@ const ModsBrowser = () => {
               }
             >
               <div
-                class="h-full rounded-xl overflow-y-auto overflow-x-hidden pr-2 ml-5"
+                class="h-full rounded-xl overflow-x-hidden pr-2 overflow-y-auto ml-5"
                 ref={(el) => {
                   infiniteQuery.setParentRef(el);
                 }}
