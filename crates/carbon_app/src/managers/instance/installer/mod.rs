@@ -4,7 +4,10 @@ use std::{ops::Deref, pin::Pin, sync::Arc, time::Duration};
 use tokio::{sync::Mutex, task::AbortHandle};
 
 use crate::{
-    api::{keys::instance::INSTANCE_DETAILS, translation::Translation},
+    api::{
+        keys::instance::{INSTANCE_DETAILS, INSTANCE_MODS},
+        translation::Translation,
+    },
     domain::{
         self,
         instance::{self, InstanceId},
@@ -497,6 +500,7 @@ impl Installer {
                         }?;
 
                         app_clone.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
+                        app_clone.invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
                         Ok::<_, anyhow::Error>(())
                     })()
                     .await;

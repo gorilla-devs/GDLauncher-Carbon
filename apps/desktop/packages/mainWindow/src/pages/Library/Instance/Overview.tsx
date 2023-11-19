@@ -50,13 +50,13 @@ const Overview = () => {
 
         <Show
           when={
-            routeData.instanceMods.data &&
+            routeData.instanceMods &&
             (routeData.instanceDetails.data?.modloaders.length || 0) > 0
           }
         >
           <Card
             title={t("instance.overview_card_mods_title")}
-            text={routeData.instanceMods.data?.length || 0}
+            text={routeData.instanceMods?.length || 0}
             icon="cart"
             class="flex-1"
           />

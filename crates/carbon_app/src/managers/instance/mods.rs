@@ -363,7 +363,7 @@ mod test {
             .await;
 
         app.instance_manager()
-            .install_curseforge_mod(instance_id, 331723, 4022327)
+            .install_curseforge_mod(instance_id, 331723, 4022327, true, None)
             .await?;
 
         // first invalidation will happen when the mod is scanned locally

@@ -375,7 +375,7 @@ const Instance = () => {
         }}
       >
         <div class="h-full bg-gradient-to-t from-darkSlate-800">
-          <div class="z-10 sticky top-5 left-5 w-fit">
+          <div class="z-50 sticky top-5 left-5 w-fit">
             <Button
               onClick={() => navigate("/library")}
               icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}

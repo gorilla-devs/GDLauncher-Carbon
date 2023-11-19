@@ -1,5 +1,5 @@
-import { Button, Checkbox, Input, Skeleton } from "@gd/ui";
-import { For, Show, batch, createMemo, createSignal } from "solid-js";
+import { Button, Checkbox, Input, Skeleton, Switch } from "@gd/ui";
+import { For, Show, createMemo, createSignal } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import Mod from "./Mod";
 import skull from "/assets/images/icons/skull.png";
@@ -16,7 +16,7 @@ const Mods = () => {
   const navigate = useGDNavigate();
 
   const [filter, setFilter] = createSignal("");
-  const [selectedMods, setSelectedMods] = createStore<{
+  const [selectedModsMap, setSelectedModsMap] = createStore<{
     [id: string]: boolean;
   }>({});
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -31,11 +31,15 @@ const Mods = () => {
 
   const filteredMods = createMemo(() =>
     filter()
-      ? routeData.instanceMods.data?.filter((item) =>
+      ? routeData.instanceMods?.filter((item) =>
           item.filename.toLowerCase().includes(filter().toLowerCase())
         )
-      : routeData.instanceMods.data
+      : routeData.instanceMods
   );
+
+  const selectedMods = createMemo(() => {
+    return routeData.instanceMods?.filter((mod) => selectedModsMap[mod.id]);
+  });
 
   const NoMods = () => {
     return (
@@ -67,8 +71,8 @@ const Mods = () => {
 
   const isSelectAllIndeterminate = () => {
     return (
-      Object.keys(selectedMods).length > 0 &&
-      Object.keys(selectedMods).length !== routeData.instanceMods.data?.length
+      (selectedMods()?.length || 0) > 0 &&
+      selectedMods()?.length !== routeData.instanceMods?.length
     );
   };
 
@@ -77,13 +81,13 @@ const Mods = () => {
       <div
         class="flex items-center fixed justify-between bottom-4 h-16 bg-darkSlate-900 mx-auto left-1/2 -translate-x-1/2 rounded-md pr-6 z-50 shadow-md shadow-darkSlate-900 transition-transform duration-100 ease-in-out origin-left w-130 border-darkSlate-700 border-solid border-1"
         classList={{
-          "translate-y-24": Object.keys(selectedMods).length === 0
+          "translate-y-24": selectedMods()?.length === 0
         }}
       >
         <div class="flex items-center h-full">
           <div
             class="flex items-center text-darkSlate-50 hover:text-white h-full px-6 mr-2"
-            onClick={() => setSelectedMods(reconcile({}))}
+            onClick={() => setSelectedModsMap(reconcile({}))}
           >
             <div class="i-ri:close-fill text-2xl" />
           </div>
@@ -91,25 +95,62 @@ const Mods = () => {
             <Trans
               key="instance_selected_mods_count"
               options={{
-                total: routeData.instanceMods.data?.length,
-                selected: Object.keys(selectedMods).length
+                total: routeData.instanceMods?.length,
+                selected: selectedMods()?.length
               }}
             />
           </div>
         </div>
-        <div
-          class="flex items-center gap-2 cursor-pointer text-darkSlate-50 hover:text-red-500 transition duration-100 ease-in-out"
-          onClick={() => {
-            Object.keys(selectedMods).forEach((mod) => {
-              deleteModMutation.mutate({
-                instance_id: parseInt(params.id, 10),
-                mod_id: mod
+        <div class="flex items-center gap-4">
+          <Switch
+            isIndeterminate={
+              selectedMods()?.some((mod) => mod.enabled) &&
+              selectedMods()?.some((mod) => !mod.enabled)
+            }
+            checked={selectedMods()?.every((mod) => mod.enabled) || false}
+            onChange={(event) => {
+              let action = event.target.checked;
+
+              if (
+                selectedMods()?.some((mod) => mod.enabled) &&
+                selectedMods()?.some((mod) => !mod.enabled)
+              ) {
+                action = true;
+              }
+
+              const modsThatNeedApply = selectedMods()?.filter(
+                (mod) => mod.enabled !== action
+              );
+
+              for (const mod of modsThatNeedApply || []) {
+                if (action) {
+                  enableModMutation.mutate({
+                    instance_id: parseInt(params.id, 10),
+                    mod_id: mod.id
+                  });
+                } else {
+                  disableModMutation.mutate({
+                    instance_id: parseInt(params.id, 10),
+                    mod_id: mod.id
+                  });
+                }
+              }
+            }}
+          />
+          <div
+            class="flex items-center gap-2 cursor-pointer text-darkSlate-50 hover:text-red-500 transition duration-100 ease-in-out"
+            onClick={() => {
+              Object.keys(selectedModsMap).forEach((mod) => {
+                deleteModMutation.mutate({
+                  instance_id: parseInt(params.id, 10),
+                  mod_id: mod
+                });
               });
-            });
-          }}
-        >
-          <span class="text-2xl i-ri:delete-bin-2-fill" />
-          <Trans key="instance.delete_mod" />
+            }}
+          >
+            <span class="text-2xl i-ri:delete-bin-2-fill" />
+            <Trans key="instance.delete_mod" />
+          </div>
         </div>
       </div>
 
@@ -118,7 +159,7 @@ const Mods = () => {
           <div class="flex items-center gap-4 cursor-pointer">
             <Checkbox
               indeterminate={isSelectAllIndeterminate()}
-              checked={Object.keys(selectedMods).length > 0}
+              checked={(selectedMods()?.length || 0) > 0}
               onChange={(checked) => {
                 let action = checked;
 
@@ -126,9 +167,9 @@ const Mods = () => {
                   action = true;
                 }
 
-                setSelectedMods(
+                setSelectedModsMap(
                   produce((prev) => {
-                    for (const mod of routeData.instanceMods.data || []) {
+                    for (const mod of routeData.instanceMods || []) {
                       prev[mod.id] = action || undefined!;
                     }
 
@@ -156,7 +197,7 @@ const Mods = () => {
               value={"asc"}
               rounded
             /> */}
-            <div
+            {/* <div
               class="flex items-center gap-2 cursor-pointer duration-100 ease-in-out transition hover:text-white text-darkSlate-50"
               onClick={() => {
                 openFolderMutation.mutate({
@@ -166,7 +207,7 @@ const Mods = () => {
               }}
             >
               <span class="text-2xl i-ri:filter-line" />
-            </div>
+            </div> */}
             <Button
               type="outline"
               size="medium"
@@ -193,8 +234,8 @@ const Mods = () => {
       <div class="h-full w-full overflow-y-hidden pb-14">
         <Show
           when={
-            routeData.instanceMods.data &&
-            routeData.instanceMods.data?.length > 0 &&
+            routeData.instanceMods &&
+            routeData.instanceMods?.length > 0 &&
             !routeData.instanceDetails.isLoading
           }
           fallback={<NoMods />}
@@ -202,11 +243,11 @@ const Mods = () => {
           <For
             each={(filteredMods() || []).sort(sortAlphabetically) as Modtype[]}
           >
-            {(props) => (
+            {(mod) => (
               <Mod
-                mod={props}
-                setSelectedMods={setSelectedMods}
-                selectMods={selectedMods}
+                mod={mod}
+                setSelectedMods={setSelectedModsMap}
+                selectMods={selectedModsMap}
               />
             )}
           </For>

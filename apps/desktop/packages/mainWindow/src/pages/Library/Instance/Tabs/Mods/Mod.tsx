@@ -2,10 +2,10 @@ import { getInstanceIdFromPath } from "@/utils/routes";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { getForgeModloaderIcon } from "@/utils/sidebar";
 import { Mod as ModType } from "@gd/core_module/bindings";
-import { Checkbox, Popover, Switch } from "@gd/ui";
+import { Checkbox, Switch } from "@gd/ui";
 import { useLocation, useParams } from "@solidjs/router";
 import { SetStoreFunction, produce } from "solid-js/store";
-import { For, Show, createResource } from "solid-js";
+import { For, Show } from "solid-js";
 import { getModImageUrl, getModpackPlatformIcon } from "@/utils/instances";
 
 type Props = {
@@ -154,8 +154,8 @@ const Mod = (props: Props) => {
         </div>
         <span class="flex gap-4 justify-center items-center">
           {/* //TODO: ADD CONFIRMATION MODAL */}
-          <Show when={props.mod.curseforge}>CF</Show>
-          <Show when={props.mod.modrinth}>MR</Show>
+          {/* <Show when={props.mod.curseforge}>CF</Show>
+          <Show when={props.mod.modrinth}>MR</Show> */}
           <Switch
             checked={props.mod.enabled}
             onChange={(e) => {
@@ -183,22 +183,85 @@ const Mod = (props: Props) => {
             }}
           />
 
-          <Popover
+          {/* <Popover
             noPadding
             noTip
             content={
               <div
+                class="p-4 bg-darkSlate-900 rounded-lg border-darkSlate-700 border-solid border-1 shadow-md shadow-darkSlate-900 w-110"
                 onClick={(e) => e.stopPropagation()}
-                class="w-40 h-40 bg-red"
               >
-                Hi
+                <div class="text-xl font-bold mb-8">
+                  Info for{" "}
+                  {props.mod.curseforge?.name ||
+                    props.mod.metadata?.name ||
+                    props.mod.filename}
+                </div>
+                <div class="flex flex-col gap-4 w-full">
+                  <div class="flex justify-between w-full">
+                    <div>ID:</div>
+                    <div class="w-70 truncate">{props.mod.id}</div>
+                  </div>
+                  <div class="flex justify-between w-full">
+                    <div>Filename:</div>
+                    <div class="w-70 truncate">{props.mod.filename}</div>
+                  </div>
+
+                  <Show when={props.mod.metadata}>
+                    <div class="text-xl">Local Metadata</div>
+                    <div class="flex justify-between w-full">
+                      <div>Name:</div>
+                      <div class="w-70 truncate">
+                        {props.mod.metadata?.modid}
+                      </div>
+                    </div>
+                    <div class="flex justify-between w-full">
+                      <div>Mod Version:</div>
+                      <div class="w-70 truncate">
+                        {props.mod.metadata?.version}
+                      </div>
+                    </div>
+                  </Show>
+
+                  <Show when={props.mod.curseforge}>
+                    <div class="text-xl text-brands-curseforge">CurseForge</div>
+                    <div class="flex justify-between w-full">
+                      <div>Curseforge Project Id:</div>
+                      <div class="w-70 truncate">
+                        {props.mod.curseforge?.project_id}
+                      </div>
+                    </div>
+                    <div class="flex justify-between w-full">
+                      <div>Curseforge File Id:</div>
+                      <div class="w-70 truncate">
+                        {props.mod.curseforge?.file_id}
+                      </div>
+                    </div>
+                  </Show>
+
+                  <Show when={props.mod.modrinth}>
+                    <div class="text-xl text-brands-modrinth">Modrinth</div>
+                    <div class="flex justify-between w-full">
+                      <div>Modrinth Project Id:</div>
+                      <div class="w-70 truncate">
+                        {props.mod.modrinth?.project_id}
+                      </div>
+                    </div>
+                    <div class="flex justify-between w-full">
+                      <div>Modrinth Version Id:</div>
+                      <div class="w-70 truncate">
+                        {props.mod.modrinth?.version_id}
+                      </div>
+                    </div>
+                  </Show>
+                </div>
               </div>
             }
             placement="left-end"
             color="bg-darkSlate-900"
           >
             <div class="text-2xl text-darkSlate-500 duration-100 ease-in-out cursor-pointer i-ri:information-fill transition-color hover:text-white" />
-          </Popover>
+          </Popover> */}
         </span>
       </div>
     </div>
