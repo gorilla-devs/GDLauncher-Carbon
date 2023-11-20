@@ -71,7 +71,7 @@ Check https://github.com/vercel/turborepo/tree/main/examples/with-docker for tur
 ## ▶️ Development
 
 ### A quick note
-Local development is currently very hard as it requires a local instance of the GDL backend which is not public. We are currently working on making it easier.
+To be able to develop on GDLauncher Carbon locally, you will need to request an API key to `api-keys@gdlauncher.com`. Please include your github username and a short description of what you are planning to do with the API key.
 
 ### Contributing
 To contribute, please see the [contributing](CONTRIBUTING.md) guide.
@@ -139,12 +139,12 @@ The GDLauncher name and logo are trademarks of GorillaDevs Inc. and may not be u
 
 ## 📜 History
 
-- 2014: Davide started experimenting with writing a C# launcher
-- 2015: Davide rewrote the launcher (still in C#) but with some better designs
+- 2014: Davide started learning programming and experimenting with writing a C# launcher
+- 2015: Davide rewrote the launcher (still in C#) but with some better designs and features
 - 2016: Yet another C# rewrite
-- 2018: First Electron rewrite
+- 2018: First Electron rewrite, Davide got into web development and started learning React
 - 2019: GDL takes on a new and modern design features Curseforge integrations, massive UI changes, and one-of-a-kind features.
-- 2022: GDLauncher Carbon Rewrite
+- 2022: GDLauncher Carbon Rewrite [See announcement](https://gdlauncher.com/en/blog/curseforge-partnership-announcement/)
 
 <br>
 
@@ -155,4 +155,4 @@ Here you can find the previous versions of the code:
 
 - [Original C# Code](https://github.com/gorilla-devs/GDLauncher_LEGACY-Full-History/tree/csharp_legacy_launcher)
 - [First Electron/React Version](https://github.com/gorilla-devs/GDLauncher_LEGACY-Full-History/tree/GDLauncher_old)
-- GDLauncher (Discontinued) [Legacy Branch](https://www.github.com/gorilla-devs/GDLauncher-discontinued)
+- GDLauncher (Discontinued) [Legacy Branch](https://www.github.com/gorilla-devs/GDLauncher)
