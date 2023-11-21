@@ -7,6 +7,7 @@ const EntityCard = (props: {
   icon: string;
   onClick?: [(_entity: ImportEntityStatus) => void, ImportEntityStatus];
   index: number;
+  className?: string;
 }) => {
   const [t] = useTransContext();
   return (
@@ -15,7 +16,9 @@ const EntityCard = (props: {
         props.entity.supported ? "cursor-pointer" : ""
       } gap-2 shadow-md  transform flex-col transition-transform hover:scale-105 hover:shadow-lg list-none flex items-center  ${
         props.entity.supported ? "" : "bg-opacity-50"
-      } backdrop-blur-lg justify-center  w-auto inline-block h-20 bg-[#1D2028]`}
+      } backdrop-blur-lg justify-center inline-block ${
+        props.className ? props.className : "h-20 w-auto"
+      } bg-[#1D2028]`}
       onClick={props.onClick}
     >
       {/* <div class={`${props.icon} text-red-400 text-5xl`}></div> */}

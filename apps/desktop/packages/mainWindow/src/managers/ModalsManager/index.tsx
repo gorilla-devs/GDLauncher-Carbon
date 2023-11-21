@@ -53,6 +53,10 @@ const defaultModals: Hash = {
     component: lazy(() => import("./modals/InstanceCreation")),
     title: "New Instance"
   },
+  exportInstance: {
+    component: lazy(() => import("./modals/InstanceExport")),
+    title: "Export Instance"
+  },
   notification: {
     component: lazy(() => import("./modals/Notification")),
     title: "Notification"
