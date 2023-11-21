@@ -115,13 +115,13 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             while let Some(path) = dir.next_entry().await? {
                 if path.metadata().await?.is_dir() {
                     if let Ok(Some(entry)) = self.scan_instance(path.path()).await {
-                        self.state.write().await.push_multi(entry).await;
+                        self.state.write().await.push_multi(entry);
                         app.invalidate(GET_IMPORT_SCAN_STATUS, None);
                     }
                 }
             }
         } else if let Ok(Some(entry)) = self.scan_instance(scan_path).await {
-            self.state.write().await.set_single(entry).await;
+            self.state.write().await.set_single(entry);
             app.invalidate(GET_IMPORT_SCAN_STATUS, None);
         }
 
@@ -143,7 +143,6 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             .read()
             .await
             .get(index)
-            .await
             .cloned()
             .ok_or_else(|| anyhow!("invalid importable instance index"))?;
 

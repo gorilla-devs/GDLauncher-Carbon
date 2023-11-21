@@ -156,7 +156,7 @@ impl InstanceImporter for ModrinthArchiveImporter {
     async fn scan(&self, app: &Arc<AppInner>, scan_path: PathBuf) -> anyhow::Result<()> {
         if scan_path.is_file() {
             if let Ok(Some(entry)) = self.scan_archive(app, scan_path).await {
-                self.state.write().await.set_single(entry).await;
+                self.state.write().await.set_single(entry);
             }
         } else if scan_path.is_dir() {
             let Ok(mut dir) = tokio::fs::read_dir(&scan_path).await else {
@@ -169,7 +169,7 @@ impl InstanceImporter for ModrinthArchiveImporter {
                 if entry.metadata().await?.is_file() {
                     futures.push(async move {
                         if let Ok(Some(entry)) = self.scan_archive(app, entry.path()).await {
-                            self.state.write().await.push_multi(entry).await;
+                            self.state.write().await.push_multi(entry);
                         }
                     })
                 }
@@ -194,7 +194,6 @@ impl InstanceImporter for ModrinthArchiveImporter {
             .read()
             .await
             .get(index)
-            .await
             .cloned()
             .ok_or_else(|| anyhow!("invalid importable instance index"))?;
 

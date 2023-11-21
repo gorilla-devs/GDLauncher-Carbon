@@ -269,22 +269,19 @@ enum InternalImportEntry<T: Clone + Into<ImportableInstance>> {
 }
 
 impl<T: Clone + Into<ImportableInstance>> ImporterState<T> {
-    async fn set_single(&mut self, entry: InternalImportEntry<T>) {
+    fn set_single(&mut self, entry: InternalImportEntry<T>) {
         *self = Self::SingleResult(entry);
     }
 
-    async fn push_multi(&mut self, entry: InternalImportEntry<T>) {
+    fn push_multi(&mut self, entry: InternalImportEntry<T>) {
         match self {
-            Self::NoResults | Self::SingleResult(_) => {
-                *self = Self::MultiResult(vec![entry]);
-            }
-            Self::MultiResult(entries) => {
-                entries.push(entry);
-            }
+            Self::NoResults => *self = Self::MultiResult(vec![entry]),
+            Self::SingleResult(entry_) => *self = Self::MultiResult(vec![entry_.to_owned(), entry]),
+            Self::MultiResult(entries) => entries.push(entry),
         }
     }
 
-    async fn get(&self, index: u32) -> Option<&T> {
+    fn get(&self, index: u32) -> Option<&T> {
         match self {
             Self::SingleResult(InternalImportEntry::Valid(entry)) => Some(entry),
             Self::MultiResult(entries) => entries

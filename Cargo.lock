@@ -418,6 +418,7 @@ dependencies = [
  "display-info",
  "dotenvy",
  "dunce",
+ "error-stack",
  "fs_extra",
  "futures",
  "hex",
@@ -1071,6 +1072,16 @@ checksum = "ac3e13f66a2f95e32a39eaa81f6b95d42878ca0e1db0c7543723dfe12557e860"
 dependencies = [
  "libc",
  "windows-sys",
+]
+
+[[package]]
+name = "error-stack"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27a72baa257b5e0e2de241967bc5ee8f855d6072351042688621081d66b2a76b"
+dependencies = [
+ "anyhow",
+ "rustc_version",
 ]
 
 [[package]]
