@@ -14,8 +14,8 @@ use crate::{
 };
 
 use self::{
-    curseforge_archive::CurseforgeArchiveImporter, legacy_gdlauncher::LegacyGDLauncherImporter,
-    modrinth_archive::ModrinthArchiveImporter,
+    curseforge_archive::CurseforgeArchiveImporter, curseforge_instance::CurseforgeInstanceImporter,
+    legacy_gdlauncher::LegacyGDLauncherImporter, modrinth_archive::ModrinthArchiveImporter,
 };
 
 use super::InstanceManager;
@@ -198,6 +198,7 @@ impl Entity {
     pub fn create_importer(self) -> Arc<dyn InstanceImporter> {
         match self {
             Self::LegacyGDLauncher => Arc::new(LegacyGDLauncherImporter::new()),
+            Self::CurseForge => Arc::new(CurseforgeInstanceImporter::new()),
             Self::CurseForgeZip => Arc::new(CurseforgeArchiveImporter::new()),
             Self::MRPack => Arc::new(ModrinthArchiveImporter::new()),
             _ => todo!(),
@@ -255,8 +256,9 @@ pub trait InstanceImporter: std::fmt::Debug + Send + Sync {
     ) -> anyhow::Result<VisualTaskId>;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 enum ImporterState<T: Clone + Into<ImportableInstance>> {
+    #[default]
     NoResults,
     SingleResult(InternalImportEntry<T>),
     MultiResult(Vec<InternalImportEntry<T>>),

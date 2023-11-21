@@ -27,7 +27,7 @@ enum CurseforgeInstanceImporterError {
 }
 
 /// Curseforge instance importer.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct CurseforgeInstanceImporter {
     state: Mutex<ImporterState<ImportableInstance>>,
 }
@@ -143,6 +143,13 @@ impl InstanceImporter for CurseforgeInstanceImporter {
 }
 
 impl CurseforgeInstanceImporter {
+    /// Creates a new instance of the curseforge instance importer.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Attempts to parse the directory as a curseforge instance by
+    /// parsing the `manifest.json` file.
     async fn parse_instance_dir(
         path: &path::Path,
     ) -> error_stack::Result<ImportableInstance, CurseforgeInstanceImporterError> {
