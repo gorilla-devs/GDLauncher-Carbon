@@ -21,6 +21,7 @@ use self::{
 use super::InstanceManager;
 
 mod curseforge_archive;
+mod curseforge_instance;
 mod legacy_gdlauncher;
 mod modrinth_archive;
 

@@ -2,6 +2,9 @@
 #![allow(warnings)]
 #![allow(dead_code)]
 
+#[macro_use]
+extern crate async_trait;
+
 use crate::managers::{
     java::{discovery::RealDiscovery, java_checker::RealJavaChecker},
     App, AppInner,
