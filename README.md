@@ -18,6 +18,7 @@ You can read more [here](https://gdlauncher.com/en/blog/curseforge-partnership-a
   - [🎮 What is GDLauncher](#-what-is-gdlauncher)
   - [What happened to the old GDLauncher?](#what-happened-to-the-old-gdlauncher)
   - [Table of Content](#table-of-content)
+  - [📥 Download](#-download)
   - [🎉 Join our community](#-join-our-community)
   - [🎁 Features](#-features)
   - [▶️ Development](#️-development)
@@ -44,6 +45,9 @@ You can read more [here](https://gdlauncher.com/en/blog/curseforge-partnership-a
     <img width="300" height="auto" src="https://cdn.gdl.gg/github-readme/modpacks.png" alt="GDLauncher" />
     <img width="300" height="auto" src="https://cdn.gdl.gg/github-readme/mods.png" alt="GDLauncher" />
 </p>
+
+## 📥 Download
+GDLauncher is currently in alpha and is only available for download through our discord server. You can join our discord server by clicking the button below.
 
 ## 🎉 Join our community
 Join our official GDLauncher discord server. There you'll find our community and friends to play with along with support for any issues you may have.
