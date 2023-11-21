@@ -24,8 +24,9 @@ const ExportFormat = () => {
     PrismLogo
   ];
   return (
-    <div class="flex">
-      <ul class="flex overflow-x-scroll overflow-y-hidden gap-2 p-0">
+    <div class="flex flex-col  ">
+      <span>Export format</span>
+      <ul class="flex  gap-2 p-0">
         <For
           each={entities.data
             ?.sort(
@@ -40,7 +41,7 @@ const ExportFormat = () => {
               icon={icons[i()]}
               onClick={[() => {}, entity]}
               index={i()}
-              className="h-20 w-40"
+              className="h-20 w-50"
             />
           )}
         </For>
