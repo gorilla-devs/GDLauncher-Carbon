@@ -50,7 +50,10 @@ impl From<ImportableInstance> for super::ImportableInstance {
 
 #[async_trait]
 impl InstanceImporter for CurseforgeInstanceImporter {
+    #[instrument(name = "CurseforgeInstanceImporter::scan", skip(self, app), err)]
     async fn scan(&self, app: &App, scan_path: path::PathBuf) -> anyhow::Result<()> {
+        info!("scanning dir");
+
         // We expect the scan path to be a directory
         if !scan_path.is_dir() {
             return Ok(());
@@ -85,8 +88,10 @@ impl InstanceImporter for CurseforgeInstanceImporter {
                     app.invalidate(keys::instance::GET_IMPORT_SCAN_STATUS, None);
                 }
                 CurseforgeInstanceImporterError::NotAnInstanceDir => {
-                    while let Some(dir) = fs::read_dir(&scan_path).await?.next_entry().await? {
-                        self.scan(app, scan_path.clone()).await?;
+                    let mut dirs = fs::read_dir(&scan_path).await?;
+
+                    while let Some(dir) = dirs.next_entry().await? {
+                        self.scan(app, dir.path()).await?;
                     }
                 }
             },
@@ -95,10 +100,12 @@ impl InstanceImporter for CurseforgeInstanceImporter {
         Ok(())
     }
 
+    #[instrument(name = "CurseforgeInstanceImporter::get_status", skip_all, ?ret)]
     async fn get_status(&self) -> ImportScanStatus {
         self.state.lock().await.clone().into()
     }
 
+    #[instrument(name = "CurseforgeInstanceImporter::begin_import", skip(app), ret, ?err)]
     async fn begin_import(
         &self,
         app: &App,
@@ -173,5 +180,11 @@ impl CurseforgeInstanceImporter {
             path: path.to_owned(),
             manifest,
         })
+    }
+
+    pub fn get_default_scan_path() -> anyhow::Result<path::PathBuf> {
+        let dirs = directories::BaseDirs::new().ok_or(anyhow!("Cannot build basedirs"))?;
+
+        Ok(dirs.home_dir().join("curseforge/minecraft/Instances"))
     }
 }

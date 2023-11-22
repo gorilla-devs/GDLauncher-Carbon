@@ -184,9 +184,10 @@ impl Entity {
     pub fn list() -> Vec<(Self, bool, SelectionType)> {
         use strum::IntoEnumIterator;
 
-        const SUPPORT: [Entity; 3] = [
+        const SUPPORT: [Entity; 4] = [
             Entity::LegacyGDLauncher,
             Entity::CurseForgeZip,
+            Entity::CurseForge,
             Entity::MRPack,
         ];
 
@@ -210,6 +211,7 @@ impl Entity {
             Self::LegacyGDLauncher => {
                 Some(LegacyGDLauncherImporter::get_default_scan_path().await?)
             }
+            Self::CurseForge => Some(CurseforgeInstanceImporter::get_default_scan_path()?),
             _ => None,
         })
     }
@@ -233,6 +235,7 @@ pub enum ImportEntry {
     Invalid(InvalidImportEntry),
 }
 
+#[derive(Debug)]
 pub enum ImportScanStatus {
     NoResults,
     SingleResult(ImportEntry),

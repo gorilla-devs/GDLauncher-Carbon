@@ -6,6 +6,8 @@
 extern crate anyhow;
 #[macro_use]
 extern crate async_trait;
+#[macro_use]
+extern crate tracing;
 
 use crate::managers::{
     java::{discovery::RealDiscovery, java_checker::RealJavaChecker},
