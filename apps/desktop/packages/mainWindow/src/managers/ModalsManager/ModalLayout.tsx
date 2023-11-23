@@ -13,6 +13,7 @@ interface Props extends ModalProps {
   background?: JSX.Element;
   height?: string;
   width?: string;
+  scrollable?: string;
 }
 
 const ModalLayout = (props: Props) => {
@@ -56,7 +57,9 @@ const ModalLayout = (props: Props) => {
           </div>
         </Show>
         <div
-          class="box-border overflow-hidden z-10 h-full"
+          class={`box-border ${
+            props.scrollable ? props.scrollable : "overflow-hidden"
+          } z-10 h-full`}
           classList={{
             "p-5": !props.noPadding
           }}

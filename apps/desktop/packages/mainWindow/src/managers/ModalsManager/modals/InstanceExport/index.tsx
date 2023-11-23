@@ -16,9 +16,10 @@ const InstanceExport = (props: ModalProps) => {
       title={props?.title}
       overflowHiddenDisabled={true}
       noPadding={true}
-      height="h-96"
+      scrollable="overflow-y-scroll scrollbar-hide"
+      // height="h-96"
     >
-      <div class="flex flex-col p-4 scrollbar-hide overflow-y-scroll w-120  ">
+      <div class="flex flex-col p-4 w-120 ">
         <ExportFormat />
         <ExportNameVersion />
         <FilesSelection />

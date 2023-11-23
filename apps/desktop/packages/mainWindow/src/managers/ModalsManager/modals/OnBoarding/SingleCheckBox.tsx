@@ -7,6 +7,7 @@ interface Props {
   setList?: Setter<never[]>;
   setInstance?: (_instance: string | undefined) => void;
   isSingleInstance?: boolean;
+  indeterminate?: boolean;
 }
 
 const SingleCheckBox = (props: Props) => {
@@ -28,6 +29,7 @@ const SingleCheckBox = (props: Props) => {
       children={<span class="text-sm">{props.title}</span>}
       checked={instances().some((instance) => instance === props.title)}
       onChange={handleChange}
+      indeterminate={props.indeterminate}
     />
   );
 };
