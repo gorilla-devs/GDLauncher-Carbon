@@ -63,7 +63,19 @@ const Sidebar = () => {
           (category) => category.project_type === "modpack"
         );
 
-  const modloaders = () => supportedModloaders();
+  const modloaders = () => {
+    const searchApi = infiniteQuery?.query?.searchApi;
+
+    if (searchApi === "modrinth") {
+      const results = supportedModloaders[searchApi];
+      return results.filter((modloader) =>
+        modloader.supported_project_types.includes("modpack")
+      );
+    } else if (searchApi === "curseforge") {
+      const results = supportedModloaders[searchApi];
+      return results;
+    }
+  };
 
   const filteredGameVersions = createMemo(() => {
     const snapshot = gameVersionFilters.snapshot;
@@ -211,10 +223,15 @@ const Sidebar = () => {
                           (modloader) => modloader !== modloader
                         );
 
+                        const modloaderName =
+                          typeof modloader === "string"
+                            ? modloader
+                            : modloader.name;
+
                         const newModloaders = checked
                           ? [
                               ...prevModloaders,
-                              modloader as FEUnifiedModLoaderType
+                              modloaderName as FEUnifiedModLoaderType
                             ]
                           : filteredModloaders;
 
@@ -225,7 +242,13 @@ const Sidebar = () => {
                       }}
                     />
                     <ModloaderIcon modloader={modloader} />
-                    <p class="m-0">{capitalize(modloader)}</p>
+                    <p class="m-0">
+                      {capitalize(
+                        typeof modloader === "string"
+                          ? modloader
+                          : modloader.name
+                      )}
+                    </p>
                   </div>
                 );
               }}

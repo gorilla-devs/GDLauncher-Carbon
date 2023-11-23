@@ -8,9 +8,14 @@ const fetchData = () => {
   const curseForgeModloaders = rspc.createQuery(() => [
     "modplatforms.curseforge.getModloaders"
   ]);
+  const modrinthModloaders = rspc.createQuery(() => [
+    "modplatforms.modrinth.getLoaders"
+  ]);
   const curseforgeCategories = rspc.createQuery(() => [
     "modplatforms.curseforge.getCategories"
   ]);
+
+  console.log(curseForgeModloaders);
 
   const modrinthCategories = rspc.createQuery(() => [
     "modplatforms.modrinth.getCategories"
@@ -21,6 +26,7 @@ const fetchData = () => {
     activeUuid,
     status,
     minecraftVersions,
+    modrinthModloaders,
     curseForgeModloaders,
     curseforgeCategories,
     modrinthCategories

@@ -499,7 +499,6 @@ impl Installer {
                             r
                         }?;
 
-                        app_clone.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
                         app_clone.invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
                         Ok::<_, anyhow::Error>(())
                     })()

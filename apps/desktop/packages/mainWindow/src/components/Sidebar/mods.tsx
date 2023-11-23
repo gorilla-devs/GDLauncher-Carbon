@@ -45,8 +45,19 @@ const Sidebar = () => {
           (category) => category.project_type === "mod"
         );
 
-  const modloaders = () => supportedModloaders();
+  const modloaders = () => {
+    const searchApi = infiniteQuery?.query?.searchApi;
 
+    if (searchApi === "modrinth") {
+      const results = supportedModloaders[searchApi];
+      return results.filter((modloader) =>
+        modloader.supported_project_types.includes("modpack")
+      );
+    } else if (searchApi === "curseforge") {
+      const results = supportedModloaders[searchApi];
+      return results;
+    }
+  };
   const instanceId = () =>
     infiniteQuery.instanceId() ?? parseInt(searchParams.instanceId, 10);
 
@@ -154,7 +165,13 @@ const Sidebar = () => {
                       disabled={!isNaN(instanceId())}
                     />
                     <ModloaderIcon modloader={modloader} />
-                    <p class="m-0">{capitalize(modloader)}</p>
+                    <p class="m-0">
+                      {capitalize(
+                        typeof modloader === "string"
+                          ? modloader
+                          : modloader.name
+                      )}
+                    </p>
                   </div>
                 );
               }}

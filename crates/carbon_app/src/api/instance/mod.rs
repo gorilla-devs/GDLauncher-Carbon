@@ -148,24 +148,36 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
-        query INSTANCE_DETAILS[app, id: FEInstanceId] {
-            app.instance_manager()
+        query INSTANCE_DETAILS[app, id: Option<FEInstanceId>] {
+            let Some(id) = id else {
+                return Ok(None);
+            };
+
+            let result = app.instance_manager()
                 .instance_details(id.into())
                 .await
-                .map(InstanceDetails::from)
+                .map(InstanceDetails::from);
+
+            Ok(Some(result?))
         }
 
-        query INSTANCE_MODS[app, id: FEInstanceId] {
+        query INSTANCE_MODS[app, id: Option<FEInstanceId>] {
+            let Some(id) = id else {
+                return Ok(None);
+            };
+
             app.meta_cache_manager()
                 .watch_and_prioritize(Some(id.into()))
                 .await;
 
-            Ok(app.instance_manager()
+            let result = app.instance_manager()
                 .list_mods(id.into())
                 .await?
                 .into_iter()
                 .map(Into::into)
-                .collect::<Vec<Mod>>())
+                .collect::<Vec<Mod>>();
+
+            Ok(Some(result))
         }
 
         mutation PREPARE_INSTANCE[app, id: FEInstanceId] {

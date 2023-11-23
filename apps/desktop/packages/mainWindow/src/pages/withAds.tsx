@@ -5,12 +5,10 @@ import { createEffect } from "solid-js";
 import fetchData from "./app.data";
 import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 import {
-  setCurseForgeModloaders,
   setCurseforgeCategories,
   setModrinthCategories,
   setSupportedModloaders
 } from "@/utils/sidebar";
-import { supportedCfModloaders } from "@/utils/constants";
 import adSize from "@/utils/adhelper";
 
 function withAdsLayout() {
@@ -41,16 +39,10 @@ function withAdsLayout() {
 
   createEffect(() => {
     if (routeData.curseForgeModloaders.data) {
-      setCurseForgeModloaders(routeData.curseForgeModloaders.data);
-
-      const curseforgeModpackModloaders = () => {
-        const filtered = routeData.curseForgeModloaders.data?.filter(
-          (modloader) => supportedCfModloaders.includes(modloader as string)
-        );
-        return filtered || [];
-      };
-
-      setSupportedModloaders(curseforgeModpackModloaders());
+      setSupportedModloaders("curseforge", routeData.curseForgeModloaders.data);
+    }
+    if (routeData.modrinthModloaders.data) {
+      setSupportedModloaders("modrinth", routeData.modrinthModloaders.data);
     }
   });
 

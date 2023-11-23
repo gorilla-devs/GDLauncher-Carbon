@@ -278,7 +278,7 @@ pub enum MRFELoaderType {
     Fabric,
     Folia,
     Forge,
-    NeoForge,
+    Neoforge,
     Iris,
     Liteloader,
     Minecraft,
@@ -293,8 +293,7 @@ pub enum MRFELoaderType {
     Vanilla,
     Velocity,
     Waterfall,
-    #[serde(other)]
-    Other(String),
+    Other,
 }
 
 impl From<LoaderType> for MRFELoaderType {
@@ -307,7 +306,7 @@ impl From<LoaderType> for MRFELoaderType {
             LoaderType::Fabric => MRFELoaderType::Fabric,
             LoaderType::Folia => MRFELoaderType::Folia,
             LoaderType::Forge => MRFELoaderType::Forge,
-            LoaderType::NeoForge => MRFELoaderType::NeoForge,
+            LoaderType::Neoforge => MRFELoaderType::Neoforge,
             LoaderType::Iris => MRFELoaderType::Iris,
             LoaderType::Liteloader => MRFELoaderType::Liteloader,
             LoaderType::Minecraft => MRFELoaderType::Minecraft,
@@ -322,7 +321,7 @@ impl From<LoaderType> for MRFELoaderType {
             LoaderType::Vanilla => MRFELoaderType::Vanilla,
             LoaderType::Velocity => MRFELoaderType::Velocity,
             LoaderType::Waterfall => MRFELoaderType::Waterfall,
-            LoaderType::Other(other) => MRFELoaderType::Other(other),
+            LoaderType::Other(other) => MRFELoaderType::Other,
         }
     }
 }
@@ -337,7 +336,7 @@ impl From<MRFELoaderType> for LoaderType {
             MRFELoaderType::Fabric => LoaderType::Fabric,
             MRFELoaderType::Folia => LoaderType::Folia,
             MRFELoaderType::Forge => LoaderType::Forge,
-            MRFELoaderType::NeoForge => LoaderType::NeoForge,
+            MRFELoaderType::Neoforge => LoaderType::Neoforge,
             MRFELoaderType::Iris => LoaderType::Iris,
             MRFELoaderType::Liteloader => LoaderType::Liteloader,
             MRFELoaderType::Minecraft => LoaderType::Minecraft,
@@ -352,7 +351,7 @@ impl From<MRFELoaderType> for LoaderType {
             MRFELoaderType::Vanilla => LoaderType::Vanilla,
             MRFELoaderType::Velocity => LoaderType::Velocity,
             MRFELoaderType::Waterfall => LoaderType::Waterfall,
-            MRFELoaderType::Other(other) => LoaderType::Other(other),
+            MRFELoaderType::Other => LoaderType::Other("unknown".to_string()),
         }
     }
 }

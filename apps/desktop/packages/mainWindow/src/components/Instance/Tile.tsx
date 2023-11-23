@@ -1,5 +1,5 @@
 /* eslint-disable i18next/no-literal-string */
-import { getForgeModloaderIcon } from "@/utils/sidebar";
+import { getCFModloaderIcon } from "@/utils/sidebar";
 import {
   ListInstance,
   CFFEModLoaderType,
@@ -345,7 +345,7 @@ const Tile = (props: Props) => {
                     <Show when={props.modloader}>
                       <img
                         class="w-4 h-4"
-                        src={getForgeModloaderIcon(
+                        src={getCFModloaderIcon(
                           props.modloader as CFFEModLoaderType
                         )}
                       />
@@ -469,7 +469,7 @@ const Tile = (props: Props) => {
                   <Show when={props.modloader}>
                     <img
                       class="w-4 h-4"
-                      src={getForgeModloaderIcon(
+                      src={getCFModloaderIcon(
                         props.modloader as CFFEModLoaderType
                       )}
                     />

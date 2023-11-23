@@ -1,6 +1,7 @@
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
+use tracing::info;
 
 use crate::{
     api::{
@@ -13,6 +14,7 @@ use crate::{
             MODRINTH_GET_TEAM, MODRINTH_GET_VERSION, MODRINTH_GET_VERSIONS, MODRINTH_SEARCH,
             UNIFIED_SEARCH,
         },
+        modplatforms::curseforge::structs::CFFEModLoaderType,
         router::router,
     },
     managers::App,
@@ -40,8 +42,8 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             Ok(curseforge::responses::FEModSearchResponse::from(response))
         }
 
-        query CURSEFORGE_GET_MODLOADERS[_, _args: ()] {
-            Ok(curseforge::structs::CFFEModLoaderType::iter().collect::<Vec<_>>())
+        query CURSEFORGE_GET_MODLOADERS[app, _args: ()] {
+            Ok(CFFEModLoaderType::iter().collect::<Vec<_>>())
         }
 
         query CURSEFORGE_GET_CATEGORIES[app, args: ()] {
@@ -164,11 +166,12 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         query UNIFIED_SEARCH[app, search_params: filters::FEUnifiedSearchParameters] {
-            println!("Search called");
-
+            info!("SEARCH search_params: {:?}", search_params);
             match search_params.search_api {
                 FESearchAPI::Curseforge => {
+                    info!("BEFORE TRY INTO");
                     let search_params: curseforge::filters::CFFEModSearchParameters = search_params.try_into()?;
+                    info!("AFTER TRY INTO");
                     let modplatforms = app.modplatforms_manager();
                     let curseforge_response = modplatforms.curseforge.search(search_params.into()).await?;
                     let fe_curseforge_response = curseforge::responses::FEModSearchResponse::from(curseforge_response);

@@ -112,6 +112,7 @@
   "modpack.modloader": "Modloader:",
   "modpack.version_downloading": "Downloading...",
   "modpack.version_download": "Download version",
+  "modpack.version_installed": "Installed",
   "instance.sort_by_popularity": "Popular",
   "instance.sort_by_lastUpdated": "Last update",
   "instance.sort_by_gameVersion": "Game version",

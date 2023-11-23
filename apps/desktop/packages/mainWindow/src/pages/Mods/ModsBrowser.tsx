@@ -17,8 +17,6 @@ import {
   FESearchAPI,
   FEUnifiedSearchParameters,
   FEUnifiedSearchResult,
-  InstanceDetails,
-  Mod,
   MRFESearchIndex
 } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
@@ -41,11 +39,6 @@ const ModsBrowser = () => {
   const [t] = useTransContext();
   const navigate = useGDNavigate();
 
-  const [instanceMods, setInstanceMods] = createSignal<Mod[]>([]);
-  const [instanceDetails, setinstanceDetails] = createSignal<
-    InstanceDetails | undefined
-  >(undefined);
-
   const infiniteQuery = useInfiniteModsQuery();
 
   const rows = () => infiniteQuery.allRows();
@@ -63,38 +56,21 @@ const ModsBrowser = () => {
       infiniteQuery.instanceId() ?? parseInt(searchParams.instanceId, 10);
 
     if (isNaN(res)) {
-      return undefined;
+      return null;
     }
 
     return res;
   };
 
-  createEffect(() => {
-    if (instanceId() !== undefined) {
-      const mods = rspc.createQuery(() => [
-        "instance.getInstanceMods",
-        instanceId() as number
-      ]);
+  const instanceMods = rspc.createQuery(() => [
+    "instance.getInstanceMods",
+    instanceId()
+  ]);
 
-      if (mods.data) setInstanceMods(mods.data);
-    }
-  });
-
-  createEffect(() => {
-    if (instanceId() !== undefined) {
-      const InstanceDetails = rspc.createQuery(() => [
-        "instance.getInstanceDetails",
-        instanceId() as number
-      ]);
-
-      if (InstanceDetails.data) setinstanceDetails(InstanceDetails.data);
-    }
-  });
-
-  onCleanup(() => {
-    setInstanceMods([]);
-    setinstanceDetails(undefined);
-  });
+  const instanceDetails = rspc.createQuery(() => [
+    "instance.getInstanceDetails",
+    instanceId()
+  ]);
 
   createEffect(() => {
     if (!lastItem() || lastItem().index === infiniteQuery?.query.index) {
@@ -148,10 +124,10 @@ const ModsBrowser = () => {
   const [imageResource] = createResource(instanceId, fetchImage);
 
   const instanceModloaders = () =>
-    instanceDetails()?.modloaders.map((modloader) => modloader.type_);
+    instanceDetails.data?.modloaders.map((modloader) => modloader.type_);
 
   const instancePlatform = () =>
-    Object.keys(instanceDetails()?.modpack || {})[0]?.toLocaleLowerCase();
+    Object.keys(instanceDetails.data?.modpack || {})[0]?.toLocaleLowerCase();
 
   createEffect((_firstTime: boolean) => {
     const modloaders = instanceModloaders();
@@ -168,8 +144,8 @@ const ModsBrowser = () => {
       newQuery["searchApi"] = platform as FESearchAPI;
     }
 
-    if (instanceDetails()?.version) {
-      newQuery["gameVersions"] = [instanceDetails()?.version!];
+    if (instanceDetails.data?.version) {
+      newQuery["gameVersions"] = [instanceDetails.data?.version!];
     }
 
     if (modloaders) {
@@ -177,10 +153,7 @@ const ModsBrowser = () => {
 
       if (modloaders.includes("forge")) {
         newQuery["modloaders"].push("forge");
-      } else if (
-        modloaders.includes("fabric") ||
-        modloaders.includes("quilt")
-      ) {
+      } else if (modloaders.includes("quilt")) {
         newQuery["modloaders"].push("fabric");
         newQuery["modloaders"].push("quilt");
       } else {
@@ -207,7 +180,7 @@ const ModsBrowser = () => {
           </Match>
           <Match when={hasFiltersData()}>
             <div class="flex flex-col bg-darkSlate-800 top-0 z-10 sticky left-0 right-0">
-              <Show when={instanceDetails()}>
+              <Show when={instanceDetails.data}>
                 <div
                   class="border-1 border-solid h-10 mb-4 rounded-lg overflow-hidden box-border flex items-center justify-between border-darkSlate-500 relative p-2"
                   style={{
@@ -239,7 +212,7 @@ const ModsBrowser = () => {
                           : `url("${DefaultImg}")`
                       }}
                     />
-                    <h2 class="m-0">{instanceDetails()?.name}</h2>
+                    <h2 class="m-0">{instanceDetails.data?.name}</h2>
                   </div>
                   <i
                     class="i-ri:close-fill text-darkSlate-50 cursor-pointer hover:text-white transition tranition-color"
@@ -251,8 +224,6 @@ const ModsBrowser = () => {
                       infiniteQuery.setQuery({
                         modloaders: null
                       });
-                      setinstanceDetails(undefined);
-                      setInstanceMods([]);
                     }}
                   />
                 </div>
@@ -380,8 +351,10 @@ const ModsBrowser = () => {
                                   type="Mod"
                                   data={mod()}
                                   instanceId={instanceId()}
-                                  installedMods={instanceMods()}
-                                  mcVersion={instanceDetails()?.version || ""}
+                                  installedMods={instanceMods.data!}
+                                  mcVersion={
+                                    instanceDetails.data?.version || ""
+                                  }
                                   modrinthCategories={
                                     routeData.modrinthCategories.data
                                   }
