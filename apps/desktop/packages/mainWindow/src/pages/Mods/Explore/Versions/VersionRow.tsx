@@ -154,7 +154,7 @@ const VersionRow = (props: Props) => {
             mod_source: mod,
             instance_id: instanceId()!,
             install_deps: !isInstalled(),
-            replaces_mod: isInstalled() ? props.installedFile?.id || null : null
+            replaces_mod: props.installedFile?.id || null
           });
         }}
       >
