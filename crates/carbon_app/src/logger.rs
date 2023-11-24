@@ -8,7 +8,7 @@ use tracing_subscriber::{
 fn generate_logs_filters() -> String {
     let filters = &[
         "debug",
-        "carbon_app=trace",
+        "carbon_app=warn",
         "hyper::client::pool=warn",
         "reqwest::connect=warn",
         "hyper::proto::h1::conn=warn",
@@ -41,7 +41,26 @@ pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
         tokio::fs::create_dir_all(&logs_path).await.unwrap();
     }
 
-    let filter = EnvFilter::try_new(generate_logs_filters()).unwrap();
+    let filter = EnvFilter::builder();
+
+    // We need to check if the env is present, because, although
+    // `EnvFilter::from_env()` says in it's docs that it will return an error
+    // if the env is not set, reading the source of the method reveals this is
+    // not true :(
+    let filter = if std::env::var("RUST_LOG").is_ok() {
+        println!("loaded logger directives from `RUST_LOG` env");
+
+        filter.from_env().expect("logger directives are invalid")
+    } else {
+        let directives = generate_logs_filters();
+
+        println!(
+            "loaded default logger directives, to override, set `RUST_LOG` env var\n\
+             RUST_LOG=\"{directives}\""
+        );
+
+        filter.parse(directives).unwrap()
+    };
 
     // let processor = tracing_forest::Printer::new()
     //     .formatter(tracing_forest::printer::Pretty)

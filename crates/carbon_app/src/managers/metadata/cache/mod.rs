@@ -1145,6 +1145,8 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
             let mut has_outdated_entries = false;
 
             if let Ok(Ok(cached_entries)) = cached_entries.await {
+                has_outdated_entries = cached_entries.len() != modpaths.len();
+
                 for entry in cached_entries {
                     if let Some((enabled, real_size)) = modpaths.get(&entry.filename) {
                         // enabled probably shouldn't be here

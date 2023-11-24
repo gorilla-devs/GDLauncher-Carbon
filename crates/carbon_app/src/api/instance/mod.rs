@@ -13,19 +13,18 @@ use hyper::{HeaderMap, StatusCode};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
-use crate::api::instance::import::FEEntity;
-use crate::domain::instance::{self as domain};
 use crate::error::{AxumError, FeError};
-use crate::managers::instance as manager;
-use crate::managers::instance::log::EntryType;
+use crate::managers::instance::log::LogEntrySourceKind;
 use crate::managers::instance::InstanceMoveTarget;
-use crate::managers::{App, AppInner};
+use crate::managers::{instance::importer, App, AppInner};
 
 use super::keys::instance::*;
 use super::router::router;
+use super::translation::Translation;
 use super::vtask::FETaskId;
 
-pub mod import;
+use crate::domain::instance as domain;
+use crate::managers::instance as manager;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
@@ -251,6 +250,8 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                             imod.instance_id.into(),
                             cf_mod.project_id,
                             cf_mod.file_id,
+                            imod.install_deps,
+                            imod.replaces_mod,
                         )
                         .await?
                 }
@@ -260,6 +261,8 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                             imod.instance_id.into(),
                             mdr_mod.project_id,
                             mdr_mod.version_id,
+                            imod.install_deps,
+                            imod.replaces_mod,
                         )
                         .await?
                 }
@@ -276,23 +279,48 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             .await
         }
 
-        query GET_IMPORTABLE_ENTITIES[_, args: ()] {
-            Ok(manager::importer::Entity::get_available()
+        query GET_IMPORTABLE_ENTITIES[_, _args: ()] {
+            anyhow::Result::Ok(importer::Entity::list()
                 .into_iter()
-                .map(FEEntity::from)
+                .map(|(e, support, selection_type)| ImportEntityStatus {
+                    entity: ImportEntity::from(e),
+                    supported: support,
+                    selection_type: ImportEntitySelectionType::from(selection_type),
+                })
                 .collect::<Vec<_>>())
         }
 
-        mutation SCAN_IMPORTABLE_INSTANCES[app, entity: import::FEEntity] {
-            import::scan_importable_instances(app, entity).await
+        query GET_IMPORT_ENTITY_DEFAULT_PATH[_, entity: ImportEntity] {
+            importer::Entity::from(entity)
+                .get_default_scan_path().await
         }
 
-        query GET_IMPORTABLE_INSTANCES[app, entity: import::FEEntity] {
-            import::get_importable_instances(app, entity).await
+        mutation SET_IMPORT_SCAN_TARGET[app, target: (ImportEntity, String)] {
+            app.instance_manager()
+                .import_manager()
+                .set_scan_target(Some((target.0.into(), PathBuf::from(target.1))))
         }
 
-        mutation IMPORT_INSTANCE[app, args: import::FEImportInstance] {
-            import::import_instance(app, args).await
+        mutation CANCEL_IMPORT_SCAN[app, args: ()] {
+            app.instance_manager()
+                .import_manager()
+                .set_scan_target(None)
+        }
+
+        query GET_IMPORT_SCAN_STATUS[app, args: ()] {
+            app.instance_manager()
+                .import_manager()
+                .scan_status()
+                .await
+                .map(FullImportScanStatus::from)
+        }
+
+        mutation IMPORT_INSTANCE[app, req: ImportRequest] {
+            app.instance_manager()
+                .import_manager()
+                .begin_import(req.index, req.name)
+                .await
+                .map(FETaskId::from)
         }
 
         query EXPLORE[app, args: ExploreQuery] {
@@ -336,11 +364,6 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
     #[derive(Deserialize)]
     struct IconPathQuery {
         path: String,
-    }
-
-    #[derive(Deserialize)]
-    struct LogQuery {
-        id: i32,
     }
 
     axum::Router::new()
@@ -406,70 +429,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                 }
             )
         )
-        .route(
-            "/log",
-            axum::routing::get(
-                |State(app): State<Arc<AppInner>>, Query(query): Query<LogQuery>| async move {
-                    let log_rx = app.instance_manager()
-                        .get_log(domain::GameLogId(query.id))
-                        .await;
-
-                    let Ok(mut log_rx) = log_rx else {
-                        return IntoResponse::into_response(StatusCode::NOT_FOUND)
-                    };
-
-                    #[derive(Serialize)]
-                    enum LogEntryType {
-                        System,
-                        StdOut,
-                        StdErr,
-                    }
-
-                    #[derive(Serialize)]
-                    struct LogEntry<'a> {
-                        line: &'a str,
-                        type_: LogEntryType,
-                    }
-
-                    let s = async_stream::stream! {
-                        let mut last_idx = 0;
-
-                        loop {
-                            let new_lines = {
-                                let log = log_rx.borrow();
-
-                                let new_lines = log.get_region(last_idx..).into_iter().map(|line| {
-                                    let entry = LogEntry {
-                                        line: line.text,
-                                        type_: match line.type_ {
-                                            EntryType::System => LogEntryType::System,
-                                            EntryType::StdOut => LogEntryType::StdOut,
-                                            EntryType::StdErr => LogEntryType::StdErr,
-                                        }
-                                    };
-
-                                    serde_json::to_vec(&entry)
-                                        .expect("serialization of a log entry should be infallible")
-                                }).collect::<Vec<_>>();
-
-                                last_idx = log.len();
-                                new_lines
-                            };
-
-                            for line in new_lines {
-                                yield Ok::<_, Infallible>(line)
-                            }
-
-                            if let Err(_) = log_rx.changed().await {
-                                break
-                            }
-                        }
-                    };
-
-                    IntoResponse::into_response((StatusCode::OK, StreamBody::new(s)))
-                }
-            )
-        )
+        .route("/log", axum::routing::get(log::log_handler))
 }
 #[derive(Type, Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct FEGroupId(i32);
@@ -649,6 +609,8 @@ struct ModrinthMod {
 struct InstallMod {
     instance_id: FEInstanceId,
     mod_source: ModSource,
+    install_deps: bool,
+    replaces_mod: Option<String>,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -867,6 +829,80 @@ struct ExportArgs {
     save_path: String,
     link_mods: bool,
     filter: ExportEntry,
+}
+
+#[derive(Type, Debug, Serialize, Deserialize)]
+pub enum ImportEntity {
+    LegacyGDLauncher,
+    MRPack,
+    Modrinth,
+    CurseForgeZip,
+    CurseForge,
+    ATLauncher,
+    Technic,
+    FTB,
+    MultiMC,
+    PrismLauncher,
+}
+
+#[derive(Type, Debug, Serialize)]
+struct ImportableInstance {
+    filename: String,
+    instance_name: String,
+}
+
+#[derive(Type, Debug, Serialize)]
+struct InvalidImportEntry {
+    name: String,
+    reason: Translation,
+}
+
+#[derive(Type, Debug, Serialize)]
+enum ImportEntry {
+    Valid(ImportableInstance),
+    Invalid(InvalidImportEntry),
+}
+
+#[derive(Type, Debug, Serialize)]
+enum ImportScanStatus {
+    NoResults,
+    SingleResult(ImportEntry),
+    MultiResult(Vec<ImportEntry>),
+}
+
+#[derive(Type, Debug, Serialize)]
+struct FullImportScanStatus {
+    scanning: bool,
+    status: ImportScanStatus,
+}
+
+#[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+enum ImportEntitySelectionType {
+    File,
+    Directory,
+}
+
+impl From<importer::SelectionType> for ImportEntitySelectionType {
+    fn from(value: importer::SelectionType) -> Self {
+        match value {
+            importer::SelectionType::File => Self::File,
+            importer::SelectionType::Directory => Self::Directory,
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize)]
+struct ImportEntityStatus {
+    entity: ImportEntity,
+    supported: bool,
+    selection_type: ImportEntitySelectionType,
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct ImportRequest {
+    index: u32,
+    name: Option<String>,
 }
 
 impl From<domain::InstanceDetails> for InstanceDetails {
@@ -1249,6 +1285,60 @@ impl From<domain::ExploreEntry> for ExploreEntry {
     }
 }
 
+impl From<ImportEntity> for importer::Entity {
+    fn from(entity: ImportEntity) -> Self {
+        match entity {
+            ImportEntity::LegacyGDLauncher => Self::LegacyGDLauncher,
+            ImportEntity::MRPack => Self::MRPack,
+            ImportEntity::Modrinth => Self::Modrinth,
+            ImportEntity::CurseForgeZip => Self::CurseForgeZip,
+            ImportEntity::CurseForge => Self::CurseForge,
+            ImportEntity::ATLauncher => Self::ATLauncher,
+            ImportEntity::Technic => Self::Technic,
+            ImportEntity::FTB => Self::FTB,
+            ImportEntity::MultiMC => Self::MultiMC,
+            ImportEntity::PrismLauncher => Self::PrismLauncher,
+        }
+    }
+}
+
+impl From<importer::Entity> for ImportEntity {
+    fn from(entity: importer::Entity) -> Self {
+        use importer::Entity as backend;
+
+        match entity {
+            backend::LegacyGDLauncher => Self::LegacyGDLauncher,
+            backend::MRPack => Self::MRPack,
+            backend::Modrinth => Self::Modrinth,
+            backend::CurseForgeZip => Self::CurseForgeZip,
+            backend::CurseForge => Self::CurseForge,
+            backend::ATLauncher => Self::ATLauncher,
+            backend::Technic => Self::Technic,
+            backend::FTB => Self::FTB,
+            backend::MultiMC => Self::MultiMC,
+            backend::PrismLauncher => Self::PrismLauncher,
+        }
+    }
+}
+
+impl From<importer::ImportableInstance> for ImportableInstance {
+    fn from(value: importer::ImportableInstance) -> Self {
+        Self {
+            filename: value.filename,
+            instance_name: value.instance_name,
+        }
+    }
+}
+
+impl From<importer::InvalidImportEntry> for InvalidImportEntry {
+    fn from(value: importer::InvalidImportEntry) -> Self {
+        Self {
+            name: value.name,
+            reason: value.reason,
+        }
+    }
+}
+
 impl From<domain::ExploreEntryType> for ExploreEntryType {
     fn from(value: domain::ExploreEntryType) -> Self {
         match value {
@@ -1258,10 +1348,31 @@ impl From<domain::ExploreEntryType> for ExploreEntryType {
     }
 }
 
+impl From<importer::ImportEntry> for ImportEntry {
+    fn from(value: importer::ImportEntry) -> Self {
+        match value {
+            importer::ImportEntry::Valid(v) => Self::Valid(v.into()),
+            importer::ImportEntry::Invalid(v) => Self::Invalid(v.into()),
+        }
+    }
+}
+
 impl From<ExportTarget> for domain::ExportTarget {
     fn from(value: ExportTarget) -> Self {
         match value {
             ExportTarget::Curseforge => Self::Curseforge,
+        }
+    }
+}
+
+impl From<importer::ImportScanStatus> for ImportScanStatus {
+    fn from(value: importer::ImportScanStatus) -> Self {
+        use importer::ImportScanStatus as domain;
+
+        match value {
+            domain::NoResults => Self::NoResults,
+            domain::SingleResult(r) => Self::SingleResult(r.into()),
+            domain::MultiResult(r) => Self::MultiResult(r.into_iter().map(Into::into).collect()),
         }
     }
 }
@@ -1275,5 +1386,91 @@ impl From<ExportEntry> for domain::ExportEntry {
                 .map(|(k, v)| (k, v.map(Into::into)))
                 .collect(),
         )
+    }
+}
+
+impl From<importer::FullImportScanStatus> for FullImportScanStatus {
+    fn from(value: importer::FullImportScanStatus) -> Self {
+        Self {
+            scanning: value.scanning,
+            status: value.status.into(),
+        }
+    }
+}
+
+mod log {
+    use super::*;
+
+    #[derive(Debug, Deserialize)]
+    pub struct LogQuery {
+        id: i32,
+    }
+
+    #[tracing::instrument(skip(app))]
+    pub async fn log_handler(
+        State(app): State<App>,
+        Query(query): Query<LogQuery>,
+    ) -> impl IntoResponse {
+        tracing::info!("starting log stream");
+
+        let log_rx = app
+            .instance_manager()
+            .get_log(domain::GameLogId(query.id))
+            .await;
+
+        let Ok(mut log_rx) = log_rx else {
+            tracing::warn!("log entry not found");
+
+            return StatusCode::NOT_FOUND.into_response();
+        };
+
+        let s = async_stream::stream! {
+            tracing::trace!("starting log stream");
+
+            let mut last_idx = 0;
+
+            loop {
+                tracing::trace!("waiting for log data to come in");
+
+                let new_lines = {
+                    let log = log_rx.borrow();
+
+                    let new_lines
+                        = log
+                            .get_span(last_idx..)
+                            .into_iter()
+                            .inspect(|entry| tracing::trace!(?entry, "received log entry"))
+                            .map(|entry| {
+                                serde_json::to_vec(&entry)
+                                    .expect(
+                                        "serialization of a log entry should be infallible"
+                                    )
+                            })
+                            .collect::<Vec<_>>();
+
+                    last_idx = log.len();
+
+                    new_lines
+                };
+
+
+
+                for line in new_lines {
+                    tracing::trace!("yielding log entry");
+
+                    yield Ok::<_, Infallible>(line)
+                }
+
+
+
+                if let Err(_) = log_rx.changed().await {
+                    tracing::error!("`log_rx` was closed, killing log stream");
+
+                    break
+                }
+            }
+        };
+
+        (StatusCode::OK, StreamBody::new(s)).into_response()
     }
 }

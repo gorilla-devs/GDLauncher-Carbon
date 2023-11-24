@@ -390,8 +390,8 @@ const Modpack = () => {
                 }}
                 class="sticky top-0 flex items-center justify-between px-4 z-10 bg-darkSlate-800 mb-4"
               >
-                <span class="mr-4">
-                  <Show when={isSticky()}>
+                <Show when={isSticky()}>
+                  <span class="mr-4">
                     <Button
                       onClick={() =>
                         navigate(`/${detailsType()}?instanceId=${instanceId()}`)
@@ -402,8 +402,8 @@ const Modpack = () => {
                       <div class="text-2xl i-ri:arrow-drop-left-line" />
                       <Trans key="instance.step_back" />
                     </Button>
-                  </Show>
-                </span>
+                  </span>
+                </Show>
                 <Tabs index={indexTab()}>
                   <TabList>
                     <For each={instancePages()}>

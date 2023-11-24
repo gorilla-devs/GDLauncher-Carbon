@@ -141,7 +141,9 @@ const ModDetails = (props: ModalProps) => {
               if (fileId && instanceId()) {
                 installModMutation.mutate({
                   mod_source: modSourceObj(),
-                  instance_id: parseInt(instanceId() as string, 10)
+                  instance_id: parseInt(instanceId() as string, 10),
+                  install_deps: true,
+                  replaces_mod: null
                 });
               }
             }}

@@ -1,5 +1,5 @@
 import { isSidebarOpened, toggleSidebar } from "@/utils/sidebar";
-import { JSXElement, mergeProps, Show } from "solid-js";
+import { createEffect, JSXElement, mergeProps, Show } from "solid-js";
 
 interface Props {
   children: JSXElement;
@@ -10,6 +10,22 @@ interface Props {
 
 const SiderbarWrapper = (props: Props) => {
   const mergedProps = mergeProps({ collapsable: true }, props);
+
+  const handleOpenAndCloseSidebar = () => {
+    if (window.innerWidth < 873 && isSidebarOpened()) {
+      toggleSidebar();
+    } else if (window.innerWidth >= 873 && !isSidebarOpened()) {
+      toggleSidebar();
+    }
+  };
+
+  createEffect(() => {
+    window.addEventListener("resize", handleOpenAndCloseSidebar);
+    return () => {
+      window.removeEventListener("resize", handleOpenAndCloseSidebar);
+    };
+  });
+
   return (
     <div
       style={{

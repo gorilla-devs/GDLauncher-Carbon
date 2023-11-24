@@ -10,27 +10,12 @@ use crate::managers::minecraft::modrinth;
 use crate::managers::minecraft::{curseforge, UpdateValue};
 use crate::managers::vtask::Subtask;
 
-use std::fmt::Debug;
-use std::io;
-use std::path::PathBuf;
-use std::pin::Pin;
-
-use std::time::Duration;
-use tokio::{io::AsyncReadExt, sync::mpsc};
-use tracing::{debug, info};
-
+use super::{InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError};
 use crate::api::keys::instance::*;
 use crate::api::translation::Translation;
 use crate::domain::instance::{self as domain, GameLogId};
-use crate::managers::instance::log::{EntryType, GameLog};
+use crate::managers::instance::log::{GameLog, LogEntry, LogEntrySourceKind};
 use crate::managers::instance::schema::make_instance_config;
-use chrono::{DateTime, Local, Utc};
-use futures::Future;
-use tokio::sync::{watch, Semaphore};
-use tokio::task::JoinHandle;
-
-use anyhow::{anyhow, bail};
-
 use crate::{
     domain::instance::info::{GameVersion, ModLoader, ModLoaderType},
     managers::{
@@ -40,8 +25,19 @@ use crate::{
         ManagerRef,
     },
 };
-
-use super::{InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError};
+use anyhow::{anyhow, bail};
+use chrono::{DateTime, Local, Utc};
+use futures::Future;
+use itertools::Itertools;
+use std::fmt::Debug;
+use std::io;
+use std::path::PathBuf;
+use std::pin::Pin;
+use std::time::Duration;
+use tokio::sync::{watch, Semaphore};
+use tokio::task::JoinHandle;
+use tokio::{io::AsyncReadExt, sync::mpsc};
+use tracing::{debug, info};
 
 #[derive(Debug)]
 pub struct PersistenceManager {
@@ -989,58 +985,6 @@ impl ManagerRef<'_, InstanceManager> {
                         panic!("stdout and stderr are not availible even though the child process was created with both enabled");
                     };
 
-                    let read_logs = async {
-                        async fn read_step<'a>(
-                            log: &'a watch::Sender<GameLog>,
-                            entry_type: EntryType,
-                            stream: &'a mut (impl AsyncReadExt + Unpin),
-                        ) -> io::Result<impl Future<Output = io::Result<()>> + 'a>
-                        {
-                            let mut buf = [0u8; 1024];
-                            stream.read(&mut buf[..]).await.map(|count| async move {
-                                if count > 0 {
-                                    let utf8 = String::from_utf8_lossy(&buf[0..count]);
-                                    log.send_if_modified(|log| {
-                                        log.push(entry_type, &*utf8);
-                                        false
-                                    });
-
-                                    loop {
-                                        tokio::select!(biased;
-                                            _ = tokio::time::sleep(Duration::from_millis(1)) => break,
-                                            count = stream.read(&mut buf[..]) => count.map(|count| {
-                                                if count > 0 {
-                                                    let utf8 = String::from_utf8_lossy(&buf[0..count]);
-                                                    log.send_if_modified(|log| {
-                                                        log.push(entry_type, &*utf8);
-                                                        false
-                                                    });
-                                                }
-                                            })?
-                                        );
-                                    }
-                                }
-
-                                Ok(())
-                            })
-                        }
-
-                        loop {
-                            let r = async {
-                                tokio::select!(biased;
-                                    cont = read_step(&log, EntryType::StdOut, &mut stdout) => cont?.await,
-                                    cont = read_step(&log, EntryType::StdErr, &mut stderr) => cont?.await,
-                                )
-                            }.await;
-
-                            if let Err(e) = r {
-                                tracing::error!({ error = ?e }, "game log reader died");
-                            }
-
-                            log.send_if_modified(|_| true);
-                        }
-                    };
-
                     let mut last_stored_time = start_time;
                     let update_playtime = async {
                         loop {
@@ -1064,7 +1008,7 @@ impl ManagerRef<'_, InstanceManager> {
                         _ = child.wait() => {},
                         _ = kill_rx.recv() => drop(child.kill().await),
                         // infallible, canceled by the above tasks
-                        _ = read_logs => {},
+                        _ = read_logs(&log, &mut stdout,&mut  stderr) => {},
                         _ = update_playtime => {}
                     }
 
@@ -1080,7 +1024,9 @@ impl ManagerRef<'_, InstanceManager> {
                     }
 
                     if let Ok(exitcode) = child.wait().await {
-                        log.send_modify(|log| log.push(EntryType::System, &exitcode.to_string()));
+                        log.send_modify(|log| {
+                            log.add_entry(LogEntry::system_message(format!("{exitcode}")))
+                        });
                     }
 
                     let _ = app.rich_presence_manager().stop_activity().await;
@@ -1331,13 +1277,118 @@ mod test {
         let mut idx = 0;
         while log.changed().await.is_ok() {
             let log = log.borrow();
-            let new_lines = log.get_region(idx..);
+            let new_lines = log.get_span(idx..);
             idx = log.len();
             for line in new_lines {
-                tracing::info!("[{:?}]: {}", line.type_, line.text);
+                tracing::info!("[{:?}]: {}", line.source_kind, line.message);
             }
         }
 
         Ok(())
+    }
+}
+
+/// Reads `stdout` and `stderr`, sending each whole line to the log.
+async fn read_logs(
+    log: &watch::Sender<GameLog>,
+    mut stdout: impl AsyncReadExt + Unpin,
+    mut stderr: impl AsyncReadExt + Unpin,
+) {
+    let mut stdout_line_buf = String::with_capacity(1024);
+    let mut stderr_line_buf = String::with_capacity(1024);
+
+    loop {
+        // TODO: should we still dispatch modifications on a
+        // time based window like before? Traffic should be low enough
+        // to not need it
+        let modified = tokio::select! { biased;
+            modified = read_pipe(
+                    &log,
+                    LogEntrySourceKind::StdErr,
+                    &mut stderr,
+                    &mut stdout_line_buf
+                ) => { modified }
+            modified = read_pipe(
+                    &log,
+                    LogEntrySourceKind::StdOut,
+                    &mut stdout,
+                    &mut stderr_line_buf
+                ) => { modified }
+        };
+
+        log.send_if_modified(|_| modified);
+    }
+}
+
+/// Performs a single poll for data from the given pipe.
+///
+/// Returns `true` when a line was fully received, at which point it is
+/// safe to flush to the log.
+///
+/// This function will modify the [`GameLog`], but not notify watchers.
+/// It is the responsibility of the caller to ensure notification happens
+/// at some point in the future if this function returns `true`.
+async fn read_pipe(
+    log: &watch::Sender<GameLog>,
+    kind: LogEntrySourceKind,
+    mut pipe: impl AsyncReadExt + Unpin,
+    line_buf: &mut String,
+) -> bool {
+    let mut buf = [0; 1024];
+
+    match pipe.read(&mut buf).await {
+        Ok(size) if size != 0 => {
+            let utf8 = String::from_utf8_lossy(&buf[..size]);
+
+            line_buf.push_str(&utf8);
+
+            match carbon_parsing::log::parse_log_entry(line_buf) {
+                Ok((rest, entry)) => {
+                    log.send_if_modified(|log| {
+                        log.add_entry((kind, entry).into());
+
+                        false
+                    });
+
+                    let rest = rest.to_owned();
+                    *line_buf = rest;
+
+                    true
+                }
+                // do nothing, wait for more bytes
+                Err(nom::Err::Incomplete(_)) => false,
+                Err(err) => {
+                    tracing::error!("failed to parse log entry:\n{err:#?}");
+
+                    log.send_if_modified(|log| {
+                        log.add_entry(LogEntry::system_error(
+                            "failed to parse log entry from {kind:?}",
+                        ));
+
+                        false
+                    });
+
+                    true
+                }
+            }
+        }
+        Ok(_) => false,
+        Err(err) => {
+            tracing::error!("failed to read stdout into the log:\n{err:#?}");
+
+            // We might have missed some data, including a
+            // `\n`, so give up on this line and flush it
+            log.send_if_modified(|log| {
+                log.add_entry(LogEntry::system_error(format!(
+                    "failed to receive data from `{kind:?}: {}`",
+                    line_buf.as_str()
+                )));
+                line_buf.clear();
+
+                false
+            });
+
+            true
+        }
     }
 }
