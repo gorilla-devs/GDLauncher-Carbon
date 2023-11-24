@@ -41,7 +41,7 @@ import { ContextMenu } from "@/components/ContextMenu";
 import { useModal } from "@/managers/ModalsManager";
 import { convertSecondsToHumanTime } from "@/utils/helpers";
 import Authors from "./Info/Authors";
-import { getForgeModloaderIcon } from "@/utils/sidebar";
+import { getCFModloaderIcon } from "@/utils/sidebar";
 
 type InstancePage = {
   label: string;
@@ -229,13 +229,13 @@ const Instance = () => {
     getModrinthData(routeData.instanceDetails.data.modpack);
 
   createEffect(() => {
-    const isModrninth = modrinthData();
+    const isModrinth = modrinthData();
 
-    if (isModrninth) {
+    if (isModrinth) {
       setModpackDetails(
         rspc.createQuery(() => [
           "modplatforms.modrinth.getProject",
-          isModrninth.project_id
+          isModrinth.project_id
         ]).data
       );
     }
@@ -479,7 +479,7 @@ const Instance = () => {
                                 <Show when={modloader.type_}>
                                   <img
                                     class="w-4 h-4"
-                                    src={getForgeModloaderIcon(modloader.type_)}
+                                    src={getCFModloaderIcon(modloader.type_)}
                                   />
                                 </Show>
                                 <span>{modloader.type_}</span>

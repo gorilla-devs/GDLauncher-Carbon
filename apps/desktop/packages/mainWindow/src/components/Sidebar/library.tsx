@@ -11,7 +11,7 @@ import {
   createSignal
 } from "solid-js";
 import {
-  getForgeModloaderIcon,
+  getCFModloaderIcon,
   isSidebarOpened,
   toggleSidebar
 } from "@/utils/sidebar";
@@ -80,7 +80,7 @@ const Sidebar = () => {
         <Match when={!isSidebarOpened()}>
           <img
             class="w-6 h-6"
-            src={getForgeModloaderIcon(key as CFFEModLoaderType)}
+            src={getCFModloaderIcon(key as CFFEModLoaderType)}
           />
         </Match>
       </Switch>

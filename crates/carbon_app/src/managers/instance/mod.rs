@@ -962,7 +962,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let shortpath = &mut instance.shortpath;
         let data = instance.type_.data_mut()?;
 
-        let path = self
+        let mut path = self
             .app
             .settings_manager()
             .runtime_path
@@ -1067,7 +1067,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             if !name_matches {
                 let _lock = self.path_lock.lock().await;
                 let (new_shortpath, new_path) = self.next_folder(&name).await?;
-                tokio::fs::rename(path.clone(), new_path).await?;
+                tokio::fs::rename(path.clone(), new_path.clone()).await?;
                 *shortpath = new_shortpath.clone();
 
                 self.app
@@ -1082,6 +1082,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     )
                     .exec()
                     .await?;
+
+                path = new_path;
             }
         }
 
@@ -1091,6 +1093,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .invalidate(INSTANCE_DETAILS, Some(update.instance_id.0.into()));
 
         if need_reinstall {
+            tracing::info!("reinstalling to {:?} instance due to version change", path);
             tokio::fs::write(path.join(".first_run_incomplete"), "")
                 .await
                 .context("writing incomplete instance marker")?;

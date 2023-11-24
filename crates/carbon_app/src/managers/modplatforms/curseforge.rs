@@ -1,7 +1,7 @@
 use anyhow::bail;
 use reqwest_middleware::ClientWithMiddleware;
 use serde_json::json;
-use tracing::trace;
+use tracing::{info, trace};
 use url::Url;
 
 use crate::{
@@ -11,7 +11,8 @@ use crate::{
             ModFileParameters, ModFilesParameters, ModParameters, ModSearchParameters,
             ModsParameters,
         },
-        Category, CurseForgeResponse, File, FingerprintsMatchesResult, Mod,
+        Category, CurseForgeResponse, File, FingerprintsMatchesResult, MinecraftModLoaderIndex,
+        Mod,
     },
     error::request::GoodJsonRequestError,
     managers::GDL_API_BASE,
@@ -29,6 +30,27 @@ impl CurseForge {
             client,
             base_url: base_url.parse().unwrap(),
         }
+    }
+
+    #[tracing::instrument(skip(self))]
+    pub async fn get_modloaders(
+        &self,
+    ) -> anyhow::Result<CurseForgeResponse<Vec<MinecraftModLoaderIndex>>> {
+        let url = self.base_url.join("minecraft/modloader")?;
+
+        trace!("GET {}", url);
+
+        let resp = self
+            .client
+            .get(url.as_str())
+            .send()
+            .await?
+            .json_with_context_reporting::<CurseForgeResponse<Vec<MinecraftModLoaderIndex>>>(
+                "curseforge::get_modloaders",
+            )
+            .await?;
+
+        Ok(resp)
     }
 
     #[tracing::instrument(skip(self))]

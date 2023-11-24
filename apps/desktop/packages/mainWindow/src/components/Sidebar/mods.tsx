@@ -3,7 +3,15 @@ import SiderbarWrapper from "./wrapper";
 import { Checkbox, Collapsable, Radio, Skeleton } from "@gd/ui";
 import fetchData from "@/pages/Mods/modsBrowser.data";
 import { useRouteData, useSearchParams } from "@solidjs/router";
-import { createResource, For, Match, Show, Switch } from "solid-js";
+import {
+  createResource,
+  For,
+  getOwner,
+  Match,
+  runWithOwner,
+  Show,
+  Switch
+} from "solid-js";
 import {
   CFFECategory,
   FESearchAPI,
@@ -28,11 +36,16 @@ import {
   modrinthCategories,
   supportedModloaders
 } from "@/utils/sidebar";
+import { rspcFetch } from "@/utils/rspcClient";
 
 const Sidebar = () => {
+  let owner = getOwner();
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const infiniteQuery = useInfiniteModsQuery();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  const instanceId = () =>
+    infiniteQuery.instanceId() ?? parseInt(searchParams.instanceId, 10);
 
   const [t] = useTransContext();
 
@@ -45,10 +58,19 @@ const Sidebar = () => {
           (category) => category.project_type === "mod"
         );
 
-  const modloaders = () => supportedModloaders();
+  const modloaders = () => {
+    const searchApi = infiniteQuery?.query?.searchApi;
 
-  const instanceId = () =>
-    infiniteQuery.instanceId() ?? parseInt(searchParams.instanceId, 10);
+    if (searchApi === "modrinth") {
+      const results = supportedModloaders[searchApi];
+      return results.filter((modloader) =>
+        modloader.supported_project_types.includes("modpack")
+      );
+    } else if (searchApi === "curseforge") {
+      const results = supportedModloaders[searchApi];
+      return results;
+    }
+  };
 
   const filteredInstances = () =>
     routeData.instancesUngrouped.data?.filter(
@@ -62,11 +84,41 @@ const Sidebar = () => {
           <Collapsable title={t("general.instances")} noPadding>
             <div class="flex flex-col gap-3">
               <Radio.group
-                onChange={(val) => {
+                onChange={async (val) => {
                   setSearchParams({
                     instanceId: val as number
                   });
                   infiniteQuery.setInstanceId(val as number);
+
+                  const _modloaders: any = await runWithOwner(
+                    owner,
+                    async () => {
+                      return rspcFetch(() => [
+                        "instance.getInstanceDetails",
+                        instanceId()
+                      ]);
+                    }
+                  );
+
+                  const modloaders = _modloaders.data.modloaders.map(
+                    (v: any) => v.type_
+                  );
+
+                  let newModloaders = [];
+                  if (modloaders) {
+                    if (modloaders?.includes("forge")) {
+                      newModloaders.push("forge");
+                    } else if (modloaders?.includes("quilt")) {
+                      newModloaders.push("fabric");
+                      newModloaders.push("quilt");
+                    } else {
+                      newModloaders = [...modloaders!] as any;
+                    }
+                  }
+
+                  infiniteQuery.setQuery({
+                    modloaders: newModloaders
+                  });
                 }}
                 value={instanceId()}
               >
@@ -149,12 +201,19 @@ const Sidebar = () => {
                         });
                       }}
                       checked={infiniteQuery.query.modloaders?.includes(
-                        modloader as FEUnifiedModLoaderType
+                        ((modloader as any)?.name ||
+                          modloader) as FEUnifiedModLoaderType
                       )}
                       disabled={!isNaN(instanceId())}
                     />
                     <ModloaderIcon modloader={modloader} />
-                    <p class="m-0">{capitalize(modloader)}</p>
+                    <p class="m-0">
+                      {capitalize(
+                        typeof modloader === "string"
+                          ? modloader
+                          : modloader.name
+                      )}
+                    </p>
                   </div>
                 );
               }}

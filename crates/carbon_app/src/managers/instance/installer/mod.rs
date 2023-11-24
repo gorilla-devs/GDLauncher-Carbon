@@ -475,6 +475,13 @@ impl Installer {
                             carbon_net::download_file(downloadable, Some(progress_watch_tx)).await?
                         }
 
+                        if let Some(id) = replaces_mod_id {
+                            app_clone
+                                .instance_manager()
+                                .delete_mod(instance_id, id)
+                                .await?;
+                        }
+
                         {
                             // context to drop instance lock after install attempt
                             let instance_manager = app_clone.instance_manager();
@@ -485,21 +492,10 @@ impl Installer {
 
                             let _ = instance.data_mut().expect("instance should still be valid");
                             let lock = inner.lock().await;
-                            let r = lock
-                                .finalize_install(&app_clone, instance_id, downloadable)
-                                .await;
-
-                            if let (Ok(_), Some(id)) = (&r, replaces_mod_id) {
-                                app_clone
-                                    .instance_manager()
-                                    .delete_mod(instance_id, id)
-                                    .await?;
-                            }
-
-                            r
+                            lock.finalize_install(&app_clone, instance_id, downloadable)
+                                .await
                         }?;
 
-                        app_clone.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
                         app_clone.invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
                         Ok::<_, anyhow::Error>(())
                     })()
