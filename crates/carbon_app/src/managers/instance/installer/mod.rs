@@ -492,8 +492,7 @@ impl Installer {
 
                             let _ = instance.data_mut().expect("instance should still be valid");
                             let lock = inner.lock().await;
-                            lock
-                                .finalize_install(&app_clone, instance_id, downloadable)
+                            lock.finalize_install(&app_clone, instance_id, downloadable)
                                 .await
                         }?;
 
