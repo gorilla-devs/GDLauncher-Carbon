@@ -14,8 +14,6 @@ import {
 } from "solid-js";
 import {
   CFFEModSearchSortField,
-  FESearchAPI,
-  FEUnifiedSearchParameters,
   FEUnifiedSearchResult,
   MRFESearchIndex
 } from "@gd/core_module/bindings";
@@ -123,48 +121,42 @@ const ModsBrowser = () => {
 
   const [imageResource] = createResource(instanceId, fetchImage);
 
-  const instanceModloaders = () =>
-    instanceDetails.data?.modloaders.map((modloader) => modloader.type_);
+  // const instanceModloaders = () =>
+  //   instanceDetails.data?.modloaders.map((modloader) => modloader.type_);
 
-  const instancePlatform = () =>
-    Object.keys(instanceDetails.data?.modpack || {})[0]?.toLocaleLowerCase();
+  // const instancePlatform = () =>
+  //   Object.keys(instanceDetails.data?.modpack || {})[0]?.toLocaleLowerCase();
 
-  createEffect((_firstTime: boolean) => {
-    const modloaders = instanceModloaders();
-    const platform = instancePlatform();
-    const _ = instanceId();
+  // createEffect(() => {
+  //   const modloaders = instanceModloaders();
+  //   const platform = instancePlatform();
+  //   const _ = instanceId();
 
-    // if (_firstTime) {
-    //   return false;
-    // }
+  //   const newQuery: Partial<FEUnifiedSearchParameters> = {};
 
-    const newQuery: Partial<FEUnifiedSearchParameters> = {};
+  //   if (platform) {
+  //     newQuery["searchApi"] = platform as FESearchAPI;
+  //   }
 
-    if (platform) {
-      newQuery["searchApi"] = platform as FESearchAPI;
-    }
+  //   if (instanceDetails.data?.version) {
+  //     newQuery["gameVersions"] = [instanceDetails.data?.version!];
+  //   }
 
-    if (instanceDetails.data?.version) {
-      newQuery["gameVersions"] = [instanceDetails.data?.version!];
-    }
+  //   if (modloaders) {
+  //     newQuery["modloaders"] = [];
 
-    if (modloaders) {
-      newQuery["modloaders"] = [];
+  //     if (modloaders.includes("forge")) {
+  //       newQuery["modloaders"].push("forge");
+  //     } else if (modloaders.includes("quilt")) {
+  //       newQuery["modloaders"].push("fabric");
+  //       newQuery["modloaders"].push("quilt");
+  //     } else {
+  //       newQuery["modloaders"] = [...modloaders] as any;
+  //     }
+  //   }
 
-      if (modloaders.includes("forge")) {
-        newQuery["modloaders"].push("forge");
-      } else if (modloaders.includes("quilt")) {
-        newQuery["modloaders"].push("fabric");
-        newQuery["modloaders"].push("quilt");
-      } else {
-        newQuery["modloaders"] = [...modloaders] as any;
-      }
-    }
-
-    infiniteQuery.setQuery(newQuery);
-
-    return false;
-  }, true);
+  //   infiniteQuery.setQuery(newQuery);
+  // });
 
   const hasFiltersData = createMemo(() => Boolean(sortingFields()));
 

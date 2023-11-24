@@ -215,6 +215,11 @@ const Sidebar = () => {
                 return (
                   <div class="flex items-center gap-2">
                     <Checkbox
+                      checked={
+                        infiniteQuery?.query.modloaders?.includes(
+                          modloader as FEUnifiedModLoaderType
+                        ) || false
+                      }
                       onChange={(checked) => {
                         const prevModloaders =
                           infiniteQuery?.query.modloaders || [];
@@ -271,18 +276,19 @@ const Sidebar = () => {
                         ? (category as CFFECategory).id
                         : (category as MRFECategory).name;
 
-                    const isCategoryIncluded =
+                    const isCategoryIncluded = () =>
                       infiniteQuery?.query.categories?.some(
                         (item) =>
-                          ("curseforge" in item &&
-                            item.curseforge === categoryId()) ||
-                          ("modrinth" in item && item.modrinth === categoryId())
+                          ("curseforge" in item[0] &&
+                            item[0].curseforge === categoryId()) ||
+                          ("modrinth" in item[0] &&
+                            item[0].modrinth === categoryId())
                       );
 
                     return (
                       <div class="flex items-center gap-3">
                         <Checkbox
-                          checked={isCategoryIncluded}
+                          checked={isCategoryIncluded()}
                           onChange={(checked) => {
                             const prevCategories =
                               infiniteQuery?.query.categories || [];

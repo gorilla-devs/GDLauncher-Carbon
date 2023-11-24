@@ -229,13 +229,13 @@ const Instance = () => {
     getModrinthData(routeData.instanceDetails.data.modpack);
 
   createEffect(() => {
-    const isModrninth = modrinthData();
+    const isModrinth = modrinthData();
 
-    if (isModrninth) {
+    if (isModrinth) {
       setModpackDetails(
         rspc.createQuery(() => [
           "modplatforms.modrinth.getProject",
-          isModrninth.project_id
+          isModrinth.project_id
         ]).data
       );
     }
