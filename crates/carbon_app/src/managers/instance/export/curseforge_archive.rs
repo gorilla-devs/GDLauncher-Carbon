@@ -257,7 +257,7 @@ mod test {
 
             let task = app
                 .instance_manager()
-                .install_curseforge_mod(instance_id, 247560, 4024011)
+                .install_curseforge_mod(instance_id, 247560, 4024011, false, None)
                 .await?;
 
             app.task_manager().wait_with_log(task).await?;

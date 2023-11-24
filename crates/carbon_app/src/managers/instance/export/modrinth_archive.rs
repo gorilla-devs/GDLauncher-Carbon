@@ -278,6 +278,8 @@ mod test {
                     instance_id,
                     String::from("fPetb5Kh"),
                     String::from("o0SCfsMe"),
+                    false,
+                    None,
                 )
                 .await?;
 
