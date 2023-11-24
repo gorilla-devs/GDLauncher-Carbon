@@ -470,7 +470,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                   onInput={(e) => {
                     setCustomTitle(e.currentTarget.value);
                   }}
-                  value={title()}
+                  value={title()!}
                   error={
                     error() &&
                     !title() &&
