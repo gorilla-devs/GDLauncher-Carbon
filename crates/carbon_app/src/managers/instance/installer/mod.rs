@@ -470,7 +470,6 @@ impl Installer {
                             .override_caching_and_wait(instance_id, true, true)
                             .await?;
 
-                        app_clone.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
                         app_clone.invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
                         Ok::<_, anyhow::Error>(())
                     })()

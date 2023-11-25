@@ -1,4 +1,4 @@
-use crate::domain::instance::info::{Modpack, StandardVersion};
+use crate::domain::instance::info::{self, Modpack, StandardVersion};
 use crate::domain::java::SystemJavaProfileName;
 use crate::domain::metrics::Event;
 use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
@@ -557,6 +557,10 @@ impl ManagerRef<'_, InstanceManager> {
                             type_: ModLoaderType::Forge,
                             version: forge_version,
                         } => {
+                            if forge_version.is_empty() {
+                                anyhow::bail!("Forge version is empty");
+                            }
+
                             let forge_manifest = app.minecraft_manager().get_forge_manifest().await?;
 
                             let forge_version =
@@ -602,6 +606,10 @@ impl ManagerRef<'_, InstanceManager> {
                             type_: ModLoaderType::Neoforge,
                             version: neoforge_version,
                         } => {
+                            if neoforge_version.is_empty() {
+                                anyhow::bail!("Neoforge version is empty");
+                            }
+
                             let neoforge_manifest = app.minecraft_manager().get_neoforge_manifest().await?;
 
                             let neoforge_version =
@@ -647,6 +655,10 @@ impl ManagerRef<'_, InstanceManager> {
                             type_: ModLoaderType::Fabric,
                             version: fabric_version,
                         } => {
+                            if fabric_version.is_empty() {
+                                anyhow::bail!("Fabric version is empty");
+                            }
+
                             let fabric_manifest = app.minecraft_manager().get_fabric_manifest().await?;
 
                             let fabric_version =
@@ -703,6 +715,10 @@ impl ManagerRef<'_, InstanceManager> {
                             type_: ModLoaderType::Quilt,
                             version: quilt_version,
                         } => {
+                            if quilt_version.is_empty() {
+                                anyhow::bail!("Quilt version is empty");
+                            }
+
                             let quilt_manifest = app.minecraft_manager().get_quilt_manifest().await?;
 
                             let quilt_version =

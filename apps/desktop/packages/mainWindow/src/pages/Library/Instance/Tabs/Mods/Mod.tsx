@@ -1,6 +1,6 @@
 import { getInstanceIdFromPath } from "@/utils/routes";
 import { queryClient, rspc } from "@/utils/rspcClient";
-import { getForgeModloaderIcon } from "@/utils/sidebar";
+import { getCFModloaderIcon } from "@/utils/sidebar";
 import { Mod as ModType } from "@gd/core_module/bindings";
 import { Checkbox, Switch } from "@gd/ui";
 import { useLocation, useParams } from "@solidjs/router";
@@ -48,7 +48,6 @@ const Mod = (props: Props) => {
 
   const disableModMutation = rspc.createMutation(["instance.disableMod"], {
     onMutate: (data) => {
-      console.log(data.mod_id);
       queryClient.setQueryData(
         ["instance.getInstanceMods", data.instance_id],
         (oldData: ModType[] | undefined) => {
@@ -133,7 +132,7 @@ const Mod = (props: Props) => {
                       <Show when={modloader}>
                         <img
                           class="w-4 h-4"
-                          src={getForgeModloaderIcon(modloader)}
+                          src={getCFModloaderIcon(modloader)}
                         />
                       </Show>
                       <p class="m-0 text-darkSlate-500 text-sm">

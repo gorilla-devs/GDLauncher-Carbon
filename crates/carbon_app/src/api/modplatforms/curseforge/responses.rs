@@ -1,9 +1,13 @@
 use rspc::Type;
 use serde::{Deserialize, Serialize};
 
-use crate::domain::modplatforms::curseforge::{Category, CurseForgeResponse, File, Mod};
+use crate::domain::modplatforms::curseforge::{
+    Category, CurseForgeResponse, File, MinecraftModLoaderIndex, Mod,
+};
 
-use super::structs::{CFFECategory, CFFEFile, CFFEMod, CFFEPagination};
+use super::structs::{
+    CFFECategory, CFFEFile, CFFEMinecraftModLoaderIndex, CFFEMod, CFFEPagination,
+};
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 pub struct FEModSearchResponse {
@@ -13,6 +17,21 @@ pub struct FEModSearchResponse {
 
 impl From<CurseForgeResponse<Vec<Mod>>> for FEModSearchResponse {
     fn from(response: CurseForgeResponse<Vec<Mod>>) -> Self {
+        Self {
+            data: response.data.into_iter().map(Into::into).collect(),
+            pagination: response.pagination.map(Into::into),
+        }
+    }
+}
+
+#[derive(Type, Debug, Deserialize, Serialize)]
+pub struct FEModloadersResponse {
+    pub data: Vec<CFFEMinecraftModLoaderIndex>,
+    pub pagination: Option<CFFEPagination>,
+}
+
+impl From<CurseForgeResponse<Vec<MinecraftModLoaderIndex>>> for FEModloadersResponse {
+    fn from(response: CurseForgeResponse<Vec<MinecraftModLoaderIndex>>) -> Self {
         Self {
             data: response.data.into_iter().map(Into::into).collect(),
             pagination: response.pagination.map(Into::into),

@@ -8,6 +8,7 @@ import ModpackBrowserData from "@/pages/Modpacks/modpacksBrowser.data";
 import ModsBrowserData from "@/pages/Mods/modsBrowser.data";
 import ModpackData from "@/pages/Modpacks/modpack.overview";
 import ModpackVersionsData from "@/pages/Modpacks/modpack.versions";
+import ModVersionsData from "@/pages/Modpacks/modpack.versions";
 import ModpackScreenshotsData from "@/pages/Modpacks/modpack.screenshots";
 import InstanceData from "@/pages/Library/Instance/instance.data";
 import InstanceLogsData from "@/pages/Library/Instance/instance.logs.data";
@@ -110,27 +111,25 @@ export const routes: RouteDefinition[] = [
       },
       {
         path: "/mods/:id/:platform",
-        component: lazy(() => import("@/pages/Modpacks/Explore")),
+        component: lazy(() => import("@/pages/Mods/Explore")),
         data: ModpackData,
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Modpacks/Explore/Overview"))
+            component: lazy(() => import("@/pages/Mods/Explore/Overview"))
           },
           {
             path: "/versions",
-            component: lazy(() => import("@/pages/Modpacks/Explore/Versions")),
-            data: ModpackVersionsData
+            component: lazy(() => import("@/pages/Mods/Explore/Versions")),
+            data: ModVersionsData
           },
           {
             path: "/changelog",
-            component: lazy(() => import("@/pages/Modpacks/Explore/Changelog"))
+            component: lazy(() => import("@/pages/Mods/Explore/Changelog"))
           },
           {
             path: "/screenshots",
-            component: lazy(
-              () => import("@/pages/Modpacks/Explore/Screenshots")
-            ),
+            component: lazy(() => import("@/pages/Mods/Explore/Screenshots")),
             data: ModpackScreenshotsData
           }
         ]

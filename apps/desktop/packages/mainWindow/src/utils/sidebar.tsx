@@ -1,4 +1,4 @@
-import { Show, createSignal } from "solid-js";
+import { Match, Show, Switch, createSignal } from "solid-js";
 import forgeIcon from "/assets/images/icons/forge.png";
 import fabricIcon from "/assets/images/icons/fabric.png";
 import quiltIcon from "/assets/images/icons/quilt.svg";
@@ -10,14 +10,16 @@ import {
   MRFECategory,
   MRFELoader
 } from "@gd/core_module/bindings";
+import { createStore } from "solid-js/store";
 
 export const [isSidebarOpened, setIsSidebarOpened] = createSignal(true);
-export const [curseForgeModloaders, setCurseForgeModloaders] = createSignal<
-  CFFEModLoaderType[]
->([]);
-export const [supportedModloaders, setSupportedModloaders] = createSignal<
-  CFFEModLoaderType[]
->([]);
+export const [supportedModloaders, setSupportedModloaders] = createStore<{
+  modrinth: MRFELoader[];
+  curseforge: CFFEModLoaderType[];
+}>({
+  modrinth: [],
+  curseforge: []
+});
 export const [curseforgeCategories, setCurseforgeCategories] = createSignal<
   CFFECategory[]
 >([]);
@@ -29,7 +31,7 @@ export const toggleSidebar = () => {
   return setIsSidebarOpened(!isSidebarOpened());
 };
 
-export const getForgeModloaderIcon = (modloader?: CFFEModLoaderType) => {
+export const getCFModloaderIcon = (modloader?: CFFEModLoaderType) => {
   switch (modloader?.toString().toLowerCase()) {
     case "forge":
       return forgeIcon;
@@ -43,34 +45,36 @@ export const getForgeModloaderIcon = (modloader?: CFFEModLoaderType) => {
 };
 
 export const getModloaderIcon = (category: CFFEModLoaderType | MRFELoader) => {
-  if (typeof category === "string") {
-    return getForgeModloaderIcon(category);
-  } else return (category as MRFELoader).icon;
+  const isCurseforge = typeof category === "string";
+
+  if (isCurseforge) {
+    return getCFModloaderIcon(category);
+  } else {
+    return (category as MRFELoader)?.icon;
+  }
 };
 
 export const ModloaderIcon = (props: {
   modloader: CFFEModLoaderType | MRFELoader;
 }) => {
   return (
-    // <Switch
-    //   fallback={
-    //     <>
-    //       <Show when={getModloaderIcon(props.modloader)}>
-    //         <div
-    //           class="w-4 h-4"
-    //           innerHTML={getModloaderIcon(props.modloader)}
-    //         />
-    //       </Show>
-    //     </>
-    //   }
-    // >
-    //   <Match when={typeof props.modloader === "string"}>
-    //     <img class="h-4 w-4" src={getModloaderIcon(props.modloader)} />
-    //   </Match>
-    // </Switch>
-    <Show when={typeof props.modloader === "string"}>
-      <img class="h-4 w-4" src={getModloaderIcon(props.modloader)} />
-    </Show>
+    <Switch
+      fallback={
+        <>
+          <Show when={getModloaderIcon(props.modloader)}>
+            <div
+              class="w-4 h-4"
+              // eslint-disable-next-line solid/no-innerhtml
+              innerHTML={getModloaderIcon(props.modloader)}
+            />
+          </Show>
+        </>
+      }
+    >
+      <Match when={typeof props.modloader === "string"}>
+        <img class="h-4 w-4" src={getModloaderIcon(props.modloader)} />
+      </Match>
+    </Switch>
   );
 };
 
