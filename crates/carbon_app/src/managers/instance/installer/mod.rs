@@ -4,7 +4,10 @@ use std::{ops::Deref, pin::Pin, sync::Arc, time::Duration};
 use tokio::{sync::Mutex, task::AbortHandle};
 
 use crate::{
-    api::{keys::instance::INSTANCE_DETAILS, translation::Translation},
+    api::{
+        keys::instance::{INSTANCE_DETAILS, INSTANCE_MODS},
+        translation::Translation,
+    },
     domain::{
         self,
         instance::{self, InstanceId},
@@ -257,6 +260,8 @@ impl Installer {
         &self,
         app: &Arc<AppInner>,
         instance_id: InstanceId,
+        install_deps: bool,
+        replaces_mod_id: Option<String>,
     ) -> anyhow::Result<VisualTaskId> {
         let (task, task_id, instance_path) = async {
             let instance_manager = app.instance_manager();
@@ -301,8 +306,16 @@ impl Installer {
         .await?;
         let visited_ids = Arc::new(Mutex::new(Vec::new()));
         let task = Arc::new(Mutex::new(task));
-        self.install_inner(app, instance_id, &instance_path, &task, &visited_ids)
-            .await?;
+        self.install_inner(
+            app,
+            instance_id,
+            &instance_path,
+            &task,
+            &visited_ids,
+            install_deps,
+            replaces_mod_id,
+        )
+        .await?;
 
         Ok(task_id)
     }
@@ -315,6 +328,8 @@ impl Installer {
         instance_path: &InstancePath,
         parent_task: &Arc<Mutex<VisualTask>>,
         visited_ids: &Arc<Mutex<Vec<String>>>,
+        install_deps: bool,
+        replaces_mod_id: Option<String>,
     ) -> anyhow::Result<()> {
         {
             let mut lock = visited_ids.lock().await;
@@ -328,86 +343,90 @@ impl Installer {
             }
         }
 
-        let (dep_error, processed_deps) = {
-            let lock = self.inner.lock().await;
-            let installer_name = lock.display_name();
-            let dep_iter = {
-                let instance_manager = app.instance_manager();
-                let instances = instance_manager.instances.read().await;
-                let instance = instances
-                    .get(&instance_id)
-                    .expect("instance should still be valid");
-                let instance_data = instance.data().expect("instance should still be valid");
+        if install_deps {
+            let (dep_error, processed_deps) = {
+                let lock = self.inner.lock().await;
+                let installer_name = lock.display_name();
+                let dep_iter = {
+                    let instance_manager = app.instance_manager();
+                    let instances = instance_manager.instances.read().await;
+                    let instance = instances
+                        .get(&instance_id)
+                        .expect("instance should still be valid");
+                    let instance_data = instance.data().expect("instance should still be valid");
 
-                lock.dependencies(app, instance_data, ModChannel::Stable)
-            };
+                    lock.dependencies(app, instance_data, ModChannel::Stable)
+                };
 
-            let mut processed_deps = Vec::new();
-            let mut dep_error = None;
+                let mut processed_deps = Vec::new();
+                let mut dep_error = None;
 
-            for dep in dep_iter {
-                let dep_result = dep().await;
-                match dep_result {
-                    Err(err) => {
-                        dep_error = Some(err.context(format!(
-                            "Error processing dependencies for `{}`",
-                            installer_name
-                        )));
-                        break;
-                    }
-                    Ok(dep) => {
-                        let dep_name = dep.display_name();
-                        let dep = Installer::new(dep);
-                        let install_future = dep.install_inner(
-                            app,
-                            instance_id,
-                            instance_path,
-                            parent_task,
-                            visited_ids,
-                        );
-                        let results = install_future.await;
-                        match results {
-                            Err(err) => {
-                                dep_error = Some(err.context(format!(
-                                    "Error installing dependency `{}` for `{}`",
-                                    dep_name, installer_name
-                                )));
-                                break;
-                            }
-                            Ok(()) => {
-                                processed_deps.push(dep);
+                for dep in dep_iter {
+                    let dep_result = dep().await;
+                    match dep_result {
+                        Err(err) => {
+                            dep_error = Some(err.context(format!(
+                                "Error processing dependencies for `{}`",
+                                installer_name
+                            )));
+                            break;
+                        }
+                        Ok(dep) => {
+                            let dep_name = dep.display_name();
+                            let dep = Installer::new(dep);
+                            let install_future = dep.install_inner(
+                                app,
+                                instance_id,
+                                instance_path,
+                                parent_task,
+                                visited_ids,
+                                true,
+                                None,
+                            );
+                            let results = install_future.await;
+                            match results {
+                                Err(err) => {
+                                    dep_error = Some(err.context(format!(
+                                        "Error installing dependency `{}` for `{}`",
+                                        dep_name, installer_name
+                                    )));
+                                    break;
+                                }
+                                Ok(()) => {
+                                    processed_deps.push(dep);
+                                }
                             }
                         }
                     }
                 }
+
+                (dep_error, processed_deps)
+            };
+
+            if self
+                .inner
+                .lock()
+                .await
+                .is_already_installed(app, instance_id)
+                .await?
+            {
+                return Ok(());
             }
 
-            (dep_error, processed_deps)
-        };
+            {
+                let mut lock = self.rollback_context.lock().await;
+                *lock = Some(InstallerRollbackContext {
+                    inner: Arc::clone(&self.inner),
+                    processed_deps: Arc::new(Mutex::new(processed_deps)),
+                    instance_id,
+                    app: Arc::clone(app),
+                })
+            }
 
-        if self
-            .inner
-            .lock()
-            .await
-            .is_already_installed(app, instance_id)
-            .await?
-        {
-            return Ok(());
-        }
-
-        {
-            let mut lock = self.rollback_context.lock().await;
-            *lock = Some(InstallerRollbackContext {
-                inner: Arc::clone(&self.inner),
-                processed_deps: Arc::new(Mutex::new(processed_deps)),
-                instance_id,
-                app: Arc::clone(app),
-            })
-        }
-
-        if let Some(dep_error) = dep_error {
-            self.rollback(Some(&dep_error)).await;
-            return Err(dep_error);
+            if let Some(dep_error) = dep_error {
+                self.rollback(Some(&dep_error)).await;
+                return Err(dep_error);
+            }
         }
 
         let t_download_file = {
@@ -456,6 +475,13 @@ impl Installer {
                             carbon_net::download_file(downloadable, Some(progress_watch_tx)).await?
                         }
 
+                        if let Some(id) = replaces_mod_id {
+                            app_clone
+                                .instance_manager()
+                                .delete_mod(instance_id, id)
+                                .await?;
+                        }
+
                         {
                             // context to drop instance lock after install attempt
                             let instance_manager = app_clone.instance_manager();
@@ -466,12 +492,11 @@ impl Installer {
 
                             let _ = instance.data_mut().expect("instance should still be valid");
                             let lock = inner.lock().await;
-
                             lock.finalize_install(&app_clone, instance_id, downloadable)
                                 .await
                         }?;
 
-                        app_clone.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
+                        app_clone.invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
                         Ok::<_, anyhow::Error>(())
                     })()
                     .await;

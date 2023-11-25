@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -14,7 +14,7 @@ use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
 use crate::error::{AxumError, FeError};
-use crate::managers::instance::log::EntryType;
+use crate::managers::instance::log::LogEntrySourceKind;
 use crate::managers::instance::InstanceMoveTarget;
 use crate::managers::{instance::importer, App, AppInner};
 
@@ -68,12 +68,16 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         mutation CREATE_INSTANCE[app, details: CreateInstance] {
+            if details.name.is_empty() {
+                return Err(anyhow::anyhow!("instance name cannot be empty"));
+            }
+
             app.instance_manager()
                 .create_instance(
                     details.group.into(),
                     details.name,
                     details.use_loaded_icon,
-                    details.version.into(),
+                    details.version.try_into()?,
                     details.notes,
                 )
                 .await
@@ -135,7 +139,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
         mutation UPDATE_INSTANCE[app, details: UpdateInstance] {
             app.instance_manager()
-                .update_instance(details.into())
+                .update_instance(details.try_into()?)
                 .await
         }
 
@@ -148,24 +152,36 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
-        query INSTANCE_DETAILS[app, id: FEInstanceId] {
-            app.instance_manager()
+        query INSTANCE_DETAILS[app, id: Option<FEInstanceId>] {
+            let Some(id) = id else {
+                return Ok(None);
+            };
+
+            let result = app.instance_manager()
                 .instance_details(id.into())
                 .await
-                .map(InstanceDetails::from)
+                .map(InstanceDetails::from);
+
+            Ok(Some(result?))
         }
 
-        query INSTANCE_MODS[app, id: FEInstanceId] {
+        query INSTANCE_MODS[app, id: Option<FEInstanceId>] {
+            let Some(id) = id else {
+                return Ok(None);
+            };
+
             app.meta_cache_manager()
                 .watch_and_prioritize(Some(id.into()))
                 .await;
 
-            Ok(app.instance_manager()
+            let result = app.instance_manager()
                 .list_mods(id.into())
                 .await?
                 .into_iter()
                 .map(Into::into)
-                .collect::<Vec<Mod>>())
+                .collect::<Vec<Mod>>();
+
+            Ok(Some(result))
         }
 
         mutation PREPARE_INSTANCE[app, id: FEInstanceId] {
@@ -250,6 +266,8 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                             imod.instance_id.into(),
                             cf_mod.project_id,
                             cf_mod.file_id,
+                            imod.install_deps,
+                            imod.replaces_mod,
                         )
                         .await?
                 }
@@ -259,6 +277,8 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                             imod.instance_id.into(),
                             mdr_mod.project_id,
                             mdr_mod.version_id,
+                            imod.install_deps,
+                            imod.replaces_mod,
                         )
                         .await?
                 }
@@ -340,11 +360,6 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
         path: String,
     }
 
-    #[derive(Deserialize)]
-    struct LogQuery {
-        id: i32,
-    }
-
     axum::Router::new()
         .route(
             "/instanceIcon",
@@ -408,70 +423,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                 }
             )
         )
-        .route(
-            "/log",
-            axum::routing::get(
-                |State(app): State<Arc<AppInner>>, Query(query): Query<LogQuery>| async move {
-                    let log_rx = app.instance_manager()
-                        .get_log(domain::GameLogId(query.id))
-                        .await;
-
-                    let Ok(mut log_rx) = log_rx else {
-                        return IntoResponse::into_response(StatusCode::NOT_FOUND)
-                    };
-
-                    #[derive(Serialize)]
-                    enum LogEntryType {
-                        System,
-                        StdOut,
-                        StdErr,
-                    }
-
-                    #[derive(Serialize)]
-                    struct LogEntry<'a> {
-                        line: &'a str,
-                        type_: LogEntryType,
-                    }
-
-                    let s = async_stream::stream! {
-                        let mut last_idx = 0;
-
-                        loop {
-                            let new_lines = {
-                                let log = log_rx.borrow();
-
-                                let new_lines = log.get_region(last_idx..).into_iter().map(|line| {
-                                    let entry = LogEntry {
-                                        line: line.text,
-                                        type_: match line.type_ {
-                                            EntryType::System => LogEntryType::System,
-                                            EntryType::StdOut => LogEntryType::StdOut,
-                                            EntryType::StdErr => LogEntryType::StdErr,
-                                        }
-                                    };
-
-                                    serde_json::to_vec(&entry)
-                                        .expect("serialization of a log entry should be infallible")
-                                }).collect::<Vec<_>>();
-
-                                last_idx = log.len();
-                                new_lines
-                            };
-
-                            for line in new_lines {
-                                yield Ok::<_, Infallible>(line)
-                            }
-
-                            if let Err(_) = log_rx.changed().await {
-                                break
-                            }
-                        }
-                    };
-
-                    IntoResponse::into_response((StatusCode::OK, StreamBody::new(s)))
-                }
-            )
-        )
+        .route("/log", axum::routing::get(log::log_handler))
 }
 #[derive(Type, Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct FEGroupId(i32);
@@ -651,6 +603,8 @@ struct ModrinthMod {
 struct InstallMod {
     instance_id: FEInstanceId,
     mod_source: ModSource,
+    install_deps: bool,
+    replaces_mod: Option<String>,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -957,19 +911,23 @@ impl From<domain::info::ModLoaderType> for FEInstanceModloaderType {
     }
 }
 
-impl From<CreateInstanceVersion> for manager::InstanceVersionSource {
-    fn from(value: CreateInstanceVersion) -> Self {
-        match value {
-            CreateInstanceVersion::Version(v) => Self::Version(v.into()),
+impl TryFrom<CreateInstanceVersion> for manager::InstanceVersionSource {
+    type Error = anyhow::Error;
+
+    fn try_from(value: CreateInstanceVersion) -> anyhow::Result<Self> {
+        Ok(match value {
+            CreateInstanceVersion::Version(v) => Self::Version(v.try_into()?),
             CreateInstanceVersion::Modpack(m) => Self::Modpack(m.into()),
-        }
+        })
     }
 }
 
-impl From<GameVersion> for domain::info::GameVersion {
-    fn from(value: GameVersion) -> Self {
+impl TryFrom<GameVersion> for domain::info::GameVersion {
+    type Error = anyhow::Error;
+
+    fn try_from(value: GameVersion) -> anyhow::Result<Self> {
         match value {
-            GameVersion::Standard(v) => Self::Standard(v.into()),
+            GameVersion::Standard(v) => Ok(Self::Standard(v.try_into()?)),
         }
     }
 }
@@ -1028,21 +986,35 @@ impl From<domain::info::ModrinthModpack> for ModrinthModpack {
     }
 }
 
-impl From<StandardVersion> for domain::info::StandardVersion {
-    fn from(value: StandardVersion) -> Self {
-        Self {
-            release: value.release,
-            modloaders: value.modloaders.into_iter().map(Into::into).collect(),
+impl TryFrom<StandardVersion> for domain::info::StandardVersion {
+    type Error = anyhow::Error;
+
+    fn try_from(value: StandardVersion) -> anyhow::Result<Self> {
+        let mut modloaders = HashSet::new();
+
+        for modloader in value.modloaders {
+            modloaders.insert(modloader.try_into()?);
         }
+
+        Ok(Self {
+            release: value.release,
+            modloaders,
+        })
     }
 }
 
-impl From<ModLoader> for domain::info::ModLoader {
-    fn from(value: ModLoader) -> Self {
-        Self {
+impl TryFrom<ModLoader> for domain::info::ModLoader {
+    type Error = anyhow::Error;
+
+    fn try_from(value: ModLoader) -> anyhow::Result<Self> {
+        if value.version.is_empty() {
+            return Err(anyhow!("modloader version cannot be empty"));
+        }
+
+        Ok(Self {
             type_: value.type_.into(),
             version: value.version,
-        }
+        })
     }
 }
 
@@ -1261,19 +1233,23 @@ impl From<MemoryRange> for (u16, u16) {
     }
 }
 
-impl From<UpdateInstance> for domain::InstanceSettingsUpdate {
-    fn from(value: UpdateInstance) -> Self {
-        Self {
+impl TryFrom<UpdateInstance> for domain::InstanceSettingsUpdate {
+    type Error = anyhow::Error;
+
+    fn try_from(value: UpdateInstance) -> anyhow::Result<Self> {
+        Ok(Self {
             instance_id: value.instance.into(),
             name: value.name.map(|x| x.inner()),
             use_loaded_icon: value.use_loaded_icon.map(|x| x.inner()),
             notes: value.notes.map(|x| x.inner()),
             version: value.version.map(|x| x.inner()),
-            modloader: value.modloader.map(|x| x.inner().map(Into::into)),
+            modloader: value
+                .modloader
+                .map(|x| x.inner().and_then(|v| v.try_into().ok())),
             global_java_args: value.global_java_args.map(|x| x.inner()),
             extra_java_args: value.extra_java_args.map(|x| x.inner()),
             memory: value.memory.map(|x| x.inner().map(Into::into)),
-        }
+        })
     }
 }
 
@@ -1358,5 +1334,82 @@ impl From<importer::FullImportScanStatus> for FullImportScanStatus {
             scanning: value.scanning,
             status: value.status.into(),
         }
+    }
+}
+
+mod log {
+    use super::*;
+
+    #[derive(Debug, Deserialize)]
+    pub struct LogQuery {
+        id: i32,
+    }
+
+    #[tracing::instrument(skip(app))]
+    pub async fn log_handler(
+        State(app): State<App>,
+        Query(query): Query<LogQuery>,
+    ) -> impl IntoResponse {
+        tracing::info!("starting log stream");
+
+        let log_rx = app
+            .instance_manager()
+            .get_log(domain::GameLogId(query.id))
+            .await;
+
+        let Ok(mut log_rx) = log_rx else {
+            tracing::warn!("log entry not found");
+
+            return StatusCode::NOT_FOUND.into_response();
+        };
+
+        let s = async_stream::stream! {
+            tracing::trace!("starting log stream");
+
+            let mut last_idx = 0;
+
+            loop {
+                tracing::trace!("waiting for log data to come in");
+
+                let new_lines = {
+                    let log = log_rx.borrow();
+
+                    let new_lines
+                        = log
+                            .get_span(last_idx..)
+                            .into_iter()
+                            .inspect(|entry| tracing::trace!(?entry, "received log entry"))
+                            .map(|entry| {
+                                serde_json::to_vec(&entry)
+                                    .expect(
+                                        "serialization of a log entry should be infallible"
+                                    )
+                            })
+                            .collect::<Vec<_>>();
+
+                    last_idx = log.len();
+
+                    new_lines
+                };
+
+
+
+                for line in new_lines {
+                    tracing::trace!("yielding log entry");
+
+                    yield Ok::<_, Infallible>(line)
+                }
+
+
+
+                if let Err(_) = log_rx.changed().await {
+                    tracing::error!("`log_rx` was closed, killing log stream");
+
+                    break
+                }
+            }
+        };
+
+        (StatusCode::OK, StreamBody::new(s)).into_response()
     }
 }

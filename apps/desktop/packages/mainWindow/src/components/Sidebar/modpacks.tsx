@@ -63,7 +63,19 @@ const Sidebar = () => {
           (category) => category.project_type === "modpack"
         );
 
-  const modloaders = () => supportedModloaders();
+  const modloaders = () => {
+    const searchApi = infiniteQuery?.query?.searchApi;
+
+    if (searchApi === "modrinth") {
+      const results = supportedModloaders[searchApi];
+      return results.filter((modloader) =>
+        modloader.supported_project_types.includes("modpack")
+      );
+    } else if (searchApi === "curseforge") {
+      const results = supportedModloaders[searchApi];
+      return results;
+    }
+  };
 
   const filteredGameVersions = createMemo(() => {
     const snapshot = gameVersionFilters.snapshot;
@@ -203,6 +215,11 @@ const Sidebar = () => {
                 return (
                   <div class="flex items-center gap-2">
                     <Checkbox
+                      checked={
+                        infiniteQuery?.query.modloaders?.includes(
+                          modloader as FEUnifiedModLoaderType
+                        ) || false
+                      }
                       onChange={(checked) => {
                         const prevModloaders =
                           infiniteQuery?.query.modloaders || [];
@@ -211,10 +228,15 @@ const Sidebar = () => {
                           (modloader) => modloader !== modloader
                         );
 
+                        const modloaderName =
+                          typeof modloader === "string"
+                            ? modloader
+                            : modloader.name;
+
                         const newModloaders = checked
                           ? [
                               ...prevModloaders,
-                              modloader as FEUnifiedModLoaderType
+                              modloaderName as FEUnifiedModLoaderType
                             ]
                           : filteredModloaders;
 
@@ -225,7 +247,13 @@ const Sidebar = () => {
                       }}
                     />
                     <ModloaderIcon modloader={modloader} />
-                    <p class="m-0">{capitalize(modloader)}</p>
+                    <p class="m-0">
+                      {capitalize(
+                        typeof modloader === "string"
+                          ? modloader
+                          : modloader.name
+                      )}
+                    </p>
                   </div>
                 );
               }}
@@ -248,18 +276,19 @@ const Sidebar = () => {
                         ? (category as CFFECategory).id
                         : (category as MRFECategory).name;
 
-                    const isCategoryIncluded =
+                    const isCategoryIncluded = () =>
                       infiniteQuery?.query.categories?.some(
                         (item) =>
-                          ("curseforge" in item &&
-                            item.curseforge === categoryId()) ||
-                          ("modrinth" in item && item.modrinth === categoryId())
+                          ("curseforge" in item[0] &&
+                            item[0].curseforge === categoryId()) ||
+                          ("modrinth" in item[0] &&
+                            item[0].modrinth === categoryId())
                       );
 
                     return (
                       <div class="flex items-center gap-3">
                         <Checkbox
-                          checked={isCategoryIncluded}
+                          checked={isCategoryIncluded()}
                           onChange={(checked) => {
                             const prevCategories =
                               infiniteQuery?.query.categories || [];

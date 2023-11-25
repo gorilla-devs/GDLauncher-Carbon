@@ -1,4 +1,5 @@
 // allow dead code during development to keep warning outputs meaningful
+#![allow(warnings)]
 #![allow(dead_code)]
 
 use crate::managers::{
@@ -7,6 +8,7 @@ use crate::managers::{
 };
 
 use rspc::RouterBuilderLike;
+use serde_json::Value;
 use std::{path::PathBuf, sync::Arc};
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
@@ -20,6 +22,7 @@ pub mod domain;
 mod error;
 pub mod iridium_client;
 pub mod managers;
+mod platform;
 // mod pprocess_keepalive;
 mod logger;
 mod once_send;

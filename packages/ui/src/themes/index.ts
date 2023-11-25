@@ -82,6 +82,8 @@ type Theme = {
   "green-700": string;
   "green-800": string;
   "green-900": string;
+  "brands-curseforge": string;
+  "brands-modrinth": string;
 };
 
 export type { Theme };

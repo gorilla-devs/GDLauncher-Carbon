@@ -27,6 +27,7 @@ import {
 } from "@/utils/mods";
 import { modpacksDefaultQuery } from "@/pages/Modpacks/useModsQuery";
 import { modsDefaultQuery } from "@/pages/Mods/useModsQuery";
+import { useSearchParams } from "@solidjs/router";
 
 type InfiniteQueryType = {
   infiniteQuery: CreateInfiniteQueryResult<any, unknown>;
@@ -57,6 +58,7 @@ const [lastScrollPosition, setLastScrollPosition] = createSignal<number>(0);
 
 const InfiniteScrollModsQueryWrapper = (props: Props) => {
   const rspcContext = rspc.useContext();
+  const [_searchParams, setSearchParams] = useSearchParams();
   const [parentRef, setParentRef] = createSignal<HTMLDivElement | undefined>(
     undefined
   );
@@ -101,6 +103,13 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
   });
 
   if (lastType() !== mergedProps.type) {
+    if (lastType() === "mod") {
+      setSearchParams({
+        instanceId: undefined
+      });
+      setInstanceId(undefined);
+    }
+
     infiniteQuery.remove();
     infiniteQuery.refetch();
     getQueryFunction(defaultQuery);

@@ -5,12 +5,10 @@ import { createEffect } from "solid-js";
 import fetchData from "./app.data";
 import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 import {
-  setCurseForgeModloaders,
   setCurseforgeCategories,
   setModrinthCategories,
   setSupportedModloaders
 } from "@/utils/sidebar";
-import { supportedCfModloaders } from "@/utils/constants";
 import adSize from "@/utils/adhelper";
 
 function withAdsLayout() {
@@ -41,16 +39,10 @@ function withAdsLayout() {
 
   createEffect(() => {
     if (routeData.curseForgeModloaders.data) {
-      setCurseForgeModloaders(routeData.curseForgeModloaders.data);
-
-      const curseforgeModpackModloaders = () => {
-        const filtered = routeData.curseForgeModloaders.data?.filter(
-          (modloader) => supportedCfModloaders.includes(modloader as string)
-        );
-        return filtered || [];
-      };
-
-      setSupportedModloaders(curseforgeModpackModloaders());
+      setSupportedModloaders("curseforge", routeData.curseForgeModloaders.data);
+    }
+    if (routeData.modrinthModloaders.data) {
+      setSupportedModloaders("modrinth", routeData.modrinthModloaders.data);
     }
   });
 
@@ -72,10 +64,8 @@ function withAdsLayout() {
           <div
             class="grid justify-end h-[calc(100vh-60px)]"
             classList={{
-              "xs:grid-cols-[auto_2fr_200px] sm:grid-cols-[auto_2fr_200px] md:grid-cols-[auto_2fr_200px] xl:grid-cols-[auto_2fr_440px]":
-                !isDetailPage(),
-              "xs:grid-cols-[2fr_200px] sm:grid-cols-[2fr_200px] md:grid-cols-[2fr_200px] lg:grid-cols-[2fr_440px]":
-                isDetailPage()
+              "grid-cols-[auto_2fr_200px]": !isDetailPage(),
+              "grid-cols-[2fr_200px]": isDetailPage()
             }}
           >
             <Outlet />

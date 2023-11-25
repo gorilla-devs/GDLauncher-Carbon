@@ -50,7 +50,7 @@ jobs:
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
-          GDL_AUTH: ${{ vars.GDL_AUTH }}
+          GDL_AUTH: ${{ secrets.GDL_AUTH }}
       - name: Lint
         run: pnpm lint
       - name: Clear target before tests to avoid folder getting too big
@@ -64,5 +64,5 @@ jobs:
           RUNTIME_PATH: ${{ vars.RUNTIME_PATH }}
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
-          GDL_AUTH: ${{ vars.GDL_AUTH }}
+          GDL_AUTH: ${{ secrets.GDL_AUTH }}
         run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test
