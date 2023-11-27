@@ -96,12 +96,12 @@ mod test {
         tokio::fs::write(folder.join("file"), []).await?;
         tokio::fs::create_dir(folder.join("subfolder")).await?;
 
-        let data = app
+        let mut data = app
             .instance_manager()
             .explore_data(instance_id, vec![String::from("folder")])
             .await?;
 
-        let expected = vec![
+        let mut expected = vec![
             ExploreEntry {
                 name: String::from("file"),
                 type_: ExploreEntryType::File { size: 0 },
@@ -111,6 +111,9 @@ mod test {
                 type_: ExploreEntryType::Directory,
             },
         ];
+
+        expected.sort_by_key(|e| e.name.clone());
+        data.sort_by_key(|e| e.name.clone());
 
         assert_eq!(data, expected);
 
