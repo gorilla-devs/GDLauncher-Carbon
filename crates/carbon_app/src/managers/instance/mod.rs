@@ -1093,7 +1093,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .invalidate(INSTANCE_DETAILS, Some(update.instance_id.0.into()));
 
         if need_reinstall {
-            tracing::info!("reinstalling to {:?} instance due to version change", path);
             tokio::fs::write(path.join(".first_run_incomplete"), "")
                 .await
                 .context("writing incomplete instance marker")?;
