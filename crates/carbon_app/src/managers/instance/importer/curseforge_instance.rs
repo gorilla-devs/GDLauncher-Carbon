@@ -1,23 +1,21 @@
 //! This module handles importing Curseforge instance imports.
 
+use super::{
+    ImportScanStatus, ImporterState, InstanceImporter, InternalImportEntry, InvalidImportEntry,
+};
 use crate::{
     api::{keys, translation::Translation},
     domain::{instance::info::GameVersion, modplatforms::curseforge::manifest::Manifest},
     managers::instance::InstanceVersionSource,
 };
-use error_stack::{report, FutureExt as _, ResultExt};
-use futures::TryFutureExt;
-use tokio::sync::Mutex;
-
-use super::{
-    ImportScanStatus, ImporterState, InstanceImporter, InternalImportEntry, InvalidImportEntry,
-};
 use crate::{
     domain::vtask::VisualTaskId,
     managers::{App, AppInner},
 };
+use error_stack::{report, FutureExt as _, ResultExt};
+use futures::TryFutureExt;
 use std::{path, sync::Arc};
-use tokio::fs;
+use tokio::{fs, io::AsyncWriteExt, sync::Mutex};
 
 #[derive(Clone, Debug, thiserror::Error)]
 enum CurseforgeInstanceImporterError {
@@ -136,11 +134,33 @@ impl InstanceImporter for CurseforgeInstanceImporter {
                 |instance_path| async {
                     let (instance_path,) = (instance_path,);
 
-                    let dest = instance_path.join(".setup").join("curseforge");
+                    let setup_path = instance_path.join(".setup");
 
-                    copy_dir_recursively(importable.path, dest)
-                        .await
-                        .map_err(|report| anyhow!(report))
+                    fs::create_dir_all(&setup_path).await?;
+
+                    let curseforge_zip_path = setup_path.join("curseforge");
+
+                    // We're using a vec here to avoid needing to call
+                    // `tokio::task::block_in_place`, which is very expensive
+                    let zip_file_buf = std::io::Cursor::new(vec![]);
+
+                    let mut zip = zip::write::ZipWriter::new(zip_file_buf);
+
+                    zip.start_file("manifest.json", Default::default());
+                    serde_json::to_writer(&mut zip, &importable.manifest)?;
+                    let zip_file_buf = zip.finish()?.into_inner();
+
+                    let mut file = fs::File::create(setup_path.join("curseforge")).await?;
+
+                    file.write_all(zip_file_buf.as_slice()).await?;
+
+                    // let dest = instance_path.join(".setup").join("curseforge");
+
+                    // copy_dir_recursively(importable.path, dest)
+                    //     .await
+                    //     .map_err(|report| anyhow!(report))
+
+                    Ok(())
                 },
             )
             .await?;
@@ -194,76 +214,4 @@ impl CurseforgeInstanceImporter {
             .join("minecraft")
             .join("Instances"))
     }
-}
-
-#[derive(Clone, Copy, Debug, thiserror::Error)]
-#[error("failed to copy file")]
-struct CopyDirError;
-
-/// Recursively copies a directory from one location to another.
-#[async_recursion]
-async fn copy_dir_recursively(
-    source: path::PathBuf,
-    dest: path::PathBuf,
-) -> error_stack::Result<(), CopyDirError> {
-    if source.is_file() {
-        return Err(report!(CopyDirError).attach_printable("source must be a directory"));
-    }
-
-    if !dest.exists() {
-        fs::create_dir_all(&dest)
-            .await
-            .change_context(CopyDirError)
-            .attach_printable("creating destination dir")?;
-    }
-
-    let mut dirs = fs::read_dir(source)
-        .await
-        .change_context(CopyDirError)
-        .attach_printable("reading directory")?;
-
-    let mut futs = vec![];
-
-    while let Some(entry) = dirs.next_entry().await.change_context(CopyDirError)? {
-        let task = if entry.path().is_file() {
-            tokio::spawn(
-                fs::copy(entry.path(), dest.clone())
-                    .map_ok(|_| {})
-                    .change_context(CopyDirError)
-                    .attach_printable("failed to copy file")
-                    .attach_printable(format!("{:?}", entry.path())),
-            )
-        } else {
-            tokio::spawn(copy_dir_recursively(
-                entry.path(),
-                dest.join(entry.path().file_name().ok_or_else(|| {
-                    report!(CopyDirError).attach_printable("file does not contain a name")
-                })?),
-            ))
-        };
-
-        futs.push(task);
-    }
-
-    futures::future::try_join_all(futs)
-        .await
-        .map_err(|err| {
-            report!(CopyDirError)
-                .attach_printable("failed to join task")
-                .attach_printable(err)
-        })
-        .and_then(|errors| {
-            let mut report = report!(CopyDirError);
-
-            report.extend(
-                errors
-                    .into_iter()
-                    .filter(|res| res.is_err())
-                    .map(|err| err.unwrap_err()),
-            );
-
-            // We need to skip 1 frame because the mere fact the
-            // report exists implies at least 1 frame.
-            report.frames().skip(1).next().map(|_| {}).ok_or(report)
-        })
 }
