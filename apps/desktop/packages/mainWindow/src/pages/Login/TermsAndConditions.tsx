@@ -110,7 +110,7 @@ const TermsAndConditions = (props: Props) => {
                 window?.openCMPWindow();
               }}
             >
-              <Trans key="login.manage_cpm" />
+              <Trans key="login.manage_cmp" />
             </div>
             <Button
               variant="primary"
