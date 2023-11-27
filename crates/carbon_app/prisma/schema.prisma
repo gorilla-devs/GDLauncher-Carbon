@@ -122,13 +122,14 @@ model ModMetadata {
   id          String              @id
   murmur2     Int
   sha512      Bytes
+  sha1        Bytes
   name        String?
   modid       String?
   version     String?
   description String?
   authors     String?
   modloaders  String
-	logoImage   LocalModImageCache?
+  logoImage   LocalModImageCache?
   curseforge  CurseForgeModCache?
   modrinth    ModrinthModCache?
   cachedFiles ModFileCache[]
@@ -145,7 +146,7 @@ model CurseForgeModCache {
   summary    String
   authors    String
   cachedAt   DateTime
-	logoImage  CurseForgeModImageCache?
+  logoImage  CurseForgeModImageCache?
   metadata   ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, fileId])
@@ -161,8 +162,10 @@ model ModrinthModCache {
   urlslug     String
   description String
   authors     String
+  filename    String
+  fileUrl     String
   cachedAt    DateTime
-	logoImage   ModrinthModImageCache?
+  logoImage   ModrinthModImageCache?
   metadata    ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, versionId])
@@ -171,24 +174,24 @@ model ModrinthModCache {
 // this one
 model LocalModImageCache {
   metadataId String @id
-	data       Bytes
-	metadata   ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Cascade)
+  data       Bytes
+  metadata   ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Cascade)
 }
 
 // this one
 model CurseForgeModImageCache {
   metadataId String @id
-	url        String
-	data       Bytes?
-	upToDate   Int @default(0)
-	metadata   CurseForgeModCache @relation(fields: [metadataId], references: [metadataId], onDelete: Cascade)
+  url        String
+  data       Bytes?
+  upToDate   Int @default(0)
+  metadata   CurseForgeModCache @relation(fields: [metadataId], references: [metadataId], onDelete: Cascade)
 }
 
 // this one
 model ModrinthModImageCache {
   metadataId String @id
-	url        String
-	data       Bytes?
-	upToDate   Int @default(0)
-	metadata   ModrinthModCache @relation(fields: [metadataId], references: [metadataId], onDelete: Cascade)
+  url        String
+  data       Bytes?
+  upToDate   Int @default(0)
+  metadata   ModrinthModCache @relation(fields: [metadataId], references: [metadataId], onDelete: Cascade)
 }

@@ -87,12 +87,6 @@ pub trait ResourceInstaller: Sync {
         instance_id: InstanceId,
     ) -> anyhow::Result<bool>;
     fn display_name(&self) -> String;
-    async fn finalize_install(
-        &self,
-        app: &Arc<AppInner>,
-        instance_id: InstanceId,
-        downloadable: Option<Downloadable>,
-    ) -> anyhow::Result<()>;
     async fn rollback(&self, instance_data: &mut InstanceData) -> anyhow::Result<()>;
 }
 
@@ -129,18 +123,6 @@ impl<I: ResourceInstaller + ?Sized + Send> ResourceInstaller for Box<I> {
     #[inline]
     fn display_name(&self) -> String {
         (**self).display_name()
-    }
-
-    #[inline]
-    async fn finalize_install(
-        &self,
-        app: &Arc<AppInner>,
-        instance_id: InstanceId,
-        downloadable: Option<Downloadable>,
-    ) -> anyhow::Result<()> {
-        (**self)
-            .finalize_install(app, instance_id, downloadable)
-            .await
     }
 
     #[inline]
@@ -482,19 +464,11 @@ impl Installer {
                                 .await?;
                         }
 
-                        {
-                            // context to drop instance lock after install attempt
-                            let instance_manager = app_clone.instance_manager();
-                            let mut instances = instance_manager.instances.write().await;
-                            let instance = instances
-                                .get_mut(&instance_id)
-                                .expect("instance should still be valid");
-
-                            let _ = instance.data_mut().expect("instance should still be valid");
-                            let lock = inner.lock().await;
-                            lock.finalize_install(&app_clone, instance_id, downloadable)
-                                .await
-                        }?;
+                        // ensure the task stays alive until the mod is cached
+                        app_clone
+                            .meta_cache_manager()
+                            .override_caching_and_wait(instance_id, true, true)
+                            .await?;
 
                         app_clone.invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
                         Ok::<_, anyhow::Error>(())
@@ -743,18 +717,6 @@ impl ResourceInstaller for CurseforgeModInstaller {
 
     fn display_name(&self) -> String {
         self.file.display_name.clone()
-    }
-
-    async fn finalize_install(
-        &self,
-        app: &Arc<AppInner>,
-        instance_id: InstanceId,
-        _downloadable: Option<Downloadable>,
-    ) -> anyhow::Result<()> {
-        app.meta_cache_manager()
-            .queue_caching(instance_id, true)
-            .await;
-        Ok(())
     }
 
     async fn rollback(&self, _instance_data: &mut InstanceData) -> anyhow::Result<()> {
@@ -1028,18 +990,6 @@ impl ResourceInstaller for ModrinthModInstaller {
 
     fn display_name(&self) -> String {
         self.version.name.clone()
-    }
-
-    async fn finalize_install(
-        &self,
-        app: &Arc<AppInner>,
-        instance_id: InstanceId,
-        _downloadable: Option<Downloadable>,
-    ) -> anyhow::Result<()> {
-        app.meta_cache_manager()
-            .queue_caching(instance_id, true)
-            .await;
-        Ok(())
     }
 
     async fn rollback(&self, _instance_data: &mut InstanceData) -> anyhow::Result<()> {

@@ -86,7 +86,10 @@ openssl = { workspace = true }
 serde_json = { workspace = true }
 dotenvy = { workspace = true }
 
-[test-dependencies]
+[dev-dependencies]
+assert2 = { workspace = true }
+flowtest = { workspace = true }
+tracing-test = { workspace = true }
 
 [features]
 production = ["iridium"]

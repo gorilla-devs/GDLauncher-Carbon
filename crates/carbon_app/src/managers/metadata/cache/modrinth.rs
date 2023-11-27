@@ -210,6 +210,8 @@ impl ModplatformCacher for ModrinthModCacher {
                     metadata_id,
                     version.id.clone(),
                     file.hashes.sha512.clone(),
+                    file.filename.clone(),
+                    file.url.clone(),
                     project.clone(),
                     authors,
                 )
@@ -362,6 +364,8 @@ async fn cache_modrinth_meta_unchecked(
     metadata_id: String,
     version_id: String,
     sha512: String,
+    filename: String,
+    file_url: String,
     project: Project,
     authors: String,
 ) -> anyhow::Result<()> {
@@ -383,6 +387,8 @@ async fn cache_modrinth_meta_unchecked(
         project.slug,
         project.description,
         authors,
+        filename,
+        file_url,
         chrono::Utc::now().into(),
         metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),
         Vec::new(),

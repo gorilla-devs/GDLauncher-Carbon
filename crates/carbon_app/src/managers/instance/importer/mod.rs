@@ -18,7 +18,7 @@ use self::{
     modrinth_archive::ModrinthArchiveImporter,
 };
 
-use super::InstanceManager;
+use super::{export::InstanceExportManager, InstanceManager};
 
 mod curseforge_archive;
 mod legacy_gdlauncher;
@@ -140,6 +140,13 @@ impl<'a> ManagerRef<'a, InstanceManager> {
     pub fn import_manager(self) -> ManagerRef<'a, InstanceImportManager> {
         ManagerRef {
             manager: &self.app.instance_manager.import_manager,
+            app: self.app,
+        }
+    }
+
+    pub fn export_manager(self) -> ManagerRef<'a, InstanceExportManager> {
+        ManagerRef {
+            manager: &self.app.instance_manager.export_manager,
             app: self.app,
         }
     }

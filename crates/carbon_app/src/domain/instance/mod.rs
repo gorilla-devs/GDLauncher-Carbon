@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
@@ -122,3 +124,24 @@ pub enum InstanceFolder {
     TexturePacks,
     ShaderPacks,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExploreEntry {
+    pub name: String,
+    pub type_: ExploreEntryType,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ExploreEntryType {
+    File { size: u32 },
+    Directory,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ExportTarget {
+    Curseforge,
+    Modrinth,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExportEntry(pub HashMap<String, Option<ExportEntry>>);

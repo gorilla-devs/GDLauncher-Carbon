@@ -158,6 +158,8 @@ impl ManagerRef<'_, VisualTaskManager> {
             }
         }
 
+        info!("task exited");
+
         Ok(())
     }
 }
