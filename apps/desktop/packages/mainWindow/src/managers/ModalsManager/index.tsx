@@ -76,6 +76,10 @@ const defaultModals: Hash = {
   onBoarding: {
     component: lazy(() => import("./modals/OnBoarding")),
     noHeader: true
+  },
+  whyAreAdsNeeded: {
+    component: lazy(() => import("./modals/WhyAreAdsNeeded")),
+    title: "Why are ads needed?"
   }
 };
 

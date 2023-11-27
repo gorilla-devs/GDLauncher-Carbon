@@ -166,12 +166,9 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         query UNIFIED_SEARCH[app, search_params: filters::FEUnifiedSearchParameters] {
-            info!("SEARCH search_params: {:?}", search_params);
             match search_params.search_api {
                 FESearchAPI::Curseforge => {
-                    info!("BEFORE TRY INTO");
                     let search_params: curseforge::filters::CFFEModSearchParameters = search_params.try_into()?;
-                    info!("AFTER TRY INTO");
                     let modplatforms = app.modplatforms_manager();
                     let curseforge_response = modplatforms.curseforge.search(search_params.into()).await?;
                     let fe_curseforge_response = curseforge::responses::FEModSearchResponse::from(curseforge_response);

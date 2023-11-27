@@ -20,10 +20,12 @@ use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
 use thiserror::Error;
 use tokio::sync::{watch, Mutex, MutexGuard, RwLock};
+use tracing::info;
 
 use crate::db::{self, read_filters::IntFilter};
 use db::instance::Data as CachedInstance;
 
+use self::export::InstanceExportManager;
 use self::importer::InstanceImportManager;
 use self::log::GameLog;
 use self::run::PersistenceManager;
@@ -33,6 +35,7 @@ use super::ManagerRef;
 use crate::domain::instance::{self as domain, GameLogId, GroupId, InstanceFolder, InstanceId};
 use domain::info;
 
+pub mod explore;
 pub mod export;
 pub mod importer;
 pub mod installer;
@@ -50,6 +53,7 @@ pub struct InstanceManager {
     loaded_icon: Mutex<Option<(String, Vec<u8>)>>,
     persistence_manager: PersistenceManager,
     import_manager: InstanceImportManager,
+    export_manager: InstanceExportManager,
     game_logs: RwLock<HashMap<GameLogId, (InstanceId, watch::Receiver<GameLog>)>>,
 }
 
@@ -68,6 +72,7 @@ impl InstanceManager {
             loaded_icon: Mutex::new(None),
             persistence_manager: PersistenceManager::new(),
             import_manager: InstanceImportManager::new(),
+            export_manager: InstanceExportManager::new(),
             game_logs: RwLock::new(HashMap::new()),
         }
     }
@@ -927,12 +932,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await
             .context("moving tmpdir to instance location")?;
 
-        let id = self.add_instance(name, shortpath.clone(), group).await?;
+        let id = self
+            .add_instance(name.clone(), shortpath.clone(), group)
+            .await?;
 
         self.instances.write().await.insert(
             id,
             Instance {
-                shortpath,
+                shortpath: shortpath.clone(),
                 type_: InstanceType::Valid(InstanceData {
                     favorite: false,
                     config: info,
@@ -944,6 +951,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+
+        info!({ shortpath = ?shortpath }, "Created new instance '{name}' (id {})", *id);
 
         Ok(id)
     }
@@ -1093,7 +1102,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .invalidate(INSTANCE_DETAILS, Some(update.instance_id.0.into()));
 
         if need_reinstall {
-            tracing::info!("reinstalling to {:?} instance due to version change", path);
             tokio::fs::write(path.join(".first_run_incomplete"), "")
                 .await
                 .context("writing incomplete instance marker")?;

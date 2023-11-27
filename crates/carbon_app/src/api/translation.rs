@@ -42,4 +42,8 @@ pub enum Translation {
     InstanceImportMrpackMalformed,
     InstanceImportMrpackMissingManifest,
     InstanceImportMrpackMalformedManifest,
+    InstanceExport,
+    InstanceExportScanningMods,
+    InstanceExportCacheMods,
+    InstanceExportCreatingBundle,
 }

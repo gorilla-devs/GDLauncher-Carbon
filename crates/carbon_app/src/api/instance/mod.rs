@@ -216,7 +216,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
         query GET_LOGS[app, args: ()] {
             Ok(app.instance_manager()
-                .get_logs()
+               .get_logs()
                .await
                .into_iter()
                .map(GameLogEntry::from)
@@ -337,6 +337,28 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .begin_import(req.index, req.name)
                 .await
                 .map(FETaskId::from)
+        }
+
+        query EXPLORE[app, args: ExploreQuery] {
+            app.instance_manager().explore_data(
+                args.instance_id.into(),
+                args.path,
+            ).await
+                .map(|entries| entries.into_iter().map(ExploreEntry::from).collect::<Vec<_>>())
+        }
+
+        mutation EXPORT[app, args: ExportArgs] {
+            let task = app.instance_manager()
+                .export_manager()
+                .export_instance(
+                    args.instance_id.into(),
+                    args.target.into(),
+                    args.save_path.into(),
+                    args.link_mods,
+                    args.filter.into(),
+                ).await?;
+
+            Ok(FETaskId::from(task))
         }
     }
 }
@@ -784,6 +806,45 @@ struct ModrinthModMetadata {
     description: String,
     authors: String,
     has_image: bool,
+}
+
+#[derive(Type, Deserialize, Debug)]
+struct ExploreQuery {
+    instance_id: FEInstanceId,
+    path: Vec<String>,
+}
+
+#[derive(Type, Serialize, Debug)]
+struct ExploreEntry {
+    name: String,
+    #[serde(rename = "type")]
+    type_: ExploreEntryType,
+}
+
+#[derive(Type, Serialize, Debug)]
+enum ExploreEntryType {
+    File { size: u32 },
+    Directory,
+}
+
+#[derive(Type, Deserialize, Debug)]
+struct ExportEntry {
+    //#[serde(flatten)]
+    entries: HashMap<String, Option<ExportEntry>>,
+}
+
+#[derive(Type, Deserialize, Debug)]
+enum ExportTarget {
+    Curseforge,
+}
+
+#[derive(Type, Deserialize, Debug)]
+struct ExportArgs {
+    instance_id: FEInstanceId,
+    target: ExportTarget,
+    save_path: String,
+    link_mods: bool,
+    filter: ExportEntry,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -1253,6 +1314,15 @@ impl TryFrom<UpdateInstance> for domain::InstanceSettingsUpdate {
     }
 }
 
+impl From<domain::ExploreEntry> for ExploreEntry {
+    fn from(value: domain::ExploreEntry) -> Self {
+        Self {
+            name: value.name,
+            type_: value.type_.into(),
+        }
+    }
+}
+
 impl From<ImportEntity> for importer::Entity {
     fn from(entity: ImportEntity) -> Self {
         match entity {
@@ -1307,11 +1377,28 @@ impl From<importer::InvalidImportEntry> for InvalidImportEntry {
     }
 }
 
+impl From<domain::ExploreEntryType> for ExploreEntryType {
+    fn from(value: domain::ExploreEntryType) -> Self {
+        match value {
+            domain::ExploreEntryType::File { size } => Self::File { size },
+            domain::ExploreEntryType::Directory => Self::Directory,
+        }
+    }
+}
+
 impl From<importer::ImportEntry> for ImportEntry {
     fn from(value: importer::ImportEntry) -> Self {
         match value {
             importer::ImportEntry::Valid(v) => Self::Valid(v.into()),
             importer::ImportEntry::Invalid(v) => Self::Invalid(v.into()),
+        }
+    }
+}
+
+impl From<ExportTarget> for domain::ExportTarget {
+    fn from(value: ExportTarget) -> Self {
+        match value {
+            ExportTarget::Curseforge => Self::Curseforge,
         }
     }
 }
@@ -1325,6 +1412,18 @@ impl From<importer::ImportScanStatus> for ImportScanStatus {
             domain::SingleResult(r) => Self::SingleResult(r.into()),
             domain::MultiResult(r) => Self::MultiResult(r.into_iter().map(Into::into).collect()),
         }
+    }
+}
+
+impl From<ExportEntry> for domain::ExportEntry {
+    fn from(value: ExportEntry) -> Self {
+        Self(
+            value
+                .entries
+                .into_iter()
+                .map(|(k, v)| (k, v.map(Into::into)))
+                .collect(),
+        )
     }
 }
 

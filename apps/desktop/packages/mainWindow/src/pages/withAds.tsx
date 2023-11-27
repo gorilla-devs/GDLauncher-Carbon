@@ -10,9 +10,12 @@ import {
   setSupportedModloaders
 } from "@/utils/sidebar";
 import adSize from "@/utils/adhelper";
+import { Trans } from "@gd/i18n";
+import { useModal } from "@/managers/ModalsManager";
 
 function withAdsLayout() {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
+  const modalContext = useModal();
 
   const location = useLocation();
 
@@ -64,19 +67,33 @@ function withAdsLayout() {
           <div
             class="grid justify-end h-[calc(100vh-60px)]"
             classList={{
-              "grid-cols-[auto_2fr_200px]": !isDetailPage(),
-              "grid-cols-[2fr_200px]": isDetailPage()
+              "grid-cols-[auto_2fr_auto]": !isDetailPage(),
+              "grid-cols-[2fr_auto]": isDetailPage()
             }}
           >
             <Outlet />
-            <div
-              id="ads-layout-container"
-              class="flex flex-col gap-4 px-5 pt-5 bg-darkSlate-800 justify-start flex-initial"
-              style={{
-                width: `${adSize.width + 40}px`
-              }}
-            >
-              <AdsBanner />
+            <div>
+              <div
+                class="flex flex-col gap-4 p-5 bg-darkSlate-800 justify-start flex-initial"
+                style={{
+                  width: `${adSize.width}px`,
+                  height: `${adSize.height}px`
+                }}
+              >
+                <AdsBanner />
+              </div>
+              <div class="flex justify-center">
+                <div
+                  class="text-center text-darkSlate-200 hover:text-darkSlate-50 transition-colors duration-200"
+                  onClick={() => {
+                    modalContext?.openModal({
+                      name: "whyAreAdsNeeded"
+                    });
+                  }}
+                >
+                  <Trans key="why_are_ads_needed" />
+                </div>
+              </div>
             </div>
             <div class="absolute top-0 left-0 right-0 bottom-0 bg-image-gdlauncher_pattern.svg -z-10" />
           </div>

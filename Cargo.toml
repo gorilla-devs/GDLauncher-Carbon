@@ -100,3 +100,8 @@ sysinfo = "0.29.0"
 serde_qs = "0.12"
 markdown = "1.0.0-alpha.11"
 ring = "0.16.20"
+
+# dev dependencies
+assert2 = "0.3.11"
+flowtest = "0.1.0"
+tracing-test = "0.2.4"

@@ -101,6 +101,8 @@ keys! {
         CANCEL_IMPORT_SCAN                          = "cancelImportScan";
         GET_IMPORT_SCAN_STATUS                      = "getImportScanStatus";
         IMPORT_INSTANCE                             = "importInstance";
+        EXPLORE                                     = "explore";
+        EXPORT                                      = "export";
     }
 
     vtask {
