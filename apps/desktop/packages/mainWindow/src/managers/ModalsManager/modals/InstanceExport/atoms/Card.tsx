@@ -11,9 +11,6 @@ export const Card = (
     };
   }
 ) => {
-  createEffect(() => {
-    console.log(payload);
-  });
   return (
     <div
       class={`h-20 w-50 flex-1 rounded-md`}
