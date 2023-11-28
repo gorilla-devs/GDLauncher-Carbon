@@ -836,6 +836,7 @@ struct ExportEntry {
 #[derive(Type, Deserialize, Debug)]
 enum ExportTarget {
     Curseforge,
+    Modrinth,
 }
 
 #[derive(Type, Deserialize, Debug)]
@@ -1399,6 +1400,7 @@ impl From<ExportTarget> for domain::ExportTarget {
     fn from(value: ExportTarget) -> Self {
         match value {
             ExportTarget::Curseforge => Self::Curseforge,
+            ExportTarget::Modrinth => Self::Modrinth,
         }
     }
 }
