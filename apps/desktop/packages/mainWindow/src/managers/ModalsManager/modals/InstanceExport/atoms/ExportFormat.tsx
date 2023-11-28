@@ -26,7 +26,10 @@ const ExportFormat = () => {
     MultiMCLogo,
     PrismLogo
   ];
-  const instances = ["Curseforge", "Modrinth"];
+  const instances = [
+    { title: "Curseforge", id: 1 },
+    { title: "Modrinth", id: 2 }
+  ];
   return (
     <div class="flex flex-col  ">
       <span>Export format</span>
@@ -51,7 +54,7 @@ const ExportFormat = () => {
               icon={icons[i()]}
               onClick={[() => {}, entity]}
               index={i() + 3}
-              entityName={instances[i()] as ExportTarget}
+              instance={instances[i()] as { title: ExportTarget; id: number }}
             />
           )}
         </For>

@@ -13,7 +13,7 @@ import { ExportTarget } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
 
 interface IPayload {
-  instance_id: string | undefined;
+  instance_id: number | undefined;
   target: ExportTarget;
   save_path: string | undefined;
   links_mod: boolean;
