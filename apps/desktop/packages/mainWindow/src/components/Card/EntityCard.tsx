@@ -2,13 +2,16 @@ import { keys } from "@/managers/ModalsManager/modals/OnBoarding/ThirdStep";
 import { ImportEntityStatus } from "@gd/core_module/bindings";
 import { useTransContext } from "@gd/i18n";
 
-const EntityCard = (props: {
+export interface EntityCardProps {
   entity: ImportEntityStatus;
   icon: string;
   onClick?: [(_entity: ImportEntityStatus) => void, ImportEntityStatus];
   index: number;
   className?: string;
-}) => {
+  selected?: boolean;
+}
+
+const EntityCard = (props: EntityCardProps) => {
   const [t] = useTransContext();
   return (
     <li
@@ -18,7 +21,9 @@ const EntityCard = (props: {
         props.entity.supported ? "" : "bg-opacity-50"
       } backdrop-blur-lg justify-center inline-block ${
         props.className ? props.className : "h-20 w-auto"
-      } bg-[#1D2028]`}
+      } bg-[#1D2028] ${
+        props.selected ? "border-solid border-1 border-primary-500" : ""
+      }`}
       onClick={props.onClick}
     >
       {/* <div class={`${props.icon} text-red-400 text-5xl`}></div> */}

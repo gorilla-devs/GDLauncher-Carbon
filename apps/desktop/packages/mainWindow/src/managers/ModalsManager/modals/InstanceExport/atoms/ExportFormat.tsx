@@ -9,21 +9,24 @@ import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg";
 import LegacyGDL from "/assets/images/icons/legacy_gdlauncher.svg";
 import { For } from "solid-js";
 import EntityCard from "@/components/Card/EntityCard";
+import { Card } from "./Card";
+import { ExportTarget, ImportEntity } from "@gd/core_module/bindings";
 const ExportFormat = () => {
   const entities = rspc.createQuery(() => ["instance.getImportableEntities"]);
   const icons = [
+    CurseForgeLogo,
+    ModrinthLogo,
     LegacyGDL,
     CurseForgeLogo,
     ModrinthLogo,
-    CurseForgeLogo,
-    ModrinthLogo,
+
     ATLauncherLogo,
     TechnicLogo,
     FTBLogo,
     MultiMCLogo,
     PrismLogo
   ];
-
+  const instances = ["Curseforge", "Modrinth"];
   return (
     <div class="flex flex-col  ">
       <span>Export format</span>
@@ -32,17 +35,23 @@ const ExportFormat = () => {
           each={entities.data
             ?.sort(
               (a, b) =>
-                (b.supported === true ? 1 : 0) - (a.supported === true ? 1 : 0)
+                (b.supported === false ? 1 : 0) -
+                (a.supported === false ? 1 : 0)
             )
-            .slice(1, 3)}
+            .slice(0, 2)
+            .map((entity) => ({
+              entity: entity.entity,
+              supported: true,
+              selection_type: entity.selection_type
+            }))}
         >
           {(entity, i) => (
-            <EntityCard
+            <Card
               entity={entity}
-              icon={icons[i() + 1]}
+              icon={icons[i()]}
               onClick={[() => {}, entity]}
-              index={i() + 1}
-              className="h-20 w-50 flex-1"
+              index={i() + 3}
+              entityName={instances[i()] as ExportTarget}
             />
           )}
         </For>
