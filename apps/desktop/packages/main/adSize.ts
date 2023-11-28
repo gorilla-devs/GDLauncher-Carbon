@@ -2,7 +2,7 @@ import { screen } from "electron";
 
 export default function getAdSize() {
   const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.workAreaSize;
+  const { width, height } = primaryDisplay.size;
 
   console.log("width", width);
   console.log("height", height);
