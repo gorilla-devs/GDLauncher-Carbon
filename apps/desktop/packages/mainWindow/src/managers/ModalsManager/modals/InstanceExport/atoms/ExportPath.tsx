@@ -1,11 +1,13 @@
 import { useTransContext } from "@gd/i18n";
 import { Input } from "@gd/ui";
-import { createSignal } from "solid-js";
+import { createEffect, createSignal } from "solid-js";
+import { setPayload, payload } from "..";
 
 const ExportPath = () => {
   const [path, setPath] = createSignal<string | undefined>(undefined);
   const [inputValue, setInputValue] = createSignal(path());
   const [t] = useTransContext();
+
   return (
     <div class="flex flex-col pt-4 gap-2 w-full">
       <span>{`${t("instance.export_path")} :`}</span>
@@ -18,6 +20,7 @@ const ExportPath = () => {
           onBlur={() => {
             if (inputValue() && inputValue() !== path()) {
               setPath(inputValue());
+              setPayload({ ...payload, save_path: inputValue() });
             }
           }}
           class="flex-1"
@@ -45,6 +48,7 @@ const ExportPath = () => {
               }
 
               setPath(result.filePaths[0]);
+              setPayload({ ...payload, save_path: result.filePaths[0] });
             }}
             class="i-material-symbols:folder-open-outline text-2xl  cursor-pointer"
           />

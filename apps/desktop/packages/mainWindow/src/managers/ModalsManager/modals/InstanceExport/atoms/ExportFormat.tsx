@@ -23,6 +23,7 @@ const ExportFormat = () => {
     MultiMCLogo,
     PrismLogo
   ];
+
   return (
     <div class="flex flex-col  ">
       <span>Export format</span>
@@ -33,15 +34,15 @@ const ExportFormat = () => {
               (a, b) =>
                 (b.supported === true ? 1 : 0) - (a.supported === true ? 1 : 0)
             )
-            .slice(0, 3)}
+            .slice(1, 3)}
         >
           {(entity, i) => (
             <EntityCard
               entity={entity}
-              icon={icons[i()]}
+              icon={icons[i() + 1]}
               onClick={[() => {}, entity]}
-              index={i()}
-              className="h-20 w-50"
+              index={i() + 1}
+              className="h-20 w-50 flex-1"
             />
           )}
         </For>

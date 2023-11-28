@@ -8,7 +8,26 @@ import FilesSelection from "./atoms/FilesSelection";
 import FilesBundle from "./atoms/FilesBundle";
 import ExportPath from "./atoms/ExportPath";
 import BeginExport from "./atoms/BeginExport";
+import { createSignal } from "solid-js";
+import { ExportTarget } from "@gd/core_module/bindings";
+import { createStore } from "solid-js/store";
 
+interface IPayload {
+  instance_id: string | undefined;
+  target: ExportTarget;
+  save_path: string | undefined;
+  links_mod: boolean;
+  filter: {};
+}
+
+const [payload, setPayload] = createStore<IPayload>({
+  instance_id: undefined,
+  target: "Curseforge",
+  save_path: undefined,
+  links_mod: false,
+  filter: {}
+});
+export { payload, setPayload };
 const InstanceExport = (props: ModalProps) => {
   return (
     <ModalLayout
@@ -21,7 +40,7 @@ const InstanceExport = (props: ModalProps) => {
     >
       <div class="flex flex-col p-4 w-120 ">
         <ExportFormat />
-        <ExportNameVersion />
+        {/* <ExportNameVersion /> */}
         <FilesSelection />
         <FilesBundle />
         <ExportPath />
