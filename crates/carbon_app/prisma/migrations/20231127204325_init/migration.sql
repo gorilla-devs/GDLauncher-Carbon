@@ -114,6 +114,7 @@ CREATE TABLE "ModMetadata" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "murmur2" INTEGER NOT NULL,
     "sha512" BLOB NOT NULL,
+    "sha1" BLOB NOT NULL,
     "name" TEXT,
     "modid" TEXT,
     "version" TEXT,
@@ -146,6 +147,8 @@ CREATE TABLE "ModrinthModCache" (
     "urlslug" TEXT NOT NULL,
     "description" TEXT NOT NULL,
     "authors" TEXT NOT NULL,
+    "filename" TEXT NOT NULL,
+    "fileUrl" TEXT NOT NULL,
     "cachedAt" DATETIME NOT NULL,
     CONSTRAINT "ModrinthModCache_metadataId_fkey" FOREIGN KEY ("metadataId") REFERENCES "ModMetadata" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
@@ -185,7 +188,7 @@ CREATE UNIQUE INDEX "Java_id_key" ON "Java"("id");
 CREATE UNIQUE INDEX "Java_path_key" ON "Java"("path");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "JavaSystemP∑rofile_id_key" ON "JavaSystemProfile"("id");
+CREATE UNIQUE INDEX "JavaSystemProfile_id_key" ON "JavaSystemProfile"("id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "JavaSystemProfile_name_key" ON "JavaSystemProfile"("name");

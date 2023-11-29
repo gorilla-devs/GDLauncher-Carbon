@@ -19,11 +19,17 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                .collect::<Vec<_>>())
         }
 
-        query GET_TASK[app, task: FETaskId] {
-            Ok(app.task_manager()
+        query GET_TASK[app, task: Option<FETaskId>] {
+            let Some(task) = task else {
+                return Ok(None);
+            };
+
+            let result = app.task_manager()
                .get_task(task.into())
                .await
-               .map(FETask::from))
+               .map(FETask::from);
+
+            Ok(result)
         }
 
         mutation DISMISS_TASK[app, task: FETaskId] {

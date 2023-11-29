@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -68,12 +68,16 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         mutation CREATE_INSTANCE[app, details: CreateInstance] {
+            if details.name.is_empty() {
+                return Err(anyhow::anyhow!("instance name cannot be empty"));
+            }
+
             app.instance_manager()
                 .create_instance(
                     details.group.into(),
                     details.name,
                     details.use_loaded_icon,
-                    details.version.into(),
+                    details.version.try_into()?,
                     details.notes,
                 )
                 .await
@@ -135,7 +139,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
         mutation UPDATE_INSTANCE[app, details: UpdateInstance] {
             app.instance_manager()
-                .update_instance(details.into())
+                .update_instance(details.try_into()?)
                 .await
         }
 
@@ -148,24 +152,36 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
-        query INSTANCE_DETAILS[app, id: FEInstanceId] {
-            app.instance_manager()
+        query INSTANCE_DETAILS[app, id: Option<FEInstanceId>] {
+            let Some(id) = id else {
+                return Ok(None);
+            };
+
+            let result = app.instance_manager()
                 .instance_details(id.into())
                 .await
-                .map(InstanceDetails::from)
+                .map(InstanceDetails::from);
+
+            Ok(Some(result?))
         }
 
-        query INSTANCE_MODS[app, id: FEInstanceId] {
+        query INSTANCE_MODS[app, id: Option<FEInstanceId>] {
+            let Some(id) = id else {
+                return Ok(None);
+            };
+
             app.meta_cache_manager()
                 .watch_and_prioritize(Some(id.into()))
                 .await;
 
-            Ok(app.instance_manager()
+            let result = app.instance_manager()
                 .list_mods(id.into())
                 .await?
                 .into_iter()
                 .map(Into::into)
-                .collect::<Vec<Mod>>())
+                .collect::<Vec<Mod>>();
+
+            Ok(Some(result))
         }
 
         mutation PREPARE_INSTANCE[app, id: FEInstanceId] {
@@ -200,7 +216,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
         query GET_LOGS[app, args: ()] {
             Ok(app.instance_manager()
-                .get_logs()
+               .get_logs()
                .await
                .into_iter()
                .map(GameLogEntry::from)
@@ -250,6 +266,8 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                             imod.instance_id.into(),
                             cf_mod.project_id,
                             cf_mod.file_id,
+                            imod.install_deps,
+                            imod.replaces_mod,
                         )
                         .await?
                 }
@@ -259,6 +277,8 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                             imod.instance_id.into(),
                             mdr_mod.project_id,
                             mdr_mod.version_id,
+                            imod.install_deps,
+                            imod.replaces_mod,
                         )
                         .await?
                 }
@@ -317,6 +337,28 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .begin_import(req.index, req.name)
                 .await
                 .map(FETaskId::from)
+        }
+
+        query EXPLORE[app, args: ExploreQuery] {
+            app.instance_manager().explore_data(
+                args.instance_id.into(),
+                args.path,
+            ).await
+                .map(|entries| entries.into_iter().map(ExploreEntry::from).collect::<Vec<_>>())
+        }
+
+        mutation EXPORT[app, args: ExportArgs] {
+            let task = app.instance_manager()
+                .export_manager()
+                .export_instance(
+                    args.instance_id.into(),
+                    args.target.into(),
+                    args.save_path.into(),
+                    args.link_mods,
+                    args.filter.into(),
+                ).await?;
+
+            Ok(FETaskId::from(task))
         }
     }
 }
@@ -583,6 +625,8 @@ struct ModrinthMod {
 struct InstallMod {
     instance_id: FEInstanceId,
     mod_source: ModSource,
+    install_deps: bool,
+    replaces_mod: Option<String>,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -764,6 +808,46 @@ struct ModrinthModMetadata {
     has_image: bool,
 }
 
+#[derive(Type, Deserialize, Debug)]
+struct ExploreQuery {
+    instance_id: FEInstanceId,
+    path: Vec<String>,
+}
+
+#[derive(Type, Serialize, Debug)]
+struct ExploreEntry {
+    name: String,
+    #[serde(rename = "type")]
+    type_: ExploreEntryType,
+}
+
+#[derive(Type, Serialize, Debug)]
+enum ExploreEntryType {
+    File { size: u32 },
+    Directory,
+}
+
+#[derive(Type, Deserialize, Debug)]
+struct ExportEntry {
+    //#[serde(flatten)]
+    entries: HashMap<String, Option<ExportEntry>>,
+}
+
+#[derive(Type, Deserialize, Debug)]
+enum ExportTarget {
+    Curseforge,
+    Modrinth,
+}
+
+#[derive(Type, Deserialize, Debug)]
+struct ExportArgs {
+    instance_id: FEInstanceId,
+    target: ExportTarget,
+    save_path: String,
+    link_mods: bool,
+    filter: ExportEntry,
+}
+
 #[derive(Type, Debug, Serialize, Deserialize)]
 pub enum ImportEntity {
     LegacyGDLauncher,
@@ -889,19 +973,23 @@ impl From<domain::info::ModLoaderType> for FEInstanceModloaderType {
     }
 }
 
-impl From<CreateInstanceVersion> for manager::InstanceVersionSource {
-    fn from(value: CreateInstanceVersion) -> Self {
-        match value {
-            CreateInstanceVersion::Version(v) => Self::Version(v.into()),
+impl TryFrom<CreateInstanceVersion> for manager::InstanceVersionSource {
+    type Error = anyhow::Error;
+
+    fn try_from(value: CreateInstanceVersion) -> anyhow::Result<Self> {
+        Ok(match value {
+            CreateInstanceVersion::Version(v) => Self::Version(v.try_into()?),
             CreateInstanceVersion::Modpack(m) => Self::Modpack(m.into()),
-        }
+        })
     }
 }
 
-impl From<GameVersion> for domain::info::GameVersion {
-    fn from(value: GameVersion) -> Self {
+impl TryFrom<GameVersion> for domain::info::GameVersion {
+    type Error = anyhow::Error;
+
+    fn try_from(value: GameVersion) -> anyhow::Result<Self> {
         match value {
-            GameVersion::Standard(v) => Self::Standard(v.into()),
+            GameVersion::Standard(v) => Ok(Self::Standard(v.try_into()?)),
         }
     }
 }
@@ -960,21 +1048,35 @@ impl From<domain::info::ModrinthModpack> for ModrinthModpack {
     }
 }
 
-impl From<StandardVersion> for domain::info::StandardVersion {
-    fn from(value: StandardVersion) -> Self {
-        Self {
-            release: value.release,
-            modloaders: value.modloaders.into_iter().map(Into::into).collect(),
+impl TryFrom<StandardVersion> for domain::info::StandardVersion {
+    type Error = anyhow::Error;
+
+    fn try_from(value: StandardVersion) -> anyhow::Result<Self> {
+        let mut modloaders = HashSet::new();
+
+        for modloader in value.modloaders {
+            modloaders.insert(modloader.try_into()?);
         }
+
+        Ok(Self {
+            release: value.release,
+            modloaders,
+        })
     }
 }
 
-impl From<ModLoader> for domain::info::ModLoader {
-    fn from(value: ModLoader) -> Self {
-        Self {
+impl TryFrom<ModLoader> for domain::info::ModLoader {
+    type Error = anyhow::Error;
+
+    fn try_from(value: ModLoader) -> anyhow::Result<Self> {
+        if value.version.is_empty() {
+            return Err(anyhow!("modloader version cannot be empty"));
+        }
+
+        Ok(Self {
             type_: value.type_.into(),
             version: value.version,
-        }
+        })
     }
 }
 
@@ -1193,18 +1295,31 @@ impl From<MemoryRange> for (u16, u16) {
     }
 }
 
-impl From<UpdateInstance> for domain::InstanceSettingsUpdate {
-    fn from(value: UpdateInstance) -> Self {
-        Self {
+impl TryFrom<UpdateInstance> for domain::InstanceSettingsUpdate {
+    type Error = anyhow::Error;
+
+    fn try_from(value: UpdateInstance) -> anyhow::Result<Self> {
+        Ok(Self {
             instance_id: value.instance.into(),
             name: value.name.map(|x| x.inner()),
             use_loaded_icon: value.use_loaded_icon.map(|x| x.inner()),
             notes: value.notes.map(|x| x.inner()),
             version: value.version.map(|x| x.inner()),
-            modloader: value.modloader.map(|x| x.inner().map(Into::into)),
+            modloader: value
+                .modloader
+                .map(|x| x.inner().and_then(|v| v.try_into().ok())),
             global_java_args: value.global_java_args.map(|x| x.inner()),
             extra_java_args: value.extra_java_args.map(|x| x.inner()),
             memory: value.memory.map(|x| x.inner().map(Into::into)),
+        })
+    }
+}
+
+impl From<domain::ExploreEntry> for ExploreEntry {
+    fn from(value: domain::ExploreEntry) -> Self {
+        Self {
+            name: value.name,
+            type_: value.type_.into(),
         }
     }
 }
@@ -1263,11 +1378,29 @@ impl From<importer::InvalidImportEntry> for InvalidImportEntry {
     }
 }
 
+impl From<domain::ExploreEntryType> for ExploreEntryType {
+    fn from(value: domain::ExploreEntryType) -> Self {
+        match value {
+            domain::ExploreEntryType::File { size } => Self::File { size },
+            domain::ExploreEntryType::Directory => Self::Directory,
+        }
+    }
+}
+
 impl From<importer::ImportEntry> for ImportEntry {
     fn from(value: importer::ImportEntry) -> Self {
         match value {
             importer::ImportEntry::Valid(v) => Self::Valid(v.into()),
             importer::ImportEntry::Invalid(v) => Self::Invalid(v.into()),
+        }
+    }
+}
+
+impl From<ExportTarget> for domain::ExportTarget {
+    fn from(value: ExportTarget) -> Self {
+        match value {
+            ExportTarget::Curseforge => Self::Curseforge,
+            ExportTarget::Modrinth => Self::Modrinth,
         }
     }
 }
@@ -1281,6 +1414,18 @@ impl From<importer::ImportScanStatus> for ImportScanStatus {
             domain::SingleResult(r) => Self::SingleResult(r.into()),
             domain::MultiResult(r) => Self::MultiResult(r.into_iter().map(Into::into).collect()),
         }
+    }
+}
+
+impl From<ExportEntry> for domain::ExportEntry {
+    fn from(value: ExportEntry) -> Self {
+        Self(
+            value
+                .entries
+                .into_iter()
+                .map(|(k, v)| (k, v.map(Into::into)))
+                .collect(),
+        )
     }
 }
 

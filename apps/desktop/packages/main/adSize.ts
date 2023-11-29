@@ -2,39 +2,18 @@ import { screen } from "electron";
 
 export default function getAdSize() {
   const primaryDisplay = screen.getPrimaryDisplay();
-  const { width, height } = primaryDisplay.workAreaSize;
+  const { width, height } = primaryDisplay.size;
 
-  if (width <= 800 || height <= 600) {
+  console.log("width", width);
+  console.log("height", height);
+
+  if (width < 1920 || height < 1080) {
     // Smaller ads (160/600)
     return {
-      minWidth: 760,
-      minHeight: 500,
-      width: 760,
-      height: 500,
-      adSize: {
-        width: 160,
-        height: 600
-      }
-    };
-  } else if (width < 1000 || height < 800) {
-    // Smaller ads (160/600)
-    return {
-      minWidth: 800,
-      minHeight: 600,
-      width: 800,
-      height: 600,
-      adSize: {
-        width: 160,
-        height: 600
-      }
-    };
-  } else if (width < 1500 || height < 870) {
-    // Smaller ads (160/600)
-    return {
-      minWidth: 1160,
-      minHeight: 720,
-      width: 1160,
-      height: 720,
+      minWidth: 770,
+      minHeight: 770,
+      width: width * 0.75,
+      height: 770,
       adSize: {
         width: 160,
         height: 600
@@ -42,13 +21,13 @@ export default function getAdSize() {
     };
   } else {
     return {
-      minWidth: 1300,
-      minHeight: 740,
-      width: 1560,
-      height: 740,
+      minWidth: 1500,
+      minHeight: 770,
+      width: 1600,
+      height: 770,
       adSize: {
         width: 400,
-        height: 300
+        height: 600
       }
     };
   }

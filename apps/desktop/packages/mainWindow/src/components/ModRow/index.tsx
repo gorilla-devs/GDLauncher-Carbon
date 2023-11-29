@@ -37,26 +37,19 @@ const ModRow = (props: ModRowProps) => {
   const [loading, setLoading] = createSignal(false);
   const [isRowSmall, setIsRowSmall] = createSignal(false);
 
-  const [taskId, setTaskId] = createSignal<undefined | number>(undefined);
+  const [taskId, setTaskId] = createSignal<number | null>(null);
+
+  const task = rspc.createQuery(() => ["vtask.getTask", taskId()]);
 
   createEffect(() => {
-    if (taskId() !== undefined && taskId() !== null) {
-      // eslint-disable-next-line solid/reactivity
-      const task = rspc.createQuery(() => [
-        "vtask.getTask",
-        taskId() as number
-      ]);
-
-      const isDownloaded = () =>
-        (task.data?.download_total || 0) > 0 &&
-        task.data?.download_total === task.data?.downloaded;
-
-      if (isDownloaded()) {
-        setLoading(false);
-        setTaskId(undefined);
-      }
-    } else {
+    if (
+      taskId() !== null &&
+      taskId() !== undefined &&
+      task.data !== undefined &&
+      task.data !== null
+    ) {
       setLoading(false);
+      setTaskId(null);
     }
   });
 
@@ -388,7 +381,9 @@ const ModRow = (props: ModRowProps) => {
                                       fileId,
                                       getProjectId(props)
                                     ),
-                                    instance_id: instanceId() as number
+                                    instance_id: instanceId() as number,
+                                    install_deps: true,
+                                    replaces_mod: null
                                   });
                                 }
                               });

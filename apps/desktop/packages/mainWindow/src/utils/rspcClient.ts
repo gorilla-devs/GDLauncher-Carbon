@@ -44,8 +44,9 @@ export default function initRspc(_port: number) {
           onData: (invalidateOperation) => {
             const key = [invalidateOperation!.key];
             if (invalidateOperation.args !== null) {
-              key.concat(invalidateOperation.args);
+              key.push(invalidateOperation.args);
             }
+            console.log("invalidateQuery", key);
             context.queryClient.invalidateQueries(key);
           }
         });

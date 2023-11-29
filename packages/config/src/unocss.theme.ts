@@ -27,6 +27,9 @@ type Theme = {
   green: {
     [key in shade]: string;
   };
+  brands: {
+    [key: string]: string;
+  };
 };
 
 const theme = {
@@ -127,6 +130,10 @@ const theme = {
       700: "var(--green-700)",
       800: "var(--green-800)",
       900: "var(--green-900)",
+    },
+    brands: {
+      curseforge: "var(--brands-curseforge)",
+      modrinth: "var(--brands-modrinth)",
     },
     // TODO: Move satisfies to the entire theme when possible
   } satisfies Theme,

@@ -16,11 +16,11 @@ use futures::Future;
 use image::ImageOutputFormat;
 use itertools::Itertools;
 use md5::Digest;
+use sha1::Sha1;
 use sha2::Sha512;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::sync::watch;
-use tokio::sync::Notify;
 use tokio::sync::RwLock;
 use tokio::sync::RwLockReadGuard;
 use tokio::sync::Semaphore;
@@ -105,7 +105,8 @@ impl UpdateNotifier {
 /// Variant of watch where both sides are simultaneously senders and receivers.
 struct LockNotify<T: Send + Sync> {
     lock: Arc<RwLock<T>>,
-    notify: Arc<Notify>,
+    notify: Arc<watch::Sender<()>>,
+    notify_rx: watch::Receiver<()>,
 }
 
 impl<T: Send + Sync> Clone for LockNotify<T> {
@@ -113,15 +114,19 @@ impl<T: Send + Sync> Clone for LockNotify<T> {
         Self {
             lock: self.lock.clone(),
             notify: self.notify.clone(),
+            notify_rx: self.notify_rx.clone(),
         }
     }
 }
 
 impl<T: Send + Sync> LockNotify<T> {
     fn new(value: T) -> Self {
+        let (notify, notify_rx) = watch::channel::<()>(());
+
         Self {
             lock: Arc::new(RwLock::new(value)),
-            notify: Arc::new(Notify::new()),
+            notify: Arc::new(notify),
+            notify_rx,
         }
     }
 
@@ -129,7 +134,7 @@ impl<T: Send + Sync> LockNotify<T> {
         let mut lock = self.lock.write().await;
 
         if f(&mut *lock) {
-            self.notify.notify_waiters();
+            let _ = self.notify.send(());
         }
     }
 
@@ -163,7 +168,10 @@ impl<T: Send + Sync> LockNotify<T> {
 
     /// Note: will hang forever if all senders drop
     async fn await_change(&mut self) {
-        self.notify.notified().await;
+        if self.notify_rx.changed().await.is_err() {
+            warn!("LockNotify sender was dropped, halting forever");
+            futures::future::pending::<()>().await;
+        }
     }
 }
 
@@ -667,6 +675,95 @@ impl ManagerRef<'_, MetaCacheManager> {
             .await;
     }
 
+    pub async fn override_caching_and_wait(
+        self,
+        instance_id: InstanceId,
+        curseforge: bool,
+        modrinth: bool,
+    ) -> anyhow::Result<()> {
+        let app = self.app.clone();
+
+        let split = |c| match c {
+            Some((tx, rx)) => (Some(tx), Some(rx)),
+            None => (None, None),
+        };
+
+        let (local_tx, local_rx) = oneshot::channel::<anyhow::Result<()>>();
+        let (cf_tx, cf_rx) = split(curseforge.then(|| oneshot::channel::<anyhow::Result<()>>()));
+        let (mr_tx, mr_rx) = split(modrinth.then(|| oneshot::channel::<anyhow::Result<()>>()));
+
+        self.local_targets
+            .send_modify_always(move |targets| {
+                targets.set_override(CacheTarget {
+                    instance_id,
+                    callback: Some(Box::new(move |r: anyhow::Result<()>| match r {
+                        Ok(()) => {
+                            let _ = local_tx.send(Ok(()));
+
+                            tokio::spawn(async move {
+                                let mcm = app.meta_cache_manager();
+
+                                let cf = cf_tx.map(|tx| {
+                                    mcm.curseforge_targets.send_modify_always(move |targets| {
+                                        targets.set_priority(CacheTarget {
+                                            instance_id,
+                                            callback: Some(Box::new(
+                                                move |r: anyhow::Result<()>| {
+                                                    let _ = tx.send(r);
+                                                },
+                                            )),
+                                        })
+                                    })
+                                });
+
+                                let mr = mr_tx.map(|tx| {
+                                    mcm.modrinth_targets.send_modify_always(move |targets| {
+                                        targets.set_priority(CacheTarget {
+                                            instance_id,
+                                            callback: Some(Box::new(
+                                                move |r: anyhow::Result<()>| {
+                                                    let _ = tx.send(r);
+                                                },
+                                            )),
+                                        })
+                                    })
+                                });
+
+                                join!(
+                                    async {
+                                        if let Some(cf) = cf {
+                                            cf.await;
+                                        }
+                                    },
+                                    async {
+                                        if let Some(mr) = mr {
+                                            mr.await;
+                                        }
+                                    }
+                                );
+                            });
+                        }
+                        e @ Err(_) => {
+                            let _ = local_tx.send(e);
+                        }
+                    })),
+                });
+            })
+            .await;
+
+        local_rx.await??;
+
+        if let Some(rx) = cf_rx {
+            rx.await??;
+        }
+
+        if let Some(rx) = mr_rx {
+            rx.await??;
+        }
+
+        Ok(())
+    }
+
     pub async fn watch_and_prioritize(self, instance_id: Option<InstanceId>) {
         let _ = self.watched_instance.send(instance_id);
 
@@ -770,8 +867,9 @@ impl ManagerRef<'_, MetaCacheManager> {
 
         let content = tokio::fs::read(path).await?;
         let content_len = content.len();
-        let (content, sha512, meta, murmur2) = tokio::task::spawn_blocking(move || {
+        let (content, sha512, sha1, meta, murmur2) = tokio::task::spawn_blocking(move || {
             let sha512: [u8; 64] = Sha512::new_with_prefix(&content).finalize().into();
+            let sha1: [u8; 20] = Sha1::new_with_prefix(&content).finalize().into();
             let meta = super::mods::parse_metadata(Cursor::new(&content));
 
             // curseforge's api removes whitespace in murmur2 hashes
@@ -779,7 +877,7 @@ impl ManagerRef<'_, MetaCacheManager> {
             murmur_content.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
             let murmur2 = murmurhash32::murmurhash2(&murmur_content);
 
-            (content, sha512, meta, murmur2)
+            (content, sha512, sha1, meta, murmur2)
         })
         .await?;
 
@@ -860,6 +958,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                     meta_id.clone(),
                     murmur2 as i32,
                     Vec::from(sha512),
+                    Vec::from(sha1),
                     meta.as_ref()
                         .map(|meta| &meta.modloaders)
                         .map(|modloaders| modloaders.iter().map(ToString::to_string).join(","))
@@ -1046,6 +1145,8 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
             let mut has_outdated_entries = false;
 
             if let Ok(Ok(cached_entries)) = cached_entries.await {
+                has_outdated_entries = cached_entries.len() != modpaths.len();
+
                 for entry in cached_entries {
                     if let Some((enabled, real_size)) = modpaths.get(&entry.filename) {
                         // enabled probably shouldn't be here

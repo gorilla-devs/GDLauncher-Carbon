@@ -120,7 +120,7 @@ pub enum FEUnifiedModSortIndex {
     Clone,
     strum_macros::EnumIter,
 )]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "lowercase")]
 pub enum FEUnifiedModLoaderType {
     // all
     Forge,
@@ -185,7 +185,7 @@ impl TryFrom<FEUnifiedModLoaderType> for modrinth::structs::MRFELoaderType {
     fn try_from(value: FEUnifiedModLoaderType) -> Result<Self, Self::Error> {
         match value {
             FEUnifiedModLoaderType::Forge => Ok(modrinth::structs::MRFELoaderType::Forge),
-            FEUnifiedModLoaderType::NeoForge => Ok(modrinth::structs::MRFELoaderType::NeoForge),
+            FEUnifiedModLoaderType::NeoForge => Ok(modrinth::structs::MRFELoaderType::Neoforge),
             FEUnifiedModLoaderType::Fabric => Ok(modrinth::structs::MRFELoaderType::Fabric),
             FEUnifiedModLoaderType::Quilt => Ok(modrinth::structs::MRFELoaderType::Quilt),
             FEUnifiedModLoaderType::LiteLoader => Ok(modrinth::structs::MRFELoaderType::Liteloader),

@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
 use rspc::Type;
 use serde::{Deserialize, Serialize};
@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     api::vtask::FETaskId,
     managers::{
-        instance::importer::{self, Entity, ImportEntry, ImportScanStatus},
+        instance::importer::{self, Entity, ImportEntry, ImportScanStatus, ImportableInstance},
         AppInner,
     },
 };

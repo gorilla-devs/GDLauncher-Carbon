@@ -210,6 +210,8 @@ impl ModplatformCacher for ModrinthModCacher {
                     metadata_id,
                     version.id.clone(),
                     file.hashes.sha512.clone(),
+                    file.filename.clone(),
+                    file.url.clone(),
                     project.clone(),
                     authors,
                 )
@@ -362,6 +364,8 @@ async fn cache_modrinth_meta_unchecked(
     metadata_id: String,
     version_id: String,
     sha512: String,
+    filename: String,
+    file_url: String,
     project: Project,
     authors: String,
 ) -> anyhow::Result<()> {
@@ -383,6 +387,8 @@ async fn cache_modrinth_meta_unchecked(
         project.slug,
         project.description,
         authors,
+        filename,
+        file_url,
         chrono::Utc::now().into(),
         metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),
         Vec::new(),
@@ -405,7 +411,7 @@ async fn cache_modrinth_meta_unchecked(
     let new_image = project.icon_url;
 
     let image = match (new_image, old_image) {
-        (Some(new), Some(old)) => Some((new == old.url, new, old.data)),
+        (Some(new), Some(old)) => Some((old.up_to_date == 1 && new == old.url, new, old.data)),
         (Some(new), None) => Some((false, new, None)),
         (None, Some(old)) => Some((old.up_to_date == 1, old.url, old.data)),
         (None, None) => None,
