@@ -261,7 +261,9 @@ const Mods = () => {
           fallback={<NoMods />}
         >
           <For
-            each={(filteredMods() || []).sort(sortAlphabetically) as Modtype[]}
+            each={
+              [...(filteredMods() || [])].sort(sortAlphabetically) as Modtype[]
+            }
           >
             {(mod) => (
               <Mod
