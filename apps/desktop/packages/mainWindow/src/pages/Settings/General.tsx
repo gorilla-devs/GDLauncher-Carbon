@@ -12,10 +12,12 @@ import RightHandSide from "./components/RightHandSide";
 import PageTitle from "./components/PageTitle";
 import Title from "./components/Title";
 import RowsContainer from "./components/RowsContainer";
+import { useModal } from "@/managers/ModalsManager";
 
 const General = () => {
   const routeData: ReturnType<typeof SettingsData> = useRouteData();
   const [t] = useTransContext();
+  const modalsContext = useModal();
 
   const [settings, setSettings] = createStore<FESettings>(
     // @ts-ignore
@@ -25,7 +27,7 @@ const General = () => {
   const settingsMutation = rspc.createMutation(["settings.setSettings"], {
     onMutate: (newSettings) => {
       queryClient.setQueryData(["settings.getSettings"], newSettings);
-    },
+    }
   });
 
   createEffect(() => {
@@ -35,29 +37,24 @@ const General = () => {
   return (
     <>
       <PageTitle>
-        <Trans
-          key="settings.general"
-          options={{
-            defaultValue: "General",
-          }}
-        />
+        <Trans key="settings:General" />
       </PageTitle>
       <RowsContainer>
         <Row>
           <Title
             description={
               <Trans
-                key="settings.release_channel_text"
+                key="settings:release_channel_text"
                 options={{
-                  defaultValue: "Select the preferred release channel",
+                  defaultValue: "Select the preferred release channel"
                 }}
               />
             }
           >
             <Trans
-              key="settings.release_channel_title"
+              key="settings:release_channel_title"
               options={{
-                defaultValue: "Release Channel",
+                defaultValue: "Release Channel"
               }}
             />
           </Title>
@@ -65,13 +62,13 @@ const General = () => {
             <Dropdown
               value={settings.releaseChannel}
               options={[
-                { label: t("settings.release_channel_stable"), key: "stable" },
-                { label: t("settings.release_channel_beta"), key: "beta" },
-                { label: t("settings.release_channel_alpha"), key: "alpha" },
+                { label: t("settings:release_channel_stable"), key: "stable" },
+                { label: t("settings:release_channel_beta"), key: "beta" },
+                { label: t("settings:release_channel_alpha"), key: "alpha" }
               ]}
               onChange={(channel) => {
                 settingsMutation.mutate({
-                  releaseChannel: channel.key as FEReleaseChannel,
+                  releaseChannel: channel.key as FEReleaseChannel
                 });
               }}
             />
@@ -81,18 +78,18 @@ const General = () => {
           <Title
             description={
               <Trans
-                key="settings.concurrent_downloads_text"
+                key="settings:concurrent_downloads_text"
                 options={{
                   defaultValue:
-                    "Select the number of concurrent downloads. If you have slow connection, select at most 3",
+                    "Select the number of concurrent downloads. If you have slow connection, select at most 3"
                 }}
               />
             }
           >
             <Trans
-              key="settings.concurrent_downloads_title"
+              key="settings:concurrent_downloads_title"
               options={{
-                defaultValue: "Concurrent Downloads",
+                defaultValue: "Concurrent Downloads"
               }}
             />
           </Title>
@@ -101,11 +98,11 @@ const General = () => {
               value={(settings.concurrentDownloads || "1").toString()}
               options={Array.from({ length: 20 }, (_, i) => ({
                 label: (i + 1).toString(),
-                key: (i + 1).toString(),
+                key: (i + 1).toString()
               }))}
               onChange={(downloads) => {
                 settingsMutation.mutate({
-                  concurrentDownloads: parseInt(downloads.key as string, 10),
+                  concurrentDownloads: parseInt(downloads.key as string, 10)
                 });
               }}
             />
@@ -114,19 +111,19 @@ const General = () => {
         <Row>
           <Title>
             <Trans
-              key="settings.game_resolution_title"
+              key="settings:game_resolution_title"
               options={{
-                defaultValue: "Game Resolution",
+                defaultValue: "Game Resolution"
               }}
             />
           </Title>
           <RightHandSide>
             <Dropdown
-              placeholder={t("settings.resolution_presets") || ""}
+              placeholder={t("settings:resolution_presets") || ""}
               options={[
                 { label: "800x600", key: "800x600" },
                 { label: "1024x768", key: "1024x768" },
-                { label: "1920x1080", key: "1920x1080" },
+                { label: "1920x1080", key: "1920x1080" }
               ]}
             />
           </RightHandSide>
@@ -135,18 +132,18 @@ const General = () => {
           <Title
             description={
               <Trans
-                key="settings.instance_sorting_text"
+                key="settings:instance_sorting_text"
                 options={{
                   defaultValue:
-                    "Select the method in which instances should be sorted.",
+                    "Select the method in which instances should be sorted."
                 }}
               />
             }
           >
             <Trans
-              key="settings.instance_sorting_title"
+              key="settings:instance_sorting_title"
               options={{
-                defaultValue: "Instance Sorting",
+                defaultValue: "Instance Sorting"
               }}
             />
           </Title>
@@ -154,7 +151,7 @@ const General = () => {
             <Dropdown
               options={[
                 { label: "Alphabetical", key: "alphabetical" },
-                { label: "Creation Date", key: "creation" },
+                { label: "Creation Date", key: "creation" }
               ]}
             />
           </RightHandSide>
@@ -163,17 +160,17 @@ const General = () => {
           <Title
             description={
               <Trans
-                key="settings.show_news_text"
+                key="settings:show_news_text"
                 options={{
-                  defaultValue: "Show or hide the news",
+                  defaultValue: "Show or hide the news"
                 }}
               />
             }
           >
             <Trans
-              key="settings.show_news_title"
+              key="settings:show_news_title"
               options={{
-                defaultValue: "Show news",
+                defaultValue: "Show news"
               }}
             />
           </Title>
@@ -182,7 +179,7 @@ const General = () => {
               checked={settings.showNews}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  showNews: e.currentTarget.checked,
+                  showNews: e.currentTarget.checked
                 });
               }}
             />
@@ -192,18 +189,18 @@ const General = () => {
           <Title
             description={
               <Trans
-                key="settings.discord_integration_text"
+                key="settings:discord_integration_text"
                 options={{
                   defaultValue:
-                    "Enable or disable discord integration. This display what are you playing in discord",
+                    "Enable or disable discord integration. This display what are you playing in discord"
                 }}
               />
             }
           >
             <Trans
-              key="settings.discord_integration_title"
+              key="settings:discord_integration_title"
               options={{
-                defaultValue: "Discord Integration",
+                defaultValue: "Discord Integration"
               }}
             />
           </Title>
@@ -212,7 +209,7 @@ const General = () => {
               checked={settings.discordIntegration}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  discordIntegration: e.currentTarget.checked,
+                  discordIntegration: e.currentTarget.checked
                 });
               }}
             />
@@ -222,41 +219,41 @@ const General = () => {
           <Title
             description={
               <Trans
-                key="settings.hide_launcher_playing_text"
+                key="settings:hide_launcher_playing_text"
                 options={{
                   defaultValue:
-                    "Automatically hide the launcher when launching an instance. You will still be able to open it from the icon tray.",
+                    "Automatically hide the launcher when launching an instance. You will still be able to open it from the icon tray."
                 }}
               />
             }
           >
             <Trans
-              key="settings.hide_launcher_playing_title"
+              key="settings:hide_launcher_playing_title"
               options={{
-                defaultValue: "Hide launcher while playing",
+                defaultValue: "Hide launcher while playing"
               }}
             />
           </Title>
           <RightHandSide>
-            <Switch checked={false} />
+            <Switch />
           </RightHandSide>
         </Row>
         <Row>
           <Title
             description={
               <Trans
-                key="settings.potato_mode_text"
+                key="settings:potato_mode_text"
                 options={{
                   defaultValue:
-                    "You got a potato PC? Don't worry! We got you covered. Enable this and all animations and special effects will be disabled.",
+                    "You got a potato PC? Don't worry! We got you covered. Enable this and all animations and special effects will be disabled."
                 }}
               />
             }
           >
             <Trans
-              key="settings.potato_mode_title"
+              key="settings:potato_mode_title"
               options={{
-                defaultValue: "Potato PC mode",
+                defaultValue: "Potato PC mode"
               }}
             />
           </Title>
@@ -265,10 +262,25 @@ const General = () => {
               checked={settings.reducedMotion}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  reducedMotion: e.currentTarget.checked,
+                  reducedMotion: e.currentTarget.checked
                 });
               }}
             />
+          </RightHandSide>
+        </Row>
+        <Row>
+          <Title>
+            <Trans key="settings:rerun_onboarding" />
+          </Title>
+          <RightHandSide>
+            <Button
+              size="small"
+              onClick={() => {
+                modalsContext?.openModal({ name: "onBoarding" });
+              }}
+            >
+              <Trans key="settings:rerun_onboarding" />
+            </Button>
           </RightHandSide>
         </Row>
         <Row class="bg-darkSlate-900 rounded-xl px-6 py-4">
@@ -280,7 +292,7 @@ const General = () => {
                   <div class="flex items-center gap-2">
                     <i class="w-5 h-5 i-ri:restart-line" />
                     <div>
-                      <Trans key="settings.restart_app" />
+                      <Trans key="settings:restart_app" />
                     </div>
                   </div>
                 </Button>
@@ -288,7 +300,7 @@ const General = () => {
                   <div class="flex items-center gap-2">
                     <i class="w-5 h-5 i-ri:delete-bin-7-line" />
                     <div>
-                      <Trans key="settings.reset_all_data" />
+                      <Trans key="settings:reset_all_data" />
                     </div>
                   </div>
                 </Button>

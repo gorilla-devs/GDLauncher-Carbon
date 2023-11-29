@@ -37,7 +37,7 @@ const AppNavbar = () => {
 
   const selectedIndex = () =>
     !!isSettings() || !!isSettingsNested()
-      ? 4
+      ? 5
       : getRouteIndex(NAVBAR_ROUTES, location.pathname);
 
   const routeData = useRouteData<typeof fetchData>();
@@ -52,9 +52,9 @@ const AppNavbar = () => {
           icon: `http://localhost:${port}/account/headImage?uuid=${account.uuid}`,
           uuid: account.uuid,
           type: account.type,
-          status: accountStatusQuery.data,
+          status: accountStatusQuery.data
         },
-        key: account?.uuid,
+        key: account?.uuid
       };
     });
 
@@ -65,7 +65,7 @@ const AppNavbar = () => {
 
   return (
     <Show when={!isLogin()}>
-      <nav class="flex items-center text-white bg-darkSlate-800 px-5 h-15">
+      <nav class="flex items-center bg-darkSlate-800 text-white px-5 h-15">
         <div class="flex w-full">
           <div class="flex items-center w-36">
             <img
@@ -74,7 +74,7 @@ const AppNavbar = () => {
               onClick={() => navigate("/library")}
             />
           </div>
-          <ul class="flex text-white w-full m-0 list-none items-center gap-6 pl-10">
+          <ul class="flex text-white w-full m-0 items-center list-none gap-6 pl-10">
             <Tabs index={selectedIndex()}>
               <TabList aligment="between">
                 <div class="flex gap-6">
@@ -86,18 +86,20 @@ const AppNavbar = () => {
                         <div
                           onClick={() =>
                             navigate(route.path, {
-                              getLastInstance: true,
+                              getLastInstance: true
                             })
                           }
                           class="no-underline"
                           classList={{
                             "text-white": !!isMatch(),
-                            "text-slate-400": !isMatch(),
+                            "text-slate-400": !isMatch()
                           }}
                         >
                           <Tab>
                             <div class="flex items-center gap-2">
-                              <i class={"w-5 h-5 " + route.icon} />
+                              <Show when={route.icon}>
+                                <i class={"w-5 h-5 " + route.icon} />
+                              </Show>
                               <li class="no-underline">{route.label}</li>
                             </div>
                           </Tab>
@@ -106,7 +108,7 @@ const AppNavbar = () => {
                     }}
                   </For>
                 </div>
-                <Spacing class="w-full" />
+                <Spacing class="hidden w-full lg:block" />
                 <Tab ignored noPadding>
                   <Button
                     size="small"
@@ -114,32 +116,33 @@ const AppNavbar = () => {
                     type="primary"
                     onClick={() => {
                       modalsContext?.openModal({
-                        name: "instanceCreation",
+                        name: "instanceCreation"
                       });
                     }}
                   >
                     <Trans
                       key="sidebar.add_instance"
                       options={{
-                        defaultValue: "Add Instance",
+                        defaultValue: "Add Instance"
                       }}
                     />
                   </Button>
                 </Tab>
                 <div class="flex gap-6 items-center">
                   <div
-                    onClick={() =>
-                      navigate("/settings", {
-                        getLastInstance: true,
-                      })
-                    }
+                    onClick={() => {
+                      if (!(!!isSettings() || !!isSettingsNested()))
+                        navigate("/settings", {
+                          getLastInstance: true
+                        });
+                    }}
                   >
                     <Tab>
                       <div
                         class="text-darkSlate-50 text-2xl cursor-pointer i-ri:settings-3-fill"
                         classList={{
                           "bg-primary-500":
-                            !!isSettings() || !!isSettingsNested(),
+                            !!isSettings() || !!isSettingsNested()
                         }}
                       />
                     </Tab>
@@ -158,7 +161,7 @@ const AppNavbar = () => {
               </TabList>
             </Tabs>
           </ul>
-          <div class="flex justify-end ml-4 min-w-52">
+          <div class="flex justify-end lg:min-w-52 lg:ml-4 ml-2">
             <Show when={routeData?.accounts.data}>
               <AccountsDropdown
                 accounts={accounts}

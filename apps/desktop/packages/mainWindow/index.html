@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en" style="margin: 0; padding: 0">
   <head>
     <meta charset="UTF-8" />
@@ -14,7 +14,7 @@
       img-src 'self' data: https: blob: http://localhost:* http://i.imgur.com;
       default-src 'unsafe-inline' 'self';
       frame-src 'self' https: https://youtube.com;
-      connect-src 'self' data: ws://localhost:* https://www.minecraft.net http://localhost:* https://unpkg.com/@rive-app/canvas@1.2.0/rive.wasm https://*.gdl.gg;
+      connect-src 'self' data: ws://localhost:* https://www.minecraft.net https://launchercontent.mojang.com/news.json http://localhost:* https://unpkg.com/@rive-app/canvas@1.2.0/rive.wasm https://*.gdl.gg;
     "
     />
 
@@ -24,28 +24,32 @@
         font-family: "Ubuntu";
         font-style: normal;
         font-weight: 300;
-        src: local("Ubuntu"),
+        src:
+          local("Ubuntu"),
           url("/assets/fonts/ubuntu-light-webfont.woff2") format("woff2");
       }
       @font-face {
         font-family: "Ubuntu";
         font-style: normal;
         font-weight: 400;
-        src: local("Ubuntu"),
+        src:
+          local("Ubuntu"),
           url("/assets/fonts/ubuntu-regular-webfont.woff2") format("woff2");
       }
       @font-face {
         font-family: "Ubuntu";
         font-style: normal;
         font-weight: 500;
-        src: local("Ubuntu"),
+        src:
+          local("Ubuntu"),
           url("/assets/fonts/ubuntu-medium-webfont.woff2") format("woff2");
       }
       @font-face {
         font-family: "Ubuntu";
         font-style: normal;
         font-weight: 600;
-        src: local("Ubuntu"),
+        src:
+          local("Ubuntu"),
           url("/assets/fonts/ubuntu-bold-webfont.woff2") format("woff2");
       }
 
@@ -69,27 +73,37 @@
         will-change: transform; */
       }
 
+      * {
+        cursor: default !important;
+      }
+
       .appFatalCrash {
         position: fixed;
         top: 0;
         left: 0;
         width: 100vw;
         height: 100vh;
-        background: #15181e;
+        background: var(--darkSlate-700);
         display: flex;
-        justify-content: center;
-        align-items: center;
+        flex-direction: column;
+        justify-content: space-between;
         z-index: 9999;
         font-size: 1.7rem;
         color: #fff;
         text-align: center;
         font-weight: 600;
-        /* transition: transform 0.4s ease-out;
-        will-change: transform; */
+      }
+      .appFatalCrash * {
+        user-select: text;
       }
     </style>
     <title>GDLauncher Carbon</title>
     <script type="module">
+      import { mainTheme } from "@gd/ui";
+
+      for (const key in mainTheme) {
+        document.documentElement.style.setProperty(`--${key}`, mainTheme[key]);
+      }
       // TODO: handle sourcemaps decoding + sentry
       window.onerror = (msg, url, line, col, error) => {
         window.fatalError(msg, url.split("/").slice(-3).join(" -> "));

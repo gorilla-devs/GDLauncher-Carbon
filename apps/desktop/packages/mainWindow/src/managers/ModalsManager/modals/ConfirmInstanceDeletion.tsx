@@ -19,7 +19,7 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
         { previusInstancesUngrouped: UngroupedInstance[] } | undefined
       > => {
         await queryClient.cancelQueries({
-          queryKey: ["instance.getInstancesUngrouped"],
+          queryKey: ["instance.getInstancesUngrouped"]
         });
 
         const previusInstancesUngrouped: UngroupedInstance[] | undefined =
@@ -54,20 +54,25 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
       },
       onSettled: () => {
         queryClient.invalidateQueries({
-          queryKey: ["instance.getInstancesUngrouped"],
+          queryKey: ["instance.getInstancesUngrouped"]
         });
-      },
+      }
     }
   );
 
   return (
-    <ModalLayout noHeader={props.noHeader} title={props?.title}>
-      <div class="flex flex-col justify-between w-100 h-60">
+    <ModalLayout
+      noHeader={props.noHeader}
+      title={props?.title}
+      height="h-60"
+      width="w-100"
+    >
+      <div class="flex flex-col justify-between h-full">
         <div class="h-h-full">
           <Trans
             key="instance_confirm_deletion.confirmation_text"
             options={{
-              instance_name: props.data?.name,
+              instance_name: props.data?.name
             }}
           >
             {""}

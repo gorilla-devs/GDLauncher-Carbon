@@ -21,6 +21,9 @@ async-trait = "0.1.61"
 axum = "0.6.2"
 chrono = "0.4.23"
 derive_more = "0.99.17"
+openssl = { version = "0.10", features = [
+  "vendored",
+] } # required to vendor openssl for steam deck
 directories = "4.0.1"
 dotenvy = "0.15.6"
 flate2 = "1.0.25"
@@ -29,11 +32,13 @@ futures = "0.3.25"
 httpdate = "1.0.2"
 hyper = "0.14.25"
 itertools = "0.10.5"
-image = { version = "0.24.5", features = ["png"], default-features = false }
+image = { version = "0.24.5" }
 jsonwebtoken = "8.2.0"
 # libc = "0.2"
 md-5 = "0.10.5"
 murmurhash32 = { git = "https://github.com/gorilla-devs/murmurhash32" }
+nom = "7"
+num_cpus = "1.16.0"
 opener = "0.6.1"
 prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "f71ad9122537c4ed29bf496a4a643947a5fe9aef", features = [
   "sqlite-create-many",
@@ -46,13 +51,17 @@ prisma-client-rust-cli = { git = "https://github.com/Brendonovich/prisma-client-
   "migrations",
 ], default_features = false }
 regex = "1.7.0"
-reqwest = { version = "0.11.13", features = ["rustls-tls", "json"] }
+reqwest = { version = "0.11.13", default-features = false, features = [
+  "json",
+  "blocking",
+  "stream",
+] }
 reqwest-middleware = "0.2.0"
 reqwest-retry = "0.2.1"
 rspc = { git = "https://github.com/oscartbeaumont/rspc", rev = "60a4fa93187c20bc5cb565cc6ee30b2f0903840e" }
 serde = "1.0.147"
 serde_json = "1.0.89"
-daedalus = { git = "https://github.com/gorilla-devs/daedalus", rev = "6db55f002e15ea28b0eaac4eff897e73bbc8febd" }
+daedalus = { git = "https://github.com/gorilla-devs/daedalus", rev = "5ab34fb44f5b37d0ac2df9e9dfdb12039cd3117e" }
 sha1 = "0.10.5"
 sha2 = "0.10.6"
 tar = "0.4.38"
@@ -62,6 +71,7 @@ thiserror = "1.0.38"
 task-local-extensions = "0.1.4"
 tokio = "1.25.0"
 tokio-stream = "0.1.11"
+dunce = "1.0.4"
 toml = "0.7.3"
 tower-http = "0.3.4"
 hex = "0.4"
@@ -81,7 +91,7 @@ uuid = "1.2.2"
 winreg = "0.10.1"
 zip = "0.6.3"
 tempdir = "0.3.7"
-sentry = "0.30.0"
+sentry = { version = "0.31.6", features = ["anyhow"] }
 syn = "2.0.11"
 quote = "1.0.26"
 url = "2.3.1"
@@ -90,3 +100,8 @@ sysinfo = "0.29.0"
 serde_qs = "0.12"
 markdown = "1.0.0-alpha.11"
 ring = "0.16.20"
+
+# dev dependencies
+assert2 = "0.3.11"
+flowtest = "0.1.0"
+tracing-test = "0.2.4"

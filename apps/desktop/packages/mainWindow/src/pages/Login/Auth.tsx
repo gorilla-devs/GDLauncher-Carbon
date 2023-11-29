@@ -4,7 +4,6 @@ import { Trans } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
 import { Button } from "@gd/ui";
 import fetchData from "./auth.login.data";
-import { trackEvent } from "@/utils/analytics";
 
 const Auth = () => {
   const [error, setError] = createSignal<null | string>(null);
@@ -13,7 +12,7 @@ const Auth = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const accountEnrollCancelMutation = rspc.createMutation([
-    "account.enroll.cancel",
+    "account.enroll.cancel"
   ]);
 
   const accountEnrollBeginMutation = rspc.createMutation(
@@ -21,7 +20,7 @@ const Auth = () => {
     {
       onError() {
         retryLogin();
-      },
+      }
     }
   );
 
@@ -43,7 +42,6 @@ const Auth = () => {
   };
 
   const handleClick = async () => {
-    trackEvent("microsoft_auth");
     setClicked(true);
     if (!routeData.status.data) {
       accountEnrollBeginMutation.mutate(undefined);
@@ -64,7 +62,7 @@ const Auth = () => {
         <Trans
           key="login.sign_in_with_microsoft"
           options={{
-            defaultValue: "Sign in with Microsoft",
+            defaultValue: "Sign in with Microsoft"
           }}
         />
       </Button>
@@ -73,7 +71,7 @@ const Auth = () => {
           key="login.sign_in_with_microsoft_text"
           options={{
             defaultValue:
-              "Sign in with your Microsoft Account. By doing so, you accept all our policies and terms stated below.",
+              "Sign in with your Microsoft Account. By doing so, you accept all our policies and terms stated below."
           }}
         />
       </p>

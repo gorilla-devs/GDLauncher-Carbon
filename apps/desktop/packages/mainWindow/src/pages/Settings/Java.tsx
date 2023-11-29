@@ -8,9 +8,10 @@ import {
   TabList,
   TabPanel,
   Tabs,
+  Tooltip
 } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
-import { For, Match, Show, Switch } from "solid-js";
+import { For, Match, Show, Switch, createMemo } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
 import { useModal } from "@/managers/ModalsManager";
 import { queryClient, rspc } from "@/utils/rspcClient";
@@ -20,6 +21,8 @@ import Row from "./components/Row";
 import Title from "./components/Title";
 import RowsContainer from "./components/RowsContainer";
 import RightHandSide from "./components/RightHandSide";
+import { generateSequence } from "@/utils/helpers";
+import Center from "./components/Center";
 
 const Java = () => {
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
@@ -33,9 +36,9 @@ const Java = () => {
     onMutate: (newSettings) => {
       queryClient.setQueryData(["settings.getSettings"], {
         ...settings?.data,
-        ...newSettings,
+        ...newSettings
       });
-    },
+    }
   });
 
   let deleteJavaMutation = rspc.createMutation(["java.deleteJavaVersion"]);
@@ -43,7 +46,11 @@ const Java = () => {
   const mbTotalRAM = () =>
     Math.round(Number(routeData.totalRam.data) / 1024 / 1024);
 
-  const initailJavaArgs = settings.data?.javaCustomArgs;
+  const initialJavaArgs = createMemo((prev: string | undefined) => {
+    if (prev) return prev;
+
+    return settings.data?.javaCustomArgs;
+  });
 
   const flattenedAvailableJavas = () =>
     Object.values(routeData.availableJavas.data || {}).reduce(
@@ -87,39 +94,28 @@ const Java = () => {
   return (
     <>
       <PageTitle>
-        <Trans
-          key="java.java"
-          options={{
-            defaultValue: "Java",
-          }}
-        />
+        <Trans key="settings:Java" />
       </PageTitle>
       <RowsContainer>
-        <Row>
+        <Row forceContentBelow>
           <Title>
             <Trans
               key="java.java_memory_title"
               options={{
-                defaultValue: "Java Memory",
+                defaultValue: "Java Memory"
               }}
             />
           </Title>
-          <RightHandSide class="flex w-86 gap box-content gap-12">
+          <Center>
             <Slider
               min={256}
               max={mbTotalRAM()}
               steps={1}
-              marks={{
-                256: "256MB",
-                [Math.round(mbTotalRAM() / 2)]: `${Math.round(
-                  mbTotalRAM() / 2
-                )}MB`,
-                [mbTotalRAM()]: `${mbTotalRAM()}MB`,
-              }}
+              marks={generateSequence(2048, mbTotalRAM())}
               value={settings.data?.xmx}
               onChange={(val) =>
                 settingsMutation.mutate({
-                  xmx: val,
+                  xmx: val
                 })
               }
             />
@@ -128,18 +124,18 @@ const Java = () => {
               value={settings.data?.xmx}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  xmx: parseInt(e.currentTarget.value, 10),
+                  xmx: parseInt(e.currentTarget.value, 10)
                 });
               }}
             />
-          </RightHandSide>
+          </Center>
         </Row>
         <Row class="flex-col items-stretch">
           <Title>
             <Trans
               key="java.java_arguments_title"
               options={{
-                defaultValue: "Java Arguments",
+                defaultValue: "Java Arguments"
               }}
             />
           </Title>
@@ -149,28 +145,40 @@ const Java = () => {
               value={settings.data?.javaCustomArgs}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  javaCustomArgs: e.target.value,
+                  javaCustomArgs: e.target.value
                 });
               }}
             />
-            <Button
-              rounded={false}
-              type="secondary"
-              class="h-10"
-              textColor="text-red-500"
-              onClick={() => {
-                settingsMutation.mutate({
-                  javaCustomArgs: initailJavaArgs,
-                });
-              }}
-            >
-              <Trans
-                key="java.reset_java_args"
-                options={{
-                  defaultValue: "Reset",
+            <Tooltip content={<Trans key="tooltip.undo" />}>
+              <Button
+                rounded={false}
+                type="secondary"
+                class="h-10"
+                size="small"
+                onClick={() => {
+                  settingsMutation.mutate({
+                    javaCustomArgs: initialJavaArgs()
+                  });
                 }}
-              />
-            </Button>
+              >
+                <i class="w-5 h-5 i-ri:arrow-go-back-fill" />
+              </Button>
+            </Tooltip>
+            <Tooltip content={<Trans key="tooltip.reset" />}>
+              <Button
+                rounded={false}
+                type="secondary"
+                class="h-10"
+                size="small"
+                onClick={() => {
+                  settingsMutation.mutate({
+                    javaCustomArgs: ""
+                  });
+                }}
+              >
+                <i class="w-5 h-5 i-ri:close-fill" />
+              </Button>
+            </Tooltip>
           </div>
         </Row>
         <Row>
@@ -178,7 +186,7 @@ const Java = () => {
             <Trans
               key="java.auto_handle_java"
               options={{
-                defaultValue: "Auto handle java",
+                defaultValue: "Auto handle java"
               }}
             />
           </Title>
@@ -187,7 +195,7 @@ const Java = () => {
               checked={settings.data?.autoManageJava}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  autoManageJava: e.target.checked,
+                  autoManageJava: e.target.checked
                 });
               }}
             />
@@ -202,7 +210,7 @@ const Java = () => {
                     <Trans
                       key="java.manage"
                       options={{
-                        defaultValue: "Manage",
+                        defaultValue: "Manage"
                       }}
                     />
                   </Tab>
@@ -210,7 +218,7 @@ const Java = () => {
                     <Trans
                       key="java.profiles"
                       options={{
-                        defaultValue: "Profiles",
+                        defaultValue: "Profiles"
                       }}
                     />
                   </Tab>
@@ -223,7 +231,7 @@ const Java = () => {
                           key="java.found_java_text"
                           options={{
                             defaultValue:
-                              "We found the following java versions on your pc",
+                              "We found the following java versions on your pc"
                           }}
                         />
                       </h2>
@@ -271,7 +279,7 @@ const Java = () => {
                                 <Trans
                                   key="java.no_found_java_text"
                                   options={{
-                                    defaultValue: "No java available",
+                                    defaultValue: "No java available"
                                   }}
                                 />
                               </p>

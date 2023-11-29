@@ -11,7 +11,7 @@ const Overview = () => {
   const [t] = useTransContext();
 
   return (
-    <div class="flex flex-col gap-4 mt-10 max-w-185">
+    <div class="flex flex-col gap-4 max-w-185 mt-10">
       <div class="w-full flex justify-center flex-wrap gap-4">
         <Show when={routeData.instanceDetails.data?.version}>
           <Card
@@ -20,6 +20,7 @@ const Overview = () => {
               (routeData.instanceDetails.data as InstanceDetails).version || ""
             }
             icon="vanilla"
+            class="flex-1"
           />
         </Show>
         <Show when={routeData.instanceDetails.data?.modloaders}>
@@ -34,22 +35,30 @@ const Overview = () => {
                   title={`Modloader ${index() || ""}`}
                   text={modloader.type_}
                   icon="book"
+                  class="flex-1"
                 />
                 <Card
                   title={`Modloader ${index() || ""} version`}
                   text={modloader.version}
                   icon="pickaxe"
+                  class="flex-1"
                 />
               </>
             )}
           </For>
         </Show>
 
-        <Show when={routeData.instanceMods.data}>
+        <Show
+          when={
+            routeData.instanceMods &&
+            (routeData.instanceDetails.data?.modloaders.length || 0) > 0
+          }
+        >
           <Card
             title={t("instance.overview_card_mods_title")}
-            text={routeData.instanceMods.data?.length || 0}
+            text={routeData.instanceMods?.length || 0}
             icon="cart"
+            class="flex-1"
           />
         </Show>
         <Show when={routeData.instanceDetails.data?.seconds_played}>
@@ -62,6 +71,7 @@ const Overview = () => {
               Date.now()
             )}
             icon="clock"
+            class="flex-1"
           />
         </Show>
         <Show when={routeData.instanceDetails.data?.last_played}>
@@ -69,11 +79,13 @@ const Overview = () => {
             title={t("instance.overview_card_last_played_title")}
             text={format(
               new Date(
-                (routeData.instanceDetails.data as InstanceDetails)?.last_played
+                (routeData.instanceDetails.data as InstanceDetails)
+                  ?.last_played as string
               ),
               "PPP"
             )}
             icon="sign"
+            class="flex-1"
           />
         </Show>
       </div>
@@ -83,7 +95,7 @@ const Overview = () => {
             <Trans
               key="instance.notes"
               options={{
-                defaultValue: "notes",
+                defaultValue: "notes"
               }}
             />
           </div>

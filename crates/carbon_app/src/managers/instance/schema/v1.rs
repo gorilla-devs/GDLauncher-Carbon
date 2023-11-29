@@ -7,8 +7,8 @@ pub struct Instance {
     pub name: String,
     #[serde(default)]
     pub icon: InstanceIcon,
-    #[serde(default = "Utc::now")]
-    pub last_played: DateTime<Utc>,
+    #[serde(default)]
+    pub last_played: Option<DateTime<Utc>>,
     #[serde(default)]
     pub seconds_played: u64,
     #[serde(default)]
@@ -88,6 +88,7 @@ pub struct ModLoader {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ModLoaderType {
+    Neoforge,
     Forge,
     Fabric,
     Quilt,
@@ -290,6 +291,7 @@ impl From<ModLoaderType> for info::ModLoaderType {
         use ModLoaderType as Schema;
 
         match value {
+            Schema::Neoforge => Self::Neoforge,
             Schema::Forge => Self::Forge,
             Schema::Fabric => Self::Fabric,
             Schema::Quilt => Self::Quilt,
@@ -302,6 +304,7 @@ impl From<info::ModLoaderType> for ModLoaderType {
         use info::ModLoaderType as Info;
 
         match value {
+            Info::Neoforge => Self::Neoforge,
             Info::Forge => Self::Forge,
             Info::Fabric => Self::Fabric,
             Info::Quilt => Self::Quilt,

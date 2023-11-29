@@ -1,4 +1,5 @@
 // allow dead code during development to keep warning outputs meaningful
+#![allow(warnings)]
 #![allow(dead_code)]
 
 use crate::managers::{
@@ -7,6 +8,7 @@ use crate::managers::{
 };
 
 use rspc::RouterBuilderLike;
+use serde_json::Value;
 use std::{path::PathBuf, sync::Arc};
 use tokio::net::TcpListener;
 use tower_http::cors::{Any, CorsLayer};
@@ -20,6 +22,7 @@ pub mod domain;
 mod error;
 pub mod iridium_client;
 pub mod managers;
+mod platform;
 // mod pprocess_keepalive;
 mod logger;
 mod once_send;
@@ -28,6 +31,31 @@ mod runtime_path_override;
 #[tokio::main]
 pub async fn main() {
     // pprocess_keepalive::init();
+    #[cfg(debug_assertions)]
+    {
+        let mut args = std::env::args();
+        if args.any(|arg| arg == "--generate-ts-bindings") {
+            crate::api::build_rspc_router()
+                .expose()
+                .config(
+                    rspc::Config::new().export_ts_bindings(
+                        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                            .parent()
+                            .unwrap()
+                            .parent()
+                            .unwrap()
+                            .join("packages")
+                            .join("core_module")
+                            .join("bindings.d.ts"),
+                    ),
+                )
+                .build();
+
+            // exit process with ok status
+            std::process::exit(0);
+        }
+    }
+
     #[cfg(feature = "production")]
     #[cfg(not(test))]
     let _guard = {
@@ -52,7 +80,7 @@ pub async fn main() {
     info!("Initializing runtime path");
     let runtime_path = runtime_path_override::get_runtime_path_override().await;
 
-    logger::setup_logger(&runtime_path).await;
+    let _guard = logger::setup_logger(&runtime_path).await;
 
     info!("Starting Carbon App v{}", app_version::APP_VERSION);
 
@@ -147,6 +175,7 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
 #[cfg(test)]
 struct TestEnv {
     tmpdir: PathBuf,
+    //log_guard: tracing_appender::non_blocking::WorkerGuard,
     app: App,
     invalidation_recv: tokio::sync::broadcast::Receiver<api::InvalidationEvent>,
 }
@@ -178,15 +207,31 @@ impl std::ops::Deref for TestEnv {
 #[cfg(test)]
 async fn setup_managers_for_test() -> TestEnv {
     let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
-    let temp_path = temp_dir.into_path();
-    info!("Test RTP: {}", temp_path.to_str().unwrap());
+    let temp_path = dunce::canonicalize(temp_dir.into_path()).unwrap();
+    //let log_guard = logger::setup_logger(&temp_path).await;
+    println!("Test RTP: {}", temp_path.to_str().unwrap());
     let (invalidation_sender, invalidation_recv) = tokio::sync::broadcast::channel(200);
 
     TestEnv {
         tmpdir: temp_path.clone(),
+        // log_guard,
         invalidation_recv,
         app: AppInner::new(invalidation_sender, temp_path).await,
     }
+}
+
+#[cfg(test)]
+#[macro_export]
+macro_rules! assert_eq_display {
+    ($a:expr, $b:expr) => {
+        if $a != $b {
+            panic!(
+                "Assertion failed: left == right\nleft:\n{a_val}\nright:\n{b_val}",
+                a_val = $a,
+                b_val = $b,
+            );
+        }
+    };
 }
 
 #[cfg(test)]

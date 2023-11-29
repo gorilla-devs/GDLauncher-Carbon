@@ -83,7 +83,14 @@ pub(super) async fn find_java_paths() -> Vec<PathBuf> {
             .cmp(&b.to_string_lossy().to_string().to_lowercase())
     });
     javas.dedup();
-    javas.into_iter().filter(|java| java.exists()).collect()
+    javas
+        .into_iter()
+        .map(|p| match dunce::canonicalize(&p) {
+            Ok(p) => p,
+            Err(_) => p,
+        })
+        .filter(|java| java.exists())
+        .collect()
 }
 
 fn search_java_binary_in_path(path: PathBuf) -> Vec<PathBuf> {
@@ -222,7 +229,14 @@ pub(super) async fn find_java_paths() -> Vec<PathBuf> {
     });
     javas.dedup();
 
-    javas.into_iter().filter(|java| java.exists()).collect()
+    javas
+        .into_iter()
+        .map(|p| match dunce::canonicalize(&p) {
+            Ok(p) => p,
+            Err(_) => p,
+        })
+        .filter(|java| java.exists())
+        .collect()
 }
 
 #[cfg(target_os = "linux")]
@@ -260,7 +274,14 @@ pub(super) async fn find_java_paths() -> Vec<PathBuf> {
     });
     javas.dedup();
 
-    javas.into_iter().filter(|java| java.exists()).collect()
+    javas
+        .into_iter()
+        .map(|p| match dunce::canonicalize(&p) {
+            Ok(p) => p,
+            Err(_) => p,
+        })
+        .filter(|java| java.exists())
+        .collect()
 }
 
 #[cfg(target_os = "linux")]

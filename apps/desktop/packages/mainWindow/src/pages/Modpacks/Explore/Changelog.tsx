@@ -6,7 +6,7 @@ import {
   Suspense,
   Switch,
   createEffect,
-  createSignal,
+  createSignal
 } from "solid-js";
 import { Dropdown, Skeleton } from "@gd/ui";
 import { rspc } from "@/utils/rspcClient";
@@ -14,9 +14,9 @@ import fetchData from "../modpack.overview";
 import {
   CFFEFile,
   CFFEFileIndex,
-  FEModResponse,
+  FEModResponse
 } from "@gd/core_module/bindings";
-import { sortArrayByGameVersion } from "@/utils/Mods";
+import { sortArrayByGameVersion } from "@/utils/mods";
 
 const Changelog = () => {
   const params = useParams();
@@ -45,7 +45,7 @@ const Changelog = () => {
         setOptions(
           routeData.modrinthProjectVersions.data.map((file) => ({
             key: file.id,
-            label: file.version_number,
+            label: file.version_number
           }))
         );
       }
@@ -57,7 +57,7 @@ const Changelog = () => {
       setOptions(
         (sortedVersions as CFFEFileIndex[]).map((file) => ({
           key: file.fileId.toString(),
-          label: file.filename,
+          label: file.filename
         }))
       );
     }
@@ -77,8 +77,8 @@ const Changelog = () => {
           {
             modId: modpackId,
             fileId:
-              parseInt(fileId() as string, 10) || (lastFile() as CFFEFile).id,
-          },
+              parseInt(fileId() as string, 10) || (lastFile() as CFFEFile).id
+          }
         ]);
         setChangelog(changelogQuery.data?.data);
       }
@@ -91,7 +91,7 @@ const Changelog = () => {
         // eslint-disable-next-line solid/reactivity
         const changelogQuery = rspc.createQuery(() => [
           "modplatforms.modrinth.getVersion",
-          fileId() as string,
+          fileId() as string
         ]);
 
         if (changelogQuery.data?.changelog) {

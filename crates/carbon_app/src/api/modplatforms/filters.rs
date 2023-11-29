@@ -127,7 +127,8 @@ pub enum FEUnifiedModLoaderType {
     NeoForge,
     Fabric,
     Quilt,
-    Liteloader,
+    LiteLoader,
+    Unknown,
 
     // curseforge
     Cauldron,
@@ -150,8 +151,6 @@ pub enum FEUnifiedModLoaderType {
     Vanilla,
     Velocity,
     Waterfall,
-    #[serde(other)]
-    Other(String),
 }
 
 impl TryFrom<FEUnifiedModLoaderType> for curseforge::structs::CFFEModLoaderType {
@@ -162,11 +161,11 @@ impl TryFrom<FEUnifiedModLoaderType> for curseforge::structs::CFFEModLoaderType 
             FEUnifiedModLoaderType::Forge => Ok(curseforge::structs::CFFEModLoaderType::Forge),
 
             FEUnifiedModLoaderType::NeoForge => {
-                Ok(curseforge::structs::CFFEModLoaderType::NeoForge)
+                Ok(curseforge::structs::CFFEModLoaderType::Neoforge)
             }
             FEUnifiedModLoaderType::Fabric => Ok(curseforge::structs::CFFEModLoaderType::Fabric),
             FEUnifiedModLoaderType::Quilt => Ok(curseforge::structs::CFFEModLoaderType::Quilt),
-            FEUnifiedModLoaderType::Liteloader => {
+            FEUnifiedModLoaderType::LiteLoader => {
                 Ok(curseforge::structs::CFFEModLoaderType::LiteLoader)
             }
             FEUnifiedModLoaderType::Cauldron => {
@@ -186,10 +185,10 @@ impl TryFrom<FEUnifiedModLoaderType> for modrinth::structs::MRFELoaderType {
     fn try_from(value: FEUnifiedModLoaderType) -> Result<Self, Self::Error> {
         match value {
             FEUnifiedModLoaderType::Forge => Ok(modrinth::structs::MRFELoaderType::Forge),
-            FEUnifiedModLoaderType::NeoForge => Ok(modrinth::structs::MRFELoaderType::NeoForge),
+            FEUnifiedModLoaderType::NeoForge => Ok(modrinth::structs::MRFELoaderType::Neoforge),
             FEUnifiedModLoaderType::Fabric => Ok(modrinth::structs::MRFELoaderType::Fabric),
             FEUnifiedModLoaderType::Quilt => Ok(modrinth::structs::MRFELoaderType::Quilt),
-            FEUnifiedModLoaderType::Liteloader => Ok(modrinth::structs::MRFELoaderType::Liteloader),
+            FEUnifiedModLoaderType::LiteLoader => Ok(modrinth::structs::MRFELoaderType::Liteloader),
             FEUnifiedModLoaderType::Bukkit => Ok(modrinth::structs::MRFELoaderType::Bukkit),
             FEUnifiedModLoaderType::Bungeecord => Ok(modrinth::structs::MRFELoaderType::Bungeecord),
             FEUnifiedModLoaderType::Canvas => Ok(modrinth::structs::MRFELoaderType::Canvas),
@@ -207,9 +206,7 @@ impl TryFrom<FEUnifiedModLoaderType> for modrinth::structs::MRFELoaderType {
             FEUnifiedModLoaderType::Vanilla => Ok(modrinth::structs::MRFELoaderType::Vanilla),
             FEUnifiedModLoaderType::Velocity => Ok(modrinth::structs::MRFELoaderType::Velocity),
             FEUnifiedModLoaderType::Waterfall => Ok(modrinth::structs::MRFELoaderType::Waterfall),
-            FEUnifiedModLoaderType::Other(other) => {
-                Ok(modrinth::structs::MRFELoaderType::Other(other))
-            }
+            FEUnifiedModLoaderType::Unknown => Err(anyhow!("Can't use unknown modloader type")),
             FEUnifiedModLoaderType::Cauldron => {
                 Err(anyhow!("Modrinth does not support the `Cauldron` loader"))
             }

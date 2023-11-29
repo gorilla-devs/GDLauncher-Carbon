@@ -64,6 +64,7 @@ keys! {
     mc {
         GET_MINECRAFT_VERSIONS                      = "getMinecraftVersions";
         GET_FORGE_VERSIONS                          = "getForgeVersions";
+        GET_NEOFORGE_VERSIONS                       = "getNeoforgeVersions";
         GET_FABRIC_VERSIONS                         = "getFabricVersions";
         GET_QUILT_VERSIONS                          = "getQuiltVersions";
     }
@@ -95,9 +96,13 @@ keys! {
         DELETE_MOD                                  = "deleteMod";
         INSTALL_MOD                                 = "installMod";
         GET_IMPORTABLE_ENTITIES                     = "getImportableEntities";
-        SCAN_IMPORTABLE_INSTANCES                   = "scanImportableInstances";
-        GET_IMPORTABLE_INSTANCES                    = "getImportableInstances";
+        GET_IMPORT_ENTITY_DEFAULT_PATH              = "getImportEntityDefaultPath";
+        SET_IMPORT_SCAN_TARGET                      = "setImportScanTarget";
+        CANCEL_IMPORT_SCAN                          = "cancelImportScan";
+        GET_IMPORT_SCAN_STATUS                      = "getImportScanStatus";
         IMPORT_INSTANCE                             = "importInstance";
+        EXPLORE                                     = "explore";
+        EXPORT                                      = "export";
     }
 
     vtask {

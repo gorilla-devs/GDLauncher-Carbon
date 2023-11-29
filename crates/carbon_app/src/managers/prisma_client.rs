@@ -27,8 +27,10 @@ pub enum DatabaseError {
 
 #[instrument]
 pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClient, DatabaseError> {
+    let runtime_path = dunce::simplified(&runtime_path);
+
     let db_uri = format!(
-        "file:{}",
+        "file:{}?connection_limit=1",
         runtime_path.join("gdl_conf.db").to_str().unwrap()
     );
 
@@ -83,7 +85,6 @@ async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
 
         let sr = ring::rand::SystemRandom::new();
         sr.fill(&mut buf).unwrap();
-        println!("Buffer: {:?}", buf);
 
         let release_channel = match APP_VERSION {
             v if v.contains("alpha") => "alpha",

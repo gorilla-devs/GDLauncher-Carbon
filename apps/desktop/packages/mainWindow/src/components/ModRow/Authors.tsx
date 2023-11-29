@@ -1,4 +1,4 @@
-import { ModRowProps, isCurseForgeData } from "@/utils/Mods";
+import { ModRowProps, isCurseForgeData } from "@/utils/mods";
 import { Accessor, For, Match, Show, Switch } from "solid-js";
 import { Tooltip } from "@gd/ui";
 import { CFFEModAuthor, FEUnifiedSearchResult } from "@gd/core_module/bindings";
@@ -31,7 +31,7 @@ const Authors = (props: Props) => {
   return (
     <Switch>
       <Match when={isCurseForgeData(modProps())}>
-        <div class="text-sm whitespace-nowrap flex gap-2">
+        <div class="text-sm flex gap-2 whitespace-nowrap">
           <Switch>
             <Match when={!props?.isRowSmall?.()}>
               <For

@@ -2,12 +2,13 @@
 import { Button, Spinner } from "@gd/ui";
 import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
-import { FEUnifiedSearchResult, Mod } from "@gd/core_module/bindings";
+import { FEUnifiedSearchResult } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
 import { getInstanceIdFromPath } from "@/utils/routes";
+import Authors from "@/components/ModRow/Authors";
 import {
   getDataCreation,
   getFileId,
@@ -15,20 +16,14 @@ import {
   getLogoUrl,
   getName,
   getProjectId,
-  isCurseForgeData,
-} from "@/utils/Mods";
-import Authors from "@/components/ModRow/Authors";
+  isCurseForgeData
+} from "@/utils/mods";
 import { marked } from "marked";
 import sanitizeHtml from "sanitize-html";
-import { CreateQueryResult } from "@tanstack/solid-query";
-import { RSPCError } from "@rspc/client";
 import { useLocation } from "@solidjs/router";
 
 const ModDetails = (props: ModalProps) => {
   const [loading, setLoading] = createSignal(false);
-  const [mods, setMods] = createSignal<
-    CreateQueryResult<Mod[], RSPCError> | undefined
-  >(undefined);
   const modDetails = () => props.data?.mod as FEUnifiedSearchResult;
   const fileId = () => getFileId(modDetails());
   const projectId = () => getProjectId(modDetails());
@@ -45,15 +40,20 @@ const ModDetails = (props: ModalProps) => {
     },
     onSuccess(taskId) {
       setTaskId(taskId);
-    },
+    }
   });
+
+  const mods = rspc.createQuery(() => [
+    "instance.getInstanceMods",
+    parseInt(instanceId() as string, 10)
+  ]);
 
   createEffect(() => {
     if (taskId() !== undefined) {
       // eslint-disable-next-line solid/reactivity
       const task = rspc.createQuery(() => [
         "vtask.getTask",
-        taskId() as number,
+        taskId() as number
       ]);
 
       const isDowloaded = () =>
@@ -68,7 +68,7 @@ const ModDetails = (props: ModalProps) => {
     if (projectId() && isCurseForgeData(modDetails())) {
       const modpackDescription = rspc.createQuery(() => [
         "modplatforms.curseforge.getModDescription",
-        { modId: projectId() as number },
+        { modId: projectId() as number }
       ]);
       if (modpackDescription.data?.data)
         setModpackDescription(modpackDescription.data?.data);
@@ -79,7 +79,7 @@ const ModDetails = (props: ModalProps) => {
     if (projectId() && !isCurseForgeData(modDetails())) {
       const modpackDescription = rspc.createQuery(() => [
         "modplatforms.modrinth.getProject",
-        projectId() as string,
+        projectId() as string
       ]);
       if (modpackDescription.data?.body)
         setModpackDescription(
@@ -96,31 +96,20 @@ const ModDetails = (props: ModalProps) => {
       ? {
           Curseforge: {
             file_id: fileId() as number,
-            project_id: projectId() as number,
-          },
+            project_id: projectId() as number
+          }
         }
       : {
           Modrinth: {
             project_id: projectId() as string,
-            version_id: fileId() as string,
-          },
+            version_id: fileId() as string
+          }
         };
   };
 
-  createEffect(() => {
-    if (instanceId() !== undefined) {
-      setMods(
-        rspc.createQuery(() => [
-          "instance.getInstanceMods",
-          parseInt(instanceId() as string, 10),
-        ])
-      );
-    }
-  });
-
   const DownloadBtn = (propss: { size: "large" | "small" }) => {
     const isModInstalled = () =>
-      mods()?.data?.find(
+      mods?.data?.find(
         (mod) =>
           (isCurseForgeData(modDetails())
             ? mod.curseforge?.project_id
@@ -142,6 +131,8 @@ const ModDetails = (props: ModalProps) => {
                 installModMutation.mutate({
                   mod_source: modSourceObj(),
                   instance_id: parseInt(instanceId() as string, 10),
+                  install_deps: true,
+                  replaces_mod: null
                 });
               }
             }}
@@ -159,7 +150,7 @@ const ModDetails = (props: ModalProps) => {
             <Trans
               key="mod.downloaded"
               options={{
-                defaultValue: "Downloaded",
+                defaultValue: "Downloaded"
               }}
             />
           </Button>
@@ -176,7 +167,7 @@ const ModDetails = (props: ModalProps) => {
             <div
               class="relative h-full bg-darkSlate-800 overflow-auto max-h-full overflow-x-hidden"
               style={{
-                "scrollbar-gutter": "stable",
+                "scrollbar-gutter": "stable"
               }}
               onScroll={() => {
                 const rect = refStickyTabs.getBoundingClientRect();
@@ -189,7 +180,7 @@ const ModDetails = (props: ModalProps) => {
                     class="h-full absolute left-0 right-0 top-0 bg-cover bg-center bg-fixed bg-no-repeat"
                     style={{
                       "background-image": `url("${getLogoUrl(modDetails())}")`,
-                      "background-position": "right-5rem",
+                      "background-position": "right-5rem"
                     }}
                   />
                   <div class="z-10 sticky top-5 left-5 w-fit">
@@ -204,7 +195,7 @@ const ModDetails = (props: ModalProps) => {
                       <Trans
                         key="instance.step_back"
                         options={{
-                          defaultValue: "Back",
+                          defaultValue: "Back"
                         }}
                       />
                     </Button>
@@ -216,7 +207,7 @@ const ModDetails = (props: ModalProps) => {
                         style={{
                           "background-image": `url("${getLogoUrl(
                             modDetails()
-                          )}")`,
+                          )}")`
                         }}
                       />
                       <div class="flex flex-1 flex-col max-w-185">
@@ -270,7 +261,7 @@ const ModDetails = (props: ModalProps) => {
                       <Trans
                         key="instance.step_back"
                         options={{
-                          defaultValue: "Back",
+                          defaultValue: "Back"
                         }}
                       />
                     </Button>

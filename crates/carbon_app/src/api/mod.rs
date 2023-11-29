@@ -33,6 +33,8 @@ impl InvalidationEvent {
 }
 
 pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
+    let mut counter = Arc::new(0);
+
     rspc::Router::<App>::new()
         .query("echo", |t| t(|_ctx, args: String| async move { Ok(args) }))
         .query("getAppVersion", |t| {
@@ -55,6 +57,7 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
                     loop {
                         match channel.recv().await {
                             Ok(event) => {
+                                tracing::trace!("Invalidated {}: {:?}", event.key, event.args);
                                 yield event;
                             }
                             Err(e) => {

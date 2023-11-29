@@ -3,9 +3,8 @@ use std::{
     mem::ManuallyDrop,
     ops::Deref,
     path::{Path, PathBuf},
+    sync::atomic::{self, AtomicUsize},
 };
-
-use anyhow::anyhow;
 
 #[derive(Clone)]
 pub struct RuntimePath(PathBuf);
@@ -18,6 +17,7 @@ impl RootPath {
     }
 }
 
+#[derive(Clone)]
 pub struct LibrariesPath(PathBuf);
 
 impl LibrariesPath {
@@ -98,7 +98,7 @@ impl InstancesPath {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct InstancePath(PathBuf);
 
 impl InstancePath {
@@ -170,15 +170,22 @@ impl TempPath {
         let time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("time is somehow pre-epoch")
-            .as_millis();
+            .as_millis() as usize;
 
         let mut path = self.to_path();
 
-        for i in 0..1000 {
+        loop {
+            static LAST_COUNT: AtomicUsize = AtomicUsize::new(0);
+            let i = LAST_COUNT.fetch_add(1, atomic::Ordering::Relaxed);
+
             if i == 0 {
                 path.push(time.to_string());
             } else {
                 path.push(format!("{time}{i}"));
+            }
+
+            if path.exists() {
+                continue;
             }
 
             let path_copy = path.clone();
@@ -192,8 +199,6 @@ impl TempPath {
 
             path.pop();
         }
-
-        Err(anyhow!("Could not create tmpdir"))
     }
 
     pub async fn maketmpdir(&self) -> anyhow::Result<TempEntry<tempentry::Folder>> {
@@ -243,6 +248,10 @@ pub mod tempentry {
 
     impl TempEntryType for File {
         fn create(path: &Path) -> io::Result<()> {
+            path.parent()
+                .map(|path| std::fs::create_dir_all(path))
+                .transpose()?;
+
             // files will be created on write
             Ok(())
         }
@@ -339,4 +348,42 @@ impl Deref for RuntimePath {
     fn deref(&self) -> &Self::Target {
         &self.0
     }
+}
+
+/// Recursivley copy from `from` to `to` except when excluded by `filter`.
+/// Overwrites existing files. May fail if a parent directory is filtered but children are not.
+pub async fn copy_dir_filter<F>(from: &Path, to: &Path, filter: F) -> anyhow::Result<()>
+where
+    F: for<'a> Fn(&'a Path) -> bool,
+{
+    let entries = walkdir::WalkDir::new(from).into_iter().filter_map(|entry| {
+        let Ok(entry) = entry else { return None };
+
+        let srcpath = entry.path().to_path_buf();
+        let relpath = srcpath.strip_prefix(from).unwrap();
+
+        if !filter(&relpath) {
+            return None;
+        }
+
+        let destpath = to.join(relpath);
+
+        Some(async move {
+            if entry.metadata()?.is_dir() {
+                tokio::fs::create_dir_all(destpath).await?;
+            } else {
+                tokio::fs::create_dir_all(destpath.parent().unwrap()).await?;
+                tokio::fs::copy(srcpath, destpath).await?;
+            }
+
+            Ok::<_, anyhow::Error>(())
+        })
+    });
+
+    futures::future::join_all(entries)
+        .await
+        .into_iter()
+        .collect::<Result<_, _>>()?;
+
+    Ok(())
 }

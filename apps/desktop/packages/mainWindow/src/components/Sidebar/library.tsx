@@ -8,12 +8,12 @@ import {
   Switch,
   createEffect,
   createMemo,
-  createSignal,
+  createSignal
 } from "solid-js";
 import {
-  getForgeModloaderIcon,
+  getCFModloaderIcon,
   isSidebarOpened,
-  toggleSidebar,
+  toggleSidebar
 } from "@/utils/sidebar";
 import { useLocation, useRouteData } from "@solidjs/router";
 import { getInstanceIdFromPath, setLastInstanceOpened } from "@/utils/routes";
@@ -80,7 +80,7 @@ const Sidebar = () => {
         <Match when={!isSidebarOpened()}>
           <img
             class="w-6 h-6"
-            src={getForgeModloaderIcon(key as CFFEModLoaderType)}
+            src={getCFModloaderIcon(key as CFFEModLoaderType)}
           />
         </Match>
       </Switch>
@@ -107,7 +107,7 @@ const Sidebar = () => {
           >
             <Input
               ref={inputRef}
-              placeholder={t("general.search") as string}
+              placeholder={t("general.search")}
               icon={<div class="i-ri:search-line" />}
               class="w-full rounded-full"
               onInput={(e) => setFilter(e.target.value)}
@@ -121,7 +121,7 @@ const Sidebar = () => {
         <div
           class="h-full box-border overflow-y-auto"
           classList={{
-            "scrollbar-hide": !isSidebarOpened(),
+            "scrollbar-hide": !isSidebarOpened()
           }}
         >
           <Show when={favoriteInstances().length > 0}>
@@ -199,7 +199,7 @@ const Sidebar = () => {
                 src={skull}
                 classList={{
                   "w-16 h-16": isSidebarOpened(),
-                  "w-10 h-10": !isSidebarOpened(),
+                  "w-10 h-10": !isSidebarOpened()
                 }}
               />
               <Show when={isSidebarOpened()}>
@@ -208,7 +208,7 @@ const Sidebar = () => {
                     key="instance.no_instances_text"
                     options={{
                       defaultValue:
-                        "At the moment there are not instances. Add one to start playing!",
+                        "At the moment there are not instances. Add one to start playing!"
                     }}
                   />
                 </p>

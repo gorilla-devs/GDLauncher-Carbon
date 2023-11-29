@@ -11,6 +11,8 @@ interface Props extends ModalProps {
   noPadding?: boolean;
   overflowHiddenDisabled?: boolean;
   background?: JSX.Element;
+  height?: string;
+  width?: string;
 }
 
 const ModalLayout = (props: Props) => {
@@ -21,21 +23,26 @@ const ModalLayout = (props: Props) => {
 
   return (
     <div
+      class={`${props.height || ""} ${props.width || ""}`}
+      classList={{
+        "h-full": !props.height,
+        "h-auto": !props.width
+      }}
       onClick={(e) => {
         e.stopPropagation();
       }}
     >
       <div
-        class={`relative flex flex-col h-fit w-fit bg-darkSlate-700 rounded-2xl ease-in-out origin-center duration-100 ${
+        class={`h-full relative flex flex-col bg-darkSlate-700 rounded-2xl ease-in-out origin-center duration-100 h-full ${
           props.class ?? ""
         }`}
         classList={{
-          "overflow-hidden": !props.overflowHiddenDisabled,
+          "overflow-hidden": !props.overflowHiddenDisabled
         }}
       >
         <Show when={props.background}>{props.background}</Show>
         <Show when={!props.noHeader}>
-          <div class="bg-darkSlate-800 flex justify-between items-center px-5 box-border h-12 rounded-t-2xl">
+          <div class="flex items-center bg-darkSlate-800 justify-between px-5 box-border h-12 rounded-t-2xl">
             <h3>{props.title}</h3>
             <div
               class="cursor-pointer text-darkSlate-500 h-5 w-5 i-ri:close-fill"
@@ -49,9 +56,9 @@ const ModalLayout = (props: Props) => {
           </div>
         </Show>
         <div
-          class="box-border h-full overflow-hidden z-10"
+          class="box-border overflow-hidden z-10 h-full"
           classList={{
-            "p-5": !props.noPadding,
+            "p-5": !props.noPadding
           }}
         >
           {c()}

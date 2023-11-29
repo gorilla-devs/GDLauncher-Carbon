@@ -1,4 +1,4 @@
-use std::{env, path::PathBuf};
+use std::{env, fs, path::PathBuf};
 
 pub(crate) async fn get_runtime_path_override() -> PathBuf {
     #[allow(unused_assignments)]
@@ -20,5 +20,10 @@ pub(crate) async fn get_runtime_path_override() -> PathBuf {
         }
     }
 
-    path.expect("Runtime path not found").join("data")
+    let data_path = path.expect("Runtime path not found");
+
+    fs::create_dir_all(&data_path)
+        .expect(format!("Failed to create data directory: {:?}", data_path).as_str());
+
+    dunce::canonicalize(data_path).unwrap()
 }

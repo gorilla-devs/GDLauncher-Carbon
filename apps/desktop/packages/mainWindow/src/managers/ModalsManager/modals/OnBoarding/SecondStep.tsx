@@ -11,15 +11,15 @@ const SecondStep = (props: Props) => {
   let setSettingsMutation = rspc.createMutation(["settings.setSettings"]);
   let settingsQuery = rspc.createQuery(() => ["settings.getSettings"]);
   return (
-    <div class="flex flex-col items-center justify-between w-160 h-140 box-border">
-      <div class="flex flex-col h-full justify-center">
-        <div class="flex items-center gap-4 w-[35rem] mb-10">
+    <div class="flex flex-col justify-between lg:w-160 h-full box-border">
+      <div class="flex flex-col min-h-60 justify-center">
+        <div class="flex items-center gap-4 w-100 lg:w-[35rem]">
           <p class="text-left text-darkSlate-100 m-0 font-normal w-fit leading-7">
             <Trans
               key="onboarding.java_title"
               options={{
                 defaultValue:
-                  "Do you want the launcher to automatically handle java for you? It will also download a managed java version if you don't have a correct one",
+                  "Do you want the launcher to automatically handle java for you? It will also download a managed java version if you don't have a correct one"
               }}
             />
           </p>

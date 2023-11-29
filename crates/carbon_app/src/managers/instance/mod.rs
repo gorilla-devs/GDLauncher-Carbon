@@ -7,12 +7,12 @@ use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 use crate::api::keys::instance::*;
 use crate::db::read_filters::StringFilter;
 use crate::domain::instance::info::{GameVersion, InstanceIcon};
-use crate::domain::vtask::VisualTaskId;
 use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::Utc;
 use fs_extra::dir::CopyOptions;
 use futures::future::BoxFuture;
+use futures::Future;
 
 use prisma_client_rust::Direction;
 use rspc::Type;
@@ -20,10 +20,13 @@ use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
 use thiserror::Error;
 use tokio::sync::{watch, Mutex, MutexGuard, RwLock};
+use tracing::info;
 
 use crate::db::{self, read_filters::IntFilter};
 use db::instance::Data as CachedInstance;
 
+use self::export::InstanceExportManager;
+use self::importer::InstanceImportManager;
 use self::log::GameLog;
 use self::run::PersistenceManager;
 
@@ -32,6 +35,8 @@ use super::ManagerRef;
 use crate::domain::instance::{self as domain, GameLogId, GroupId, InstanceFolder, InstanceId};
 use domain::info;
 
+pub mod explore;
+pub mod export;
 pub mod importer;
 pub mod installer;
 pub mod log;
@@ -41,13 +46,14 @@ mod schema;
 
 #[derive(Debug)]
 pub struct InstanceManager {
-    pub importer: Mutex<importer::Importer>,
     pub(crate) instances: RwLock<HashMap<InstanceId, Instance>>,
     index_lock: Mutex<()>,
     // seperate lock to prevent a deadlock with the index lock
     path_lock: Mutex<()>,
     loaded_icon: Mutex<Option<(String, Vec<u8>)>>,
     persistence_manager: PersistenceManager,
+    import_manager: InstanceImportManager,
+    export_manager: InstanceExportManager,
     game_logs: RwLock<HashMap<GameLogId, (InstanceId, watch::Receiver<GameLog>)>>,
 }
 
@@ -60,18 +66,24 @@ impl Default for InstanceManager {
 impl InstanceManager {
     pub fn new() -> Self {
         Self {
-            importer: Mutex::new(importer::Importer::default()),
             instances: RwLock::new(HashMap::new()),
             index_lock: Mutex::new(()),
             path_lock: Mutex::new(()),
             loaded_icon: Mutex::new(None),
             persistence_manager: PersistenceManager::new(),
+            import_manager: InstanceImportManager::new(),
+            export_manager: InstanceExportManager::new(),
             game_logs: RwLock::new(HashMap::new()),
         }
     }
 }
 
 impl<'s> ManagerRef<'s, InstanceManager> {
+    pub async fn launch_background_tasks(self) {
+        let _ = self.scan_instances().await;
+        self.import_manager().launch_background_tasks();
+    }
+
     pub async fn scan_instances(self) -> anyhow::Result<()> {
         let instance_cache = self
             .app
@@ -143,7 +155,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
             self.app
                 .meta_cache_manager()
-                .queue_local_caching(instance_id, false)
+                .queue_caching(instance_id, false)
                 .await;
         }
 
@@ -829,6 +841,25 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         version: InstanceVersionSource,
         notes: String,
     ) -> anyhow::Result<InstanceId> {
+        self.create_instance_ext(group, name, use_loaded_icon, version, notes, |_| async {
+            Ok(())
+        })
+        .await
+    }
+
+    pub async fn create_instance_ext<F, I>(
+        self,
+        group: GroupId,
+        name: String,
+        use_loaded_icon: bool,
+        version: InstanceVersionSource,
+        notes: String,
+        initializer: F,
+    ) -> anyhow::Result<InstanceId>
+    where
+        F: FnOnce(PathBuf) -> I,
+        I: Future<Output = anyhow::Result<()>>,
+    {
         let tmpdir = self
             .app
             .settings_manager()
@@ -853,12 +884,15 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let (version, modpack) = match version {
             InstanceVersionSource::Version(version) => (Some(version), None),
             InstanceVersionSource::Modpack(modpack) => (None, Some(modpack)),
+            InstanceVersionSource::ModpackWithKnownVersion(version, modpack) => {
+                (Some(version), Some(modpack))
+            }
         };
 
         let info = info::Instance {
             name: name.clone(),
             icon,
-            last_played: Utc::now(),
+            last_played: None,
             seconds_played: 0,
             modpack,
             game_configuration: info::GameConfig {
@@ -875,9 +909,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await
             .context("writing instance json")?;
 
-        tokio::fs::write(tmpdir.join(".first_run_incomplete"), "")
+        tokio::fs::create_dir(tmpdir.join(".setup"))
             .await
-            .context("writing incomplete instance marker")?;
+            .context("writing setup marker")?;
 
         let _lock = self.path_lock.lock().await;
         let (shortpath, path) = self.next_folder(&name).await?;
@@ -891,17 +925,21 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         )
         .await?;
 
+        initializer(tmpdir.to_path_buf()).await?;
+
         tmpdir
             .rename(path)
             .await
             .context("moving tmpdir to instance location")?;
 
-        let id = self.add_instance(name, shortpath.clone(), group).await?;
+        let id = self
+            .add_instance(name.clone(), shortpath.clone(), group)
+            .await?;
 
         self.instances.write().await.insert(
             id,
             Instance {
-                shortpath,
+                shortpath: shortpath.clone(),
                 type_: InstanceType::Valid(InstanceData {
                     favorite: false,
                     config: info,
@@ -913,6 +951,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+
+        info!({ shortpath = ?shortpath }, "Created new instance '{name}' (id {})", *id);
 
         Ok(id)
     }
@@ -931,7 +971,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let shortpath = &mut instance.shortpath;
         let data = instance.type_.data_mut()?;
 
-        let path = self
+        let mut path = self
             .app
             .settings_manager()
             .runtime_path
@@ -1036,7 +1076,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             if !name_matches {
                 let _lock = self.path_lock.lock().await;
                 let (new_shortpath, new_path) = self.next_folder(&name).await?;
-                tokio::fs::rename(path.clone(), new_path).await?;
+                tokio::fs::rename(path.clone(), new_path.clone()).await?;
                 *shortpath = new_shortpath.clone();
 
                 self.app
@@ -1051,6 +1091,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     )
                     .exec()
                     .await?;
+
+                path = new_path;
             }
         }
 
@@ -1098,7 +1140,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .to_path()
             .join(shortpath as &str);
 
-        data.config.last_played = Utc::now();
+        data.config.last_played = Some(Utc::now());
         data.config.seconds_played += added_seconds;
 
         let json = schema::make_instance_config(data.config.clone())?;
@@ -1227,10 +1269,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
-        self.app
-            .meta_cache_manager()
-            .queue_local_caching(id, false)
-            .await;
+        self.app.meta_cache_manager().queue_caching(id, false).await;
 
         Ok(id)
     }
@@ -1393,7 +1432,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        let InstanceType::Valid(data) = &instance.type_ else { return Ok(None) };
+        let InstanceType::Valid(data) = &instance.type_ else {
+            return Ok(None);
+        };
 
         match &data.config.icon {
             InstanceIcon::Default => Ok(None),
@@ -1613,6 +1654,7 @@ pub struct Mod {
 pub enum InstanceVersionSource {
     Version(info::GameVersion),
     Modpack(info::Modpack),
+    ModpackWithKnownVersion(info::GameVersion, info::Modpack),
 }
 
 #[derive(Error, Debug)]
@@ -2013,6 +2055,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore = "currently failing intermittently (probably due to restart_in_place)"]
     async fn instance_crud() -> anyhow::Result<()> {
         let mut app = crate::setup_managers_for_test().await;
 

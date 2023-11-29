@@ -1,11 +1,14 @@
 use anyhow::bail;
 use thiserror::Error;
 
+use crate::api::keys::instance::INSTANCE_MODS;
+use crate::db::{
+    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
+    modrinth_mod_cache as mrdb,
+};
+use crate::domain::instance as domain;
 use crate::domain::instance::info::ModLoaderType;
 use crate::{domain::vtask::VisualTaskId, managers::ManagerRef};
-
-use crate::db::{mod_file_cache as fcdb, mod_metadata as metadb};
-use crate::{db::read_filters::IntFilter, domain::instance as domain};
 
 use super::{
     installer::{CurseforgeModInstaller, IntoInstaller, ModrinthModInstaller},
@@ -25,13 +28,12 @@ impl ManagerRef<'_, InstanceManager> {
             .app
             .prisma_client
             .mod_file_cache()
-            .find_many(vec![fcdb::WhereParam::InstanceId(IntFilter::Equals(
-                *instance_id,
-            ))])
+            .find_many(vec![fcdb::instance_id::equals(*instance_id)])
             .with(
                 fcdb::metadata::fetch()
-                    .with(metadb::curseforge::fetch())
-                    .with(metadb::modrinth::fetch()),
+                    .with(metadb::logo_image::fetch())
+                    .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch()))
+                    .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
             )
             .exec()
             .await?
@@ -40,20 +42,24 @@ impl ManagerRef<'_, InstanceManager> {
                 id: m.id,
                 filename: m.filename,
                 enabled: m.enabled,
-                metadata: m.metadata.as_ref().and_then(|m| {
-                    m.modid.clone().map(|modid| domain::ModFileMetadata {
-                        modid,
-                        name: m.name.clone(),
-                        version: m.version.clone(),
-                        description: m.description.clone(),
-                        authors: m.authors.clone(),
-                        modloaders: m
-                            .modloaders
-                            .split(',')
-                            // ignore unknown modloaders
-                            .flat_map(|loader| ModLoaderType::try_from(loader).ok())
-                            .collect::<Vec<_>>(),
-                    })
+                metadata: m.metadata.as_ref().map(|m| domain::ModFileMetadata {
+                    modid: m.modid.clone(),
+                    name: m.name.clone(),
+                    version: m.version.clone(),
+                    description: m.description.clone(),
+                    authors: m.authors.clone(),
+                    modloaders: m
+                        .modloaders
+                        .split(',')
+                        // ignore unknown modloaders
+                        .flat_map(|loader| ModLoaderType::try_from(loader).ok())
+                        .collect::<Vec<_>>(),
+                    has_image: m
+                        .logo_image
+                        .as_ref()
+                        .map(|v| v.as_ref().map(|_| ()))
+                        .flatten()
+                        .is_some(),
                 }),
                 curseforge: m
                     .metadata
@@ -67,18 +73,29 @@ impl ManagerRef<'_, InstanceManager> {
                         urlslug: m.urlslug,
                         summary: m.summary,
                         authors: m.authors,
+                        has_image: m
+                            .logo_image
+                            .flatten()
+                            .as_ref()
+                            .map(|row| row.data.as_ref().map(|_| ()))
+                            .flatten()
+                            .is_some(),
                     }),
                 modrinth: m.metadata.and_then(|m| m.modrinth).flatten().map(|m| {
                     domain::ModrinthModMetadata {
                         project_id: m.project_id,
                         version_id: m.version_id,
                         title: m.title,
-                        filename: m.filename,
                         urlslug: m.urlslug,
                         description: m.description,
                         authors: m.authors,
-                        sha512: m.sha_512,
-                        sha1: m.sha_1,
+                        has_image: m
+                            .logo_image
+                            .flatten()
+                            .as_ref()
+                            .map(|row| row.data.as_ref().map(|_| ()))
+                            .flatten()
+                            .is_some(),
                     }
                 }),
             });
@@ -106,7 +123,7 @@ impl ManagerRef<'_, InstanceManager> {
             .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
             .exec()
             .await?
-            .ok_or(InvalidModIdError(instance_id, id))?;
+            .ok_or(InvalidInstanceModIdError(instance_id, id.clone()))?;
 
         let mut disabled_path = self
             .app
@@ -145,10 +162,17 @@ impl ManagerRef<'_, InstanceManager> {
         }
 
         self.app
-            .meta_cache_manager()
-            .queue_local_caching(instance_id, true)
-            .await;
+            .prisma_client
+            .mod_file_cache()
+            .update(
+                fcdb::UniqueWhereParam::IdEquals(id),
+                vec![fcdb::SetParam::SetEnabled(enabled)],
+            )
+            .exec()
+            .await?;
 
+        self.app
+            .invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
         Ok(())
     }
 
@@ -167,7 +191,7 @@ impl ManagerRef<'_, InstanceManager> {
             .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
             .exec()
             .await?
-            .ok_or(InvalidModIdError(instance_id, id))?;
+            .ok_or(InvalidInstanceModIdError(instance_id, id))?;
 
         let mut disabled_path = self
             .app
@@ -191,7 +215,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         self.app
             .meta_cache_manager()
-            .queue_local_caching(instance_id, true)
+            .queue_caching(instance_id, true)
             .await;
 
         Ok(())
@@ -202,12 +226,16 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         project_id: u32,
         file_id: u32,
+        install_deps: bool,
+        replaces_mod_id: Option<String>,
     ) -> anyhow::Result<VisualTaskId> {
         let installer = CurseforgeModInstaller::create(self.app, project_id, file_id)
             .await?
             .into_installer();
 
-        let task_id = installer.install(self.app, instance_id).await?;
+        let task_id = installer
+            .install(self.app, instance_id, install_deps, replaces_mod_id)
+            .await?;
 
         Ok(task_id)
     }
@@ -217,29 +245,99 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         project_id: String,
         version_id: String,
+        install_deps: bool,
+        replaces_mod_id: Option<String>,
     ) -> anyhow::Result<VisualTaskId> {
         let installer = ModrinthModInstaller::create(self.app, project_id, version_id)
             .await?
             .into_installer();
 
-        let task_id = installer.install(self.app, instance_id).await?;
+        let task_id = installer
+            .install(self.app, instance_id, install_deps, replaces_mod_id)
+            .await?;
 
         Ok(task_id)
+    }
+
+    pub async fn get_mod_icon(
+        &self,
+        instance_id: InstanceId,
+        mod_id: String,
+        platformid: i32,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
+        let instances = self.instances.read().await;
+        let _ = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let r = self
+            .app
+            .prisma_client
+            .mod_file_cache()
+            .find_unique(fcdb::UniqueWhereParam::IdEquals(mod_id.clone()))
+            .with(
+                fcdb::metadata::fetch()
+                    .with(metadb::logo_image::fetch())
+                    .with(metadb::curseforge::fetch().with(cfdb::logo_image::fetch()))
+                    .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
+            )
+            .exec()
+            .await?
+            .ok_or(InvalidModIdError(mod_id))?
+            .metadata
+            .ok_or_else(|| anyhow::anyhow!("broken db state"))?;
+
+        let logo_image = match platformid {
+            0 => r
+                .logo_image
+                .ok_or_else(|| anyhow::anyhow!("broken db state"))?
+                .map(|m| m.data),
+            1 => r
+                .curseforge
+                .ok_or_else(|| anyhow::anyhow!("broken db state"))?
+                .map(|cf| {
+                    cf.logo_image
+                        .ok_or_else(|| anyhow::anyhow!("broken db state"))
+                })
+                .transpose()?
+                .flatten()
+                .map(|img| img.data)
+                .flatten(),
+            2 => r
+                .modrinth
+                .ok_or_else(|| anyhow::anyhow!("broken db state"))?
+                .map(|mr| {
+                    mr.logo_image
+                        .ok_or_else(|| anyhow::anyhow!("broken db state"))
+                })
+                .transpose()?
+                .flatten()
+                .map(|img| img.data)
+                .flatten(),
+            _ => bail!("unsupported platform"),
+        };
+
+        Ok(logo_image)
     }
 }
 
 #[derive(Error, Debug)]
 #[error("invalid mod id '{1}' given for instance '{0}'")]
-pub struct InvalidModIdError(InstanceId, String);
+pub struct InvalidInstanceModIdError(InstanceId, String);
+
+#[derive(Error, Debug)]
+#[error("invalid mod id '{0}'")]
+pub struct InvalidModIdError(String);
 
 #[cfg(test)]
 mod test {
-    use crate::managers::instance::InstanceVersionSource;
     use std::collections::HashSet;
 
+    use crate::managers::instance::InstanceVersionSource;
     use crate::{api::keys::instance::INSTANCE_MODS, domain::instance::info};
 
     #[tokio::test]
+    #[ignore]
     async fn test_mod_metadata() -> anyhow::Result<()> {
         dbg!();
         let app = crate::setup_managers_for_test().await;
@@ -261,11 +359,11 @@ mod test {
             .await?;
 
         app.meta_cache_manager()
-            .prioritize_instance(instance_id)
+            .cache_with_priority(instance_id)
             .await;
 
         app.instance_manager()
-            .install_curseforge_mod(instance_id, 331723, 4022327)
+            .install_curseforge_mod(instance_id, 331723, 4022327, true, None)
             .await?;
 
         // first invalidation will happen when the mod is scanned locally

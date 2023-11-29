@@ -18,56 +18,56 @@ const resourcePacks: IResourcepack[] = [
     enabled: true,
     mcversion: "1.19.2",
     modloaderVersion: "2.1.3",
-    resourcePackVersion: "1.17",
+    resourcePackVersion: "1.17"
   },
   {
     title: "Mods2",
     enabled: true,
     mcversion: "1.19.2",
     modloaderVersion: "2.1.3",
-    resourcePackVersion: "1.15",
+    resourcePackVersion: "1.15"
   },
   {
     title: "Mods3",
     enabled: true,
     mcversion: "1.19.2",
     modloaderVersion: "2.1.3",
-    resourcePackVersion: "1.15",
+    resourcePackVersion: "1.15"
   },
   {
     title: "Mods4",
     enabled: true,
     mcversion: "1.19.2",
     modloaderVersion: "2.1.3",
-    resourcePackVersion: "1.14",
+    resourcePackVersion: "1.14"
   },
   {
     title: "Mods5",
     enabled: true,
     mcversion: "1.19.2",
     modloaderVersion: "2.1.3",
-    resourcePackVersion: "1.17",
+    resourcePackVersion: "1.17"
   },
   {
     title: "Mods6",
     enabled: true,
     mcversion: "1.19.2",
     modloaderVersion: "2.1.3",
-    resourcePackVersion: "1.17",
+    resourcePackVersion: "1.17"
   },
   {
     title: "Mods7",
     enabled: true,
     mcversion: "1.19.2",
     modloaderVersion: "2.1.3",
-    resourcePackVersion: "1.17",
+    resourcePackVersion: "1.17"
   },
   {
     title: "Mods8",
     enabled: true,
     mcversion: "1.19.2",
     modloaderVersion: "2.1.3",
-    resourcePackVersion: "1.17",
+    resourcePackVersion: "1.17"
   },
   {
     title: "Mods9",
@@ -75,50 +75,50 @@ const resourcePacks: IResourcepack[] = [
     mcversion: "1.19.2",
     modloaderVersion: "2.1.3",
 
-    resourcePackVersion: "1.17",
+    resourcePackVersion: "1.17"
   },
   {
     title: "Mods8",
     enabled: true,
     mcversion: "1.19.2",
     modloaderVersion: "2.1.3",
-    resourcePackVersion: "1.17",
+    resourcePackVersion: "1.17"
   },
   {
     title: "Mods9",
     enabled: true,
     mcversion: "1.19.2",
     modloaderVersion: "2.1.3",
-    resourcePackVersion: "1.17",
+    resourcePackVersion: "1.17"
   },
   {
     title: "Mods8",
     enabled: true,
     mcversion: "1.19.2",
     modloaderVersion: "2.1.3",
-    resourcePackVersion: "1.17",
+    resourcePackVersion: "1.17"
   },
   {
     title: "Mods9",
     enabled: true,
     mcversion: "1.19.2",
     modloaderVersion: "2.1.3",
-    resourcePackVersion: "1.17",
+    resourcePackVersion: "1.17"
   },
   {
     title: "Mods8",
     enabled: true,
     mcversion: "1.19.2",
     modloaderVersion: "2.1.3",
-    resourcePackVersion: "1.17",
+    resourcePackVersion: "1.17"
   },
   {
     title: "Mods9",
     enabled: true,
     mcversion: "1.19.2",
     modloaderVersion: "2.1.3",
-    resourcePackVersion: "1.17",
-  },
+    resourcePackVersion: "1.17"
+  }
 ];
 
 const NoResourcePacks = () => {
@@ -131,7 +131,7 @@ const NoResourcePacks = () => {
             key="instance.no_resource_packs_text"
             options={{
               defaultValue:
-                "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder",
+                "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder"
             }}
           />
         </p>
@@ -139,7 +139,7 @@ const NoResourcePacks = () => {
           <Trans
             key="instance.add_resource_pack"
             options={{
-              defaultValue: "+ Add pack",
+              defaultValue: "+ Add pack"
             }}
           />
         </Button>
@@ -165,14 +165,14 @@ const ResourcePacks = () => {
               <Trans
                 key="instance.sort_by"
                 options={{
-                  defaultValue: "Sort by:",
+                  defaultValue: "Sort by:"
                 }}
               />
             </p>
             <Dropdown
               options={[
                 { label: t("instance.sort_by_asc"), key: "asc" },
-                { label: t("instance.sort_by_desc"), key: "desc" },
+                { label: t("instance.sort_by_desc"), key: "desc" }
               ]}
               value={"asc"}
               rounded
@@ -182,7 +182,7 @@ const ResourcePacks = () => {
             <Trans
               key="instance.add_resource_pack_pack"
               options={{
-                defaultValue: "+ Add ResourcePack",
+                defaultValue: "+ Add ResourcePack"
               }}
             />
           </Button>
@@ -194,7 +194,7 @@ const ResourcePacks = () => {
               <Trans
                 key="instance.select_all_resource_pack"
                 options={{
-                  defaultValue: "Select All",
+                  defaultValue: "Select All"
                 }}
               />
             </div>
@@ -203,7 +203,7 @@ const ResourcePacks = () => {
               <Trans
                 key="instance.open_resource_packs_folder"
                 options={{
-                  defaultValue: "Open folder",
+                  defaultValue: "Open folder"
                 }}
               />
             </div>
@@ -212,7 +212,7 @@ const ResourcePacks = () => {
               <Trans
                 key="instance.disable_resource_pack"
                 options={{
-                  defaultValue: "disable",
+                  defaultValue: "disable"
                 }}
               />
             </div>
@@ -221,7 +221,7 @@ const ResourcePacks = () => {
               <Trans
                 key="instance.delete_resource_pack"
                 options={{
-                  defaultValue: "delete",
+                  defaultValue: "delete"
                 }}
               />
             </div>
@@ -231,7 +231,7 @@ const ResourcePacks = () => {
             <Trans
               key="instance.resource_packs"
               options={{
-                defaultValue: "Resource packs",
+                defaultValue: "Resource packs"
               }}
             />
           </div>

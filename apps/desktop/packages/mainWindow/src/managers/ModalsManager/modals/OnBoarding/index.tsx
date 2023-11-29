@@ -8,27 +8,27 @@ import FirstStep from "./FirstStep";
 import { useTransContext } from "@gd/i18n";
 import mcCubes from "/assets/images/icons/mc-cubes.png";
 
+const [currentStep, setCurrentStep] = createSignal(0);
+export { currentStep, setCurrentStep };
 const OnBoarding = (props: ModalProps) => {
   const [t] = useTransContext();
-
-  const [currentStep, setCurrentStep] = createSignal(0);
 
   const onBoardingSteps = [
     {
       label: t("introduction"),
       icon: <div>1</div>,
-      onClick: () => setCurrentStep(0),
+      onClick: () => setCurrentStep(0)
     },
     {
       label: t("handle_java"),
       icon: <div>2</div>,
-      onClick: () => setCurrentStep(1),
+      onClick: () => setCurrentStep(1)
     },
     {
       label: t("import_instances"),
       icon: <div>3</div>,
-      onClick: () => setCurrentStep(2),
-    },
+      onClick: () => setCurrentStep(2)
+    }
   ];
 
   const nextStep = () => {
@@ -50,21 +50,23 @@ const OnBoarding = (props: ModalProps) => {
         />
       }
     >
-      <div class="select-none w-160 box-border h-145">
-        <div class="max-w-70 mx-auto">
+      <div class="select-none box-border lg:w-160 h-full flex flex-col">
+        <div class="w-full h-15 max-w-70 mx-auto">
           <Steps steps={onBoardingSteps} currentStep={currentStep()} />
         </div>
-        <Switch>
-          <Match when={currentStep() === 0}>
-            <FirstStep nextStep={nextStep} />
-          </Match>
-          <Match when={currentStep() === 1}>
-            <SecondStep nextStep={nextStep} prevStep={prevStep} />
-          </Match>
-          <Match when={currentStep() === 2}>
-            <ThirdStep prevStep={prevStep} />
-          </Match>
-        </Switch>
+        <div class="h-full">
+          <Switch>
+            <Match when={currentStep() === 0}>
+              <FirstStep nextStep={nextStep} />
+            </Match>
+            <Match when={currentStep() === 1}>
+              <SecondStep nextStep={nextStep} prevStep={prevStep} />
+            </Match>
+            <Match when={currentStep() === 2}>
+              <ThirdStep prevStep={prevStep} />
+            </Match>
+          </Switch>
+        </div>
       </div>
     </ModalLayout>
   );

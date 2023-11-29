@@ -459,7 +459,6 @@ pub struct CFFEMinecraftModLoaderIndex {
     pub latest: bool,
     pub recommended: bool,
     pub date_modified: String, // date-time
-    pub mod_loader_type: CFFEModLoaderType,
 }
 
 impl From<mpcf::MinecraftModLoaderIndex> for CFFEMinecraftModLoaderIndex {
@@ -470,7 +469,6 @@ impl From<mpcf::MinecraftModLoaderIndex> for CFFEMinecraftModLoaderIndex {
             latest: minecraft_mod_loader_index.latest,
             recommended: minecraft_mod_loader_index.recommended,
             date_modified: minecraft_mod_loader_index.date_modified,
-            mod_loader_type: minecraft_mod_loader_index.mod_loader_type.into(),
         }
     }
 }
@@ -857,15 +855,15 @@ impl From<mpcf::GameVersionTypeStatus> for CFFEGameVersionTypeStatus {
 }
 
 #[derive(Type, Debug, Deserialize, Serialize, EnumIter)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "lowercase")]
 pub enum CFFEModLoaderType {
     Forge,
-    NeoForge,
+    Neoforge,
     Cauldron,
     LiteLoader,
     Fabric,
     Quilt,
-    Other(u8),
+    Unknown,
 }
 
 use mpcf::ModLoaderType as CFModLoaderType;
@@ -873,12 +871,12 @@ impl From<CFModLoaderType> for CFFEModLoaderType {
     fn from(minecraft_mod_loader_type: CFModLoaderType) -> Self {
         match minecraft_mod_loader_type {
             CFModLoaderType::Forge => CFFEModLoaderType::Forge,
-            CFModLoaderType::NeoForge => CFFEModLoaderType::NeoForge,
+            CFModLoaderType::NeoForge => CFFEModLoaderType::Neoforge,
             CFModLoaderType::Cauldron => CFFEModLoaderType::Cauldron,
             CFModLoaderType::LiteLoader => CFFEModLoaderType::LiteLoader,
             CFModLoaderType::Fabric => CFFEModLoaderType::Fabric,
             CFModLoaderType::Quilt => CFFEModLoaderType::Quilt,
-            CFModLoaderType::Other(other) => CFFEModLoaderType::Other(other),
+            CFModLoaderType::Other(_) => CFFEModLoaderType::Unknown,
         }
     }
 }
@@ -887,12 +885,12 @@ impl From<CFFEModLoaderType> for CFModLoaderType {
     fn from(minecraft_mod_loader_type: CFFEModLoaderType) -> CFModLoaderType {
         match minecraft_mod_loader_type {
             CFFEModLoaderType::Forge => CFModLoaderType::Forge,
-            CFFEModLoaderType::NeoForge => CFModLoaderType::NeoForge,
+            CFFEModLoaderType::Neoforge => CFModLoaderType::NeoForge,
             CFFEModLoaderType::Cauldron => CFModLoaderType::Cauldron,
             CFFEModLoaderType::LiteLoader => CFModLoaderType::LiteLoader,
             CFFEModLoaderType::Fabric => CFModLoaderType::Fabric,
             CFFEModLoaderType::Quilt => CFModLoaderType::Quilt,
-            CFFEModLoaderType::Other(other) => CFModLoaderType::Other(other),
+            CFFEModLoaderType::Unknown => CFModLoaderType::Other(0),
         }
     }
 }

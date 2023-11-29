@@ -1,4 +1,4 @@
-import { logsObj, setLogsObj } from "@/utils/logs";
+import { LogEntryLevel, logsObj, setLogsObj } from "@/utils/logs";
 import { port } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import { useParams, useRouteData } from "@solidjs/router";
@@ -11,7 +11,7 @@ import {
   createResource,
   createSignal,
   onCleanup,
-  onMount,
+  onMount
 } from "solid-js";
 import fetchData from "../../instance.logs.data";
 import { getRunningState } from "@/utils/instances";
@@ -91,11 +91,7 @@ const Logs = () => {
   const instanceLogss = () => logsObj[instanceId()] || [];
 
   const copyLogsToClipboard = () => {
-    const joinedLines = instanceLogss()
-      .map((log) => log.line)
-      .join("");
-
-    window.copyToClipboard(joinedLines);
+    window.copyToClipboard(JSON.stringify(instanceLogss()));
     setLogsCopied(true);
   };
 
@@ -174,11 +170,46 @@ const Logs = () => {
           <Match when={(instanceLogss().length || 0) > 0}>
             <For each={instanceLogss()}>
               {(log) => {
+                let levelColorClass = "";
+
+                switch (log.level) {
+                  case LogEntryLevel.Trace: {
+                    levelColorClass = "text-gray-500";
+
+                    break;
+                  }
+                  case LogEntryLevel.Debug: {
+                    levelColorClass = "text-orange-500";
+
+                    break;
+                  }
+                  case LogEntryLevel.Info: {
+                    levelColorClass = "text-green-500";
+
+                    break;
+                  }
+                  case LogEntryLevel.Warn: {
+                    levelColorClass = "text-text-500";
+
+                    break;
+                  }
+                  case LogEntryLevel.Error: {
+                    levelColorClass = "text-red-500";
+
+                    break;
+                  }
+                }
+
                 return (
                   <div class="flex flex-col justify-center items-center w-full overflow-x-auto scrollbar-hide">
                     <pre class="m-0 w-full box-border leading-8">
                       <code class="text-darkSlate-50 text-sm select-text">
-                        {log?.line}
+                        <span class={levelColorClass}>
+                          [{log.level.toUpperCase()}]
+                        </span>{" "}
+                        {log.logger}@{log.thread}
+                        {": "}
+                        {log?.message}
                       </code>
                     </pre>
                   </div>
@@ -192,7 +223,7 @@ const Logs = () => {
                 <Trans
                   key="logs.no_logs"
                   options={{
-                    defaultValue: "No logs",
+                    defaultValue: "No logs"
                   }}
                 />
               </p>

@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
   const isDev = mode === "development";
 
   const definitions = {
-    __APP_VERSION__: JSON.stringify(appVersion),
+    __APP_VERSION__: JSON.stringify(appVersion)
   };
 
   if (isDev) {
@@ -24,8 +24,8 @@ export default defineConfig(({ mode }) => {
     envDir: resolve(__dirname, "../../../../"),
     resolve: {
       alias: {
-        electron: "@overwolf/ow-electron",
-      },
+        electron: "@overwolf/ow-electron"
+      }
     },
     define: definitions,
     build: {
@@ -33,7 +33,7 @@ export default defineConfig(({ mode }) => {
       lib: {
         entry: "index.ts",
         formats: ["cjs"],
-        fileName: () => "[name].cjs",
+        fileName: () => "[name].cjs"
       },
       minify: process.env./* from mode option */ NODE_ENV === "production",
       emptyOutDir: true,
@@ -41,10 +41,10 @@ export default defineConfig(({ mode }) => {
         external: [
           "electron",
           "@overwolf/ow-electron",
-          ...builtinModules,
+          ...builtinModules
           // ...Object.keys(pkg.dependencies || {}),
-        ],
-      },
-    },
+        ]
+      }
+    }
   };
 });

@@ -14,7 +14,7 @@ import {
   ModrinthModpack,
   ModpackPlatform,
   CFFECategory,
-  MRFECategory,
+  MRFECategory
 } from "@gd/core_module/bindings";
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg";
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg";
@@ -179,7 +179,7 @@ export const isProgressKnown = (
 export const isProgressFailed = (
   progress: Progress
 ): progress is { Failed: FeError } => {
-  return (progress as { Failed: FeError }).Failed !== undefined;
+  return (progress as { Failed: FeError })?.Failed !== undefined;
 };
 
 export const isModpackCurseforge = (
@@ -211,6 +211,24 @@ export const fetchImage = async (id: number) => {
   if (!imageNotPresent) {
     return imageUrl;
   } else return "";
+};
+
+export const getModImageUrl = (
+  instanceId: string,
+  modId: string,
+  platform: string | null
+) => {
+  return `http://localhost:${port}/instance/modIcon?instance_id=${instanceId}&mod_id=${modId}&platform=${platform}`;
+};
+
+export const getUrlType = (url: string) => {
+  return url.match(
+    /^\/(modpacks|mods)\/[a-zA-Z0-9]+\/(curseforge|modrinth)(\/[^/]+)*$/
+  )
+    ? url.match(/mods/)
+      ? "mods"
+      : "modpacks"
+    : null;
 };
 
 export interface InvalidInstanceType extends Omit<UngroupedInstance, "status"> {
@@ -255,13 +273,19 @@ export const CategoryIcon = (props: {
       fallback={
         <div>
           <Show when={getCategoryIcon(props.category)}>
-            <div class="w-4 h-4" innerHTML={getCategoryIcon(props.category)} />
+            <div
+              class="w-4 h-4"
+              innerHTML={getCategoryIcon(props.category) as string | undefined}
+            />
           </Show>
         </div>
       }
     >
       <Match when={"iconUrl" in props.category}>
-        <img class="h-4 w-4" src={getCategoryIcon(props.category)} />
+        <img
+          class="h-4 w-4"
+          src={getCategoryIcon(props.category) as string | undefined}
+        />
       </Match>
     </Switch>
   );

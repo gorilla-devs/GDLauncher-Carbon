@@ -5,7 +5,6 @@ import initThemes from "./utils/theme";
 import { rspc } from "@/utils/rspcClient";
 import { useModal } from "./managers/ModalsManager";
 import { useKeyDownEvent } from "@solid-primitives/keyboard";
-import initAnalytics from "@/utils/analytics";
 import { checkForUpdates } from "./utils/updater";
 
 type Props = {
@@ -22,7 +21,6 @@ const App = (props: Props) => {
 
   initThemes();
 
-  initAnalytics();
   checkForUpdates();
 
   const setIsFirstRun = rspc.createMutation(["settings.setSettings"]);
@@ -54,7 +52,7 @@ const App = (props: Props) => {
   return (
     <div class="relative w-screen select-none">
       <div class="w-screen flex z-10 h-auto">
-        <main class="relative flex-1">
+        <main class="relative flex-grow max-w-screen">
           {/* <Suspense fallback={<></>}> */}
           <Route />
           {/* </Suspense> */}

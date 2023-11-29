@@ -1,11 +1,19 @@
 import { Dropdown, createNotification } from "@gd/ui";
-import { createSignal, Switch, Match, Show, createEffect } from "solid-js";
+import {
+  createSignal,
+  Switch,
+  Match,
+  Show,
+  createEffect,
+  getOwner,
+  runWithOwner
+} from "solid-js";
 import Auth from "./Auth";
 import CodeStep from "./CodeStep";
 import fetchData from "./auth.login.data";
 import { Navigate, useRouteData } from "@solidjs/router";
 import { supportedLanguages, useTransContext } from "@gd/i18n";
-import { queryClient, rspc } from "@/utils/rspcClient";
+import { rspc } from "@/utils/rspcClient";
 import TermsAndConditions from "./TermsAndConditions";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 import { handleStatus } from "@/utils/login";
@@ -18,6 +26,7 @@ export type DeviceCodeObjectType = {
 };
 
 export default function Login() {
+  const owner = getOwner();
   const [step, setStep] = createSignal<number>(0);
   const [deviceCodeObject, setDeviceCodeObject] =
     createSignal<DeviceCodeObjectType | null>(null);
@@ -30,15 +39,8 @@ export default function Login() {
     routeData.accounts.data?.length! > 0 &&
     routeData.settings.data?.termsAndPrivacyAccepted;
 
-  const settingsMutation = rspc.createMutation(["settings.setSettings"], {
-    onMutate: (newSettings) => {
-      if (newSettings.language) changeLanguage(newSettings.language as string);
-      queryClient.setQueryData(["settings.getSettings"], newSettings);
-    },
-  });
-
   const accountEnrollFinalizeMutation = rspc.createMutation([
-    "account.enroll.finalize",
+    "account.enroll.finalize"
   ]);
 
   const nextStep = () => {
@@ -61,7 +63,7 @@ export default function Login() {
         setDeviceCodeObject({
           userCode: info.userCode,
           link: info.verificationUri,
-          expiresAt: info.expiresAt,
+          expiresAt: info.expiresAt
         });
         if (routeData.status.data) setStep(2);
       },
@@ -71,7 +73,7 @@ export default function Login() {
       },
       onComplete() {
         accountEnrollFinalizeMutation.mutate(undefined);
-      },
+      }
     });
   });
 
@@ -88,11 +90,11 @@ export default function Login() {
         <div class="flex justify-center items-center w-full p-0 h-screen bg-img-loginBG.jpg">
           <div
             style={{
-              "mix-blend-mode": "hard-light",
+              "mix-blend-mode": "hard-light"
             }}
             class="absolute left-0 right-0 bg-darkSlate-800 bottom-0 top-0 opacity-80"
           />
-          <div class="absolute top-0 z-10 left-1/2 -translate-x-1/2 top-5">
+          <div class="fixed right-6 bottom-6">
             <Dropdown
               value={routeData.settings.data?.language}
               options={Object.keys(supportedLanguages).map((lang) => ({
@@ -101,10 +103,12 @@ export default function Login() {
                     {t(`languages:${lang}_native`)} {t(`languages:${lang}`)}
                   </div>
                 ),
-                key: lang,
+                key: lang
               }))}
               onChange={(lang) => {
-                settingsMutation.mutate({ language: lang.key as string });
+                runWithOwner(owner, () => {
+                  changeLanguage(lang.key as string);
+                });
               }}
               rounded
             />
@@ -113,12 +117,12 @@ export default function Login() {
             class="flex flex-col items-center text-white relative justify-end rounded-2xl h-110"
             style={{
               background: "rgba(29, 32, 40, 0.8)",
-              "justify-content": step() === 1 ? "flex-end" : "center",
+              "justify-content": step() === 1 ? "flex-end" : "center"
             }}
             classList={{
               "overflow-hidden": step() === 2,
               "w-140": step() !== 0,
-              "max-w-160": step() === 0,
+              "max-w-160": step() === 0
             }}
           >
             <Show when={step() === 0}>

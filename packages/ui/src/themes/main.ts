@@ -83,6 +83,8 @@ const mainTheme: Theme = {
   "green-700": "hsla(126, 60%, 32%, 1)",
   "green-800": "hsla(126, 60%, 28%, 1)",
   "green-900": "hsla(126, 60%, 24%, 1)",
+  "brands-curseforge": "#f16436",
+  "brands-modrinth": "#1bd96a",
 };
 
 export { mainTheme };

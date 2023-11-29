@@ -1,3 +1,4 @@
+use serde::Serialize;
 use std::{
     ops::{Bound, RangeBounds},
     sync::atomic::{AtomicI32, Ordering},
@@ -14,185 +15,143 @@ use crate::{
 
 use super::InstanceManager;
 
-#[derive(Debug)]
-pub struct GameLog {
-    // buffer holding the full log
-    log: String,
-    lines: Vec<Option<InternalLogEntry>>,
-    last_entry: usize,
-    last_was_terminated: bool,
+#[derive(Debug, Default)]
+pub struct GameLog(Vec<LogEntry>);
+
+/// Represents a log entry.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LogEntry {
+    /// The source of the log entry.
+    pub source_kind: LogEntrySourceKind,
+    /// The name of the logger that emitted this entry.
+    pub logger: String,
+    /// The timestamp the entry was created.
+    pub timestamp: u64,
+    /// The name of the thread that created the entry.
+    pub thread: String,
+    /// The verbosity level of the entry.
+    pub level: LogEntryLevel,
+    /// The entry message itself.
+    pub message: String,
 }
 
-#[derive(Debug)]
-// Note: Option<LogEntry> shares a repr with LogEntry due to enum optimization
-pub struct InternalLogEntry {
-    type_: EntryType,
-    start: usize,
-    end: usize,
+impl From<(LogEntrySourceKind, carbon_parsing::log::LogEntry<'_>)> for LogEntry {
+    fn from((source_kind, entry): (LogEntrySourceKind, carbon_parsing::log::LogEntry)) -> Self {
+        let carbon_parsing::log::LogEntry {
+            logger,
+            level,
+            timestamp,
+            thread_name,
+            message,
+        } = entry;
+
+        Self {
+            source_kind,
+            logger: logger.to_owned(),
+            timestamp,
+            thread: thread_name.to_owned(),
+            level: level.into(),
+            message: message.to_owned(),
+        }
+    }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct LogEntry<'a> {
-    pub type_: EntryType,
-    pub start_line: usize,
-    pub text: &'a str,
+impl LogEntry {
+    /// Create a new system message.
+    pub fn system_message(msg: impl ToString) -> Self {
+        Self {
+            source_kind: LogEntrySourceKind::System,
+            logger: "GDLauncher".into(),
+            timestamp: chrono::Local::now().timestamp_millis() as u64,
+            thread: "N/A".into(),
+            level: LogEntryLevel::Info,
+            message: msg.to_string(),
+        }
+    }
+
+    /// Create a new system message with an `error` level.
+    pub fn system_error(msg: impl ToString) -> Self {
+        let mut this = Self::system_message(msg);
+
+        this.level = LogEntryLevel::Error;
+
+        this
+    }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum EntryType {
+/// The level of the log entry.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum LogEntryLevel {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl From<carbon_parsing::log::LogEntryLevel> for LogEntryLevel {
+    fn from(level: carbon_parsing::log::LogEntryLevel) -> Self {
+        use carbon_parsing::log::LogEntryLevel as LogEntryLevel_;
+
+        match level {
+            LogEntryLevel_::Trace => Self::Trace,
+            LogEntryLevel_::Debug => Self::Debug,
+            LogEntryLevel_::Info => Self::Info,
+            LogEntryLevel_::Warn => Self::Warn,
+            LogEntryLevel_::Error => Self::Error,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize)]
+pub enum LogEntrySourceKind {
     System,
     StdOut,
     StdErr,
-    // more entries once log levels are handled
-}
-
-impl Default for GameLog {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl GameLog {
+    /// Creates a new game log.
     pub fn new() -> Self {
-        Self {
-            log: String::new(),
-            lines: Vec::new(),
-            last_entry: 0,
-            last_was_terminated: true,
-        }
+        Self::default()
     }
 
-    /// Push new text to the log.
-    ///
-    /// # Note
-    /// If this entry's type matches that of the last entry and
-    /// the last entry did not end in \n they will be merged.
-    pub fn push(&mut self, type_: EntryType, mut text: &str) {
-        fn push_newlines(self_: &mut GameLog, text: &str) {
-            let mut newline = false;
-            let mut newline_count = 0;
-
-            for c in text.chars() {
-                newline = c == '\n';
-
-                if newline {
-                    newline_count += 1;
-                }
-            }
-
-            self_.last_was_terminated = newline;
-
-            if newline {
-                self_.lines.extend((1..newline_count).map(|_| None));
-            }
-        }
-
-        let mut newline = false;
-        let mut newline_count = 0;
-
-        for c in text.chars() {
-            newline = c == '\n';
-
-            if newline {
-                newline_count += 1;
-            }
-        }
-
-        if newline {
-            text = &text[0..text.len() - 1];
-        }
-
-        if !self.last_was_terminated {
-            if let Some(Some(last)) = self.lines.get_mut(self.last_entry) {
-                if last.type_ == type_ {
-                    if text.is_empty() {
-                        return;
-                    }
-
-                    self.log.push_str(text);
-                    last.end = self.log.len();
-
-                    self.last_was_terminated = newline;
-
-                    if newline {
-                        self.lines.extend((1..newline_count).map(|_| None));
-                    }
-
-                    return;
-                }
-            }
-        }
-
-        let start = self.log.len();
-        self.log.push_str(text);
-        let end = self.log.len();
-
-        self.last_entry = self.lines.len(); // len == last + 1
-        self.lines
-            .push(Some(InternalLogEntry { type_, start, end }));
-
-        self.last_was_terminated = newline;
-
-        if newline {
-            self.lines.extend((1..newline_count).map(|_| None));
-        }
+    /// Inserts a new entry into the log.
+    pub fn add_entry(&mut self, entry: LogEntry) {
+        self.0.push(entry)
     }
 
-    /// Get the first log entry before the given line
-    pub fn get_entry(&self, line: usize) -> Option<LogEntry> {
-        for i in (0..=line).rev() {
-            let Some(entry) = self.lines.get(i) else { return None };
-
-            if let Some(entry) = entry {
-                return Some(LogEntry {
-                    type_: entry.type_,
-                    start_line: i,
-                    text: &self.log[entry.start..entry.end],
-                });
-            }
-        }
-
-        return None;
+    /// Retrieves the requested entry from the log.
+    pub fn get_entry(&self, line: usize) -> Option<&LogEntry> {
+        self.0.get(line)
     }
 
     /// Get a region of log entries containing the given start and end lines
-    pub fn get_region(&self, lines: impl RangeBounds<usize>) -> Vec<LogEntry> {
-        let mut entries = Vec::<LogEntry>::new();
-
+    /// Truncates the range if it is out of bounds.
+    pub fn get_span(&self, lines: impl RangeBounds<usize>) -> &[LogEntry] {
         let start = match lines.start_bound() {
-            Bound::Included(&v) => v,
-            Bound::Excluded(&v) => v + 1,
+            Bound::Included(s) => *s,
             Bound::Unbounded => 0,
+            Bound::Excluded(_) => unreachable!("start bounds are never excluded"),
         };
 
         let end = match lines.end_bound() {
-            Bound::Included(&v) => v + 1,
-            Bound::Excluded(&v) => v,
-            Bound::Unbounded => self.lines.len(),
+            Bound::Included(e) if *e <= self.0.len() => *e + 1, // normalize to excluded
+            Bound::Excluded(e) if *e < self.0.len() => *e,
+            _ => self.0.len(),
         };
 
-        for i in (0..end).rev() {
-            let Some(entry) = self.lines.get(i) else { continue };
-
-            if let Some(entry) = entry {
-                entries.push(LogEntry {
-                    type_: entry.type_,
-                    start_line: i,
-                    text: &self.log[entry.start..entry.end],
-                });
-
-                if i <= start {
-                    break;
-                }
-            }
+        if start >= end {
+            return Default::default();
         }
 
-        entries.reverse();
-        return entries;
+        &self.0[start..end]
     }
 
+    /// Get the number of entries contained in the log.
     pub fn len(&self) -> usize {
-        self.lines.len()
+        self.0.len()
     }
 }
 
@@ -259,102 +218,51 @@ pub struct InvalidGameLogIdError;
 
 #[cfg(test)]
 mod test {
-    use super::{EntryType, GameLog, LogEntry};
+    use super::*;
 
     #[test]
-    fn push() {
+    fn span() {
         let mut log = GameLog::new();
-        log.push(EntryType::StdOut, "testing\n");
-        assert_eq!(
-            log.get_entry(0),
-            Some(LogEntry {
-                type_: EntryType::StdOut,
-                start_line: 0,
-                text: "testing"
-            }),
-        );
-    }
 
-    #[test]
-    fn region() {
-        let mut log = GameLog::new();
-        log.push(EntryType::StdOut, "testing1\n");
-        log.push(EntryType::StdOut, "testing2\n");
-        assert_eq!(
-            log.get_region(..),
-            vec![
-                LogEntry {
-                    type_: EntryType::StdOut,
-                    start_line: 0,
-                    text: "testing1"
-                },
-                LogEntry {
-                    type_: EntryType::StdOut,
-                    start_line: 1,
-                    text: "testing2"
-                },
-            ],
-        );
-    }
+        log.add_entry(LogEntry::system_message("item 1"));
+        log.add_entry(LogEntry::system_message("item 2"));
+        log.add_entry(LogEntry::system_message("item 3"));
+        log.add_entry(LogEntry::system_message("item 4"));
 
-    #[test]
-    fn line_merging() {
-        let mut log = GameLog::new();
-        log.push(EntryType::StdOut, "testing1");
-        log.push(EntryType::StdOut, "testing2\n");
-        assert_eq!(
-            log.get_entry(0),
-            Some(LogEntry {
-                type_: EntryType::StdOut,
-                start_line: 0,
-                text: "testing1testing2"
-            }),
-        );
+        // Test each kind of range
 
-        log.push(EntryType::StdOut, "testing3");
-        log.push(EntryType::StdErr, "testing4\n");
-        assert_eq!(
-            log.get_region(..),
-            vec![
-                LogEntry {
-                    type_: EntryType::StdOut,
-                    start_line: 0,
-                    text: "testing1testing2"
-                },
-                LogEntry {
-                    type_: EntryType::StdOut,
-                    start_line: 1,
-                    text: "testing3"
-                },
-                LogEntry {
-                    type_: EntryType::StdErr,
-                    start_line: 2,
-                    text: "testing4"
-                },
-            ],
-        );
-    }
+        #[track_caller]
+        fn test_span<R, const N: usize>(log: &GameLog, range: R, expected: [&str; N])
+        where
+            R: std::ops::RangeBounds<usize>,
+        {
+            let span = log
+                .get_span(range)
+                .iter()
+                .map(|entry| &entry.message)
+                .collect::<Vec<_>>();
 
-    #[test]
-    fn multiline_entry() {
-        let mut log = GameLog::new();
-        log.push(EntryType::StdOut, "testing1\ntesting2\n");
+            assert_eq!(span, expected);
+        }
 
-        let entry = LogEntry {
-            type_: EntryType::StdOut,
-            start_line: 0,
-            text: "testing1\ntesting2",
-        };
+        // ..
+        test_span(&log, .., ["item 1", "item 2", "item 3", "item 4"]);
 
-        assert_eq!(log.get_entry(0), Some(entry));
-        assert_eq!(log.get_entry(1), Some(entry));
-        assert_eq!(log.get_region(..), vec![entry]);
-        assert_eq!(log.get_region(..2), vec![entry]);
-        assert_eq!(log.get_region(..=1), vec![entry]);
-        assert_eq!(log.get_region(0..), vec![entry]);
-        assert_eq!(log.get_region(0..2), vec![entry]);
-        assert_eq!(log.get_region(0..=1), vec![entry]);
-        assert_eq!(log.get_region(0..1), vec![entry]);
-        assert_eq!(log.get_region(1..2), vec![entry]);
+        // a..
+        test_span(&log, 1.., ["item 2", "item 3", "item 4"]);
+        test_span(&log, 3.., ["item 4"]);
+        test_span(&log, 5.., []);
+
+        //  ..b
+        test_span(&log, ..5, ["item 1", "item 2", "item 3", "item 4"]);
+        test_span(&log, ..=3, ["item 1", "item 2", "item 3", "item 4"]);
+        test_span(&log, ..3, ["item 1", "item 2", "item 3"]);
+        test_span(&log, ..0, []);
+
+        // a..b
+        test_span(&log, 1..1, []);
+        test_span(&log, 1..0, []);
+        test_span(&log, 1..2, ["item 2"]);
+        test_span(&log, 1..=3, ["item 2", "item 3", "item 4"]);
     }
 }

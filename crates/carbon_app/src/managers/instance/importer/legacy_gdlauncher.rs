@@ -1,127 +1,151 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
-use tokio::{
-    fs::create_dir_all,
-    io::{AsyncReadExt, AsyncWriteExt},
-    sync::Mutex,
-};
+use anyhow::anyhow;
+use tokio::sync::RwLock;
 
 use crate::{
-    api::{instance::import::FEEntity, keys, translation::Translation},
+    api::keys::instance::*,
+    api::translation::Translation,
     domain::{
         instance::info::{
             CurseforgeModpack, GameVersion, ModLoader, ModLoaderType, Modpack, StandardVersion,
         },
         vtask::VisualTaskId,
     },
-    managers::{
-        instance::InstanceVersionSource,
-        vtask::{Subtask, VisualTask},
-        AppInner,
-    },
+    managers::{instance::InstanceVersionSource, AppInner},
 };
 
-use super::InstanceImporter;
+use super::{
+    ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter, InternalImportEntry,
+    InvalidImportEntry,
+};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone)]
+struct Importable {
+    filename: String,
+    path: PathBuf,
+    config: LegacyGDLauncherConfig,
+}
+
+impl From<Importable> for ImportableInstance {
+    fn from(value: Importable) -> Self {
+        Self {
+            filename: value.filename.clone(),
+            instance_name: value.filename,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct LegacyGDLauncherImporter {
-    results: Mutex<Vec<LegacyGDLauncherConfigWrapper>>,
+    state: RwLock<ImporterState<Importable>>,
+}
+
+impl LegacyGDLauncherImporter {
+    pub fn new() -> Self {
+        Self {
+            state: RwLock::new(ImporterState::NoResults),
+        }
+    }
+
+    pub async fn get_default_scan_path() -> anyhow::Result<PathBuf> {
+        let basedirs = directories::BaseDirs::new().ok_or(anyhow!("Cannot build basedirs"))?;
+
+        // old gdl did not respect the xdg basedirs spec on linux
+        #[cfg(target_os = "linux")]
+        let p = basedirs.config_dir();
+        #[cfg(not(target_os = "linux"))]
+        let p = basedirs.data_dir();
+
+        let mut p = p.join("gdlauncher_next");
+
+        let override_path = p.join("override.data");
+        if override_path.exists() {
+            let override_path = tokio::fs::read_to_string(override_path).await;
+            if let Ok(override_path) = override_path {
+                let override_path = PathBuf::from(override_path);
+                if override_path.is_dir() {
+                    p = override_path;
+                }
+            }
+        }
+
+        Ok(p.join("instances"))
+    }
+
+    async fn scan_instance(
+        &self,
+        path: PathBuf,
+    ) -> anyhow::Result<Option<InternalImportEntry<Importable>>> {
+        let config = path.join("config.json");
+        if !config.is_file() {
+            return Ok(None);
+        }
+
+        let config = tokio::fs::read_to_string(config).await?;
+        let config = serde_json::from_str::<LegacyGDLauncherConfig>(&config);
+        let filename = path
+            .file_name()
+            .expect("filename cannot be empty")
+            .to_string_lossy()
+            .to_string();
+
+        match config {
+            Ok(config) => Ok(Some(InternalImportEntry::Valid(Importable {
+                filename,
+                path,
+                config,
+            }))),
+            Err(_) => Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
+                name: filename,
+                reason: Translation::InstanceImportLegacyBadConfigFile,
+            }))),
+        }
+    }
 }
 
 #[async_trait::async_trait]
 impl InstanceImporter for LegacyGDLauncherImporter {
-    type Config = LegacyGDLauncherConfigWrapper;
+    async fn scan(&self, app: &Arc<AppInner>, scan_path: PathBuf) -> anyhow::Result<()> {
+        if scan_path.is_dir() {
+            let Ok(mut dir) = tokio::fs::read_dir(&scan_path).await else {
+                return Ok(());
+            };
 
-    async fn scan(&mut self, app: Arc<AppInner>) -> anyhow::Result<()> {
-        let mut old_gdl_base_path = directories::BaseDirs::new()
-            .ok_or(anyhow::anyhow!("Cannot build basedirs"))?
-            .data_dir()
-            .join("gdlauncher_next");
-
-        let override_path = old_gdl_base_path.join("override.data");
-
-        if override_path.exists() {
-            let override_path = tokio::fs::read_to_string(override_path).await;
-
-            if let Ok(override_path) = override_path {
-                let override_path = PathBuf::from(override_path);
-
-                if override_path.exists() {
-                    old_gdl_base_path = override_path;
+            while let Some(path) = dir.next_entry().await? {
+                if path.metadata().await?.is_dir() {
+                    if let Ok(Some(entry)) = self.scan_instance(path.path()).await {
+                        self.state.write().await.push_multi(entry).await;
+                        app.invalidate(GET_IMPORT_SCAN_STATUS, None);
+                    }
                 }
             }
+        } else if let Ok(Some(entry)) = self.scan_instance(scan_path).await {
+            self.state.write().await.set_single(entry).await;
+            app.invalidate(GET_IMPORT_SCAN_STATUS, None);
         }
 
-        let instances_path = old_gdl_base_path.join("instances");
-
-        let Ok(mut all_instances) = tokio::fs::read_dir(&instances_path).await else {
-            return Ok(());
-        };
-
-        self.results.lock().await.clear();
-        app.invalidate(
-            keys::instance::GET_IMPORTABLE_INSTANCES,
-            Some(serde_json::to_value(FEEntity::LegacyGDLauncher)?),
-        );
-
-        while let Some(child) = all_instances.next_entry().await? {
-            if child.metadata().await?.is_dir() {
-                let config = child.path().join("config.json");
-                if !config.exists() {
-                    continue;
-                }
-
-                let config = tokio::fs::read_to_string(config).await?;
-                let Ok(config): Result<LegacyGDLauncherConfig, serde_json::Error> = serde_json::from_str(&config) else {
-                    tracing::info!(
-                        "Failed to parse legacy gdlauncher config: {}",
-                        child.path().display()
-                    );
-                    continue;
-                };
-
-                let mut lock = self.results.lock().await;
-
-                lock.push(LegacyGDLauncherConfigWrapper {
-                    name: child.file_name().into_string().unwrap(),
-                    full_path: child.path(),
-                    config,
-                });
-
-                app.invalidate(
-                    keys::instance::GET_IMPORTABLE_INSTANCES,
-                    Some(serde_json::to_value(FEEntity::LegacyGDLauncher)?),
-                );
-            }
-        }
-
-        Ok(())
+        Ok(()) // TODO: invalidate on iter
     }
 
-    async fn get_available(&self) -> anyhow::Result<Vec<super::ImportableInstance>> {
-        let mut instances = Vec::new();
-
-        let lock = self.results.lock().await;
-        for instance in lock.iter() {
-            instances.push(super::ImportableInstance {
-                name: instance.name.clone(),
-            });
-        }
-
-        Ok(instances)
+    async fn get_status(&self) -> ImportScanStatus {
+        self.state.read().await.clone().into()
     }
 
-    async fn import(&self, app: Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId> {
-        let lock = self.results.lock().await;
-        let instance = lock
-            .get(index as usize)
-            .ok_or(anyhow::anyhow!("No importable instance at index {index}"))?;
-
-        if let Some(ref background) = instance.config.background {
-            app.instance_manager()
-                .load_icon(instance.full_path.join(background))
-                .await?;
-        }
+    async fn begin_import(
+        &self,
+        app: &Arc<AppInner>,
+        index: u32,
+        name: Option<String>,
+    ) -> anyhow::Result<VisualTaskId> {
+        let instance = self
+            .state
+            .read()
+            .await
+            .get(index)
+            .await
+            .cloned()
+            .ok_or_else(|| anyhow!("invalid importable instance index"))?;
 
         let instance_version_source = 'a: {
             let modloader = match &*instance.config.loader.loader_type {
@@ -131,8 +155,8 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             }
             .and_then(|loader_type| {
                 let Some(ref loader_version) = instance.config.loader.loader_version else {
-                        return None;
-                    };
+                    return None;
+                };
 
                 Some(ModLoader {
                     type_: loader_type,
@@ -153,137 +177,81 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                 }
 
                 let Some(project_id) = instance.config.loader.project_id else {
-                        return Err(anyhow::anyhow!("Missing project id"));
-
+                    return Err(anyhow!("Missing project id"));
                 };
                 let Some(file_id) = instance.config.loader.file_id else {
-                        return Err(anyhow::anyhow!("Missing file id"));
+                    return Err(anyhow!("Missing file id"));
                 };
 
                 let curseforge_modpack = CurseforgeModpack {
-                    project_id,
-                    file_id,
+                    project_id: project_id as u32,
+                    file_id: file_id as u32,
                 };
 
-                break 'a InstanceVersionSource::Modpack(Modpack::Curseforge(curseforge_modpack));
+                break 'a InstanceVersionSource::ModpackWithKnownVersion(
+                    standard_version,
+                    Modpack::Curseforge(curseforge_modpack),
+                );
             } else {
                 break 'a InstanceVersionSource::Version(standard_version);
             }
         };
 
-        let created_instance_id = app
+        if let Some(ref background) = instance.config.background {
+            app.instance_manager()
+                .load_icon(instance.path.join(background))
+                .await?;
+        }
+
+        let initializer = |instance_path: PathBuf| {
+            let instance = &instance;
+            async move {
+                let path = instance_path.join("instance");
+
+                tokio::fs::create_dir_all(instance_path.join(".setup").join("modpack-complete"))
+                    .await?;
+
+                // create copy-filter function in file utils for all importers
+                crate::domain::runtime_path::copy_dir_filter(&instance.path, &path, |path| {
+                    match path.to_str() {
+                        Some("config.json" | "manifest.json" | "installing.lock" | "natives") => {
+                            false
+                        }
+                        Some(p)
+                            if Some(p)
+                                == instance.config.background.as_ref().map(|x| x.as_str()) =>
+                        {
+                            false
+                        }
+                        _ => true,
+                    }
+                })
+                .await?;
+
+                Ok(())
+            }
+        };
+
+        let id = app
             .instance_manager()
-            .create_instance(
+            .create_instance_ext(
                 app.instance_manager().get_default_group().await?,
-                instance.name.clone(),
+                name.unwrap_or_else(|| instance.filename.clone()),
                 instance.config.background.is_some(),
                 instance_version_source,
-                "".to_string(),
+                String::new(),
+                initializer,
             )
             .await?;
 
-        let instance_full_path = instance.full_path.clone();
-        let instance_background = instance.config.background.clone();
-        let app_clone = Arc::clone(&app);
-        let callback_task = move |subtask: Subtask| {
-            Box::pin(async move {
-                subtask.start_opaque();
-
-                let walked_dir = walkdir::WalkDir::new(&instance_full_path)
-                    .into_iter()
-                    .filter_map(|entry| {
-                        let Ok(entry) = entry else {
-                            return None;
-                        };
-
-                        let Some(file_name) = entry.file_name().to_str() else {
-                            return None;
-                        };
-
-                        match file_name {
-                            "config.json" => None,
-                            _ => {
-                                if let Some(ref background) = instance_background {
-                                    if file_name == background {
-                                        return None;
-                                    }
-                                }
-
-                                Some(entry)
-                            }
-                        }
-                    })
-                    .collect::<Vec<_>>();
-
-                let count = walked_dir.len() as u32;
-                subtask.update_items(0, count);
-
-                let instances_path = app_clone
-                    .settings_manager()
-                    .runtime_path
-                    .get_instances()
-                    .to_path();
-
-                let instance_path = instances_path.join(
-                    &app_clone
-                        .instance_manager()
-                        .instances
-                        .read()
-                        .await
-                        .get(&created_instance_id)
-                        .unwrap()
-                        .shortpath,
-                );
-
-                for (i, entry) in walked_dir.into_iter().enumerate() {
-                    let is_dir = entry.file_type().is_dir();
-                    let path = entry.path();
-                    let relative_path = path.strip_prefix(&instance_full_path).unwrap();
-
-                    let destination = instance_path.join(relative_path);
-
-                    if destination.exists() {
-                        // TODO: Check checksum
-                        continue;
-                    }
-
-                    if is_dir {
-                        create_dir_all(destination).await?;
-                    } else {
-                        let mut file = tokio::fs::File::open(path).await?;
-                        let mut buffer = Vec::new();
-                        file.read_to_end(&mut buffer).await?;
-
-                        let mut file = tokio::fs::File::create(destination).await?;
-                        file.write_all(&buffer).await?;
-                    }
-                    subtask.update_items(i as u32, count);
-                }
-
-                // Ensure task is completed just in case
-                subtask.update_items(count, count);
-
-                Ok::<(), anyhow::Error>(())
-            }) as _ // Required to cast trait object to concrete object
-        };
-
-        let (_, task_id) = app
-            .instance_manager()
-            .prepare_game(created_instance_id, None, Some(Box::new(callback_task)))
-            .await?;
-
-        Ok(task_id)
+        app.instance_manager()
+            .prepare_game(id, None, None)
+            .await
+            .map(|r| r.1)
     }
 }
 
-#[derive(Debug)]
-pub struct LegacyGDLauncherConfigWrapper {
-    name: String,
-    full_path: PathBuf,
-    config: LegacyGDLauncherConfig,
-}
-
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LegacyGDLauncherConfig {
     loader: _Loader,
@@ -292,37 +260,16 @@ pub struct LegacyGDLauncherConfig {
     background: Option<String>,
 }
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct _Loader {
     loader_type: String,
     loader_version: Option<String>,
     mc_version: String,
     #[serde(rename = "fileID")]
-    file_id: Option<u32>,
+    file_id: Option<i32>,
     #[serde(rename = "projectID")]
-    project_id: Option<u32>,
+    project_id: Option<i32>,
     source: Option<String>,
     source_name: Option<String>,
-}
-
-mod test {
-    use crate::managers::instance::importer::InstanceImporter;
-
-    #[tokio::test]
-    async fn test_legacy_gdlauncher_importer() {
-        let app = crate::setup_managers_for_test().await;
-
-        let mut importer = super::LegacyGDLauncherImporter::default();
-        importer.scan(app.app.clone()).await.unwrap();
-
-        let instances = importer.get_available().await.unwrap();
-
-        for (index, _) in instances.iter().enumerate() {
-            importer
-                .import(app.app.clone(), index as u32)
-                .await
-                .unwrap();
-        }
-    }
 }

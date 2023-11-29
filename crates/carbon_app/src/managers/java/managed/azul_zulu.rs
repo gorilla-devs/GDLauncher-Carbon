@@ -67,96 +67,141 @@ impl Managed for AzulZulu {
             Ok::<(), anyhow::Error>(())
         });
 
-        carbon_net::download_file(&downloadable, Some(p_sender)).await?;
+        let result = {
+            carbon_net::download_file(&downloadable, Some(p_sender)).await?;
 
-        progress_proxy.await??;
+            progress_proxy.await??;
 
-        let file_handle = std::fs::File::open(&downloadable.path)?;
-        let mut archive = zip::ZipArchive::new(file_handle)?;
+            let file_handle = std::fs::File::open(&downloadable.path)?;
+            let mut archive = zip::ZipArchive::new(file_handle)?;
 
-        let progress_report_clone = progress_report.clone();
-        let version_name = version.name.clone();
-        let main_binary_path = spawn_blocking(move || {
-            let total_archive_files = archive.len() as u64;
+            let progress_report_clone = progress_report.clone();
+            let version_name = version.name.clone();
+            let main_binary_path = spawn_blocking(move || {
+                let total_archive_files = archive.len() as u64;
 
-            let root_dir = {
-                let root: PathBuf = archive
-                    .by_index(0)?
-                    .enclosed_name()
-                    .ok_or_else(|| {
-                        anyhow::anyhow!("Invalid zip. Cannot get enclosed name for item 0 of zip")
-                    })?
-                    .to_owned();
+                let root_dir = {
+                    let root: PathBuf = archive
+                        .by_index(0)?
+                        .enclosed_name()
+                        .ok_or_else(|| {
+                            anyhow::anyhow!(
+                                "Invalid zip. Cannot get enclosed name for item 0 of zip"
+                            )
+                        })?
+                        .to_owned();
 
-                root.components()
-                    .next()
-                    .ok_or_else(|| anyhow::anyhow!("No root component"))?
-                    .as_os_str()
-                    .to_owned()
-            };
-
-            let is_single_root_dir = archive.file_names().all(|file_name| {
-                let path = Path::new(file_name);
-                let Some(os_str) = path.components().next() else {
-                    return false;
-                };
-                os_str.as_os_str() == root_dir
-            });
-
-            let java_managed_path = if is_single_root_dir {
-                base_managed_java_path.to_path()
-            } else {
-                let removed_extension = PathBuf::from(version_name).with_extension("");
-                base_managed_java_path.to_path().join(removed_extension)
-            };
-
-            std::fs::create_dir_all(&java_managed_path)?;
-
-            let mut main_binary_path = None;
-
-            for i in 0..archive.len() {
-                let mut file = archive.by_index(i)?;
-                let outpath = match file.enclosed_name() {
-                    Some(path) => Path::new(&java_managed_path).join(path),
-                    None => continue,
+                    root.components()
+                        .next()
+                        .ok_or_else(|| anyhow::anyhow!("No root component"))?
+                        .as_os_str()
+                        .to_owned()
                 };
 
-                if (*file.name()).ends_with("bin/java") || (*file.name()).ends_with("bin/java.exe")
-                {
-                    main_binary_path = Some(outpath.clone());
-                }
+                let is_single_root_dir = archive.file_names().all(|file_name| {
+                    let path = Path::new(file_name);
+                    let Some(os_str) = path.components().next() else {
+                        return false;
+                    };
+                    os_str.as_os_str() == root_dir
+                });
 
-                if (*file.name()).ends_with('/') {
-                    std::fs::create_dir_all(&outpath)?;
+                let java_managed_path = if is_single_root_dir {
+                    base_managed_java_path.to_path()
                 } else {
-                    if let Some(p) = outpath.parent() {
-                        if !p.exists() {
-                            std::fs::create_dir_all(p)?;
+                    let removed_extension = PathBuf::from(version_name).with_extension("");
+                    base_managed_java_path.to_path().join(removed_extension)
+                };
+
+                std::fs::create_dir_all(&java_managed_path)?;
+
+                let mut main_binary_path = None;
+
+                for i in 0..archive.len() {
+                    let mut file = archive.by_index(i)?;
+                    let outpath = match file.enclosed_name() {
+                        Some(path) => Path::new(&java_managed_path).join(path),
+                        None => continue,
+                    };
+
+                    if (*file.name()).ends_with("bin/java")
+                        || (*file.name()).ends_with("bin/java.exe")
+                    {
+                        main_binary_path = Some(outpath.clone());
+                    }
+
+                    if (*file.name()).ends_with('/') {
+                        std::fs::create_dir_all(&outpath)?;
+                    } else {
+                        if let Some(p) = outpath.parent() {
+                            if !p.exists() {
+                                std::fs::create_dir_all(p).map_err(|err| {
+                                    anyhow::anyhow!("Can't create directory {:?} - {}", p, err)
+                                })?;
+                            }
+                        }
+
+                        if !outpath.exists() || file.size() != outpath.metadata()?.len() {
+                            let mut outfile = std::fs::File::create(&outpath).map_err(|err| {
+                                anyhow::anyhow!("Can't create file {:?} - {}", outpath, err)
+                            })?;
+
+                            std::io::copy(&mut file, &mut outfile).map_err(|err| {
+                                anyhow::anyhow!(
+                                    "Can't copy file {} -> {:?} - {}",
+                                    file.name(),
+                                    outpath,
+                                    err
+                                )
+                            })?;
                         }
                     }
 
-                    let mut outfile = std::fs::File::create(&outpath)?;
-                    std::io::copy(&mut file, &mut outfile)?;
-                }
+                    // Get and Set permissions
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
 
-                // Get and Set permissions
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::PermissionsExt;
-
-                    if let Some(mode) = file.unix_mode() {
-                        std::fs::set_permissions(&outpath, std::fs::Permissions::from_mode(mode))?;
+                        if let Some(mode) = file.unix_mode() {
+                            std::fs::set_permissions(
+                                &outpath,
+                                std::fs::Permissions::from_mode(mode),
+                            )
+                            .map_err(|err| {
+                                anyhow::anyhow!(
+                                    "Can't set file permission on {} - {}",
+                                    file.name(),
+                                    err
+                                )
+                            })?;
+                        }
                     }
+
+                    progress_report_clone.send(Step::Extracting(i as u64, total_archive_files))?;
                 }
 
-                progress_report_clone.send(Step::Extracting(i as u64, total_archive_files))?;
+                main_binary_path.ok_or_else(|| anyhow::anyhow!("No main binary found"))
+            })
+            .await??;
+
+            progress_report.send(Step::Done)?;
+
+            Ok::<_, anyhow::Error>(main_binary_path)
+        };
+
+        let delete = std::fs::remove_file(&downloadable.path);
+
+        if let Err(e) = delete {
+            tracing::warn!("Could not delete downloaded file: {}", e);
+        }
+
+        let main_binary_path = {
+            let tmp = result?;
+            match dunce::canonicalize(&tmp) {
+                Ok(p) => p,
+                Err(_) => tmp,
             }
-
-            main_binary_path.ok_or_else(|| anyhow::anyhow!("No main binary found"))
-        })
-        .await??;
-
-        progress_report.send(Step::Done)?;
+        };
 
         let java_component = java_checker
             .get_bin_info(
@@ -212,11 +257,16 @@ impl AzulAPI {
                             download_url: version.download_url.clone(),
                             id: version.package_uuid.clone(),
                             java_version: JavaVersion {
-                                major: version.java_version.get(0).cloned().ok_or(
+                                major: version.java_version.first().cloned().ok_or(
                                     anyhow::anyhow!("No major version found for {}", version.name),
                                 )?,
-                                minor: version.java_version.get(1).cloned(),
-                                patch: version.java_version.get(2).cloned().map(|v| v.to_string()),
+                                minor: version.java_version.get(1).cloned().unwrap_or(0),
+                                patch: version
+                                    .java_version
+                                    .get(2)
+                                    .cloned()
+                                    .map(|v| v.to_string())
+                                    .unwrap_or("0".to_string()),
                                 build_metadata: None,
                                 prerelease: None,
                                 update_number: None,

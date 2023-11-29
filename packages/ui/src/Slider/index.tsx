@@ -23,6 +23,7 @@ interface Props {
   noLabels?: boolean;
   noTooltip?: boolean;
   onChange?: (_val: number) => void;
+  OnRelease?: (_val: number) => void;
   vertical?: boolean;
 }
 
@@ -145,6 +146,7 @@ function Slider(props: Props) {
   const mouseup = () => {
     setShowTooltip(false);
     setDragging(false);
+    props?.OnRelease?.(currentValue());
   };
 
   const trackClick = (e: MouseEvent) => {
@@ -158,6 +160,7 @@ function Slider(props: Props) {
     const position = props.vertical ? e.clientY : e.clientX; // Use clientY for vertical slider, clientX for horizontal
     const value = calcValueByPos(position);
     onChange(value);
+    mouseup();
   };
 
   onMount(() => {

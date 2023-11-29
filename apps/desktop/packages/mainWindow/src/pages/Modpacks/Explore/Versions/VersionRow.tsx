@@ -2,7 +2,7 @@ import {
   CFFEFile,
   CFFEMod,
   MRFEProject,
-  MRFEVersion,
+  MRFEVersion
 } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { format } from "date-fns";
@@ -15,6 +15,7 @@ type Props = {
   modVersion: MRFEVersion | CFFEFile;
   project: CFFEMod | MRFEProject | undefined;
   isCurseforge?: boolean;
+  disabled?: boolean;
 };
 
 const VersionRow = (props: Props) => {
@@ -41,7 +42,7 @@ const VersionRow = (props: Props) => {
       onSettled() {
         setLoading(false);
         navigate(`/library`);
-      },
+      }
     }
   );
 
@@ -53,7 +54,7 @@ const VersionRow = (props: Props) => {
       },
       onError() {
         addNotification("Error while downloading the modpack.", "error");
-      },
+      }
     }
   );
 
@@ -89,7 +90,7 @@ const VersionRow = (props: Props) => {
     <div class="group flex justify-between items-center py-2 rounded-md px-2 hover:bg-darkSlate-900">
       <div class="flex flex-col">
         <h4 class="m-0 font-medium group-hover:text-lightSlate-200">
-          {getName()}
+          {getName().replaceAll(".zip", "")}
         </h4>
         <div class="flex justify-between items-center">
           <div class="flex justify-between">
@@ -106,7 +107,7 @@ const VersionRow = (props: Props) => {
                   getReleaseType() === "stable" ||
                   getReleaseType() === "release",
                 "text-yellow-500": getReleaseType() === "beta",
-                "text-red-500": getReleaseType() === "alpha",
+                "text-red-500": getReleaseType() === "alpha"
               }}
             >
               {getReleaseType()}
@@ -115,8 +116,14 @@ const VersionRow = (props: Props) => {
         </div>
       </div>
       <span
-        class="flex gap-2 text-lightGray-800 cursor-pointer select-none group-hover:text-lightSlate-50"
+        class="flex gap-2 select-none items-center"
+        classList={{
+          "cursor-pointer text-lightGray-800 group-hover:text-lightSlate-50 group-hover:text-lg transition transition-all duration-75 ease-in-out":
+            !props.disabled,
+          "cursor-not-allowed text-lightGray-800": props.disabled
+        }}
         onClick={() => {
+          if (props.disabled) return;
           const icon = props.isCurseforge
             ? (props.project as CFFEMod).logo?.url
             : (props.project as MRFEProject).icon_url;
@@ -125,14 +132,14 @@ const VersionRow = (props: Props) => {
             ? {
                 Curseforge: {
                   file_id: (props.modVersion as CFFEFile).id,
-                  project_id: (props.modVersion as CFFEFile).modId,
-                },
+                  project_id: (props.modVersion as CFFEFile).modId
+                }
               }
             : {
                 Modrinth: {
                   project_id: (props.modVersion as MRFEVersion).project_id,
-                  version_id: (props.modVersion as MRFEVersion).id,
-                },
+                  version_id: (props.modVersion as MRFEVersion).id
+                }
               };
 
           if (icon) {
@@ -147,28 +154,18 @@ const VersionRow = (props: Props) => {
               ? (props.modVersion as CFFEFile).displayName
               : (props.project as MRFEProject).title,
             version: {
-              Modpack: modpack,
-            },
+              Modpack: modpack
+            }
           });
         }}
       >
-        <Switch fallback={<div>Loading...</div>}>
+        <Switch>
           <Match when={loading()}>
-            <Trans
-              key="modpack.version_downloading"
-              options={{
-                defaultValue: "Downloading...",
-              }}
-            />
+            <Trans key="modpack.version_downloading" />
             <Spinner class="w-5 h-5" />
           </Match>
           <Match when={!loading()}>
-            <Trans
-              key="modpack.version_download"
-              options={{
-                defaultValue: "Download version",
-              }}
-            />
+            <Trans key="modpack.version_download" />
             <div class="i-ri:download-2-line" />
           </Match>
         </Switch>

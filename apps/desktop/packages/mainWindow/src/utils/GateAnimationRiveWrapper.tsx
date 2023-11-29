@@ -36,7 +36,7 @@ const RiveAppWapper = (props: Props) => {
               openGate?.fire();
             };
           }
-        },
+        }
       });
     }
   });
@@ -55,7 +55,7 @@ const RiveAppWapper = (props: Props) => {
       height={props.height || 600}
       style={{
         width: `${props.width || 600}px`,
-        height: `${props.height || 600}px`,
+        height: `${props.height || 600}px`
       }}
     />
   );

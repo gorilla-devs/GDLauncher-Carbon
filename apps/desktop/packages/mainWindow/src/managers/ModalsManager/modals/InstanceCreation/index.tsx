@@ -13,7 +13,7 @@ const InstanceCreation = (props: ModalProps) => {
       overflowHiddenDisabled={true}
       noPadding={true}
     >
-      <div class="flex flex-col justify-between scrollbar-hide w-120 overflow-y-scroll h-136">
+      <div class="flex flex-col justify-between scrollbar-hide overflow-y-scroll w-120 h-full">
         <Tabs variant="block" paddingY="py-2">
           <TabList>
             <Tab>

@@ -50,7 +50,7 @@ const Screenshots = () => {
             <Trans
               key="modpack.no_screenshot"
               options={{
-                defaultValue: "No screenshots",
+                defaultValue: "No screenshots"
               }}
             />
           </Match>

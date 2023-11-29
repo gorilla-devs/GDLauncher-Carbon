@@ -48,7 +48,7 @@ pub const GDL_API_BASE: &str = env!("BASE_API");
 mod app {
     use tracing::error;
 
-    use crate::cache_middleware;
+    use crate::{cache_middleware, domain, iridium_client::get_client};
 
     use super::{
         java::JavaManager, metadata::cache::MetaCacheManager, metrics::MetricsManager,
@@ -62,15 +62,15 @@ mod app {
         account_manager: AccountManager,
         pub(crate) invalidation_channel: broadcast::Sender<InvalidationEvent>,
         download_manager: DownloadManager,
-        instance_manager: InstanceManager,
+        pub(crate) instance_manager: InstanceManager,
         meta_cache_manager: MetaCacheManager,
         pub(crate) metrics_manager: MetricsManager,
         pub(crate) modplatforms_manager: ModplatformsManager,
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
         pub(crate) prisma_client: Arc<PrismaClient>,
-        pub(crate) task_manager: VisualTaskManager,
-        pub(crate) system_info_manager: SystemInfoManager,
-        pub(crate) rich_presence_manager: rich_presence::RichPresenceManager,
+        task_manager: VisualTaskManager,
+        system_info_manager: SystemInfoManager,
+        rich_presence_manager: rich_presence::RichPresenceManager,
     }
 
     macro_rules! manager_getter {
@@ -89,26 +89,28 @@ mod app {
             invalidation_channel: broadcast::Sender<InvalidationEvent>,
             runtime_path: PathBuf,
         ) -> App {
-            let db_client = prisma_client::load_and_migrate(runtime_path.clone())
-                .await
-                .unwrap();
+            let db_client = match prisma_client::load_and_migrate(runtime_path.clone()).await {
+                Ok(client) => Arc::new(client),
+                Err(prisma_client::DatabaseError::Migration(err)) => {
+                    error!("Database migration failed: {}", err);
+                    panic!("Database migration failed: {}", err);
+                }
+                Err(err) => {
+                    error!("Database connection failed: {}", err);
+                    panic!("Database connection failed: {}", err);
+                }
+            };
 
             let app = Arc::new(UnsafeCell::new(MaybeUninit::<AppInner>::uninit()));
             let unsaferef = UnsafeAppRef(Arc::downgrade(&app));
 
-            // SAFETY: cannot be used until after the ref is initialized.
-            let client = reqwest::Client::builder().build().unwrap();
-
-            let reqwest = cache_middleware::new_client(
-                unsaferef.clone(),
-                reqwest_middleware::ClientBuilder::new(client),
-            );
+            let http_client = cache_middleware::new_client(unsaferef.clone(), get_client());
 
             let app = unsafe {
                 let inner = Arc::into_raw(app);
 
                 (*inner).get().write(MaybeUninit::new(AppInner {
-                    settings_manager: SettingsManager::new(runtime_path),
+                    settings_manager: SettingsManager::new(runtime_path, http_client.clone()),
                     java_manager: JavaManager::new(),
                     minecraft_manager: MinecraftManager::new(),
                     account_manager: AccountManager::new(),
@@ -116,10 +118,13 @@ mod app {
                     download_manager: DownloadManager::new(),
                     instance_manager: InstanceManager::new(),
                     meta_cache_manager: MetaCacheManager::new(),
-                    metrics_manager: MetricsManager::new(),
+                    metrics_manager: MetricsManager::new(
+                        Arc::clone(&db_client),
+                        http_client.clone(),
+                    ),
                     invalidation_channel,
-                    reqwest_client: reqwest,
-                    prisma_client: Arc::new(db_client),
+                    reqwest_client: http_client.clone(),
+                    prisma_client: Arc::clone(&db_client),
                     task_manager: VisualTaskManager::new(),
                     system_info_manager: SystemInfoManager::new(),
                     rich_presence_manager: rich_presence::RichPresenceManager::new(),
@@ -135,13 +140,28 @@ mod app {
             let _app = app.clone();
             tokio::spawn(async move {
                 _app.meta_cache_manager().launch_background_tasks().await;
-                // ignore scanning errors instead of taking down the launcher
-                let _ = _app.clone().instance_manager().scan_instances().await;
+                _app.clone()
+                    .instance_manager()
+                    .launch_background_tasks()
+                    .await;
             });
 
             let _app = app.clone();
             tokio::spawn(async move {
                 let _ = _app.clone().rich_presence_manager().start_presence().await;
+            });
+
+            let _app = app.clone();
+            let http_client = http_client.clone();
+            tokio::spawn(async move {
+                let _ = http_client
+                    .get(format!("{}/v1/announcement", GDL_API_BASE))
+                    .send()
+                    .await;
+                let _ = _app
+                    .metrics_manager()
+                    .track_event(domain::metrics::Event::LauncherStarted)
+                    .await;
             });
 
             app
@@ -165,9 +185,7 @@ mod app {
                 .invalidation_channel
                 .send(InvalidationEvent::new(key.full, args))
             {
-                Ok(_) => {
-                    tracing::debug!("invalidated {}", key.full);
-                }
+                Ok(_) => {}
                 Err(e) => {
                     error!("Error sending invalidation request: {e}");
                 }
@@ -185,35 +203,6 @@ mod app {
                     return Ok(event);
                 }
             }
-        }
-    }
-}
-
-impl Drop for AppInner {
-    fn drop(&mut self) {
-        #[cfg(feature = "production")]
-        #[cfg(not(test))]
-        {
-            use crate::domain::metrics::{Event, EventName};
-            use crate::iridium_client::get_client;
-            use std::collections::HashMap;
-            use tracing::debug;
-
-            let close_event = Event {
-                name: EventName::AppClosed,
-                properties: HashMap::new(),
-            };
-
-            let client = get_client();
-
-            tokio::runtime::Handle::current().block_on(async move {
-                debug!("Collecting metric for app close");
-                let res = self.metrics_manager.track_event(close_event).await;
-                match res {
-                    Ok(_) => debug!("Successfully collected metric for app close"),
-                    Err(e) => error!("Error collecting metric for app close: {e}"),
-                }
-            });
         }
     }
 }

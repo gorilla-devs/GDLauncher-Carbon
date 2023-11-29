@@ -7,7 +7,7 @@ import {
   Outlet,
   useLocation,
   useParams,
-  useRouteData,
+  useRouteData
 } from "@solidjs/router";
 import {
   For,
@@ -18,7 +18,7 @@ import {
   createResource,
   createSignal,
   onCleanup,
-  onMount,
+  onMount
 } from "solid-js";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { queryClient, rspc } from "@/utils/rspcClient";
@@ -27,21 +27,21 @@ import {
   FEModResponse,
   MRFEProject,
   InstanceDetails,
-  UngroupedInstance,
+  UngroupedInstance
 } from "@gd/core_module/bindings";
 import {
   fetchImage,
   getCurseForgeData,
   getModrinthData,
   getPreparingState,
-  getRunningState,
+  getRunningState
 } from "@/utils/instances";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { ContextMenu } from "@/components/ContextMenu";
 import { useModal } from "@/managers/ModalsManager";
 import { convertSecondsToHumanTime } from "@/utils/helpers";
 import Authors from "./Info/Authors";
-import { getForgeModloaderIcon } from "@/utils/sidebar";
+import { getCFModloaderIcon } from "@/utils/sidebar";
 
 type InstancePage = {
   label: string;
@@ -54,6 +54,7 @@ const Instance = () => {
   const location = useLocation();
   const [editableName, setEditableName] = createSignal(false);
   const [isFavorite, setIsFavorite] = createSignal(false);
+  const [tabsTranslate, setTabsTranslate] = createSignal(0);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const [newName, setNewName] = createSignal(
     routeData.instanceDetails.data?.name || ""
@@ -68,6 +69,11 @@ const Instance = () => {
 
   const [t] = useTransContext();
   const modalsContext = useModal();
+  let backButtonRef: HTMLSpanElement;
+
+  onMount(() => {
+    setTabsTranslate(-backButtonRef.offsetWidth);
+  });
 
   const setFavoriteMutation = rspc.createMutation(["instance.setFavorite"], {
     onMutate: async (
@@ -80,10 +86,10 @@ const Instance = () => {
       | undefined
     > => {
       await queryClient.cancelQueries({
-        queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)],
+        queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)]
       });
       await queryClient.cancelQueries({
-        queryKey: ["instance.getInstancesUngrouped"],
+        queryKey: ["instance.getInstancesUngrouped"]
       });
 
       const instancesUngrouped: UngroupedInstance[] | undefined =
@@ -92,7 +98,7 @@ const Instance = () => {
       const instanceDetails: InstanceDetails | undefined =
         queryClient.getQueryData([
           "instance.getInstanceDetails",
-          parseInt(params.id, 10),
+          parseInt(params.id, 10)
         ]);
 
       queryClient.setQueryData(
@@ -110,10 +116,10 @@ const Instance = () => {
     },
     onSettled() {
       queryClient.invalidateQueries({
-        queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)],
+        queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)]
       });
       queryClient.invalidateQueries({
-        queryKey: ["instance.getInstancesUngrouped"],
+        queryKey: ["instance.getInstancesUngrouped"]
       });
       setIsFavorite((prev) => !prev);
     },
@@ -134,7 +140,7 @@ const Instance = () => {
           context.instanceDetails
         );
       }
-    },
+    }
   });
 
   createEffect(() => {
@@ -145,7 +151,7 @@ const Instance = () => {
   const instancePages = () => [
     {
       label: "Overview",
-      path: `/library/${params.id}`,
+      path: `/library/${params.id}`
     },
 
     ...(routeData.instanceDetails.data?.modloaders.length! > 0
@@ -153,17 +159,18 @@ const Instance = () => {
           {
             label: "Mods",
             path: `/library/${params.id}/mods`,
-          },
+            noPadding: true
+          }
         ]
       : []),
     {
       label: "Settings",
-      path: `/library/${params.id}/settings`,
+      path: `/library/${params.id}/settings`
     },
     {
       label: "Logs",
-      path: `/library/${params.id}/logs`,
-    },
+      path: `/library/${params.id}/logs`
+    }
     // {
     //   label: "Resource Packs",
     //   path: `/library/${params.id}/resourcepacks`,
@@ -182,11 +189,11 @@ const Instance = () => {
     getRouteIndex(instancePages(), location.pathname, true);
 
   const launchInstanceMutation = rspc.createMutation([
-    "instance.launchInstance",
+    "instance.launchInstance"
   ]);
 
   const updateInstanceMutation = rspc.createMutation([
-    "instance.updateInstance",
+    "instance.updateInstance"
   ]);
 
   const killInstanceMutation = rspc.createMutation(["instance.killInstance"]);
@@ -210,8 +217,8 @@ const Instance = () => {
         rspc.createQuery(() => [
           "modplatforms.curseforge.getMod",
           {
-            modId: isCurseforge.project_id as number,
-          },
+            modId: isCurseforge.project_id as number
+          }
         ]).data
       );
     }
@@ -222,13 +229,13 @@ const Instance = () => {
     getModrinthData(routeData.instanceDetails.data.modpack);
 
   createEffect(() => {
-    const isModrninth = modrinthData();
+    const isModrinth = modrinthData();
 
-    if (isModrninth) {
+    if (isModrinth) {
       setModpackDetails(
         rspc.createQuery(() => [
           "modplatforms.modrinth.getProject",
-          isModrninth.project_id,
+          isModrinth.project_id
         ]).data
       );
     }
@@ -241,7 +248,7 @@ const Instance = () => {
         use_loaded_icon: null,
         memory: null,
         notes: null,
-        instance: parseInt(params.id, 10),
+        instance: parseInt(params.id, 10)
       });
     }
     setEditableName(false);
@@ -285,21 +292,20 @@ const Instance = () => {
   const [isSticky, setIsSticky] = createSignal(false);
 
   const openFolderMutation = rspc.createMutation([
-    "instance.openInstanceFolder",
+    "instance.openInstanceFolder"
   ]);
 
   const handleEdit = () => {
     modalsContext?.openModal(
       {
-        name: "instanceCreation",
+        name: "instanceCreation"
       },
       {
         id: params.id,
         modloader: routeData.instanceDetails.data?.modloaders[0]?.type_,
         title: routeData.instanceDetails.data?.name,
         mcVersion: routeData.instanceDetails.data?.version,
-        modloaderVersion:
-          routeData.instanceDetails.data?.modloaders[0]?.version,
+        modloaderVersion: routeData.instanceDetails.data?.modloaders[0]?.version
       }
     );
   };
@@ -307,7 +313,7 @@ const Instance = () => {
   const handleOpenFolder = () => {
     openFolderMutation.mutate({
       instance_id: parseInt(params.id, 10),
-      folder: "Root",
+      folder: "Root"
     });
   };
 
@@ -315,13 +321,13 @@ const Instance = () => {
     {
       icon: "i-ri:pencil-fill",
       label: t("instance.action_edit"),
-      action: handleEdit,
+      action: handleEdit
     },
     {
       icon: "i-ri:folder-open-fill",
       label: t("instance.action_open_folder"),
-      action: handleOpenFolder,
-    },
+      action: handleOpenFolder
+    }
   ];
 
   createEffect(() => {
@@ -344,41 +350,42 @@ const Instance = () => {
   return (
     <main
       id="main-container-instance-details"
-      class="relative h-full bg-darkSlate-800 overflow-x-hidden flex flex-col"
+      class="h-full bg-darkSlate-800 flex flex-col relative overflow-x-hidden"
       onScroll={() => {
         const rect = refStickyTabs.getBoundingClientRect();
         setIsSticky(rect.top <= 104);
+        // TODO FIX ME
+        if (rect.top <= 104) {
+          setTabsTranslate(0);
+        } else {
+          setTabsTranslate(-backButtonRef.offsetWidth);
+        }
       }}
     >
       <header
         ref={(el) => {
           headerRef = el;
         }}
-        class="relative flex flex-col justify-between ease-in-out transition-all items-stretch ease-in-out bg-cover bg-center transition-100 min-h-60"
+        class="relative flex flex-col justify-between ease-in-out transition-all ease-in-out items-stretch bg-cover bg-center min-h-60 transition-100"
         style={{
           transition: "height 0.2s",
           "background-image": imageUrl()
             ? `url("${imageUrl()}")`
-            : `url("${DefaultImg}")`,
+            : `url("${DefaultImg}")`
         }}
       >
         <div class="h-full bg-gradient-to-t from-darkSlate-800">
-          <div class="z-10 sticky top-5 left-5 w-fit">
+          <div class="z-50 sticky top-5 left-5 w-fit">
             <Button
               onClick={() => navigate("/library")}
               icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
               size="small"
               type="transparent"
             >
-              <Trans
-                key="instance.step_back"
-                options={{
-                  defaultValue: "Back",
-                }}
-              />
+              <Trans key="instance.step_back" />
             </Button>
           </div>
-          <div class="flex justify-center sticky h-24 top-52 z-20 w-full bg-gradient-to-t from-darkSlate-800 pb-2 box-border px-6">
+          <div class="flex justify-center sticky w-full bg-gradient-to-t from-darkSlate-800 box-border px-6 h-24 top-52 z-20 pb-2">
             <div class="flex w-full justify-start">
               <div class="flex justify-between w-full items-end">
                 <div class="flex flex-col gap-4 flex-1 lg:flex-row justify-end">
@@ -387,7 +394,7 @@ const Instance = () => {
                     style={{
                       "background-image": imageUrl()
                         ? `url("${imageUrl()}")`
-                        : `url("${DefaultImg}")`,
+                        : `url("${DefaultImg}")`
                     }}
                   />
 
@@ -398,7 +405,7 @@ const Instance = () => {
                         "border-2 border-darkSlate-800 border-solid rounded-lg bg-darkSlate-700":
                           editableName(),
                         "border-2 border-transparent border-solid rounded-lg":
-                          !editableName(),
+                          !editableName()
                       }}
                     >
                       <span class="flex gap-2 cursor-pointer">
@@ -433,16 +440,16 @@ const Instance = () => {
                         classList={{ "bg-darkSlate-800 pl-2": editableName() }}
                       >
                         <div
-                          class="cursor-pointer ease-in-out z-10 text-white transition i-ri:check-fill text-3xl duration-50 hover:text-green-500"
+                          class="cursor-pointer ease-in-out z-10 transition text-white i-ri:check-fill text-3xl duration-50 hover:text-green-500"
                           classList={{
-                            hidden: !editableName(),
+                            hidden: !editableName()
                           }}
                           onClick={() => handleNameChange()}
                         />
                         <div
-                          class="cursor-pointer ease-in-out text-white transition text-3xl duration-50 z-10 i-ri:close-fill hover:text-red-500"
+                          class="cursor-pointer ease-in-out text-white transition text-3xl duration-50 z-10 hover:text-red-500 i-ri:close-fill"
                           classList={{
-                            hidden: !editableName(),
+                            hidden: !editableName()
                           }}
                           onClick={() => {
                             if (
@@ -462,8 +469,8 @@ const Instance = () => {
                       ref={innerContainerRef}
                       class="flex justify-between cursor-default flex-row"
                     >
-                      <div class="flex flex-row gap-4 items-start mt-2 ml-2 text-lightGray-600">
-                        <div class="m-0 flex gap-2 items-center h-full">
+                      <div class="flex flex-row gap-4 flex-wrap items-start mt-2 ml-2 text-lightGray-600">
+                        <div class="m-0 flex gap-2 items-center">
                           <For
                             each={routeData.instanceDetails.data?.modloaders}
                           >
@@ -472,7 +479,7 @@ const Instance = () => {
                                 <Show when={modloader.type_}>
                                   <img
                                     class="w-4 h-4"
-                                    src={getForgeModloaderIcon(modloader.type_)}
+                                    src={getCFModloaderIcon(modloader.type_)}
                                   />
                                 </Show>
                                 <span>{modloader.type_}</span>
@@ -487,7 +494,7 @@ const Instance = () => {
                             undefined
                           }
                         >
-                          <div class="flex gap-2 items-center h-full">
+                          <div class="flex gap-2 items-center">
                             <div class="i-ri:time-fill" />
                             <span class="whitespace-nowrap">
                               {convertSecondsToHumanTime(
@@ -510,7 +517,7 @@ const Instance = () => {
                           <div
                             class="flex justify-center items-center cursor-pointer rounded-full h-8 w-8"
                             style={{
-                              background: "rgba(255, 255, 255, 0.1)",
+                              background: "rgba(255, 255, 255, 0.1)"
                             }}
                           >
                             <div class="text-xl i-ri:more-2-fill" />
@@ -519,13 +526,13 @@ const Instance = () => {
                         <div
                           class="rounded-full h-8 flex justify-center items-center cursor-pointer w-8"
                           style={{
-                            background: "rgba(255, 255, 255, 0.1)",
+                            background: "rgba(255, 255, 255, 0.1)"
                           }}
                           onClick={() =>
                             setFavoriteMutation.mutate({
                               instance: parseInt(params.id, 10),
                               favorite:
-                                !routeData.instanceDetails.data?.favorite,
+                                !routeData.instanceDetails.data?.favorite
                             })
                           }
                         >
@@ -533,7 +540,7 @@ const Instance = () => {
                             class="text-xl"
                             classList={{
                               "text-yellow-500 i-ri:star-s-fill": isFavorite(),
-                              "i-ri:star-line": !isFavorite(),
+                              "i-ri:star-line": !isFavorite()
                             }}
                           />
                         </div>
@@ -557,20 +564,10 @@ const Instance = () => {
                         >
                           <Switch>
                             <Match when={!isRunning()}>
-                              <Trans
-                                key="instance.play"
-                                options={{
-                                  defaultValue: "play",
-                                }}
-                              />
+                              <Trans key="instance.play" />
                             </Match>
                             <Match when={isRunning()}>
-                              <Trans
-                                key="instance.stop"
-                                options={{
-                                  defaultValue: "stop",
-                                }}
-                              />
+                              <Trans key="instance.stop" />
                             </Match>
                           </Switch>
                         </Button>
@@ -584,79 +581,92 @@ const Instance = () => {
         </div>
       </header>
       <div class="bg-darkSlate-800 sticky">
-        <div class="flex justify-center p-6 min-h-150">
+        <div
+          class="flex justify-center min-h-150 py-6"
+          classList={{
+            "px-6": !instancePages()[selectedIndex()]?.noPadding
+          }}
+        >
           <div class="bg-darkSlate-800 w-full">
             <div
               class="sticky flex items-center justify-between z-10 bg-darkSlate-800 top-0 mb-4"
+              classList={{
+                "px-6": instancePages()[selectedIndex()]?.noPadding
+              }}
               ref={(el) => {
                 refStickyTabs = el;
               }}
             >
-              <span class="mr-4">
-                <Show when={isSticky()}>
+              <div class="flex items-center">
+                <span
+                  class="mr-4 transition-transform duration-100 ease-in-out origin-left"
+                  classList={{
+                    "scale-x-100": isSticky(),
+                    "scale-x-0": !isSticky()
+                  }}
+                  ref={(el) => {
+                    backButtonRef = el;
+                  }}
+                >
                   <Button
                     onClick={() => navigate("/library")}
                     icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
                     size="small"
                     type="secondary"
                   >
-                    <Trans
-                      key="instance.step_back"
-                      options={{
-                        defaultValue: "Back",
-                      }}
-                    />
-                  </Button>
-                </Show>
-              </span>
-              <Tabs index={selectedIndex()}>
-                <TabList>
-                  <For each={instancePages()}>
-                    {(page: InstancePage) => (
-                      <Link href={page.path} class="no-underline">
-                        <Tab class="bg-transparent">{page.label}</Tab>
-                      </Link>
-                    )}
-                  </For>
-                </TabList>
-              </Tabs>
-              <Show when={isSticky()}>
-                <span class="ml-4">
-                  <Button
-                    uppercase
-                    type="glow"
-                    size="small"
-                    variant={isRunning() && "red"}
-                    loading={isPreparing() !== undefined}
-                    onClick={() => {
-                      if (isRunning()) {
-                        killInstanceMutation.mutate(parseInt(params.id, 10));
-                      } else {
-                        launchInstanceMutation.mutate(parseInt(params.id, 10));
-                      }
-                    }}
-                  >
-                    <Switch>
-                      <Match when={!isRunning()}>
-                        <Trans
-                          key="instance.play"
-                          options={{
-                            defaultValue: "play",
-                          }}
-                        />
-                      </Match>
-                      <Match when={isRunning()}>
-                        <Trans
-                          key="instance.stop"
-                          options={{
-                            defaultValue: "stop",
-                          }}
-                        />
-                      </Match>
-                    </Switch>
+                    <Trans key="instance.step_back" />
                   </Button>
                 </span>
-              </Show>
+                <div
+                  class="transition-transform duration-100 ease-in-out origin-left"
+                  style={{
+                    transform: `translateX(${tabsTranslate()}px)`
+                  }}
+                >
+                  <Tabs index={selectedIndex()}>
+                    <TabList>
+                      <For each={instancePages()}>
+                        {(page: InstancePage) => (
+                          <Link href={page.path} class="no-underline">
+                            <Tab class="bg-transparent">{page.label}</Tab>
+                          </Link>
+                        )}
+                      </For>
+                    </TabList>
+                  </Tabs>
+                </div>
+              </div>
+              <span
+                class="ml-4 transition-transform duration-100 ease-in-out origin-right"
+                classList={{
+                  "scale-x-100": isSticky(),
+                  "scale-x-0": !isSticky()
+                }}
+              >
+                <Button
+                  uppercase
+                  type="glow"
+                  size="small"
+                  variant={isRunning() && "red"}
+                  loading={isPreparing() !== undefined}
+                  onClick={() => {
+                    if (isRunning()) {
+                      killInstanceMutation.mutate(parseInt(params.id, 10));
+                    } else {
+                      launchInstanceMutation.mutate(parseInt(params.id, 10));
+                    }
+                  }}
+                >
+                  <Switch>
+                    <Match when={!isRunning()}>
+                      <Trans key="instance.play" />
+                    </Match>
+                    <Match when={isRunning()}>
+                      <Trans key="instance.stop" />
+                    </Match>
+                  </Switch>
+                </Button>
+              </span>
             </div>
             <Outlet />
           </div>

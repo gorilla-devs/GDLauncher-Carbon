@@ -4,9 +4,11 @@ import SettingsJavaData from "@/pages/Settings/settings.java.data";
 import SettingsGeneralData from "@/pages/Settings/settings.general.data";
 import LoginData from "@/pages/Login/auth.login.data";
 import AppData from "@/pages/app.data";
-import BrowserData from "@/pages/Modpacks/browser.data";
+import ModpackBrowserData from "@/pages/Modpacks/modpacksBrowser.data";
+import ModsBrowserData from "@/pages/Mods/modsBrowser.data";
 import ModpackData from "@/pages/Modpacks/modpack.overview";
 import ModpackVersionsData from "@/pages/Modpacks/modpack.versions";
+import ModVersionsData from "@/pages/Modpacks/modpack.versions";
 import ModpackScreenshotsData from "@/pages/Modpacks/modpack.screenshots";
 import InstanceData from "@/pages/Library/Instance/instance.data";
 import InstanceLogsData from "@/pages/Library/Instance/instance.logs.data";
@@ -17,7 +19,7 @@ export const routes: RouteDefinition[] = [
   {
     path: "/",
     component: lazy(() => import("@/pages/Login")),
-    data: LoginData,
+    data: LoginData
   },
   {
     path: "/",
@@ -31,7 +33,7 @@ export const routes: RouteDefinition[] = [
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Library/Home")),
+            component: lazy(() => import("@/pages/Library/Home"))
           },
           {
             path: "/:id",
@@ -42,60 +44,95 @@ export const routes: RouteDefinition[] = [
                 path: "/",
                 component: lazy(
                   () => import("@/pages/Library/Instance/Overview")
-                ),
+                )
               },
               {
                 path: "/mods",
                 component: lazy(
                   () => import("@/pages/Library/Instance/Tabs/Mods")
-                ),
+                )
               },
               {
                 path: "/settings",
                 component: lazy(
                   () => import("@/pages/Library/Instance/Tabs/Settings")
-                ),
+                )
               },
               {
                 path: "/logs",
                 component: lazy(
                   () => import("@/pages/Library/Instance/Tabs/Log")
                 ),
-                data: InstanceLogsData,
+                data: InstanceLogsData
               },
               {
                 path: "/resourcepacks",
                 component: lazy(
                   () => import("@/pages/Library/Instance/Tabs/ResourcePacks")
-                ),
+                )
               },
               {
                 path: "/screenshots",
                 component: lazy(
                   () => import("@/pages/Library/Instance/Tabs/Screenshots")
-                ),
+                )
               },
               {
                 path: "/versions",
                 component: lazy(
                   () => import("@/pages/Library/Instance/Tabs/Versions")
-                ),
-              },
-            ],
-          },
-        ],
+                )
+              }
+            ]
+          }
+        ]
       },
       {
         path: "/modpacks",
         component: lazy(() => import("@/pages/Modpacks")),
-        data: BrowserData,
+        data: ModpackBrowserData,
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Modpacks/Browser")),
-            data: BrowserData,
+            component: lazy(() => import("@/pages/Modpacks/ModpacksBrowser"))
+          }
+        ]
+      },
+      {
+        path: "/mods",
+        component: lazy(() => import("@/pages/Mods")),
+        data: ModsBrowserData,
+        children: [
+          {
+            path: "/",
+            component: lazy(() => import("@/pages/Mods/ModsBrowser"))
+          }
+        ]
+      },
+      {
+        path: "/mods/:id/:platform",
+        component: lazy(() => import("@/pages/Mods/Explore")),
+        data: ModpackData,
+        children: [
+          {
+            path: "/",
+            component: lazy(() => import("@/pages/Mods/Explore/Overview"))
           },
-        ],
+          {
+            path: "/versions",
+            component: lazy(() => import("@/pages/Mods/Explore/Versions")),
+            data: ModVersionsData
+          },
+          {
+            path: "/changelog",
+            component: lazy(() => import("@/pages/Mods/Explore/Changelog"))
+          },
+          {
+            path: "/screenshots",
+            component: lazy(() => import("@/pages/Mods/Explore/Screenshots")),
+            data: ModpackScreenshotsData
+          }
+        ]
       },
       {
         path: "/modpacks/:id/:platform",
@@ -104,25 +141,25 @@ export const routes: RouteDefinition[] = [
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Modpacks/Explore/Overview")),
+            component: lazy(() => import("@/pages/Modpacks/Explore/Overview"))
           },
           {
             path: "/versions",
             component: lazy(() => import("@/pages/Modpacks/Explore/Versions")),
-            data: ModpackVersionsData,
+            data: ModpackVersionsData
           },
           {
             path: "/changelog",
-            component: lazy(() => import("@/pages/Modpacks/Explore/Changelog")),
+            component: lazy(() => import("@/pages/Modpacks/Explore/Changelog"))
           },
           {
             path: "/screenshots",
             component: lazy(
               () => import("@/pages/Modpacks/Explore/Screenshots")
             ),
-            data: ModpackScreenshotsData,
-          },
-        ],
+            data: ModpackScreenshotsData
+          }
+        ]
       },
       {
         path: "/settings",
@@ -131,31 +168,35 @@ export const routes: RouteDefinition[] = [
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Settings/General")),
+            component: lazy(() => import("@/pages/Settings/General"))
           },
           {
             path: "/language",
-            component: lazy(() => import("@/pages/Settings/Language")),
+            component: lazy(() => import("@/pages/Settings/Language"))
           },
           {
             path: "/appearance",
-            component: lazy(() => import("@/pages/Settings/Appearance")),
+            component: lazy(() => import("@/pages/Settings/Appearance"))
           },
           {
             path: "/java",
             component: lazy(() => import("@/pages/Settings/Java")),
-            data: SettingsJavaData,
+            data: SettingsJavaData
           },
           {
             path: "/privacy",
-            component: lazy(() => import("@/pages/Settings/Privacy")),
+            component: lazy(() => import("@/pages/Settings/Privacy"))
           },
-        ],
+          {
+            path: "/runtime-path",
+            component: lazy(() => import("@/pages/Settings/RuntimePath"))
+          }
+        ]
       },
       {
         path: "**",
-        component: lazy(() => import("@/errors/404")),
-      },
-    ],
-  },
+        component: lazy(() => import("@/errors/404"))
+      }
+    ]
+  }
 ];

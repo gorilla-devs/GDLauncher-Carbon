@@ -27,6 +27,9 @@ type Theme = {
   green: {
     [key in shade]: string;
   };
+  brands: {
+    [key: string]: string;
+  };
 };
 
 const theme = {
@@ -128,6 +131,10 @@ const theme = {
       800: "var(--green-800)",
       900: "var(--green-900)",
     },
+    brands: {
+      curseforge: "var(--brands-curseforge)",
+      modrinth: "var(--brands-modrinth)",
+    },
     // TODO: Move satisfies to the entire theme when possible
   } satisfies Theme,
   animation: {
@@ -141,6 +148,12 @@ const theme = {
     durations: { loadingbar: "1s", enterScaleIn: "200ms" },
     timingFns: { loadingbar: "linear", enterScaleIn: "ease-in-out" },
     counts: { loadingbar: "infinite" },
+  },
+  screens: {
+    xs: { max: "800px" }, // For the condition width <= 800
+    sm: { max: "999px" }, // For the condition width < 1000
+    md: { max: "1499px" }, // For the condition width < 1500
+    // Any width >= 1500 will be considered the default or 'lg' scenario
   },
 };
 

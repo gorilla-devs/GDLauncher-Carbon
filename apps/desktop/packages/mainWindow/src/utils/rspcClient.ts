@@ -1,20 +1,21 @@
 import { QueryClient } from "@tanstack/solid-query";
 import {
   createClient,
-  wsLink,
   createWSClient,
   Unsubscribable,
+  wsLink
 } from "@rspc/client";
 import { createSolidQueryHooks } from "@rspc/solid";
 import type { Procedures } from "@gd/core_module";
+import { createEffect } from "solid-js";
 
 export const rspc = createSolidQueryHooks<Procedures>();
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false, // default: true
-    },
-  },
+      refetchOnWindowFocus: false // default: true
+    }
+  }
 });
 
 export let port: number | null = null;
@@ -22,15 +23,15 @@ export let port: number | null = null;
 export default function initRspc(_port: number) {
   port = _port;
   const wsClient = createWSClient({
-    url: `ws://localhost:${_port}/rspc/ws`,
+    url: `ws://localhost:${_port}/rspc/ws`
   });
 
   const client = createClient<Procedures>({
     links: [
       wsLink({
-        client: wsClient,
-      }),
-    ],
+        client: wsClient
+      })
+    ]
   });
 
   const createInvalidateQuery = () => {
@@ -43,10 +44,11 @@ export default function initRspc(_port: number) {
           onData: (invalidateOperation) => {
             const key = [invalidateOperation!.key];
             if (invalidateOperation.args !== null) {
-              key.concat(invalidateOperation.args);
+              key.push(invalidateOperation.args);
             }
+            console.log("invalidateQuery", key);
             context.queryClient.invalidateQueries(key);
-          },
+          }
         });
       }
     }
@@ -67,6 +69,21 @@ export default function initRspc(_port: number) {
 
   return {
     client,
-    createInvalidateQuery,
+    createInvalidateQuery
   };
+}
+
+export async function rspcFetch(...args: any[]) {
+  // using .apply to avoid typescript error
+  const res = rspc.createQuery.apply(null, args as any);
+
+  return new Promise((resolve, reject) => {
+    createEffect(() => {
+      if (res.error) {
+        reject(res);
+      } else if (res.status === "success") {
+        resolve(res);
+      }
+    });
+  });
 }

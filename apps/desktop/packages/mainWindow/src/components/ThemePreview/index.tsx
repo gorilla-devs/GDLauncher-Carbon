@@ -11,7 +11,7 @@ const ThemePreview = (props: Props) => {
     {
       shade1: "fill-darkSlate-900",
       shade2: "fill-darkSlate-700",
-      shade3: "fill-darkSlate-600",
+      shade3: "fill-darkSlate-600"
     },
     props
   );

@@ -7,7 +7,7 @@ for (const file of files) {
   if (!(file.endsWith(".zip") || file.endsWith(".png"))) {
     fs.rmSync(path.join("release", file), {
       recursive: true,
-      force: true,
+      force: true
     });
   }
 }

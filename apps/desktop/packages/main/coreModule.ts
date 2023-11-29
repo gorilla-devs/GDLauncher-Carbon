@@ -2,7 +2,17 @@ import path from "path";
 import os from "os";
 import { spawn } from "child_process";
 import type { ChildProcessWithoutNullStreams } from "child_process";
-import { app, ipcMain } from "electron";
+import { ipcMain } from "electron";
+import { CURRENT_RUNTIME_PATH } from "./runtimePath";
+
+export type Log = {
+  type: "info" | "error";
+  message: string;
+};
+
+export type CoreModuleError = {
+  logs: Log[];
+};
 
 const isDev = import.meta.env.MODE === "development";
 
@@ -19,7 +29,7 @@ const loadCoreModule: CoreModule = () =>
     if (isDev) {
       resolve({
         port: 4650,
-        kill: () => {},
+        kill: () => {}
       });
       return;
     }
@@ -32,33 +42,48 @@ const loadCoreModule: CoreModule = () =>
 
     console.log(`[CORE] Spawning core module: ${coreModulePath}`);
     let coreModule: ChildProcessWithoutNullStreams | null = null;
+    let logs: Log[] = [];
 
     try {
       coreModule = spawn(
         coreModulePath,
-        ["--runtime_path", app.getPath("userData")],
+        ["--runtime_path", CURRENT_RUNTIME_PATH!],
         {
           shell: false,
           detached: false,
           stdio: "pipe",
           env: {
-            RUST_BACKTRACE: "full",
-          },
+            ...process.env,
+            RUST_BACKTRACE: "full"
+          }
         }
       );
     } catch (err) {
       console.error(`[CORE] Spawn error: ${err}`);
-      return reject(err);
+      reject({
+        logs
+      });
+
+      return;
     }
 
     coreModule.on("error", function (err) {
       console.error(`[CORE] Spawn error: ${err}`);
-      reject(err);
+      reject({
+        logs
+      });
+
+      return;
     });
 
     coreModule.stdout.on("data", (data) => {
       let dataString = data.toString();
       let rows = dataString.split(/\r?\n|\r|\n/g);
+
+      logs.push({
+        type: "info",
+        message: dataString
+      });
 
       for (let row of rows) {
         if (row.startsWith("_STATUS_:")) {
@@ -66,7 +91,7 @@ const loadCoreModule: CoreModule = () =>
           console.log(`[CORE] Port: ${port}`);
           resolve({
             port,
-            kill: () => coreModule?.kill(),
+            kill: () => coreModule?.kill()
           });
         }
       }
@@ -74,6 +99,10 @@ const loadCoreModule: CoreModule = () =>
     });
 
     coreModule.stderr.on("data", (data) => {
+      logs.push({
+        type: "error",
+        message: data.toString()
+      });
       console.error(`[CORE] Error: ${data.toString()}`);
     });
 
@@ -81,12 +110,14 @@ const loadCoreModule: CoreModule = () =>
       console.log(`[CORE] Exit with code: ${code}`);
 
       if (code !== 0) {
-        reject(new Error(`Core module exited with code ${code}`));
+        reject({
+          logs
+        });
       }
 
       resolve({
         port: 0,
-        kill: () => coreModule?.kill(),
+        kill: () => coreModule?.kill()
       });
     });
   });
@@ -94,7 +125,14 @@ const loadCoreModule: CoreModule = () =>
 const coreModule = loadCoreModule();
 
 ipcMain.handle("getCoreModulePort", async () => {
-  return (await coreModule).port;
+  let port = null;
+  try {
+    port = (await coreModule).port;
+  } catch (e) {
+    return (e as any).logs;
+  }
+
+  return port;
 });
 
 export default coreModule;

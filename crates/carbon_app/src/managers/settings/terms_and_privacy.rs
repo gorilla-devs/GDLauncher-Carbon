@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use markdown::{CompileOptions, Options};
+use reqwest_middleware::ClientWithMiddleware;
 use serde::Serialize;
 use tokio::sync::Mutex;
 use uuid::Uuid;
@@ -20,26 +20,23 @@ pub enum ConsentType {
 
 pub struct TermsAndPrivacy {
     latest_sha: Arc<Mutex<Option<String>>>,
-    reqwest_client: reqwest::Client,
+    http_client: ClientWithMiddleware,
 }
 
 impl TermsAndPrivacy {
-    pub fn new() -> Self {
+    pub fn new(http_client: ClientWithMiddleware) -> Self {
         Self {
             latest_sha: Arc::new(Mutex::new(None)),
-            reqwest_client: reqwest::Client::builder()
-                .user_agent("GDLauncher App")
-                .build()
-                .expect("Unreasonable to fail"),
+            http_client,
         }
     }
 
-    pub async fn record_consent<'a>(
+    pub async fn record_consent<'b>(
         &self,
         consent_type: ConsentType,
         consented: bool,
-        user_id: &'a Uuid,
-        secret: &'a Vec<u8>,
+        user_id: &'b Uuid,
+        secret: &'b Vec<u8>,
     ) -> anyhow::Result<()> {
         let mut lock = self.latest_sha.lock().await;
         let latest_sha = match lock.as_ref() {
@@ -52,9 +49,9 @@ impl TermsAndPrivacy {
         };
 
         #[derive(Debug, Serialize)]
-        pub struct Body<'b> {
-            pub user_id: &'b Uuid,
-            pub secret: &'b Vec<u8>,
+        pub struct Body<'c> {
+            pub user_id: &'c Uuid,
+            pub secret: &'c Vec<u8>,
             pub consent_type: ConsentType,
             pub consented: bool,
             pub document_hash: String,
@@ -70,7 +67,7 @@ impl TermsAndPrivacy {
         };
 
         let res = self
-            .reqwest_client
+            .http_client
             .post(&consent_url)
             .json(&body)
             .send()
@@ -87,7 +84,7 @@ impl TermsAndPrivacy {
 
     pub async fn update_latest_commit_sha(&self) -> anyhow::Result<String> {
         let response = self
-            .reqwest_client
+            .http_client
             .get(&format!("{BASE_GH_API_REPO_URL}/commits/master"))
             .send()
             .await?
@@ -115,7 +112,7 @@ impl TermsAndPrivacy {
         };
 
         let response = self
-            .reqwest_client
+            .http_client
             .get(format!(
                 "{}/{}/terms-of-service.md",
                 BASE_GH_REPO_URL, latest_sha
@@ -140,7 +137,7 @@ impl TermsAndPrivacy {
         };
 
         let response = self
-            .reqwest_client
+            .http_client
             .get(format!(
                 "{}/{}/privacy-statement.md",
                 BASE_GH_REPO_URL, latest_sha

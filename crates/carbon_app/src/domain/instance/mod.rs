@@ -1,6 +1,9 @@
-use crate::domain::vtask::VisualTaskId;
+use std::collections::HashMap;
+
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
+
+use crate::domain::vtask::VisualTaskId;
 
 pub mod info;
 
@@ -31,7 +34,7 @@ pub struct InstanceDetails {
     pub global_java_args: bool,
     pub extra_java_args: Option<String>,
     pub memory: Option<(u16, u16)>,
-    pub last_played: DateTime<Utc>,
+    pub last_played: Option<DateTime<Utc>>,
     pub seconds_played: u32,
     pub modloaders: Vec<info::ModLoader>,
     pub state: LaunchState,
@@ -76,12 +79,13 @@ pub struct Mod {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModFileMetadata {
-    pub modid: String,
+    pub modid: Option<String>,
     pub name: Option<String>,
     pub version: Option<String>,
     pub description: Option<String>,
     pub authors: Option<String>,
     pub modloaders: Vec<info::ModLoaderType>,
+    pub has_image: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,6 +96,7 @@ pub struct CurseForgeModMetadata {
     pub urlslug: String,
     pub summary: String,
     pub authors: String,
+    pub has_image: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -99,12 +104,10 @@ pub struct ModrinthModMetadata {
     pub project_id: String,
     pub version_id: String,
     pub title: String,
-    pub filename: String,
     pub urlslug: String,
     pub description: String,
     pub authors: String,
-    pub sha512: String,
-    pub sha1: String,
+    pub has_image: bool,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -121,3 +124,24 @@ pub enum InstanceFolder {
     TexturePacks,
     ShaderPacks,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExploreEntry {
+    pub name: String,
+    pub type_: ExploreEntryType,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ExploreEntryType {
+    File { size: u32 },
+    Directory,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum ExportTarget {
+    Curseforge,
+    Modrinth,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExportEntry(pub HashMap<String, Option<ExportEntry>>);

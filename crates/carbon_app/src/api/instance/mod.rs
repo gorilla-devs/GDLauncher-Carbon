@@ -1,7 +1,6 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::path::PathBuf;
-
 use std::sync::Arc;
 
 use anyhow::anyhow;
@@ -9,26 +8,23 @@ use axum::body::StreamBody;
 use axum::extract::{Query, State};
 use axum::response::IntoResponse;
 use chrono::{DateTime, Utc};
-
 use hyper::http::HeaderValue;
 use hyper::{HeaderMap, StatusCode};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
-use crate::api::instance::import::FEEntity;
 use crate::error::{AxumError, FeError};
-use crate::managers::instance::log::EntryType;
+use crate::managers::instance::log::LogEntrySourceKind;
 use crate::managers::instance::InstanceMoveTarget;
-use crate::managers::{App, AppInner};
+use crate::managers::{instance::importer, App, AppInner};
 
 use super::keys::instance::*;
 use super::router::router;
+use super::translation::Translation;
 use super::vtask::FETaskId;
 
 use crate::domain::instance as domain;
 use crate::managers::instance as manager;
-
-pub mod import;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
@@ -72,12 +68,16 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         mutation CREATE_INSTANCE[app, details: CreateInstance] {
+            if details.name.is_empty() {
+                return Err(anyhow::anyhow!("instance name cannot be empty"));
+            }
+
             app.instance_manager()
                 .create_instance(
                     details.group.into(),
                     details.name,
                     details.use_loaded_icon,
-                    details.version.into(),
+                    details.version.try_into()?,
                     details.notes,
                 )
                 .await
@@ -139,7 +139,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
         mutation UPDATE_INSTANCE[app, details: UpdateInstance] {
             app.instance_manager()
-                .update_instance(details.into())
+                .update_instance(details.try_into()?)
                 .await
         }
 
@@ -152,24 +152,36 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
-        query INSTANCE_DETAILS[app, id: FEInstanceId] {
-            app.instance_manager()
+        query INSTANCE_DETAILS[app, id: Option<FEInstanceId>] {
+            let Some(id) = id else {
+                return Ok(None);
+            };
+
+            let result = app.instance_manager()
                 .instance_details(id.into())
                 .await
-                .map(InstanceDetails::from)
+                .map(InstanceDetails::from);
+
+            Ok(Some(result?))
         }
 
-        query INSTANCE_MODS[app, id: FEInstanceId] {
+        query INSTANCE_MODS[app, id: Option<FEInstanceId>] {
+            let Some(id) = id else {
+                return Ok(None);
+            };
+
             app.meta_cache_manager()
-                .focus_instance(id.into())
+                .watch_and_prioritize(Some(id.into()))
                 .await;
 
-            Ok(app.instance_manager()
+            let result = app.instance_manager()
                 .list_mods(id.into())
                 .await?
                 .into_iter()
                 .map(Into::into)
-                .collect::<Vec<Mod>>())
+                .collect::<Vec<Mod>>();
+
+            Ok(Some(result))
         }
 
         mutation PREPARE_INSTANCE[app, id: FEInstanceId] {
@@ -204,7 +216,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
         query GET_LOGS[app, args: ()] {
             Ok(app.instance_manager()
-                .get_logs()
+               .get_logs()
                .await
                .into_iter()
                .map(GameLogEntry::from)
@@ -254,6 +266,8 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                             imod.instance_id.into(),
                             cf_mod.project_id,
                             cf_mod.file_id,
+                            imod.install_deps,
+                            imod.replaces_mod,
                         )
                         .await?
                 }
@@ -263,6 +277,8 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                             imod.instance_id.into(),
                             mdr_mod.project_id,
                             mdr_mod.version_id,
+                            imod.install_deps,
+                            imod.replaces_mod,
                         )
                         .await?
                 }
@@ -279,23 +295,70 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             .await
         }
 
-        query GET_IMPORTABLE_ENTITIES[_, args: ()] {
-            Ok(manager::importer::Entity::get_available()
+        query GET_IMPORTABLE_ENTITIES[_, _args: ()] {
+            anyhow::Result::Ok(importer::Entity::list()
                 .into_iter()
-                .map(FEEntity::from)
+                .map(|(e, support, selection_type)| ImportEntityStatus {
+                    entity: ImportEntity::from(e),
+                    supported: support,
+                    selection_type: ImportEntitySelectionType::from(selection_type),
+                })
                 .collect::<Vec<_>>())
         }
 
-        mutation SCAN_IMPORTABLE_INSTANCES[app, entity: import::FEEntity] {
-            import::scan_importable_instances(app, entity).await
+        query GET_IMPORT_ENTITY_DEFAULT_PATH[_, entity: ImportEntity] {
+            importer::Entity::from(entity)
+                .get_default_scan_path().await
         }
 
-        query GET_IMPORTABLE_INSTANCES[app, entity: import::FEEntity] {
-            import::get_importable_instances(app, entity).await
+        mutation SET_IMPORT_SCAN_TARGET[app, target: (ImportEntity, String)] {
+            app.instance_manager()
+                .import_manager()
+                .set_scan_target(Some((target.0.into(), PathBuf::from(target.1))))
         }
 
-        mutation IMPORT_INSTANCE[app, args: import::FEImportInstance] {
-            import::import_instance(app, args).await
+        mutation CANCEL_IMPORT_SCAN[app, args: ()] {
+            app.instance_manager()
+                .import_manager()
+                .set_scan_target(None)
+        }
+
+        query GET_IMPORT_SCAN_STATUS[app, args: ()] {
+            app.instance_manager()
+                .import_manager()
+                .scan_status()
+                .await
+                .map(FullImportScanStatus::from)
+        }
+
+        mutation IMPORT_INSTANCE[app, req: ImportRequest] {
+            app.instance_manager()
+                .import_manager()
+                .begin_import(req.index, req.name)
+                .await
+                .map(FETaskId::from)
+        }
+
+        query EXPLORE[app, args: ExploreQuery] {
+            app.instance_manager().explore_data(
+                args.instance_id.into(),
+                args.path,
+            ).await
+                .map(|entries| entries.into_iter().map(ExploreEntry::from).collect::<Vec<_>>())
+        }
+
+        mutation EXPORT[app, args: ExportArgs] {
+            let task = app.instance_manager()
+                .export_manager()
+                .export_instance(
+                    args.instance_id.into(),
+                    args.target.into(),
+                    args.save_path.into(),
+                    args.link_mods,
+                    args.filter.into(),
+                ).await?;
+
+            Ok(FETaskId::from(task))
         }
     }
 }
@@ -308,13 +371,15 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
     }
 
     #[derive(Deserialize)]
-    struct IconPathQuery {
-        path: String,
+    struct ModIconQuery {
+        instance_id: i32,
+        mod_id: String,
+        platform: String,
     }
 
     #[derive(Deserialize)]
-    struct LogQuery {
-        id: i32,
+    struct IconPathQuery {
+        path: String,
     }
 
     axum::Router::new()
@@ -345,6 +410,31 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
             ),
         )
         .route(
+            "/modIcon",
+            axum::routing::get(
+                |State(app): State<Arc<AppInner>>, Query(query): Query<ModIconQuery>| async move {
+                    let platformid = match &query.platform as &str {
+                        "metadata" => 0,
+                        "curseforge" => 1,
+                        "modrinth" => 2,
+                        _ => return Err(FeError::from_anyhow(&anyhow::anyhow!("unsupported platform")).make_axum()),
+                    };
+
+                    let icon = app.instance_manager()
+                        .get_mod_icon(domain::InstanceId(query.instance_id), query.mod_id, platformid)
+                        .await
+                        .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
+
+                    Ok::<_, AxumError>(match icon {
+                        Some(icon) => {
+                            (StatusCode::OK, icon)
+                        }
+                        None => (StatusCode::NO_CONTENT, Vec::new()),
+                    })
+                }
+            )
+        )
+        .route(
             "/loadIcon",
             axum::routing::get(
                 |State(app): State<Arc<AppInner>>, Query(query): Query<IconPathQuery>| async move {
@@ -355,70 +445,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                 }
             )
         )
-        .route(
-            "/log",
-            axum::routing::get(
-                |State(app): State<Arc<AppInner>>, Query(query): Query<LogQuery>| async move {
-                    let log_rx = app.instance_manager()
-                        .get_log(domain::GameLogId(query.id))
-                        .await;
-
-                    let Ok(mut log_rx) = log_rx else {
-                        return IntoResponse::into_response(StatusCode::NOT_FOUND)
-                    };
-
-                    #[derive(Serialize)]
-                    enum LogEntryType {
-                        System,
-                        StdOut,
-                        StdErr,
-                    }
-
-                    #[derive(Serialize)]
-                    struct LogEntry<'a> {
-                        line: &'a str,
-                        type_: LogEntryType,
-                    }
-
-                    let s = async_stream::stream! {
-                        let mut last_idx = 0;
-
-                        loop {
-                            let new_lines = {
-                                let log = log_rx.borrow();
-
-                                let new_lines = log.get_region(last_idx..).into_iter().map(|line| {
-                                    let entry = LogEntry {
-                                        line: line.text,
-                                        type_: match line.type_ {
-                                            EntryType::System => LogEntryType::System,
-                                            EntryType::StdOut => LogEntryType::StdOut,
-                                            EntryType::StdErr => LogEntryType::StdErr,
-                                        }
-                                    };
-
-                                    serde_json::to_vec(&entry)
-                                        .expect("serialization of a log entry should be infallible")
-                                }).collect::<Vec<_>>();
-
-                                last_idx = log.len();
-                                new_lines
-                            };
-
-                            for line in new_lines {
-                                yield Ok::<_, Infallible>(line)
-                            }
-
-                            if let Err(_) = log_rx.changed().await {
-                                break
-                            }
-                        }
-                    };
-
-                    IntoResponse::into_response((StatusCode::OK, StreamBody::new(s)))
-                }
-            )
-        )
+        .route("/log", axum::routing::get(log::log_handler))
 }
 #[derive(Type, Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct FEGroupId(i32);
@@ -482,7 +509,7 @@ enum ListInstanceStatus {
 #[derive(Type, Debug, Serialize)]
 struct ValidListInstance {
     mc_version: Option<String>,
-    modloader: Option<CFFEModLoaderType>,
+    modloader: Option<FEInstanceModloaderType>,
     modpack_platform: Option<ModpackPlatform>,
     state: LaunchState,
 }
@@ -598,6 +625,8 @@ struct ModrinthMod {
 struct InstallMod {
     instance_id: FEInstanceId,
     mod_source: ModSource,
+    install_deps: bool,
+    replaces_mod: Option<String>,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -674,7 +703,7 @@ struct InstanceDetails {
     global_java_args: bool,
     extra_java_args: Option<String>,
     memory: Option<MemoryRange>,
-    last_played: DateTime<Utc>,
+    last_played: Option<DateTime<Utc>>,
     seconds_played: u32,
     modloaders: Vec<ModLoader>,
     notes: String,
@@ -711,13 +740,14 @@ enum InstanceFolder {
 
 #[derive(Type, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 struct ModLoader {
-    type_: CFFEModLoaderType,
+    type_: FEInstanceModloaderType,
     version: String,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "camelCase")]
-enum CFFEModLoaderType {
+enum FEInstanceModloaderType {
+    Neoforge,
     Forge,
     Fabric,
     Quilt,
@@ -747,35 +777,149 @@ struct Mod {
 
 #[derive(Type, Debug, Serialize)]
 struct ModFileMetadata {
-    modid: String,
+    modid: Option<String>,
     name: Option<String>,
     version: Option<String>,
     description: Option<String>,
     authors: Option<String>,
-    modloaders: Vec<CFFEModLoaderType>,
+    modloaders: Vec<FEInstanceModloaderType>,
+    has_image: bool,
 }
 
 #[derive(Type, Serialize, Debug)]
 struct CurseForgeModMetadata {
-    pub project_id: u32,
-    pub file_id: u32,
-    pub name: String,
-    pub urlslug: String,
-    pub summary: String,
-    pub authors: String,
+    project_id: u32,
+    file_id: u32,
+    name: String,
+    urlslug: String,
+    summary: String,
+    authors: String,
+    has_image: bool,
 }
 
 #[derive(Type, Serialize, Debug)]
 struct ModrinthModMetadata {
-    pub project_id: String,
-    pub version_id: String,
-    pub title: String,
-    pub filename: String,
-    pub urlslug: String,
-    pub description: String,
-    pub authors: String,
-    pub sha512: String,
-    pub sha1: String,
+    project_id: String,
+    version_id: String,
+    title: String,
+    urlslug: String,
+    description: String,
+    authors: String,
+    has_image: bool,
+}
+
+#[derive(Type, Deserialize, Debug)]
+struct ExploreQuery {
+    instance_id: FEInstanceId,
+    path: Vec<String>,
+}
+
+#[derive(Type, Serialize, Debug)]
+struct ExploreEntry {
+    name: String,
+    #[serde(rename = "type")]
+    type_: ExploreEntryType,
+}
+
+#[derive(Type, Serialize, Debug)]
+enum ExploreEntryType {
+    File { size: u32 },
+    Directory,
+}
+
+#[derive(Type, Deserialize, Debug)]
+struct ExportEntry {
+    //#[serde(flatten)]
+    entries: HashMap<String, Option<ExportEntry>>,
+}
+
+#[derive(Type, Deserialize, Debug)]
+enum ExportTarget {
+    Curseforge,
+    Modrinth,
+}
+
+#[derive(Type, Deserialize, Debug)]
+struct ExportArgs {
+    instance_id: FEInstanceId,
+    target: ExportTarget,
+    save_path: String,
+    link_mods: bool,
+    filter: ExportEntry,
+}
+
+#[derive(Type, Debug, Serialize, Deserialize)]
+pub enum ImportEntity {
+    LegacyGDLauncher,
+    MRPack,
+    Modrinth,
+    CurseForgeZip,
+    CurseForge,
+    ATLauncher,
+    Technic,
+    FTB,
+    MultiMC,
+    PrismLauncher,
+}
+
+#[derive(Type, Debug, Serialize)]
+struct ImportableInstance {
+    filename: String,
+    instance_name: String,
+}
+
+#[derive(Type, Debug, Serialize)]
+struct InvalidImportEntry {
+    name: String,
+    reason: Translation,
+}
+
+#[derive(Type, Debug, Serialize)]
+enum ImportEntry {
+    Valid(ImportableInstance),
+    Invalid(InvalidImportEntry),
+}
+
+#[derive(Type, Debug, Serialize)]
+enum ImportScanStatus {
+    NoResults,
+    SingleResult(ImportEntry),
+    MultiResult(Vec<ImportEntry>),
+}
+
+#[derive(Type, Debug, Serialize)]
+struct FullImportScanStatus {
+    scanning: bool,
+    status: ImportScanStatus,
+}
+
+#[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+enum ImportEntitySelectionType {
+    File,
+    Directory,
+}
+
+impl From<importer::SelectionType> for ImportEntitySelectionType {
+    fn from(value: importer::SelectionType) -> Self {
+        match value {
+            importer::SelectionType::File => Self::File,
+            importer::SelectionType::Directory => Self::Directory,
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize)]
+struct ImportEntityStatus {
+    entity: ImportEntity,
+    supported: bool,
+    selection_type: ImportEntitySelectionType,
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct ImportRequest {
+    index: u32,
+    name: Option<String>,
 }
 
 impl From<domain::InstanceDetails> for InstanceDetails {
@@ -816,11 +960,12 @@ impl From<domain::info::ModLoader> for ModLoader {
     }
 }
 
-impl From<domain::info::ModLoaderType> for CFFEModLoaderType {
+impl From<domain::info::ModLoaderType> for FEInstanceModloaderType {
     fn from(value: domain::info::ModLoaderType) -> Self {
         use domain::info::ModLoaderType as domain;
 
         match value {
+            domain::Neoforge => Self::Neoforge,
             domain::Forge => Self::Forge,
             domain::Fabric => Self::Fabric,
             domain::Quilt => Self::Quilt,
@@ -828,19 +973,23 @@ impl From<domain::info::ModLoaderType> for CFFEModLoaderType {
     }
 }
 
-impl From<CreateInstanceVersion> for manager::InstanceVersionSource {
-    fn from(value: CreateInstanceVersion) -> Self {
-        match value {
-            CreateInstanceVersion::Version(v) => Self::Version(v.into()),
+impl TryFrom<CreateInstanceVersion> for manager::InstanceVersionSource {
+    type Error = anyhow::Error;
+
+    fn try_from(value: CreateInstanceVersion) -> anyhow::Result<Self> {
+        Ok(match value {
+            CreateInstanceVersion::Version(v) => Self::Version(v.try_into()?),
             CreateInstanceVersion::Modpack(m) => Self::Modpack(m.into()),
-        }
+        })
     }
 }
 
-impl From<GameVersion> for domain::info::GameVersion {
-    fn from(value: GameVersion) -> Self {
+impl TryFrom<GameVersion> for domain::info::GameVersion {
+    type Error = anyhow::Error;
+
+    fn try_from(value: GameVersion) -> anyhow::Result<Self> {
         match value {
-            GameVersion::Standard(v) => Self::Standard(v.into()),
+            GameVersion::Standard(v) => Ok(Self::Standard(v.try_into()?)),
         }
     }
 }
@@ -899,30 +1048,45 @@ impl From<domain::info::ModrinthModpack> for ModrinthModpack {
     }
 }
 
-impl From<StandardVersion> for domain::info::StandardVersion {
-    fn from(value: StandardVersion) -> Self {
-        Self {
-            release: value.release,
-            modloaders: value.modloaders.into_iter().map(Into::into).collect(),
+impl TryFrom<StandardVersion> for domain::info::StandardVersion {
+    type Error = anyhow::Error;
+
+    fn try_from(value: StandardVersion) -> anyhow::Result<Self> {
+        let mut modloaders = HashSet::new();
+
+        for modloader in value.modloaders {
+            modloaders.insert(modloader.try_into()?);
         }
+
+        Ok(Self {
+            release: value.release,
+            modloaders,
+        })
     }
 }
 
-impl From<ModLoader> for domain::info::ModLoader {
-    fn from(value: ModLoader) -> Self {
-        Self {
+impl TryFrom<ModLoader> for domain::info::ModLoader {
+    type Error = anyhow::Error;
+
+    fn try_from(value: ModLoader) -> anyhow::Result<Self> {
+        if value.version.is_empty() {
+            return Err(anyhow!("modloader version cannot be empty"));
+        }
+
+        Ok(Self {
             type_: value.type_.into(),
             version: value.version,
-        }
+        })
     }
 }
 
-impl From<CFFEModLoaderType> for domain::info::ModLoaderType {
-    fn from(value: CFFEModLoaderType) -> Self {
+impl From<FEInstanceModloaderType> for domain::info::ModLoaderType {
+    fn from(value: FEInstanceModloaderType) -> Self {
         match value {
-            CFFEModLoaderType::Forge => Self::Forge,
-            CFFEModLoaderType::Fabric => Self::Fabric,
-            CFFEModLoaderType::Quilt => Self::Quilt,
+            FEInstanceModloaderType::Neoforge => Self::Neoforge,
+            FEInstanceModloaderType::Forge => Self::Forge,
+            FEInstanceModloaderType::Fabric => Self::Fabric,
+            FEInstanceModloaderType::Quilt => Self::Quilt,
         }
     }
 }
@@ -1043,6 +1207,7 @@ impl From<domain::ModFileMetadata> for ModFileMetadata {
             description: value.description,
             authors: value.authors,
             modloaders: value.modloaders.into_iter().map(Into::into).collect(),
+            has_image: value.has_image,
         }
     }
 }
@@ -1056,6 +1221,7 @@ impl From<domain::CurseForgeModMetadata> for CurseForgeModMetadata {
             urlslug: value.urlslug,
             summary: value.summary,
             authors: value.authors,
+            has_image: value.has_image,
         }
     }
 }
@@ -1066,12 +1232,10 @@ impl From<domain::ModrinthModMetadata> for ModrinthModMetadata {
             project_id: value.project_id,
             version_id: value.version_id,
             title: value.title,
-            filename: value.filename,
             urlslug: value.urlslug,
             description: value.description,
             authors: value.authors,
-            sha512: value.sha512,
-            sha1: value.sha1,
+            has_image: value.has_image,
         }
     }
 }
@@ -1131,18 +1295,222 @@ impl From<MemoryRange> for (u16, u16) {
     }
 }
 
-impl From<UpdateInstance> for domain::InstanceSettingsUpdate {
-    fn from(value: UpdateInstance) -> Self {
-        Self {
+impl TryFrom<UpdateInstance> for domain::InstanceSettingsUpdate {
+    type Error = anyhow::Error;
+
+    fn try_from(value: UpdateInstance) -> anyhow::Result<Self> {
+        Ok(Self {
             instance_id: value.instance.into(),
             name: value.name.map(|x| x.inner()),
             use_loaded_icon: value.use_loaded_icon.map(|x| x.inner()),
             notes: value.notes.map(|x| x.inner()),
             version: value.version.map(|x| x.inner()),
-            modloader: value.modloader.map(|x| x.inner().map(Into::into)),
+            modloader: value
+                .modloader
+                .map(|x| x.inner().and_then(|v| v.try_into().ok())),
             global_java_args: value.global_java_args.map(|x| x.inner()),
             extra_java_args: value.extra_java_args.map(|x| x.inner()),
             memory: value.memory.map(|x| x.inner().map(Into::into)),
+        })
+    }
+}
+
+impl From<domain::ExploreEntry> for ExploreEntry {
+    fn from(value: domain::ExploreEntry) -> Self {
+        Self {
+            name: value.name,
+            type_: value.type_.into(),
         }
+    }
+}
+
+impl From<ImportEntity> for importer::Entity {
+    fn from(entity: ImportEntity) -> Self {
+        match entity {
+            ImportEntity::LegacyGDLauncher => Self::LegacyGDLauncher,
+            ImportEntity::MRPack => Self::MRPack,
+            ImportEntity::Modrinth => Self::Modrinth,
+            ImportEntity::CurseForgeZip => Self::CurseForgeZip,
+            ImportEntity::CurseForge => Self::CurseForge,
+            ImportEntity::ATLauncher => Self::ATLauncher,
+            ImportEntity::Technic => Self::Technic,
+            ImportEntity::FTB => Self::FTB,
+            ImportEntity::MultiMC => Self::MultiMC,
+            ImportEntity::PrismLauncher => Self::PrismLauncher,
+        }
+    }
+}
+
+impl From<importer::Entity> for ImportEntity {
+    fn from(entity: importer::Entity) -> Self {
+        use importer::Entity as backend;
+
+        match entity {
+            backend::LegacyGDLauncher => Self::LegacyGDLauncher,
+            backend::MRPack => Self::MRPack,
+            backend::Modrinth => Self::Modrinth,
+            backend::CurseForgeZip => Self::CurseForgeZip,
+            backend::CurseForge => Self::CurseForge,
+            backend::ATLauncher => Self::ATLauncher,
+            backend::Technic => Self::Technic,
+            backend::FTB => Self::FTB,
+            backend::MultiMC => Self::MultiMC,
+            backend::PrismLauncher => Self::PrismLauncher,
+        }
+    }
+}
+
+impl From<importer::ImportableInstance> for ImportableInstance {
+    fn from(value: importer::ImportableInstance) -> Self {
+        Self {
+            filename: value.filename,
+            instance_name: value.instance_name,
+        }
+    }
+}
+
+impl From<importer::InvalidImportEntry> for InvalidImportEntry {
+    fn from(value: importer::InvalidImportEntry) -> Self {
+        Self {
+            name: value.name,
+            reason: value.reason,
+        }
+    }
+}
+
+impl From<domain::ExploreEntryType> for ExploreEntryType {
+    fn from(value: domain::ExploreEntryType) -> Self {
+        match value {
+            domain::ExploreEntryType::File { size } => Self::File { size },
+            domain::ExploreEntryType::Directory => Self::Directory,
+        }
+    }
+}
+
+impl From<importer::ImportEntry> for ImportEntry {
+    fn from(value: importer::ImportEntry) -> Self {
+        match value {
+            importer::ImportEntry::Valid(v) => Self::Valid(v.into()),
+            importer::ImportEntry::Invalid(v) => Self::Invalid(v.into()),
+        }
+    }
+}
+
+impl From<ExportTarget> for domain::ExportTarget {
+    fn from(value: ExportTarget) -> Self {
+        match value {
+            ExportTarget::Curseforge => Self::Curseforge,
+            ExportTarget::Modrinth => Self::Modrinth,
+        }
+    }
+}
+
+impl From<importer::ImportScanStatus> for ImportScanStatus {
+    fn from(value: importer::ImportScanStatus) -> Self {
+        use importer::ImportScanStatus as domain;
+
+        match value {
+            domain::NoResults => Self::NoResults,
+            domain::SingleResult(r) => Self::SingleResult(r.into()),
+            domain::MultiResult(r) => Self::MultiResult(r.into_iter().map(Into::into).collect()),
+        }
+    }
+}
+
+impl From<ExportEntry> for domain::ExportEntry {
+    fn from(value: ExportEntry) -> Self {
+        Self(
+            value
+                .entries
+                .into_iter()
+                .map(|(k, v)| (k, v.map(Into::into)))
+                .collect(),
+        )
+    }
+}
+
+impl From<importer::FullImportScanStatus> for FullImportScanStatus {
+    fn from(value: importer::FullImportScanStatus) -> Self {
+        Self {
+            scanning: value.scanning,
+            status: value.status.into(),
+        }
+    }
+}
+
+mod log {
+    use super::*;
+
+    #[derive(Debug, Deserialize)]
+    pub struct LogQuery {
+        id: i32,
+    }
+
+    #[tracing::instrument(skip(app))]
+    pub async fn log_handler(
+        State(app): State<App>,
+        Query(query): Query<LogQuery>,
+    ) -> impl IntoResponse {
+        tracing::info!("starting log stream");
+
+        let log_rx = app
+            .instance_manager()
+            .get_log(domain::GameLogId(query.id))
+            .await;
+
+        let Ok(mut log_rx) = log_rx else {
+            tracing::warn!("log entry not found");
+
+            return StatusCode::NOT_FOUND.into_response();
+        };
+
+        let s = async_stream::stream! {
+            tracing::trace!("starting log stream");
+
+            let mut last_idx = 0;
+
+            loop {
+                tracing::trace!("waiting for log data to come in");
+
+                let new_lines = {
+                    let log = log_rx.borrow();
+
+                    let new_lines
+                        = log
+                            .get_span(last_idx..)
+                            .into_iter()
+                            .inspect(|entry| tracing::trace!(?entry, "received log entry"))
+                            .map(|entry| {
+                                serde_json::to_vec(&entry)
+                                    .expect(
+                                        "serialization of a log entry should be infallible"
+                                    )
+                            })
+                            .collect::<Vec<_>>();
+
+                    last_idx = log.len();
+
+                    new_lines
+                };
+
+
+
+                for line in new_lines {
+                    tracing::trace!("yielding log entry");
+
+                    yield Ok::<_, Infallible>(line)
+                }
+
+
+
+                if let Err(_) = log_rx.changed().await {
+                    tracing::error!("`log_rx` was closed, killing log stream");
+
+                    break
+                }
+            }
+        };
+
+        (StatusCode::OK, StreamBody::new(s)).into_response()
     }
 }

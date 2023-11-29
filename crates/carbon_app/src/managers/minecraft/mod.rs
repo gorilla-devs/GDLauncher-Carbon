@@ -23,6 +23,7 @@ pub mod fabric;
 pub mod forge;
 pub mod minecraft;
 pub mod modrinth;
+pub mod neoforge;
 pub mod quilt;
 
 pub(crate) struct MinecraftManager {
@@ -32,7 +33,7 @@ pub(crate) struct MinecraftManager {
 impl MinecraftManager {
     pub fn new() -> Self {
         Self {
-            meta_base_url: Url::parse("https://meta.gdl.gg/").unwrap(),
+            meta_base_url: Url::parse(env!("META_BASE_URL")).unwrap(),
         }
     }
 }
@@ -51,6 +52,10 @@ impl ManagerRef<'_, MinecraftManager> {
 
     pub async fn get_forge_manifest(&self) -> anyhow::Result<Manifest> {
         forge::get_manifest(&self.app.reqwest_client, &self.meta_base_url).await
+    }
+
+    pub async fn get_neoforge_manifest(&self) -> anyhow::Result<Manifest> {
+        neoforge::get_manifest(&self.app.reqwest_client, &self.meta_base_url).await
     }
 
     pub async fn get_fabric_manifest(&self) -> anyhow::Result<Manifest> {
@@ -131,6 +136,30 @@ impl ManagerRef<'_, MinecraftManager> {
         all_files.extend(assets);
 
         Ok(all_files)
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct UpdateValue<T: Copy + Clone + Eq>(pub T);
+
+impl<T: Copy + Clone + Eq> UpdateValue<T> {
+    pub fn new(value: T) -> Self {
+        Self(value)
+    }
+
+    pub fn set(&mut self, value: T) {
+        self.0 = value;
+    }
+
+    pub fn get(&self) -> &T {
+        &self.0
+    }
+
+    pub fn update_from(&mut self, from: &Self, update_callback: impl FnOnce(T)) {
+        if self.0 != from.0 {
+            self.0 = from.0;
+            update_callback(self.0);
+        }
     }
 }
 

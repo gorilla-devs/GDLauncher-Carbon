@@ -13,28 +13,33 @@ const settings: Array<settingsItem> = [
   {
     name: "General",
     icon: "i-ri:home-gear-fill",
-    path: "/settings",
+    path: "/settings"
   },
   {
     name: "Language",
     icon: "i-ri:global-line",
-    path: "/settings/language",
+    path: "/settings/language"
   },
   {
     name: "Appearance",
     icon: "i-ri:brush-line",
-    path: "/settings/appearance",
+    path: "/settings/appearance"
   },
   {
     name: "Java",
     icon: "i-nonicons:java-16",
-    path: "/settings/java",
+    path: "/settings/java"
   },
   {
     name: "Privacy",
     icon: "i-ri:shield-keyhole-line",
-    path: "/settings/privacy",
+    path: "/settings/privacy"
   },
+  {
+    name: "Runtime Path",
+    icon: "i-ri-folder-fill",
+    path: "/settings/runtime-path"
+  }
 ];
 
 const Sidebar = () => {

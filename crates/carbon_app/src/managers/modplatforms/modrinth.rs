@@ -5,7 +5,7 @@ use url::Url;
 
 use crate::{
     domain::modplatforms::modrinth::{
-        project::Project,
+        project::{Project, ProjectVersionsFilters},
         responses::{
             CategoriesResponse, LoadersResponse, ProjectsResponse, TeamResponse,
             VersionHashesResponse, VersionsResponse,
@@ -46,8 +46,9 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context()
+            .json_with_context_reporting("modrinth::get_categories")
             .await?;
+
         Ok(categories)
     }
 
@@ -62,7 +63,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context()
+            .json_with_context_reporting("modrinth::get_loaders")
             .await?;
         Ok(categories)
     }
@@ -83,7 +84,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context()
+            .json_with_context_reporting("modrinth::search")
             .await?;
         Ok(search_results)
     }
@@ -99,7 +100,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context()
+            .json_with_context_reporting("modrinth::get_project")
             .await?;
         Ok(proj)
     }
@@ -107,11 +108,22 @@ impl Modrinth {
     #[tracing::instrument(skip(self))]
     pub async fn get_project_versions(
         &self,
-        project: ProjectID,
+        filters: ProjectVersionsFilters,
     ) -> anyhow::Result<VersionsResponse> {
-        let url = self
+        let mut url = self
             .base_url
-            .join(&format!("project/{}/version", &*project))?;
+            .join(&format!("project/{}/version", &*filters.project_id))?;
+        {
+            let mut query_pairs = url.query_pairs_mut();
+
+            if let Some(game_version) = filters.game_version {
+                query_pairs.append_pair("game_versions", &format!(r#"["{}"]"#, &game_version));
+            }
+
+            if let Some(loaders) = filters.loaders {
+                query_pairs.append_pair("loaders", &format!(r#"["{}"]"#, &loaders));
+            }
+        }
 
         trace!("GET {}", url);
 
@@ -120,7 +132,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context()
+            .json_with_context_reporting("modrinth::get_project_versions")
             .await?;
         Ok(proj)
     }
@@ -138,7 +150,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context()
+            .json_with_context_reporting("modrinth::get_projects")
             .await?;
         Ok(projects)
     }
@@ -154,7 +166,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context()
+            .json_with_context_reporting("modrinth::get_version")
             .await?;
         Ok(ver)
     }
@@ -172,7 +184,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context()
+            .json_with_context_reporting("modrinth::get_versions")
             .await?;
         Ok(versions)
     }
@@ -194,7 +206,7 @@ impl Modrinth {
             .json(&hashes_query)
             .send()
             .await?
-            .json_with_context()
+            .json_with_context_reporting("modrinth::get_versions_from_hash")
             .await?;
         Ok(versions)
     }
@@ -210,7 +222,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context::<TeamResponse>()
+            .json_with_context_reporting::<TeamResponse>("modrinth::get_team")
             .await?
             .into_iter()
             .filter(|member| member.accepted)
@@ -231,7 +243,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context::<Vec<TeamResponse>>()
+            .json_with_context_reporting::<Vec<TeamResponse>>("modrinth::get_teams")
             .await?
             .into_iter()
             .map(|team| team.into_iter().filter(|member| member.accepted).collect())
@@ -252,7 +264,7 @@ impl Modrinth {
             .get(url.as_str())
             .send()
             .await?
-            .json_with_context::<TeamResponse>()
+            .json_with_context_reporting::<TeamResponse>("modrinth::get_project_team")
             .await?
             .into_iter()
             .filter(|member| member.accepted)
@@ -385,7 +397,11 @@ mod test {
         let modrinth = Modrinth::new(client);
 
         let results = modrinth
-            .get_project_versions(ProjectID("u6dRKJwZ".to_string()))
+            .get_project_versions(ProjectVersionsFilters {
+                project_id: ProjectID("u6dRKJwZ".to_string()),
+                game_version: None,
+                loaders: None,
+            })
             .await?;
         tracing::debug!("Versions: {:?}", results);
         assert!(!results.is_empty());

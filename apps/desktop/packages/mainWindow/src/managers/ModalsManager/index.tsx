@@ -5,10 +5,11 @@ import {
   For,
   JSX,
   lazy,
-  useContext,
+  useContext
 } from "solid-js";
 import { Dynamic, Portal } from "solid-js/web";
 import { useGDNavigate } from "../NavigationManager";
+import adSize from "@/utils/adhelper";
 
 export type ModalProps = {
   title: string;
@@ -30,48 +31,52 @@ type Hash = {
 const defaultModals = {
   privacyStatement: {
     component: lazy(() => import("./modals/PrivacyStatement")),
-    title: "Privacy Statement",
+    title: "Privacy Statement"
   },
   termsAndConditions: {
     component: lazy(() => import("./modals/TermsAndConditions")),
-    title: "Terms and Conditions",
+    title: "Terms and Conditions"
   },
   addJava: {
     component: lazy(() => import("./modals/Java/AddJava")),
-    title: "Add java version",
-  },
-  addMod: {
-    component: lazy(() => import("./modals/AddMod")),
-    title: "Add mod",
+    title: "Add java version"
   },
   modDetails: {
     component: lazy(() => import("./modals/ModDetails")),
-    title: "Mod Details",
+    title: "Mod Details"
   },
   javaSetup: {
     component: lazy(() => import("./modals/Java/JavaSetup")),
-    title: "Java Setup",
+    title: "Java Setup"
   },
   instanceCreation: {
     component: lazy(() => import("./modals/InstanceCreation")),
-    title: "New Instance",
+    title: "New Instance"
   },
   notification: {
     component: lazy(() => import("./modals/Notification")),
-    title: "Notification",
+    title: "Notification"
   },
   confirmInstanceDeletion: {
     component: lazy(() => import("./modals/ConfirmInstanceDeletion")),
-    title: "Confirm Instance Deletion",
+    title: "Confirm Instance Deletion"
+  },
+  ConfirmChangeRuntimePath: {
+    component: lazy(() => import("./modals/ConfirmChangeRuntimePath")),
+    title: "Confirm Change RuntimePath"
   },
   appUpdate: {
     component: lazy(() => import("./modals/AppUpdate")),
-    title: "New App Version Available",
+    title: "New App Version Available"
   },
   onBoarding: {
     component: lazy(() => import("./modals/OnBoarding")),
-    noHeader: true,
+    noHeader: true
   },
+  whyAreAdsNeeded: {
+    component: lazy(() => import("./modals/WhyAreAdsNeeded")),
+    title: "Why are ads needed?"
+  }
 };
 
 type ModalName = keyof typeof defaultModals;
@@ -140,7 +145,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
       setTimeout(() => (overlay.style.opacity = "1"), 10); // Transition to opacity 1
       setModalStack((currentStack) => [
         ...currentStack,
-        { name: modal.name, data },
+        { name: modal.name, data }
       ]);
 
       // Update URL params
@@ -153,11 +158,11 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
         navigate(decodedParamString.replace("=&", "?"));
       } else {
         setSearchParams({
-          [`m[${modalStack().length}]`]: modal.name,
+          [`m[${modalStack().length}]`]: modal.name
         });
       }
     },
-    closeModal,
+    closeModal
   };
 
   return (
@@ -175,22 +180,19 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                 .preventClose;
 
               return (
-                <>
+                <div class="h-screen w-screen absolute inset-0 flex">
                   <div
-                    class="absolute bottom-0 top-0 left-0 flex justify-center items-center z-999"
-                    onClick={() => {
+                    class="relative flex flex-grow h-full justify-center items-center z-999"
+                    onMouseDown={() => {
                       if (!preventClose) {
                         closeModal();
                       }
                     }}
-                    classList={{
-                      "right-0": location.pathname === "/",
-                      "right-[440px]": location.pathname !== "/",
-                    }}
                   >
                     <div
                       style={{ "z-index": `${index() + 1}` }}
-                      class="duration-100 ease-in-out animate-enterScaleIn"
+                      onMouseDown={(e) => e.stopPropagation()}
+                      class="duration-100 ease-in-out animate-enterScaleIn h-3/4"
                     >
                       <Dynamic
                         component={ModalComponent}
@@ -199,18 +201,21 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                         title={title}
                       />
                     </div>
+                    <div class="absolute inset-0 bg-darkSlate-900 backdrop-blur-sm opacity-80" />
                   </div>
+
                   <div
-                    class="h-screen w-screen absolute duration-100 ease-in-out text-white transition-all backdrop-blur-sm grid place-items-center z-99 origin-center"
+                    class="h-screen duration-100 ease-in-out text-white transition-all grid place-items-center z-99 origin-center"
+                    style={{
+                      width: `${adSize.width + 40}px`
+                    }}
                     onClick={() => {
                       if (!preventClose) {
                         closeModal();
                       }
                     }}
-                  >
-                    <div class="h-screen w-screen bg-darkSlate-900 opacity-80" />
-                  </div>
-                </>
+                  />
+                </div>
               );
             }}
           </For>

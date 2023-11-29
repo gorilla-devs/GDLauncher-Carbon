@@ -1,17 +1,17 @@
-import { ModRowProps, getCategories, isCurseForgeData } from "@/utils/Mods";
-import { Accessor, For, Match, Show, Switch } from "solid-js";
+import { getCategories, isCurseForgeData, ModRowProps } from "@/utils/mods";
+import { For, Match, Show, Switch } from "solid-js";
 import { Tag, Tooltip } from "@gd/ui";
 import {
   CFFECategory,
   MRFECategoriesResponse,
-  MRFECategory,
+  MRFECategory
 } from "@gd/core_module/bindings";
 import { CategoryIcon } from "@/utils/instances";
 import { capitalize } from "@/utils/helpers";
 
 type Props = {
   modProps: ModRowProps;
-  isRowSmall: Accessor<boolean>;
+  isRowSmall: boolean;
   modrinthCategories: MRFECategoriesResponse | undefined;
 };
 
@@ -19,7 +19,7 @@ const Categories = (props: Props) => {
   return (
     <div class="flex gap-2 scrollbar-hide">
       <Switch>
-        <Match when={!props.isRowSmall()}>
+        <Match when={!props.isRowSmall}>
           <For each={getCategories(props.modProps)}>
             {(tag) => {
               const modrinthCategory = () =>
@@ -57,7 +57,7 @@ const Categories = (props: Props) => {
             }}
           </For>
         </Match>
-        <Match when={props.isRowSmall()}>
+        <Match when={props.isRowSmall}>
           <Tooltip
             content={
               isCurseForgeData(props.modProps.data)

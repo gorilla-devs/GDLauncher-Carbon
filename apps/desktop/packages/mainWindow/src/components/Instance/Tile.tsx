@@ -1,12 +1,12 @@
 /* eslint-disable i18next/no-literal-string */
-import { getForgeModloaderIcon } from "@/utils/sidebar";
+import { getCFModloaderIcon } from "@/utils/sidebar";
 import {
   ListInstance,
   CFFEModLoaderType,
   FESubtask,
   Translation,
   UngroupedInstance,
-  ModpackPlatform,
+  ModpackPlatform
 } from "@gd/core_module/bindings";
 import { For, Match, Show, Switch, mergeProps } from "solid-js";
 import { ContextMenu } from "../ContextMenu";
@@ -49,28 +49,28 @@ const Tile = (props: Props) => {
   const modalsContext = useModal();
 
   const launchInstanceMutation = rspc.createMutation([
-    "instance.launchInstance",
+    "instance.launchInstance"
   ]);
 
   const killInstanceMutation = rspc.createMutation(["instance.killInstance"]);
 
   const openFolderMutation = rspc.createMutation([
-    "instance.openInstanceFolder",
+    "instance.openInstanceFolder"
   ]);
 
   const duplicateInstanceMutation = rspc.createMutation([
-    "instance.duplicateInstance",
+    "instance.duplicateInstance"
   ]);
 
   const instanceDetails = rspc.createQuery(() => [
     "instance.getInstanceDetails",
-    props.instance.id,
+    props.instance.id
   ]);
 
   const handleOpenFolder = () => {
     openFolderMutation.mutate({
       instance_id: props.instance.id,
-      folder: "Root",
+      folder: "Root"
     });
   };
 
@@ -82,11 +82,11 @@ const Tile = (props: Props) => {
     // deleteInstanceMutation.mutate(props.instance.id);
     modalsContext?.openModal(
       {
-        name: "confirmInstanceDeletion",
+        name: "confirmInstanceDeletion"
       },
       {
         id: props.instance.id,
-        name: props.instance.name,
+        name: props.instance.name
       }
     );
   };
@@ -100,7 +100,7 @@ const Tile = (props: Props) => {
   const handleEdit = () => {
     modalsContext?.openModal(
       {
-        name: "instanceCreation",
+        name: "instanceCreation"
       },
       {
         id: props.instance.id,
@@ -108,7 +108,7 @@ const Tile = (props: Props) => {
         title: props.instance.name,
         mcVersion: validInstance()?.mc_version,
         modloaderVersion: instanceDetails?.data?.modloaders[0]?.version,
-        img: props.img,
+        img: props.img
       }
     );
   };
@@ -117,7 +117,7 @@ const Tile = (props: Props) => {
     if (!props.isInvalid) {
       duplicateInstanceMutation.mutate({
         instance: props.instance.id,
-        new_name: props.instance.name,
+        new_name: props.instance.name
       });
     }
   };
@@ -126,38 +126,38 @@ const Tile = (props: Props) => {
     {
       icon: props.isRunning ? "i-ri:stop-fill" : "i-ri:play-fill",
       label: props.isRunning ? t("instance.stop") : t("instance.action_play"),
-      action: handlePlay,
+      action: handlePlay
     },
     {
       icon: "i-ri:pencil-fill",
       label: t("instance.action_edit"),
-      action: handleEdit,
+      action: handleEdit
     },
     {
       icon: "i-ri:settings-3-fill",
       label: t("instance.action_settings"),
-      action: handleSettings,
+      action: handleSettings
     },
     ...(!props.isInvalid
       ? [
           {
             icon: "i-ri:file-copy-fill",
             label: t("instance.action_duplicate"),
-            action: handleDuplicate,
-          },
+            action: handleDuplicate
+          }
         ]
       : []),
     {
       icon: "i-ri:folder-open-fill",
       label: t("instance.action_open_folder"),
-      action: handleOpenFolder,
+      action: handleOpenFolder
     },
     {
       id: "delete",
       icon: "i-ri:delete-bin-2-fill",
       label: t("instance.action_delete"),
-      action: handleDelete,
-    },
+      action: handleDelete
+    }
   ];
 
   const getTranslationArgs = (translation: Translation) => {
@@ -181,7 +181,7 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "default"}>
         <ContextMenu menuItems={menuItems()}>
           <div
-            class="relative flex justify-center flex-col select-none group items-start z-50"
+            class="flex justify-center flex-col relative select-none group items-start z-50"
             onClick={(e) => {
               e.stopPropagation();
               if (
@@ -194,9 +194,9 @@ const Tile = (props: Props) => {
               }
             }}
           >
-            <div class="relative rounded-2xl overflow-hidden h-38 w-38">
+            <div class="relative rounded-2xl overflow-hidden h-38 w-38 border-1 border-solid border-darkSlate-600">
               <div
-                class="flex justify-center relative items-center rounded-2xl overflow-hidden h-38 w-38 bg-cover bg-center max-w-38"
+                class="flex justify-center relative items-center rounded-2xl overflow-hidden h-38 w-38 bg-cover bg-center max-w-38 hover:opacity-60 hover:bg-darkSlate-600"
                 classList={{
                   grayscale: props.isLoading || isInQueue(),
                   "cursor-pointer":
@@ -204,20 +204,20 @@ const Tile = (props: Props) => {
                     !isInQueue() &&
                     !props.isInvalid &&
                     !props.failError &&
-                    !props.isRunning,
+                    !props.isRunning
                 }}
                 style={{
                   "background-image": props.img
                     ? `url("${props.img as string}")`
                     : `url("${DefaultImg}")`,
-                  "background-size": props.img ? "100%" : "120%",
+                  "background-size": props.img ? "cover" : "120%"
                 }}
               >
                 <Show when={props.isInvalid}>
                   <h2 class="text-sm text-center z-20">
                     <Trans key="instance.error_invalid" />
                   </h2>
-                  <div class="z-10 absolute right-0 w-full h-full rounded-2xl top-0 left-0 bottom-0 bg-gradient-to-l from-black opacity-50 from-30%" />
+                  <div class="w-full rounded-2xl z-10 absolute right-0 h-full top-0 left-0 bottom-0 bg-gradient-to-l from-black opacity-50 from-30%" />
                   <div class="z-10 absolute top-0 bottom-0 left-0 right-0 from-black opacity-50 w-full h-full rounded-2xl bg-gradient-to-t" />
                   <div class="absolute z-10 text-2xl i-ri:alert-fill text-yellow-500 top-1 right-1" />
                 </Show>
@@ -229,7 +229,7 @@ const Tile = (props: Props) => {
                 </Show>
 
                 <div
-                  class="group flex justify-center items-center rounded-full cursor-pointer absolute ease-in-out duration-100 transition-all h-12 w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 hidden will-change-transform"
+                  class="group flex justify-center items-center absolute rounded-full cursor-pointer ease-in-out duration-100 hidden transition-all h-12 w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
                   classList={{
                     "bg-primary-500 hover:bg-primary-400 text-2xl hover:text-3xl hover:drop-shadow-2xl":
                       !props.isRunning,
@@ -240,7 +240,7 @@ const Tile = (props: Props) => {
                       !isInQueue() &&
                       !props.isInvalid &&
                       !props.failError &&
-                      !props.isRunning,
+                      !props.isRunning
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -251,7 +251,7 @@ const Tile = (props: Props) => {
                     class="text-white"
                     classList={{
                       "i-ri:play-fill": !props.isRunning,
-                      "i-ri:stop-fill text-xl": props.isRunning,
+                      "i-ri:stop-fill text-xl": props.isRunning
                     }}
                   />
                 </div>
@@ -263,8 +263,8 @@ const Tile = (props: Props) => {
                     props.percentage !== null
                   }
                 >
-                  <div class="flex flex-col justify-center items-center gap-2 z-20 w-full h-full">
-                    <h3 class="m-0 text-center text-3xl opacity-50">
+                  <div class="flex flex-col justify-center items-center z-20 w-full h-full gap-2">
+                    <h3 class="text-center opacity-50 m-0 text-3xl">
                       {Math.round(props.percentage as number)}%
                     </h3>
                     <div class="h-10">
@@ -275,7 +275,7 @@ const Tile = (props: Props) => {
                             classList={{
                               "text-xs":
                                 props.subTasks && props.subTasks?.length > 1,
-                              "text-md": props.subTasks?.length === 1,
+                              "text-md": props.subTasks?.length === 1
                             }}
                           >
                             <Trans
@@ -297,7 +297,7 @@ const Tile = (props: Props) => {
                   </div>
                 </Show>
                 <Show when={validInstance()?.modpack_platform}>
-                  <div class="absolute flex justify-center items-center bg-darkSlate-900 border-1 rounded-lg top-2 right-2 p-2 border-solid border-darkSlate-600">
+                  <div class="absolute flex justify-center items-center border-1 border-solid border-darkSlate-600 bg-darkSlate-900 rounded-lg p-2 top-2 right-2">
                     <img
                       class="w-4 h-4"
                       src={getModpackPlatformIcon(
@@ -307,28 +307,36 @@ const Tile = (props: Props) => {
                   </div>
                 </Show>
                 <Show when={props.isLoading || isInQueue()}>
-                  <div class="absolute top-0 bottom-0 left-0 right-0 z-11 backdrop-blur-lg" />
+                  <div class="absolute top-0 bottom-0 left-0 right-0 backdrop-blur-sm z-11" />
                   <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
                   <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
                 </Show>
               </div>
               <Show when={props.isLoading && props.percentage !== undefined}>
                 <div
-                  class="absolute left-0 bottom-0 z-40 rounded-full bg-primary-500 h-1"
+                  class="absolute left-0 bottom-0 rounded-full z-40 bg-primary-500 h-1"
                   style={{
-                    width: `${props.percentage}%`,
+                    width: `${props.percentage}%`
                   }}
                 />
               </Show>
             </div>
             <h4
-              class="overflow-hidden max-w-38 text-ellipsis whitespace-nowrap mt-2 mb-1"
+              class="max-w-38 text-ellipsis whitespace-nowrap mt-2 mb-1"
               classList={{
                 "text-white": !props.isLoading && !isInQueue(),
-                "text-lightGray-900": props.isLoading || isInQueue(),
+                "text-lightGray-900": props.isLoading || isInQueue()
               }}
             >
-              {props.instance.name}
+              <Tooltip
+                content={
+                  props.instance.name.length > 20 ? props.instance.name : ""
+                }
+                placement="top"
+                class="max-w-38 w-full text-ellipsis overflow-hidden"
+              >
+                {props.instance.name}
+              </Tooltip>
             </h4>
             <Switch>
               <Match when={!props.isLoading}>
@@ -337,12 +345,12 @@ const Tile = (props: Props) => {
                     <Show when={props.modloader}>
                       <img
                         class="w-4 h-4"
-                        src={getForgeModloaderIcon(
+                        src={getCFModloaderIcon(
                           props.modloader as CFFEModLoaderType
                         )}
                       />
                     </Show>
-                    <p class="m-0">{props.modloader}</p>
+                    <p class="m-0">{props.modloader?.toString()}</p>
                   </span>
                   <p class="m-0">{props.version}</p>
                 </div>
@@ -355,13 +363,12 @@ const Tile = (props: Props) => {
               </Match>
             </Switch>
           </div>
-          {/* </Tooltip> */}
         </ContextMenu>
       </Match>
       <Match when={mergedProps.variant === "sidebar"}>
         <ContextMenu menuItems={menuItems()}>
           <div
-            class="group relative group select-none flex items-center w-full gap-4 box-border cursor-pointer px-3 h-14 erelative"
+            class="group relative group select-none flex items-center w-full box-border cursor-pointer gap-4 px-3 h-14 erelative"
             onClick={(e) => {
               if (
                 !props.isLoading &&
@@ -373,7 +380,7 @@ const Tile = (props: Props) => {
               }
             }}
             classList={{
-              grayscale: props.isLoading || isInQueue(),
+              grayscale: props.isLoading || isInQueue()
             }}
           >
             <Show when={props.isInvalid}>
@@ -394,7 +401,7 @@ const Tile = (props: Props) => {
             </Show>
 
             <div
-              class="rounded-full absolute flex justify-center items-center cursor-pointer duration-100 will-change-transform transition-transform right-5 h-7 w-7"
+              class="rounded-full absolute flex justify-center items-center cursor-pointer duration-100 will-change-transform right-5 transition-transform h-7 w-7"
               classList={{
                 "bg-primary-500": !props.isRunning,
                 "scale-0": !props.isRunning,
@@ -404,14 +411,14 @@ const Tile = (props: Props) => {
                   !isInQueue() &&
                   !props.isInvalid &&
                   !props.failError &&
-                  !props.isRunning,
+                  !props.isRunning
               }}
             >
               <div
                 class="text-white"
                 classList={{
                   "i-ri:play-fill text-lg": !props.isRunning,
-                  "i-ri:stop-fill text-md": props.isRunning,
+                  "i-ri:stop-fill text-md": props.isRunning
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -424,7 +431,7 @@ const Tile = (props: Props) => {
               <div
                 class="absolute top-0 left-0 bottom-0 opacity-10 bg-white"
                 style={{
-                  width: `${props.percentage}%`,
+                  width: `${props.percentage}%`
                 }}
               />
             </Show>
@@ -433,10 +440,10 @@ const Tile = (props: Props) => {
               style={{
                 "background-image": props.img
                   ? `url("${props.img as string}")`
-                  : `url("${DefaultImg}")`,
+                  : `url("${DefaultImg}")`
               }}
               classList={{
-                grayscale: props.isLoading,
+                grayscale: props.isLoading
               }}
             />
             <div class="flex flex-col">
@@ -444,7 +451,7 @@ const Tile = (props: Props) => {
                 class="m-0 text-ellipsis text-ellipsis overflow-hidden max-w-38 max-h-9"
                 classList={{
                   "text-darkSlate-50": mergedProps.isLoading,
-                  "text-white": !mergedProps.isLoading,
+                  "text-white": !mergedProps.isLoading
                 }}
               >
                 {props.instance.name}
@@ -462,13 +469,13 @@ const Tile = (props: Props) => {
                   <Show when={props.modloader}>
                     <img
                       class="w-4 h-4"
-                      src={getForgeModloaderIcon(
+                      src={getCFModloaderIcon(
                         props.modloader as CFFEModLoaderType
                       )}
                     />
                   </Show>
                   <Show when={props.modloader}>
-                    <p class="m-0">{props.modloader}</p>
+                    <p class="m-0">{props.modloader?.toString()}</p>
                   </Show>
                 </span>
                 <p class="m-0">{props.version}</p>
@@ -478,11 +485,7 @@ const Tile = (props: Props) => {
         </ContextMenu>
       </Match>
       <Match when={mergedProps.variant === "sidebar-small"}>
-        <Tooltip
-          content={props.instance.name}
-          placement="right"
-          // color="bg-darkSlate-400"
-        >
+        <Tooltip content={props.instance.name} placement="right">
           <div
             onClick={(e) => {
               if (
@@ -511,10 +514,10 @@ const Tile = (props: Props) => {
               style={{
                 "background-image": props.img
                   ? `url("${props.img as string}")`
-                  : `url("${DefaultImg}")`,
+                  : `url("${DefaultImg}")`
               }}
               classList={{
-                grayscale: props.isLoading || isInQueue(),
+                grayscale: props.isLoading || isInQueue()
               }}
             >
               <Show when={props.isInvalid}>
@@ -535,14 +538,14 @@ const Tile = (props: Props) => {
                     !isInQueue() &&
                     !props.isInvalid &&
                     !props.failError &&
-                    !props.isRunning,
+                    !props.isRunning
                 }}
               >
                 <div
                   class="text-white text-lg"
                   classList={{
                     "i-ri:play-fill": !props.isRunning,
-                    "i-ri:stop-fill": props.isRunning,
+                    "i-ri:stop-fill": props.isRunning
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
