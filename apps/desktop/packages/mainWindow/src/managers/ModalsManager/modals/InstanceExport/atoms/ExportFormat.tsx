@@ -13,6 +13,7 @@ import { Card } from "./Card";
 import { ExportTarget, ImportEntity } from "@gd/core_module/bindings";
 const ExportFormat = () => {
   const entities = rspc.createQuery(() => ["instance.getImportableEntities"]);
+
   const icons = [
     CurseForgeLogo,
     ModrinthLogo,

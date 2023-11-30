@@ -42,6 +42,9 @@ import { useModal } from "@/managers/ModalsManager";
 import { convertSecondsToHumanTime } from "@/utils/helpers";
 import Authors from "./Info/Authors";
 import { getCFModloaderIcon } from "@/utils/sidebar";
+import { instanceId, setInstanceId } from "@/utils/browser";
+import { getInstanceIdFromPath } from "@/utils/routes";
+import { parse } from "date-fns";
 
 type InstancePage = {
   label: string;
@@ -327,6 +330,17 @@ const Instance = () => {
       icon: "i-ri:folder-open-fill",
       label: t("instance.action_open_folder"),
       action: handleOpenFolder
+    },
+    {
+      icon: "i-mdi:export",
+      label: t("instance.export_instance"),
+      action: () => {
+        const instanceId = getInstanceIdFromPath(location.pathname);
+        setInstanceId(parseInt(instanceId as string, 10));
+        modalsContext?.openModal({
+          name: "exportInstance"
+        });
+      }
     }
   ];
 
