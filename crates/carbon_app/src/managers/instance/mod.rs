@@ -147,6 +147,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             }
 
             instances.insert(instance_id, instance);
+            drop(instances);
 
             self.app
                 .meta_cache_manager()
