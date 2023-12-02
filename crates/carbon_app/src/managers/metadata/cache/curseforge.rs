@@ -156,11 +156,15 @@ impl ModplatformCacher for CurseforgeModCacher {
         trace!("processing curseforge mod batch for instance {instance_id}");
 
         let mut matches = fp_response
-            .exact_fingerprints
+            .exact_matches
             .into_iter()
-            .zip(fp_response.exact_matches.into_iter())
-            .zip(mods_response.into_iter())
-            .map(|((fingerprint, fileinfo), modinfo)| (fingerprint, (fileinfo, modinfo)))
+            .map(|fp_match| {
+                mods_response
+                    .iter()
+                    .find(|m| m.id == fp_match.file.mod_id)
+                    .map(|m| (fp_match.file.file_fingerprint, (fp_match, m)))
+            })
+            .flatten()
             .collect::<HashMap<_, _>>();
 
         let mcm = app.meta_cache_manager();
@@ -169,19 +173,19 @@ impl ModplatformCacher for CurseforgeModCacher {
         drop(ignored_hashes);
 
         let futures = batch.into_iter().filter_map(|(metadata_id, murmur2)| {
-            let fpmatch = matches.remove(&murmur2);
-            fpmatch.map(|(fileinfo, modinfo)| async move {
+            let fp_match = matches.get(&murmur2);
+            fp_match.map(|(fp_match, modinfo)| async move {
                 let r = cache_curseforge_meta_unchecked(
                     app,
                     metadata_id.clone(),
-                    fileinfo.file.id,
+                    fp_match.file.id,
                     murmur2,
                     modinfo,
                 )
                 .await;
 
                 if let Err(e) = r {
-                    error!({ error = ?e, metadata_id, file_id = ?fileinfo.file.id }, "Could not store curseforge mod metadata. Will not attempt to download again for this session.");
+                    error!({ error = ?e, metadata_id, file_id = ?fp_match.file.id }, "Could not store curseforge mod metadata. Will not attempt to download again for this session.");
 
                     mcm.ignored_remote_cf_hashes.write().await.insert(murmur2);
                 }
@@ -329,7 +333,7 @@ async fn cache_curseforge_meta_unchecked(
     metadata_id: String,
     file_id: i32,
     murmur2: u32,
-    modinfo: Mod,
+    modinfo: &Mod,
 ) -> anyhow::Result<()> {
     let prev = app
         .prisma_client
@@ -345,10 +349,10 @@ async fn cache_curseforge_meta_unchecked(
         murmur2 as i32,
         modinfo.id,
         file_id,
-        modinfo.name,
-        modinfo.slug,
-        modinfo.summary,
-        modinfo.authors.into_iter().map(|a| a.name).join(", "),
+        modinfo.name.clone(),
+        modinfo.slug.clone(),
+        modinfo.summary.clone(),
+        modinfo.authors.iter().map(|a| &a.name).join(", "),
         chrono::Utc::now().into(),
         metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),
         Vec::new(),
@@ -367,7 +371,7 @@ async fn cache_curseforge_meta_unchecked(
                 .expect("logo_image was requested but not returned by prisma")
         })
         .flatten();
-    let new_image = modinfo.logo.map(|it| it.url);
+    let new_image = modinfo.logo.as_ref().map(|it| it.url.clone());
 
     let image = match (new_image, old_image) {
         (Some(new), Some(old)) => Some((old.up_to_date == 1 && new == old.url, new, old.data)),
