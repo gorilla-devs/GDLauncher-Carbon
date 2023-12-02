@@ -9,8 +9,15 @@ import { createStore, produce, reconcile } from "solid-js/store";
 import fetchData from "../../instance.data";
 import { Mod as Modtype } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
+import { useRescroller, type RescrollerState } from "@/hooks/rescroll";
+
+let rescrollerState: RescrollerState | undefined = undefined;
 
 const Mods = () => {
+  const [initRescrollerState, rescroller] = useRescroller(rescrollerState);
+
+  rescrollerState = initRescrollerState;
+
   const [t] = useTransContext();
   const params = useParams();
   const navigate = useGDNavigate();
@@ -53,6 +60,8 @@ const Mods = () => {
             type="outline"
             size="medium"
             onClick={() => {
+              rescroller.setScrollToFromCurrentPosition();
+
               navigate(`/mods?instanceId=${params.id}`);
             }}
           >
@@ -77,7 +86,16 @@ const Mods = () => {
   };
 
   return (
-    <div>
+    <div
+      ref={(ref) =>
+        queueMicrotask(() =>
+          rescroller.setScrollRefAndScrollIfNeeded(
+            // If the rescroller ever stops working, check this line first
+            ref.parentElement!.parentElement!.parentElement!.parentElement!
+          )
+        )
+      }
+    >
       <div
         class="flex items-center fixed justify-between bottom-4 h-16 bg-darkSlate-900 mx-auto left-1/2 -translate-x-1/2 rounded-md pr-6 z-50 shadow-md shadow-darkSlate-900 transition-transform duration-100 ease-in-out origin-left w-130 border-darkSlate-700 border-solid border-1"
         classList={{
@@ -212,6 +230,8 @@ const Mods = () => {
               type="outline"
               size="medium"
               onClick={() => {
+                rescroller.setScrollToFromCurrentPosition();
+
                 navigate(`/mods?instanceId=${params.id}`);
               }}
             >
@@ -241,7 +261,9 @@ const Mods = () => {
           fallback={<NoMods />}
         >
           <For
-            each={(filteredMods() || []).sort(sortAlphabetically) as Modtype[]}
+            each={
+              [...(filteredMods() || [])].sort(sortAlphabetically) as Modtype[]
+            }
           >
             {(mod) => (
               <Mod
