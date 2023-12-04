@@ -5,13 +5,14 @@ import SingleCheckBox from "../../OnBoarding/SingleCheckBox";
 import { rspc } from "@/utils/rspcClient";
 import { payload } from "..";
 import { instanceId } from "@/utils/browser";
-import { ExploreEntry } from "@gd/core_module/bindings";
+import { ExploreEntry, ExportEntry } from "@gd/core_module/bindings";
 import { isWithinInterval } from "date-fns";
+import ExportCheckbox from "./ExportCheckbox";
 
 const FilesSelection = () => {
   const [t] = useTransContext();
-  const [filesToSelect, setFilesToSelect] = createSignal<ExploreEntry[]>([]);
-  const [files, setFiles] = createSignal<never[]>([]);
+  // const [filesToSelect, setFilesToSelect] = createSignal<ExportEntry>({entries: {}});
+  // const [files, setFiles] = createSignal<never[]>([]);
 
   if (typeof instanceId() === "number") {
     console.log(instanceId());
@@ -45,30 +46,30 @@ const FilesSelection = () => {
     //   }
     // };
 
-    const exploreRecursively = (path: string[]) => {
-      const explore = rspc.createQuery(() => [
-        "instance.explore",
-        {
-          instance_id: instanceId() as number,
-          path: path
-        }
-      ]);
-
-      const files = explore.data ?? [];
-
-      for (const file of files) {
-        // console.log("file: ", file.name);
-        // console.log("type: ", file.type);
-        // console.log("path: ", [...path, file.name].join("/"));
-        if (file.type === "Directory") {
-          console.log([...path, file.name]);
-          exploreRecursively([...path, file.name]);
-        } else {
-          setFilesToSelect([...filesToSelect(), file]);
-        }
-      }
-    };
-    exploreRecursively([]);
+    // const exploreRecursively = (path: string[]) => {
+    //   const explore = rspc.createQuery(() => [
+    //     "instance.explore",
+    //     {
+    //       instance_id: instanceId() as number,
+    //       path: path
+    //     }
+    //   ]);
+    //   // console.log(explore);
+    //   const files = explore.data ?? [];
+    //   // console.log("files: ", files);
+    //   for (const file of files) {
+    //     // console.log("file: ", file.name);
+    //     // console.log("type: ", file.type);
+    //     // console.log("path: ", [...path, file.name].join("/"));
+    //     if (file.type === "Directory") {
+    //       // console.log([...path, file.name]);
+    //       exploreRecursively([...path, file.name]);
+    //     } else {
+    //       setFilesToSelect([...filesToSelect(), file]);
+    //     }
+    //   }
+    // };
+    // exploreRecursively([]);
 
     // const explore = rspc.createQuery(() => [
     //   "instance.explore",
@@ -80,12 +81,14 @@ const FilesSelection = () => {
     // console.log(explore.data);
     // console.log(filesToSelect());
   }
-
+  // createEffect(() => {
+  //   console.log("filestoSelect", filesToSelect());
+  // });
   return (
     <div class="w-full flex flex-col gap-2 pt-2">
       <span>{t("instance.select_files_text")}</span>
       <div class="w-full rounded-md bg-darkSlate-900 h-44 overflow-y-scroll">
-        <For each={filesToSelect()}>
+        {/* <For each={filesToSelect()}>
           {(item) => (
             <div class="flex flex-row justify-between items-center h-10 px-2">
               <SingleCheckBox
@@ -96,7 +99,8 @@ const FilesSelection = () => {
               <span>{item.type["File"].size} kb</span>
             </div>
           )}
-        </For>
+        </For> */}
+        <ExportCheckbox title="mods" canExpand />
       </div>
     </div>
   );
