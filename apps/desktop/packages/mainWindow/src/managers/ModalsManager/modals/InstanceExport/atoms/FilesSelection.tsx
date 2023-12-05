@@ -8,6 +8,7 @@ import { instanceId } from "@/utils/browser";
 import { ExploreEntry, ExportEntry } from "@gd/core_module/bindings";
 import { isWithinInterval } from "date-fns";
 import ExportCheckbox from "./ExportCheckbox";
+import ExportCheckboxParent from "./ExportCheckboxParent";
 
 const FilesSelection = () => {
   const [t] = useTransContext();
@@ -88,6 +89,7 @@ const FilesSelection = () => {
     <div class="w-full flex flex-col gap-2 pt-2">
       <span>{t("instance.select_files_text")}</span>
       <div class="w-full rounded-md bg-darkSlate-900 h-44 overflow-y-scroll">
+        <ExportCheckboxParent />
         {/* <For each={filesToSelect()}>
           {(item) => (
             <div class="flex flex-row justify-between items-center h-10 px-2">
@@ -100,7 +102,7 @@ const FilesSelection = () => {
             </div>
           )}
         </For> */}
-        <ExportCheckbox title="mods" canExpand />
+        {/* <ExportCheckbox title="mods" canExpand /> */}
       </div>
     </div>
   );
