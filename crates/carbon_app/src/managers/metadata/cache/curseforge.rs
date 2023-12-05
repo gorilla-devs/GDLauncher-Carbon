@@ -12,6 +12,9 @@ use tracing::trace;
 use crate::db::read_filters::DateTimeFilter;
 use crate::db::read_filters::IntFilter;
 use crate::domain::instance::InstanceId;
+use crate::domain::instance::info::ModLoader;
+use crate::domain::instance::info::ModLoaderType;
+use crate::domain::modplatforms::curseforge::File;
 use crate::domain::modplatforms::curseforge::filters::ModsParameters;
 use crate::domain::modplatforms::curseforge::filters::ModsParametersBody;
 use crate::domain::modplatforms::curseforge::FingerprintsMatchesResult;
@@ -174,9 +177,9 @@ impl ModplatformCacher for CurseforgeModCacher {
                 let r = cache_curseforge_meta_unchecked(
                     app,
                     metadata_id.clone(),
-                    fileinfo.file.id,
+                    &fileinfo.file,
                     murmur2,
-                    modinfo,
+                    &modinfo,
                 )
                 .await;
 
@@ -327,9 +330,9 @@ impl ModplatformCacher for CurseforgeModCacher {
 async fn cache_curseforge_meta_unchecked(
     app: &App,
     metadata_id: String,
-    file_id: i32,
+    fileinfo: &File,
     murmur2: u32,
-    modinfo: Mod,
+    modinfo: &Mod,
 ) -> anyhow::Result<()> {
     let prev = app
         .prisma_client
@@ -341,14 +344,65 @@ async fn cache_curseforge_meta_unchecked(
         .exec()
         .await?;
 
+    // This is undocumented, we're guessing what the valid values here are.
+    // It seems to contain both game versions and modloaders
+    fn parse_update_paths(versions: &[String]) -> Vec<(String, ModLoaderType)> {
+        let mut game_versions = Vec::new();
+        let mut loaders = Vec::new();
+
+        for entry in versions {
+            let entry = entry.to_lowercase();
+            match ModLoaderType::try_from(&entry as &str) {
+                Ok(loader) => loaders.push(loader),
+                Err(_) => game_versions.push(entry),
+            }
+        }
+
+        let mut pairs = Vec::new();
+
+        for game_version in game_versions {
+            for loader in &loaders {
+                pairs.push((game_version.to_lowercase(), *loader));
+            }
+        }
+
+        pairs
+    }
+
+    let file_update_paths = parse_update_paths(&fileinfo.game_versions[..]);
+    let mut updatable_path_indexes = Vec::<usize>::new();
+
+    for file in &modinfo.latest_files {
+        if file.id == fileinfo.id { continue; }
+
+        let update_paths = parse_update_paths(&file.game_versions);
+
+        for pair in update_paths {
+            let idx = file_update_paths.iter().position(|p| *p == pair);
+
+            if let Some(idx) = idx {
+                if !updatable_path_indexes.contains(&idx) {
+                    updatable_path_indexes.push(idx);
+                }
+            }
+        }
+    }
+
+    let update_paths = file_update_paths.iter()
+        .enumerate()
+        .filter(|(i, _)| updatable_path_indexes.contains(&i))
+        .map(|(_, (gamever, loader))| format!("{gamever},{}", loader.to_string().to_lowercase()))
+        .join(";");
+
     let o_insert_cfmeta = app.prisma_client.curse_forge_mod_cache().create(
         murmur2 as i32,
         modinfo.id,
-        file_id,
-        modinfo.name,
-        modinfo.slug,
-        modinfo.summary,
-        modinfo.authors.into_iter().map(|a| a.name).join(", "),
+        fileinfo.id,
+        modinfo.name.clone(),
+        modinfo.slug.clone(),
+        modinfo.summary.clone(),
+        modinfo.authors.iter().map(|a| &a.name).join(", "),
+        update_paths,
         chrono::Utc::now().into(),
         metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),
         Vec::new(),
@@ -367,7 +421,7 @@ async fn cache_curseforge_meta_unchecked(
                 .expect("logo_image was requested but not returned by prisma")
         })
         .flatten();
-    let new_image = modinfo.logo.map(|it| it.url);
+    let new_image = modinfo.logo.as_ref().map(|it| &it.url).cloned();
 
     let image = match (new_image, old_image) {
         (Some(new), Some(old)) => Some((new == old.url, new, old.data)),

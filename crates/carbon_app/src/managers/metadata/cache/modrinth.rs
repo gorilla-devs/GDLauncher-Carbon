@@ -383,6 +383,7 @@ async fn cache_modrinth_meta_unchecked(
         project.slug,
         project.description,
         authors,
+        String::new(),
         chrono::Utc::now().into(),
         metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),
         Vec::new(),

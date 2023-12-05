@@ -5,8 +5,9 @@ use crate::db::{
     curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
     modrinth_mod_cache as mrdb,
 };
-use crate::domain::instance as domain;
-use crate::domain::instance::info::ModLoaderType;
+use crate::domain::instance::{self as domain, info};
+use crate::domain::instance::info::{ModLoaderType, GameVersion};
+use crate::managers::instance::InstanceType;
 use crate::{domain::vtask::VisualTaskId, managers::ManagerRef};
 
 use super::{
@@ -16,12 +17,36 @@ use super::{
 
 impl ManagerRef<'_, InstanceManager> {
     pub async fn list_mods(self, instance_id: InstanceId) -> anyhow::Result<Vec<domain::Mod>> {
-        {
-            let instances = self.instances.read().await;
-            if instances.get(&instance_id).is_none() {
-                bail!(InvalidInstanceIdError(instance_id));
-            }
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let InstanceType::Valid(data) = &instance.type_ else {
+            bail!("instance {} is not valid", *instance_id);
+        };
+
+        let update_paths = match &data.config.game_configuration.version {
+            Some(GameVersion::Standard(version)) => {
+                let v = version.release.to_lowercase();
+
+                version.modloaders.iter()
+                    .map(|loader| (v.clone(), loader.type_.to_string().to_lowercase()))
+                    .collect::<Vec<_>>()
+            },
+            _ => Vec::new(),
+        };
+
+        drop(instances);
+
+        fn split_paths<'a>(paths: &'a str) -> Vec<(&'a str, &'a str)> {
+            paths.split(';')
+                .filter_map(|path| path.split_once(','))
+                .collect()
         }
+
+        let has_update_for_paths = |paths: &Vec<(&str, &str)>| update_paths.iter()
+            .any(|(v1, l1)| paths.iter().any(|(v2, l2)| v1 == v2 && l1 == l2));
 
         let mods = self
             .app
@@ -37,66 +62,71 @@ impl ManagerRef<'_, InstanceManager> {
             .exec()
             .await?
             .into_iter()
-            .map(|m| domain::Mod {
-                id: m.id,
-                filename: m.filename,
-                enabled: m.enabled,
-                metadata: m.metadata.as_ref().map(|m| domain::ModFileMetadata {
-                    modid: m.modid.clone(),
-                    name: m.name.clone(),
-                    version: m.version.clone(),
-                    description: m.description.clone(),
-                    authors: m.authors.clone(),
-                    modloaders: m
-                        .modloaders
-                        .split(',')
-                        // ignore unknown modloaders
-                        .flat_map(|loader| ModLoaderType::try_from(loader).ok())
-                        .collect::<Vec<_>>(),
-                    has_image: m
-                        .logo_image
-                        .as_ref()
-                        .map(|v| v.as_ref().map(|_| ()))
-                        .flatten()
-                        .is_some(),
-                }),
-                curseforge: m
+            .map(|m| {
+                let (cf, mr) = m
                     .metadata
                     .clone()
-                    .and_then(|m| m.curseforge)
-                    .flatten()
-                    .map(|m| domain::CurseForgeModMetadata {
-                        project_id: m.project_id as u32,
-                        file_id: m.file_id as u32,
-                        name: m.name,
-                        urlslug: m.urlslug,
-                        summary: m.summary,
-                        authors: m.authors,
+                    .map(|m| (m.curseforge.flatten(), m.modrinth.flatten()))
+                    .unwrap_or((None, None));
+
+                domain::Mod {
+                    id: m.id,
+                    filename: m.filename,
+                    enabled: m.enabled,
+                    metadata: m.metadata.as_ref().map(|m| domain::ModFileMetadata {
+                        modid: m.modid.clone(),
+                        name: m.name.clone(),
+                        version: m.version.clone(),
+                        description: m.description.clone(),
+                        authors: m.authors.clone(),
+                        modloaders: m
+                            .modloaders
+                            .split(',')
+                            // ignore unknown modloaders
+                            .flat_map(|loader| ModLoaderType::try_from(loader).ok())
+                            .collect::<Vec<_>>(),
                         has_image: m
                             .logo_image
-                            .flatten()
                             .as_ref()
-                            .map(|row| row.data.as_ref().map(|_| ()))
+                            .map(|v| v.as_ref().map(|_| ()))
                             .flatten()
                             .is_some(),
                     }),
-                modrinth: m.metadata.and_then(|m| m.modrinth).flatten().map(|m| {
-                    domain::ModrinthModMetadata {
-                        project_id: m.project_id,
-                        version_id: m.version_id,
-                        title: m.title,
-                        urlslug: m.urlslug,
-                        description: m.description,
-                        authors: m.authors,
-                        has_image: m
-                            .logo_image
-                            .flatten()
-                            .as_ref()
-                            .map(|row| row.data.as_ref().map(|_| ()))
-                            .flatten()
-                            .is_some(),
-                    }
-                }),
+                    has_curseforge_update: cf.as_ref().map(|v| has_update_for_paths(&split_paths(&v.update_paths))).unwrap_or(false),
+                    curseforge: cf.map(|m| domain::CurseForgeModMetadata {
+                            project_id: m.project_id as u32,
+                            file_id: m.file_id as u32,
+                            name: m.name,
+                            urlslug: m.urlslug,
+                            summary: m.summary,
+                            authors: m.authors,
+                            has_image: m
+                                .logo_image
+                                .flatten()
+                                .as_ref()
+                                .map(|row| row.data.as_ref().map(|_| ()))
+                                .flatten()
+                                .is_some(),
+                        }),
+                    has_modrinth_update: mr.as_ref().map(|v| has_update_for_paths(&split_paths(&v.update_paths))).unwrap_or(false),
+                    modrinth: m.metadata.and_then(|m| m.modrinth).flatten().map(|m| {
+                        domain::ModrinthModMetadata {
+                            project_id: m.project_id,
+                            version_id: m.version_id,
+                            title: m.title,
+                            urlslug: m.urlslug,
+                            description: m.description,
+                            authors: m.authors,
+                            has_image: m
+                                .logo_image
+                                .flatten()
+                                .as_ref()
+                                .map(|row| row.data.as_ref().map(|_| ()))
+                                .flatten()
+                                .is_some(),
+                        }
+                    }),
+                }
             });
 
         Ok(mods.collect::<Vec<_>>())
