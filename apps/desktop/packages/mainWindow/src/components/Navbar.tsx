@@ -120,12 +120,7 @@ const AppNavbar = () => {
                       });
                     }}
                   >
-                    <Trans
-                      key="sidebar.add_instance"
-                      options={{
-                        defaultValue: "Add Instance"
-                      }}
-                    />
+                    <Trans key="sidebar.add_instance" />
                   </Button>
                 </Tab>
                 <div class="flex gap-6 items-center">

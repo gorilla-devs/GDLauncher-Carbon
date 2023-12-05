@@ -27,6 +27,8 @@ type Props = {
   noTip?: boolean;
   noPadding?: boolean;
   opened?: boolean;
+  onOpen?: () => void;
+  onClose?: () => void;
 };
 
 type Point = { x: number; y: number };
@@ -57,6 +59,16 @@ const Popover = (props: Props) => {
   const [openTimer, setOpenTimer] =
     createSignal<ReturnType<typeof setTimeout>>();
 
+  const open = () => {
+    setPopoverOpened(true);
+    props.onOpen?.();
+  };
+
+  const close = () => {
+    setPopoverOpened(false);
+    props.onClose?.();
+  };
+
   const menuRect = () => {
     if (!PopoverRef()) return;
     const popover = PopoverRef() as HTMLDivElement;
@@ -82,8 +94,10 @@ const Popover = (props: Props) => {
       !isPointInTriangle({ x: e.clientX, y: e.clientY }, a, b, c) &&
       !isHoveringCard()
     ) {
-      setPopoverOpened(false);
-    } else setPopoverOpened(true);
+      close();
+    } else {
+      open();
+    }
   };
 
   let debounceTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -125,7 +139,9 @@ const Popover = (props: Props) => {
   });
 
   createEffect(() => {
-    if (position.middlewareData.hide?.referenceHidden) setPopoverOpened(false);
+    if (position.middlewareData.hide?.referenceHidden) {
+      close();
+    }
   });
 
   return (
@@ -136,7 +152,7 @@ const Popover = (props: Props) => {
             onMouseEnter={() => setSsHoveringCard(true)}
             onMouseLeave={() => setSsHoveringCard(false)}
             ref={setPopoverRef}
-            class={`rounded-lg will-change z-[100] ${props.color || ""}`}
+            class={`rounded-lg will-change z-50 ${props.color || ""}`}
             style={{
               position: "absolute",
               top: `${position.y ?? 0}px`,
@@ -171,7 +187,7 @@ const Popover = (props: Props) => {
           setSsHoveringCard(true);
           setOpenTimer(
             setTimeout(() => {
-              setPopoverOpened(true);
+              open();
             }, 300)
           );
         }}

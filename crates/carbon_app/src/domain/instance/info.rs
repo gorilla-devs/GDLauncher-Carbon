@@ -9,6 +9,8 @@ use chrono::{DateTime, Utc};
 pub struct Instance {
     pub name: String,
     pub icon: InstanceIcon,
+    pub date_created: DateTime<Utc>,
+    pub date_updated: DateTime<Utc>,
     pub last_played: Option<DateTime<Utc>>,
     pub seconds_played: u64,
     pub modpack: Option<Modpack>,

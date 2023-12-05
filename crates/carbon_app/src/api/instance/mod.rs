@@ -783,6 +783,9 @@ struct ModFileMetadata {
     description: Option<String>,
     authors: Option<String>,
     modloaders: Vec<FEInstanceModloaderType>,
+    sha_1: String,
+    sha_512: String,
+    murmur_2: String,
     has_image: bool,
 }
 
@@ -1207,6 +1210,9 @@ impl From<domain::ModFileMetadata> for ModFileMetadata {
             description: value.description,
             authors: value.authors,
             modloaders: value.modloaders.into_iter().map(Into::into).collect(),
+            sha_1: hex::encode(value.sha_1),
+            sha_512: hex::encode(value.sha_512),
+            murmur_2: value.murmur_2.to_string(),
             has_image: value.has_image,
         }
     }

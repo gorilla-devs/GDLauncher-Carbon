@@ -18,6 +18,7 @@ import { Trans } from "@gd/i18n";
 import { Spinner, createNotification } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import { createSignal, For, Show, Switch, Match, createEffect } from "solid-js";
+import CopyIcon from "../CopyIcon";
 
 export type Label = {
   name: string;
@@ -488,15 +489,7 @@ export const AccountsDropdown = (props: Props) => {
               <div class="flex gap-1">
                 <p class="m-0 text-xs">{(activeAccount() as Label)?.uuid}</p>
               </div>
-              <div
-                class="text-darkSlate-50 ease-in-out cursor-pointer transition i-ri:file-copy-fill text-sm hover:text-white"
-                onClick={() => {
-                  navigator.clipboard.writeText(
-                    (activeAccount() as Label)?.uuid
-                  );
-                  addNotification("The UUID has been copied");
-                }}
-              />
+              <CopyIcon text={(activeAccount() as Label)?.uuid} />
             </div>
           </div>
         </div>

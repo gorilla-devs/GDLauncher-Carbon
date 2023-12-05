@@ -2,11 +2,16 @@ import { getInstanceIdFromPath } from "@/utils/routes";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { getCFModloaderIcon } from "@/utils/sidebar";
 import { Mod as ModType } from "@gd/core_module/bindings";
-import { Checkbox, Switch } from "@gd/ui";
+import { Button, Checkbox, Popover, Switch, Tooltip } from "@gd/ui";
 import { useLocation, useParams } from "@solidjs/router";
 import { SetStoreFunction, produce } from "solid-js/store";
-import { For, Show } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
 import { getModImageUrl, getModpackPlatformIcon } from "@/utils/instances";
+import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg";
+import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg";
+import { useGDNavigate } from "@/managers/NavigationManager";
+import CopyIcon from "@/components/CopyIcon";
+import { Trans } from "@gd/i18n";
 
 type Props = {
   mod: ModType;
@@ -18,11 +23,32 @@ type Props = {
   };
 };
 
+const CopiableEntity = (props: {
+  text: string | undefined | null | number;
+}) => {
+  return (
+    <div class="text-lightSlate-200 flex items-center w-60">
+      <div class="truncate">
+        <Tooltip
+          content={<div class="max-w-110 break-all">{props.text || "-"}</div>}
+        >
+          {props.text || "-"}
+        </Tooltip>
+      </div>
+      <Show when={props.text}>
+        <div class="flex-shrink-0 ml-2">
+          <CopyIcon text={props.text} />
+        </div>
+      </Show>
+    </div>
+  );
+};
+
 const Mod = (props: Props) => {
+  const [isHoveringCard, setIsHoveringCard] = createSignal(false);
+  const navigate = useGDNavigate();
   const params = useParams();
-
   const location = useLocation();
-
   const instanceId = () => getInstanceIdFromPath(location.pathname);
 
   const enableModMutation = rspc.createMutation(["instance.enableMod"], {
@@ -76,9 +102,18 @@ const Mod = (props: Props) => {
 
   const isCurseForge = () => props.mod.curseforge;
 
+  const unsigned_murmur2 = () => {
+    const murmur2 = props.mod.metadata?.murmur_2;
+    if (!murmur2) return null;
+    return parseInt(murmur2, 10) >>> 0;
+  };
+
   return (
     <div
       class="w-full flex items-center py-2 px-6 box-border h-14 group hover:bg-darkSlate-700"
+      classList={{
+        "bg-darkSlate-700": isHoveringCard()
+      }}
       onClick={() => {
         props.setSelectedMods(
           produce((draft) => {
@@ -93,7 +128,7 @@ const Mod = (props: Props) => {
           <div
             class="opacity-0 group-hover:opacity-100 transition-opacity duration-100 ease-in-out"
             classList={{
-              "opacity-100": props.selectMods[props.mod.id]
+              "opacity-100": props.selectMods[props.mod.id] || isHoveringCard()
             }}
           >
             <Checkbox checked={props.selectMods[props.mod.id]} />
@@ -125,36 +160,20 @@ const Mod = (props: Props) => {
               {props.mod.curseforge?.name ||
                 props.mod.metadata?.name ||
                 props.mod.filename}
-              <div class="flex gap-2">
-                <For each={props.mod.metadata?.modloaders}>
-                  {(modloader, _) => (
-                    <span class="flex gap-2 justify-center items-center">
-                      <Show when={modloader}>
-                        <img
-                          class="w-4 h-4"
-                          src={getCFModloaderIcon(modloader)}
-                        />
-                      </Show>
-                      <p class="m-0 text-darkSlate-500 text-sm">
-                        {`${modloader}`}
-                      </p>
-                    </span>
-                  )}
-                </For>
-                <p class="m-0 text-darkSlate-500 text-sm">
-                  {`${props.mod.metadata?.modloaders[0]} ${
-                    props.mod.curseforge?.project_id ||
-                    props.mod.metadata?.version
-                  }`}
-                </p>
-              </div>
             </div>
           </div>
         </div>
         <span class="flex gap-4 justify-center items-center">
-          {/* //TODO: ADD CONFIRMATION MODAL */}
-          {/* <Show when={props.mod.curseforge}>CF</Show>
-          <Show when={props.mod.modrinth}>MR</Show> */}
+          <Show when={props.mod.curseforge}>
+            <span class="flex justify-center items-center">
+              <img src={CurseforgeLogo} class="w-4 h-4" />
+            </span>
+          </Show>
+          <Show when={props.mod.modrinth}>
+            <span class="flex justify-center items-center">
+              <img src={ModrinthLogo} class="w-4 h-4" />
+            </span>
+          </Show>
           <Switch
             checked={props.mod.enabled}
             onChange={(e) => {
@@ -181,76 +200,203 @@ const Mod = (props: Props) => {
               });
             }}
           />
-
-          {/* <Popover
+          <Popover
             noPadding
             noTip
+            onOpen={() => setIsHoveringCard(true)}
+            onClose={() => setIsHoveringCard(false)}
             content={
               <div
-                class="p-4 bg-darkSlate-900 rounded-lg border-darkSlate-700 border-solid border-1 shadow-md shadow-darkSlate-900 w-110"
+                class="p-4 text-darkSlate-100 bg-darkSlate-900 rounded-lg border-darkSlate-700 border-solid border-1 shadow-md shadow-darkSlate-90 w-110"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div class="text-xl font-bold mb-8">
-                  Info for{" "}
-                  {props.mod.curseforge?.name ||
-                    props.mod.metadata?.name ||
-                    props.mod.filename}
+                <div class="text-xl text-white font-bold mb-4">
+                  <Trans
+                    key="instance.mods_technical_info_for"
+                    options={{
+                      mod_name:
+                        props.mod.curseforge?.name ||
+                        props.mod.metadata?.name ||
+                        props.mod.filename
+                    }}
+                  >
+                    {""}
+                    <span class="italic">{""}</span>
+                  </Trans>
                 </div>
-                <div class="flex flex-col gap-4 w-full">
-                  <div class="flex justify-between w-full">
-                    <div>ID:</div>
-                    <div class="w-70 truncate">{props.mod.id}</div>
+                <div class="flex flex-col w-full">
+                  <div class="flex justify-between w-full text-sm">
+                    <div class="w-50">
+                      <Trans key="instance.id" />
+                    </div>
+                    <CopiableEntity text={props.mod.id} />
                   </div>
-                  <div class="flex justify-between w-full">
-                    <div>Filename:</div>
-                    <div class="w-70 truncate">{props.mod.filename}</div>
+                  <div class="flex justify-between w-full text-sm">
+                    <div class="w-50">
+                      <Trans key="instance.file_name" />
+                    </div>
+                    <CopiableEntity text={props.mod.filename} />
                   </div>
 
                   <Show when={props.mod.metadata}>
-                    <div class="text-xl">Local Metadata</div>
-                    <div class="flex justify-between w-full">
-                      <div>Name:</div>
-                      <div class="w-70 truncate">
-                        {props.mod.metadata?.modid}
-                      </div>
+                    <div class="text-xl text-white mt-4">
+                      <Trans key="instance.local_metadata" />
                     </div>
-                    <div class="flex justify-between w-full">
-                      <div>Mod Version:</div>
-                      <div class="w-70 truncate">
-                        {props.mod.metadata?.version}
+                    <div class="flex justify-between w-full text-sm">
+                      <div class="w-50">
+                        <Trans key="instance.metadata_name" />
+                      </div>
+                      <CopiableEntity text={props.mod.metadata?.modid} />
+                    </div>
+                    <div class="flex justify-between w-full text-sm">
+                      <div class="w-50">
+                        <Trans key="instance.metadata_version" />
+                      </div>
+                      <CopiableEntity text={props.mod.metadata?.version} />
+                    </div>
+                    <div class="flex justify-between w-full text-sm">
+                      <div class="w-50">
+                        <Trans key="instance.metadata_sha_1" />
+                      </div>
+                      <CopiableEntity text={props.mod.metadata?.sha_1} />
+                    </div>
+                    <div class="flex justify-between w-full text-sm">
+                      <div class="w-50">
+                        <Trans key="instance.metadata_sha_512" />
+                      </div>
+                      <CopiableEntity text={props.mod.metadata?.sha_512} />
+                    </div>
+                    <div class="flex justify-between w-full text-sm">
+                      <div class="w-50">
+                        <Trans key="instance.metadata_murmur_2" />
+                      </div>
+                      <CopiableEntity text={props.mod.metadata?.murmur_2} />
+                    </div>
+                    <div class="flex justify-between w-full text-sm">
+                      <div class="w-50">
+                        <Trans key="instance.metadata_murmur_2_unsigned" />
+                      </div>
+                      <CopiableEntity text={unsigned_murmur2()} />
+                    </div>
+                    <div class="flex justify-between w-full text-sm">
+                      <div class="w-50">
+                        <Trans key="instance.metadata_modloaders" />
+                      </div>
+                      <div class="gap-2 text-lightSlate-200 flex items-center w-60">
+                        <For each={props.mod.metadata?.modloaders}>
+                          {(modloader, _) => (
+                            <>
+                              <Show when={modloader}>
+                                <img
+                                  class="w-4 h-4"
+                                  src={getCFModloaderIcon(modloader)}
+                                />
+                              </Show>
+                              <div class="text-sm">{modloader}</div>
+                            </>
+                          )}
+                        </For>
                       </div>
                     </div>
                   </Show>
 
                   <Show when={props.mod.curseforge}>
-                    <div class="text-xl text-brands-curseforge">CurseForge</div>
-                    <div class="flex justify-between w-full">
-                      <div>Curseforge Project Id:</div>
-                      <div class="w-70 truncate">
-                        {props.mod.curseforge?.project_id}
+                    <div class="flex items-center justify-between text-xl mt-4">
+                      <div class="flex items-center text-white">
+                        <Trans key="instance.curseforge" />
+                        <img src={CurseforgeLogo} class="w-4 h-4 ml-2" />
                       </div>
                     </div>
-                    <div class="flex justify-between w-full">
-                      <div>Curseforge File Id:</div>
-                      <div class="w-70 truncate">
-                        {props.mod.curseforge?.file_id}
+                    <div class="flex justify-between w-full text-sm">
+                      <div class="w-50">
+                        <Trans key="instance.curseforge_project_id" />
                       </div>
+                      <CopiableEntity text={props.mod.curseforge?.project_id} />
+                    </div>
+                    <div class="flex justify-between w-full text-sm">
+                      <div class="w-50">
+                        <Trans key="instance.curseforge_file_id" />
+                      </div>
+                      <CopiableEntity text={props.mod.curseforge?.file_id} />
+                    </div>
+                    <div class="flex w-full my-4 gap-4">
+                      <Button
+                        type="outline"
+                        rounded={false}
+                        size="small"
+                        onClick={() => {
+                          navigate(
+                            `/mods/${props.mod.curseforge
+                              ?.project_id}/curseforge?instanceId=${instanceId()}`
+                          );
+                        }}
+                      >
+                        <Trans key="instance.open_mod_page" />
+                        <div class="i-ri:arrow-right-s-line ml-1" />
+                      </Button>
+                      <Button
+                        type="outline"
+                        rounded={false}
+                        size="small"
+                        onClick={() => {
+                          window.openExternalLink(
+                            `https://www.curseforge.com/minecraft/mc-mods/${props.mod.curseforge?.urlslug}`
+                          );
+                        }}
+                      >
+                        <Trans key="instance.open_in_browser" />
+                        <div class="i-ri:external-link-line ml-1" />
+                      </Button>
                     </div>
                   </Show>
 
                   <Show when={props.mod.modrinth}>
-                    <div class="text-xl text-brands-modrinth">Modrinth</div>
-                    <div class="flex justify-between w-full">
-                      <div>Modrinth Project Id:</div>
-                      <div class="w-70 truncate">
-                        {props.mod.modrinth?.project_id}
+                    <div class="flex items-center justify-between text-xl mt-4">
+                      <div class="flex items-center text-white">
+                        <Trans key="instance.modrinth" />
+                        <img src={ModrinthLogo} class="w-4 h-4 ml-2" />
                       </div>
                     </div>
-                    <div class="flex justify-between w-full">
-                      <div>Modrinth Version Id:</div>
-                      <div class="w-70 truncate">
-                        {props.mod.modrinth?.version_id}
+                    <div class="flex justify-between w-full text-sm">
+                      <div class="w-50">
+                        <Trans key="instance.modrinth_project_id" />
                       </div>
+                      <CopiableEntity text={props.mod.modrinth?.project_id} />
+                    </div>
+                    <div class="flex justify-between w-full text-sm">
+                      <div class="w-50">
+                        <Trans key="instance.modrinth_version_id" />
+                      </div>
+                      <CopiableEntity text={props.mod.modrinth?.version_id} />
+                    </div>
+                    <div class="flex w-full my-4 gap-4">
+                      <Button
+                        type="outline"
+                        rounded={false}
+                        size="small"
+                        onClick={() => {
+                          navigate(
+                            `/mods/${props.mod.modrinth
+                              ?.project_id}/modrith?instanceId=${instanceId()}`
+                          );
+                        }}
+                      >
+                        <Trans key="instance.open_mod_page" />
+                        <div class="i-ri:arrow-right-s-line ml-1" />
+                      </Button>
+                      <Button
+                        type="outline"
+                        rounded={false}
+                        size="small"
+                        onClick={() => {
+                          window.openExternalLink(
+                            `https://modrinth.com/mod/${props.mod.modrinth?.urlslug}`
+                          );
+                        }}
+                      >
+                        <Trans key="instance.open_in_browser" />
+                        <div class="i-ri:external-link-line ml-1" />
+                      </Button>
                     </div>
                   </Show>
                 </div>
@@ -259,8 +405,14 @@ const Mod = (props: Props) => {
             placement="left-end"
             color="bg-darkSlate-900"
           >
-            <div class="text-2xl text-darkSlate-500 duration-100 ease-in-out cursor-pointer i-ri:information-fill transition-color hover:text-white" />
-          </Popover> */}
+            <div
+              class="text-2xl text-darkSlate-500 duration-100 ease-in-out cursor-pointer i-ri:information-fill transition-color hover:text-white"
+              classList={{
+                "text-white": isHoveringCard()
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </Popover>
         </span>
       </div>
     </div>
