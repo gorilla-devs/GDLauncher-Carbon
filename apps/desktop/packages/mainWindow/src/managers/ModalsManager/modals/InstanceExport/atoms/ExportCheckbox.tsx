@@ -92,52 +92,88 @@
 // export default ExportCheckbox;
 import { instanceId } from "@/utils/browser";
 import { rspc } from "@/utils/rspcClient";
-import { set } from "date-fns";
-import { createSignal, For, Show } from "solid-js";
+import { Checkbox } from "@gd/ui";
+import { createEffect, createSignal, For, Match, Show, Switch } from "solid-js";
 
 // Define the structure for your files and folders
 type FileFolder = {
-  name: string;
-  type: "file" | "folder";
-  children?: FileFolder[];
+  name?: string;
+  type?: "file" | "folder";
+  path?: Array<string>;
 };
 
-const FolderDropdown = (props: { folder: FileFolder }) => {
+const FolderDropdown = (props: {
+  folder: FileFolder;
+  initialData: any | undefined;
+}) => {
   const [isOpen, setIsOpen] = createSignal(false);
-  const [contents, setContents] = createSignal<FileFolder[]>([]);
-  const [path, setPath] = createSignal<string[]>([]);
+  const [contents, setContents] = createSignal<any[]>([]);
+  // const [path, setPath] = createSignal<string[]>([]);
 
   // Mock function to fetch contents. Replace this with your actual API call.
-  const fetchContents = (folderName: string) => {
-    // Here you would make an API call to fetch the contents of the folder.
-    // This is just a placeholder for demonstration purposes.
-    const explore = rspc.createQuery(() => [
-      "instance.explore",
-      {
-        instance_id: instanceId() as number,
-        path: path()
-      }
-    ]);
-    setPath((prevPath) => [...prevPath, folderName]);
-    return explore.data;
-  };
+  // const fetchContents = (folderName: string) => {
+  //   // Here you would make an API call to fetch the contents of the folder.
+  //   // This is just a placeholder for demonstration purposes.
 
-  const toggleFolder = () => {
-    if (!isOpen()) {
-      const fetchedContents = fetchContents(props.folder.name);
-      setContents(fetchedContents as any);
+  //   setPath((prevPath) => [...prevPath, folderName]);
+  //   return explore.data;
+  // };
+
+  createEffect(() => {
+    if (!isOpen() && contents().length === 0) {
+      rspc.createQuery(
+        () => [
+          "instance.explore",
+          {
+            instance_id: instanceId() as number,
+            path: props.folder.path as Array<string>
+          }
+        ],
+        {
+          onSuccess: (data) => {
+            setContents(data as any);
+          }
+        }
+      );
+      // setContents(explore.data as any);
     }
-    setIsOpen(!isOpen());
-  };
+    // setIsOpen(!isOpen());
+  });
 
+  // const toggleFolder = () => {
+  //   if (!isOpen()) {
+  //     const explore = rspc.createQuery(() => [
+  //       "instance.explore",
+  //       {
+  //         instance_id: instanceId() as number,
+  //         path: ["config"]
+  //       }
+  //     ]);
+  //     setContents(explore.data as any);
+  //   }
+  //   setIsOpen(!isOpen());
+  // };
+  console.log("name", props.folder.name);
   return (
-    <div>
-      <div onClick={toggleFolder}>
-        {props.folder.name} {isOpen() ? "▼" : "►"}
-      </div>
-      <Show when={isOpen()}>
-        <div style={{ "margin-left": "20px" }}>
-          <For each={contents()}>
+    <div class="flex flex-col p-1">
+      <Show when={props.folder.name}>
+        <div class="flex items-center gap-2">
+          <div
+            onClick={() => {
+              setIsOpen(!isOpen());
+            }}
+            class={`${
+              isOpen()
+                ? "i-ep:arrow-down-bold"
+                : "i-ep:arrow-down-bold rotate-[270deg]"
+            } bg-darkSlate-500`}
+          ></div>
+          <Checkbox children={<span>{props.folder.name}</span>} />
+        </div>
+      </Show>
+      <div style={{ "margin-left": !props.initialData ? "20px" : "" }}>
+        <Show when={isOpen() || props.initialData}>
+          {/* <For each={contents()}>
             {(item) =>
               item.type === "folder" ? (
                 <FolderDropdown folder={item} />
@@ -145,9 +181,36 @@ const FolderDropdown = (props: { folder: FileFolder }) => {
                 <div>{item.name}</div>
               )
             }
+          </For> */}
+          <For each={(props.initialData as any) || contents()}>
+            {(item) => (
+              <div class="flex flex-row justify-between items-center ">
+                <Switch>
+                  <Match when={item.type === "Directory"}>
+                    <FolderDropdown
+                      initialData={undefined}
+                      folder={{
+                        name: item.name,
+                        type: item.type,
+                        path: [
+                          ...(props.folder.path as Array<string>),
+                          item.name
+                        ]
+                      }}
+                    />
+                  </Match>
+                  <Match when={item.type !== "Directory"}>
+                    <div class="flex items-center gap-2 p-1">
+                      <div class="w-[16px] h-[16px]"></div>
+                      <Checkbox children={<span>{item.name}</span>} />
+                    </div>
+                  </Match>
+                </Switch>
+              </div>
+            )}
           </For>
-        </div>
-      </Show>
+        </Show>
+      </div>
     </div>
   );
 };

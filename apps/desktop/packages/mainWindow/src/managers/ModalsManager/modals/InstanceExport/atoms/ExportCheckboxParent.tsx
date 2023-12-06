@@ -14,19 +14,7 @@ const ExportCheckboxParent = () => {
   console.log(explore.data);
   return (
     <>
-      <For each={explore.data}>
-        {(item) => (
-          // <div class="flex flex-row justify-between items-center h-10 px-2">
-
-          //   {/* <span>{item.type["File"].size} kb</span> */}
-          // </div>
-          <ExportCheckbox
-            title={item.name}
-            folder={{ ...item, name: item.name }}
-            canExpand={item.type === "Directory"}
-          />
-        )}
-      </For>
+      <ExportCheckbox initialData={explore.data} folder={{ path: [] }} />
     </>
   );
 };
