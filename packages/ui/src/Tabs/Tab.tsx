@@ -80,7 +80,7 @@ const Tab = (_props: Props) => {
       <Switch>
         <Match when={tabsContext?.variant() === "underline"}>
           <div
-            class={`bg-darkSlate-800 font-500 capitalize ${
+            class={`bg-darkSlate-800 hover:text-white transition-colors font-500 capitalize ${
               tabsContext?.paddingX?.() || ""
             } ${tabsContext?.paddingY?.() || ""}`}
             classList={{
