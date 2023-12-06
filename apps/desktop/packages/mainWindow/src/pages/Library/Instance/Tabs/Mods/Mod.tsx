@@ -449,7 +449,9 @@ const Mod = (props: Props) => {
                         );
                       }}
                     >
-                      <div>Switch Version</div>
+                      <div>
+                        <Trans key="instance.switch_version" />
+                      </div>
                       <div class="flex justify-center items-center">
                         <img src={ModrinthLogo} class="w-4 h-4" />
                       </div>
@@ -465,7 +467,9 @@ const Mod = (props: Props) => {
                         );
                       }}
                     >
-                      <div>Switch Version</div>
+                      <div>
+                        <Trans key="instance.switch_version" />
+                      </div>
                       <div class="flex justify-center items-center">
                         <img src={CurseforgeLogo} class="w-4 h-4" />
                       </div>
