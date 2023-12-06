@@ -1,101 +1,14 @@
-// // Necessary imports
-// import { createEffect, createSignal, For, Show } from "solid-js";
-// // Assuming these are your custom imports
-// import { instanceId } from "@/utils/browser";
-// import { rspc } from "@/utils/rspcClient";
-// import { Checkbox } from "@gd/ui";
-
-// interface Props {
-//   canExpand?: boolean;
-//   title?: string;
-//   onChange?: (_checked: boolean) => void;
-//   indeterminate?: boolean;
-//   checked?: boolean;
-//   file: {
-//     name: string;
-//     type: string;
-//     // Add other necessary file properties here
-//   };
-// }
-
-// const ExportCheckbox = (props: Props) => {
-//   const [path, setPath] = createSignal<string[]>([]);
-//   const [data, setData] = createSignal<any>({});
-//   // const [opened, setOpened] = createSignal(false);
-//   // const [expand, setExpand] = createSignal<{ [key: string]: boolean }>({});
-
-//   console.log("data: ", data());
-//   // Fetching data when a folder is expanded
-//   createEffect(() => {
-//     console.log("createEffect");
-//     if (!data().isOpen && data().isexpanding) {
-//       setPath((prevPath) => [...prevPath, props.file.name]);
-//       fetchData();
-//     }
-//   });
-
-//   // Function to fetch data from the backend
-//   const fetchData = async () => {
-//     console.log("fetching data");
-//     const explore = rspc.createQuery(() => [
-//       "instance.explore",
-//       {
-//         instance_id: instanceId() as number,
-//         path: path()
-//       }
-//     ]);
-//     console.log(explore.data);
-//     setData({ data: explore.data, isOpen: true });
-//   };
-
-//   // Toggle folder open/close
-//   const toggleFolder = () => {
-//     console.log("toggleFolder");
-//     setData({ ...data(), isOpen: false, isexpanding: !data().isexpanding });
-//   };
-
-//   return (
-//     <div>
-//       <div class="flex items-center gap-2 h-10 px-2">
-//         <Show when={props.canExpand}>
-//           <div
-//             class={`${
-//               data().isexpanding ? "i-ep:arrow-up" : "i-ep:arrow-down"
-//             }`}
-//             onClick={toggleFolder}
-//           ></div>
-//         </Show>
-//         <Checkbox
-//           children={<span class="text-sm">{props.title}</span>}
-//           checked={props.checked}
-//           onChange={props.onChange}
-//           indeterminate={props.indeterminate}
-//         />
-//       </div>
-//       <Show when={data().isexpanding}>
-//         <div class="pl-4">
-//           <For each={data().data}>
-//             {(item) => (
-//               <ExportCheckbox
-//                 title={item.name}
-//                 file={item}
-//                 canExpand={item.type === "Directory"}
-//               />
-//             )}
-//           </For>
-//         </div>
-//       </Show>
-//     </div>
-//   );
-// };
-
 // export default ExportCheckbox;
 import { instanceId } from "@/utils/browser";
 import { rspc } from "@/utils/rspcClient";
+import { ExportEntry } from "@gd/core_module/bindings";
 import { Checkbox } from "@gd/ui";
 import { createEffect, createSignal, For, Match, Show, Switch } from "solid-js";
 
 // Define the structure for your files and folders
+const [checkedFiles, setCheckedFiles] = createSignal<ExportEntry>({
+  entries: {}
+});
 type FileFolder = {
   name?: string;
   type?: "file" | "folder";
@@ -153,7 +66,9 @@ const FolderDropdown = (props: {
   //   }
   //   setIsOpen(!isOpen());
   // };
-  console.log("name", props.folder.name);
+  createEffect(() => {
+    console.log(checkedFiles());
+  });
   return (
     <div class="flex flex-col p-1">
       <Show when={props.folder.name}>
@@ -168,7 +83,29 @@ const FolderDropdown = (props: {
                 : "i-ep:arrow-down-bold rotate-[270deg]"
             } bg-darkSlate-500`}
           ></div>
-          <Checkbox children={<span>{props.folder.name}</span>} />
+          <Checkbox
+            checked={props.folder.name! in checkedFiles().entries}
+            onChange={() => {
+              console.log(props.folder.path);
+              setCheckedFiles(() => {
+                if (props.folder.name! in checkedFiles().entries) {
+                  const newCheckedFiles = { ...checkedFiles() };
+                  delete newCheckedFiles.entries[props.folder.name!];
+                  return newCheckedFiles;
+                } else {
+                  return {
+                    entries: {
+                      ...checkedFiles().entries,
+                      [props.folder.name!]: {
+                        entries: null
+                      }
+                    }
+                  };
+                }
+              });
+            }}
+            children={<span>{props.folder.name}</span>}
+          />
         </div>
       </Show>
       <div style={{ "margin-left": !props.initialData ? "20px" : "" }}>
@@ -202,7 +139,10 @@ const FolderDropdown = (props: {
                   <Match when={item.type !== "Directory"}>
                     <div class="flex items-center gap-2 p-1">
                       <div class="w-[16px] h-[16px]"></div>
-                      <Checkbox children={<span>{item.name}</span>} />
+                      <Checkbox
+                        onChange={() => {}}
+                        children={<span>{item.name}</span>}
+                      />
                     </div>
                   </Match>
                 </Switch>
