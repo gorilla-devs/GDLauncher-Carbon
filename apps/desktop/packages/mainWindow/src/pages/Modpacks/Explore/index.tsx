@@ -240,9 +240,7 @@ const Modpack = () => {
             />
             <div class="z-20 top-5 sticky left-5 w-fit">
               <Button
-                onClick={() =>
-                  navigate(`/${detailsType()}?instanceId=${instanceId()}`)
-                }
+                onClick={() => navigate(-1)}
                 icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
                 size="small"
                 type="secondary"
