@@ -12,7 +12,11 @@ import {
   Show,
   Switch
 } from "solid-js";
-import { checkedFiles, setCheckedFiles } from "./ExportCheckboxParent";
+import {
+  buildNestedObject,
+  checkedFiles,
+  setCheckedFiles
+} from "./ExportCheckboxParent";
 import { set } from "date-fns";
 import _ from "lodash";
 import { is } from "date-fns/locale";
@@ -42,7 +46,6 @@ const FileCheckbox = (props: { file: FileFolder; name: string }) => {
   };
 
   createEffect(() => {
-    console.log(props.file);
     const path = [...(props.file.path as Array<string>), props.name as string];
 
     const isAlreadyInList = checkedFiles().some((item) =>
@@ -116,7 +119,8 @@ const FolderDropdown = (props: {
     // setIsOpen(!isOpen());
   });
   createEffect(() => {
-    console.log(checkedFiles());
+    const obj = buildNestedObject(checkedFiles());
+    console.log(obj);
   });
 
   const handleChange = (checked: boolean, path: Array<string>) => {
