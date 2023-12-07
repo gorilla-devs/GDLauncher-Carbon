@@ -896,8 +896,8 @@ impl ResourceInstaller for ModrinthModInstaller {
                                 .modrinth
                                 .get_project_versions(ProjectVersionsFilters {
                                     project_id: ProjectID(project_id),
-                                    game_version: None,
-                                    loaders: None,
+                                    game_versions: Vec::new(),
+                                    loaders: Vec::new(),
                                 })
                                 .await
                                 .and_then(|versions| {

@@ -309,8 +309,8 @@ impl From<MRFEProjectVersionsFilters> for ProjectVersionsFilters {
     fn from(value: MRFEProjectVersionsFilters) -> Self {
         ProjectVersionsFilters {
             project_id: value.project_id.into(),
-            game_version: value.game_version,
-            loaders: value.loaders,
+            game_versions: value.game_version.into_iter().collect(),
+            loaders: value.loaders.into_iter().collect(),
         }
     }
 }

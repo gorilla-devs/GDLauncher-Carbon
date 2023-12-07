@@ -11,12 +11,11 @@ use tracing::trace;
 
 use crate::db::read_filters::DateTimeFilter;
 use crate::db::read_filters::IntFilter;
-use crate::domain::instance::InstanceId;
-use crate::domain::instance::info::ModLoader;
 use crate::domain::instance::info::ModLoaderType;
-use crate::domain::modplatforms::curseforge::File;
+use crate::domain::instance::InstanceId;
 use crate::domain::modplatforms::curseforge::filters::ModsParameters;
 use crate::domain::modplatforms::curseforge::filters::ModsParametersBody;
+use crate::domain::modplatforms::curseforge::File;
 use crate::domain::modplatforms::curseforge::FingerprintsMatchesResult;
 use crate::domain::modplatforms::curseforge::Mod;
 use crate::managers::App;
@@ -373,7 +372,9 @@ async fn cache_curseforge_meta_unchecked(
     let mut updatable_path_indexes = Vec::<usize>::new();
 
     for file in &modinfo.latest_files {
-        if file.id == fileinfo.id { continue; }
+        if file.id == fileinfo.id {
+            continue;
+        }
 
         let update_paths = parse_update_paths(&file.game_versions);
 
@@ -388,7 +389,8 @@ async fn cache_curseforge_meta_unchecked(
         }
     }
 
-    let update_paths = file_update_paths.iter()
+    let update_paths = file_update_paths
+        .iter()
         .enumerate()
         .filter(|(i, _)| updatable_path_indexes.contains(&i))
         .map(|(_, (gamever, loader))| format!("{gamever},{}", loader.to_string().to_lowercase()))
