@@ -134,10 +134,9 @@ const AppNavbar = () => {
                   >
                     <Tab>
                       <div
-                        class="text-darkSlate-50 text-2xl cursor-pointer i-ri:settings-3-fill"
+                        class="text-2xl i-ri:settings-3-fill"
                         classList={{
-                          "bg-primary-500":
-                            !!isSettings() || !!isSettingsNested()
+                          "text-white": !!isSettings() || !!isSettingsNested()
                         }}
                       />
                     </Tab>
@@ -145,7 +144,7 @@ const AppNavbar = () => {
                   <Show when={updateAvailable()}>
                     <Tab ignored>
                       <div
-                        class="text-2xl cursor-pointer text-green-600 i-ri:download-2-fill"
+                        class="text-2xl text-green-600 i-ri:download-2-fill"
                         onClick={() =>
                           modalsContext?.openModal({ name: "appUpdate" })
                         }
