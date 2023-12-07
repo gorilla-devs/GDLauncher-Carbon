@@ -170,7 +170,7 @@ const Popover = (_props: Props) => {
       <Show when={props.opened || PopoverOpened()}>
         <Portal>
           <Show when={props.trigger === "click"}>
-            <div class="w-screen h-screen absolute top-0 left-0 backdrop-blur-[2px] z-100" />
+            <div class="w-screen h-screen absolute top-0 left-0 backdrop-blur-[2px] z-50" />
           </Show>
           <div
             onMouseEnter={() => {

@@ -387,7 +387,7 @@ export const AccountsDropdown = (props: Props) => {
   });
 
   return (
-    <div class="relative inline-block z-100" id={props.id}>
+    <div class="relative inline-block" id={props.id}>
       <p
         class="mt-0 mb-2 font-bold"
         classList={{
@@ -445,7 +445,7 @@ export const AccountsDropdown = (props: Props) => {
       <div
         ref={menuRef}
         tabindex="0"
-        class="rounded-md px-4 w-auto absolute right-0 flex-col text-darkSlate-50 pb-2 mt-1 z-100 min-w-80 pt-3 bg-darkSlate-900"
+        class="rounded-md px-4 w-auto absolute right-0 flex-col text-darkSlate-50 pb-2 mt-1 z-[101] min-w-80 pt-3 bg-darkSlate-900"
         onMouseLeave={() => {
           setFocusIn(false);
         }}
