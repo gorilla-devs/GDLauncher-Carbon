@@ -4,6 +4,7 @@ import VersionRow from "./VersionRow";
 import { rspc } from "@/utils/rspcClient";
 import { CFFEFile, MRFEVersion } from "@gd/core_module/bindings";
 import MainContainer from "@/components/Browser/MainContainer";
+import { createEffect } from "solid-js";
 
 const Versions = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -12,43 +13,49 @@ const Versions = () => {
 
   const instanceId = () => parseInt(searchParams.instanceId, 10);
 
-  // const instanceDetails = rspc.createQuery(() => [
-  //   "instance.getInstanceDetails",
-  //   instanceId()
-  // ]);
+  const instanceDetails = rspc.createQuery(() => [
+    "instance.getInstanceDetails",
+    instanceId()
+  ]);
 
   const instanceMods = rspc.createQuery(() => [
     "instance.getInstanceMods",
     instanceId()
   ]);
 
-  // const modplatform = () => instanceDetails.data?.modloaders[0].type_;
+  const modplatform = () => instanceDetails.data?.modloaders[0].type_;
 
   const versions = () => {
-    // function compareModloader(version: string): boolean {
-    //   if (modplatform() === "quilt") {
-    //     return version === "fabric" || version === "quilt";
-    //   }
+    function compareModloader(version: string): boolean {
+      if (modplatform() === "quilt") {
+        return version === "fabric" || version === "quilt";
+      }
 
-    //   return version === modplatform();
-    // }
+      return version === modplatform();
+    }
 
     const mrVersions = routeData.modrinthProjectVersions?.data?.filter(
-      (_version) => {
-        // if (modplatform()) {
-        //   return version.loaders.some(compareModloader);
-        // }
+      (version) => {
+        if (
+          routeData.modrinthGetProject.data?.project_type === "mod" &&
+          modplatform()
+        ) {
+          return version.loaders.some(compareModloader);
+        }
         return true;
       }
     );
 
     const cfVersions = routeData.curseforgeGetModFiles?.data?.data.filter(
-      (_version) => {
-        // if (modplatform()) {
-        //   return version.gameVersions.some((_version) =>
-        //     compareModloader(_version.toLowerCase())
-        //   );
-        // }
+      (version) => {
+        if (
+          routeData.curseforgeGetMod.data?.data.classId === 6 &&
+          modplatform()
+        ) {
+          return version.gameVersions.some((_version) =>
+            compareModloader(_version.toLowerCase())
+          );
+        }
         return true;
       }
     );
@@ -73,6 +80,10 @@ const Versions = () => {
       }
     }
   };
+
+  createEffect(() => {
+    console.log(routeData);
+  });
 
   return (
     <MainContainer
