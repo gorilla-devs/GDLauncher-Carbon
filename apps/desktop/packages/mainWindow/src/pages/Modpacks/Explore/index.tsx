@@ -408,6 +408,7 @@ const Modpack = () => {
                       {(page) => (
                         <Link
                           href={`${page.path}${location.search}`}
+                          replace
                           class="no-underline"
                         >
                           <Tab class="bg-transparent">{page.label}</Tab>

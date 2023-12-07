@@ -180,9 +180,9 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
               const preventClose = defaultModals[modal.name].preventClose;
 
               return (
-                <div class="h-screen w-screen absolute inset-0 flex">
+                <div class="h-screen w-screen flex absolute inset-0">
                   <div
-                    class="relative flex flex-grow h-full justify-center items-center z-999"
+                    class="flex h-full items-center relative flex-grow justify-center z-999"
                     onMouseDown={() => {
                       if (!preventClose) {
                         closeModal();

@@ -169,6 +169,9 @@ const Popover = (_props: Props) => {
     <>
       <Show when={props.opened || PopoverOpened()}>
         <Portal>
+          <Show when={props.trigger === "click"}>
+            <div class="w-screen h-screen absolute top-0 left-0 backdrop-blur-[2px] z-100" />
+          </Show>
           <div
             onMouseEnter={() => {
               setSsHoveringCard(true);
@@ -177,7 +180,7 @@ const Popover = (_props: Props) => {
               setSsHoveringCard(false);
             }}
             ref={setPopoverRef}
-            class={`rounded-lg will-change z-50 ${props.color || ""}`}
+            class={`rounded-lg will-change z-100 ${props.color || ""}`}
             style={{
               position: "absolute",
               top: `${position.y ?? 0}px`,
