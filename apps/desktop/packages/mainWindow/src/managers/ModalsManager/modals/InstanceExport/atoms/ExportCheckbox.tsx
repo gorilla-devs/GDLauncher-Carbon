@@ -3,16 +3,79 @@ import { instanceId } from "@/utils/browser";
 import { rspc } from "@/utils/rspcClient";
 import { ExportEntry } from "@gd/core_module/bindings";
 import { Checkbox } from "@gd/ui";
-import { createEffect, createSignal, For, Match, Show, Switch } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  For,
+  Match,
+  onMount,
+  Show,
+  Switch
+} from "solid-js";
+import { checkedFiles, setCheckedFiles } from "./ExportCheckboxParent";
+import { set } from "date-fns";
+import _ from "lodash";
+import { is } from "date-fns/locale";
 
 // Define the structure for your files and folders
-const [checkedFiles, setCheckedFiles] = createSignal<ExportEntry>({
-  entries: {}
-});
+
 type FileFolder = {
   name?: string;
-  type?: "file" | "folder";
+  type?: "file" | "folder" | "Directory";
   path?: Array<string>;
+};
+export function isSubsetOf(needle: Array<string>, haystack: Array<string>) {
+  return needle.every((val, idx) => haystack[idx] === val);
+}
+
+const FileCheckbox = (props: { file: FileFolder; name: string }) => {
+  const handleChange = (checked: boolean, path: Array<string>) => {
+    if (checked) {
+      setCheckedFiles((prev) => [...prev, path]);
+      return;
+    }
+    setCheckedFiles((prev) =>
+      prev.filter((item) => {
+        return !isSubsetOf(item, path);
+      })
+    );
+  };
+
+  createEffect(() => {
+    console.log(props.file);
+    const path = [...(props.file.path as Array<string>), props.name as string];
+
+    const isAlreadyInList = checkedFiles().some((item) =>
+      _.isEqual(item, path)
+    );
+
+    if (isAlreadyInList) {
+      return;
+    }
+
+    const isAreadyChecked = checkedFiles().some((item) =>
+      isSubsetOf(item, path)
+    );
+
+    if (isAreadyChecked) {
+      setCheckedFiles((prev) => [...prev, path]);
+    }
+  });
+
+  return (
+    <Checkbox
+      checked={checkedFiles().some((item) =>
+        _.isEqual(item, [...(props.file.path as Array<string>), props.name])
+      )}
+      onChange={(checked: boolean) => {
+        handleChange(checked, [
+          ...(props.file.path as Array<string>),
+          props.name as string
+        ]);
+      }}
+      children={<span>{props.name}</span>}
+    />
+  );
 };
 
 const FolderDropdown = (props: {
@@ -52,6 +115,46 @@ const FolderDropdown = (props: {
     }
     // setIsOpen(!isOpen());
   });
+  createEffect(() => {
+    console.log(checkedFiles());
+  });
+
+  const handleChange = (checked: boolean, path: Array<string>) => {
+    if (checked) {
+      setCheckedFiles((prev) => [...prev, path]);
+      return;
+    }
+    setCheckedFiles((prev) =>
+      prev.filter((item) => !isSubsetOf(item, path) && !isSubsetOf(path, item))
+    );
+  };
+
+  createEffect(() => {
+    const path = _.cloneDeep(props.folder.path as Array<string>);
+
+    const isAlreadyInList = checkedFiles().some((item) =>
+      _.isEqual(item, path)
+    );
+
+    if (isAlreadyInList) {
+      return;
+    }
+
+    const isAreadyChecked = checkedFiles().some((item) =>
+      isSubsetOf(item, path)
+    );
+
+    const isAllChildrenChecked =
+      !isAreadyChecked &&
+      checkedFiles().filter(
+        (item) => item.length - path.length === 1 && isSubsetOf(path, item)
+      ).length === contents().length &&
+      contents().length !== 0;
+
+    if (isAreadyChecked || isAllChildrenChecked) {
+      setCheckedFiles((prev) => [...prev, path]);
+    }
+  });
 
   // const toggleFolder = () => {
   //   if (!isOpen()) {
@@ -66,9 +169,6 @@ const FolderDropdown = (props: {
   //   }
   //   setIsOpen(!isOpen());
   // };
-  createEffect(() => {
-    console.log(checkedFiles());
-  });
   return (
     <div class="flex flex-col p-1">
       <Show when={props.folder.name}>
@@ -84,25 +184,14 @@ const FolderDropdown = (props: {
             } bg-darkSlate-500`}
           ></div>
           <Checkbox
-            checked={props.folder.name! in checkedFiles().entries}
-            onChange={() => {
-              console.log(props.folder.path);
-              setCheckedFiles(() => {
-                if (props.folder.name! in checkedFiles().entries) {
-                  const newCheckedFiles = { ...checkedFiles() };
-                  delete newCheckedFiles.entries[props.folder.name!];
-                  return newCheckedFiles;
-                } else {
-                  return {
-                    entries: {
-                      ...checkedFiles().entries,
-                      [props.folder.name!]: {
-                        entries: null
-                      }
-                    }
-                  };
-                }
-              });
+            indeterminate={checkedFiles().some((item) =>
+              isSubsetOf(props.folder.path as Array<string>, item)
+            )}
+            checked={checkedFiles().some((item) =>
+              _.isEqual(item, props.folder.path as Array<string>)
+            )}
+            onChange={(checked: boolean) => {
+              handleChange(checked, props.folder.path as Array<string>);
             }}
             children={<span>{props.folder.name}</span>}
           />
@@ -139,10 +228,22 @@ const FolderDropdown = (props: {
                   <Match when={item.type !== "Directory"}>
                     <div class="flex items-center gap-2 p-1">
                       <div class="w-[16px] h-[16px]"></div>
-                      <Checkbox
-                        onChange={() => {}}
+                      <FileCheckbox name={item.name} file={props.folder} />
+                      {/* <Checkbox
+                        checked={checkedFiles().some((checkedItem) =>
+                          _.isEqual(checkedItem, [
+                            ...(props.folder.path as Array<string>),
+                            item.name
+                          ])
+                        )}
+                        onChange={(checked: boolean) => {
+                          handleChange(checked, [
+                            ...(props.folder.path as Array<string>),
+                            item.name
+                          ] as Array<string>);
+                        }}
                         children={<span>{item.name}</span>}
-                      />
+                      /> */}
                     </div>
                   </Match>
                 </Switch>
