@@ -370,7 +370,14 @@ impl ManagerRef<'_, InstanceManager> {
             bail!("unable to find newer mod version");
         }
 
-        self.install_curseforge_mod(instance_id, version.mod_id as u32, version.id as u32, false, Some(id)).await
+        self.install_curseforge_mod(
+            instance_id,
+            version.mod_id as u32,
+            version.id as u32,
+            false,
+            Some(id),
+        )
+        .await
     }
 
     pub async fn update_modrinth_mod(
@@ -435,7 +442,8 @@ impl ManagerRef<'_, InstanceManager> {
             bail!("unable to find newer mod version");
         }
 
-        self.install_modrinth_mod(instance_id, version.project_id, version.id, false, Some(id)).await
+        self.install_modrinth_mod(instance_id, version.project_id, version.id, false, Some(id))
+            .await
     }
 
     pub async fn get_mod_icon(
