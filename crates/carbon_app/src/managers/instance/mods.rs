@@ -336,7 +336,7 @@ impl ManagerRef<'_, InstanceManager> {
             .with(fcdb::metadata::fetch().with(metadb::curseforge::fetch()))
             .exec()
             .await?
-            .ok_or(InvalidInstanceModIdError(instance_id, id))?;
+            .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
         let cf = m.metadata
             .expect("metadata must be associated with a ModFileCache entry")
@@ -370,7 +370,7 @@ impl ManagerRef<'_, InstanceManager> {
             bail!("unable to find newer mod version");
         }
 
-        self.install_curseforge_mod(instance_id, version.mod_id, version.id) // todo: replace existing
+        self.install_curseforge_mod(instance_id, version.mod_id as u32, version.id as u32, false, Some(id)).await
     }
 
     pub async fn update_modrinth_mod(
@@ -402,7 +402,7 @@ impl ManagerRef<'_, InstanceManager> {
             .with(fcdb::metadata::fetch().with(metadb::modrinth::fetch()))
             .exec()
             .await?
-            .ok_or(InvalidInstanceModIdError(instance_id, id))?;
+            .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
         let mr = m.metadata
             .expect("metadata must be associated with a ModFileCache entry")
@@ -435,7 +435,7 @@ impl ManagerRef<'_, InstanceManager> {
             bail!("unable to find newer mod version");
         }
 
-        self.install_modrinth_mod(instance_id, version.project_id, version.id) // todo: replace existing
+        self.install_modrinth_mod(instance_id, version.project_id, version.id, false, Some(id)).await
     }
 
     pub async fn get_mod_icon(

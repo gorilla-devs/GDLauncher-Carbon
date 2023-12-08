@@ -394,7 +394,7 @@ pub enum ModLoaderType {
 impl From<generic::ModLoaderType> for ModLoaderType {
     fn from(value: generic::ModLoaderType) -> Self {
         match value {
-            generic::ModLoaderType::Neoforge => Self::Neoforge,
+            generic::ModLoaderType::Neoforge => Self::NeoForge,
             generic::ModLoaderType::Forge => Self::Forge,
             generic::ModLoaderType::Fabric => Self::Fabric,
             generic::ModLoaderType::Quilt => Self::Quilt,
