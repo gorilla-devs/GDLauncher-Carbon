@@ -50,12 +50,6 @@ const ExportPath = () => {
 
               setPayload({ ...payload, save_path: result.filePath });
             }}
-            // onClick={async () => {
-            //   const result = await window.showSaveDialog({
-            //     title: "Select File Path"
-            //   });
-            //   console.log(result);
-            // }}
             class="i-material-symbols:folder-open-outline text-2xl  cursor-pointer"
           />
         </div>

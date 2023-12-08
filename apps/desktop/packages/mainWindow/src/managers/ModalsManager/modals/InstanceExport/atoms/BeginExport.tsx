@@ -7,6 +7,26 @@ import { setPayload, payload, setExportStep } from "..";
 import { ExportArgs, ExportEntry } from "@gd/core_module/bindings";
 import { instanceId } from "@/utils/browser";
 import { buildNestedObject, checkedFiles } from "./ExportCheckboxParent";
+import _ from "lodash";
+
+function convertNestedObject(obj: any): any {
+  const result: any = {};
+
+  for (const key in obj.entries) {
+    if (obj.entries.hasOwnProperty(key)) {
+      const value = obj.entries[key];
+      if (value && typeof value === "object" && value.entries !== null) {
+        // If the current value has a nested 'entries' object, recursively process it
+        result[key] = convertNestedObject(value as any);
+      } else {
+        // If 'entries' is null or not an object, set the key's value to null
+        result[key] = null;
+      }
+    }
+  }
+
+  return { entries: result };
+}
 
 const BeginExport = () => {
   const [t] = useTransContext();
@@ -25,12 +45,13 @@ const BeginExport = () => {
   };
 
   const handleExportInstance = () => {
-    console.log(payload);
     setPayload((prev) => ({ ...prev, instance_id: instanceId() }));
     const obj = buildNestedObject(checkedFiles());
-    setPayload((prev) => ({ ...prev, filter: { entries: obj } }));
+    const converted = convertNestedObject({ entries: obj });
+    setPayload((prev) => ({ ...prev, filter: converted }));
+    console.log("payload", payload);
     if (validatePayload(payload as ExportArgs)) {
-      console.log("payload", payload);
+      console.log(payload);
       exportInstanceMutation.mutate({
         filter: payload.filter as ExportEntry,
         instance_id: payload.instance_id as number,
@@ -52,7 +73,13 @@ const BeginExport = () => {
       >
         {t("instance.cancel_export")}
       </Button>
-      <Button onClick={handleExportInstance} type="primary" size="large">
+      <Button
+        onClick={() => {
+          handleExportInstance();
+        }}
+        type="primary"
+        size="large"
+      >
         {t("instance.begin_export")}
       </Button>
     </div>

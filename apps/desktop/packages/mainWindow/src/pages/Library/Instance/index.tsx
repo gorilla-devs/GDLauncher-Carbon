@@ -47,7 +47,8 @@ import { getInstanceIdFromPath } from "@/utils/routes";
 import { parse } from "date-fns";
 import {
   setPayload,
-  payload
+  payload,
+  setExportStep
 } from "@/managers/ModalsManager/modals/InstanceExport";
 
 type InstancePage = {
@@ -345,6 +346,7 @@ const Instance = () => {
           ...payload,
           instance_id: parseInt(instanceId as string, 10)
         });
+        setExportStep(0);
         modalsContext?.openModal({
           name: "exportInstance"
         });
