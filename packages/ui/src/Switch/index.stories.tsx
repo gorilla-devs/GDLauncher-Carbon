@@ -16,13 +16,38 @@ type Story = StoryObj<typeof Switch>;
 
 export const Checked: Story = {
   args: {
-    disabled: false,
     checked: true,
   },
 };
+
+export const CheckedDisabled: Story = {
+  args: {
+    checked: true,
+    disabled: true,
+  },
+};
+
 export const UnChecked: Story = {
   args: {
-    disabled: false,
     checked: false,
+  },
+};
+
+export const UnCheckedDisabled: Story = {
+  args: {
+    checked: false,
+    disabled: true,
+  },
+};
+
+export const Loading: Story = {
+  args: {
+    isLoading: true,
+  },
+};
+
+export const Indeterminate: Story = {
+  args: {
+    isIndeterminate: true,
   },
 };

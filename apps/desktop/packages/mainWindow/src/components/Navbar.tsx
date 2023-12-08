@@ -37,7 +37,7 @@ const AppNavbar = () => {
 
   const selectedIndex = () =>
     !!isSettings() || !!isSettingsNested()
-      ? 4
+      ? 5
       : getRouteIndex(NAVBAR_ROUTES, location.pathname);
 
   const routeData = useRouteData<typeof fetchData>();
@@ -130,11 +130,12 @@ const AppNavbar = () => {
                 </Tab>
                 <div class="flex gap-6 items-center">
                   <div
-                    onClick={() =>
-                      navigate("/settings", {
-                        getLastInstance: true
-                      })
-                    }
+                    onClick={() => {
+                      if (!(!!isSettings() || !!isSettingsNested()))
+                        navigate("/settings", {
+                          getLastInstance: true
+                        });
+                    }}
                   >
                     <Tab>
                       <div

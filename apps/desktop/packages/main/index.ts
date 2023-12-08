@@ -133,8 +133,8 @@ async function createWindow() {
   win.webContents.on("before-input-event", (event, input) => {
     if (input.alt && input.shift && input.code === "KeyI") {
       event.preventDefault();
-      console.log("Opening dev tools");
-      win?.webContents.openDevTools();
+      console.log("dev tools open:", win?.webContents.isDevToolsOpened());
+      win?.webContents.toggleDevTools();
     }
   });
 
@@ -182,6 +182,13 @@ async function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith("https:")) shell.openExternal(url);
     return { action: "deny" };
+  });
+
+  ipcMain.handle("relaunch", () => {
+    console.info("relaunching app...");
+
+    app.relaunch();
+    app.exit();
   });
 }
 

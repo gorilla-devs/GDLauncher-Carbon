@@ -1,5 +1,5 @@
 /* eslint-disable i18next/no-literal-string */
-import { getForgeModloaderIcon } from "@/utils/sidebar";
+import { getCFModloaderIcon } from "@/utils/sidebar";
 import {
   ListInstance,
   CFFEModLoaderType,
@@ -196,7 +196,7 @@ const Tile = (props: Props) => {
           >
             <div class="relative rounded-2xl overflow-hidden h-38 w-38 border-1 border-solid border-darkSlate-600">
               <div
-                class="flex justify-center relative items-center rounded-2xl overflow-hidden h-38 w-38 bg-cover bg-center max-w-38"
+                class="flex justify-center relative items-center rounded-2xl overflow-hidden h-38 w-38 bg-cover bg-center max-w-38 hover:opacity-60 hover:bg-darkSlate-600"
                 classList={{
                   grayscale: props.isLoading || isInQueue(),
                   "cursor-pointer":
@@ -345,7 +345,7 @@ const Tile = (props: Props) => {
                     <Show when={props.modloader}>
                       <img
                         class="w-4 h-4"
-                        src={getForgeModloaderIcon(
+                        src={getCFModloaderIcon(
                           props.modloader as CFFEModLoaderType
                         )}
                       />
@@ -469,7 +469,7 @@ const Tile = (props: Props) => {
                   <Show when={props.modloader}>
                     <img
                       class="w-4 h-4"
-                      src={getForgeModloaderIcon(
+                      src={getCFModloaderIcon(
                         props.modloader as CFFEModLoaderType
                       )}
                     />

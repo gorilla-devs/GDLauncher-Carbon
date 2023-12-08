@@ -33,7 +33,7 @@ impl VisualTaskManager {
 impl ManagerRef<'_, VisualTaskManager> {
     pub async fn spawn_task(self, task: &VisualTask) -> VisualTaskId {
         let task = task.clone();
-        static ATOMIC_ID: AtomicI32 = AtomicI32::new(0);
+        static ATOMIC_ID: AtomicI32 = AtomicI32::new(1);
 
         // Note: the id also keeps tasks in order.
         let id = VisualTaskId(ATOMIC_ID.fetch_add(1, Ordering::Relaxed));
@@ -157,6 +157,8 @@ impl ManagerRef<'_, VisualTaskManager> {
                 break;
             }
         }
+
+        info!("task exited");
 
         Ok(())
     }

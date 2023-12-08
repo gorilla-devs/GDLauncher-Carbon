@@ -72,6 +72,8 @@ ring = { workspace = true }
 num_cpus = { workspace = true }
 display-info = "0.4.3"
 # libc = { workspace = true }
+nom = { workspace = true }
+carbon_parsing = { path = "../carbon_parsing" }
 
 [target.'cfg(windows)'.dependencies]
 winreg = { workspace = true }
@@ -84,7 +86,10 @@ openssl = { workspace = true }
 serde_json = { workspace = true }
 dotenvy = { workspace = true }
 
-[test-dependencies]
+[dev-dependencies]
+assert2 = { workspace = true }
+flowtest = { workspace = true }
+tracing-test = { workspace = true }
 
 [features]
 production = ["iridium"]

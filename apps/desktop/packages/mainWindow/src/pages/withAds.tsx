@@ -5,16 +5,17 @@ import { createEffect } from "solid-js";
 import fetchData from "./app.data";
 import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 import {
-  setCurseForgeModloaders,
   setCurseforgeCategories,
   setModrinthCategories,
   setSupportedModloaders
 } from "@/utils/sidebar";
-import { supportedCfModloaders } from "@/utils/constants";
 import adSize from "@/utils/adhelper";
+import { Trans } from "@gd/i18n";
+import { useModal } from "@/managers/ModalsManager";
 
 function withAdsLayout() {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
+  const modalContext = useModal();
 
   const location = useLocation();
 
@@ -41,16 +42,10 @@ function withAdsLayout() {
 
   createEffect(() => {
     if (routeData.curseForgeModloaders.data) {
-      setCurseForgeModloaders(routeData.curseForgeModloaders.data);
-
-      const curseforgeModpackModloaders = () => {
-        const filtered = routeData.curseForgeModloaders.data?.filter(
-          (modloader) => supportedCfModloaders.includes(modloader as string)
-        );
-        return filtered || [];
-      };
-
-      setSupportedModloaders(curseforgeModpackModloaders());
+      setSupportedModloaders("curseforge", routeData.curseForgeModloaders.data);
+    }
+    if (routeData.modrinthModloaders.data) {
+      setSupportedModloaders("modrinth", routeData.modrinthModloaders.data);
     }
   });
 
@@ -72,21 +67,33 @@ function withAdsLayout() {
           <div
             class="grid justify-end h-[calc(100vh-60px)]"
             classList={{
-              "xs:grid-cols-[auto_2fr_200px] sm:grid-cols-[auto_2fr_200px] md:grid-cols-[auto_2fr_200px] xl:grid-cols-[auto_2fr_440px]":
-                !isDetailPage(),
-              "xs:grid-cols-[2fr_200px] sm:grid-cols-[2fr_200px] md:grid-cols-[2fr_200px] lg:grid-cols-[2fr_440px]":
-                isDetailPage()
+              "grid-cols-[auto_2fr_auto]": !isDetailPage(),
+              "grid-cols-[2fr_auto]": isDetailPage()
             }}
           >
             <Outlet />
-            <div
-              id="ads-layout-container"
-              class="flex flex-col gap-4 px-5 pt-5 bg-darkSlate-800 justify-start flex-initial"
-              style={{
-                width: `${adSize.width + 40}px`
-              }}
-            >
-              <AdsBanner />
+            <div>
+              <div
+                class="flex flex-col gap-4 p-5 bg-darkSlate-800 justify-start flex-initial"
+                style={{
+                  width: `${adSize.width}px`,
+                  height: `${adSize.height}px`
+                }}
+              >
+                <AdsBanner />
+              </div>
+              <div class="flex justify-center">
+                <div
+                  class="text-center text-darkSlate-200 hover:text-darkSlate-50 transition-colors duration-200"
+                  onClick={() => {
+                    modalContext?.openModal({
+                      name: "whyAreAdsNeeded"
+                    });
+                  }}
+                >
+                  <Trans key="why_are_ads_needed" />
+                </div>
+              </div>
             </div>
             <div class="absolute top-0 left-0 right-0 bottom-0 bg-image-gdlauncher_pattern.svg -z-10" />
           </div>

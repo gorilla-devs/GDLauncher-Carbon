@@ -174,20 +174,23 @@ impl InstanceImporter for ModrinthArchiveImporter {
                     })
                 }
             }
+
+            futures::future::join_all(futures).await;
         }
 
         Ok(())
-    }
-
-    async fn get_default_scan_path(&self, _app: &Arc<AppInner>) -> anyhow::Result<Option<PathBuf>> {
-        Ok(None)
     }
 
     async fn get_status(&self) -> ImportScanStatus {
         self.state.read().await.clone().into()
     }
 
-    async fn begin_import(&self, app: &Arc<AppInner>, index: u32) -> anyhow::Result<VisualTaskId> {
+    async fn begin_import(
+        &self,
+        app: &Arc<AppInner>,
+        index: u32,
+        name: Option<String>,
+    ) -> anyhow::Result<VisualTaskId> {
         let instance = self
             .state
             .read()
@@ -239,7 +242,7 @@ impl InstanceImporter for ModrinthArchiveImporter {
             .instance_manager()
             .create_instance_ext(
                 app.instance_manager().get_default_group().await?,
-                instance.index.name.clone(),
+                name.unwrap_or_else(|| instance.index.name.clone()),
                 use_icon,
                 instance_version_source,
                 String::new(),

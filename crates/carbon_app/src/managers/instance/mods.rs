@@ -1,6 +1,7 @@
 use anyhow::{anyhow, bail};
 use thiserror::Error;
 
+use crate::api::keys::instance::INSTANCE_MODS;
 use crate::db::{
     curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
     modrinth_mod_cache as mrdb,
@@ -170,7 +171,7 @@ impl ManagerRef<'_, InstanceManager> {
             .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
             .exec()
             .await?
-            .ok_or(InvalidInstanceModIdError(instance_id, id))?;
+            .ok_or(InvalidInstanceModIdError(instance_id, id.clone()))?;
 
         let mut disabled_path = self
             .app
@@ -209,10 +210,17 @@ impl ManagerRef<'_, InstanceManager> {
         }
 
         self.app
-            .meta_cache_manager()
-            .queue_caching(instance_id, true)
-            .await;
+            .prisma_client
+            .mod_file_cache()
+            .update(
+                fcdb::UniqueWhereParam::IdEquals(id),
+                vec![fcdb::SetParam::SetEnabled(enabled)],
+            )
+            .exec()
+            .await?;
 
+        self.app
+            .invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
         Ok(())
     }
 
@@ -266,12 +274,16 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         project_id: u32,
         file_id: u32,
+        install_deps: bool,
+        replaces_mod_id: Option<String>,
     ) -> anyhow::Result<VisualTaskId> {
         let installer = CurseforgeModInstaller::create(self.app, project_id, file_id)
             .await?
             .into_installer();
 
-        let task_id = installer.install(self.app, instance_id).await?;
+        let task_id = installer
+            .install(self.app, instance_id, install_deps, replaces_mod_id)
+            .await?;
 
         Ok(task_id)
     }
@@ -281,12 +293,16 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         project_id: String,
         version_id: String,
+        install_deps: bool,
+        replaces_mod_id: Option<String>,
     ) -> anyhow::Result<VisualTaskId> {
         let installer = ModrinthModInstaller::create(self.app, project_id, version_id)
             .await?
             .into_installer();
 
-        let task_id = installer.install(self.app, instance_id).await?;
+        let task_id = installer
+            .install(self.app, instance_id, install_deps, replaces_mod_id)
+            .await?;
 
         Ok(task_id)
     }
@@ -520,7 +536,7 @@ mod test {
             .await;
 
         app.instance_manager()
-            .install_curseforge_mod(instance_id, 331723, 4022327)
+            .install_curseforge_mod(instance_id, 331723, 4022327, true, None)
             .await?;
 
         // first invalidation will happen when the mod is scanned locally

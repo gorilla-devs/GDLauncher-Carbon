@@ -83,6 +83,8 @@ const poisonGreen: Theme = {
   "green-700": "hsla(116, 50%, 32%, 1)",
   "green-800": "hsla(116, 50%, 28%, 1)",
   "green-900": "hsla(116, 50%, 24%, 1)",
+  "brands-curseforge": "#f16436",
+  "brands-modrinth": "#1bd96a",
 };
 
 export { poisonGreen };

@@ -387,7 +387,7 @@ pub enum ModLoaderType {
     LiteLoader = 3,
     Fabric = 4,
     Quilt = 5,
-    Neoforge = 6,
+    NeoForge = 6,
     Other(u8),
 }
 
@@ -414,7 +414,7 @@ impl<'de> Deserialize<'de> for ModLoaderType {
             3 => Ok(Self::LiteLoader),
             4 => Ok(Self::Fabric),
             5 => Ok(Self::Quilt),
-            6 => Ok(Self::Neoforge),
+            6 => Ok(Self::NeoForge),
             other => Ok(Self::Other(other)),
         }
     }
@@ -431,7 +431,7 @@ impl Serialize for ModLoaderType {
             Self::LiteLoader => 3,
             Self::Fabric => 4,
             Self::Quilt => 5,
-            Self::Neoforge => 6,
+            Self::NeoForge => 6,
             Self::Other(other) => *other,
         })
     }

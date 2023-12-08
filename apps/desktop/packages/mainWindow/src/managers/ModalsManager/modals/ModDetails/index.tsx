@@ -2,7 +2,7 @@
 import { Button, Spinner } from "@gd/ui";
 import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
-import { FEUnifiedSearchResult, Mod } from "@gd/core_module/bindings";
+import { FEUnifiedSearchResult } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Match, Show, Switch, createEffect, createSignal } from "solid-js";
 import { format } from "date-fns";
@@ -20,15 +20,10 @@ import {
 } from "@/utils/mods";
 import { marked } from "marked";
 import sanitizeHtml from "sanitize-html";
-import { CreateQueryResult } from "@tanstack/solid-query";
-import { RSPCError } from "@rspc/client";
 import { useLocation } from "@solidjs/router";
 
 const ModDetails = (props: ModalProps) => {
   const [loading, setLoading] = createSignal(false);
-  const [mods, setMods] = createSignal<
-    CreateQueryResult<Mod[], RSPCError> | undefined
-  >(undefined);
   const modDetails = () => props.data?.mod as FEUnifiedSearchResult;
   const fileId = () => getFileId(modDetails());
   const projectId = () => getProjectId(modDetails());
@@ -47,6 +42,11 @@ const ModDetails = (props: ModalProps) => {
       setTaskId(taskId);
     }
   });
+
+  const mods = rspc.createQuery(() => [
+    "instance.getInstanceMods",
+    parseInt(instanceId() as string, 10)
+  ]);
 
   createEffect(() => {
     if (taskId() !== undefined) {
@@ -107,20 +107,9 @@ const ModDetails = (props: ModalProps) => {
         };
   };
 
-  createEffect(() => {
-    if (instanceId() !== undefined) {
-      setMods(
-        rspc.createQuery(() => [
-          "instance.getInstanceMods",
-          parseInt(instanceId() as string, 10)
-        ])
-      );
-    }
-  });
-
   const DownloadBtn = (propss: { size: "large" | "small" }) => {
     const isModInstalled = () =>
-      mods()?.data?.find(
+      mods?.data?.find(
         (mod) =>
           (isCurseForgeData(modDetails())
             ? mod.curseforge?.project_id
@@ -141,7 +130,9 @@ const ModDetails = (props: ModalProps) => {
               if (fileId && instanceId()) {
                 installModMutation.mutate({
                   mod_source: modSourceObj(),
-                  instance_id: parseInt(instanceId() as string, 10)
+                  instance_id: parseInt(instanceId() as string, 10),
+                  install_deps: true,
+                  replaces_mod: null
                 });
               }
             }}

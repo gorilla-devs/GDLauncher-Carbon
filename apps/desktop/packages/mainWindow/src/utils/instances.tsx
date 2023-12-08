@@ -179,7 +179,7 @@ export const isProgressKnown = (
 export const isProgressFailed = (
   progress: Progress
 ): progress is { Failed: FeError } => {
-  return (progress as { Failed: FeError }).Failed !== undefined;
+  return (progress as { Failed: FeError })?.Failed !== undefined;
 };
 
 export const isModpackCurseforge = (
@@ -213,21 +213,12 @@ export const fetchImage = async (id: number) => {
   } else return "";
 };
 
-export const fetchModImage = async (
+export const getModImageUrl = (
   instanceId: string,
   modId: string,
   platform: string | null
 ) => {
-  if (platform == null) return "";
-
-  const imageUrl = `http://localhost:${port}/instance/modIcon?instance_id=${instanceId}&mod_id=${modId}&platform=${platform}`;
-  const image = await fetch(imageUrl);
-
-  const imageNotPresent = image.status === 204;
-
-  if (!imageNotPresent) {
-    return imageUrl;
-  } else return "";
+  return `http://localhost:${port}/instance/modIcon?instance_id=${instanceId}&mod_id=${modId}&platform=${platform}`;
 };
 
 export const getUrlType = (url: string) => {
