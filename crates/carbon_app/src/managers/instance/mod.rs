@@ -893,6 +893,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let info = info::Instance {
             name: name.clone(),
             icon,
+            date_created: Utc::now(),
+            date_updated: Utc::now(),
             last_played: None,
             seconds_played: 0,
             modpack,
@@ -1060,6 +1062,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         if let Some(memory) = update.memory {
             info.game_configuration.memory = memory;
         }
+
+        info.date_updated = Utc::now();
 
         let json = schema::make_instance_config(info.clone())?;
 

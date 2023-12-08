@@ -3,6 +3,7 @@ import fss from "fs";
 import path from "path";
 import fs from "fs/promises";
 import fse from "fs-extra";
+import coreModule from "./coreModule";
 
 export const RUNTIME_PATH_OVERRIDE_NAME = "runtime_path_override";
 const RUNTIME_PATH_DEFAULT_NAME = "data";
@@ -58,10 +59,12 @@ ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
 
   await fs.mkdir(newPath, { recursive: true });
 
+  (await coreModule).kill();
+
   // TODO: Copy with progress
   await fse.copy(CURRENT_RUNTIME_PATH!, newPath, {
     overwrite: true,
-    errorOnExist: true
+    errorOnExist: false
   });
 
   await fs.writeFile(runtimeOverridePath, newPath);
@@ -70,6 +73,7 @@ ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
 
   // TODO: with a bit of work we can change the RTPath without actually restarting the app
   app.relaunch();
+  app.exit();
 });
 
 ipcMain.handle("validateRuntimePath", async (_, newPath: string | null) => {

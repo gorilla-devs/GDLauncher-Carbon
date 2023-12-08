@@ -80,7 +80,7 @@ const Tab = (_props: Props) => {
       <Switch>
         <Match when={tabsContext?.variant() === "underline"}>
           <div
-            class={`bg-darkSlate-800 font-500 capitalize ${
+            class={`bg-darkSlate-800 hover:text-white transition-colors font-500 capitalize ${
               tabsContext?.paddingX?.() || ""
             } ${tabsContext?.paddingY?.() || ""}`}
             classList={{
@@ -105,7 +105,7 @@ const Tab = (_props: Props) => {
         </Match>
         <Match when={tabsContext?.variant() === "block"}>
           <div
-            class={`flex gap-1 justify-center items-center flex-1 h-full cursor-pointer rounded-xl font-500 capitalize box-border ${
+            class={`flex gap-1 hover:text-white justify-center items-center flex-1 h-full cursor-pointer rounded-xl font-500 capitalize box-border ${
               tabsContext?.paddingX?.() || ""
             } ${tabsContext?.paddingY?.() || ""}`}
             classList={{
@@ -132,7 +132,7 @@ const Tab = (_props: Props) => {
         </Match>
         <Match when={tabsContext?.variant() === "traditional"}>
           <div
-            class={`flex gap-1 justify-center items-center bg-darkSlate-800 flex-1 h-full font-500 capitalize box-border rounded-t-xl ${
+            class={`flex gap-1 hover:text-white justify-center items-center bg-darkSlate-800 flex-1 h-full font-500 capitalize box-border rounded-t-xl ${
               tabsContext?.paddingX?.() || ""
             } ${tabsContext?.paddingY?.() || ""}`}
             classList={{

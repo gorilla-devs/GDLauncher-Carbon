@@ -17,7 +17,7 @@ import {
   FEUnifiedSearchType
 } from "@gd/core_module/bindings";
 import { createVirtualizer } from "@tanstack/solid-virtual";
-import { rspc } from "@/utils/rspcClient";
+import { rspc, rspcFetch } from "@/utils/rspcClient";
 import { instanceId, scrollTop, setInstanceId } from "@/utils/browser";
 import {
   modpacksQuery,
@@ -53,12 +53,14 @@ export const useInfiniteModsQuery = () => {
   return useContext(InfiniteQueryContext) as InfiniteQueryType;
 };
 
-const [lastType, setLastType] = createSignal<FEUnifiedSearchType | null>(null);
+export const [lastType, setLastType] = createSignal<FEUnifiedSearchType | null>(
+  null
+);
 const [lastScrollPosition, setLastScrollPosition] = createSignal<number>(0);
 
 const InfiniteScrollModsQueryWrapper = (props: Props) => {
   const rspcContext = rspc.useContext();
-  const [_searchParams, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [parentRef, setParentRef] = createSignal<HTMLDivElement | undefined>(
     undefined
   );
@@ -102,8 +104,31 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
     getCurrentScrollPosition();
   });
 
+  const setQueryWrapper = (newValue: Partial<FEUnifiedSearchParameters>) => {
+    getQueryFunction(newValue);
+    infiniteQuery.remove();
+    infiniteQuery.refetch();
+    rowVirtualizer.scrollToIndex(0);
+  };
+
   if (lastType() !== mergedProps.type) {
-    if (lastType() === "mod") {
+    getQueryFunction(defaultQuery);
+
+    const _instanceId = parseInt(searchParams.instanceId, 10);
+    if (_instanceId && !lastType()) {
+      setInstanceId(_instanceId);
+
+      rspcFetch(() => ["instance.getInstanceDetails", _instanceId]).then(
+        (details) => {
+          setQueryWrapper({
+            modloaders: (details as any).data.modloaders.map(
+              (v: any) => v.type_
+            ),
+            gameVersions: [(details as any).data.version]
+          });
+        }
+      );
+    } else if (lastType() === "mod") {
       setSearchParams({
         instanceId: undefined
       });
@@ -112,7 +137,6 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
 
     infiniteQuery.remove();
     infiniteQuery.refetch();
-    getQueryFunction(defaultQuery);
     parentRef()?.scrollTo(0, scrollTop());
     setLastType(mergedProps.type);
     setLastScrollPosition(0);
@@ -139,13 +163,6 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
     estimateSize: () => 150,
     overscan: 15
   });
-
-  const setQueryWrapper = (newValue: Partial<FEUnifiedSearchParameters>) => {
-    getQueryFunction(newValue);
-    infiniteQuery.remove();
-    infiniteQuery.refetch();
-    rowVirtualizer.scrollToIndex(0);
-  };
 
   const context = {
     infiniteQuery,

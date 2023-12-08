@@ -7,6 +7,8 @@ pub struct Instance {
     pub name: String,
     #[serde(default)]
     pub icon: InstanceIcon,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
     #[serde(default)]
     pub last_played: Option<DateTime<Utc>>,
     #[serde(default)]
@@ -107,6 +109,8 @@ impl From<Instance> for info::Instance {
         Self {
             name: value.name,
             icon: value.icon.into(),
+            date_created: value.created_at,
+            date_updated: value.updated_at,
             last_played: value.last_played,
             seconds_played: value.seconds_played,
             modpack: value.modpack.map(Into::into),
@@ -121,6 +125,8 @@ impl From<info::Instance> for Instance {
         Self {
             name: value.name,
             icon: value.icon.into(),
+            created_at: value.date_created,
+            updated_at: value.date_updated,
             last_played: value.last_played,
             seconds_played: value.seconds_played,
             modpack: value.modpack.map(Into::into),

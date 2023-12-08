@@ -124,6 +124,11 @@ const TransWrapper = (props: TransWrapperProps) => {
     async onSuccess(settings) {
       let { language } = settings;
       if (!_i18nInstance.isInitialized) {
+        let maybeEnglish = null;
+        if (language !== "english") {
+          maybeEnglish = await loadLanguageFiles("english");
+        }
+
         const defaultNamespacesMap = await loadLanguageFiles(language);
 
         await _i18nInstance.init({
@@ -132,7 +137,8 @@ const TransWrapper = (props: TransWrapperProps) => {
           lng: language,
           fallbackLng: "english",
           resources: {
-            [language]: defaultNamespacesMap
+            [language]: defaultNamespacesMap,
+            ...(maybeEnglish && { english: maybeEnglish })
           },
           partialBundledLanguages: true,
           debug: true
