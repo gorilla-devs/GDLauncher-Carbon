@@ -45,6 +45,10 @@ import { getCFModloaderIcon } from "@/utils/sidebar";
 import { instanceId, setInstanceId } from "@/utils/browser";
 import { getInstanceIdFromPath } from "@/utils/routes";
 import { parse } from "date-fns";
+import {
+  setPayload,
+  payload
+} from "@/managers/ModalsManager/modals/InstanceExport";
 
 type InstancePage = {
   label: string;
@@ -337,6 +341,10 @@ const Instance = () => {
       action: () => {
         const instanceId = getInstanceIdFromPath(location.pathname);
         setInstanceId(parseInt(instanceId as string, 10));
+        setPayload({
+          ...payload,
+          instance_id: parseInt(instanceId as string, 10)
+        });
         modalsContext?.openModal({
           name: "exportInstance"
         });

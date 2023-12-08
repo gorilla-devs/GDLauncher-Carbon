@@ -48,6 +48,7 @@ const ExportPath = () => {
               }
 
               setPath(result.filePaths[0]);
+
               setPayload({ ...payload, save_path: result.filePaths[0] });
             }}
             class="i-material-symbols:folder-open-outline text-2xl  cursor-pointer"

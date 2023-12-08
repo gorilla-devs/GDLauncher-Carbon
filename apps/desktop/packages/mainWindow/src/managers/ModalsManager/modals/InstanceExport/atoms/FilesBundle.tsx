@@ -6,12 +6,12 @@ import { setPayload, payload } from "..";
 const FilesBundle = () => {
   const [t] = useTransContext();
   const handleSwitch = () => {
-    setPayload({ ...payload, links_mod: !payload.links_mod });
+    setPayload({ ...payload, link_mods: !payload.link_mods });
   };
   return (
     <div class="w-full flex justify-between items-center pt-2">
       <span>{t("instance.bundle_files_text")}</span>
-      <Switch onClick={handleSwitch} checked={payload.links_mod} />
+      <Switch onChange={handleSwitch} checked={payload.link_mods} />
     </div>
   );
 };

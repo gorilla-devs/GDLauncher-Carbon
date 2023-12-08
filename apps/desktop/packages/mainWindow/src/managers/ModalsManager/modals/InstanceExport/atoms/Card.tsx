@@ -18,8 +18,7 @@ export const Card = (
       onClick={() => {
         setPayload({
           ...payload,
-          target: props.instance.title,
-          instance_id: props.instance.id
+          target: props.instance.title
         });
       }}
     >
