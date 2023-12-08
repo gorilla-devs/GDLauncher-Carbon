@@ -163,17 +163,17 @@ const Sidebar = () => {
             <div class="flex flex-col gap-3">
               <Radio.group
                 onChange={async (val) => {
+                  const details: any = await runWithOwner(owner, async () => {
+                    return rspcFetch(() => [
+                      "instance.getInstanceDetails",
+                      val
+                    ]);
+                  });
+
                   setSearchParams({
                     instanceId: val as number
                   });
                   infiniteQuery.setInstanceId(val as number);
-
-                  const details: any = await runWithOwner(owner, async () => {
-                    return rspcFetch(() => [
-                      "instance.getInstanceDetails",
-                      instanceId()
-                    ]);
-                  });
 
                   const modloaders = details.data.modloaders.map(
                     (v: any) => v.type_

@@ -114,8 +114,8 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
   if (lastType() !== mergedProps.type) {
     getQueryFunction(defaultQuery);
 
-    if (!lastType()) {
-      const _instanceId = parseInt(searchParams.instanceId, 10);
+    const _instanceId = parseInt(searchParams.instanceId, 10);
+    if (_instanceId && !lastType()) {
       setInstanceId(_instanceId);
 
       rspcFetch(() => ["instance.getInstanceDetails", _instanceId]).then(

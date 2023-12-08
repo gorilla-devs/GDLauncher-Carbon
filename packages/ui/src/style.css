@@ -17,7 +17,7 @@
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: var(--lightGray-800);
+  background-color: var(--lightGray-700);
 }
 
 .potato-pc *,
