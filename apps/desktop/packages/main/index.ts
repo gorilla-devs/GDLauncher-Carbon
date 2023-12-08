@@ -9,6 +9,7 @@ import {
   ipcMain,
   Menu,
   OpenDialogOptions,
+  SaveDialogOptions,
   screen,
   session,
   shell
@@ -93,6 +94,10 @@ async function createWindow() {
 
   ipcMain.handle("openFileDialog", async (_, opts: OpenDialogOptions) => {
     return dialog.showOpenDialog(opts);
+  });
+
+  ipcMain.handle("showSaveDialog", async (_, opts: SaveDialogOptions) => {
+    return dialog.showSaveDialog(opts);
   });
 
   ipcMain.handle("getCurrentOS", async () => {

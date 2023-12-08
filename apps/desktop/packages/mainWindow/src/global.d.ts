@@ -19,6 +19,9 @@ declare global {
     openFileDialog: (
       filters: Electron.OpenDialogOptions
     ) => Promise<Electron.OpenDialogReturnValue>;
+    showSaveDialog: (
+      filters: Electron.SaveDialogOptions
+    ) => Promise<Electron.SaveDialogReturnValue>;
     adSizeChanged: (
       cb: (event: Electron.IpcRendererEvent, ...args: any[]) => void
     ) => void;

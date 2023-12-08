@@ -4,7 +4,7 @@ import { rspc } from "@/utils/rspcClient";
 import { useTransContext } from "@gd/i18n";
 import { Button } from "@gd/ui";
 import { setPayload, payload, setExportStep } from "..";
-import { ExportArgs } from "@gd/core_module/bindings";
+import { ExportArgs, ExportEntry } from "@gd/core_module/bindings";
 import { instanceId } from "@/utils/browser";
 import { buildNestedObject, checkedFiles } from "./ExportCheckboxParent";
 
@@ -30,8 +30,14 @@ const BeginExport = () => {
     const obj = buildNestedObject(checkedFiles());
     setPayload((prev) => ({ ...prev, filter: { entries: obj } }));
     if (validatePayload(payload as ExportArgs)) {
-      console.log("here!!!");
-      exportInstanceMutation.mutate(payload as ExportArgs);
+      console.log("payload", payload);
+      exportInstanceMutation.mutate({
+        filter: payload.filter as ExportEntry,
+        instance_id: payload.instance_id as number,
+        save_path: payload.save_path as string,
+        target: payload.target,
+        link_mods: payload.link_mods
+      });
     }
   };
 

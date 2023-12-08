@@ -37,20 +37,25 @@ const ExportPath = () => {
         <div class="flex items-center justify-center p-2 bg-[#1D2028] rounded-lg">
           <div
             onClick={async () => {
-              const result = await window.openFileDialog({
+              const result = await window.showSaveDialog({
                 title: "Select Runtime Path",
-                defaultPath: path() || "",
-                properties: ["openFile", "openDirectory"]
+                defaultPath: path() || ""
               });
 
               if (result.canceled) {
                 return;
               }
 
-              setPath(result.filePaths[0]);
+              setPath(result.filePath);
 
-              setPayload({ ...payload, save_path: result.filePaths[0] });
+              setPayload({ ...payload, save_path: result.filePath });
             }}
+            // onClick={async () => {
+            //   const result = await window.showSaveDialog({
+            //     title: "Select File Path"
+            //   });
+            //   console.log(result);
+            // }}
             class="i-material-symbols:folder-open-outline text-2xl  cursor-pointer"
           />
         </div>
