@@ -105,7 +105,7 @@ async function createWindow() {
   });
 
   ipcMain.handle("openFolder", async (_, path) => {
-    shell.openPath(path);
+    shell.showItemInFolder(path);
   });
 
   ipcMain.handle("openCMPWindow", async () => {

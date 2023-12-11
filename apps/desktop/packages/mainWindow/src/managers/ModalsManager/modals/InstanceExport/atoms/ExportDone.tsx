@@ -1,6 +1,7 @@
 import { useTransContext } from "@gd/i18n";
 import { Button } from "@gd/ui";
 import CheckIcon from "./CheckIcon";
+import { ipcRenderer, shell } from "electron";
 
 export default function ExportDone(props: { path: string }) {
   const [t] = useTransContext();

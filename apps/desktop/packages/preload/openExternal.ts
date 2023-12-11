@@ -15,3 +15,7 @@ contextBridge.exposeInMainWorld("openFileDialog", async (filters?: any) =>
 contextBridge.exposeInMainWorld("showSaveDialog", async (filters?: any) =>
   ipcRenderer.invoke("showSaveDialog", filters)
 );
+
+contextBridge.exposeInMainWorld("openFolder", async (link: string) =>
+  ipcRenderer.invoke("openFolder", link)
+);
