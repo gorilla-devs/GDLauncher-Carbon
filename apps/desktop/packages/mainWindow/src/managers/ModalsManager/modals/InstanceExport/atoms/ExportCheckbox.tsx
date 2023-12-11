@@ -10,8 +10,6 @@ import {
 } from "./ExportCheckboxParent";
 import _ from "lodash";
 
-// Define the structure for your files and folders
-
 type FileFolder = {
   name?: string;
   type?: "file" | "folder" | "Directory";
@@ -70,22 +68,12 @@ const FileCheckbox = (props: { file: FileFolder; name: string }) => {
   );
 };
 
-const FolderDropdown = (props: {
+const ExportCheckbox = (props: {
   folder: FileFolder;
   initialData: any | undefined;
 }) => {
   const [isOpen, setIsOpen] = createSignal(false);
   const [contents, setContents] = createSignal<any[]>([]);
-  // const [path, setPath] = createSignal<string[]>([]);
-
-  // Mock function to fetch contents. Replace this with your actual API call.
-  // const fetchContents = (folderName: string) => {
-  //   // Here you would make an API call to fetch the contents of the folder.
-  //   // This is just a placeholder for demonstration purposes.
-
-  //   setPath((prevPath) => [...prevPath, folderName]);
-  //   return explore.data;
-  // };
 
   createEffect(() => {
     if (!isOpen() && contents().length === 0) {
@@ -103,9 +91,7 @@ const FolderDropdown = (props: {
           }
         }
       );
-      // setContents(explore.data as any);
     }
-    // setIsOpen(!isOpen());
   });
   createEffect(() => {
     const obj = buildNestedObject(checkedFiles());
@@ -149,19 +135,6 @@ const FolderDropdown = (props: {
     }
   });
 
-  // const toggleFolder = () => {
-  //   if (!isOpen()) {
-  //     const explore = rspc.createQuery(() => [
-  //       "instance.explore",
-  //       {
-  //         instance_id: instanceId() as number,
-  //         path: ["config"]
-  //       }
-  //     ]);
-  //     setContents(explore.data as any);
-  //   }
-  //   setIsOpen(!isOpen());
-  // };
   return (
     <div class="flex flex-col p-1">
       <Show when={props.folder.name}>
@@ -195,7 +168,7 @@ const FolderDropdown = (props: {
           {/* <For each={contents()}>
             {(item) =>
               item.type === "folder" ? (
-                <FolderDropdown folder={item} />
+                <ExportCheckbox folder={item} />
               ) : (
                 <div>{item.name}</div>
               )
@@ -206,7 +179,7 @@ const FolderDropdown = (props: {
               <div class="flex flex-row justify-between items-center ">
                 <Switch>
                   <Match when={item.type === "Directory"}>
-                    <FolderDropdown
+                    <ExportCheckbox
                       initialData={undefined}
                       folder={{
                         name: item.name,
@@ -249,4 +222,4 @@ const FolderDropdown = (props: {
   );
 };
 
-export default FolderDropdown;
+export default ExportCheckbox;

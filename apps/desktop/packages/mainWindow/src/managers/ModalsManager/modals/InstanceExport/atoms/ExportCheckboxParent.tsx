@@ -32,7 +32,7 @@ const ExportCheckboxParent = () => {
       path: []
     }
   ]);
-  console.log(explore.data);
+
   return (
     <>
       <ExportCheckbox initialData={explore.data} folder={{ path: [] }} />
