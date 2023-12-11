@@ -14,15 +14,256 @@ import {
   shell
 } from "electron";
 import os, { platform, release } from "os";
-import { join, resolve } from "path";
-import "./runtimePath";
-import "./cli"; // THIS MUST BE BEFORE "coreModule" IMPORT!
-import coreModule from "./coreModule";
+import path, { join, resolve } from "path";
+import fs from "fs/promises";
+import fss from "fs";
+import fse from "fs-extra";
+import { spawn } from "child_process";
+import type { ChildProcessWithoutNullStreams } from "child_process";
+import * as Sentry from "@sentry/electron/main";
 import "./preloadListeners";
 import getAdSize from "./adSize";
 import handleUncaughtException from "./handleUncaughtException";
 import initAutoUpdater from "./autoUpdater";
 import "./appMenu";
+
+export const RUNTIME_PATH_OVERRIDE_NAME = "runtime_path_override";
+const RUNTIME_PATH_DEFAULT_NAME = "data";
+
+export let CURRENT_RUNTIME_PATH: string | null = null;
+
+export function initRTPath(override: string | null | undefined) {
+  if (override) {
+    CURRENT_RUNTIME_PATH = override;
+    return;
+  }
+
+  const runtimeOverridePath = path.join(
+    app.getPath("userData"),
+    RUNTIME_PATH_OVERRIDE_NAME
+  );
+
+  let file_override: string | null = null;
+  try {
+    const tmp_path = fss.readFileSync(runtimeOverridePath).toString();
+    fse.ensureDirSync(tmp_path);
+    file_override = tmp_path;
+  } catch {
+    // ignore
+  }
+
+  CURRENT_RUNTIME_PATH =
+    file_override ||
+    path.join(app.getPath("userData"), RUNTIME_PATH_DEFAULT_NAME);
+}
+
+const args = process.argv.slice(1);
+
+type Argument = {
+  argument: string;
+  value: string | null;
+};
+
+function validateArgument(arg: string): Argument | null {
+  const hasValue =
+    args.includes(arg) && !args[args.indexOf(arg) + 1]?.startsWith("--");
+
+  if (hasValue) {
+    return {
+      argument: arg,
+      value: args[args.indexOf(arg) + 1]
+    };
+  }
+
+  if (args.includes(arg)) {
+    return {
+      argument: arg,
+      value: null
+    };
+  }
+
+  return null;
+}
+
+export function getPatchedUserData() {
+  let appData = null;
+
+  if (os.platform() !== "linux") {
+    appData = app.getPath("appData");
+  } else {
+    // monkey patch linux since it defaults to .config instead of .local/share
+    const xdgDataHome = process.env.XDG_DATA_HOME;
+    if (xdgDataHome) {
+      appData = xdgDataHome;
+    } else {
+      const homeDir = os.homedir();
+      appData = path.join(homeDir, ".local/share");
+    }
+  }
+
+  return path.join(appData, "gdlauncher_carbon");
+}
+
+app.setPath("userData", getPatchedUserData());
+
+if (app.isPackaged) {
+  const overrideCLIDataPath = validateArgument("--runtime_path");
+  const overrideEnvDataPath = process.env.GDL_RUNTIME_PATH;
+
+  initRTPath(overrideCLIDataPath?.value || overrideEnvDataPath);
+} else {
+  const rtPath = import.meta.env.RUNTIME_PATH;
+  if (!rtPath) {
+    throw new Error("Missing runtime path");
+  }
+  initRTPath(rtPath);
+}
+
+console.log("Userdata path:", app.getPath("userData"));
+console.log("Runtime path:", CURRENT_RUNTIME_PATH);
+
+const allowMultipleInstances = validateArgument(
+  "--gdl_allow_multiple_instances"
+);
+
+if (!allowMultipleInstances) {
+  if (!app.requestSingleInstanceLock()) {
+    app.quit();
+    process.exit(0);
+  }
+}
+
+const disableSentry = validateArgument("--gdl_disable_sentry");
+
+if (!disableSentry) {
+  if (import.meta.env.VITE_MAIN_DSN) {
+    // @ts-ignore
+    process.removeListener("uncaughtException", handleUncaughtException);
+
+    Sentry.init({
+      dsn: import.meta.env.VITE_MAIN_DSN
+    });
+  }
+}
+
+export type Log = {
+  type: "info" | "error";
+  message: string;
+};
+
+export type CoreModuleError = {
+  logs: Log[];
+};
+
+const isDev = import.meta.env.MODE === "development";
+
+const binaryName =
+  os.platform() === "win32" ? "core_module.exe" : "core_module";
+
+type CoreModule = () => Promise<{
+  port: number;
+  kill: () => void;
+}>;
+
+const loadCoreModule: CoreModule = () =>
+  new Promise((resolve, reject) => {
+    if (isDev) {
+      resolve({
+        port: 4650,
+        kill: () => {}
+      });
+      return;
+    }
+
+    const coreModulePath = path.resolve(
+      __dirname,
+      "../../../../resources/binaries",
+      binaryName
+    );
+
+    console.log(`[CORE] Spawning core module: ${coreModulePath}`);
+    let coreModule: ChildProcessWithoutNullStreams | null = null;
+    let logs: Log[] = [];
+
+    try {
+      coreModule = spawn(
+        coreModulePath,
+        ["--runtime_path", CURRENT_RUNTIME_PATH!],
+        {
+          shell: false,
+          detached: false,
+          stdio: "pipe",
+          env: {
+            ...process.env,
+            RUST_BACKTRACE: "full"
+          }
+        }
+      );
+    } catch (err) {
+      console.error(`[CORE] Spawn error: ${err}`);
+      reject({
+        logs
+      });
+
+      return;
+    }
+
+    coreModule.on("error", function (err) {
+      console.error(`[CORE] Spawn error: ${err}`);
+      reject({
+        logs
+      });
+
+      return;
+    });
+
+    coreModule.stdout.on("data", (data) => {
+      let dataString = data.toString();
+      let rows = dataString.split(/\r?\n|\r|\n/g);
+
+      logs.push({
+        type: "info",
+        message: dataString
+      });
+
+      for (let row of rows) {
+        if (row.startsWith("_STATUS_:")) {
+          const port: number = row.split("|")[1];
+          console.log(`[CORE] Port: ${port}`);
+          resolve({
+            port,
+            kill: () => coreModule?.kill()
+          });
+        }
+      }
+      console.log(`[CORE] Message: ${dataString}`);
+    });
+
+    coreModule.stderr.on("data", (data) => {
+      logs.push({
+        type: "error",
+        message: data.toString()
+      });
+      console.error(`[CORE] Error: ${data.toString()}`);
+    });
+
+    coreModule.on("exit", (code) => {
+      console.log(`[CORE] Exit with code: ${code}`);
+
+      if (code !== 0) {
+        reject({
+          logs
+        });
+      }
+
+      resolve({
+        port: 0,
+        kill: () => coreModule?.kill()
+      });
+    });
+  });
+
+const coreModule = loadCoreModule();
 
 if ((app as any).overwolf) {
   (app as any).overwolf.disableAnonymousAnalytics();
@@ -102,6 +343,81 @@ async function createWindow() {
   ipcMain.handle("openCMPWindow", async () => {
     // @ts-ignore
     app.overwolf.openCMPWindow();
+  });
+
+  ipcMain.handle("getUserData", async () => {
+    return app.getPath("userData");
+  });
+
+  ipcMain.handle("getInitialRuntimePath", async () => {
+    return path.join(app.getPath("userData"), RUNTIME_PATH_DEFAULT_NAME);
+  });
+
+  ipcMain.handle("getRuntimePath", async () => {
+    return CURRENT_RUNTIME_PATH;
+  });
+
+  ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
+    if (newPath === CURRENT_RUNTIME_PATH) {
+      return;
+    }
+
+    const runtimeOverridePath = path.join(
+      app.getPath("userData"),
+      RUNTIME_PATH_OVERRIDE_NAME
+    );
+
+    await fs.mkdir(newPath, { recursive: true });
+
+    (await coreModule).kill();
+
+    // TODO: Copy with progress
+    await fse.copy(CURRENT_RUNTIME_PATH!, newPath, {
+      overwrite: true,
+      errorOnExist: false
+    });
+
+    await fs.writeFile(runtimeOverridePath, newPath);
+
+    await fse.remove(CURRENT_RUNTIME_PATH!);
+
+    // TODO: with a bit of work we can change the RTPath without actually restarting the app
+    app.relaunch();
+    app.exit();
+  });
+
+  ipcMain.handle("validateRuntimePath", async (_, newPath: string | null) => {
+    if (!newPath || newPath === CURRENT_RUNTIME_PATH) {
+      return false;
+    }
+
+    const pathExists = await fse.pathExists(newPath);
+    if (!pathExists) {
+      return true;
+    }
+
+    const newPathStat = await fs.stat(newPath);
+    if (!newPathStat.isDirectory()) {
+      return false;
+    }
+
+    const files = await fs.readdir(newPath);
+    if (files.length > 0) {
+      return false;
+    }
+
+    return true;
+  });
+
+  ipcMain.handle("getCoreModulePort", async () => {
+    let port = null;
+    try {
+      port = (await coreModule).port;
+    } catch (e) {
+      return (e as any).logs;
+    }
+
+    return port;
   });
 
   win.webContents.on("will-navigate", (e, url) => {

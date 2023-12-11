@@ -18,6 +18,7 @@ import { Trans } from "@gd/i18n";
 import { Spinner, createNotification } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import { createSignal, For, Show, Switch, Match, createEffect } from "solid-js";
+import CopyIcon from "../CopyIcon";
 
 export type Label = {
   name: string;
@@ -386,7 +387,7 @@ export const AccountsDropdown = (props: Props) => {
   });
 
   return (
-    <div class="relative inline-block z-[10001]" id={props.id}>
+    <div class="relative inline-block" id={props.id}>
       <p
         class="mt-0 mb-2 font-bold"
         classList={{
@@ -444,7 +445,7 @@ export const AccountsDropdown = (props: Props) => {
       <div
         ref={menuRef}
         tabindex="0"
-        class="rounded-md px-4 w-auto absolute right-0 flex-col text-darkSlate-50 pb-2 mt-1 z-40 min-w-80 pt-3 bg-darkSlate-900"
+        class="rounded-md px-4 w-auto absolute right-0 flex-col text-darkSlate-50 pb-2 mt-1 z-[101] min-w-80 pt-3 bg-darkSlate-900"
         onMouseLeave={() => {
           setFocusIn(false);
         }}
@@ -488,15 +489,7 @@ export const AccountsDropdown = (props: Props) => {
               <div class="flex gap-1">
                 <p class="m-0 text-xs">{(activeAccount() as Label)?.uuid}</p>
               </div>
-              <div
-                class="text-darkSlate-50 ease-in-out cursor-pointer transition i-ri:file-copy-fill text-sm hover:text-white"
-                onClick={() => {
-                  navigator.clipboard.writeText(
-                    (activeAccount() as Label)?.uuid
-                  );
-                  addNotification("The UUID has been copied");
-                }}
-              />
+              <CopyIcon text={(activeAccount() as Label)?.uuid} />
             </div>
           </div>
         </div>

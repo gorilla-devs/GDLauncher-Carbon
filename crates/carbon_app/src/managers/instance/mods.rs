@@ -98,6 +98,9 @@ impl ManagerRef<'_, InstanceManager> {
                             // ignore unknown modloaders
                             .flat_map(|loader| ModLoaderType::try_from(loader).ok())
                             .collect::<Vec<_>>(),
+                        sha_512: m.sha_512.clone(),
+                        sha_1: m.sha_1.clone(),
+                        murmur_2: m.murmur_2,
                         has_image: m
                             .logo_image
                             .as_ref()

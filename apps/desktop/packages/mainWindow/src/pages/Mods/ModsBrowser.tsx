@@ -191,7 +191,7 @@ const ModsBrowser = () => {
                       type="outline"
                       size="small"
                       icon={
-                        <i class="text-darkSlate-50 cursor-pointer hover:text-white transition i-ri:arrow-left-s-line tranition-color" />
+                        <i class="text-darkSlate-50 cursor-pointer hover:text-white transition i-ri:arrow-left-s-line transition-colors" />
                       }
                     >
                       <Trans key="instance.go_to_installed_mods" />
@@ -207,14 +207,16 @@ const ModsBrowser = () => {
                     <h2 class="m-0">{instanceDetails.data?.name}</h2>
                   </div>
                   <i
-                    class="i-ri:close-fill text-darkSlate-50 cursor-pointer hover:text-white transition tranition-color"
+                    class="w-5 h-5 i-ri:close-fill text-darkSlate-50 cursor-pointer hover:text-white transition-colors"
                     onClick={() => {
                       setSearchParams({
                         instanceId: undefined
                       });
                       infiniteQuery.setInstanceId(undefined);
                       infiniteQuery.setQuery({
-                        modloaders: null
+                        modloaders: null,
+                        gameVersions: null,
+                        categories: null
                       });
                     }}
                   />

@@ -90,7 +90,7 @@ const NotificationsProvider = (props: Props) => {
         <For each={notifications()}>
           {(notification, i) => (
             <div
-              class="w-50 h-10 px-4 text-white fixed left-1/2 rounded-md flex justify-center items-center z-60"
+              class="w-50 h-10 px-4 text-white fixed left-1/2 rounded-md flex justify-center items-center z-100"
               style={{
                 transform: `translate(-50%, ${
                   notification.position === "bottom"
