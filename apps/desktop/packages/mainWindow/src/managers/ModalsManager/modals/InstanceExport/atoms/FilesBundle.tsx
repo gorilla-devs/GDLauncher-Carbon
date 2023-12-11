@@ -1,6 +1,5 @@
 import { useTransContext } from "@gd/i18n";
 import { Switch } from "@gd/ui";
-import { createSignal } from "solid-js";
 import { setPayload, payload } from "..";
 
 const FilesBundle = () => {

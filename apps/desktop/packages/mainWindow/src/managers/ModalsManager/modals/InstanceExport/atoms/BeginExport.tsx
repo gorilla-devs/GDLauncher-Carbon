@@ -13,7 +13,7 @@ function convertNestedObject(obj: any): any {
   const result: any = {};
 
   for (const key in obj.entries) {
-    if (obj.entries.hasOwnProperty(key)) {
+    if (key in obj.entries) {
       const value = obj.entries[key];
       if (value && typeof value === "object" && value.entries !== null) {
         // If the current value has a nested 'entries' object, recursively process it

@@ -1,7 +1,7 @@
 import { useTransContext } from "@gd/i18n";
 import LoadingGif from "/assets/images/image.gif";
 import { Progressbar } from "@gd/ui";
-import { rspc, rspcFetch } from "@/utils/rspcClient";
+import { rspcFetch } from "@/utils/rspcClient";
 import { createEffect, createSignal } from "solid-js";
 import { setTaskId, taskId } from "@/utils/import";
 import { isProgressFailed } from "@/utils/instances";

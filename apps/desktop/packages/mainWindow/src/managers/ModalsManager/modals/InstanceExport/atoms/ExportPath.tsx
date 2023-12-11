@@ -1,6 +1,6 @@
 import { useTransContext } from "@gd/i18n";
 import { Input } from "@gd/ui";
-import { createEffect, createSignal } from "solid-js";
+import { createSignal } from "solid-js";
 import { setPayload, payload } from "..";
 
 const ExportPath = () => {

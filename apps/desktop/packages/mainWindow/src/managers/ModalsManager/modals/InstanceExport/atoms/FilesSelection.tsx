@@ -1,13 +1,5 @@
 import { useTransContext } from "@gd/i18n";
-import { Checkbox } from "@gd/ui";
-import { For, createEffect, createSignal } from "solid-js";
-import SingleCheckBox from "../../OnBoarding/SingleCheckBox";
-import { rspc } from "@/utils/rspcClient";
-import { payload } from "..";
 import { instanceId } from "@/utils/browser";
-import { ExploreEntry, ExportEntry } from "@gd/core_module/bindings";
-import { isWithinInterval } from "date-fns";
-import ExportCheckbox from "./ExportCheckbox";
 import ExportCheckboxParent from "./ExportCheckboxParent";
 
 const FilesSelection = () => {

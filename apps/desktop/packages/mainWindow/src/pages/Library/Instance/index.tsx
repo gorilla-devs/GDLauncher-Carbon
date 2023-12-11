@@ -42,9 +42,8 @@ import { useModal } from "@/managers/ModalsManager";
 import { convertSecondsToHumanTime } from "@/utils/helpers";
 import Authors from "./Info/Authors";
 import { getCFModloaderIcon } from "@/utils/sidebar";
-import { instanceId, setInstanceId } from "@/utils/browser";
+import { setInstanceId } from "@/utils/browser";
 import { getInstanceIdFromPath } from "@/utils/routes";
-import { parse } from "date-fns";
 import {
   setPayload,
   payload,

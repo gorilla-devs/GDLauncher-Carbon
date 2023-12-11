@@ -8,10 +8,11 @@ import PrismLogo from "/assets/images/icons/prism_logo.svg";
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg";
 import LegacyGDL from "/assets/images/icons/legacy_gdlauncher.svg";
 import { For } from "solid-js";
-import EntityCard from "@/components/Card/EntityCard";
 import { Card } from "./Card";
-import { ExportTarget, ImportEntity } from "@gd/core_module/bindings";
+import { ExportTarget } from "@gd/core_module/bindings";
+import { useTransContext } from "@gd/i18n";
 const ExportFormat = () => {
+  const [t] = useTransContext();
   const entities = rspc.createQuery(() => ["instance.getImportableEntities"]);
 
   const icons = [
@@ -33,7 +34,7 @@ const ExportFormat = () => {
   ];
   return (
     <div class="flex flex-col  ">
-      <span>Export format</span>
+      <span>{t("instance.export_format")}</span>
       <ul class="flex  gap-2 p-0">
         <For
           each={entities.data

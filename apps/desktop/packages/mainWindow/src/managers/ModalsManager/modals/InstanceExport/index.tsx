@@ -1,9 +1,6 @@
-import { Tab, TabList, TabPanel, Tabs } from "@gd/ui";
 import { ModalProps } from "../..";
 import ModalLayout from "../../ModalLayout";
-import { Trans } from "@gd/i18n";
 import ExportFormat from "./atoms/ExportFormat";
-import ExportNameVersion from "./atoms/ExportNameVersion";
 import FilesSelection from "./atoms/FilesSelection";
 import FilesBundle from "./atoms/FilesBundle";
 import ExportPath from "./atoms/ExportPath";

@@ -1,8 +1,6 @@
 import EntityCard, { EntityCardProps } from "@/components/Card/EntityCard";
 import { setPayload, payload } from "..";
 import { ExportTarget } from "@gd/core_module/bindings";
-import { createEffect } from "solid-js";
-import { rspc } from "@/utils/rspcClient";
 
 export const Card = (
   props: EntityCardProps & {

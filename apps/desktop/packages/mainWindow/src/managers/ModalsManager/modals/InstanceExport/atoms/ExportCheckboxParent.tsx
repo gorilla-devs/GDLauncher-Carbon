@@ -1,8 +1,7 @@
 import { instanceId } from "@/utils/browser";
 import { rspc } from "@/utils/rspcClient";
-import { For, createSignal } from "solid-js";
+import { createSignal } from "solid-js";
 import ExportCheckbox from "./ExportCheckbox";
-import { ExportEntry } from "@gd/core_module/bindings";
 
 const [checkedFiles, setCheckedFiles] = createSignal<Array<Array<string>>>([]);
 export { checkedFiles, setCheckedFiles };

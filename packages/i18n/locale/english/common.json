@@ -211,6 +211,7 @@
   "instance.cancel_export": "Cancel",
   "instance.begin_export": "Begin Export",
   "instance.export_instance": "Export Instance",
+  "instance.export_format": "Export format",
   "onboarding.scan_target_path": "Scan target path:",
   "onboarding.import_instance_or_zip": "Import instance / Zip",
   "onboarding.java_title": "Do you want the launcher to automatically handle Java for you? It will also download a managed Java version if you don't have the correct one",

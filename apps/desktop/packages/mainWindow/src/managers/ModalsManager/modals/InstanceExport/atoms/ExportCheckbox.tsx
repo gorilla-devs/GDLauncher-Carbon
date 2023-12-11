@@ -1,25 +1,14 @@
 // export default ExportCheckbox;
 import { instanceId } from "@/utils/browser";
 import { rspc } from "@/utils/rspcClient";
-import { ExportEntry } from "@gd/core_module/bindings";
 import { Checkbox } from "@gd/ui";
-import {
-  createEffect,
-  createSignal,
-  For,
-  Match,
-  onMount,
-  Show,
-  Switch
-} from "solid-js";
+import { createEffect, createSignal, For, Match, Show, Switch } from "solid-js";
 import {
   buildNestedObject,
   checkedFiles,
   setCheckedFiles
 } from "./ExportCheckboxParent";
-import { set } from "date-fns";
 import _ from "lodash";
-import { is } from "date-fns/locale";
 
 // Define the structure for your files and folders
 
