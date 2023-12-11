@@ -5,6 +5,11 @@
   - Added the required column `updatePaths` to the `ModrinthModCache` table without a default value. This is not possible if the table is not empty.
 
 */
+DELETE FROM CurseForgeModCache;
+DELETE FROM CurseForgeModImageCache;
+DELETE FROM ModrinthModCache;
+DELETE FROM ModrinthModImageCache;
+
 -- RedefineTables
 PRAGMA foreign_keys=OFF;
 CREATE TABLE "new_CurseForgeModCache" (
