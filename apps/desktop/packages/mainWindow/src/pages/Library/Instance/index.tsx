@@ -650,7 +650,11 @@ const Instance = () => {
                     <TabList>
                       <For each={instancePages()}>
                         {(page: InstancePage) => (
-                          <Link href={page.path} class="no-underline">
+                          <Link
+                            draggable={false}
+                            href={page.path}
+                            class="no-underline"
+                          >
                             <Tab class="bg-transparent">{page.label}</Tab>
                           </Link>
                         )}

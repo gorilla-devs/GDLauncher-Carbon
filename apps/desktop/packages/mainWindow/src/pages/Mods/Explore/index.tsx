@@ -285,6 +285,7 @@ const Modpack = () => {
                         <Link
                           href={`${page.path}${location.search}`}
                           class="no-underline"
+                          draggable={false}
                         >
                           <Tab class="bg-transparent">{page.label}</Tab>
                         </Link>
