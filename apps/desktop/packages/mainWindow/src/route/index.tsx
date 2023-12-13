@@ -8,7 +8,7 @@ import ModpackBrowserData from "@/pages/Modpacks/modpacksBrowser.data";
 import ModsBrowserData from "@/pages/Mods/modsBrowser.data";
 import ModpackData from "@/pages/Modpacks/modpack.overview";
 import ModpackVersionsData from "@/pages/Modpacks/modpack.versions";
-import ModVersionsData from "@/pages/Modpacks/modpack.versions";
+import ModVersionsData from "@/pages/Mods/mods.versions";
 import ModpackScreenshotsData from "@/pages/Modpacks/modpack.screenshots";
 import InstanceData from "@/pages/Library/Instance/instance.data";
 import InstanceLogsData from "@/pages/Library/Instance/instance.logs.data";

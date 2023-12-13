@@ -85,6 +85,9 @@ pub struct ModFileMetadata {
     pub description: Option<String>,
     pub authors: Option<String>,
     pub modloaders: Vec<info::ModLoaderType>,
+    pub sha_512: Vec<u8>,
+    pub sha_1: Vec<u8>,
+    pub murmur_2: i32,
     pub has_image: bool,
 }
 

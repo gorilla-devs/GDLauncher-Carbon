@@ -1090,6 +1090,8 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                 .get_instance_path(&instance.shortpath)
                 .get_mods_path();
 
+            drop(instances);
+
             let mut pathbuf = PathBuf::new();
             pathbuf.push(app.settings_manager().runtime_path.get_root().to_path());
             pathbuf.push(&subpath);
@@ -1185,12 +1187,16 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
 
             let entry_futures = modpaths.into_iter().map(|(subpath, (enabled, _))| {
                 let pathbuf = &pathbuf;
+                let update_notifier = &update_notifier;
 
                 async move {
                     app.meta_cache_manager()
                         .cache_mod_file_unchecked(instance_id, pathbuf, subpath, enabled)
-                        .await
-                        .map(|_| ())
+                        .await?;
+
+                    update_notifier.send(instance_id);
+
+                    Ok(())
                 }
             });
 

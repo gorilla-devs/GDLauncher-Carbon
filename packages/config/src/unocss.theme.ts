@@ -143,10 +143,20 @@ const theme = {
         "{ 0% { transform: translateX(0) scaleX(0); } 40% { transform: translateX(0) scaleX(0.4); } 100% { transform: translateX(100%) scaleX(0.5); } }",
       enterScaleIn:
         "{ 0% { transform: scale(.9); opacity: 0 } 100% { transform: scale(1); opacity: 1 } }",
+      scaleBounce:
+        "{ 0% { transform: scale(1); } 50% { transform: scale(0); } 70% { transform: scale(1); } 85% { transform: scale(1.2); } 100% { transform: scale(1); } }",
     },
 
-    durations: { loadingbar: "1s", enterScaleIn: "200ms" },
-    timingFns: { loadingbar: "linear", enterScaleIn: "ease-in-out" },
+    durations: {
+      loadingbar: "1s",
+      enterScaleIn: "200ms",
+      scaleBounce: "600ms",
+    },
+    timingFns: {
+      loadingbar: "linear",
+      enterScaleIn: "ease-in-out",
+      scaleBounce: "cubic-bezier(0.68, -0.55, 0.265, 1.55)",
+    },
     counts: { loadingbar: "infinite" },
   },
   screens: {

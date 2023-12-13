@@ -220,12 +220,7 @@ const Logs = () => {
           <Match when={(instanceLogss().length || 0) === 0}>
             <div class="h-full flex justify-center items-center">
               <p>
-                <Trans
-                  key="logs.no_logs"
-                  options={{
-                    defaultValue: "No logs"
-                  }}
-                />
+                <Trans key="logs.no_logs" />
               </p>
             </div>
           </Match>

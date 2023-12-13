@@ -41,7 +41,7 @@ pub struct File {
     pub server_pack_file_id: Option<i32>,
     pub is_early_access_content: Option<bool>,
     pub early_access_end_date: Option<String>, // Consider using a datetime library for date-time representation
-    pub file_fingerprint: u64,
+    pub file_fingerprint: u32,
     pub modules: Vec<FileModule>,
 }
 

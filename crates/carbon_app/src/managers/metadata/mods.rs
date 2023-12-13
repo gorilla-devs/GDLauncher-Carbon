@@ -505,20 +505,6 @@ pub struct ModFileMetadata {
     pub logo_file: Option<String>,
 }
 
-impl From<ModFileMetadata> for domain::ModFileMetadata {
-    fn from(value: ModFileMetadata) -> Self {
-        Self {
-            modid: value.modid,
-            name: value.name,
-            version: value.version,
-            description: value.description,
-            authors: value.authors,
-            modloaders: value.modloaders,
-            has_image: value.logo_file.is_some(),
-        }
-    }
-}
-
 impl From<McModInfo> for ModFileMetadata {
     fn from(value: McModInfo) -> Self {
         Self {

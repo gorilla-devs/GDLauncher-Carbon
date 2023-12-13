@@ -9,6 +9,7 @@ import { createStore, produce, reconcile } from "solid-js/store";
 import fetchData from "../../instance.data";
 import { Mod as Modtype } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
+import { setLastType } from "@/components/InfiniteScrollModsQueryWrapper";
 
 const Mods = () => {
   const [t] = useTransContext();
@@ -212,6 +213,7 @@ const Mods = () => {
               type="outline"
               size="medium"
               onClick={() => {
+                setLastType(null);
                 navigate(`/mods?instanceId=${params.id}`);
               }}
             >
