@@ -9,10 +9,9 @@ import {
   ModpackPlatform
 } from "@gd/core_module/bindings";
 import { For, Match, Show, Switch, mergeProps } from "solid-js";
-import { ContextMenu } from "../ContextMenu";
 import { Trans, useTransContext } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
-import { Spinner, Tooltip } from "@gd/ui";
+import { ContextMenu, Spinner, Tooltip } from "@gd/ui";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { useModal } from "@/managers/ModalsManager";

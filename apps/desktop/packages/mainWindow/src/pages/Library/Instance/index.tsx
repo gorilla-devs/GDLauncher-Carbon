@@ -1,7 +1,7 @@
 /* eslint-disable i18next/no-literal-string */
 import getRouteIndex from "@/route/getRouteIndex";
 import { Trans, useTransContext } from "@gd/i18n";
-import { Tabs, TabList, Tab, Button } from "@gd/ui";
+import { Tabs, TabList, Tab, Button, ContextMenu } from "@gd/ui";
 import {
   Link,
   Outlet,
@@ -37,7 +37,7 @@ import {
   getRunningState
 } from "@/utils/instances";
 import DefaultImg from "/assets/images/default-instance-img.png";
-import { ContextMenu } from "@/components/ContextMenu";
+// import { ContextMenu } from "@/components/ContextMenu";
 import { useModal } from "@/managers/ModalsManager";
 import { convertSecondsToHumanTime } from "@/utils/helpers";
 import Authors from "./Info/Authors";
