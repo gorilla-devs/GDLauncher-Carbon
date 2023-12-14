@@ -401,6 +401,8 @@ mod test {
                 project_id: ProjectID("u6dRKJwZ".to_string()),
                 game_version: None,
                 loaders: None,
+                offset: None,
+                limit: None,
             })
             .await?;
         tracing::debug!("Versions: {:?}", results);

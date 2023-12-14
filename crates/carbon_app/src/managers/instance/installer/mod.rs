@@ -885,6 +885,8 @@ impl ResourceInstaller for ModrinthModInstaller {
                                     project_id: ProjectID(project_id),
                                     game_version: None,
                                     loaders: None,
+                                    limit: None,
+                                    offset: None,
                                 })
                                 .await
                                 .and_then(|versions| {

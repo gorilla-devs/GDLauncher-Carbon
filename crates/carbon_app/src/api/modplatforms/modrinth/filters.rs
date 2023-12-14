@@ -303,6 +303,10 @@ pub struct MRFEProjectVersionsFilters {
     pub game_version: Option<String>,
     #[specta(optional)]
     pub loaders: Option<String>,
+    #[specta(optional)]
+    pub limit: Option<u32>,
+    #[specta(optional)]
+    pub offset: Option<u32>,
 }
 
 impl From<MRFEProjectVersionsFilters> for ProjectVersionsFilters {
@@ -311,6 +315,8 @@ impl From<MRFEProjectVersionsFilters> for ProjectVersionsFilters {
             project_id: value.project_id.into(),
             game_version: value.game_version,
             loaders: value.loaders,
+            limit: value.limit,
+            offset: value.offset,
         }
     }
 }

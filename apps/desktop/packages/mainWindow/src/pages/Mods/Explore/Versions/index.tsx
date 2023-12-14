@@ -2,8 +2,8 @@ import { useRouteData, useSearchParams } from "@solidjs/router";
 import fetchData from "../../mods.versions";
 import VersionRow from "./VersionRow";
 import { rspc } from "@/utils/rspcClient";
-import { CFFEFile, MRFEVersion } from "@gd/core_module/bindings";
 import MainContainer from "@/components/Browser/MainContainer";
+import { useInfiniteVersionsQuery } from "@/components/InfiniteScrollVersionsQueryWrapper";
 import { createEffect } from "solid-js";
 
 const Versions = () => {
@@ -11,69 +11,51 @@ const Versions = () => {
 
   const [searchParams] = useSearchParams();
 
-  const instanceId = () => parseInt(searchParams.instanceId, 10);
+  const infiniteQuery = useInfiniteVersionsQuery();
 
-  const instanceDetails = rspc.createQuery(() => [
-    "instance.getInstanceDetails",
-    instanceId()
-  ]);
+  const rows = () => infiniteQuery.allRows();
+
+  const lastItem = () =>
+    infiniteQuery?.rowVirtualizer?.getVirtualItems()[
+      infiniteQuery?.rowVirtualizer?.getVirtualItems()?.length - 1
+    ];
+
+  const instanceId = () => parseInt(searchParams.instanceId, 10);
 
   const instanceMods = rspc.createQuery(() => [
     "instance.getInstanceMods",
     instanceId()
   ]);
 
-  const modplatform = () => instanceDetails.data?.modloaders[0].type_;
+  // createEffect(() => {
+  //   if (!lastItem() || lastItem().index === infiniteQuery?.query.index) {
+  //     return;
+  //   }
 
-  const versions = () => {
-    function compareModloader(version: string): boolean {
-      if (modplatform() === "quilt") {
-        return version === "fabric" || version === "quilt";
-      }
+  //   const lastItemIndex = infiniteQuery?.infiniteQuery.hasNextPage
+  //     ? lastItem().index - 1
+  //     : lastItem().index;
 
-      return version === modplatform();
-    }
-
-    const mrVersions = routeData.modrinthProjectVersions?.data?.filter(
-      (version) => {
-        if (
-          routeData.modrinthGetProject.data?.project_type === "mod" &&
-          modplatform()
-        ) {
-          return version.loaders.some(compareModloader);
-        }
-        return true;
-      }
-    );
-
-    const cfVersions = routeData.curseforgeGetModFiles?.data?.data.filter(
-      (version) => {
-        if (
-          routeData.curseforgeGetMod.data?.data.classId === 6 &&
-          modplatform()
-        ) {
-          return version.gameVersions.some((_version) =>
-            compareModloader(_version.toLowerCase())
-          );
-        }
-        return true;
-      }
-    );
-
-    return mrVersions || cfVersions || [];
-  };
+  //   if (
+  //     lastItemIndex >= rows().length - 1 &&
+  //     infiniteQuery?.infiniteQuery.hasNextPage &&
+  //     !infiniteQuery.infiniteQuery.isFetchingNextPage
+  //   ) {
+  //     infiniteQuery.infiniteQuery.fetchNextPage();
+  //   }
+  // });
 
   const installedMod = () => {
-    for (const version of versions()) {
+    for (const version of rows()) {
       if (instanceMods.data) {
         for (const mod of instanceMods.data) {
           if (
-            mod.curseforge?.file_id === (version as CFFEFile).id ||
-            mod.modrinth?.version_id === (version as MRFEVersion).id
+            mod.curseforge?.file_id === version?.id ||
+            mod.modrinth?.version_id === version?.id.toString()
           ) {
             return {
-              id: mod.id,
-              remoteId: version.id.toString()
+              id: mod?.id,
+              remoteId: version?.id.toString()
             };
           }
         }
@@ -81,22 +63,26 @@ const Versions = () => {
     }
   };
 
-  createEffect(() => {
-    console.log(routeData);
-  });
+  // createEffect(() => {
+  //   console.log(
+  //     "virtual rows",
+  //     infiniteQuery?.rowVirtualizer?.getVirtualItems(),
+  //     infiniteQuery?.allRows()
+  //   );
+  // });
 
   return (
     <MainContainer
-      versions={versions()}
+      virtualVersions={infiniteQuery?.rowVirtualizer?.getVirtualItems()}
+      totalVirtualHeight={infiniteQuery?.rowVirtualizer?.getTotalSize() || 0}
+      setVirtualListRef={infiniteQuery?.setParentRef}
+      versions={rows()}
       curseforgeProjectData={routeData.curseforgeGetMod?.data?.data}
       modrinthProjectData={routeData.modrinthGetProject?.data}
       instanceId={instanceId()}
       installedMod={installedMod()}
       isCurseforge={routeData.isCurseforge}
-      isLoading={
-        (routeData.modrinthGetProject as any)?.isLoading ||
-        (routeData.curseforgeGetModFiles as any)?.isLoading
-      }
+      isLoading={false}
     >
       {VersionRow}
     </MainContainer>

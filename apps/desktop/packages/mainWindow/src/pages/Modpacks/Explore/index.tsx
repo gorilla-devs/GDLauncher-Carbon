@@ -26,6 +26,7 @@ import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
 import Authors from "@/pages/Library/Instance/Info/Authors";
 import { getUrlType } from "@/utils/instances";
+import ExploreVersionsNavbar from "@/components/ExploreVersionsNavbar";
 
 const getTabIndexFromPath = (path: string) => {
   if (path.match(/\/(modpacks|mods)\/.+\/.+/g)) {
@@ -186,6 +187,8 @@ const Modpack = () => {
         }
       });
     }
+
+    setLoading(false);
   };
 
   createEffect(() => {
@@ -386,59 +389,70 @@ const Modpack = () => {
                 ref={(el) => {
                   refStickyTabs = el;
                 }}
-                class="sticky top-0 flex items-center justify-between px-4 z-10 bg-darkSlate-800 mb-4"
+                class="sticky top-0 flex flex-col px-4 z-10 bg-darkSlate-800 mb-4"
               >
-                <Show when={isSticky()}>
-                  <span class="mr-4">
+                <div class="flex items-center justify-between">
+                  <Show when={isSticky()}>
+                    <span class="mr-4">
+                      <Button
+                        onClick={() =>
+                          navigate(
+                            `/${detailsType()}?instanceId=${instanceId()}`
+                          )
+                        }
+                        size="small"
+                        type="secondary"
+                      >
+                        <div class="text-2xl i-ri:arrow-drop-left-line" />
+                        <Trans key="instance.step_back" />
+                      </Button>
+                    </span>
+                  </Show>
+                  <Tabs index={indexTab()}>
+                    <TabList>
+                      <For each={instancePages()}>
+                        {(page) => (
+                          <Link
+                            href={`${page.path}${location.search}`}
+                            replace
+                            class="no-underline"
+                          >
+                            <Tab class="bg-transparent">{page.label}</Tab>
+                          </Link>
+                        )}
+                      </For>
+                    </TabList>
+                  </Tabs>
+                  <Show when={isSticky()}>
                     <Button
-                      onClick={() =>
-                        navigate(`/${detailsType()}?instanceId=${instanceId()}`)
-                      }
+                      uppercase
                       size="small"
-                      type="secondary"
+                      disabled={
+                        routeData.modpackDetails.isInitialLoading ||
+                        (!isModpack() && !instanceId())
+                      }
+                      onClick={() => handleDownload()}
                     >
-                      <div class="text-2xl i-ri:arrow-drop-left-line" />
-                      <Trans key="instance.step_back" />
+                      <Show when={loading()}>
+                        <Spinner />
+                      </Show>
+                      <Show when={!loading()}>
+                        <Trans
+                          key="modpack.download"
+                          options={{
+                            defaultValue: "Download"
+                          }}
+                        />
+                      </Show>
                     </Button>
-                  </span>
-                </Show>
-                <Tabs index={indexTab()}>
-                  <TabList>
-                    <For each={instancePages()}>
-                      {(page) => (
-                        <Link
-                          href={`${page.path}${location.search}`}
-                          replace
-                          class="no-underline"
-                        >
-                          <Tab class="bg-transparent">{page.label}</Tab>
-                        </Link>
-                      )}
-                    </For>
-                  </TabList>
-                </Tabs>
-                <Show when={isSticky()}>
-                  <Button
-                    uppercase
-                    size="small"
-                    disabled={
-                      routeData.modpackDetails.isInitialLoading ||
-                      (!isModpack() && !instanceId())
+                  </Show>
+                </div>
+                <Show when={indexTab() === 3}>
+                  <ExploreVersionsNavbar
+                    modplatform={
+                      routeData.isCurseforge ? "curseforge" : "modrinth"
                     }
-                    onClick={() => handleDownload()}
-                  >
-                    <Show when={loading()}>
-                      <Spinner />
-                    </Show>
-                    <Show when={!loading()}>
-                      <Trans
-                        key="modpack.download"
-                        options={{
-                          defaultValue: "Download"
-                        }}
-                      />
-                    </Show>
-                  </Button>
+                  />
                 </Show>
               </div>
               <div class="px-4 z-0">

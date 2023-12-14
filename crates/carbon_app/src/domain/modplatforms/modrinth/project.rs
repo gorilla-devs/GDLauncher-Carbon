@@ -9,6 +9,8 @@ pub struct ProjectVersionsFilters {
     pub project_id: ProjectID,
     pub game_version: Option<String>,
     pub loaders: Option<String>,
+    pub offset: Option<u32>,
+    pub limit: Option<u32>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
