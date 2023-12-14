@@ -77,7 +77,9 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
               modId: parseInt(props.modId, 10),
               query: {
                 index: versionsQuery.index,
-                pageSize: versionsQuery.pageSize
+                pageSize: versionsQuery.pageSize,
+                gameVersion: versionsQuery.gameVersion,
+                modLoaderType: versionsQuery.modLoaderType
                 // modLoaderType: versionsQuery.modLoaderType
               }
             }

@@ -28,21 +28,21 @@ const Versions = () => {
   ]);
 
   // createEffect(() => {
-  //   if (!lastItem() || lastItem().index === infiniteQuery?.query.index) {
-  //     return;
-  //   }
+  // if (!lastItem() || lastItem().index === infiniteQuery?.query.index) {
+  //   return;
+  // }
 
-  //   const lastItemIndex = infiniteQuery?.infiniteQuery.hasNextPage
-  //     ? lastItem().index - 1
-  //     : lastItem().index;
+  // const lastItemIndex = infiniteQuery?.infiniteQuery.hasNextPage
+  //   ? lastItem().index - 1
+  //   : lastItem().index;
 
-  //   if (
-  //     lastItemIndex >= rows().length - 1 &&
-  //     infiniteQuery?.infiniteQuery.hasNextPage &&
-  //     !infiniteQuery.infiniteQuery.isFetchingNextPage
-  //   ) {
-  //     infiniteQuery.infiniteQuery.fetchNextPage();
-  //   }
+  // if (
+  //   lastItemIndex >= rows().length - 1 &&
+  //   infiniteQuery?.infiniteQuery.hasNextPage &&
+  //   !infiniteQuery.infiniteQuery.isFetchingNextPage
+  // ) {
+  // infiniteQuery.infiniteQuery.fetchNextPage();
+  // }
   // });
 
   const installedMod = () => {
