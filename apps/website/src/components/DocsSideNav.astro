@@ -1,0 +1,51 @@
+---
+import type { MDXInstance } from "astro";
+import { getCollection, type CollectionEntry } from "astro:content";
+
+const { pathname } = Astro.url;
+const pages = await getCollection("docs");
+
+const categories = [...new Set(pages.map((p) => p.data.category))];
+---
+
+<div
+  class="bg-slate-50 px-12 md:px-24 lg:px-0 py-32 shadow-inner lg:shadow-none transition-colors"
+>
+  {
+    categories.map((category) => (
+      <>
+        <h3 class="mt-4 mb-2 text-2xl font-semibold capitalize first:mt-0 lg:text-lg">
+          {category}
+        </h3>
+        <ul
+          aria-label={`Pages in ${category}`}
+          class="border-l text-lg lg:text-base"
+        >
+          {pages
+            .filter((page) => page.data.category === category)
+            .map(({ data, slug }) => (
+              <li
+                aria-label={data.title}
+                class={`-ml-px border-l py-1 pl-4 text-slate-400 transition-all hover:border-slate-500 hover:text-slate-500
+                  ${
+                    pathname === `/docs/${slug}`
+                      ? "border-slate-600 font-semibold text-slate-800"
+                      : " border-transparent dark:border-slate-600"
+                  }
+              `}
+              >
+                <a href={`/docs/${slug}`}>{data.title}</a>
+              </li>
+            ))}
+        </ul>
+      </>
+    ))
+  }
+</div>
+<a
+  class="bg-black/20 backdrop-blur-sm select-none touch-manipulation lg:hidden"
+  href="#"
+  id="sidenav-close"
+  title="Close Menu"
+  aria-label="Close Menu"
+  onchange="history.go(-1)"></a>
