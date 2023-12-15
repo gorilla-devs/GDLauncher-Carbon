@@ -37,7 +37,7 @@ const AppNavbar = () => {
 
   const selectedIndex = () =>
     !!isSettings() || !!isSettingsNested()
-      ? 6
+      ? 5
       : getRouteIndex(NAVBAR_ROUTES, location.pathname);
 
   const routeData = useRouteData<typeof fetchData>();
@@ -123,25 +123,7 @@ const AppNavbar = () => {
                     <Trans key="sidebar.add_instance" />
                   </Button>
                 </Tab>
-                <Tab ignored noPadding>
-                  <Button
-                    size="small"
-                    class="w-max"
-                    type="primary"
-                    onClick={() => {
-                      modalsContext?.openModal({
-                        name: "exportInstance"
-                      });
-                    }}
-                  >
-                    <Trans
-                      key="sidebar.export_instance"
-                      options={{
-                        defaultValue: "Export Instance"
-                      }}
-                    />
-                  </Button>
-                </Tab>
+
                 <div class="flex gap-6 items-center">
                   <div
                     onClick={() => {
