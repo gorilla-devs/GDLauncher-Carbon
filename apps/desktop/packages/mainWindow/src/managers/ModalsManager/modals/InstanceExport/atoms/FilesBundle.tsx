@@ -8,7 +8,7 @@ const FilesBundle = () => {
     setPayload({ ...payload, link_mods: !payload.link_mods });
   };
   return (
-    <div class="w-full flex justify-between items-center pt-2">
+    <div class="w-full flex justify-between items-center pt-4">
       <span>{t("instance.bundle_files_text")}</span>
       <Switch onChange={handleSwitch} checked={payload.link_mods} />
     </div>
