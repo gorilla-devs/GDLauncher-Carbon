@@ -25,7 +25,7 @@ const [payload, setPayload] = createStore<IPayload>({
   instance_id: undefined,
   target: "Curseforge",
   save_path: undefined,
-  link_mods: false,
+  link_mods: true,
   filter: { entries: {} }
 });
 export { payload, setPayload };
