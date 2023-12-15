@@ -81,6 +81,7 @@ const BeginExport = () => {
         }}
         type="primary"
         size="large"
+        disabled={validatePayload(payload as ExportArgs) === 0}
       >
         {t("instance.begin_export")}
       </Button>
