@@ -41,6 +41,8 @@ const BeginExport = () => {
   const validatePayload = (payload: ExportArgs) => {
     if (typeof payload.instance_id !== "number") return 0;
     if (typeof payload.save_path !== "string") return 0;
+    const extension = _.last(payload.save_path.split("."));
+    if (extension !== "zip" && extension !== "mrpack") return 0;
     return 1;
   };
 

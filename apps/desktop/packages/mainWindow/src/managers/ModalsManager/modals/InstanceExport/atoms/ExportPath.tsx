@@ -39,7 +39,18 @@ const ExportPath = () => {
             onClick={async () => {
               const result = await window.showSaveDialog({
                 title: "Select Runtime Path",
-                defaultPath: path() || ""
+                defaultPath: path() || "",
+                filters: [
+                  {
+                    name:
+                      payload.target === "Curseforge"
+                        ? "ZIP Files"
+                        : "MRPACK Files",
+                    extensions: [
+                      payload.target === "Curseforge" ? "zip" : "mrpack"
+                    ]
+                  }
+                ]
               });
 
               if (result.canceled) {
