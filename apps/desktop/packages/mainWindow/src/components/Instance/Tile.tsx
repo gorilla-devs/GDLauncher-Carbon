@@ -16,6 +16,12 @@ import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { useModal } from "@/managers/ModalsManager";
 import { getModpackPlatformIcon, getValideInstance } from "@/utils/instances";
+import { setInstanceId } from "@/utils/browser";
+import {
+  setExportStep,
+  setPayload,
+  payload
+} from "@/managers/ModalsManager/modals/InstanceExport";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
 
@@ -150,6 +156,22 @@ const Tile = (props: Props) => {
       icon: "i-ri:folder-open-fill",
       label: t("instance.action_open_folder"),
       action: handleOpenFolder
+    },
+    {
+      icon: "i-mingcute:file-export-fill",
+      label: t("instance.export_instance"),
+      action: () => {
+        const instanceId = props.instance.id;
+        setInstanceId(instanceId);
+        setPayload({
+          ...payload,
+          instance_id: instanceId
+        });
+        setExportStep(0);
+        modalsContext?.openModal({
+          name: "exportInstance"
+        });
+      }
     },
     {
       id: "delete",
