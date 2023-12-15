@@ -336,7 +336,7 @@ const Instance = () => {
       action: handleOpenFolder
     },
     {
-      icon: "i-mdi:export",
+      icon: "i-mingcute:file-export-fill",
       label: t("instance.export_instance"),
       action: () => {
         const instanceId = getInstanceIdFromPath(location.pathname);
