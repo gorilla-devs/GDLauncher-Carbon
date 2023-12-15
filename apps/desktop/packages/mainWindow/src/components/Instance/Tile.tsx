@@ -22,6 +22,7 @@ import {
   setPayload,
   payload
 } from "@/managers/ModalsManager/modals/InstanceExport";
+import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/atoms/ExportCheckboxParent";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
 
@@ -168,6 +169,7 @@ const Tile = (props: Props) => {
           instance_id: instanceId
         });
         setExportStep(0);
+        setCheckedFiles([]);
         modalsContext?.openModal({
           name: "exportInstance"
         });

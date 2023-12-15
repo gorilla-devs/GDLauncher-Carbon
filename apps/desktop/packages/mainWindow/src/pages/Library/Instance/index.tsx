@@ -49,6 +49,7 @@ import {
   payload,
   setExportStep
 } from "@/managers/ModalsManager/modals/InstanceExport";
+import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/atoms/ExportCheckboxParent";
 
 type InstancePage = {
   label: string;
@@ -345,7 +346,9 @@ const Instance = () => {
           ...payload,
           instance_id: parseInt(instanceId as string, 10)
         });
+        setCheckedFiles([]);
         setExportStep(0);
+
         modalsContext?.openModal({
           name: "exportInstance"
         });
