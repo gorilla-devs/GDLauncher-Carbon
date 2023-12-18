@@ -1,5 +1,5 @@
-use daedalus::minecraft::VersionManifest;
 use crate::domain::instance::info as generic;
+use daedalus::minecraft::VersionManifest;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::{collections::HashMap, path::PathBuf};
