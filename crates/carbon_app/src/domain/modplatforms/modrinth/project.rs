@@ -13,8 +13,8 @@ use super::{search::ProjectID, *};
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ProjectVersionsFilters {
     pub project_id: ProjectID,
-    pub game_version: Option<String>,
-    pub loaders: Option<String>,
+    pub game_versions: Vec<String>,
+    pub loaders: Vec<String>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
