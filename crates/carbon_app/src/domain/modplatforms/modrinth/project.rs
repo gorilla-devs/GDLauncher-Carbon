@@ -2,6 +2,12 @@
 //!
 //! [documentation](https://docs.modrinth.com/api-spec/#tag/project_model)
 
+use std::path::PathBuf;
+
+use daedalus::minecraft::VersionManifest;
+
+use crate::domain::runtime_path::InstancePath;
+
 use super::{search::ProjectID, *};
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -154,6 +160,7 @@ pub enum ProjectStatus {
     Archived,
     /// The project has been submitted for approval and is being reviewed
     Processing,
+    Withheld,
     Unknown,
 }
 
@@ -190,6 +197,41 @@ pub enum ProjectType {
     Shader,
     Modpack,
     ResourcePack,
+}
+
+impl ProjectType {
+    pub fn into_path(
+        self,
+        instance_path: &InstancePath,
+        game_version: String,
+        mc_manifest: &VersionManifest,
+    ) -> PathBuf {
+        match self {
+            Self::ResourcePack => {
+                // anything older than 1.6.1 is in the texturepacks folder
+                let index_1_6_1 = mc_manifest
+                    .versions
+                    .iter()
+                    .position(|v| v.id == "1.6.1")
+                    .unwrap_or(0);
+
+                let manifest_version = mc_manifest
+                    .versions
+                    .iter()
+                    .position(|v| v.id == game_version)
+                    .unwrap_or(0);
+
+                // current game version needs to be below 1.6.1, so the index needs to be higher
+                if manifest_version > index_1_6_1 {
+                    instance_path.get_texturepacks_path()
+                } else {
+                    instance_path.get_resourcepacks_path()
+                }
+            }
+            Self::Shader => instance_path.get_shaderpacks_path(),
+            _ => instance_path.get_mods_path(),
+        }
+    }
 }
 
 /// File extensions for images
