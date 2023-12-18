@@ -49,7 +49,7 @@ const Versions = () => {
     const cfVersions = routeData.curseforgeGetModFiles?.data?.data.filter(
       (version) => {
         if (
-          routeData.curseforgeGetMod.data?.data.classId === 6 &&
+          routeData.curseforgeGetMod.data?.data.classId === "mods" &&
           modplatform()
         ) {
           return version.gameVersions.some((_version) =>
