@@ -47,7 +47,7 @@ Skeleton.instance = Instance;
 Skeleton.instances = () => {
   return (
     <div class="flex gap-4">
-      <For each={new Array(3)}>{() => <Instance />}</For>
+      <For each={new Array(5)}>{() => <Instance />}</For>
     </div>
   );
 };
