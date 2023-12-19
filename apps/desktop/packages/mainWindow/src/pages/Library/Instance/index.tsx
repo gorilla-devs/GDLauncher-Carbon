@@ -342,8 +342,12 @@ const Instance = () => {
       action: () => {
         const instanceId = getInstanceIdFromPath(location.pathname);
         setInstanceId(parseInt(instanceId as string, 10));
+
         setPayload({
-          ...payload,
+          target: "Curseforge",
+          save_path: undefined,
+          link_mods: true,
+          filter: { entries: {} },
           instance_id: parseInt(instanceId as string, 10)
         });
         setCheckedFiles([]);

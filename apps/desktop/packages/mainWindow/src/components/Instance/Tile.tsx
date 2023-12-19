@@ -165,7 +165,11 @@ const Tile = (props: Props) => {
         const instanceId = props.instance.id;
         setInstanceId(instanceId);
         setPayload({
-          ...payload,
+          target: "Curseforge",
+          save_path: undefined,
+          link_mods: true,
+          filter: { entries: {} },
+
           instance_id: instanceId
         });
         setExportStep(0);
