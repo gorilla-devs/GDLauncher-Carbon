@@ -9,7 +9,7 @@ use crate::db::read_filters::StringFilter;
 use crate::domain::instance::info::{GameVersion, InstanceIcon};
 use anyhow::bail;
 use anyhow::{anyhow, Context};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use fs_extra::dir::CopyOptions;
 use futures::future::BoxFuture;
 use futures::Future;
@@ -178,7 +178,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     ) -> anyhow::Result<Option<Instance>> {
         let config_path = path.join("instance.json");
 
-        let config_text = match tokio::fs::read_to_string(config_path).await {
+        let config_text = match tokio::fs::read_to_string(config_path.clone()).await {
             Ok(x) => x,
             Err(e) => {
                 // if we aren't already tracking this instance just ignore it.
@@ -198,7 +198,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             }
         };
 
-        match schema::parse_instance_config(&config_text) {
+        match schema::parse_and_update_instance_config(self.app.clone(), &config_text, config_path)
+            .await
+        {
             Ok(config) => {
                 let instance = InstanceData {
                     favorite: cached.map(|cached| cached.favorite).unwrap_or(false),
@@ -213,15 +215,20 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 }))
             }
             Err(e) => {
+                let try_downcast = e.downcast_ref::<serde_json::Error>();
                 let error = InvalidConfiguration::Invalid(ConfigurationParseError {
-                    type_: match e.classify() {
-                        JsonErrorType::Data => ConfigurationParseErrorType::Data,
-                        JsonErrorType::Syntax => ConfigurationParseErrorType::Syntax,
-                        JsonErrorType::Eof => ConfigurationParseErrorType::Eof,
-                        JsonErrorType::Io => unreachable!(),
-                    },
-                    line: e.line() as u32, // will panic with more lines but that dosen't really seem like a problem
-                    message: e.to_string(),
+                    type_: try_downcast
+                        .map(|e| match e.classify() {
+                            JsonErrorType::Data => ConfigurationParseErrorType::Data,
+                            JsonErrorType::Syntax => ConfigurationParseErrorType::Syntax,
+                            JsonErrorType::Eof => ConfigurationParseErrorType::Eof,
+                            JsonErrorType::Io => unreachable!(),
+                        })
+                        .unwrap_or(ConfigurationParseErrorType::Unknown),
+                    line: try_downcast.map(|e| e.line()).unwrap_or_default() as u32, // will panic with more lines but that dosen't really seem like a problem
+                    message: try_downcast
+                        .map(|e| e.to_string())
+                        .unwrap_or_else(|| e.to_string()),
                     config_text,
                 });
 
@@ -314,6 +321,18 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                     }
                                 })
                             }
+                        },
+                        last_played: match status {
+                            InstanceType::Valid(status) => status.config.last_played,
+                            InstanceType::Invalid(status) => None,
+                        },
+                        date_created: match status {
+                            InstanceType::Valid(status) => status.config.date_created,
+                            InstanceType::Invalid(status) => DateTime::default(),
+                        },
+                        date_updated: match status {
+                            InstanceType::Valid(status) => status.config.date_updated,
+                            InstanceType::Invalid(status) => DateTime::default(),
                         },
                     })
                     .collect::<Vec<_>>(),
@@ -1510,6 +1529,9 @@ pub struct ListInstance {
     pub favorite: bool,
     pub status: ListInstanceStatus,
     pub icon_revision: u32,
+    pub last_played: Option<DateTime<Utc>>,
+    pub date_created: DateTime<Utc>,
+    pub date_updated: DateTime<Utc>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -1631,6 +1653,7 @@ pub enum ConfigurationParseErrorType {
     Syntax,
     Data,
     Eof,
+    Unknown,
 }
 
 #[derive(Debug)]
@@ -2098,6 +2121,9 @@ mod test {
                     modpack_platform: None,
                     state: domain::LaunchState::Inactive { failed_task: None },
                 }),
+                last_played: None,
+                date_created: list[0].instances[0].date_created,
+                date_updated: list[0].instances[0].date_updated,
             }],
         }];
 

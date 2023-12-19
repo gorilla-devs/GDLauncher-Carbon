@@ -116,12 +116,15 @@ impl Modrinth {
         {
             let mut query_pairs = url.query_pairs_mut();
 
-            if let Some(game_version) = filters.game_version {
-                query_pairs.append_pair("game_versions", &format!(r#"["{}"]"#, &game_version));
+            if !filters.game_versions.is_empty() {
+                query_pairs.append_pair(
+                    "game_versions",
+                    &serde_json::to_string(&filters.game_versions)?,
+                );
             }
 
-            if let Some(loaders) = filters.loaders {
-                query_pairs.append_pair("loaders", &format!(r#"["{}"]"#, &loaders));
+            if !filters.loaders.is_empty() {
+                query_pairs.append_pair("loaders", &serde_json::to_string(&filters.loaders)?);
             }
         }
 
@@ -399,8 +402,8 @@ mod test {
         let results = modrinth
             .get_project_versions(ProjectVersionsFilters {
                 project_id: ProjectID("u6dRKJwZ".to_string()),
-                game_version: None,
-                loaders: None,
+                game_versions: Vec::new(),
+                loaders: Vec::new(),
             })
             .await?;
         tracing::debug!("Versions: {:?}", results);
