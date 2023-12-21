@@ -2,12 +2,18 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
-#[derive(Debug, Serialize, Deserialize)]
+fn get_current_datetime() -> DateTime<Utc> {
+    Utc::now()
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Instance {
     pub name: String,
     #[serde(default)]
     pub icon: InstanceIcon,
+    #[serde(default = "get_current_datetime")]
     pub created_at: DateTime<Utc>,
+    #[serde(default = "get_current_datetime")]
     pub updated_at: DateTime<Utc>,
     #[serde(default)]
     pub last_played: Option<DateTime<Utc>>,
@@ -20,7 +26,7 @@ pub struct Instance {
     pub notes: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum InstanceIcon {
     Default,
@@ -33,26 +39,26 @@ impl Default for InstanceIcon {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "platform")]
 pub enum Modpack {
     Curseforge(CurseforgeModpack),
     Modrinth(ModrinthModpack),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct CurseforgeModpack {
     pub project_id: u32,
     pub file_id: u32,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ModrinthModpack {
     pub project_id: String,
     pub version_id: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GameConfig {
     pub version: Option<GameVersion>,
     #[serde(default = "default_global_java_args")]
@@ -67,28 +73,28 @@ fn default_global_java_args() -> bool {
     true
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum GameVersion {
     Standard(StandardVersion),
     Custom(String),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct StandardVersion {
     pub release: String,
     #[serde(default)]
     pub modloaders: HashSet<ModLoader>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
 pub struct ModLoader {
     #[serde(rename = "type")]
     pub type_: ModLoaderType,
     pub version: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
 pub enum ModLoaderType {
     Neoforge,
     Forge,
@@ -96,7 +102,7 @@ pub enum ModLoaderType {
     Quilt,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MemoryRange {
     pub min_mb: u16,
     pub max_mb: u16,

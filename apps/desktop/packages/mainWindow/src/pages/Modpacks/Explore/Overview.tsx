@@ -19,7 +19,7 @@ const Overview = () => {
         ]),
         allowedAttributes: {
           a: ["href", "name", "target", "class"],
-          img: ["src", "width", "height"],
+          img: ["src", "width", "height", "class"],
           iframe: ["src", "width", "height", "allowfullscreen"]
         },
         allowedIframeHostnames: [
@@ -28,7 +28,10 @@ const Overview = () => {
           "cdn.ko-fi.com"
         ],
         transformTags: {
-          a: sanitizeHtml.simpleTransform("a", { class: "text-blue-500" })
+          a: sanitizeHtml.simpleTransform("a", { class: "text-blue-500" }),
+          img: sanitizeHtml.simpleTransform("img", {
+            class: "max-w-full w-auto"
+          })
         }
       });
 
@@ -37,7 +40,10 @@ const Overview = () => {
         <div>
           <Switch fallback={<Skeleton.modpackOverviewPage />}>
             <Match when={routeData.isCurseforge}>
-              <div innerHTML={cleanHtml()} />
+              <div
+                class="w-full max-w-full overflow-hidden"
+                innerHTML={cleanHtml()}
+              />
             </Match>
             <Match when={!routeData.isCurseforge}>
               <div

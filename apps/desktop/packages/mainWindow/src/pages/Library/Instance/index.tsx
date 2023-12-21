@@ -1,7 +1,7 @@
 /* eslint-disable i18next/no-literal-string */
 import getRouteIndex from "@/route/getRouteIndex";
 import { Trans, useTransContext } from "@gd/i18n";
-import { Tabs, TabList, Tab, Button } from "@gd/ui";
+import { Tabs, TabList, Tab, Button, ContextMenu } from "@gd/ui";
 import {
   Link,
   Outlet,
@@ -37,11 +37,19 @@ import {
   getRunningState
 } from "@/utils/instances";
 import DefaultImg from "/assets/images/default-instance-img.png";
-import { ContextMenu } from "@/components/ContextMenu";
+// import { ContextMenu } from "@/components/ContextMenu";
 import { useModal } from "@/managers/ModalsManager";
 import { convertSecondsToHumanTime } from "@/utils/helpers";
 import Authors from "./Info/Authors";
 import { getCFModloaderIcon } from "@/utils/sidebar";
+import { setInstanceId } from "@/utils/browser";
+import { getInstanceIdFromPath } from "@/utils/routes";
+import {
+  setPayload,
+  payload,
+  setExportStep
+} from "@/managers/ModalsManager/modals/InstanceExport";
+import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/atoms/ExportCheckboxParent";
 
 type InstancePage = {
   label: string;
@@ -327,6 +335,28 @@ const Instance = () => {
       icon: "i-ri:folder-open-fill",
       label: t("instance.action_open_folder"),
       action: handleOpenFolder
+    },
+    {
+      icon: "i-mingcute:file-export-fill",
+      label: t("instance.export_instance"),
+      action: () => {
+        const instanceId = getInstanceIdFromPath(location.pathname);
+        setInstanceId(parseInt(instanceId as string, 10));
+
+        setPayload({
+          target: "Curseforge",
+          save_path: undefined,
+          link_mods: true,
+          filter: { entries: {} },
+          instance_id: parseInt(instanceId as string, 10)
+        });
+        setCheckedFiles([]);
+        setExportStep(0);
+
+        modalsContext?.openModal({
+          name: "exportInstance"
+        });
+      }
     }
   ];
 
@@ -627,7 +657,11 @@ const Instance = () => {
                     <TabList>
                       <For each={instancePages()}>
                         {(page: InstancePage) => (
-                          <Link href={page.path} class="no-underline">
+                          <Link
+                            draggable={false}
+                            href={page.path}
+                            class="no-underline"
+                          >
                             <Tab class="bg-transparent">{page.label}</Tab>
                           </Link>
                         )}

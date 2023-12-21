@@ -160,7 +160,9 @@ const Mods = () => {
           <div class="flex items-center gap-4 cursor-pointer">
             <Checkbox
               indeterminate={isSelectAllIndeterminate()}
-              checked={(selectedMods()?.length || 0) > 0}
+              checked={
+                (selectedMods()?.length || 0) > 0 && !isSelectAllIndeterminate()
+              }
               onChange={(checked) => {
                 let action = checked;
 

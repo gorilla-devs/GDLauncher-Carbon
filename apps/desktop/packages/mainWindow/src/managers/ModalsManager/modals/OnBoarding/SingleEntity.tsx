@@ -114,7 +114,9 @@ const SingleEntity = (props: {
       }
     }
   });
-
+  createEffect(() => {
+    console.log(instances());
+  });
   return (
     <>
       <div class="flex-1 w-full flex flex-col items-center justify-center p-4">
@@ -230,10 +232,10 @@ const SingleEntity = (props: {
                           {t("instance.select_all_mods")}
                         </span>
                       }
-                      checked={instances().length !== 0}
-                      indeterminate={
-                        instances().length !== instance.multiResult?.length
+                      checked={
+                        instances().length === instance.multiResult?.length
                       }
+                      indeterminate={instances().length !== 0}
                       onChange={(e) => {
                         if (e) {
                           setInstances(
