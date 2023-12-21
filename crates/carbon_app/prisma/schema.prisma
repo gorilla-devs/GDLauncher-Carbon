@@ -137,17 +137,18 @@ model ModMetadata {
 
 // this one
 model CurseForgeModCache {
-  metadataId String      @id
-  murmur2    Int
-  projectId  Int
-  fileId     Int
-  name       String
-  urlslug    String
-  summary    String
-  authors    String
-  cachedAt   DateTime
-  logoImage  CurseForgeModImageCache?
-  metadata   ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Cascade)
+  metadataId  String      @id
+  murmur2     Int
+  projectId   Int
+  fileId      Int
+  name        String
+  urlslug     String
+  summary     String
+  authors     String
+	updatePaths String // in the form `<gamever>,<modloader>;<gamever>,<modloader>` for every availible combination
+  cachedAt    DateTime
+	logoImage   CurseForgeModImageCache?
+  metadata    ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, fileId])
 }
@@ -162,6 +163,7 @@ model ModrinthModCache {
   urlslug     String
   description String
   authors     String
+	updatePaths String // in the form `<gamever>,<modloader>;<gamever>,<modloader>` for every availible combination
   filename    String
   fileUrl     String
   cachedAt    DateTime

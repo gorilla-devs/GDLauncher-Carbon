@@ -287,6 +287,27 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             Ok(super::vtask::FETaskId::from(task))
         }
 
+        mutation UPDATE_MOD[app, args: UpdateMod] {
+            let task = match args.mod_source {
+                ModSourceType::Curseforge => {
+                    app.instance_manager()
+                        .update_curseforge_mod(
+                            args.instance_id.into(),
+                            args.mod_id,
+                        ).await?
+                },
+                ModSourceType::Modrinth => {
+                    app.instance_manager()
+                        .update_modrinth_mod(
+                            args.instance_id.into(),
+                            args.mod_id,
+                        ).await?
+                }
+            };
+
+            Ok(super::vtask::FETaskId::from(task))
+        }
+
         mutation INSTALL_LATEST_MOD[app, imod: InstallLatestMod] {
             let task = match imod.mod_source {
                 LatestModSource::Curseforge(cf_mod) => {
@@ -633,6 +654,12 @@ enum ModSource {
 }
 
 #[derive(Type, Debug, Deserialize)]
+enum ModSourceType {
+    Curseforge,
+    Modrinth,
+}
+
+#[derive(Type, Debug, Deserialize)]
 struct CurseforgeMod {
     project_id: u32,
     file_id: u32,
@@ -650,6 +677,13 @@ struct InstallMod {
     mod_source: ModSource,
     install_deps: bool,
     replaces_mod: Option<String>,
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct UpdateMod {
+    instance_id: FEInstanceId,
+    mod_source: ModSourceType,
+    mod_id: String,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -807,7 +841,9 @@ struct Mod {
     enabled: bool,
     metadata: Option<ModFileMetadata>,
     curseforge: Option<CurseForgeModMetadata>,
+    has_curseforge_update: bool,
     modrinth: Option<ModrinthModMetadata>,
+    has_modrinth_update: bool,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -1231,7 +1267,9 @@ impl From<domain::Mod> for Mod {
             enabled: value.enabled,
             metadata: value.metadata.map(Into::into),
             curseforge: value.curseforge.map(Into::into),
+            has_curseforge_update: value.has_curseforge_update,
             modrinth: value.modrinth.map(Into::into),
+            has_modrinth_update: value.has_modrinth_update,
         }
     }
 }

@@ -1,3 +1,4 @@
+use crate::domain::instance::info as generic;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::collections::HashMap;
@@ -388,6 +389,17 @@ pub enum ModLoaderType {
     Quilt = 5,
     NeoForge = 6,
     Other(u8),
+}
+
+impl From<generic::ModLoaderType> for ModLoaderType {
+    fn from(value: generic::ModLoaderType) -> Self {
+        match value {
+            generic::ModLoaderType::Neoforge => Self::NeoForge,
+            generic::ModLoaderType::Forge => Self::Forge,
+            generic::ModLoaderType::Fabric => Self::Fabric,
+            generic::ModLoaderType::Quilt => Self::Quilt,
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for ModLoaderType {

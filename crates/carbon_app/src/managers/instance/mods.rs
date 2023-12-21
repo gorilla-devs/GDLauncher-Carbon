@@ -1,4 +1,4 @@
-use anyhow::bail;
+use anyhow::{anyhow, bail};
 use thiserror::Error;
 
 use crate::api::keys::instance::INSTANCE_MODS;
@@ -7,10 +7,14 @@ use crate::db::{
     modrinth_mod_cache as mrdb,
 };
 use crate::domain::instance as domain;
-use crate::domain::instance::info::ModLoaderType;
-use crate::domain::modplatforms::curseforge::filters::ModParameters;
+use crate::domain::instance::info::{GameVersion, ModLoaderType};
+use crate::domain::modplatforms::curseforge;
+use crate::domain::modplatforms::curseforge::filters::{
+    ModFilesParameters, ModFilesParametersQuery, ModParameters,
+};
 use crate::domain::modplatforms::modrinth::project::ProjectVersionsFilters;
 use crate::domain::modplatforms::modrinth::search::ProjectID;
+use crate::managers::instance::InstanceType;
 use crate::{domain::vtask::VisualTaskId, managers::ManagerRef};
 
 use super::{
@@ -20,12 +24,42 @@ use super::{
 
 impl ManagerRef<'_, InstanceManager> {
     pub async fn list_mods(self, instance_id: InstanceId) -> anyhow::Result<Vec<domain::Mod>> {
-        {
-            let instances = self.instances.read().await;
-            if instances.get(&instance_id).is_none() {
-                bail!(InvalidInstanceIdError(instance_id));
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let InstanceType::Valid(data) = &instance.type_ else {
+            bail!("instance {} is not valid", *instance_id);
+        };
+
+        let update_paths = match &data.config.game_configuration.version {
+            Some(GameVersion::Standard(version)) => {
+                let v = version.release.to_lowercase();
+
+                version
+                    .modloaders
+                    .iter()
+                    .map(|loader| (v.clone(), loader.type_.to_string().to_lowercase()))
+                    .collect::<Vec<_>>()
             }
+            _ => Vec::new(),
+        };
+
+        drop(instances);
+
+        fn split_paths<'a>(paths: &'a str) -> Vec<(&'a str, &'a str)> {
+            paths
+                .split(';')
+                .filter_map(|path| path.split_once(','))
+                .collect()
         }
+
+        let has_update_for_paths = |paths: &Vec<(&str, &str)>| {
+            update_paths
+                .iter()
+                .any(|(v1, l1)| paths.iter().any(|(v2, l2)| v1 == v2 && l1 == l2))
+        };
 
         let mods = self
             .app
@@ -41,38 +75,44 @@ impl ManagerRef<'_, InstanceManager> {
             .exec()
             .await?
             .into_iter()
-            .map(|m| domain::Mod {
-                id: m.id,
-                filename: m.filename,
-                enabled: m.enabled,
-                metadata: m.metadata.as_ref().map(|m| domain::ModFileMetadata {
-                    modid: m.modid.clone(),
-                    name: m.name.clone(),
-                    version: m.version.clone(),
-                    description: m.description.clone(),
-                    authors: m.authors.clone(),
-                    modloaders: m
-                        .modloaders
-                        .split(',')
-                        // ignore unknown modloaders
-                        .flat_map(|loader| ModLoaderType::try_from(loader).ok())
-                        .collect::<Vec<_>>(),
-                    sha_512: m.sha_512.clone(),
-                    sha_1: m.sha_1.clone(),
-                    murmur_2: m.murmur_2,
-                    has_image: m
-                        .logo_image
-                        .as_ref()
-                        .map(|v| v.as_ref().map(|_| ()))
-                        .flatten()
-                        .is_some(),
-                }),
-                curseforge: m
+            .map(|m| {
+                let (cf, mr) = m
                     .metadata
                     .clone()
-                    .and_then(|m| m.curseforge)
-                    .flatten()
-                    .map(|m| domain::CurseForgeModMetadata {
+                    .map(|m| (m.curseforge.flatten(), m.modrinth.flatten()))
+                    .unwrap_or((None, None));
+
+                domain::Mod {
+                    id: m.id,
+                    filename: m.filename,
+                    enabled: m.enabled,
+                    metadata: m.metadata.as_ref().map(|m| domain::ModFileMetadata {
+                        modid: m.modid.clone(),
+                        name: m.name.clone(),
+                        version: m.version.clone(),
+                        description: m.description.clone(),
+                        authors: m.authors.clone(),
+                        modloaders: m
+                            .modloaders
+                            .split(',')
+                            // ignore unknown modloaders
+                            .flat_map(|loader| ModLoaderType::try_from(loader).ok())
+                            .collect::<Vec<_>>(),
+                        sha_512: m.sha_512.clone(),
+                        sha_1: m.sha_1.clone(),
+                        murmur_2: m.murmur_2,
+                        has_image: m
+                            .logo_image
+                            .as_ref()
+                            .map(|v| v.as_ref().map(|_| ()))
+                            .flatten()
+                            .is_some(),
+                    }),
+                    has_curseforge_update: cf
+                        .as_ref()
+                        .map(|v| has_update_for_paths(&split_paths(&v.update_paths)))
+                        .unwrap_or(false),
+                    curseforge: cf.map(|m| domain::CurseForgeModMetadata {
                         project_id: m.project_id as u32,
                         file_id: m.file_id as u32,
                         name: m.name,
@@ -87,23 +127,28 @@ impl ManagerRef<'_, InstanceManager> {
                             .flatten()
                             .is_some(),
                     }),
-                modrinth: m.metadata.and_then(|m| m.modrinth).flatten().map(|m| {
-                    domain::ModrinthModMetadata {
-                        project_id: m.project_id,
-                        version_id: m.version_id,
-                        title: m.title,
-                        urlslug: m.urlslug,
-                        description: m.description,
-                        authors: m.authors,
-                        has_image: m
-                            .logo_image
-                            .flatten()
-                            .as_ref()
-                            .map(|row| row.data.as_ref().map(|_| ()))
-                            .flatten()
-                            .is_some(),
-                    }
-                }),
+                    has_modrinth_update: mr
+                        .as_ref()
+                        .map(|v| has_update_for_paths(&split_paths(&v.update_paths)))
+                        .unwrap_or(false),
+                    modrinth: m.metadata.and_then(|m| m.modrinth).flatten().map(|m| {
+                        domain::ModrinthModMetadata {
+                            project_id: m.project_id,
+                            version_id: m.version_id,
+                            title: m.title,
+                            urlslug: m.urlslug,
+                            description: m.description,
+                            authors: m.authors,
+                            has_image: m
+                                .logo_image
+                                .flatten()
+                                .as_ref()
+                                .map(|row| row.data.as_ref().map(|_| ()))
+                                .flatten()
+                                .is_some(),
+                        }
+                    }),
+                }
             });
 
         Ok(mods.collect::<Vec<_>>())
@@ -362,8 +407,8 @@ impl ManagerRef<'_, InstanceManager> {
             .modrinth
             .get_project_versions(ProjectVersionsFilters {
                 project_id: ProjectID(project_id.clone()),
-                game_version: Some(version),
-                loaders: Some(modloader),
+                game_versions: Vec::from([version.clone()]),
+                loaders: Vec::from([modloader]),
                 limit: Some(1),
                 offset: None,
             })
@@ -382,6 +427,147 @@ impl ManagerRef<'_, InstanceManager> {
         let task_id = installer.install(self.app, instance_id, true, None).await?;
 
         Ok(task_id)
+    }
+
+    pub async fn update_curseforge_mod(
+        self,
+        instance_id: InstanceId,
+        id: String,
+    ) -> anyhow::Result<VisualTaskId> {
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let InstanceType::Valid(data) = &instance.type_ else {
+            bail!("instance is in an invalid state");
+        };
+
+        let Some(GameVersion::Standard(version)) = data.config.game_configuration.version.clone()
+        else {
+            bail!("Instance uses a custom game version file. Cannot resolve minecraft version for mod installation");
+        };
+
+        drop(instances);
+
+        let m = self
+            .app
+            .prisma_client
+            .mod_file_cache()
+            .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
+            .with(fcdb::metadata::fetch().with(metadb::curseforge::fetch()))
+            .exec()
+            .await?
+            .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
+
+        let cf = m.metadata
+            .expect("metadata must be associated with a ModFileCache entry")
+            .curseforge
+            .expect("curseforge metadata was queried but not returned")
+            .ok_or_else(|| anyhow!("Attempted to use update_curseforge_mod to update a mod not availible on curseforge"))?;
+
+        let mod_files = self
+            .app
+            .modplatforms_manager()
+            .curseforge
+            .get_mod_files(ModFilesParameters {
+                mod_id: cf.project_id,
+                query: ModFilesParametersQuery {
+                    game_version: Some(version.release),
+                    game_version_type_id: None,
+                    mod_loader_type: version.modloaders.iter().next().map(|v| v.type_.into()),
+                    index: None,
+                    page_size: None,
+                },
+            })
+            .await?;
+
+        let version = mod_files.data.into_iter().next();
+
+        let Some(version) = version else {
+            bail!("unable to find newer mod version");
+        };
+
+        if version.id == cf.file_id {
+            bail!("unable to find newer mod version");
+        }
+
+        self.install_curseforge_mod(
+            instance_id,
+            version.mod_id as u32,
+            version.id as u32,
+            false,
+            Some(id),
+        )
+        .await
+    }
+
+    pub async fn update_modrinth_mod(
+        self,
+        instance_id: InstanceId,
+        id: String,
+    ) -> anyhow::Result<VisualTaskId> {
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let InstanceType::Valid(data) = &instance.type_ else {
+            bail!("instance is in an invalid state");
+        };
+
+        let Some(GameVersion::Standard(version)) = data.config.game_configuration.version.clone()
+        else {
+            bail!("Instance uses a custom game version file. Cannot resolve minecraft version for mod installation");
+        };
+
+        drop(instances);
+
+        let m = self
+            .app
+            .prisma_client
+            .mod_file_cache()
+            .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
+            .with(fcdb::metadata::fetch().with(metadb::modrinth::fetch()))
+            .exec()
+            .await?
+            .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
+
+        let mr = m.metadata
+            .expect("metadata must be associated with a ModFileCache entry")
+            .modrinth
+            .expect("curseforge metadata was queried but not returned")
+            .ok_or_else(|| anyhow!("Attempted to use update_modrinth_mod to update a mod not availible on modrinth"))?;
+
+        let mod_files = self
+            .app
+            .modplatforms_manager()
+            .modrinth
+            .get_project_versions(ProjectVersionsFilters {
+                project_id: ProjectID(mr.project_id),
+                game_versions: vec![version.release],
+                loaders: version
+                    .modloaders
+                    .iter()
+                    .map(|ml| ml.type_.to_string())
+                    .collect(),
+                limit: None,
+                offset: None,
+            })
+            .await?;
+
+        let version = mod_files.0.into_iter().next();
+
+        let Some(version) = version else {
+            bail!("unable to find newer mod version");
+        };
+
+        if version.id == mr.version_id {
+            bail!("unable to find newer mod version");
+        }
+
+        self.install_modrinth_mod(instance_id, version.project_id, version.id, false, Some(id))
+            .await
     }
 
     pub async fn get_mod_icon(
@@ -410,31 +596,25 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .ok_or(InvalidModIdError(mod_id))?
             .metadata
-            .ok_or_else(|| anyhow::anyhow!("broken db state"))?;
+            .ok_or_else(|| anyhow!("broken db state"))?;
 
         let logo_image = match platformid {
             0 => r
                 .logo_image
-                .ok_or_else(|| anyhow::anyhow!("broken db state"))?
+                .ok_or_else(|| anyhow!("broken db state"))?
                 .map(|m| m.data),
             1 => r
                 .curseforge
-                .ok_or_else(|| anyhow::anyhow!("broken db state"))?
-                .map(|cf| {
-                    cf.logo_image
-                        .ok_or_else(|| anyhow::anyhow!("broken db state"))
-                })
+                .ok_or_else(|| anyhow!("broken db state"))?
+                .map(|cf| cf.logo_image.ok_or_else(|| anyhow!("broken db state")))
                 .transpose()?
                 .flatten()
                 .map(|img| img.data)
                 .flatten(),
             2 => r
                 .modrinth
-                .ok_or_else(|| anyhow::anyhow!("broken db state"))?
-                .map(|mr| {
-                    mr.logo_image
-                        .ok_or_else(|| anyhow::anyhow!("broken db state"))
-                })
+                .ok_or_else(|| anyhow!("broken db state"))?
+                .map(|mr| mr.logo_image.ok_or_else(|| anyhow!("broken db state")))
                 .transpose()?
                 .flatten()
                 .map(|img| img.data)
