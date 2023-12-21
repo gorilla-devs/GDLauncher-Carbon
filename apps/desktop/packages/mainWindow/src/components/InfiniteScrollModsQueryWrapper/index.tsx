@@ -35,7 +35,7 @@ type InfiniteQueryType = {
   isLoading: boolean;
   setQuery: (_newValue: Partial<FEUnifiedSearchParameters>) => void;
   rowVirtualizer: any;
-  setParentRef: Setter<HTMLDivElement | undefined>;
+  setParentRef: Setter<Element | null>;
   allRows: () => FEUnifiedSearchResult[];
   setInstanceId: Setter<number | undefined>;
   instanceId: Accessor<number | undefined>;
@@ -61,9 +61,7 @@ const [lastScrollPosition, setLastScrollPosition] = createSignal<number>(0);
 const InfiniteScrollModsQueryWrapper = (props: Props) => {
   const rspcContext = rspc.useContext();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [parentRef, setParentRef] = createSignal<HTMLDivElement | undefined>(
-    undefined
-  );
+  const [parentRef, setParentRef] = createSignal<Element | null>(null);
 
   const mergedProps = mergeProps({ type: "modPack" }, props);
 

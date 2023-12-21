@@ -6,9 +6,16 @@ import { McType } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Checkbox, Dropdown } from "@gd/ui";
 import { useSearchParams } from "@solidjs/router";
-import { Match, Switch, createMemo, createResource } from "solid-js";
+import {
+  Match,
+  Switch,
+  createMemo,
+  createResource,
+  createSignal
+} from "solid-js";
 import { createStore } from "solid-js/store";
 import { rspc } from "@/utils/rspcClient";
+import { useInfiniteVersionsQuery } from "../InfiniteScrollVersionsQueryWrapper";
 
 const mapTypeToColor = (type: McType) => {
   return (
@@ -35,13 +42,19 @@ type Props = {
 
 const ExploreVersionsNavbar = (props: Props) => {
   const [searchParams, _setSearchParams] = useSearchParams();
+  const instanceId = parseInt(searchParams.instanceId, 10);
+
+  const infiniteQuery = useInfiniteVersionsQuery();
+
+  const [overrideEnabled, setOverrideEnabled] = createSignal(
+    !instanceId || isNaN(instanceId)
+  );
+
   const [gameVersionFilters, setGameVersionFilters] = createStore({
     snapshot: false,
     oldAlpha: false,
     oldBeta: false
   });
-
-  const instanceId = parseInt(searchParams.instanceId, 10);
 
   const instanceDetails = rspc.createQuery(() => [
     "instance.getInstanceDetails",
@@ -54,11 +67,12 @@ const ExploreVersionsNavbar = (props: Props) => {
   );
 
   const modloaders = () => {
+    let res: { label: string; key: string }[] = [];
+
     if (props.modplatform === "modrinth") {
       const results = supportedModloaders[props.modplatform];
-      return results
+      res = results
         .filter((modloader) =>
-          // TODO: FIX
           modloader.supported_project_types.includes("modpack")
         )
         .map((v) => ({
@@ -67,11 +81,18 @@ const ExploreVersionsNavbar = (props: Props) => {
         }));
     } else if (props.modplatform === "curseforge") {
       const results = supportedModloaders[props.modplatform];
-      return results.map((v) => ({
+      res = results.map((v) => ({
         label: v.toString(),
         key: v.toString()
       }));
     }
+
+    return [
+      {
+        label: "Select a modloader",
+        key: ""
+      }
+    ].concat(res);
   };
 
   const filteredGameVersions = createMemo(() => {
@@ -114,37 +135,49 @@ const ExploreVersionsNavbar = (props: Props) => {
 
   return (
     <div class="h-12 w-full flex gap-4 my-4">
-      <div class="flex gap-2">
-        <div
-          class="h-full w-12 flex-1"
-          style={{
-            "background-image": imageResource()
-              ? `url("${imageResource() as string}")`
-              : `url("${DefaultImg}")`,
-            "background-size": imageResource() ? "cover" : "120%"
-          }}
-        />
-        <div class="flex flex-col justify-between">
-          <div>{instanceDetails.data?.name}</div>
-          <div class="flex text-darkSlate-50 gap-2">
-            <Checkbox />
-            Override filters
+      <Switch>
+        <Match when={!isNaN(instanceId)}>
+          <div class="flex gap-2">
+            <div
+              class="h-full w-12 flex-1"
+              style={{
+                "background-image": imageResource()
+                  ? `url("${imageResource() as string}")`
+                  : `url("${DefaultImg}")`,
+                "background-size": imageResource() ? "cover" : "120%"
+              }}
+            />
+            <div class="flex flex-col justify-between">
+              <div>{instanceDetails.data?.name}</div>
+              <div class="flex text-darkSlate-50 gap-2">
+                <Checkbox
+                  checked={overrideEnabled()}
+                  onChange={setOverrideEnabled}
+                />
+                Override filters
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        </Match>
+        <Match when={!instanceId || isNaN(instanceId)}>
+          <div class="flex items-center text-darkSlate-100">
+            No instance selected
+          </div>
+        </Match>
+      </Switch>
       <div class="flex items-center gap-2">
         <Dropdown
           class="w-full"
           containerClass="w-full"
           options={filteredMappedGameVersions()}
-          // disabled={!isNaN(instanceId()!)}
+          disabled={!overrideEnabled()}
           icon={<div class="i-ri:price-tag-3-fill" />}
-          // value={infiniteQuery.query.gameVersions?.[0] || null}
-          // onChange={(val) => {
-          //   infiniteQuery?.setQuery({
-          //     gameVersions: val.key ? [val.key as string] : null
-          //   });
-          // }}
+          value={infiniteQuery.query.gameVersion || null}
+          onChange={(val) => {
+            infiniteQuery?.setQuery({
+              gameVersion: val.key.toString()
+            });
+          }}
         />
       </div>
       <div class="flex items-center gap-2">
@@ -152,14 +185,14 @@ const ExploreVersionsNavbar = (props: Props) => {
           class="w-full"
           containerClass="w-full"
           options={modloaders()!}
-          // disabled={!isNaN(instanceId()!)}
+          disabled={!overrideEnabled()}
           icon={<div class="i-ri:price-tag-3-fill" />}
-          // value={infiniteQuery.query.gameVersions?.[0] || null}
-          // onChange={(val) => {
-          //   infiniteQuery?.setQuery({
-          //     gameVersions: val.key ? [val.key as string] : null
-          //   });
-          // }}
+          value={infiniteQuery.query.modLoaderType || null}
+          onChange={(val) => {
+            infiniteQuery?.setQuery({
+              modLoaderType: val.key.toString() || null
+            });
+          }}
         />
       </div>
     </div>

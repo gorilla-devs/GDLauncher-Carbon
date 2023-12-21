@@ -26,7 +26,9 @@ import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
 import Authors from "@/pages/Library/Instance/Info/Authors";
 import ExploreVersionsNavbar from "@/components/ExploreVersionsNavbar";
-import InfiniteScrollVersionsQueryWrapper from "@/components/InfiniteScrollVersionsQueryWrapper";
+import InfiniteScrollVersionsQueryWrapper, {
+  useInfiniteVersionsQuery
+} from "@/components/InfiniteScrollVersionsQueryWrapper";
 
 const getTabIndexFromPath = (path: string) => {
   if (path.match(/\/(modpacks|mods)\/.+\/.+/g)) {
@@ -44,12 +46,27 @@ const getTabIndexFromPath = (path: string) => {
   return 0;
 };
 
+const InfiniteScrollQueryWrapper = () => {
+  const params = useParams();
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
+
+  return (
+    <InfiniteScrollVersionsQueryWrapper
+      modId={params.id}
+      modplatform={routeData.isCurseforge ? "curseforge" : "modrinth"}
+    >
+      <Modpack />
+    </InfiniteScrollVersionsQueryWrapper>
+  );
+};
+
 const Modpack = () => {
   const owner = getOwner();
   const [loading, setLoading] = createSignal(false);
   const navigate = useGDNavigate();
   const params = useParams();
   const routeData: ReturnType<typeof fetchData> = useRouteData();
+  const infiniteQuery = useInfiniteVersionsQuery();
 
   const installModMutation = rspc.createMutation(
     ["instance.installLatestMod"],
@@ -145,6 +162,9 @@ const Modpack = () => {
         style={{
           "scrollbar-gutter": "stable"
         }}
+        ref={(el) => {
+          infiniteQuery.setParentRef(el);
+        }}
         onScroll={() => {
           const rect = refStickyTabs.getBoundingClientRect();
           setIsSticky(rect.top <= 104);
@@ -220,7 +240,6 @@ const Modpack = () => {
                       </div>
                       <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-2">
                         <div class="i-ri:time-fill" />
-
                         <Switch>
                           <Match when={!isFetching()}>
                             <Show
@@ -367,14 +386,7 @@ const Modpack = () => {
                 </Show>
               </div>
               <div class="px-4 z-0">
-                <InfiniteScrollVersionsQueryWrapper
-                  modId={params.id}
-                  modplatform={
-                    routeData.isCurseforge ? "curseforge" : "modrinth"
-                  }
-                >
-                  <Outlet />
-                </InfiniteScrollVersionsQueryWrapper>
+                <Outlet />
               </div>
             </div>
           </div>
@@ -384,4 +396,4 @@ const Modpack = () => {
   );
 };
 
-export default Modpack;
+export default InfiniteScrollQueryWrapper;

@@ -1,12 +1,12 @@
 import { CFFEMod, MRFEProject } from "@gd/core_module/bindings";
-import { VersionRowType } from "../InfiniteScrollVersionsQueryWrapper";
+import { VersionRowTypeData } from "../InfiniteScrollVersionsQueryWrapper";
 import { For, Match, Switch } from "solid-js";
 import { Trans } from "@gd/i18n";
 import { Spinner } from "@gd/ui";
 import { format } from "date-fns";
 
 export type Props = {
-  modVersion: VersionRowType;
+  modVersion: VersionRowTypeData;
   project: CFFEMod | MRFEProject | undefined;
   isCurseforge?: boolean;
   instanceId?: number | null;
@@ -29,7 +29,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
   return (
     <Switch>
       <Match when={props.modVersion}>
-        <div class="table-cell py-2 align-middle">
+        <div class="py-2 align-middle">
           <h4 class="m-0 font-medium text-md pb-2">
             {props.modVersion.name.replaceAll(".zip", "")}
           </h4>
@@ -40,12 +40,12 @@ const RowContainer = (props: Props & AdditionalProps) => {
             </For>
           </div>
         </div>
-        <div class="table-cell align-middle">
+        <div class="align-middle">
           {format(new Date(props.modVersion.datePublished), "dd-MM-yyyy")}
         </div>
-        <div class="table-cell align-middle">{props.modVersion.downloads}</div>
+        <div class="align-middle">{props.modVersion.downloads}</div>
         <div
-          class="table-cell align-middle"
+          class="align-middle"
           classList={{
             "text-green-500":
               props.modVersion.releaseType === "stable" ||
@@ -56,7 +56,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
         >
           {props.modVersion.releaseType}
         </div>
-        <div class="table-cell align-middle">
+        <div class="align-middle">
           <div
             class="text-2xl text-darkSlate-500 duration-100 ease-in-out cursor-pointer i-ri:information-fill transition-color hover:text-white"
             classList={
@@ -67,7 +67,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
           />
         </div>
         <div
-          class="table-cell align-middle"
+          class="align-middle"
           classList={{
             "text-green-500": props.isInstalled,
             "text-lightGray-800": !props.disabled && !props.isInstalled,

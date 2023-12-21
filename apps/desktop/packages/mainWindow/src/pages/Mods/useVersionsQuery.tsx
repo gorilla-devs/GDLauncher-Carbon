@@ -1,6 +1,13 @@
 import { createStore } from "solid-js/store";
 
-export const versionsDefaultQuery = {
+type VersionsQueryType = {
+  gameVersion: string | null;
+  index: number;
+  modLoaderType: string | null;
+  pageSize: number;
+};
+
+export const versionsDefaultQuery: VersionsQueryType = {
   gameVersion: null,
   index: 0,
   modLoaderType: null,

@@ -2,21 +2,21 @@ import {
   createInfiniteQuery,
   CreateInfiniteQueryResult
 } from "@tanstack/solid-query";
-import {
-  Accessor,
-  createContext,
-  createEffect,
-  createSignal,
-  Setter,
-  useContext
-} from "solid-js";
+import { Accessor, createContext, Setter, useContext } from "solid-js";
 import { createVirtualizer } from "@tanstack/solid-virtual";
 import { rspc } from "@/utils/rspcClient";
-import { instanceId, scrollTop, setInstanceId } from "@/utils/browser";
+import { instanceId, setInstanceId } from "@/utils/browser";
 import { useSearchParams } from "@solidjs/router";
 import useVersionsQuery from "@/pages/Mods/useVersionsQuery";
+import { CFFEFile } from "@gd/core_module/bindings";
 
 export type VersionRowType = {
+  data: VersionRowTypeData[];
+  index: number;
+  total: number;
+};
+
+export type VersionRowTypeData = {
   id: number;
   fileId: string;
   name: string;
@@ -34,8 +34,8 @@ type InfiniteQueryType = {
   isLoading: boolean;
   setQuery: (_newValue: Partial<typeof versionsQuery>) => void;
   rowVirtualizer: any;
-  setParentRef: Setter<HTMLDivElement | undefined>;
-  allRows: () => VersionRowType[];
+  setParentRef: (_el: Element | null) => void;
+  allRows: () => VersionRowTypeData[];
   setInstanceId: Setter<number | undefined>;
   instanceId: Accessor<number | undefined>;
 };
@@ -56,73 +56,83 @@ export const useInfiniteVersionsQuery = () => {
 const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   const rspcContext = rspc.useContext();
   const [searchParams, _setSearchParams] = useSearchParams();
-  const [parentRef, setParentRef] = createSignal<HTMLDivElement | undefined>(
-    undefined
-  );
+  let parentRef: HTMLDivElement | null = null;
 
   const infiniteQuery = createInfiniteQuery({
     queryKey: () => ["modplatforms.versions"],
-    queryFn: (ctx) => {
+    queryFn: async (ctx) => {
       setVersionsQuery({
-        index: ctx.pageParam + versionsQuery.pageSize!
+        index: ctx.pageParam
       });
 
-      console.log(versionsQuery);
+      console.log("Context", ctx, versionsQuery);
 
       if (props.modplatform === "curseforge") {
-        return rspcContext.client
-          .query([
-            "modplatforms.curseforge.getModFiles",
-            {
-              modId: parseInt(props.modId, 10),
-              query: {
-                index: versionsQuery.index,
-                pageSize: versionsQuery.pageSize,
-                gameVersion: versionsQuery.gameVersion,
-                modLoaderType: versionsQuery.modLoaderType
-                // modLoaderType: versionsQuery.modLoaderType
-              }
+        const response = await rspcContext.client.query([
+          "modplatforms.curseforge.getModFiles",
+          {
+            modId: parseInt(props.modId, 10),
+            query: {
+              index: versionsQuery.index,
+              pageSize: versionsQuery.pageSize,
+              gameVersion: versionsQuery.gameVersion,
+              modLoaderType: versionsQuery.modLoaderType
             }
-          ])
-          .then((vOuter) => {
-            console.log("results", vOuter);
-            return vOuter.data.map((v) => ({
-              id: v.id,
-              fileId: v.modId.toString(),
-              name: v.displayName,
-              releaseType: v.releaseType as string,
-              gameVersions: v.gameVersions,
-              downloads: v.downloadCount,
-              datePublished: v.fileDate
-            }));
-          });
+          }
+        ]);
+
+        return {
+          data: response.data.map((v) => ({
+            id: v.id,
+            fileId: v.modId.toString(),
+            name: v.displayName,
+            releaseType: v.releaseType as string,
+            gameVersions: v.gameVersions,
+            downloads: v.downloadCount,
+            datePublished: v.fileDate
+          })),
+          index: response.pagination?.index,
+          total: response.pagination?.totalCount
+        } as VersionRowType;
       } else {
-        return rspcContext.client
-          .query([
-            "modplatforms.modrinth.getProjectVersions",
-            {
-              project_id: props.modId,
-              game_version: versionsQuery.gameVersion,
-              loaders: versionsQuery.modLoaderType,
-              limit: versionsQuery.pageSize,
-              offset: ctx.pageParam
-            }
-          ])
-          .then((vOuter) =>
-            vOuter.map((v) => ({
-              id: parseInt(v.project_id, 10),
-              fileId: v.id,
-              name: v.name,
-              releaseType: v.version_type as string,
-              gameVersions: v.game_versions,
-              downloads: v.downloads,
-              datePublished: v.date_published
-            }))
-          );
+        const project = await rspcContext.client.query([
+          "modplatforms.modrinth.getProject",
+          props.modId
+        ]);
+
+        const response = await rspcContext.client.query([
+          "modplatforms.modrinth.getProjectVersions",
+          {
+            project_id: props.modId,
+            game_version: versionsQuery.gameVersion,
+            loaders: versionsQuery.modLoaderType,
+            limit: versionsQuery.pageSize,
+            offset: ctx.pageParam
+          }
+        ]);
+
+        return {
+          data: response.map((v) => ({
+            id: parseInt(v.project_id, 10),
+            fileId: v.id,
+            name: v.name,
+            releaseType: v.version_type as string,
+            gameVersions: v.game_versions,
+            downloads: v.downloads,
+            datePublished: v.date_published
+          })),
+          index: ctx.pageParam,
+          total: project.versions.length
+        } as VersionRowType;
       }
     },
     getNextPageParam: (lastPage) => {
-      return true;
+      const index = lastPage?.index || 0;
+      const totalCount = lastPage.total || 0;
+      const pageSize = versionsQuery.pageSize || 20;
+      const hasNextPage = index + pageSize < totalCount;
+
+      return hasNextPage && index + pageSize;
     },
     enabled: false
   });
@@ -131,7 +141,6 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
     setVersionsQuery(newValue);
     infiniteQuery.remove();
     infiniteQuery.refetch();
-    rowVirtualizer.scrollToIndex(0);
   };
 
   // setVersionsQuery();
@@ -139,23 +148,20 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   const _instanceId = parseInt(searchParams.instanceId, 10);
   setInstanceId(_instanceId);
 
-  // rspcFetch(() => ["instance.getInstanceDetails", _instanceId]).then(
-  //   (details) => {
-  //     setQueryWrapper({
-  //       modLoaderType: (details as any).data.modloaders[0].map(
-  //         (v: any) => v.type_
-  //       ),
-  //       gameVersion: (details as any).data.version
-  //     });
-  //   }
-  // );
+  rspcContext.client
+    .query(["instance.getInstanceDetails", _instanceId])
+    .then((details) => {
+      setQueryWrapper({
+        modLoaderType: details?.modloaders[0].type_,
+        gameVersion: details?.version
+      });
+    });
 
   infiniteQuery.remove();
   infiniteQuery.refetch();
-  parentRef()?.scrollTo(0, scrollTop());
 
   const allRows = () =>
-    infiniteQuery.data ? infiniteQuery.data.pages.flatMap((d) => d) : [];
+    infiniteQuery.data ? infiniteQuery.data.pages.flatMap((d) => d.data) : [];
 
   const rowVirtualizer = createVirtualizer({
     get count() {
@@ -163,9 +169,9 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
         ? allRows().length + 1
         : allRows().length;
     },
-    getScrollElement: () => parentRef(),
+    getScrollElement: () => parentRef,
     estimateSize: () => 62,
-    overscan: 15
+    overscan: 6
   });
 
   const context = {
@@ -178,7 +184,9 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
     },
     setQuery: setQueryWrapper,
     rowVirtualizer,
-    setParentRef,
+    setParentRef: (el: Element | null) => {
+      parentRef = el as HTMLDivElement;
+    },
     allRows,
     setInstanceId,
     instanceId
