@@ -185,11 +185,11 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         mutation PREPARE_INSTANCE[app, id: FEInstanceId] {
-            app.instance_manager()
+            let (_, vtask_id) = app.instance_manager()
                 .prepare_game(id.into(), None, None)
                 .await?;
 
-            Ok(())
+            Ok(FETaskId::from(vtask_id))
         }
 
         mutation LAUNCH_INSTANCE[app, id: FEInstanceId] {
@@ -512,6 +512,9 @@ struct ListInstance {
     favorite: bool,
     status: ListInstanceStatus,
     icon_revision: u32,
+    last_played: Option<DateTime<Utc>>,
+    date_created: DateTime<Utc>,
+    date_updated: DateTime<Utc>,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -561,6 +564,7 @@ enum ConfigurationParseErrorType {
     Syntax,
     Data,
     Eof,
+    Unknown,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -1148,6 +1152,9 @@ impl From<manager::ListInstance> for ListInstance {
             favorite: value.favorite,
             status: value.status.into(),
             icon_revision: value.icon_revision,
+            last_played: value.last_played,
+            date_created: value.date_created,
+            date_updated: value.date_updated,
         }
     }
 }
@@ -1203,6 +1210,7 @@ impl From<manager::ConfigurationParseErrorType> for ConfigurationParseErrorType 
             manager::Syntax => Self::Syntax,
             manager::Data => Self::Data,
             manager::Eof => Self::Eof,
+            manager::Unknown => Self::Unknown,
         }
     }
 }

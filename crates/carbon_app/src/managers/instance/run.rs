@@ -630,8 +630,9 @@ impl ManagerRef<'_, InstanceManager> {
                                 .find(|v| {
                                     let exact_match = v.id == format!("{}-{}", version.release, neoforge_version);
                                     let fuzzy_match = v.id.starts_with(&format!("{}-{}", version.release, neoforge_version));
+                                    let only_version = v.id == neoforge_version;
 
-                                    exact_match || fuzzy_match
+                                    exact_match || fuzzy_match || only_version
                                 })
                                 .ok_or_else(|| {
                                     anyhow!(

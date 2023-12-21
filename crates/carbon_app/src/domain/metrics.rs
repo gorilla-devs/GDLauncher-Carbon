@@ -41,4 +41,8 @@ pub enum Event {
         timestamp_end: i64,
         timezone_offset: i32,
     },
+    FeaturedModpackInstalled {
+        campaign_id: String,
+        item_id: String,
+    },
 }

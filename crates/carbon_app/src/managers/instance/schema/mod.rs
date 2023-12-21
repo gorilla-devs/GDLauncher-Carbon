@@ -1,6 +1,8 @@
+use std::{path::PathBuf, sync::Arc};
+
 use serde::{Deserialize, Serialize};
 
-use crate::domain::instance::info;
+use crate::{domain::instance::info, managers::AppInner};
 
 mod v1;
 
@@ -35,9 +37,29 @@ fn patch_creation_update_date(instance: &str) -> Result<InstanceConfig, serde_js
     return _config;
 }
 
+pub async fn parse_and_update_instance_config(
+    app: Arc<AppInner>,
+    config_str: &str,
+    config_path: PathBuf,
+) -> anyhow::Result<info::Instance> {
+    let config = parse_instance_config(config_str)?;
+
+    let serialized = make_instance_config(config.clone())?;
+
+    if &serialized != config_str {
+        let tmpfile = app
+            .settings_manager()
+            .runtime_path
+            .get_temp()
+            .write_file_atomic(config_path, serialized.as_bytes())
+            .await?;
+    }
+
+    Ok(config)
+}
+
 pub fn parse_instance_config(config_str: &str) -> Result<info::Instance, serde_json::Error> {
-    let config = serde_json::from_str::<InstanceConfig>(config_str)
-        .or_else(|_| patch_creation_update_date(config_str))?;
+    let config = serde_json::from_str::<InstanceConfig>(config_str)?;
 
     Ok(match config {
         InstanceConfig::V1(config) => config.into(),
