@@ -13,7 +13,10 @@
     "@astrojs/mdx": "^2.0.1",
     "@astrojs/rss": "^4.0.1",
     "@astrojs/sitemap": "^3.0.3",
-    "astro": "^4.0.5"
+    "@astrojs/solid-js": "^3.0.2",
+    "astro": "^4.0.5",
+    "class-variance-authority": "^0.7.0",
+    "solid-js": "^1.8.7"
   },
   "devDependencies": {
     "@astrojs/tailwind": "^5.0.3",
