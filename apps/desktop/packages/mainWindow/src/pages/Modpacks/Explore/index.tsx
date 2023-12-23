@@ -27,6 +27,9 @@ import { rspc } from "@/utils/rspcClient";
 import Authors from "@/pages/Library/Instance/Info/Authors";
 import { getUrlType } from "@/utils/instances";
 import ExploreVersionsNavbar from "@/components/ExploreVersionsNavbar";
+import InfiniteScrollVersionsQueryWrapper, {
+  useInfiniteVersionsQuery
+} from "@/components/InfiniteScrollVersionsQueryWrapper";
 
 const getTabIndexFromPath = (path: string) => {
   if (path.match(/\/(modpacks|mods)\/.+\/.+/g)) {
@@ -44,10 +47,25 @@ const getTabIndexFromPath = (path: string) => {
   return 0;
 };
 
+const InfiniteScrollQueryWrapper = () => {
+  const params = useParams();
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
+
+  return (
+    <InfiniteScrollVersionsQueryWrapper
+      modId={params.id}
+      modplatform={routeData.isCurseforge ? "curseforge" : "modrinth"}
+    >
+      <Modpack />
+    </InfiniteScrollVersionsQueryWrapper>
+  );
+};
+
 const Modpack = () => {
   const [loading, setLoading] = createSignal(false);
   const navigate = useGDNavigate();
   const params = useParams();
+  const infiniteQuery = useInfiniteVersionsQuery();
   const addNotification = createNotification();
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const [instanceMods, setInstanceMods] = createSignal<Mod[]>([]);
@@ -221,6 +239,9 @@ const Modpack = () => {
         class="relative h-full bg-darkSlate-800 overflow-x-hidden overflow-auto max-h-full"
         style={{
           "scrollbar-gutter": "stable"
+        }}
+        ref={(el) => {
+          infiniteQuery.setParentRef(el);
         }}
         onScroll={() => {
           const rect = refStickyTabs.getBoundingClientRect();
@@ -467,4 +488,4 @@ const Modpack = () => {
   );
 };
 
-export default Modpack;
+export default InfiniteScrollQueryWrapper;

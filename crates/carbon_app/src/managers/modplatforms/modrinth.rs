@@ -126,6 +126,14 @@ impl Modrinth {
             if !filters.loaders.is_empty() {
                 query_pairs.append_pair("loaders", &serde_json::to_string(&filters.loaders)?);
             }
+
+            if let Some(offset) = filters.offset {
+                query_pairs.append_pair("offset", &offset.to_string());
+            }
+
+            if let Some(limit) = filters.limit {
+                query_pairs.append_pair("limit", &limit.to_string());
+            }
         }
 
         trace!("GET {}", url);

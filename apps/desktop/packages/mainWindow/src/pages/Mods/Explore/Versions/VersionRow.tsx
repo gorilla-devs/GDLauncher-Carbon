@@ -36,15 +36,9 @@ const VersionRow = (props: Props) => {
   };
 
   const isInstalled = () => {
-    if (props.isCurseforge) {
-      return (
-        props.installedFile?.remoteId === props.modVersion?.id &&
-        props.installedFile !== null
-      );
-    }
-
     return (
-      props.installedFile?.remoteId === props.modVersion?.id &&
+      props.installedFile?.remoteId.toString() ===
+        props.modVersion?.id.toString() &&
       props.installedFile?.remoteId !== null
     );
   };

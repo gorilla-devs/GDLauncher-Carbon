@@ -182,18 +182,21 @@ function Button(props: Props) {
 
   return (
     <button
-      classList={getVariant(
-        props.type || "primary",
-        mergedProps.rounded,
-        props.size || "medium",
-        !!props.disabled,
-        mergedProps.uppercase,
-        !!props.iconRight,
-        !!props.loading,
-        props.variant || "primary",
-        props.cursor,
-        props.textColor
-      )}
+      classList={{
+        ...getVariant(
+          props.type || "primary",
+          mergedProps.rounded,
+          props.size || "medium",
+          !!props.disabled,
+          mergedProps.uppercase,
+          !!props.iconRight,
+          !!props.loading,
+          props.variant || "primary",
+          props.cursor,
+          props.textColor
+        ),
+        ...props.classList,
+      }}
       {...(others as JSX.ButtonHTMLAttributes<HTMLButtonElement>)}
       style={{
         ...(mergedProps.type === "transparent" && {

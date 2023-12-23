@@ -8,7 +8,6 @@ import { rspc } from "@/utils/rspcClient";
 import { instanceId, setInstanceId } from "@/utils/browser";
 import { useSearchParams } from "@solidjs/router";
 import useVersionsQuery from "@/pages/Mods/useVersionsQuery";
-import { CFFEFile } from "@gd/core_module/bindings";
 
 export type VersionRowType = {
   data: VersionRowTypeData[];
@@ -65,8 +64,6 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
         index: ctx.pageParam
       });
 
-      console.log("Context", ctx, versionsQuery);
-
       if (props.modplatform === "curseforge") {
         const response = await rspcContext.client.query([
           "modplatforms.curseforge.getModFiles",
@@ -80,6 +77,13 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
             }
           }
         ]);
+
+        console.log(
+          "Context",
+          response,
+          versionsQuery,
+          response.pagination?.index
+        );
 
         return {
           data: response.data.map((v) => ({
@@ -107,9 +111,11 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
             game_version: versionsQuery.gameVersion,
             loaders: versionsQuery.modLoaderType,
             limit: versionsQuery.pageSize,
-            offset: ctx.pageParam
+            offset: versionsQuery.index
           }
         ]);
+
+        console.log("Context", response, versionsQuery);
 
         return {
           data: response.map((v) => ({
@@ -121,7 +127,7 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
             downloads: v.downloads,
             datePublished: v.date_published
           })),
-          index: ctx.pageParam,
+          index: versionsQuery.index,
           total: project.versions.length
         } as VersionRowType;
       }
@@ -143,19 +149,24 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
     infiniteQuery.refetch();
   };
 
-  // setVersionsQuery();
-
   const _instanceId = parseInt(searchParams.instanceId, 10);
   setInstanceId(_instanceId);
 
-  rspcContext.client
-    .query(["instance.getInstanceDetails", _instanceId])
-    .then((details) => {
-      setQueryWrapper({
-        modLoaderType: details?.modloaders[0].type_,
-        gameVersion: details?.version
+  if (_instanceId && !isNaN(_instanceId)) {
+    rspcContext.client
+      .query(["instance.getInstanceDetails", _instanceId])
+      .then((details) => {
+        setQueryWrapper({
+          modLoaderType: details?.modloaders[0].type_,
+          gameVersion: details?.version
+        });
       });
+  } else {
+    setQueryWrapper({
+      modLoaderType: undefined,
+      gameVersion: undefined
     });
+  }
 
   infiniteQuery.remove();
   infiniteQuery.refetch();
@@ -171,7 +182,7 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
     },
     getScrollElement: () => parentRef,
     estimateSize: () => 62,
-    overscan: 6
+    overscan: 10
   });
 
   const context = {

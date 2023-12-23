@@ -61,10 +61,7 @@ const ExploreVersionsNavbar = (props: Props) => {
     instanceId
   ]);
 
-  const [imageResource, { refetch }] = createResource(
-    () => instanceId,
-    fetchImage
-  );
+  const [imageResource] = createResource(() => instanceId, fetchImage);
 
   const modloaders = () => {
     let res: { label: string; key: string }[] = [];
@@ -175,7 +172,7 @@ const ExploreVersionsNavbar = (props: Props) => {
           value={infiniteQuery.query.gameVersion || null}
           onChange={(val) => {
             infiniteQuery?.setQuery({
-              gameVersion: val.key.toString()
+              gameVersion: val.key.toString() || null
             });
           }}
         />
