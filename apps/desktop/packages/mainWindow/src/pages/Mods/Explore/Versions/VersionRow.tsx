@@ -1,6 +1,9 @@
 import RowContainer, { Props } from "@/components/Browser/RowContainer";
+import CopyIcon from "@/components/CopyIcon";
 import { rspc } from "@/utils/rspcClient";
-import { createEffect, createSignal } from "solid-js";
+import { ModSource } from "@gd/core_module/bindings";
+import { Tooltip } from "@gd/ui";
+import { Show, createEffect, createSignal } from "solid-js";
 
 const VersionRow = (props: Props) => {
   const [loading, setLoading] = createSignal(false);
@@ -13,11 +16,11 @@ const VersionRow = (props: Props) => {
 
   const onPrimaryAction = () => {
     if (!props.instanceId) return;
-    const mod = props.isCurseforge
+    const mod: ModSource = props.isCurseforge
       ? {
           Curseforge: {
-            project_id: props.modVersion.id,
-            file_id: props.modVersion.fileId
+            project_id: parseInt(props.modVersion.id, 10),
+            file_id: parseInt(props.modVersion.fileId, 10)
           }
         }
       : {
@@ -27,10 +30,12 @@ const VersionRow = (props: Props) => {
           }
         };
 
+    console.log(mod);
+
     installModMutation.mutate({
       mod_source: mod,
       instance_id: props.instanceId!,
-      install_deps: !props.instanceId,
+      install_deps: !props.installedFile?.id,
       replaces_mod: props.installedFile?.id || null
     });
   };
@@ -38,7 +43,7 @@ const VersionRow = (props: Props) => {
   const isInstalled = () => {
     return (
       props.installedFile?.remoteId.toString() ===
-        props.modVersion?.id.toString() &&
+        props.modVersion?.fileId.toString() &&
       props.installedFile?.remoteId !== null
     );
   };

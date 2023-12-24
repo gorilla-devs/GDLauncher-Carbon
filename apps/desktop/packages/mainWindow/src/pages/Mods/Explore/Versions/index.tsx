@@ -50,18 +50,22 @@ const Versions = () => {
       if (instanceMods.data) {
         for (const mod of instanceMods.data) {
           if (
-            mod.curseforge?.file_id === version?.id ||
-            mod.modrinth?.version_id === version?.id.toString()
+            mod.curseforge?.file_id.toString() === version?.fileId ||
+            mod.modrinth?.version_id === version?.id
           ) {
             return {
               id: mod?.id,
-              remoteId: version?.id.toString()
+              remoteId: version?.fileId.toString()
             };
           }
         }
       }
     }
   };
+
+  createEffect(() => {
+    console.log(installedMod());
+  });
 
   return (
     <MainContainer

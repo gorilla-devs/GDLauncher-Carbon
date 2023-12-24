@@ -16,13 +16,17 @@ export type VersionRowType = {
 };
 
 export type VersionRowTypeData = {
-  id: number;
+  id: string;
   fileId: string;
   name: string;
   releaseType: string;
   gameVersions: string[];
   downloads: number;
   datePublished: string;
+  fileName: string;
+  size: number;
+  hash: string;
+  status: string;
 };
 
 export const [versionsQuery, setVersionsQuery] = useVersionsQuery();
@@ -87,13 +91,17 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
 
         return {
           data: response.data.map((v) => ({
-            id: v.id,
-            fileId: v.modId.toString(),
+            id: v.modId.toString(),
+            fileId: v.id.toString(),
             name: v.displayName,
             releaseType: v.releaseType as string,
             gameVersions: v.gameVersions,
             downloads: v.downloadCount,
-            datePublished: v.fileDate
+            datePublished: v.fileDate,
+            fileName: v.fileName,
+            size: v.fileLength,
+            hash: v.fileFingerprint,
+            status: v.fileStatus
           })),
           index: response.pagination?.index,
           total: response.pagination?.totalCount
@@ -119,13 +127,17 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
 
         return {
           data: response.map((v) => ({
-            id: parseInt(v.project_id, 10),
+            id: v.project_id,
             fileId: v.id,
             name: v.name,
             releaseType: v.version_type as string,
             gameVersions: v.game_versions,
             downloads: v.downloads,
-            datePublished: v.date_published
+            datePublished: v.date_published,
+            fileName: v.files[0].filename,
+            size: v.files[0].size,
+            hash: v.files[0].hashes.sha512,
+            status: v.status
           })),
           index: versionsQuery.index,
           total: project.versions.length
