@@ -14,8 +14,10 @@
     "@astrojs/rss": "^4.0.1",
     "@astrojs/sitemap": "^3.0.3",
     "@astrojs/solid-js": "^3.0.2",
+    "@fontsource/ubuntu": "^5.0.8",
     "astro": "^4.0.5",
     "class-variance-authority": "^0.7.0",
+    "lodash": "^4.17.21",
     "solid-js": "^1.8.7",
     "tailwind-merge": "^2.2.0"
   },

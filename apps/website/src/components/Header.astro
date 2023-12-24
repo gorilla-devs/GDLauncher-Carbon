@@ -2,10 +2,11 @@
 import HeaderLink from "./HeaderLink.astro";
 import { Image } from 'astro:assets';
 import Logo from "../assets/logo.svg"
-import Button from "./Button"
+import Button from "./button/Button"
+import Separator from "./button/Separator.astro"
 ---
 
-<header >
+<header>
   <nav>
     <Image src={Logo} alt="gdlauncher logo" width="173" height="40"/>
     <div class="internal-links">
@@ -15,14 +16,14 @@ import Button from "./Button"
       <HeaderLink class="text-graygd">Modpacks</HeaderLink>
     </div>
     <div class="social-links">
-      <Button />
+      <Button intent="primary" className="uppercase"><div class="flex flex-row-reverse">download <Separator /></div></Button>
     </div>
   </nav>
 </header>
 <style>
   header {
     margin: 0;
-    padding: 1rem;
+    padding: 2rem;
     
     
   }
@@ -39,7 +40,7 @@ import Button from "./Button"
   }
   nav a {
     padding: 1em 0.5em;
-    
+    cursor: pointer;
   }
   
   
