@@ -1,6 +1,6 @@
 import { For } from "solid-js";
 
-interface ButtonDropdownProps {
+export interface ButtonDropdownProps {
   items: Array<{
     item: Element | string;
     onClick?: () => void;

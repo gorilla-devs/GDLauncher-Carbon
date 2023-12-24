@@ -1,6 +1,6 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { Show } from "solid-js";
-import { ButtonDropdown } from "./ButtonDropdown";
+import { ButtonDropdown, type ButtonDropdownProps } from "./ButtonDropdown";
 import Separator from "./Separator.astro";
 import Apple from "../../assets/Apple";
 import Windows from "../../assets/Windows";
@@ -12,7 +12,9 @@ interface Props {
   onClick?: () => void;
   isDropdown?: boolean;
   icon?: Element;
+  items?: Array<{ item: Element | string; onClick: () => void }>;
 }
+
 const button = cva("button", {
   variants: {
     intent: {
@@ -49,33 +51,6 @@ const button = cva("button", {
   },
 });
 
-const items: Array<{ item: Element | string; onClick: () => void }> = [
-  {
-    item: (
-      <div class="flex items-center gap-2 p-1">
-        <Apple /> MacOS
-      </div>
-    ) as Element,
-    onClick: () => {},
-  },
-  {
-    item: (
-      <div class="flex items-center gap-2 p-1">
-        <Windows /> Windows
-      </div>
-    ) as Element,
-    onClick: () => {},
-  },
-  {
-    item: (
-      <div class="flex items-center gap-2 p-1">
-        <Linux /> Linux
-      </div>
-    ) as Element,
-    onClick: () => {},
-  },
-];
-
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof button> {}
@@ -89,7 +64,14 @@ const Button = (props: ButtonProps & Props) => {
       {props.children}
 
       <Show when={props.isDropdown}>
-        <ButtonDropdown items={items} />
+        <ButtonDropdown
+          items={
+            props.items as Array<{
+              item: Element | string;
+              onClick: () => void;
+            }>
+          }
+        />
       </Show>
     </button>
   );
