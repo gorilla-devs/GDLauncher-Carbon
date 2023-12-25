@@ -27,6 +27,7 @@ export type VersionRowTypeData = {
   size: number;
   hash: string;
   status: string;
+  mainThumbnail?: string;
 };
 
 export const [versionsQuery, setVersionsQuery] = useVersionsQuery();
@@ -69,6 +70,13 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
       });
 
       if (props.modplatform === "curseforge") {
+        const project = await rspcContext.client.query([
+          "modplatforms.curseforge.getMod",
+          {
+            modId: parseInt(props.modId, 10)
+          }
+        ]);
+
         const response = await rspcContext.client.query([
           "modplatforms.curseforge.getModFiles",
           {
@@ -82,13 +90,6 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
           }
         ]);
 
-        console.log(
-          "Context",
-          response,
-          versionsQuery,
-          response.pagination?.index
-        );
-
         return {
           data: response.data.map((v) => ({
             id: v.modId.toString(),
@@ -101,7 +102,8 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
             fileName: v.fileName,
             size: v.fileLength,
             hash: v.fileFingerprint,
-            status: v.fileStatus
+            status: v.fileStatus,
+            mainThumbnail: project.data.logo?.url
           })),
           index: response.pagination?.index,
           total: response.pagination?.totalCount
@@ -127,8 +129,6 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
           }
         ]);
 
-        console.log("Context", response, versionsQuery);
-
         return {
           data: response.map((v) => ({
             id: v.project_id,
@@ -141,7 +141,8 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
             fileName: v.files[0].filename,
             size: v.files[0].size,
             hash: v.files[0].hashes.sha512,
-            status: v.status
+            status: v.status,
+            mainThumbnail: project.icon_url
           })),
           index: versionsQuery.index,
           total: project.versions.length

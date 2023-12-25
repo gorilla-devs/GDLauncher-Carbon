@@ -17,6 +17,7 @@ type Props = {
   isCurseforge: boolean;
   isLoading: boolean;
   children: (_: RowContainerProps) => JSX.Element;
+  type: "modpack" | "mod";
 };
 
 const MainContainer = (props: Props) => {
@@ -78,6 +79,7 @@ const MainContainer = (props: Props) => {
                     installedFile={props.installedMod}
                     modVersion={props.versions[modFile.index]}
                     instanceId={props.instanceId}
+                    type={props.type}
                   />
                 </div>
               );

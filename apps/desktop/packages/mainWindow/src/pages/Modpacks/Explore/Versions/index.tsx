@@ -35,14 +35,6 @@ const Versions = () => {
     }
   });
 
-  createEffect(() => {
-    console.log(
-      "virtualversions",
-      infiniteQuery?.rowVirtualizer?.getVirtualItems(),
-      rows()
-    );
-  });
-
   return (
     <MainContainer
       virtualVersions={infiniteQuery?.rowVirtualizer?.getVirtualItems()}
@@ -54,6 +46,7 @@ const Versions = () => {
       instanceId={undefined}
       isCurseforge={routeData.isCurseforge}
       isLoading={false}
+      type="modpack"
     >
       {VersionRow}
     </MainContainer>

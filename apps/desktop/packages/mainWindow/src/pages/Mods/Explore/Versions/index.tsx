@@ -79,6 +79,7 @@ const Versions = () => {
       installedMod={installedMod()}
       isCurseforge={routeData.isCurseforge}
       isLoading={false}
+      type="mod"
     >
       {VersionRow}
     </MainContainer>

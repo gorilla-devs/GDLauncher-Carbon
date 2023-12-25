@@ -5,7 +5,6 @@ import { Trans } from "@gd/i18n";
 import { Button, Popover, Spinner, Tooltip } from "@gd/ui";
 import { format } from "date-fns";
 import CopyIcon from "../CopyIcon";
-import { useGDNavigate } from "@/managers/NavigationManager";
 
 export type Props = {
   modVersion: VersionRowTypeData;
@@ -18,6 +17,7 @@ export type Props = {
         remoteId: string | number;
       }
     | undefined;
+  type: "modpack" | "mod";
 };
 
 export type AdditionalProps = {
@@ -50,7 +50,6 @@ const CopiableEntity = (props: {
 
 const RowContainer = (props: Props & AdditionalProps) => {
   const [isHoveringInfoCard, setIsHoveringInfoCard] = createSignal(false);
-  const navigate = useGDNavigate();
 
   return (
     <Switch>
@@ -174,7 +173,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
           >
             <div class="flex gap-2">
               <Switch>
-                <Match when={!props.instanceId}>
+                <Match when={props.type === "mod" && !props.instanceId}>
                   <Trans key="rowcontainer.no_instance_selected" />
                 </Match>
                 <Match when={props.loading}>

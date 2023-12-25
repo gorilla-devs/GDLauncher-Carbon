@@ -45,15 +45,11 @@ const VersionRow = (props: Props) => {
   );
 
   const onPrimaryAction = () => {
-    // const icon = props.isCurseforge
-    //   ? props.project.logo?.url
-    //   : props.project.icon_url;
-
     const modpack = props.isCurseforge
       ? {
           Curseforge: {
-            project_id: props.modVersion.id,
-            file_id: props.modVersion.fileId
+            project_id: parseInt(props.modVersion.id, 10),
+            file_id: parseInt(props.modVersion.fileId, 10)
           }
         }
       : {
@@ -63,9 +59,9 @@ const VersionRow = (props: Props) => {
           }
         };
 
-    // if (icon) {
-    //   loadIconMutation.mutate(icon);
-    // }
+    if (props.modVersion.mainThumbnail) {
+      loadIconMutation.mutate(props.modVersion.mainThumbnail);
+    }
 
     setLoading(true);
     createInstanceMutation.mutate({
