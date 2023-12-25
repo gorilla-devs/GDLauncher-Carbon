@@ -199,7 +199,9 @@ const RowContainer = (props: Props & AdditionalProps) => {
           </Button>
         </div>
       </Match>
-      <Match when={!props.modVersion}>Loading</Match>
+      <Match when={!props.modVersion}>
+        <Trans key="loading" />
+      </Match>
     </Switch>
   );
 };

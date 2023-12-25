@@ -85,7 +85,7 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
               index: versionsQuery.index,
               pageSize: versionsQuery.pageSize,
               gameVersion: versionsQuery.gameVersion,
-              modLoaderType: versionsQuery.modLoaderType
+              modLoaderType: versionsQuery.modLoaderType as any
             }
           }
         ]);
