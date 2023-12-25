@@ -51,7 +51,7 @@ const Versions = () => {
         for (const mod of instanceMods.data) {
           if (
             mod.curseforge?.file_id.toString() === version?.fileId ||
-            mod.modrinth?.version_id === version?.id
+            mod.modrinth?.version_id === version?.fileId
           ) {
             return {
               id: mod?.id,

@@ -10,9 +10,12 @@ use std::{
     str::FromStr,
 };
 
-use crate::domain::modplatforms::modrinth::{
-    project::{ProjectSupportRange, ProjectType},
-    UtcDateTime,
+use crate::domain::{
+    modplatforms::modrinth::{
+        project::{ProjectSupportRange, ProjectType},
+        UtcDateTime,
+    },
+    url::{deserialize_from_raw_json, serialize_as_raw_json},
 };
 use anyhow::anyhow;
 use carbon_macro::into_query_parameters;
@@ -140,24 +143,6 @@ impl<'de> Deserialize<'de> for SearchFacet {
             .parse()
             .map_err(serde::de::Error::custom)
     }
-}
-
-fn serialize_as_raw_json<S, T>(value: T, s: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-    T: Serialize,
-{
-    let json = serde_json::to_string(&value).map_err(serde::ser::Error::custom)?;
-    s.serialize_str(&json)
-}
-
-fn deserialize_from_raw_json<'de, D, T>(d: D) -> Result<T, D::Error>
-where
-    D: Deserializer<'de>,
-    T: DeserializeOwned,
-{
-    let json = String::deserialize(d)?;
-    serde_json::from_str(&json).map_err(serde::de::Error::custom)
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

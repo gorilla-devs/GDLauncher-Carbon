@@ -102,6 +102,20 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
     getCurrentScrollPosition();
   });
 
+  const allRows = () =>
+    infiniteQuery.data ? infiniteQuery.data.pages.flatMap((d) => d.data) : [];
+
+  const rowVirtualizer = createVirtualizer({
+    get count() {
+      return infiniteQuery.hasNextPage
+        ? allRows().length + 1
+        : allRows().length;
+    },
+    getScrollElement: () => parentRef(),
+    estimateSize: () => 150,
+    overscan: 15
+  });
+
   const setQueryWrapper = (newValue: Partial<FEUnifiedSearchParameters>) => {
     getQueryFunction(newValue);
     infiniteQuery.remove();
@@ -147,20 +161,6 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
       });
     });
   }
-
-  const allRows = () =>
-    infiniteQuery.data ? infiniteQuery.data.pages.flatMap((d) => d.data) : [];
-
-  const rowVirtualizer = createVirtualizer({
-    get count() {
-      return infiniteQuery.hasNextPage
-        ? allRows().length + 1
-        : allRows().length;
-    },
-    getScrollElement: () => parentRef(),
-    estimateSize: () => 150,
-    overscan: 15
-  });
 
   const context = {
     infiniteQuery,

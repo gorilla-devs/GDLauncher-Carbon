@@ -38,6 +38,7 @@ const mapTypeToColor = (type: McType) => {
 
 type Props = {
   modplatform: "curseforge" | "modrinth";
+  type: "modpack" | "mod";
 };
 
 const ExploreVersionsNavbar = (props: Props) => {
@@ -156,7 +157,9 @@ const ExploreVersionsNavbar = (props: Props) => {
             </div>
           </div>
         </Match>
-        <Match when={!instanceId || isNaN(instanceId)}>
+        <Match
+          when={props.type === "mod" && (!instanceId || isNaN(instanceId))}
+        >
           <div class="flex items-center text-darkSlate-100">
             No instance selected
           </div>

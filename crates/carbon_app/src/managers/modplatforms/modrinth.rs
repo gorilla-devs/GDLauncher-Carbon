@@ -113,28 +113,9 @@ impl Modrinth {
         let mut url = self
             .base_url
             .join(&format!("project/{}/version", &*filters.project_id))?;
-        {
-            let mut query_pairs = url.query_pairs_mut();
 
-            if !filters.game_versions.is_empty() {
-                query_pairs.append_pair(
-                    "game_versions",
-                    &serde_json::to_string(&filters.game_versions)?,
-                );
-            }
-
-            if !filters.loaders.is_empty() {
-                query_pairs.append_pair("loaders", &serde_json::to_string(&filters.loaders)?);
-            }
-
-            if let Some(offset) = filters.offset {
-                query_pairs.append_pair("offset", &offset.to_string());
-            }
-
-            if let Some(limit) = filters.limit {
-                query_pairs.append_pair("limit", &limit.to_string());
-            }
-        }
+        let query = filters.into_query_parameters()?;
+        url.set_query(Some(&query));
 
         trace!("GET {}", url);
 
@@ -410,8 +391,8 @@ mod test {
         let results = modrinth
             .get_project_versions(ProjectVersionsFilters {
                 project_id: ProjectID("u6dRKJwZ".to_string()),
-                game_versions: Vec::new(),
-                loaders: Vec::new(),
+                game_versions: None,
+                loaders: None,
                 offset: None,
                 limit: None,
             })

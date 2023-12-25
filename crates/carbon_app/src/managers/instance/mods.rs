@@ -407,9 +407,9 @@ impl ManagerRef<'_, InstanceManager> {
             .modrinth
             .get_project_versions(ProjectVersionsFilters {
                 project_id: ProjectID(project_id.clone()),
-                game_versions: Vec::from([version.clone()]),
-                loaders: Vec::from([modloader]),
-                limit: Some(1),
+                game_versions: Some(Vec::from([version.clone()])),
+                loaders: Some(Vec::from([modloader])),
+                limit: None,
                 offset: None,
             })
             .await?
@@ -545,12 +545,14 @@ impl ManagerRef<'_, InstanceManager> {
             .modrinth
             .get_project_versions(ProjectVersionsFilters {
                 project_id: ProjectID(mr.project_id),
-                game_versions: vec![version.release],
-                loaders: version
-                    .modloaders
-                    .iter()
-                    .map(|ml| ml.type_.to_string())
-                    .collect(),
+                game_versions: Some(vec![version.release]),
+                loaders: Some(
+                    version
+                        .modloaders
+                        .iter()
+                        .map(|ml| ml.type_.to_string())
+                        .collect(),
+                ),
                 limit: None,
                 offset: None,
             })

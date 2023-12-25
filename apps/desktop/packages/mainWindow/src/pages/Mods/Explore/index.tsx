@@ -383,6 +383,7 @@ const Modpack = () => {
                     modplatform={
                       routeData.isCurseforge ? "curseforge" : "modrinth"
                     }
+                    type="mod"
                   />
                 </Show>
               </div>

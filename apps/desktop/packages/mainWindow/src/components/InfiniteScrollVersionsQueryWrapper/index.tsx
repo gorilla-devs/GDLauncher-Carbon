@@ -116,10 +116,14 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
           "modplatforms.modrinth.getProjectVersions",
           {
             project_id: props.modId,
-            game_version: versionsQuery.gameVersion,
-            loaders: versionsQuery.modLoaderType,
-            limit: versionsQuery.pageSize,
-            offset: versionsQuery.index
+            game_versions: versionsQuery.gameVersion
+              ? [versionsQuery.gameVersion!]
+              : undefined,
+            loaders: versionsQuery.modLoaderType
+              ? [versionsQuery.modLoaderType!]
+              : undefined
+            // limit: versionsQuery.pageSize,
+            // offset: versionsQuery.index
           }
         ]);
 
@@ -145,6 +149,10 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
       }
     },
     getNextPageParam: (lastPage) => {
+      if (props.modplatform === "modrinth") {
+        return false;
+      }
+
       const index = lastPage?.index || 0;
       const totalCount = lastPage.total || 0;
       const pageSize = versionsQuery.pageSize || 20;

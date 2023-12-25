@@ -315,14 +315,19 @@ const Sidebar = () => {
                         const prevModloaders =
                           infiniteQuery?.query.modloaders || [];
 
+                        const modloaderName =
+                          typeof modloader === "string"
+                            ? modloader
+                            : modloader.name;
+
                         const filteredModloaders = prevModloaders.filter(
-                          (_modloader) => _modloader !== modloader
+                          (_modloader) => _modloader !== modloaderName
                         );
 
                         const newModloaders = checked
                           ? [
                               ...prevModloaders,
-                              modloader as FEUnifiedModLoaderType
+                              modloaderName as FEUnifiedModLoaderType
                             ]
                           : filteredModloaders;
 

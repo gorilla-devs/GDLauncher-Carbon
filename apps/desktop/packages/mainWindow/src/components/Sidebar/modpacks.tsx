@@ -215,23 +215,22 @@ const Sidebar = () => {
                 return (
                   <div class="flex items-center gap-2">
                     <Checkbox
-                      checked={
-                        infiniteQuery?.query.modloaders?.includes(
-                          modloader as FEUnifiedModLoaderType
-                        ) || false
-                      }
+                      checked={infiniteQuery.query.modloaders?.includes(
+                        ((modloader as any)?.name ||
+                          modloader) as FEUnifiedModLoaderType
+                      )}
                       onChange={(checked) => {
                         const prevModloaders =
                           infiniteQuery?.query.modloaders || [];
-
-                        const filteredModloaders = prevModloaders.filter(
-                          (modloader) => modloader !== modloader
-                        );
 
                         const modloaderName =
                           typeof modloader === "string"
                             ? modloader
                             : modloader.name;
+
+                        const filteredModloaders = prevModloaders.filter(
+                          (_modloader) => _modloader !== modloaderName
+                        );
 
                         const newModloaders = checked
                           ? [
