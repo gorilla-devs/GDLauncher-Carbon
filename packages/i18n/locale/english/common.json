@@ -123,6 +123,7 @@
   "modpack.version_switch": "Switch version",
   "modpack.version_installed": "Installed",
   "rowcontainer.no_instance_selected": "No Instance Selected",
+  "rowcontainer.override_filters": "Override Filters",
   "browser_table_headers.name": "Name",
   "browser_table_headers.published": "Published",
   "browser_table_headers.downloads": "Downloads",

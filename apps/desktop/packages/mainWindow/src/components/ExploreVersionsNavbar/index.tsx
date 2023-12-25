@@ -51,7 +51,7 @@ const ExploreVersionsNavbar = (props: Props) => {
     !instanceId || isNaN(instanceId)
   );
 
-  const [gameVersionFilters, setGameVersionFilters] = createStore({
+  const [gameVersionFilters, _setGameVersionFilters] = createStore({
     snapshot: false,
     oldAlpha: false,
     oldBeta: false
@@ -152,7 +152,7 @@ const ExploreVersionsNavbar = (props: Props) => {
                   checked={overrideEnabled()}
                   onChange={setOverrideEnabled}
                 />
-                Override filters
+                <Trans key="rowcontainer.override_filters" />
               </div>
             </div>
           </div>
@@ -161,7 +161,7 @@ const ExploreVersionsNavbar = (props: Props) => {
           when={props.type === "mod" && (!instanceId || isNaN(instanceId))}
         >
           <div class="flex items-center text-darkSlate-100">
-            No instance selected
+            <Trans key="rowcontainer.no_instance_selected" />
           </div>
         </Match>
       </Switch>
