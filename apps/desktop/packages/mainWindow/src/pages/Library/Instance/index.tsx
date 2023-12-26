@@ -46,7 +46,6 @@ import { setInstanceId } from "@/utils/browser";
 import { getInstanceIdFromPath } from "@/utils/routes";
 import {
   setPayload,
-  payload,
   setExportStep
 } from "@/managers/ModalsManager/modals/InstanceExport";
 import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/atoms/ExportCheckboxParent";

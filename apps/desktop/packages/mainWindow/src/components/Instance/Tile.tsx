@@ -19,8 +19,7 @@ import { getModpackPlatformIcon, getValideInstance } from "@/utils/instances";
 import { setInstanceId } from "@/utils/browser";
 import {
   setExportStep,
-  setPayload,
-  payload
+  setPayload
 } from "@/managers/ModalsManager/modals/InstanceExport";
 import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/atoms/ExportCheckboxParent";
 

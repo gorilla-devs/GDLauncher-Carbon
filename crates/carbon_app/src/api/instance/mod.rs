@@ -308,6 +308,29 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             Ok(super::vtask::FETaskId::from(task))
         }
 
+        mutation INSTALL_LATEST_MOD[app, imod: InstallLatestMod] {
+            let task = match imod.mod_source {
+                LatestModSource::Curseforge(cf_mod) => {
+                    app.instance_manager()
+                        .install_latest_curseforge_mod(
+                            imod.instance_id.into(),
+                            cf_mod,
+                        )
+                        .await?
+                }
+                LatestModSource::Modrinth(mdr_mod) => {
+                    app.instance_manager()
+                        .install_latest_modrinth_mod(
+                            imod.instance_id.into(),
+                            mdr_mod
+                        )
+                        .await?
+                }
+            };
+
+            Ok(super::vtask::FETaskId::from(task))
+        }
+
         mutation OPEN_INSTANCE_FOLDER[app, folder: OpenInstanceFolder] {
             app.instance_manager().open_folder(
                 folder.instance_id.into(),
@@ -665,6 +688,18 @@ struct UpdateMod {
     instance_id: FEInstanceId,
     mod_source: ModSourceType,
     mod_id: String,
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct InstallLatestMod {
+    instance_id: FEInstanceId,
+    mod_source: LatestModSource,
+}
+
+#[derive(Type, Debug, Deserialize)]
+enum LatestModSource {
+    Curseforge(u32),
+    Modrinth(String),
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]

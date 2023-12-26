@@ -4,17 +4,34 @@
 
 use std::path::PathBuf;
 
+use carbon_macro::into_query_parameters;
 use daedalus::minecraft::VersionManifest;
 
-use crate::domain::runtime_path::InstancePath;
+use crate::domain::{
+    runtime_path::InstancePath,
+    url::{deserialize_from_raw_json, serialize_as_raw_json},
+};
 
 use super::{search::ProjectID, *};
 
+#[into_query_parameters]
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ProjectVersionsFilters {
     pub project_id: ProjectID,
-    pub game_versions: Vec<String>,
-    pub loaders: Vec<String>,
+    #[serde(
+        serialize_with = "serialize_as_raw_json",
+        deserialize_with = "deserialize_from_raw_json",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub game_versions: Option<Vec<String>>,
+    #[serde(
+        serialize_with = "serialize_as_raw_json",
+        deserialize_with = "deserialize_from_raw_json",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub loaders: Option<Vec<String>>,
+    pub offset: Option<u32>,
+    pub limit: Option<u32>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

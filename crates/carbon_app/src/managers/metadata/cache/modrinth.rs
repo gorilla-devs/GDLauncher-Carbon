@@ -140,8 +140,10 @@ impl ModplatformCacher for ModrinthModCacher {
                             mpm.modrinth
                                 .get_project_versions(ProjectVersionsFilters {
                                     project_id: ProjectID(version.project_id.clone()),
-                                    game_versions: version.game_versions.clone(),
-                                    loaders: version.loaders.clone(),
+                                    game_versions: Some(version.game_versions.clone()),
+                                    loaders: Some(version.loaders.clone()),
+                                    limit: None,
+                                    offset: None,
                                 })
                                 .await
                                 .ok(),

@@ -10,7 +10,7 @@ use crate::domain::instance as domain;
 use crate::domain::instance::info::{GameVersion, ModLoaderType};
 use crate::domain::modplatforms::curseforge;
 use crate::domain::modplatforms::curseforge::filters::{
-    ModFilesParameters, ModFilesParametersQuery,
+    ModFilesParameters, ModFilesParametersQuery, ModParameters,
 };
 use crate::domain::modplatforms::modrinth::project::ProjectVersionsFilters;
 use crate::domain::modplatforms::modrinth::search::ProjectID;
@@ -291,6 +291,65 @@ impl ManagerRef<'_, InstanceManager> {
         Ok(task_id)
     }
 
+    pub async fn install_latest_curseforge_mod(
+        self,
+        instance_id: InstanceId,
+        project_id: u32,
+    ) -> anyhow::Result<VisualTaskId> {
+        let version = {
+            let instances = self.instances.read().await;
+            instances
+                .get(&instance_id)
+                .ok_or(InvalidInstanceIdError(instance_id))?
+                .data()?
+                .config
+                .game_configuration
+                .version
+                .as_ref()
+                .ok_or(anyhow::anyhow!("Can't find valid version"))?
+                .clone()
+        };
+
+        let (version, modloader) = match version {
+            domain::info::GameVersion::Custom(_) => todo!("Unsupported"),
+            domain::info::GameVersion::Standard(version) => {
+                let modloader = version
+                    .modloaders
+                    .iter()
+                    .next()
+                    .ok_or(anyhow::anyhow!("No modloader available"))?;
+
+                (version.release.clone(), modloader.type_.to_string())
+            }
+        };
+
+        let file_id = self
+            .app
+            .modplatforms_manager()
+            .curseforge
+            .get_mod(ModParameters {
+                mod_id: project_id.try_into()?,
+            })
+            .await?
+            .data
+            .latest_files_indexes
+            .iter()
+            .find(|value| value.game_version == version)
+            .ok_or(anyhow::anyhow!(
+                "Can't find a valid version for this instance"
+            ))?
+            .file_id
+            .try_into()?;
+
+        let installer = CurseforgeModInstaller::create(self.app, project_id, file_id)
+            .await?
+            .into_installer();
+
+        let task_id = installer.install(self.app, instance_id, true, None).await?;
+
+        Ok(task_id)
+    }
+
     pub async fn install_modrinth_mod(
         &self,
         instance_id: InstanceId,
@@ -306,6 +365,66 @@ impl ManagerRef<'_, InstanceManager> {
         let task_id = installer
             .install(self.app, instance_id, install_deps, replaces_mod_id)
             .await?;
+
+        Ok(task_id)
+    }
+
+    pub async fn install_latest_modrinth_mod(
+        &self,
+        instance_id: InstanceId,
+        project_id: String,
+    ) -> anyhow::Result<VisualTaskId> {
+        let version = {
+            let instances = self.instances.read().await;
+            instances
+                .get(&instance_id)
+                .ok_or(InvalidInstanceIdError(instance_id))?
+                .data()?
+                .config
+                .game_configuration
+                .version
+                .as_ref()
+                .ok_or(anyhow::anyhow!("Can't find valid version"))?
+                .clone()
+        };
+
+        let (version, modloader) = match version {
+            domain::info::GameVersion::Custom(_) => todo!("Unsupported"),
+            domain::info::GameVersion::Standard(version) => {
+                let modloader = version
+                    .modloaders
+                    .iter()
+                    .next()
+                    .ok_or(anyhow::anyhow!("No modloader available"))?;
+
+                (version.release.clone(), modloader.type_.to_string())
+            }
+        };
+
+        let version_id = self
+            .app
+            .modplatforms_manager()
+            .modrinth
+            .get_project_versions(ProjectVersionsFilters {
+                project_id: ProjectID(project_id.clone()),
+                game_versions: Some(Vec::from([version.clone()])),
+                loaders: Some(Vec::from([modloader])),
+                limit: None,
+                offset: None,
+            })
+            .await?
+            .get(0)
+            .ok_or(anyhow::anyhow!(
+                "Can't find a valid version for this instance"
+            ))?
+            .id
+            .clone();
+
+        let installer = ModrinthModInstaller::create(self.app, project_id, version_id)
+            .await?
+            .into_installer();
+
+        let task_id = installer.install(self.app, instance_id, true, None).await?;
 
         Ok(task_id)
     }
@@ -426,12 +545,16 @@ impl ManagerRef<'_, InstanceManager> {
             .modrinth
             .get_project_versions(ProjectVersionsFilters {
                 project_id: ProjectID(mr.project_id),
-                game_versions: vec![version.release],
-                loaders: version
-                    .modloaders
-                    .iter()
-                    .map(|ml| ml.type_.to_string())
-                    .collect(),
+                game_versions: Some(vec![version.release]),
+                loaders: Some(
+                    version
+                        .modloaders
+                        .iter()
+                        .map(|ml| ml.type_.to_string())
+                        .collect(),
+                ),
+                limit: None,
+                offset: None,
             })
             .await?;
 
