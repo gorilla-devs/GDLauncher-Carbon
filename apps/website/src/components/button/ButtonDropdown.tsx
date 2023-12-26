@@ -9,7 +9,7 @@ export interface ButtonDropdownProps {
 
 export const ButtonDropdown = (props: ButtonDropdownProps) => {
   return (
-    <div class="bg-darkgd absolute   w-full rounded-xssgd top-full">
+    <div class="bg-darkgd absolute   w-full rounded-xssgd top-full translate-y-1">
       <For each={props.items}>
         {({ item, onClick }) => (
           <div

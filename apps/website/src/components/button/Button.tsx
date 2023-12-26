@@ -1,5 +1,5 @@
 import { cva, type VariantProps } from "class-variance-authority";
-import { Show } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { ButtonDropdown, type ButtonDropdownProps } from "./ButtonDropdown";
 import Separator from "./Separator.astro";
 import Apple from "../../assets/Apple";
@@ -56,14 +56,23 @@ export interface ButtonProps
     VariantProps<typeof button> {}
 
 const Button = (props: ButtonProps & Props) => {
+  const [items, showItems] = createSignal(false);
   const intent = props.intent;
   const size = props.size;
   const className = props.className;
   return (
-    <button onClick={props.onClick} class={button({ intent, size, className })}>
+    <button
+      onClick={() => {
+        if (props.isDropdown) {
+          showItems(!items());
+        }
+        if (props.onClick) props.onClick();
+      }}
+      class={button({ intent, size, className })}
+    >
       {props.children}
 
-      <Show when={props.isDropdown}>
+      <Show when={props.isDropdown && items()}>
         <ButtonDropdown
           items={
             props.items as Array<{

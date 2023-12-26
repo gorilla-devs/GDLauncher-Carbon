@@ -6,6 +6,7 @@ import { Image } from "astro:assets";
 import BHLogo from "../assets/bh.svg";
 import '@fontsource/ubuntu';
 import { SITE_TITLE, SITE_DESCRIPTION, DownloadItems } from "../consts";
+import { DownloadButtonDropdown } from "../components/button/DownloadButtonDropdown";
 ---
 
 <!doctype html>
@@ -58,7 +59,8 @@ import { SITE_TITLE, SITE_DESCRIPTION, DownloadItems } from "../consts";
 			Your All-In-One Minecraft Modded Launcher
 		  </span>
         </div>
-		<Button items={DownloadItems} isDropdown={true} intent="primary" size="medium">DOWNLOAD FOR</Button>
+		<!-- <Button items={DownloadItems} isDropdown={true} intent="primary" size="medium">DOWNLOAD FOR</Button> -->
+    <DownloadButtonDropdown client:only/>
       </div>
 
       <!-- <Footer /> -->
