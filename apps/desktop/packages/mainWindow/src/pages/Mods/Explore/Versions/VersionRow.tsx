@@ -1,9 +1,7 @@
 import RowContainer, { Props } from "@/components/Browser/RowContainer";
-import CopyIcon from "@/components/CopyIcon";
 import { rspc } from "@/utils/rspcClient";
 import { ModSource } from "@gd/core_module/bindings";
-import { Tooltip } from "@gd/ui";
-import { Show, createEffect, createSignal } from "solid-js";
+import { createEffect, createSignal } from "solid-js";
 
 const VersionRow = (props: Props) => {
   const [loading, setLoading] = createSignal(false);
