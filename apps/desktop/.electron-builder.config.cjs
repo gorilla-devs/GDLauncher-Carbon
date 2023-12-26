@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const dotenv = require("dotenv");
+const { notarize } = require("electron-notarize");
 
 dotenv.config({
   path: "../../.env"
@@ -45,9 +46,11 @@ let publish =
           process.env.PUBLISH_URL_FOLDER
       };
 
+const appId = "org.gorilladevs.GDLauncher";
+
 module.exports = {
   productName: "GDLauncher",
-  appId: "org.gorilladevs.GDLauncher",
+  appId,
   generateUpdatesFilesForAllChannels: true,
   copyright: `Copyright © ${new Date().getFullYear()} GorillaDevs Inc.`,
   publish,
@@ -86,7 +89,12 @@ module.exports = {
     target: appChannel === "snapshot" ? ["zip"] : ["zip", "dmg"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
     entitlements: "./entitlements.mac.plist",
-    extendInfo: "./entitlements.mac.bundles.plist"
+    extendInfo: "./entitlements.mac.bundles.plist",
+    hardenedRuntime: true,
+    gatekeeperAssess: false
+  },
+  dmg: {
+    sign: false
   },
   linux: {
     target: appChannel === "snapshot" ? ["zip"] : ["zip", "appImage"],
@@ -106,5 +114,20 @@ module.exports = {
       `${JSON.stringify(packageJson, null, 2)}\n`,
       "utf8"
     );
+  },
+  afterSign: async (context) => {
+    const { electronPlatformName, appOutDir } = context;
+    if (electronPlatformName !== "darwin") {
+      return;
+    }
+
+    const appName = context.packager.appInfo.productFilename;
+
+    return await notarize({
+      appBundleId: appId,
+      appPath: `${appOutDir}/${appName}.app`,
+      appleId: process.env.APPLE_ID,
+      appleIdPassword: process.env.APPLE_ID_PASSWORD
+    });
   }
 };
