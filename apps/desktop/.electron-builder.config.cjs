@@ -89,7 +89,7 @@ module.exports = {
     target: appChannel === "snapshot" ? ["zip"] : ["zip", "dmg"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
     entitlements: "./entitlements.mac.plist",
-    extendInfo: "./entitlements.mac.bundles.plist",
+    extendInfo: "./entitlements.mac.plist",
     hardenedRuntime: true,
     gatekeeperAssess: false
   },
