@@ -5,9 +5,12 @@ import Button from "../components/button/Button";
 import Download from "../components/Download.astro"
 import { Image } from "astro:assets";
 import BHLogo from "../assets/bh.svg";
+import Footer from "../components/Footer.astro";
+import Subtract from "../assets/subtract.svg";
 import '@fontsource/ubuntu';
 import { SITE_TITLE, SITE_DESCRIPTION, DownloadItems } from "../consts";
 import { DownloadButtonDropdown } from "../components/button/DownloadButtonDropdown";
+import WhatMakesGDSpecia from "../components/WhatMakesGDSpecia.astro";
 ---
 
 <!doctype html>
@@ -17,6 +20,7 @@ import { DownloadButtonDropdown } from "../components/button/DownloadButtonDropd
     <style>
 		body {
 			font-family: "Ubuntu", cursive;
+      background-color: rgba(29, 32, 40, 1);
 		}
       .background {
         background-image: linear-gradient(
@@ -33,7 +37,7 @@ import { DownloadButtonDropdown } from "../components/button/DownloadButtonDropd
   >
 
   <body>
-    <div class="min-h-screen background flex flex-col">
+    <div class="min-h-screen background flex flex-col relative">
       <Header />
       <div class="flex flex-1 flex-col items-center justify-center gap-4">
         <Button intent="secondary" className="rounded-xsgd" >
@@ -63,9 +67,12 @@ import { DownloadButtonDropdown } from "../components/button/DownloadButtonDropd
 		<!-- <Button items={DownloadItems} isDropdown={true} intent="primary" size="medium">DOWNLOAD FOR</Button> -->
     <!-- <DownloadButtonDropdown client:only/> -->
     <Download />
+    
       </div>
 
      
     </div>
+    <!-- <WhatMakesGDSpecia /> -->
+    <Footer />
   </body>
 </html>
