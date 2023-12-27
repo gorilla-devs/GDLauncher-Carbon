@@ -2,6 +2,7 @@
 import BaseHead from "../components/BaseHead.astro";
 import Header from "../components/Header.astro";
 import Button from "../components/button/Button";
+import Download from "../components/Download.astro"
 import { Image } from "astro:assets";
 import BHLogo from "../assets/bh.svg";
 import '@fontsource/ubuntu';
@@ -60,10 +61,11 @@ import { DownloadButtonDropdown } from "../components/button/DownloadButtonDropd
 		  </span>
         </div>
 		<!-- <Button items={DownloadItems} isDropdown={true} intent="primary" size="medium">DOWNLOAD FOR</Button> -->
-    <DownloadButtonDropdown client:only/>
+    <!-- <DownloadButtonDropdown client:only/> -->
+    <Download />
       </div>
 
-      <!-- <Footer /> -->
+     
     </div>
   </body>
 </html>

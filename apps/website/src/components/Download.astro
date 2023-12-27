@@ -1,0 +1,45 @@
+---
+import { Image } from 'astro:assets';
+import Logo1 from '../assets/1.svg';
+import Logo2 from '../assets/2.svg';
+import Logo3 from '../assets/3.svg';
+import Logo4 from '../assets/4.svg';
+import Logo5 from '../assets/5.svg';
+import Logo6 from '../assets/6.svg';
+import Logo7 from '../assets/7.svg';
+import { DownloadButtonDropdown } from './button/DownloadButtonDropdown';
+
+
+
+---
+
+<div class=" w-[80%] flex justify-between h-[170px]">
+	<Image src={Logo1} alt="item1" width={62} height={62} class="self-start opacity-0 animated-logo"/>
+    <Image src={Logo2} alt="item2" width={62} height={62} class="animated-logo opacity-0"/>
+    <Image src={Logo3} alt="item3" width={62} height={62} class="animated-logo opacity-0"/>
+    <div class="flex flex-col justify-between items-center">
+        <DownloadButtonDropdown client:only/>
+        <Image src={Logo4} alt="item4" width={62} height={62} class="animated-logo opacity-0"/>
+    </div>
+    <Image src={Logo7} alt="item7" width={62} height={62} class="-translate-y-2 animated-logo opacity-0"/>
+    <Image src={Logo5} alt="item5" width={62} height={62} class="animated-logo opacity-0"/>
+    <Image src={Logo6} alt="item6" width={62} height={62} class="self-start animated-logo opacity-0"/>
+</div>
+<style>
+	
+</style>
+
+<script>
+    
+    const logos = document.querySelectorAll('.animated-logo');
+    
+    let delay = 0;
+
+    logos.forEach(logo => {
+        setTimeout(() => {
+            logo.classList.remove('opacity-0');
+            logo.classList.add('animate-fadeIn');
+        }, delay);
+        delay += 500;
+    });
+</script>
