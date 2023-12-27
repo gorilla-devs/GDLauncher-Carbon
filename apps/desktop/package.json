@@ -7,7 +7,7 @@
   "license": "ARR",
   "type": "module",
   "_comment": "DO NOT MANUALLY EDIT THE VERSION",
-  "version": "0.0.0",
+  "version": "2.0.0-alpha.1703603674",
   "main": "dist/main/index.cjs",
   "scripts": {
     "dev": "node scripts/watch.mjs",
