@@ -1,6 +1,7 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import { createSignal, Show } from "solid-js";
 import { ButtonDropdown, type ButtonDropdownProps } from "./ButtonDropdown";
+import { type JSX } from "solid-js";
 import Separator from "./Separator.astro";
 import Apple from "../../assets/Apple";
 import Windows from "../../assets/Windows";
@@ -8,11 +9,14 @@ import Linux from "../../assets/Linux";
 
 interface Props {
   transparent?: boolean;
-  children: Element | string;
+  children: JSX.Element | JSX.Element[] | string;
   onClick?: () => void;
   isDropdown?: boolean;
-  icon?: Element;
-  items?: Array<{ item: Element | string; onClick: () => void }>;
+  icon?: JSX.Element | JSX.Element[] | string;
+  items?: Array<{
+    item: JSX.Element | JSX.Element[] | string;
+    onClick: () => void;
+  }>;
 }
 
 const button = cva("button", {
@@ -25,7 +29,7 @@ const button = cva("button", {
         "hover:bg-bluegd-400",
         "rounded-smgd",
         "flex",
-        "items-center",
+        "gap-2",
         "justify-center",
         "relative",
       ],
@@ -52,14 +56,14 @@ const button = cva("button", {
 });
 
 export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+  extends JSX.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof button> {}
 
 const Button = (props: ButtonProps & Props) => {
   const [items, showItems] = createSignal(false);
   const intent = props.intent;
   const size = props.size;
-  const className = props.className;
+  const className = props.class;
   return (
     <button
       onClick={() => {
