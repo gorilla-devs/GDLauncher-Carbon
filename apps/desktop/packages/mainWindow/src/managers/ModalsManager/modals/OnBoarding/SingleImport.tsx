@@ -4,6 +4,7 @@ import { isProgressFailed } from "@/utils/instances";
 import { rspc, rspcFetch } from "@/utils/rspcClient";
 import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Progressbar } from "@gd/ui";
+import { stat } from "original-fs";
 import { Match, Switch, createEffect, createSignal } from "solid-js";
 
 const [isDownloaded, setIsDownloaded] = createSignal(false);
@@ -63,7 +64,7 @@ const SingleImport = (props: {
           }
         }
         const isFailed = task.data && isProgressFailed(task.data.progress);
-        const isDownloaded = task.data === null;
+        const isDownloaded = task.data === null && progress() !== 0;
         if (isDownloaded || isFailed) {
           setTaskId(undefined);
         }
