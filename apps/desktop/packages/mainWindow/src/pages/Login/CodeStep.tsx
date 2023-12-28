@@ -1,4 +1,4 @@
-import { Button, LoadingBar } from "@gd/ui";
+import { Button, LoadingBar, Popover } from "@gd/ui";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { msToMinutes, msToSeconds, parseTwoDigitNumber } from "@/utils/helpers";
 import { Setter } from "solid-js";
@@ -151,6 +151,38 @@ const CodeStep = (props: Props) => {
           />
         </Button>
       </div>
+      <div class="absolute top-4 right-4">
+        <Popover
+          noTip
+          content={
+            <div class="px-4 pb-6 max-w-100">
+              <h3>
+                <Trans key="login.troubles_logging_in" />
+              </h3>
+              <div class="text-md pb-8">
+                <Trans key="login.link_not_working_help" />
+              </div>
+              <div
+                class="text-lightSlate-600 hover:text-lightSlate-50 flex gap-2 items-center"
+                onClick={() => {
+                  navigator.clipboard.writeText(deviceCodeLink()!);
+                  addNotification("The link has been copied");
+                }}
+              >
+                <div class="w-4 h-4 i-ri:link" />
+                <div>{deviceCodeLink()}</div>
+              </div>
+            </div>
+          }
+        >
+          <div class="flex items-center text-darkSlate-50 hover:text-lightSlate-50 transition-color duration-75">
+            <div>
+              <Trans key="login.need_help" />
+            </div>
+            <div class="ml-2 w-6 h-6 i-ri:question-fill" />
+          </div>
+        </Popover>
+      </div>
       <div>
         <div class="flex flex-col justify-center items-center">
           <DeviceCode
@@ -228,19 +260,6 @@ const CodeStep = (props: Props) => {
           />
           <div class="text-md i-ri:external-link-fill" />
         </Button>
-        <div class="text-md text-darkSlate-100">
-          <Trans key="login.link_not_working_help" />
-        </div>
-        <div
-          class="text-lightSlate-600 hover:text-lightSlate-50 flex gap-2 items-center"
-          onClick={() => {
-            navigator.clipboard.writeText(deviceCodeLink()!);
-            addNotification("The link has been copied");
-          }}
-        >
-          <div class="w-4 h-4 i-ri:link" />
-          <div>{deviceCodeLink()}</div>
-        </div>
       </Show>
       <Show when={expired()}>
         <div
