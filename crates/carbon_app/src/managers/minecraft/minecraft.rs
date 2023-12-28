@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
@@ -271,13 +271,17 @@ pub async fn generate_startup_command(
     lwjgl_group: &LibraryGroup,
     instance_path: InstancePath,
 ) -> anyhow::Result<Vec<String>> {
-    let libraries = chain_lwjgl_libs_with_base_libs(
+    let mut libraries = chain_lwjgl_libs_with_base_libs(
         &version.libraries,
         &lwjgl_group.libraries,
         &java_component.arch,
         &runtime_path.get_libraries(),
         true,
     );
+
+    let tmp_set: HashSet<_> = libraries.drain(..).collect();
+    libraries.extend(tmp_set.into_iter());
+
 
     let libraries = libraries
         .into_iter()
