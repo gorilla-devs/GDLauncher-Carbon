@@ -1,5 +1,6 @@
 import { DownloadItems } from "../../consts";
 import Button from "./Button";
+import { AiOutlineArrowDown } from "solid-icons/ai";
 
 export const DownloadButtonDropdown = () => {
   return (
@@ -8,8 +9,10 @@ export const DownloadButtonDropdown = () => {
       isDropdown={true}
       intent="primary"
       size="medium"
+      class="items-center"
     >
-      DOWNLOAD FOR
+      <span>DOWNLOAD FOR</span>
+      <AiOutlineArrowDown size={20} />
     </Button>
   );
 };
