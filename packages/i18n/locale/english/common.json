@@ -25,6 +25,7 @@
   "login.enter_code_in_browser": "Enter the specified code on the browser page to complete the authorization",
   "login.waiting_login_code_msg": "Waiting for authorization...",
   "login.open_in_browser": "Copy and open in browser",
+  "login.link_not_working_help": "If the above button does not work, you can open the link in the browser:",
   "login.refresh": "refresh",
   "login.read_and_accept": "I have read and accept the <0>Terms of Service</0> and <1>Privacy Statement</1>",
   "login.cookies_tracking": "Enable anonymous metrics to improve the user experience and provide experimental features",

@@ -159,7 +159,7 @@ const CodeStep = (props: Props) => {
             id="login-link-btn"
             onClick={() => {
               window.copyToClipboard(userCode() || "");
-              addNotification("The link has been copied");
+              addNotification("The code has been copied");
             }}
           />
           <Show when={expired()}>
@@ -226,8 +226,21 @@ const CodeStep = (props: Props) => {
               defaultValue: "Copy and open in browser"
             }}
           />
-          <div class="text-md i-ri:link" />
+          <div class="text-md i-ri:external-link-fill" />
         </Button>
+        <div class="text-md text-darkSlate-100">
+          <Trans key="login.link_not_working_help" />
+        </div>
+        <div
+          class="text-lightSlate-600 hover:text-lightSlate-50 flex gap-2 items-center"
+          onClick={() => {
+            navigator.clipboard.writeText(deviceCodeLink()!);
+            addNotification("The link has been copied");
+          }}
+        >
+          <div class="w-4 h-4 i-ri:link" />
+          <div>{deviceCodeLink()}</div>
+        </div>
       </Show>
       <Show when={expired()}>
         <div

@@ -117,12 +117,14 @@ module.exports = {
   },
   afterSign: async (context) => {
     const { electronPlatformName, appOutDir } = context;
-    if (electronPlatformName !== "darwin") {
+    if (electronPlatformName !== "darwin" || !process.env.APPLE_ID || !process.env.APPLE_ID_PASSWORD) {
+      console.log("Skipping notarization");
       return;
     }
 
     const appName = context.packager.appInfo.productFilename;
 
+    console.log("Notarizing...")
     return await notarize({
       appBundleId: appId,
       appPath: `${appOutDir}/${appName}.app`,
