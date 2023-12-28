@@ -109,12 +109,12 @@
         document.documentElement.style.setProperty(`--${key}`, mainTheme[key]);
       }
       // TODO: handle sourcemaps decoding + sentry
-      // if (import.meta.env.DEV) {
-      // window.onerror = (msg, url, line, col, error) => {
-      //   window.fatalError(msg, url.split("/").slice(-3).join(" -> "));
-      //   return true;
-      // };
-      // }
+      if (import.meta.env.DEV) {
+        window.onerror = (msg, url, line, col, error) => {
+          window.fatalError(msg, url.split("/").slice(-3).join(" -> "));
+          return true;
+        };
+      }
     </script>
   </head>
   <body style="margin: 0; padding: 0; overflow: hidden" spellcheck="false">
