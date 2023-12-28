@@ -85,9 +85,12 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         mutation LOAD_ICON_URL[app, url: String] {
-            app.instance_manager()
+            let icon = app.instance_manager()
                 .download_icon(url)
-                .await
+                .await?;
+
+            app.instance_manager().set_loaded_icon(icon).await;
+            Ok(())
         }
 
         mutation DELETE_GROUP[app, id: FEGroupId] {
@@ -482,10 +485,13 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
             "/loadIcon",
             axum::routing::get(
                 |State(app): State<Arc<AppInner>>, Query(query): Query<IconPathQuery>| async move {
-                    app.instance_manager()
+                    let icon = app.instance_manager()
                         .load_icon(PathBuf::from(query.path))
                         .await
-                        .map_err(|e| FeError::from_anyhow(&e).make_axum())
+                        .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
+
+                    app.instance_manager().set_loaded_icon(icon).await;
+                    Ok::<_, AxumError>(())
                 }
             )
         )
