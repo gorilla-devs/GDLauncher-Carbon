@@ -16,6 +16,9 @@ module.exports = {
       boxShadow: {
         mdgd: "0px 0px 12px 0px rgba(40, 101, 164, 1)",
       },
+      padding: {
+        mdgd: "24px",
+      },
       borderRadius: {
         xssgd: "8px",
         xsgd: "12px",
