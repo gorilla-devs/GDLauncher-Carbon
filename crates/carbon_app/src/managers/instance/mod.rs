@@ -811,7 +811,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         bail!("unable to sanitize instance name")
     }
 
-    pub async fn load_icon(self, icon: PathBuf) -> anyhow::Result<Vec<u8>> {
+    pub async fn load_icon(self, icon: PathBuf) -> anyhow::Result<(String, Vec<u8>)> {
         let data = tokio::fs::read(icon.clone())
             .await
             .with_context(|| format!("Reading file `{}`", icon.to_string_lossy()))?;
@@ -826,12 +826,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .to_string_lossy()
             .to_string();
 
-        *self.loaded_icon.lock().await = Some((icon_name, data.clone()));
-
-        Ok(data)
+        Ok((icon_name, data))
     }
 
-    pub async fn download_icon(self, url: String) -> anyhow::Result<()> {
+    pub async fn download_icon(self, url: String) -> anyhow::Result<(String, Vec<u8>)> {
         let extension = url
             .rsplit_once('/')
             .map(|(_, name)| name.rsplit_once('.'))
@@ -848,9 +846,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .bytes()
             .await?;
 
-        *self.loaded_icon.lock().await = Some((format!("icon.{extension}"), data.to_vec()));
+        Ok((format!("icon.{extension}"), data.to_vec()))
+    }
 
-        Ok(())
+    pub async fn set_loaded_icon(self, icon: (String, Vec<u8>)) {
+        *self.loaded_icon.lock().await = Some(icon);
     }
 
     pub async fn create_instance(
@@ -861,17 +861,20 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         version: InstanceVersionSource,
         notes: String,
     ) -> anyhow::Result<InstanceId> {
-        self.create_instance_ext(group, name, use_loaded_icon, version, notes, |_| async {
-            Ok(())
-        })
-        .await
+        let icon = match use_loaded_icon {
+            true => self.loaded_icon.lock().await.take(),
+            false => None,
+        };
+
+        self.create_instance_ext(group, name, icon, version, notes, |_| async { Ok(()) })
+            .await
     }
 
     pub async fn create_instance_ext<F, I>(
         self,
         group: GroupId,
         name: String,
-        use_loaded_icon: bool,
+        icon: Option<(String, Vec<u8>)>,
         version: InstanceVersionSource,
         notes: String,
         initializer: F,
@@ -890,15 +893,15 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         tokio::fs::create_dir(tmpdir.join("instance")).await?;
 
-        let icon = match (use_loaded_icon, self.loaded_icon.lock().await.take()) {
-            (true, Some((path, data))) => {
+        let icon = match icon {
+            Some((path, data)) => {
                 tokio::fs::write(tmpdir.join(&path), data)
                     .await
                     .context("saving instance icon")?;
 
                 InstanceIcon::RelativePath(path)
             }
-            _ => InstanceIcon::Default,
+            None => InstanceIcon::Default,
         };
 
         let (version, modpack) = match version {

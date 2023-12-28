@@ -197,11 +197,14 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             }
         };
 
-        if let Some(ref background) = instance.config.background {
-            app.instance_manager()
-                .load_icon(instance.path.join(background))
-                .await?;
-        }
+        let icon = match &instance.config.background {
+            Some(background) => Some(
+                app.instance_manager()
+                    .load_icon(instance.path.join(background))
+                    .await?,
+            ),
+            None => None,
+        };
 
         let initializer = |instance_path: PathBuf| {
             let instance = &instance;
@@ -237,7 +240,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             .create_instance_ext(
                 app.instance_manager().get_default_group().await?,
                 name.unwrap_or_else(|| instance.filename.clone()),
-                instance.config.background.is_some(),
+                icon,
                 instance_version_source,
                 String::new(),
                 initializer,
