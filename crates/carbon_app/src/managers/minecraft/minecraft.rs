@@ -282,7 +282,6 @@ pub async fn generate_startup_command(
     let tmp_set: HashSet<_> = libraries.drain(..).collect();
     libraries.extend(tmp_set.into_iter());
 
-
     let libraries = libraries
         .into_iter()
         .reduce(|a, b| format!("{a}{CLASSPATH_SEPARATOR}{b}"))
