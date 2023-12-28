@@ -23,4 +23,6 @@ export {
 export { Dropdown } from "./Dropdown";
 export { Tooltip } from "./Tooltip";
 export { Popover } from "./Popover";
+export { ContextMenu } from "./Menu";
+export { ContextMenuProvider, useContextMenu } from "./Menu/ContextMenuContext";
 export * from "./themes";

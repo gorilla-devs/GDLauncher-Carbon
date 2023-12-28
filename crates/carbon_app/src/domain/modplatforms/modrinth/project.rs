@@ -2,13 +2,36 @@
 //!
 //! [documentation](https://docs.modrinth.com/api-spec/#tag/project_model)
 
+use std::path::PathBuf;
+
+use carbon_macro::into_query_parameters;
+use daedalus::minecraft::VersionManifest;
+
+use crate::domain::{
+    runtime_path::InstancePath,
+    url::{deserialize_from_raw_json, serialize_as_raw_json},
+};
+
 use super::{search::ProjectID, *};
 
+#[into_query_parameters]
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ProjectVersionsFilters {
     pub project_id: ProjectID,
-    pub game_version: Option<String>,
-    pub loaders: Option<String>,
+    #[serde(
+        serialize_with = "serialize_as_raw_json",
+        deserialize_with = "deserialize_from_raw_json",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub game_versions: Option<Vec<String>>,
+    #[serde(
+        serialize_with = "serialize_as_raw_json",
+        deserialize_with = "deserialize_from_raw_json",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub loaders: Option<Vec<String>>,
+    pub offset: Option<u32>,
+    pub limit: Option<u32>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -154,6 +177,7 @@ pub enum ProjectStatus {
     Archived,
     /// The project has been submitted for approval and is being reviewed
     Processing,
+    Withheld,
     Unknown,
 }
 
@@ -190,6 +214,41 @@ pub enum ProjectType {
     Shader,
     Modpack,
     ResourcePack,
+}
+
+impl ProjectType {
+    pub fn into_path(
+        self,
+        instance_path: &InstancePath,
+        game_version: String,
+        mc_manifest: &VersionManifest,
+    ) -> PathBuf {
+        match self {
+            Self::ResourcePack => {
+                // anything older than 1.6.1 is in the texturepacks folder
+                let index_1_6_1 = mc_manifest
+                    .versions
+                    .iter()
+                    .position(|v| v.id == "1.6.1")
+                    .unwrap_or(0);
+
+                let manifest_version = mc_manifest
+                    .versions
+                    .iter()
+                    .position(|v| v.id == game_version)
+                    .unwrap_or(0);
+
+                // current game version needs to be below 1.6.1, so the index needs to be higher
+                if manifest_version > index_1_6_1 {
+                    instance_path.get_texturepacks_path()
+                } else {
+                    instance_path.get_resourcepacks_path()
+                }
+            }
+            Self::Shader => instance_path.get_shaderpacks_path(),
+            _ => instance_path.get_mods_path(),
+        }
+    }
 }
 
 /// File extensions for images

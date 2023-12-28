@@ -7,10 +7,10 @@ const Skeleton = () => {
 const SidebarInstance = () => {
   return (
     <div class="flex gap-2 py-2 px-4">
-      <div class="w-10 h-10 rounded-lg bg-darkSlate-700" />
+      <div class="w-10 h-10 rounded-lg bg-darkSlate-500" />
       <div class="flex flex-col space-between gap-2">
-        <div class="w-32 h-4 rounded-md bg-darkSlate-700" />
-        <div class="w-32 h-4 rounded-md bg-darkSlate-700" />
+        <div class="w-32 h-4 rounded-md bg-darkSlate-500" />
+        <div class="w-32 h-4 rounded-md bg-darkSlate-500" />
       </div>
     </div>
   );
@@ -27,16 +27,16 @@ Skeleton.sidebarInstances = () => {
 };
 
 Skeleton.sidebarInstanceSmall = () => {
-  return <div class="h-10 w-10 rounded-lg bg-darkSlate-700 py-2 px-4" />;
+  return <div class="h-10 w-10 rounded-lg bg-darkSlate-500 py-2 px-4" />;
 };
 
 const Instance = () => {
   return (
     <div class="flex flex-col gap-2">
-      <div class="w-38 h-38 rounded-lg bg-darkSlate-700" />
+      <div class="w-38 h-38 rounded-lg bg-darkSlate-500" />
       <div class="flex flex-col space-between gap-2">
-        <div class="w-32 h-4 rounded-md bg-darkSlate-700" />
-        <div class="w-32 h-4 rounded-md bg-darkSlate-700" />
+        <div class="w-32 h-4 rounded-md bg-darkSlate-500" />
+        <div class="w-32 h-4 rounded-md bg-darkSlate-500" />
       </div>
     </div>
   );
@@ -47,18 +47,18 @@ Skeleton.instance = Instance;
 Skeleton.instances = () => {
   return (
     <div class="flex gap-4">
-      <For each={new Array(3)}>{() => <Instance />}</For>
+      <For each={new Array(5)}>{() => <Instance />}</For>
     </div>
   );
 };
 
 Skeleton.news = () => {
-  return <div class="w-full h-80 rounded-lg bg-darkSlate-700 mb-5" />;
+  return <div class="w-full h-80 rounded-lg bg-darkSlate-500 mb-5" />;
 };
 
 const Modpack = () => {
   return (
-    <div class="flex justify-between h-40 w-full rounded-xl bg-darkSlate-700 p-4 gap-4 box-border">
+    <div class="flex justify-between h-40 w-full rounded-xl bg-darkSlate-500 p-4 gap-4 box-border">
       <div class="rounded-xl select-none h-30 w-30 bg-darkSlate-500" />
       <div class="flex flex-col space-between gap-2 flex-1">
         <div class="w-full h-4 rounded-md bg-darkSlate-500" />
@@ -196,6 +196,25 @@ Skeleton.explorer = () => {
         <div class="w-100 h-36 rounded-xl bg-darkSlate-500" />
         <div class="w-100 h-36 rounded-xl bg-darkSlate-500" />
         <div class="w-100 h-36 rounded-xl bg-darkSlate-500" />
+      </div>
+    </div>
+  );
+};
+
+Skeleton.featuredHomeTile = () => {
+  return (
+    <div class="flex flex-col gap-4">
+      <div class="flex gap-4">
+        <div class="w-24 h-16 rounded-lg bg-darkSlate-500" />
+        <div class="flex flex-col gap-2 mt-2 w-full">
+          <div class="w-full h-6 rounded-full bg-darkSlate-500" />
+          <div class="w-full h-4 rounded-full bg-darkSlate-500" />
+        </div>
+      </div>
+      <div class="w-full h-26 rounded-xl bg-darkSlate-500" />
+      <div class="flex justify-between">
+        <div class="w-30 h-10 rounded-full bg-darkSlate-500" />
+        <div class="w-30 h-10 rounded-full bg-darkSlate-500" />
       </div>
     </div>
   );

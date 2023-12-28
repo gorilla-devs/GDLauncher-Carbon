@@ -26,6 +26,10 @@ import { format } from "date-fns";
 import { rspc } from "@/utils/rspcClient";
 import Authors from "@/pages/Library/Instance/Info/Authors";
 import { getUrlType } from "@/utils/instances";
+import ExploreVersionsNavbar from "@/components/ExploreVersionsNavbar";
+import InfiniteScrollVersionsQueryWrapper, {
+  useInfiniteVersionsQuery
+} from "@/components/InfiniteScrollVersionsQueryWrapper";
 
 const getTabIndexFromPath = (path: string) => {
   if (path.match(/\/(modpacks|mods)\/.+\/.+/g)) {
@@ -43,10 +47,25 @@ const getTabIndexFromPath = (path: string) => {
   return 0;
 };
 
+const InfiniteScrollQueryWrapper = () => {
+  const params = useParams();
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
+
+  return (
+    <InfiniteScrollVersionsQueryWrapper
+      modId={params.id}
+      modplatform={routeData.isCurseforge ? "curseforge" : "modrinth"}
+    >
+      <Modpack />
+    </InfiniteScrollVersionsQueryWrapper>
+  );
+};
+
 const Modpack = () => {
   const [loading, setLoading] = createSignal(false);
   const navigate = useGDNavigate();
   const params = useParams();
+  const infiniteQuery = useInfiniteVersionsQuery();
   const addNotification = createNotification();
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const [instanceMods, setInstanceMods] = createSignal<Mod[]>([]);
@@ -186,6 +205,8 @@ const Modpack = () => {
         }
       });
     }
+
+    setLoading(false);
   };
 
   createEffect(() => {
@@ -218,6 +239,9 @@ const Modpack = () => {
         class="relative h-full bg-darkSlate-800 overflow-x-hidden overflow-auto max-h-full"
         style={{
           "scrollbar-gutter": "stable"
+        }}
+        ref={(el) => {
+          infiniteQuery.setParentRef(el);
         }}
         onScroll={() => {
           const rect = refStickyTabs.getBoundingClientRect();
@@ -386,59 +410,72 @@ const Modpack = () => {
                 ref={(el) => {
                   refStickyTabs = el;
                 }}
-                class="sticky top-0 flex items-center justify-between px-4 z-10 bg-darkSlate-800 mb-4"
+                class="sticky top-0 flex flex-col px-4 z-10 bg-darkSlate-800 mb-4"
               >
-                <Show when={isSticky()}>
-                  <span class="mr-4">
+                <div class="flex items-center justify-between">
+                  <Show when={isSticky()}>
+                    <span class="mr-4">
+                      <Button
+                        onClick={() =>
+                          navigate(
+                            `/${detailsType()}?instanceId=${instanceId()}`
+                          )
+                        }
+                        size="small"
+                        type="secondary"
+                      >
+                        <div class="text-2xl i-ri:arrow-drop-left-line" />
+                        <Trans key="instance.step_back" />
+                      </Button>
+                    </span>
+                  </Show>
+                  <Tabs index={indexTab()}>
+                    <TabList>
+                      <For each={instancePages()}>
+                        {(page) => (
+                          <Link
+                            href={`${page.path}${location.search}`}
+                            replace
+                            class="no-underline"
+                            draggable={false}
+                          >
+                            <Tab class="bg-transparent">{page.label}</Tab>
+                          </Link>
+                        )}
+                      </For>
+                    </TabList>
+                  </Tabs>
+                  <Show when={isSticky()}>
                     <Button
-                      onClick={() =>
-                        navigate(`/${detailsType()}?instanceId=${instanceId()}`)
-                      }
+                      uppercase
                       size="small"
-                      type="secondary"
+                      disabled={
+                        routeData.modpackDetails.isInitialLoading ||
+                        (!isModpack() && !instanceId())
+                      }
+                      onClick={() => handleDownload()}
                     >
-                      <div class="text-2xl i-ri:arrow-drop-left-line" />
-                      <Trans key="instance.step_back" />
+                      <Show when={loading()}>
+                        <Spinner />
+                      </Show>
+                      <Show when={!loading()}>
+                        <Trans
+                          key="modpack.download"
+                          options={{
+                            defaultValue: "Download"
+                          }}
+                        />
+                      </Show>
                     </Button>
-                  </span>
-                </Show>
-                <Tabs index={indexTab()}>
-                  <TabList>
-                    <For each={instancePages()}>
-                      {(page) => (
-                        <Link
-                          href={`${page.path}${location.search}`}
-                          replace
-                          class="no-underline"
-                        >
-                          <Tab class="bg-transparent">{page.label}</Tab>
-                        </Link>
-                      )}
-                    </For>
-                  </TabList>
-                </Tabs>
-                <Show when={isSticky()}>
-                  <Button
-                    uppercase
-                    size="small"
-                    disabled={
-                      routeData.modpackDetails.isInitialLoading ||
-                      (!isModpack() && !instanceId())
+                  </Show>
+                </div>
+                <Show when={indexTab() === 3}>
+                  <ExploreVersionsNavbar
+                    modplatform={
+                      routeData.isCurseforge ? "curseforge" : "modrinth"
                     }
-                    onClick={() => handleDownload()}
-                  >
-                    <Show when={loading()}>
-                      <Spinner />
-                    </Show>
-                    <Show when={!loading()}>
-                      <Trans
-                        key="modpack.download"
-                        options={{
-                          defaultValue: "Download"
-                        }}
-                      />
-                    </Show>
-                  </Button>
+                    type="modpack"
+                  />
                 </Show>
               </div>
               <div class="px-4 z-0">
@@ -452,4 +489,4 @@ const Modpack = () => {
   );
 };
 
-export default Modpack;
+export default InfiniteScrollQueryWrapper;

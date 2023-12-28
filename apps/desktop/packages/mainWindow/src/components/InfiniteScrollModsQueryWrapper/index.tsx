@@ -35,7 +35,7 @@ type InfiniteQueryType = {
   isLoading: boolean;
   setQuery: (_newValue: Partial<FEUnifiedSearchParameters>) => void;
   rowVirtualizer: any;
-  setParentRef: Setter<HTMLDivElement | undefined>;
+  setParentRef: Setter<Element | null>;
   allRows: () => FEUnifiedSearchResult[];
   setInstanceId: Setter<number | undefined>;
   instanceId: Accessor<number | undefined>;
@@ -61,9 +61,7 @@ const [lastScrollPosition, setLastScrollPosition] = createSignal<number>(0);
 const InfiniteScrollModsQueryWrapper = (props: Props) => {
   const rspcContext = rspc.useContext();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [parentRef, setParentRef] = createSignal<HTMLDivElement | undefined>(
-    undefined
-  );
+  const [parentRef, setParentRef] = createSignal<Element | null>(null);
 
   const mergedProps = mergeProps({ type: "modPack" }, props);
 
@@ -102,6 +100,20 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
 
   onCleanup(() => {
     getCurrentScrollPosition();
+  });
+
+  const allRows = () =>
+    infiniteQuery.data ? infiniteQuery.data.pages.flatMap((d) => d.data) : [];
+
+  const rowVirtualizer = createVirtualizer({
+    get count() {
+      return infiniteQuery.hasNextPage
+        ? allRows().length + 1
+        : allRows().length;
+    },
+    getScrollElement: () => parentRef(),
+    estimateSize: () => 150,
+    overscan: 15
   });
 
   const setQueryWrapper = (newValue: Partial<FEUnifiedSearchParameters>) => {
@@ -149,20 +161,6 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
       });
     });
   }
-
-  const allRows = () =>
-    infiniteQuery.data ? infiniteQuery.data.pages.flatMap((d) => d.data) : [];
-
-  const rowVirtualizer = createVirtualizer({
-    get count() {
-      return infiniteQuery.hasNextPage
-        ? allRows().length + 1
-        : allRows().length;
-    },
-    getScrollElement: () => parentRef(),
-    estimateSize: () => 150,
-    overscan: 15
-  });
 
   const context = {
     infiniteQuery,

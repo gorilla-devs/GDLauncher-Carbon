@@ -9,14 +9,19 @@ import {
   ModpackPlatform
 } from "@gd/core_module/bindings";
 import { For, Match, Show, Switch, mergeProps } from "solid-js";
-import { ContextMenu } from "../ContextMenu";
 import { Trans, useTransContext } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
-import { Spinner, Tooltip } from "@gd/ui";
+import { ContextMenu, Spinner, Tooltip } from "@gd/ui";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { useModal } from "@/managers/ModalsManager";
 import { getModpackPlatformIcon, getValideInstance } from "@/utils/instances";
+import { setInstanceId } from "@/utils/browser";
+import {
+  setExportStep,
+  setPayload
+} from "@/managers/ModalsManager/modals/InstanceExport";
+import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/atoms/ExportCheckboxParent";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
 
@@ -151,6 +156,27 @@ const Tile = (props: Props) => {
       icon: "i-ri:folder-open-fill",
       label: t("instance.action_open_folder"),
       action: handleOpenFolder
+    },
+    {
+      icon: "i-mingcute:file-export-fill",
+      label: t("instance.export_instance"),
+      action: () => {
+        const instanceId = props.instance.id;
+        setInstanceId(instanceId);
+        setPayload({
+          target: "Curseforge",
+          save_path: undefined,
+          link_mods: true,
+          filter: { entries: {} },
+
+          instance_id: instanceId
+        });
+        setExportStep(0);
+        setCheckedFiles([]);
+        modalsContext?.openModal({
+          name: "exportInstance"
+        });
+      }
     },
     {
       id: "delete",

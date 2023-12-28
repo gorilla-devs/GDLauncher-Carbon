@@ -1,9 +1,3 @@
-import {
-  CFFEFile,
-  CFFEMod,
-  MRFEProject,
-  MRFEVersion
-} from "@gd/core_module/bindings";
 import { rspc } from "@/utils/rspcClient";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { createNotification } from "@gd/ui";
@@ -51,35 +45,30 @@ const VersionRow = (props: Props) => {
   );
 
   const onPrimaryAction = () => {
-    const icon = props.isCurseforge
-      ? (props.project as CFFEMod).logo?.url
-      : (props.project as MRFEProject).icon_url;
-
     const modpack = props.isCurseforge
       ? {
           Curseforge: {
-            file_id: (props.modVersion as CFFEFile).id,
-            project_id: (props.modVersion as CFFEFile).modId
+            project_id: parseInt(props.modVersion.id, 10),
+            file_id: parseInt(props.modVersion.fileId, 10)
           }
         }
       : {
           Modrinth: {
-            project_id: (props.modVersion as MRFEVersion).project_id,
-            version_id: (props.modVersion as MRFEVersion).id
+            project_id: props.modVersion.id,
+            version_id: props.modVersion.fileId
           }
         };
 
-    if (icon) {
-      loadIconMutation.mutate(icon);
+    if (props.modVersion.mainThumbnail) {
+      loadIconMutation.mutate(props.modVersion.mainThumbnail);
     }
+
     setLoading(true);
     createInstanceMutation.mutate({
       group: defaultGroup.data || 1,
       use_loaded_icon: true,
       notes: "",
-      name: props.isCurseforge
-        ? (props.modVersion as CFFEFile).displayName
-        : (props.project as MRFEProject).title,
+      name: props.modVersion.name,
       version: {
         Modpack: modpack
       }

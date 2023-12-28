@@ -300,17 +300,23 @@ impl From<MRFEProjectSearchParameters> for ProjectSearchParameters {
 pub struct MRFEProjectVersionsFilters {
     pub project_id: MRFEProjectID,
     #[specta(optional)]
-    pub game_version: Option<String>,
+    pub game_versions: Option<Vec<String>>,
     #[specta(optional)]
-    pub loaders: Option<String>,
+    pub loaders: Option<Vec<String>>,
+    #[specta(optional)]
+    pub limit: Option<u32>,
+    #[specta(optional)]
+    pub offset: Option<u32>,
 }
 
 impl From<MRFEProjectVersionsFilters> for ProjectVersionsFilters {
     fn from(value: MRFEProjectVersionsFilters) -> Self {
         ProjectVersionsFilters {
             project_id: value.project_id.into(),
-            game_version: value.game_version,
+            game_versions: value.game_versions,
             loaders: value.loaders,
+            limit: value.limit,
+            offset: value.offset,
         }
     }
 }

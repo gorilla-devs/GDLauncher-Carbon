@@ -185,11 +185,11 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         mutation PREPARE_INSTANCE[app, id: FEInstanceId] {
-            app.instance_manager()
+            let (_, vtask_id) = app.instance_manager()
                 .prepare_game(id.into(), None, None)
                 .await?;
 
-            Ok(())
+            Ok(FETaskId::from(vtask_id))
         }
 
         mutation LAUNCH_INSTANCE[app, id: FEInstanceId] {
@@ -279,6 +279,50 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                             mdr_mod.version_id,
                             imod.install_deps,
                             imod.replaces_mod,
+                        )
+                        .await?
+                }
+            };
+
+            Ok(super::vtask::FETaskId::from(task))
+        }
+
+        mutation UPDATE_MOD[app, args: UpdateMod] {
+            let task = match args.mod_source {
+                ModSourceType::Curseforge => {
+                    app.instance_manager()
+                        .update_curseforge_mod(
+                            args.instance_id.into(),
+                            args.mod_id,
+                        ).await?
+                },
+                ModSourceType::Modrinth => {
+                    app.instance_manager()
+                        .update_modrinth_mod(
+                            args.instance_id.into(),
+                            args.mod_id,
+                        ).await?
+                }
+            };
+
+            Ok(super::vtask::FETaskId::from(task))
+        }
+
+        mutation INSTALL_LATEST_MOD[app, imod: InstallLatestMod] {
+            let task = match imod.mod_source {
+                LatestModSource::Curseforge(cf_mod) => {
+                    app.instance_manager()
+                        .install_latest_curseforge_mod(
+                            imod.instance_id.into(),
+                            cf_mod,
+                        )
+                        .await?
+                }
+                LatestModSource::Modrinth(mdr_mod) => {
+                    app.instance_manager()
+                        .install_latest_modrinth_mod(
+                            imod.instance_id.into(),
+                            mdr_mod
                         )
                         .await?
                 }
@@ -491,6 +535,9 @@ struct ListInstance {
     favorite: bool,
     status: ListInstanceStatus,
     icon_revision: u32,
+    last_played: Option<DateTime<Utc>>,
+    date_created: DateTime<Utc>,
+    date_updated: DateTime<Utc>,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -540,6 +587,7 @@ enum ConfigurationParseErrorType {
     Syntax,
     Data,
     Eof,
+    Unknown,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -610,6 +658,12 @@ enum ModSource {
 }
 
 #[derive(Type, Debug, Deserialize)]
+enum ModSourceType {
+    Curseforge,
+    Modrinth,
+}
+
+#[derive(Type, Debug, Deserialize)]
 struct CurseforgeMod {
     project_id: u32,
     file_id: u32,
@@ -627,6 +681,25 @@ struct InstallMod {
     mod_source: ModSource,
     install_deps: bool,
     replaces_mod: Option<String>,
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct UpdateMod {
+    instance_id: FEInstanceId,
+    mod_source: ModSourceType,
+    mod_id: String,
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct InstallLatestMod {
+    instance_id: FEInstanceId,
+    mod_source: LatestModSource,
+}
+
+#[derive(Type, Debug, Deserialize)]
+enum LatestModSource {
+    Curseforge(u32),
+    Modrinth(String),
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -772,7 +845,9 @@ struct Mod {
     enabled: bool,
     metadata: Option<ModFileMetadata>,
     curseforge: Option<CurseForgeModMetadata>,
+    has_curseforge_update: bool,
     modrinth: Option<ModrinthModMetadata>,
+    has_modrinth_update: bool,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -1112,6 +1187,9 @@ impl From<manager::ListInstance> for ListInstance {
             favorite: value.favorite,
             status: value.status.into(),
             icon_revision: value.icon_revision,
+            last_played: value.last_played,
+            date_created: value.date_created,
+            date_updated: value.date_updated,
         }
     }
 }
@@ -1167,6 +1245,7 @@ impl From<manager::ConfigurationParseErrorType> for ConfigurationParseErrorType 
             manager::Syntax => Self::Syntax,
             manager::Data => Self::Data,
             manager::Eof => Self::Eof,
+            manager::Unknown => Self::Unknown,
         }
     }
 }
@@ -1196,7 +1275,9 @@ impl From<domain::Mod> for Mod {
             enabled: value.enabled,
             metadata: value.metadata.map(Into::into),
             curseforge: value.curseforge.map(Into::into),
+            has_curseforge_update: value.has_curseforge_update,
             modrinth: value.modrinth.map(Into::into),
+            has_modrinth_update: value.has_modrinth_update,
         }
     }
 }

@@ -1,10 +1,12 @@
 use std::borrow::BorrowMut;
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
 use carbon_net::{Downloadable, Progress};
 use tokio::task::spawn_blocking;
 
+use crate::domain::modplatforms::curseforge::filters::{ModsParameters, ModsParametersBody};
 use crate::domain::modplatforms::curseforge::{self, CurseForgeResponse, File};
 use crate::domain::runtime_path::InstancePath;
 use crate::managers::App;
@@ -106,6 +108,10 @@ pub async fn prepare_modpack_from_zip(
     })
     .await??;
 
+    let mc_manifest = Arc::new(app.minecraft_manager().get_minecraft_manifest().await?);
+
+    let mc_version = manifest.minecraft.version.clone();
+
     let downloadables = {
         let mut handles = Vec::new();
 
@@ -114,10 +120,37 @@ pub async fn prepare_modpack_from_zip(
 
         let files_len = manifest.files.len() as u64;
 
+        let cf_manager = &app.modplatforms_manager().curseforge;
+        let addons = Arc::new(
+            cf_manager
+                .get_mods(ModsParameters {
+                    body: ModsParametersBody {
+                        mod_ids: manifest
+                            .files
+                            .iter()
+                            .map(|file| file.project_id)
+                            .collect::<Vec<_>>(),
+                    },
+                })
+                .await?
+                .data
+                .into_iter()
+                .map(|addon| {
+                    (
+                        addon.id,
+                        addon.class_id.unwrap_or(curseforge::ClassId::Mods),
+                    )
+                })
+                .collect::<HashMap<_, _>>(),
+        );
+
         for file in &manifest.files {
             let semaphore = semaphore.clone();
             let app = app.clone();
             let instance_path = instance_path.clone();
+            let addons = addons.clone();
+            let mc_version = mc_version.clone();
+            let mc_manifest = mc_manifest.clone();
             let progress_percentage_sender_clone = progress_percentage_sender.clone();
             let atomic_counter = atomic_counter_download_metadata.clone();
 
@@ -128,12 +161,18 @@ pub async fn prepare_modpack_from_zip(
                 let _ = semaphore.acquire().await?;
 
                 let cf_manager = &app.modplatforms_manager().curseforge;
+                let class_id = addons
+                    .get(&mod_id)
+                    .ok_or(anyhow::anyhow!("Failed to get addon"))?;
 
                 let CurseForgeResponse { data: mod_file, .. } = cf_manager
                     .get_mod_file(curseforge::filters::ModFileParameters { mod_id, file_id })
                     .await?;
 
-                let instance_path = instance_path.get_mods_path(); // TODO: they could also be other things
+                let instance_path =
+                    class_id
+                        .clone()
+                        .into_path(&instance_path, mc_version, &mc_manifest);
                 let downloadable = Downloadable::new(
                     mod_file
                         .download_url

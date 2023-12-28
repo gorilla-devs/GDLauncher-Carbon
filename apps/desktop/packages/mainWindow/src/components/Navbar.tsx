@@ -123,6 +123,7 @@ const AppNavbar = () => {
                     <Trans key="sidebar.add_instance" />
                   </Button>
                 </Tab>
+
                 <div class="flex gap-6 items-center">
                   <div
                     onClick={() => {

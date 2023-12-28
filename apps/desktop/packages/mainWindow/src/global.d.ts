@@ -19,6 +19,9 @@ declare global {
     openFileDialog: (
       filters: Electron.OpenDialogOptions
     ) => Promise<Electron.OpenDialogReturnValue>;
+    showSaveDialog: (
+      filters: Electron.SaveDialogOptions
+    ) => Promise<Electron.SaveDialogReturnValue>;
     adSizeChanged: (
       cb: (event: Electron.IpcRendererEvent, ...args: any[]) => void
     ) => void;
@@ -38,6 +41,7 @@ declare global {
     installUpdate: () => void;
     downloadUpdate: () => void;
     openExternalLink: (link: string) => void;
+    openFolder: (path: string) => void;
     copyToClipboard: (text: string) => void;
     openCMPWindow: () => void;
     getCoreModulePort: () => Promise<number>;
