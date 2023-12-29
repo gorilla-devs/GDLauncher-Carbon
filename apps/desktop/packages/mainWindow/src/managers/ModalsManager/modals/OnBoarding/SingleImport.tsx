@@ -32,7 +32,7 @@ const SingleImport = (props: {
             setProgress(Math.floor(task.data.progress.Known * 100));
           }
         }
-        console.log(progress());
+
         const isFailed = task.data && isProgressFailed(task.data.progress);
         const isDownloaded = task.data === null && progress() !== 0;
         if (isDownloaded || isFailed) {

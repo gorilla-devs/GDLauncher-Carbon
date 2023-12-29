@@ -16,13 +16,6 @@ const BeginImportStep = (props: {
     }
   );
 
-  // props.instances?.forEach(async (instance, index) => {
-  //   await importInstanceMutation.mutateAsync({
-  //     name: instance,
-  //     index: index
-  //   });
-  // });
-
   async function createMutations() {
     for (let i = 0; i < props.instances!.length; i++) {
       await importInstanceMutation.mutateAsync({
