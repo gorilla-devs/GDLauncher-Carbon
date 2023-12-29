@@ -5,6 +5,8 @@ import Button from "../components/button/Button";
 import Download from "../components/Download.astro";
 import { Image } from "astro:assets";
 import BHLogo from "../assets/bh.svg";
+import Library from "../assets/library.svg";
+import Export from "../assets/export.svg";
 import Footer from "../components/Footer.astro";
 import Subtract from "../assets/subtract.svg";
 import "@fontsource/ubuntu";
@@ -69,9 +71,34 @@ import GdxCF from "../components/GdxCF.astro";
         <!-- <DownloadButtonDropdown client:only/> -->
         <Download />
       </div>
+	  <div class="relative mx-auto">
+		<div class="relative">
+			<Image id="firstImg" src={Library} alt="gd launcher" class="mx-auto"/>
+		<Image id="secondImg" src={Export} alt="gd launcher" class="absolute right-0 bottom-0"/>
+		</div>
+		
+	  </div>
     </div>
+
     <WhatMakesGDSpecial />
-    <!-- <GdxCF /> -->
-    <!-- <Footer /> -->
+    <GdxCF />
+    <Footer />
   </body>
 </html>
+
+
+<style>
+	#secondImg {
+		animation: fade linear;
+		animation-timeline: view();
+	}
+	@keyframes fade {
+		from {
+			opacity: 0;
+		}
+		to {
+			opacity: 1;
+		}
+	}
+</style>
+
