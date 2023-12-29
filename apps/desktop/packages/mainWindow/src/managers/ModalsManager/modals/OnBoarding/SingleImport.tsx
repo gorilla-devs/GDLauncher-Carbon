@@ -63,23 +63,11 @@ const SingleImport = (props: {
             <div class="font-semibold">{progress()}%</div>
           </div>
         </Match>
-        {/* <Match when={state() === t("instance.failed")}>
+        <Match when={state() === "failed"}>
           <div>
-            <Button
-              type="primary"
-              class="bg-red-500"
-              onClick={() => {
-                setProgress(0);
-                importInstanceMutation.mutate({
-                  name: props.instanceName,
-                  index: props.instanceIndex
-                });
-              }}
-            >
-              <Trans key="onboarding.retry" />
-            </Button>
+            <div class="i-ph:x-bold text-2xl text-red-600" />
           </div>
-        </Match> */}
+        </Match>
         <Match when={state() === "completed"}>
           <div class="i-ic:round-check text-2xl text-green-600" />
         </Match>
