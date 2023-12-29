@@ -13,7 +13,7 @@ export const DownloadForButton = () => {
     return <Apple />;
   };
   return (
-    <Button intent="primary" class="uppercase">
+    <Button intent="primary" class="uppercase items-center">
       <span>DOWNLOAD FOR</span>
       {getOs()}
     </Button>
