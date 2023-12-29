@@ -13,49 +13,18 @@ export { isDownloaded };
 const SingleImport = (props: {
   instanceIndex: number;
   instanceName: string;
+  taskId?: number;
 }) => {
   const [t] = useTransContext();
   const [progress, setProgress] = createSignal(0);
   const [state, setState] = createSignal("idle");
-  const importInstanceMutation = rspc.createMutation(
-    ["instance.importInstance"],
-    {
-      onSuccess(taskId) {
-        setTaskIds((prev: any) => {
-          if (prev) {
-            if (props.instanceName in prev) {
-              {
-                if (state() === "failed") {
-                  return {
-                    ...prev,
-                    [props.instanceName]: taskId
-                  };
-                } else {
-                  return prev;
-                }
-              }
-            } else {
-              return {
-                ...prev,
-                [props.instanceName]: taskId
-              };
-            }
-          } else {
-            return {
-              [props.instanceName]: taskId
-            };
-          }
-        });
-      }
-    }
-  );
+
   createEffect(() => {
     async function runner() {
       if (taskIds() !== undefined) {
-        const taskId = (taskIds() as any)[props.instanceName];
         const task: any = (await rspcFetch(() => [
           "vtask.getTask",
-          taskId as number
+          props.taskId as number
         ])) as any;
 
         if (task.data && task.data.progress) {
@@ -63,6 +32,7 @@ const SingleImport = (props: {
             setProgress(Math.floor(task.data.progress.Known * 100));
           }
         }
+        console.log(progress());
         const isFailed = task.data && isProgressFailed(task.data.progress);
         const isDownloaded = task.data === null && progress() !== 0;
         if (isDownloaded || isFailed) {
@@ -82,14 +52,7 @@ const SingleImport = (props: {
       console.error(err);
     }
   });
-  createEffect(() => {
-    if (!taskIds()) {
-      importInstanceMutation.mutate({
-        name: props.instanceName,
-        index: props.instanceIndex
-      });
-    }
-  });
+
   return (
     <div class="flex gap-2 px-4 justify-between rounded-md">
       <span class="font-semibold">{props.instanceName}</span>
@@ -100,7 +63,7 @@ const SingleImport = (props: {
             <div class="font-semibold">{progress()}%</div>
           </div>
         </Match>
-        <Match when={state() === t("instance.failed")}>
+        {/* <Match when={state() === t("instance.failed")}>
           <div>
             <Button
               type="primary"
@@ -116,7 +79,7 @@ const SingleImport = (props: {
               <Trans key="onboarding.retry" />
             </Button>
           </div>
-        </Match>
+        </Match> */}
         <Match when={state() === "completed"}>
           <div class="i-ic:round-check text-2xl text-green-600" />
         </Match>
