@@ -6,7 +6,9 @@ use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
 use crate::api::keys::instance::*;
 use crate::db::read_filters::StringFilter;
-use crate::domain::instance::info::{GameVersion, InstanceIcon};
+use crate::domain::instance::info::{GameVersion, InstanceIcon, Modpack};
+use crate::domain::modplatforms::curseforge::filters::{ModFileParameters, ModParameters};
+use crate::domain::modplatforms::modrinth::search::{ProjectID, VersionID};
 use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::{DateTime, Utc};
@@ -30,6 +32,7 @@ use self::importer::InstanceImportManager;
 use self::log::GameLog;
 use self::run::PersistenceManager;
 
+use super::modplatforms::curseforge::CurseForge;
 use super::ManagerRef;
 
 use crate::domain::instance::{self as domain, GameLogId, GroupId, InstanceFolder, InstanceId};
@@ -1449,6 +1452,134 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         })
     }
 
+    pub async fn modpack_info(self, instance_id: InstanceId) -> anyhow::Result<ModpackInfo> {
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let instance = match &instance.type_ {
+            InstanceType::Invalid(_) => bail!(InvalidInstanceDataError),
+            InstanceType::Valid(x) => x,
+        };
+
+        let modpack = match &instance.config.modpack {
+            Some(modpack) => modpack,
+            None => bail!("instance has no modpack"),
+        };
+
+        let modpack_info = match modpack {
+            info::Modpack::Curseforge(curseforge) => {
+                let cache_entry = self
+                    .app
+                    .prisma_client
+                    .curse_forge_modpack_cache()
+                    .find_unique(db::curse_forge_modpack_cache::project_id_file_id(
+                        curseforge.project_id as i32,
+                        curseforge.file_id as i32,
+                    ))
+                    .exec()
+                    .await?;
+
+                match cache_entry {
+                    Some(cache_entry) => ModpackInfo {
+                        name: cache_entry.modpack_name,
+                        version_name: cache_entry.version_name,
+                        url_slug: cache_entry.url_slug,
+                    },
+                    None => {
+                        let modplatform_manager = self.app.modplatforms_manager();
+                        let addon_file =
+                            modplatform_manager
+                                .curseforge
+                                .get_mod_file(ModFileParameters {
+                                    mod_id: curseforge.project_id as i32,
+                                    file_id: curseforge.file_id as i32,
+                                });
+                        let addon = modplatform_manager.curseforge.get_mod(ModParameters {
+                            mod_id: curseforge.project_id as i32,
+                        });
+
+                        let (addon_file, addon) = tokio::try_join!(addon_file, addon)?;
+
+                        self.app
+                            .prisma_client
+                            .curse_forge_modpack_cache()
+                            .create(
+                                curseforge.project_id as i32,
+                                curseforge.file_id as i32,
+                                addon.data.name.clone(),
+                                addon_file.data.file_name.clone(),
+                                addon.data.slug.clone(),
+                                vec![],
+                            )
+                            .exec()
+                            .await?;
+
+                        ModpackInfo {
+                            name: addon.data.name,
+                            version_name: addon_file.data.display_name,
+                            url_slug: addon.data.slug,
+                        }
+                    }
+                }
+            }
+            info::Modpack::Modrinth(modrinth) => {
+                let cache_entry = self
+                    .app
+                    .prisma_client
+                    .modrinth_modpack_cache()
+                    .find_unique(db::modrinth_modpack_cache::project_id_version_id(
+                        modrinth.project_id.clone(),
+                        modrinth.version_id.clone(),
+                    ))
+                    .exec()
+                    .await?;
+
+                match cache_entry {
+                    Some(cache_entry) => ModpackInfo {
+                        name: cache_entry.modpack_name,
+                        version_name: cache_entry.version_name,
+                        url_slug: cache_entry.url_slug,
+                    },
+                    None => {
+                        let modplatform_manager = self.app.modplatforms_manager();
+                        let modpack = modplatform_manager
+                            .modrinth
+                            .get_project(ProjectID(modrinth.project_id.clone()));
+                        let version = modplatform_manager
+                            .modrinth
+                            .get_version(VersionID(modrinth.version_id.clone()));
+
+                        let (modpack, version) = tokio::try_join!(modpack, version)?;
+
+                        self.app
+                            .prisma_client
+                            .modrinth_modpack_cache()
+                            .create(
+                                modrinth.project_id.clone(),
+                                modrinth.version_id.clone(),
+                                modpack.title.clone(),
+                                version.version_number.clone(),
+                                modpack.slug.clone(),
+                                vec![],
+                            )
+                            .exec()
+                            .await?;
+
+                        ModpackInfo {
+                            name: modpack.title,
+                            version_name: version.version_number,
+                            url_slug: modpack.slug,
+                        }
+                    }
+                }
+            }
+        };
+
+        Ok(modpack_info)
+    }
+
     pub async fn instance_icon(
         self,
         instance_id: InstanceId,
@@ -1671,6 +1802,13 @@ pub struct InstanceData {
     config: info::Instance,
     state: run::LaunchState,
     icon_revision: u32,
+}
+
+#[derive(Debug)]
+pub struct ModpackInfo {
+    pub name: String,
+    pub version_name: String,
+    pub url_slug: String,
 }
 
 #[derive(Debug, Clone)]
@@ -2185,6 +2323,95 @@ mod test {
 
         list = app.instance_manager().list_groups().await?;
         assert_eq!(list, expected);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_modpack_info() -> anyhow::Result<()> {
+        let mut app = crate::setup_managers_for_test().await;
+
+        let default_group_id = app.instance_manager().get_default_group().await?;
+        let default_group = &app.instance_manager().list_groups().await?[0];
+        let curseforge_instance_id = app
+            .instance_manager()
+            .create_instance(
+                default_group_id,
+                String::from("curseforge instance"),
+                false,
+                InstanceVersionSource::Modpack(info::Modpack::Curseforge(
+                    info::CurseforgeModpack {
+                        // RLCraft
+                        project_id: 285109,
+                        file_id: 4612979,
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+
+        let modrinth_instance_id = app
+            .instance_manager()
+            .create_instance(
+                default_group_id,
+                String::from("modrinth instance"),
+                false,
+                InstanceVersionSource::Modpack(info::Modpack::Modrinth(info::ModrinthModpack {
+                    // Fabulously Optimized
+                    project_id: String::from("1KVo5zza"),
+                    version_id: String::from("HH3vor7X"),
+                })),
+                String::new(),
+            )
+            .await?;
+
+        assert_eq!(
+            app.prisma_client
+                .curse_forge_modpack_cache()
+                .find_many(vec![])
+                .exec()
+                .await?
+                .len(),
+            0
+        );
+
+        assert_eq!(
+            app.prisma_client
+                .modrinth_modpack_cache()
+                .find_many(vec![])
+                .exec()
+                .await?
+                .len(),
+            0
+        );
+
+        app.instance_manager()
+            .modpack_info(curseforge_instance_id)
+            .await?;
+
+        app.instance_manager()
+            .modpack_info(modrinth_instance_id)
+            .await?;
+
+        assert_eq!(
+            app.prisma_client
+                .curse_forge_modpack_cache()
+                .find_many(vec![])
+                .exec()
+                .await?
+                .len(),
+            1
+        );
+
+        assert_eq!(
+            app.prisma_client
+                .modrinth_modpack_cache()
+                .find_many(vec![])
+                .exec()
+                .await?
+                .len(),
+            1
+        );
 
         Ok(())
     }

@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{AxumError, FeError};
 use crate::managers::instance::log::LogEntrySourceKind;
-use crate::managers::instance::InstanceMoveTarget;
+use crate::managers::instance::{InstanceMoveTarget, ModpackInfo};
 use crate::managers::{instance::importer, App, AppInner};
 
 use super::keys::instance::*;
@@ -164,6 +164,19 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .instance_details(id.into())
                 .await
                 .map(InstanceDetails::from);
+
+            Ok(Some(result?))
+        }
+
+        query GET_MODPACK_INFO[app, id: Option<FEInstanceId>] {
+            let Some(id) = id else {
+                return Ok(None);
+            };
+
+            let result = app.instance_manager()
+                .modpack_info(id.into())
+                .await
+                .map(FEModpackInfo::from);
 
             Ok(Some(result?))
         }
@@ -789,6 +802,25 @@ struct InstanceDetails {
     state: LaunchState,
     icon_revision: u32,
 }
+
+#[derive(Type, Debug, Serialize, Deserialize)]
+pub struct FEModpackInfo {
+    pub name: String,
+    pub version_name: String,
+    pub url_slug: String,
+}
+
+impl From<ModpackInfo> for FEModpackInfo {
+    fn from(value: ModpackInfo) -> Self {
+        Self {
+            name: value.name,
+            version_name: value.version_name,
+            url_slug: value.url_slug,
+        }
+    }
+}
+
+
 
 #[derive(Type, Debug, Serialize, Deserialize)]
 pub struct MemoryRange {

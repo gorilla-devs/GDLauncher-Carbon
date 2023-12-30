@@ -103,7 +103,6 @@ model InstanceGroup {
   instances  Instance[]
 }
 
-// this one
 model ModFileCache {
   id         String      @id @default(uuid())
   instanceId Int
@@ -117,7 +116,6 @@ model ModFileCache {
   @@unique([instanceId, filename])
 }
 
-// this one
 model ModMetadata {
   id          String              @id
   murmur2     Int
@@ -135,9 +133,8 @@ model ModMetadata {
   cachedFiles ModFileCache[]
 }
 
-// this one
 model CurseForgeModCache {
-  metadataId  String      @id
+  metadataId  String                   @id
   murmur2     Int
   projectId   Int
   fileId      Int
@@ -145,17 +142,16 @@ model CurseForgeModCache {
   urlslug     String
   summary     String
   authors     String
-	updatePaths String // in the form `<gamever>,<modloader>;<gamever>,<modloader>` for every availible combination
+  updatePaths String // in the form `<gamever>,<modloader>;<gamever>,<modloader>` for every availible combination
   cachedAt    DateTime
-	logoImage   CurseForgeModImageCache?
-  metadata    ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Cascade)
+  logoImage   CurseForgeModImageCache?
+  metadata    ModMetadata              @relation(fields: [metadataId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, fileId])
 }
 
-// this one
 model ModrinthModCache {
-  metadataId  String      @id
+  metadataId  String                 @id
   sha512      String
   projectId   String
   versionId   String
@@ -163,37 +159,80 @@ model ModrinthModCache {
   urlslug     String
   description String
   authors     String
-	updatePaths String // in the form `<gamever>,<modloader>;<gamever>,<modloader>` for every availible combination
+  updatePaths String // in the form `<gamever>,<modloader>;<gamever>,<modloader>` for every availible combination
   filename    String
   fileUrl     String
   cachedAt    DateTime
   logoImage   ModrinthModImageCache?
-  metadata    ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Cascade)
+  metadata    ModMetadata            @relation(fields: [metadataId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, versionId])
 }
 
-// this one
 model LocalModImageCache {
-  metadataId String @id
+  metadataId String      @id
   data       Bytes
   metadata   ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Cascade)
 }
 
-// this one
 model CurseForgeModImageCache {
-  metadataId String @id
+  metadataId String             @id
   url        String
   data       Bytes?
-  upToDate   Int @default(0)
+  upToDate   Int                @default(0)
   metadata   CurseForgeModCache @relation(fields: [metadataId], references: [metadataId], onDelete: Cascade)
 }
 
-// this one
 model ModrinthModImageCache {
-  metadataId String @id
+  metadataId String           @id
   url        String
   data       Bytes?
-  upToDate   Int @default(0)
+  upToDate   Int              @default(0)
   metadata   ModrinthModCache @relation(fields: [metadataId], references: [metadataId], onDelete: Cascade)
+}
+
+model CurseForgeModpackCache {
+  projectId   Int
+  fileId      Int
+  modpackName String
+  versionName String
+  urlSlug     String
+  logoImage   CurseForgeModpackImageCache?
+  updatedAt   DateTime                     @updatedAt
+
+  @@id([projectId, fileId])
+}
+
+model ModrinthModpackCache {
+  projectId                           String
+  versionId                           String
+  modpackName                         String
+  versionName                         String
+  urlSlug                             String
+  logoImage                           ModrinthModpackImageCache?
+  updatedAt                           DateTime                   @updatedAt
+
+  @@id([projectId, versionId])
+}
+
+model CurseForgeModpackImageCache {
+  projectId              Int
+  fileId                 Int
+  url                    String
+  data                   Bytes?
+  upToDate               Int                    @default(0)
+  CurseForgeModpackCache CurseForgeModpackCache @relation(fields: [projectId, fileId], references: [projectId, fileId], onDelete: Cascade)
+
+  @@id([projectId, fileId])
+}
+
+model ModrinthModpackImageCache {
+  projectId            String
+  versionId            String
+  url                  String
+  data                 Bytes?
+  upToDate             Int                  @default(0)
+  ModrinthModpackCache ModrinthModpackCache @relation(fields: [projectId, versionId], references: [projectId, versionId], onDelete: Cascade)
+
+  @@id([projectId, versionId])
 }

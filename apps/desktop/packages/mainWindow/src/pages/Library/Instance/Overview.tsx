@@ -5,6 +5,7 @@ import fetchData from "./instance.data";
 import { useRouteData } from "@solidjs/router";
 import { InstanceDetails } from "@gd/core_module/bindings";
 import { format, formatDistance } from "date-fns";
+import FadedBanner from "@/components/FadedBanner";
 
 const Overview = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -89,6 +90,9 @@ const Overview = () => {
           />
         </Show>
       </div>
+      <Show when={routeData.modpackInfo}>
+        <FadedBanner />
+      </Show>
       <Show when={routeData.instanceDetails.data?.notes}>
         <div class="flex flex-col justify-between gap-2 p-5 bg-darkSlate-700 rounded-xl w-full items-start box-border w-59">
           <div class="text-darkSlate-50 uppercase">
