@@ -1,4 +1,6 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+use tracing::trace;
 
 use crate::managers::java::utils::PATH_SEPARATOR;
 
@@ -12,7 +14,7 @@ async fn load_java_paths_from_env() -> anyhow::Result<Vec<PathBuf>> {
         if let Ok(env_path) = env_path {
             let paths: Vec<_> = env_path.split(PATH_SEPARATOR).map(PathBuf::from).collect();
             for path in paths {
-                java_paths.extend(search_java_binary_in_path(path));
+                java_paths.extend(append_java_binary_in_path(path));
             }
         }
     }
@@ -20,22 +22,114 @@ async fn load_java_paths_from_env() -> anyhow::Result<Vec<PathBuf>> {
     Ok(java_paths)
 }
 
+pub(super) async fn scan_managed_java_paths(path: PathBuf) -> Vec<PathBuf> {
+    let mut javas: Vec<PathBuf> = vec![];
+
+    let Ok(mut java_folders) = tokio::fs::read_dir(path).await else {
+        return vec![];
+    };
+
+    while let Some(java_folder) = java_folders.next_entry().await.ok().flatten() {
+        let java_folder = java_folder.path();
+
+        if !java_folder.is_dir() {
+            trace!(
+                "Managed java path is not a directory. Skipping: {:?}",
+                java_folder
+            );
+            continue;
+        }
+
+        javas.extend(scan_single_managed_java_paths(java_folder).await);
+    }
+
+    // Remove duplicates
+    javas.sort_by(|a, b| {
+        a.to_string_lossy()
+            .to_string()
+            .to_lowercase()
+            .cmp(&b.to_string_lossy().to_string().to_lowercase())
+    });
+    javas.dedup();
+
+    javas
+        .into_iter()
+        .map(|p| match dunce::canonicalize(&p) {
+            Ok(p) => p,
+            Err(_) => p,
+        })
+        .filter(|java| java.exists())
+        .collect()
+}
+
+pub(super) async fn scan_single_managed_java_paths(path: PathBuf) -> Vec<PathBuf> {
+    let mut javas: Vec<PathBuf> = vec![];
+
+    let Ok(mut java_folders) = tokio::fs::read_dir(&path).await else {
+        return vec![];
+    };
+
+    while let Some(java_folder) = java_folders.next_entry().await.ok().flatten() {
+        let java_folder = java_folder.path();
+
+        if !java_folder.is_dir() {
+            continue;
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            javas.extend(append_java_binary_in_path(&java_folder));
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            javas.extend(append_java_binary_in_path(
+                &java_folder.join("Contents/Home"),
+            ));
+
+            // Could be one level deeper
+            let Ok(mut java_folders) = tokio::fs::read_dir(&path).await else {
+                return vec![];
+            };
+
+            while let Some(java_folder) = java_folders.next_entry().await.ok().flatten() {
+                let java_folder = java_folder.path();
+
+                if !java_folder.is_dir() {
+                    continue;
+                }
+
+                javas.extend(append_java_binary_in_path(
+                    &java_folder.join("Contents/Home"),
+                ));
+            }
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            javas.extend(append_java_binary_in_path(&java_folder));
+        }
+    }
+
+    javas
+}
+
 #[cfg(target_os = "macos")]
 pub(super) async fn find_java_paths() -> Vec<PathBuf> {
     let mut javas: Vec<PathBuf> = vec![];
-    javas.extend(search_java_binary_in_path(
+    javas.extend(append_java_binary_in_path(
         PathBuf::from("/Applications/Xcode.app/Contents/Applications/Application Loader.app/Contents/MacOS/itms/java")
     ));
-    javas.extend(search_java_binary_in_path(PathBuf::from(
+    javas.extend(append_java_binary_in_path(PathBuf::from(
         "/Library/Internet Plug-Ins/JavaAppletPlugin.plugin/Contents/Home",
     )));
-    javas.extend(search_java_binary_in_path(PathBuf::from(
+    javas.extend(append_java_binary_in_path(PathBuf::from(
         "/System/Library/Frameworks/JavaVM.framework/Versions/Current/Commands",
     )));
-    javas.extend(search_java_binary_in_path(PathBuf::from(
+    javas.extend(append_java_binary_in_path(PathBuf::from(
         "/opt/homebrew/opt/openjdk/bin",
     )));
-    javas.extend(search_java_binary_in_path(PathBuf::from("/usr/bin")));
+    javas.extend(append_java_binary_in_path(PathBuf::from("/usr/bin")));
 
     // Library JVM
     let library_jvm_dir = PathBuf::from("/Library/Java/JavaVirtualMachines");
@@ -45,8 +139,8 @@ pub(super) async fn find_java_paths() -> Vec<PathBuf> {
             let library_jvm_java = library_jvm_java.path();
             javas.extend(
                 vec![
-                    search_java_binary_in_path(library_jvm_java.join("Contents/Home")),
-                    search_java_binary_in_path(library_jvm_java.join("Contents/Home/jre")),
+                    append_java_binary_in_path(library_jvm_java.join("Contents/Home")),
+                    append_java_binary_in_path(library_jvm_java.join("Contents/Home/jre")),
                 ]
                 .concat(),
             );
@@ -62,8 +156,8 @@ pub(super) async fn find_java_paths() -> Vec<PathBuf> {
 
             javas.extend(
                 vec![
-                    search_java_binary_in_path(system_library_jvm_java.join("Contents/Home")),
-                    search_java_binary_in_path(system_library_jvm_java.join("Contents/Commands")),
+                    append_java_binary_in_path(system_library_jvm_java.join("Contents/Home")),
+                    append_java_binary_in_path(system_library_jvm_java.join("Contents/Commands")),
                 ]
                 .concat(),
             );
@@ -93,7 +187,9 @@ pub(super) async fn find_java_paths() -> Vec<PathBuf> {
         .collect()
 }
 
-fn search_java_binary_in_path(path: PathBuf) -> Vec<PathBuf> {
+fn append_java_binary_in_path<P: AsRef<Path>>(path: P) -> Vec<PathBuf> {
+    let path = path.as_ref();
+
     let mut options = vec![];
     if cfg!(windows) {
         options.push(path.join("bin").join("java.exe"));
@@ -122,12 +218,12 @@ fn read_registry_key(
             let subkey_reg = hkcu.open_subkey(&joined_subkey)?;
             let subkey_reg_value: std::result::Result<String, _> = subkey_reg.get_value(value);
             if let Ok(registry_str) = subkey_reg_value {
-                results.extend(search_java_binary_in_path(PathBuf::from(registry_str)));
+                results.extend(append_java_binary_in_path(PathBuf::from(registry_str)));
             }
         }
     } else {
         let s_value: String = key_reg.get_value(value)?;
-        results.extend(search_java_binary_in_path(PathBuf::from(s_value)));
+        results.extend(append_java_binary_in_path(PathBuf::from(s_value)));
     }
     Ok(results)
 }
@@ -213,7 +309,7 @@ pub(super) async fn find_java_paths() -> Vec<PathBuf> {
                 for child in children.by_ref().flatten() {
                     let child = child.path();
                     if child.is_dir() {
-                        javas.extend(search_java_binary_in_path(child));
+                        javas.extend(append_java_binary_in_path(child));
                     }
                 }
             }

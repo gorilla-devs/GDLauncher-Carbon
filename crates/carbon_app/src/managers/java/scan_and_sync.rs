@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use strum::IntoEnumIterator;
-use tracing::{trace, warn};
+use tracing::{info, trace, warn};
 
 use crate::{
     db::{read_filters::StringFilter, PrismaClient},
@@ -265,11 +265,13 @@ where
 }
 
 #[tracing::instrument(level = "trace", skip_all)]
-pub async fn scan_and_sync_managed<G>(
+pub async fn scan_and_sync_managed<T, G>(
     db: &Arc<PrismaClient>,
+    discovery: &T,
     java_checker: &G,
 ) -> anyhow::Result<()>
 where
+    T: Discovery,
     G: JavaChecker,
 {
     let managed_javas = db
@@ -280,7 +282,7 @@ where
         .exec()
         .await?;
 
-    for managed_java in managed_javas {
+    for managed_java in &managed_javas {
         let java_bin_info = java_checker
             .get_bin_info(
                 &PathBuf::from(managed_java.path.clone()),
@@ -289,7 +291,23 @@ where
             .await;
 
         if java_bin_info.is_err() {
-            update_java_component_in_db_to_invalid(db, managed_java.path).await?;
+            update_java_component_in_db_to_invalid(db, managed_java.path.clone()).await?;
+        }
+    }
+
+    let javas_on_disk = discovery.find_managed_java_paths().await;
+
+    for java_path in javas_on_disk.iter().filter(|path| {
+        !managed_javas
+            .iter()
+            .any(|java| java.path == path.to_string_lossy().to_string())
+    }) {
+        let java_bin_info = java_checker
+            .get_bin_info(&java_path, JavaComponentType::Managed)
+            .await;
+
+        if let Ok(java_component) = java_bin_info {
+            add_java_component_to_db(db, java_component).await?;
         }
     }
 
@@ -379,7 +397,7 @@ mod test {
             java_checker::{MockJavaChecker, MockJavaCheckerInvalid},
             scan_and_sync::{
                 add_java_component_to_db, scan_and_sync_custom, scan_and_sync_local,
-                sync_system_java_profiles,
+                scan_and_sync_managed, sync_system_java_profiles,
             },
             JavaManager,
         },
@@ -552,6 +570,25 @@ mod test {
 
         assert_eq!(java_components.len(), 1);
         assert!(!java_components[0].is_valid);
+    }
+
+    #[tokio::test]
+    async fn test_scan_and_sync_managed_on_disk_but_not_on_database() {
+        let app = setup_managers_for_test().await;
+        let db = &app.prisma_client;
+        let discovery = &MockDiscovery;
+        let java_checker = &MockJavaChecker;
+
+        scan_and_sync_managed(db, discovery, java_checker)
+            .await
+            .unwrap();
+
+        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+
+        assert_eq!(java_components.len(), 3);
+        for java_component in java_components {
+            assert!(java_component.is_valid);
+        }
     }
 
     #[tokio::test]

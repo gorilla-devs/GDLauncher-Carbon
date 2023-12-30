@@ -81,7 +81,7 @@ impl JavaManager {
     {
         scan_and_sync::scan_and_sync_local(db, discovery, java_checker).await?;
         scan_and_sync::scan_and_sync_custom(db, java_checker).await?;
-        scan_and_sync::scan_and_sync_managed(db, java_checker).await?;
+        scan_and_sync::scan_and_sync_managed(db, discovery, java_checker).await?;
 
         scan_and_sync::sync_system_java_profiles(db).await?;
 
