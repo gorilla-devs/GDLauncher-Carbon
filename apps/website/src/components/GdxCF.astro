@@ -7,11 +7,11 @@ import Ellipse from "../assets/ellipse.svg"
 
 ---
 
-<div class="flex flex-col items-center justify-center relative">
+<div class="flex flex-col items-center justify-center relative gap-2">
     <Button intent="transparent" class="uppercase">creators can start</Button>
     <span class="text-[40px] text-white font-bold text-center">Earning $$$ through</span>
     <span class="text-[40px] text-white font-bold text-center">CurseForge Downloads</span>
-    <div class="bg-bluegd-500 w-[80%] flex p-8 gap-8">
+    <div class="bg-bluegd-500 w-[80%] flex p-8 gap-8 mb-10">
         <Image src={GdLauncherXCurseForge} alt="gdlauncher x curseforge"/>
         <div class="flex flex-col  justify-between basis-[50%]">
             <Image src={CurseForge} alt="curseforge"/>
@@ -23,11 +23,14 @@ import Ellipse from "../assets/ellipse.svg"
             <Button intent="transparent" class="text-white border-white font-bold w-1/2">VISIT OUR PARTNERS</Button>
         </div>
     </div>
-    <Image src={Ellipse} alt="ellipse" class="absolute bottom-0 background"/>
+    <Image src={Ellipse} alt="ellipse" class="absolute bottom-0 background -z-10 w-full"/>
 </div>
 
 <style>
     .background {
-        background-color: transparent;
+        background-color: linear-gradient(
+            rgba(23, 29, 39, 0.3),
+            /* Your specified semi-transparent color */ rgba(23, 29, 39, 0.3)
+          ),
     }
 </style>
