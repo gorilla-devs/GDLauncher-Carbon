@@ -120,7 +120,10 @@ import Feat7 from "../assets/feat7.svg";
     position: relative;
     overflow: hidden;
   }
-  .background__card::before {
+  .background__card:hover {
+    cursor: pointer;
+  }
+  .background__card:hover::before {
     content: '';
     background: conic-gradient(transparent 270deg, rgba(40, 101, 164, 1), transparent);
     position: absolute;
@@ -131,7 +134,7 @@ import Feat7 from "../assets/feat7.svg";
     width: 100%;
     animation: rotate 2s linear infinite;
   }
-  .background__card::after {
+  .background__card:hover::after {
     content: '';
     background: inherit;
     border-radius: inherit;
