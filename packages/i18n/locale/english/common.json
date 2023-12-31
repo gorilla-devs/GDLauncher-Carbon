@@ -63,6 +63,8 @@
   "instance.instance_loader": "Loader",
   "instance.instance_version": "Version",
   "instance.version": "Instance version",
+  "instance.modpack_open_website": "Open Website",
+  "instance.modpack_view": "View",
   "instance.instance_modal_instance_creation_cancel": "Cancel",
   "instance.instance_modal_instance_creation_create": "Create",
   "instance.instance_modal_instance_update": "Update",

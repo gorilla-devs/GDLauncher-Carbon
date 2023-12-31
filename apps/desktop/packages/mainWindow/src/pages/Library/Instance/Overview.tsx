@@ -3,22 +3,43 @@ import { Trans, useTransContext } from "@gd/i18n";
 import { For, Show } from "solid-js";
 import fetchData from "./instance.data";
 import { useParams, useRouteData } from "@solidjs/router";
-import { InstanceDetails } from "@gd/core_module/bindings";
+import {
+  CurseforgeModpack,
+  InstanceDetails,
+  ModrinthModpack
+} from "@gd/core_module/bindings";
 import { format, formatDistance } from "date-fns";
 import FadedBanner, { FadedBannerSkeleton } from "@/components/FadedBanner";
 import { port } from "@/utils/rspcClient";
 import { Button } from "@gd/ui";
+import { getModpackPlatformIcon } from "@/utils/instances";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 const Overview = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const params = useParams();
+  const navigate = useGDNavigate();
   const [t] = useTransContext();
 
   const modpackPlatform = () => {
     if ("Curseforge" in (routeData.instanceDetails.data?.modpack || {})) {
-      return "curseforge";
+      return "Curseforge";
     } else if ("Modrinth" in (routeData.instanceDetails.data?.modpack || {})) {
-      return "modrinth";
+      return "Modrinth";
+    }
+  };
+
+  const modpackProjectId = () => {
+    if ("Curseforge" in (routeData.instanceDetails.data?.modpack || {})) {
+      return (
+        (routeData.instanceDetails.data?.modpack as any)
+          ?.Curseforge as CurseforgeModpack
+      ).project_id;
+    } else if ("Modrinth" in (routeData.instanceDetails.data?.modpack || {})) {
+      return (
+        (routeData.instanceDetails.data?.modpack as any)
+          ?.Modrinth as ModrinthModpack
+      ).project_id;
     }
   };
 
@@ -120,27 +141,69 @@ const Overview = () => {
           <FadedBanner
             imageUrl={`http://localhost:${port}/instance/modpackIcon?instance_id=${params.id}`}
           >
-            <div class="flex justify-between items-center w-full z-10">
+            <div class="flex gap-4 justify-between items-center w-full z-10">
               <div class="flex items-center gap-2">
                 <img
                   class="h-13 w-13 rounded-lg"
                   src={`http://localhost:${port}/instance/modpackIcon?instance_id=${params.id}`}
                 />
-                <div class="text-white text-md whitespace-nowrap">
-                  <div>{routeData.modpackInfo.data?.name}</div>
-                  <div class="flex">
-                    <div>{modpackPlatform()}</div>
-                    <div>{routeData.modpackInfo.data?.version_name}</div>
+                <div class="text-white whitespace-nowrap">
+                  <div class="text-lg font-bold">
+                    {routeData.modpackInfo.data?.name}
+                  </div>
+                  <div class="flex gap-3 text-sm text-lightSlate-600">
+                    <div class="flex items-center">
+                      <img
+                        src={getModpackPlatformIcon(modpackPlatform()!)}
+                        class="h-3 w-3"
+                      />
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <div class="i-ri:file-fill w-3 h-3" />
+                      <div>{routeData.modpackInfo.data?.version_name}</div>
+                    </div>
                   </div>
                 </div>
               </div>
-              <div class="flex gap-4">
-                <Button rounded={false} type="outline">
-                  Open Website
+              <div class="flex gap-3">
+                <Button
+                  rounded={false}
+                  type="outline"
+                  onClick={() => {
+                    if (modpackPlatform() === "Curseforge") {
+                      window.openExternalLink(
+                        `https://www.curseforge.com/minecraft/modpacks/${routeData.modpackInfo.data?.url_slug}`
+                      );
+                    } else if (modpackPlatform() === "Modrinth") {
+                      window.openExternalLink(
+                        `https://modrinth.com/mod/${routeData.modpackInfo.data?.url_slug}`
+                      );
+                    }
+                  }}
+                >
+                  <Trans key="instance.modpack_open_website" />
                   <i class="i-ri:external-link-line" />
                 </Button>
-                <Button rounded={false} type="primary">
-                  View
+                <Button
+                  rounded={false}
+                  type="primary"
+                  onClick={() => {
+                    if (modpackPlatform() === "Curseforge") {
+                      navigate(
+                        `/modpacks/${modpackProjectId()}/curseforge?instanceId=${
+                          params.id
+                        }`
+                      );
+                    } else if (modpackPlatform() === "Modrinth") {
+                      navigate(
+                        `/modpacks/${modpackProjectId()}/modrith?instanceId=${
+                          params.id
+                        }`
+                      );
+                    }
+                  }}
+                >
+                  <Trans key="instance.modpack_view" />
                   <i class="i-ri:arrow-right-line" />
                 </Button>
               </div>
