@@ -21,7 +21,7 @@ import Feat7 from "../assets/feat7.svg";
   >
   <div class="grid grid-cols-4 gap-4 w-[80%] p-4">
     <div
-      class="flex flex-col items-center text-center w-[275px] h-[315px] background p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat1} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Modpack Integration</span>
@@ -32,7 +32,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-[275px] h-[315px] background p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat2} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Mods Manager</span>
@@ -43,7 +43,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-[275px] h-[315px] background p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat3} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Java Manager</span>
@@ -54,7 +54,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-[275px] h-[315px] background p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat4} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold"
@@ -67,7 +67,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-[275px] h-[315px] background p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat5} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Advanced Logs Manager</span>
@@ -78,7 +78,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-[275px] h-[315px] background p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat6} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Modload Support</span>
@@ -89,7 +89,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-[275px] h-[315px] background p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat7} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Modpack Autoupdater</span>
@@ -100,7 +100,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-[275px] h-[315px] background p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat1} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Custom Themes</span>
@@ -114,7 +114,43 @@ import Feat7 from "../assets/feat7.svg";
 </div>
 
 <style>
-  .background {
+  .background__card {
     background-color: rgba(39, 43, 53, 1);
+    --offset: 2px;
+    position: relative;
+    overflow: hidden;
+  }
+  .background__card::before {
+    content: '';
+    background: conic-gradient(transparent 270deg, rgba(40, 101, 164, 1), transparent);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    aspect-ratio: 1;
+    width: 100%;
+    animation: rotate 2s linear infinite;
+  }
+  .background__card::after {
+    content: '';
+    background: inherit;
+    border-radius: inherit;
+    position: absolute;
+    inset: var(--offset);
+    height: calc(100% - 2 * var(--offset));
+    width: calc(100% - 2 * var(--offset));
+    z-index: 1;
+  }
+  .background__card > * {
+    position: relative;
+    z-index: 2;
+  }
+  @keyframes rotate {
+    0% {
+      transform: translate(-50%, -50%) scale(1.4) rotate(0turn);
+    }
+    100% {
+      transform: translate(-50%, -50%) scale(1.4) rotate(1turn);
+    }
   }
 </style>
