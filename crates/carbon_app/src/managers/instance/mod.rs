@@ -1494,7 +1494,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(Some(modpack_info))
     }
 
-    pub async fn get_modpack_icon(self, instance_id: InstanceId) -> anyhow::Result<Option<Vec<u8>>> {
+    pub async fn get_modpack_icon(
+        self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
