@@ -7,7 +7,8 @@ import Twitter from "../assets/twitter.svg"
 import Discord from "../assets/discord.svg"
 ---
 
-<footer class="flex justify-between p-20">
+<footer class="flex flex-col">
+	<div class="flex justify-between p-20">
 	<div class="flex flex-col  items-start basis-[50%]">
 		<Image src={Logo} alt="BH Logo" class="pb-4"/>
 		<p class="text-graygd w-1/2">GDLauncher is a simple, yet powerful Minecraft custom launcher with a strong focus on the user experience.</p>
@@ -62,7 +63,11 @@ import Discord from "../assets/discord.svg"
 				</HeaderLink>
 			</li>
 		</ul>
+		<span class="text-graygd">(C) 2023 by GorillaDevs Inc. | All Right Reserved</span>
 	</div>
+	
+	</div>
+	<span class="text-graygd text-center pb-2">NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG.</span>
 </footer>
 <style>
   a {
