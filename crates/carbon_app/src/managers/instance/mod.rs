@@ -32,10 +32,13 @@ use self::importer::InstanceImportManager;
 use self::log::GameLog;
 use self::run::PersistenceManager;
 
+use super::metadata::cache;
 use super::modplatforms::curseforge::CurseForge;
 use super::ManagerRef;
 
-use crate::domain::instance::{self as domain, GameLogId, GroupId, InstanceFolder, InstanceId};
+use crate::domain::instance::{
+    self as domain, GameLogId, GroupId, InstanceFolder, InstanceId, InstanceModpackInfo,
+};
 use domain::info;
 
 pub mod explore;
@@ -58,6 +61,7 @@ pub struct InstanceManager {
     import_manager: InstanceImportManager,
     export_manager: InstanceExportManager,
     game_logs: RwLock<HashMap<GameLogId, (InstanceId, watch::Receiver<GameLog>)>>,
+    modpack_info_semaphore: Mutex<()>,
 }
 
 impl Default for InstanceManager {
@@ -77,6 +81,7 @@ impl InstanceManager {
             import_manager: InstanceImportManager::new(),
             export_manager: InstanceExportManager::new(),
             game_logs: RwLock::new(HashMap::new()),
+            modpack_info_semaphore: Mutex::new(()),
         }
     }
 }
@@ -1452,7 +1457,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         })
     }
 
-    pub async fn modpack_info(self, instance_id: InstanceId) -> anyhow::Result<ModpackInfo> {
+    pub async fn get_modpack_info(
+        self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<Option<InstanceModpackInfo>> {
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
@@ -1464,120 +1472,60 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         };
 
         let modpack = match &instance.config.modpack {
-            Some(modpack) => modpack,
-            None => bail!("instance has no modpack"),
+            Some(modpack) => modpack.clone(),
+            None => {
+                return Ok(None);
+            }
         };
+
+        drop(instances);
+
+        let _guard = self.modpack_info_semaphore.lock().await;
 
         let modpack_info = match modpack {
             info::Modpack::Curseforge(curseforge) => {
-                let cache_entry = self
-                    .app
-                    .prisma_client
-                    .curse_forge_modpack_cache()
-                    .find_unique(db::curse_forge_modpack_cache::project_id_file_id(
-                        curseforge.project_id as i32,
-                        curseforge.file_id as i32,
-                    ))
-                    .exec()
-                    .await?;
-
-                match cache_entry {
-                    Some(cache_entry) => ModpackInfo {
-                        name: cache_entry.modpack_name,
-                        version_name: cache_entry.version_name,
-                        url_slug: cache_entry.url_slug,
-                    },
-                    None => {
-                        let modplatform_manager = self.app.modplatforms_manager();
-                        let addon_file =
-                            modplatform_manager
-                                .curseforge
-                                .get_mod_file(ModFileParameters {
-                                    mod_id: curseforge.project_id as i32,
-                                    file_id: curseforge.file_id as i32,
-                                });
-                        let addon = modplatform_manager.curseforge.get_mod(ModParameters {
-                            mod_id: curseforge.project_id as i32,
-                        });
-
-                        let (addon_file, addon) = tokio::try_join!(addon_file, addon)?;
-
-                        self.app
-                            .prisma_client
-                            .curse_forge_modpack_cache()
-                            .create(
-                                curseforge.project_id as i32,
-                                curseforge.file_id as i32,
-                                addon.data.name.clone(),
-                                addon_file.data.file_name.clone(),
-                                addon.data.slug.clone(),
-                                vec![],
-                            )
-                            .exec()
-                            .await?;
-
-                        ModpackInfo {
-                            name: addon.data.name,
-                            version_name: addon_file.data.display_name,
-                            url_slug: addon.data.slug,
-                        }
-                    }
-                }
+                cache::curseforge::modpack::get_modpack_metadata(&self.app, curseforge).await?
             }
             info::Modpack::Modrinth(modrinth) => {
-                let cache_entry = self
-                    .app
-                    .prisma_client
-                    .modrinth_modpack_cache()
-                    .find_unique(db::modrinth_modpack_cache::project_id_version_id(
-                        modrinth.project_id.clone(),
-                        modrinth.version_id.clone(),
-                    ))
-                    .exec()
-                    .await?;
-
-                match cache_entry {
-                    Some(cache_entry) => ModpackInfo {
-                        name: cache_entry.modpack_name,
-                        version_name: cache_entry.version_name,
-                        url_slug: cache_entry.url_slug,
-                    },
-                    None => {
-                        let modplatform_manager = self.app.modplatforms_manager();
-                        let modpack = modplatform_manager
-                            .modrinth
-                            .get_project(ProjectID(modrinth.project_id.clone()));
-                        let version = modplatform_manager
-                            .modrinth
-                            .get_version(VersionID(modrinth.version_id.clone()));
-
-                        let (modpack, version) = tokio::try_join!(modpack, version)?;
-
-                        self.app
-                            .prisma_client
-                            .modrinth_modpack_cache()
-                            .create(
-                                modrinth.project_id.clone(),
-                                modrinth.version_id.clone(),
-                                modpack.title.clone(),
-                                version.version_number.clone(),
-                                modpack.slug.clone(),
-                                vec![],
-                            )
-                            .exec()
-                            .await?;
-
-                        ModpackInfo {
-                            name: modpack.title,
-                            version_name: version.version_number,
-                            url_slug: modpack.slug,
-                        }
-                    }
-                }
+                cache::modrinth::modpack::get_modpack_metadata(&self.app, modrinth).await?
             }
         };
 
-        Ok(modpack_info)
+        Ok(Some(modpack_info))
+    }
+
+    pub async fn get_modpack_icon(self, instance_id: InstanceId) -> anyhow::Result<Option<Vec<u8>>> {
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let instance = match &instance.type_ {
+            InstanceType::Invalid(_) => bail!(InvalidInstanceDataError),
+            InstanceType::Valid(x) => x,
+        };
+
+        let modpack = match &instance.config.modpack {
+            Some(modpack) => modpack.clone(),
+            None => {
+                return Ok(None);
+            }
+        };
+
+        drop(instances);
+
+        let _guard = self.modpack_info_semaphore.lock().await;
+
+        let modpack_info = match modpack {
+            info::Modpack::Curseforge(curseforge) => {
+                cache::curseforge::modpack::get_modpack_icon(&self.app, curseforge).await?
+            }
+            info::Modpack::Modrinth(modrinth) => {
+                cache::modrinth::modpack::get_modpack_icon(&self.app, modrinth).await?
+            }
+        };
+
+        Ok(Some(modpack_info))
     }
 
     pub async fn instance_icon(
@@ -1802,13 +1750,6 @@ pub struct InstanceData {
     config: info::Instance,
     state: run::LaunchState,
     icon_revision: u32,
-}
-
-#[derive(Debug)]
-pub struct ModpackInfo {
-    pub name: String,
-    pub version_name: String,
-    pub url_slug: String,
 }
 
 #[derive(Debug, Clone)]
@@ -2386,11 +2327,11 @@ mod test {
         );
 
         app.instance_manager()
-            .modpack_info(curseforge_instance_id)
+            .get_modpack_info(curseforge_instance_id)
             .await?;
 
         app.instance_manager()
-            .modpack_info(modrinth_instance_id)
+            .get_modpack_info(modrinth_instance_id)
             .await?;
 
         assert_eq!(
@@ -2406,6 +2347,26 @@ mod test {
         assert_eq!(
             app.prisma_client
                 .modrinth_modpack_cache()
+                .find_many(vec![])
+                .exec()
+                .await?
+                .len(),
+            1
+        );
+
+        assert_eq!(
+            app.prisma_client
+                .curse_forge_modpack_image_cache()
+                .find_many(vec![])
+                .exec()
+                .await?
+                .len(),
+            1
+        );
+
+        assert_eq!(
+            app.prisma_client
+                .modrinth_modpack_image_cache()
                 .find_many(vec![])
                 .exec()
                 .await?

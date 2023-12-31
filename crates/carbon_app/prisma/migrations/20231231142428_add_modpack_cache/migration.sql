@@ -18,7 +18,6 @@ CREATE TABLE "ModrinthModpackCache" (
     "versionName" TEXT NOT NULL,
     "urlSlug" TEXT NOT NULL,
     "updatedAt" DATETIME NOT NULL,
-    "modrinthModpackImageCacheMetadataId" TEXT,
 
     PRIMARY KEY ("projectId", "versionId")
 );
@@ -29,7 +28,6 @@ CREATE TABLE "CurseForgeModpackImageCache" (
     "fileId" INTEGER NOT NULL,
     "url" TEXT NOT NULL,
     "data" BLOB,
-    "upToDate" INTEGER NOT NULL DEFAULT 0,
 
     PRIMARY KEY ("projectId", "fileId"),
     CONSTRAINT "CurseForgeModpackImageCache_projectId_fileId_fkey" FOREIGN KEY ("projectId", "fileId") REFERENCES "CurseForgeModpackCache" ("projectId", "fileId") ON DELETE CASCADE ON UPDATE CASCADE
@@ -41,7 +39,6 @@ CREATE TABLE "ModrinthModpackImageCache" (
     "versionId" TEXT NOT NULL,
     "url" TEXT NOT NULL,
     "data" BLOB,
-    "upToDate" INTEGER NOT NULL DEFAULT 0,
 
     PRIMARY KEY ("projectId", "versionId"),
     CONSTRAINT "ModrinthModpackImageCache_projectId_versionId_fkey" FOREIGN KEY ("projectId", "versionId") REFERENCES "ModrinthModpackCache" ("projectId", "versionId") ON DELETE CASCADE ON UPDATE CASCADE

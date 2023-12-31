@@ -204,13 +204,13 @@ model CurseForgeModpackCache {
 }
 
 model ModrinthModpackCache {
-  projectId                           String
-  versionId                           String
-  modpackName                         String
-  versionName                         String
-  urlSlug                             String
-  logoImage                           ModrinthModpackImageCache?
-  updatedAt                           DateTime                   @updatedAt
+  projectId   String
+  versionId   String
+  modpackName String
+  versionName String
+  urlSlug     String
+  logoImage   ModrinthModpackImageCache?
+  updatedAt   DateTime                   @updatedAt
 
   @@id([projectId, versionId])
 }
@@ -220,7 +220,6 @@ model CurseForgeModpackImageCache {
   fileId                 Int
   url                    String
   data                   Bytes?
-  upToDate               Int                    @default(0)
   CurseForgeModpackCache CurseForgeModpackCache @relation(fields: [projectId, fileId], references: [projectId, fileId], onDelete: Cascade)
 
   @@id([projectId, fileId])
@@ -231,7 +230,6 @@ model ModrinthModpackImageCache {
   versionId            String
   url                  String
   data                 Bytes?
-  upToDate             Int                  @default(0)
   ModrinthModpackCache ModrinthModpackCache @relation(fields: [projectId, versionId], references: [projectId, versionId], onDelete: Cascade)
 
   @@id([projectId, versionId])

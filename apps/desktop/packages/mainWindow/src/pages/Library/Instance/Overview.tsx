@@ -2,14 +2,25 @@ import Card from "@/components/Card";
 import { Trans, useTransContext } from "@gd/i18n";
 import { For, Show } from "solid-js";
 import fetchData from "./instance.data";
-import { useRouteData } from "@solidjs/router";
+import { useParams, useRouteData } from "@solidjs/router";
 import { InstanceDetails } from "@gd/core_module/bindings";
 import { format, formatDistance } from "date-fns";
-import FadedBanner from "@/components/FadedBanner";
+import FadedBanner, { FadedBannerSkeleton } from "@/components/FadedBanner";
+import { port } from "@/utils/rspcClient";
+import { Button } from "@gd/ui";
 
 const Overview = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
+  const params = useParams();
   const [t] = useTransContext();
+
+  const modpackPlatform = () => {
+    if ("Curseforge" in (routeData.instanceDetails.data?.modpack || {})) {
+      return "curseforge";
+    } else if ("Modrinth" in (routeData.instanceDetails.data?.modpack || {})) {
+      return "modrinth";
+    }
+  };
 
   return (
     <div class="flex flex-col gap-4 max-w-185 mt-10">
@@ -90,8 +101,52 @@ const Overview = () => {
           />
         </Show>
       </div>
-      <Show when={routeData.modpackInfo}>
-        <FadedBanner />
+      <Show
+        when={
+          routeData.instanceDetails.data?.modpack &&
+          routeData.modpackInfo.isLoading
+        }
+      >
+        <div class="flex items-center gap-2 p-5 bg-darkSlate-700 rounded-xl box-border h-23 min-w-59">
+          <FadedBannerSkeleton />
+        </div>
+      </Show>
+      <Show
+        when={
+          routeData.instanceDetails.data?.modpack && routeData.modpackInfo.data
+        }
+      >
+        <div class="relative flex p-5 rounded-xl box-border h-23 w-full overflow-hidden bg-darkSlate-700">
+          <FadedBanner
+            imageUrl={`http://localhost:${port}/instance/modpackIcon?instance_id=${params.id}`}
+          >
+            <div class="flex justify-between items-center w-full z-10">
+              <div class="flex items-center gap-2">
+                <img
+                  class="h-13 w-13 rounded-lg"
+                  src={`http://localhost:${port}/instance/modpackIcon?instance_id=${params.id}`}
+                />
+                <div class="text-white text-md whitespace-nowrap">
+                  <div>{routeData.modpackInfo.data?.name}</div>
+                  <div class="flex">
+                    <div>{modpackPlatform()}</div>
+                    <div>{routeData.modpackInfo.data?.version_name}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="flex gap-4">
+                <Button rounded={false} type="outline">
+                  Open Website
+                  <i class="i-ri:external-link-line" />
+                </Button>
+                <Button rounded={false} type="primary">
+                  View
+                  <i class="i-ri:arrow-right-line" />
+                </Button>
+              </div>
+            </div>
+          </FadedBanner>
+        </div>
       </Show>
       <Show when={routeData.instanceDetails.data?.notes}>
         <div class="flex flex-col justify-between gap-2 p-5 bg-darkSlate-700 rounded-xl w-full items-start box-border w-59">

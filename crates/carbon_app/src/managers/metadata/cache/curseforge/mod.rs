@@ -28,6 +28,8 @@ use crate::db::{
     mod_metadata as metadb,
 };
 
+pub mod modpack;
+
 pub struct CurseforgeModCacher;
 
 #[async_trait::async_trait]
