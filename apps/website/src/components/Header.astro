@@ -1,16 +1,15 @@
 ---
 import HeaderLink from "./HeaderLink.astro";
-import { Image } from 'astro:assets';
-import Logo from "../assets/logo.svg"
-import Button from "./button/Button"
-import Separator from "./button/Separator.astro"
+import { Image } from "astro:assets";
+import Logo from "../assets/logo.svg";
+import Button from "./button/Button";
+import Separator from "./button/Separator.astro";
 import { DownloadForButton } from "./button/DownloadForButton";
-
 ---
 
 <header>
   <nav>
-    <Image src={Logo} alt="gdlauncher logo" width="173" height="40"/>
+    <Image src={Logo} alt="gdlauncher logo" width="173" height="40" />
     <div class="internal-links">
       <HeaderLink class="text-graygd" href="/">Home</HeaderLink>
       <HeaderLink class="text-graygd">The Team</HeaderLink>
@@ -19,7 +18,7 @@ import { DownloadForButton } from "./button/DownloadForButton";
     </div>
     <div class="social-links">
       <!-- <Button  intent="primary" className="uppercase"><div class="flex flex-row-reverse">download <Separator /></div></Button> -->
-      <DownloadForButton client:only/>
+      <DownloadForButton client:only />
     </div>
   </nav>
 </header>
@@ -27,25 +26,20 @@ import { DownloadForButton } from "./button/DownloadForButton";
   header {
     margin: 0;
     padding: 2rem;
-    
-    
   }
   h2 {
     margin: 0;
     font-size: 1em;
   }
 
- 
   nav {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
+    gap: 8rem;
   }
   nav a {
     padding: 1em 0.5em;
     cursor: pointer;
   }
-  
-  
-  
 </style>
