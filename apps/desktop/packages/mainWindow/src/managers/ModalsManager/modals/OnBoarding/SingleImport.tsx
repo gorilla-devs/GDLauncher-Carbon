@@ -1,9 +1,8 @@
 import { setTaskId } from "@/utils/import";
-import { setTaskIds, taskIds } from "@/utils/import";
+import { taskIds } from "@/utils/import";
 import { isProgressFailed } from "@/utils/instances";
-import { rspc, rspcFetch } from "@/utils/rspcClient";
-import { Trans, useTransContext } from "@gd/i18n";
-import { Button, Progressbar } from "@gd/ui";
+import { rspcFetch } from "@/utils/rspcClient";
+import { Progressbar } from "@gd/ui";
 import { Match, Switch, createEffect, createSignal } from "solid-js";
 
 const [isDownloaded, setIsDownloaded] = createSignal(false);
@@ -14,7 +13,6 @@ const SingleImport = (props: {
   instanceName: string;
   taskId?: number;
 }) => {
-  const [t] = useTransContext();
   const [progress, setProgress] = createSignal(0);
   const [state, setState] = createSignal("idle");
   createEffect(() => {
