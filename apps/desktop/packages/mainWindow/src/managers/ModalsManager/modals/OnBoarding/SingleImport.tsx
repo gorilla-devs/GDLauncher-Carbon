@@ -12,49 +12,17 @@ export { isDownloaded };
 const SingleImport = (props: {
   instanceIndex: number;
   instanceName: string;
+  taskId?: number;
 }) => {
   const [t] = useTransContext();
   const [progress, setProgress] = createSignal(0);
   const [state, setState] = createSignal("idle");
-  const importInstanceMutation = rspc.createMutation(
-    ["instance.importInstance"],
-    {
-      onSuccess(taskId) {
-        setTaskIds((prev: any) => {
-          if (prev) {
-            if (props.instanceName in prev) {
-              {
-                if (state() === "failed") {
-                  return {
-                    ...prev,
-                    [props.instanceName]: taskId
-                  };
-                } else {
-                  return prev;
-                }
-              }
-            } else {
-              return {
-                ...prev,
-                [props.instanceName]: taskId
-              };
-            }
-          } else {
-            return {
-              [props.instanceName]: taskId
-            };
-          }
-        });
-      }
-    }
-  );
   createEffect(() => {
     async function runner() {
       if (taskIds() !== undefined) {
-        const taskId = (taskIds() as any)[props.instanceName];
         const task: any = (await rspcFetch(() => [
           "vtask.getTask",
-          taskId as number
+          props.taskId as number
         ])) as any;
 
         if (task.data && task.data.progress) {
@@ -63,7 +31,7 @@ const SingleImport = (props: {
           }
         }
         const isFailed = task.data && isProgressFailed(task.data.progress);
-        const isDownloaded = task.data === null;
+        const isDownloaded = task.data === null && progress() !== 0;
         if (isDownloaded || isFailed) {
           setTaskId(undefined);
         }
@@ -81,14 +49,7 @@ const SingleImport = (props: {
       console.error(err);
     }
   });
-  createEffect(() => {
-    if (!taskIds()) {
-      importInstanceMutation.mutate({
-        name: props.instanceName,
-        index: props.instanceIndex
-      });
-    }
-  });
+
   return (
     <div class="flex gap-2 px-4 justify-between rounded-md">
       <span class="font-semibold">{props.instanceName}</span>
@@ -99,21 +60,9 @@ const SingleImport = (props: {
             <div class="font-semibold">{progress()}%</div>
           </div>
         </Match>
-        <Match when={state() === t("instance.failed")}>
+        <Match when={state() === "failed"}>
           <div>
-            <Button
-              type="primary"
-              class="bg-red-500"
-              onClick={() => {
-                setProgress(0);
-                importInstanceMutation.mutate({
-                  name: props.instanceName,
-                  index: props.instanceIndex
-                });
-              }}
-            >
-              <Trans key="onboarding.retry" />
-            </Button>
+            <div class="i-ph:x-bold text-2xl text-red-600" />
           </div>
         </Match>
         <Match when={state() === "completed"}>
