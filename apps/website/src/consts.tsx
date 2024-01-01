@@ -18,7 +18,10 @@ export const DownloadItems: Array<{
         <Apple /> MacOS
       </div>
     ) as Element,
-    onClick: () => {},
+    onClick: () => {
+      window.location.href =
+        "https://cdn-raw.gdl.gg/launcher/GDLauncher__2.0.0-alpha.1703815106__mac__universal.dmg";
+    },
   },
   {
     item: (
@@ -26,7 +29,10 @@ export const DownloadItems: Array<{
         <Windows /> Windows
       </div>
     ) as Element,
-    onClick: () => {},
+    onClick: () => {
+      window.location.href =
+        "https://cdn-raw.gdl.gg/launcher/GDLauncher__2.0.0-alpha.1703815106__win__x64.exe";
+    },
   },
   {
     item: (
@@ -34,6 +40,9 @@ export const DownloadItems: Array<{
         <Linux /> Linux
       </div>
     ) as Element,
-    onClick: () => {},
+    onClick: () => {
+      window.location.href =
+        "https://cdn-raw.gdl.gg/launcher/GDLauncher__2.0.0-alpha.1703815106__linux__x64.AppImage";
+    },
   },
 ];
