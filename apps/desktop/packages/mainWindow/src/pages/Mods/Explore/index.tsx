@@ -4,7 +4,6 @@ import { useGDNavigate } from "@/managers/NavigationManager";
 import { Trans } from "@gd/i18n";
 import { Button, Skeleton, Spinner, Tab, TabList, Tabs } from "@gd/ui";
 import {
-  Link,
   Outlet,
   useLocation,
   useParams,
@@ -326,7 +325,7 @@ const Modpack = () => {
                 ref={(el) => {
                   refStickyTabs = el;
                 }}
-                class="sticky top-0 flex flex-col px-4 z-10 bg-darkSlate-800 mb-4"
+                class="sticky top-0 flex flex-col px-4 pb-0 z-10 bg-darkSlate-800"
               >
                 <div class="flex items-center justify-between">
                   <Show when={isSticky()}>
@@ -344,20 +343,21 @@ const Modpack = () => {
                     </span>
                   </Show>
                   <Tabs index={indexTab()}>
-                    <TabList>
-                      <For each={instancePages()}>
-                        {(page) => (
-                          <Link
-                            href={`${page.path}${location.search}`}
-                            replace
-                            class="no-underline"
-                            draggable={false}
-                          >
-                            <Tab class="bg-transparent">{page.label}</Tab>
-                          </Link>
-                        )}
-                      </For>
-                    </TabList>
+                    <div class="h-14">
+                      <TabList>
+                        <For each={instancePages()}>
+                          {(page) => (
+                            <Tab
+                              onClick={() => {
+                                navigate(`${page.path}${location.search}`);
+                              }}
+                            >
+                              {page.label}
+                            </Tab>
+                          )}
+                        </For>
+                      </TabList>
+                    </div>
                   </Tabs>
                   <Show when={isSticky()}>
                     <Button
@@ -387,7 +387,7 @@ const Modpack = () => {
                   />
                 </Show>
               </div>
-              <div class="px-4 z-0">
+              <div class="p-4 z-0">
                 <Outlet />
               </div>
             </div>

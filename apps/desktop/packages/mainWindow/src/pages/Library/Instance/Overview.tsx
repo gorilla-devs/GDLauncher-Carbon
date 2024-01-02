@@ -44,7 +44,7 @@ const Overview = () => {
   };
 
   return (
-    <div class="flex flex-col gap-4 mt-10">
+    <div class="flex flex-col gap-4">
       <div class="w-full flex justify-center flex-wrap gap-4">
         <Show when={routeData.instanceDetails.data?.version}>
           <Card
@@ -127,7 +127,7 @@ const Overview = () => {
             routeData.modpackInfo.isLoading
           }
         >
-          <div class="p-5 bg-darkSlate-700 rounded-xl box-border h-23 flex-1 min-w-140">
+          <div class="bg-darkSlate-700 rounded-xl box-border flex-1 p-5 h-23 min-w-full">
             <FadedBannerSkeleton />
           </div>
         </Show>
@@ -137,11 +137,11 @@ const Overview = () => {
             routeData.modpackInfo.data
           }
         >
-          <div class="relative flex p-5 rounded-xl box-border min-h-23 h-max overflow-hidden bg-darkSlate-700 min-w-max w-full flex-1">
+          <div class="relative flex p-5 rounded-xl box-border bg-darkSlate-700 w-full flex-1 min-h-23 h-max overflow-hidden min-w-max">
             <FadedBanner
               imageUrl={`http://localhost:${port}/instance/modpackIcon?instance_id=${params.id}`}
             >
-              <div class="flex flex-col 2xl:flex-row 2xl:items-center 2xl:gap-14 justify-between items-start w-full z-10 gap-6">
+              <div class="flex flex-col justify-between items-start w-full z-10 gap-6 2xl:flex-row 2xl:items-center 2xl:gap-14">
                 <div class="flex items-center gap-2">
                   <img
                     class="h-13 w-13 rounded-lg"
@@ -159,7 +159,7 @@ const Overview = () => {
                         />
                       </div>
                       <div class="flex items-center gap-2">
-                        <div class="i-ri:file-fill w-3 h-3" />
+                        <div class="w-3 h-3 i-ri:file-fill" />
                         <div>{routeData.modpackInfo.data?.version_name}</div>
                       </div>
                     </div>
