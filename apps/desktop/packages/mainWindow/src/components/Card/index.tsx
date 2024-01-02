@@ -1,4 +1,4 @@
-import { mergeProps } from "solid-js";
+import { JSX, mergeProps } from "solid-js";
 import vanillaIcon from "/assets/images/icons/vanilla.png";
 import magicBallIcon from "/assets/images/icons/magicBall.png";
 import clockIcon from "/assets/images/icons/clock.png";
@@ -11,7 +11,7 @@ type Icon = "vanilla" | "book" | "cart" | "clock" | "pickaxe" | "sign";
 interface Props {
   icon?: Icon;
   title: string;
-  text: string | number;
+  text: JSX.Element | string;
   class?: string;
 }
 
@@ -39,7 +39,7 @@ const Card = (props: Props) => {
 
   return (
     <div
-      class={`flex items-center gap-2 p-5 h-23 min-w-59 bg-darkSlate-700 rounded-xl box-border ${
+      class={`flex items-center gap-2 p-5 h-23 min-w-max bg-darkSlate-700 rounded-xl box-border ${
         props.class || ""
       }`}
     >

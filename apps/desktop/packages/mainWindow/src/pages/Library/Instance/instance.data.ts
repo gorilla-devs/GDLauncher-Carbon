@@ -10,6 +10,11 @@ const fetchData = ({ params }) => {
     parseInt(params.id, 10)
   ]);
 
+  const modpackInfo = rspc.createQuery(() => [
+    "instance.getModpackInfo",
+    parseInt(params.id, 10)
+  ]);
+
   const instancesUngrouped = rspc.createQuery(() => [
     "instance.getInstancesUngrouped"
   ]);
@@ -32,6 +37,7 @@ const fetchData = ({ params }) => {
 
   return {
     instanceDetails,
+    modpackInfo,
     instanceMods: instanceMods.mods,
     instancesUngrouped,
     totalRam

@@ -109,7 +109,7 @@
         document.documentElement.style.setProperty(`--${key}`, mainTheme[key]);
       }
       // TODO: handle sourcemaps decoding + sentry
-      if (import.meta.env.DEV) {
+      if (!import.meta.env.DEV) {
         window.onerror = (msg, url, line, col, error) => {
           window.fatalError(msg, url.split("/").slice(-3).join(" -> "));
           return true;

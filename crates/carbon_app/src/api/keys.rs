@@ -105,6 +105,7 @@ keys! {
         IMPORT_INSTANCE                             = "importInstance";
         EXPLORE                                     = "explore";
         EXPORT                                      = "export";
+        GET_MODPACK_INFO                            = "getModpackInfo";
     }
 
     vtask {
