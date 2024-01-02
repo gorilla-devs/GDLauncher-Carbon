@@ -127,7 +127,7 @@ const Overview = () => {
             routeData.modpackInfo.isLoading
           }
         >
-          <div class="flex items-center gap-2 p-5 bg-darkSlate-700 rounded-xl box-border h-23 min-w-59">
+          <div class="p-5 bg-darkSlate-700 rounded-xl box-border h-23 flex-1 min-w-64">
             <FadedBannerSkeleton />
           </div>
         </Show>
