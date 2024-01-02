@@ -175,7 +175,7 @@ function Button(props: Props) {
       size: "large",
       uppercase: false,
       iconRight: false,
-      rounded: true,
+      rounded: false,
     },
     props
   );

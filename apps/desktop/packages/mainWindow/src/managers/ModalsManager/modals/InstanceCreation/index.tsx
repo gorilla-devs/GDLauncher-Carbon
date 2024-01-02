@@ -14,12 +14,12 @@ const InstanceCreation = (props: ModalProps) => {
       noPadding={true}
     >
       <div class="flex flex-col justify-between scrollbar-hide overflow-y-scroll w-120 h-full">
-        <Tabs variant="block" paddingY="py-2">
-          <TabList>
-            <Tab>
+        <Tabs>
+          <TabList heightClass="h-14">
+            <Tab class="w-1/2" centerContent>
               <Trans key="instance.instance_creation_custom_tab" />
             </Tab>
-            <Tab>
+            <Tab class="w-1/2" centerContent>
               <Trans key="instance.instance_import_tab" />
             </Tab>
           </TabList>

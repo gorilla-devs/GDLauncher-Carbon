@@ -2,13 +2,7 @@
 import getRouteIndex from "@/route/getRouteIndex";
 import { Trans, useTransContext } from "@gd/i18n";
 import { Tabs, TabList, Tab, Button, ContextMenu } from "@gd/ui";
-import {
-  Link,
-  Outlet,
-  useLocation,
-  useParams,
-  useRouteData
-} from "@solidjs/router";
+import { Outlet, useLocation, useParams, useRouteData } from "@solidjs/router";
 import {
   For,
   Match,
@@ -575,7 +569,6 @@ const Instance = () => {
                         </div>
                         <Button
                           uppercase
-                          type="glow"
                           size="large"
                           variant={isRunning() && "red"}
                           loading={isPreparing() !== undefined}
@@ -593,9 +586,11 @@ const Instance = () => {
                         >
                           <Switch>
                             <Match when={!isRunning()}>
+                              <i class="i-ri:play-fill" />
                               <Trans key="instance.play" />
                             </Match>
                             <Match when={isRunning()}>
+                              <i class="i-ri:stop-fill" />
                               <Trans key="instance.stop" />
                             </Match>
                           </Switch>
@@ -618,7 +613,7 @@ const Instance = () => {
         >
           <div class="bg-darkSlate-800 w-full">
             <div
-              class="sticky flex items-center justify-between z-10 bg-darkSlate-800 top-0 mb-4"
+              class="sticky flex items-center justify-between z-10 bg-darkSlate-800 top-0 h-14"
               classList={{
                 "px-6": instancePages()[selectedIndex()]?.noPadding
               }}
@@ -626,8 +621,8 @@ const Instance = () => {
                 refStickyTabs = el;
               }}
             >
-              <div class="flex items-center">
-                <span
+              <div class="flex items-center h-full">
+                <div
                   class="mr-4 transition-transform duration-100 ease-in-out origin-left"
                   classList={{
                     "scale-x-100": isSticky(),
@@ -645,31 +640,33 @@ const Instance = () => {
                   >
                     <Trans key="instance.step_back" />
                   </Button>
-                </span>
+                </div>
                 <div
-                  class="transition-transform duration-100 ease-in-out origin-left"
+                  class="transition-transform duration-100 ease-in-out origin-left h-full flex items-center"
                   style={{
                     transform: `translateX(${tabsTranslate()}px)`
                   }}
                 >
                   <Tabs index={selectedIndex()}>
                     <TabList>
-                      <For each={instancePages()}>
-                        {(page: InstancePage) => (
-                          <Link
-                            draggable={false}
-                            href={page.path}
-                            class="no-underline"
-                          >
-                            <Tab class="bg-transparent">{page.label}</Tab>
-                          </Link>
-                        )}
-                      </For>
+                      <div class="flex gap-6 h-full">
+                        <For each={instancePages()}>
+                          {(page: InstancePage) => (
+                            <Tab
+                              onClick={() => {
+                                navigate(page.path);
+                              }}
+                            >
+                              {page.label}
+                            </Tab>
+                          )}
+                        </For>
+                      </div>
                     </TabList>
                   </Tabs>
                 </div>
               </div>
-              <span
+              <div
                 class="ml-4 transition-transform duration-100 ease-in-out origin-right"
                 classList={{
                   "scale-x-100": isSticky(),
@@ -678,7 +675,6 @@ const Instance = () => {
               >
                 <Button
                   uppercase
-                  type="glow"
                   size="small"
                   variant={isRunning() && "red"}
                   loading={isPreparing() !== undefined}
@@ -692,16 +688,20 @@ const Instance = () => {
                 >
                   <Switch>
                     <Match when={!isRunning()}>
+                      <i class="i-ri:play-fill" />
                       <Trans key="instance.play" />
                     </Match>
                     <Match when={isRunning()}>
+                      <i class="i-ri:stop-fill" />
                       <Trans key="instance.stop" />
                     </Match>
                   </Switch>
                 </Button>
-              </span>
+              </div>
             </div>
-            <Outlet />
+            <div class="py-4">
+              <Outlet />
+            </div>
           </div>
         </div>
       </div>

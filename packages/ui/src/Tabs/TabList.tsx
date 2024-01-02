@@ -4,6 +4,7 @@ import { SpacingTab, TabType, useTabsContext } from "./Tabs";
 interface Props {
   aligment?: "between" | "default";
   children: Element[] | JSXElement;
+  heightClass?: string;
 }
 
 const TabList = (props: Props) => {
@@ -68,7 +69,9 @@ const TabList = (props: Props) => {
 
   return (
     <div
-      class="flex relative items-start h-auto w-full "
+      class={`flex relative items-start w-full min-h-12 ${
+        props.heightClass ?? "h-full"
+      }`}
       classList={{
         "bg-darkSlate-800": tabsContext?.variant() === "underline",
         "bg-darkSlate-900": tabsContext?.variant() === "block",
@@ -77,7 +80,7 @@ const TabList = (props: Props) => {
       <Switch>
         <Match when={tabsContext?.variant() === "underline"}>
           <div
-            class="flex border-b-darkSlate-800 border-b-1 box-border overflow-auto w-full"
+            class="flex border-b-darkSlate-800 border-b-1 box-border overflow-auto w-full h-full"
             classList={{
               "gap-6": tabsContext?.orientation() !== undefined,
               "flex-row": tabsContext?.orientation() === "horizontal",
@@ -123,7 +126,7 @@ const TabList = (props: Props) => {
         </Match>
         <Match when={tabsContext?.variant() === "block"}>
           <div
-            class="flex items-center p-2 rounded-xl box-border overflow-auto w-full"
+            class="flex items-center m-2 rounded-xl box-border overflow-auto w-full"
             classList={{
               "gap-6": tabsContext?.orientation() !== undefined,
               "flex-row": tabsContext?.orientation() === "horizontal",
