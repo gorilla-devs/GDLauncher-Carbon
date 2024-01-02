@@ -24,7 +24,7 @@ pub enum InstanceIcon {
     RelativePath(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum Modpack {
     Curseforge(CurseforgeModpack),
     Modrinth(ModrinthModpack),
@@ -45,13 +45,13 @@ pub enum ModpackPlatform {
     Modrinth,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct CurseforgeModpack {
     pub project_id: u32,
     pub file_id: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct ModrinthModpack {
     pub project_id: String,
     pub version_id: String,

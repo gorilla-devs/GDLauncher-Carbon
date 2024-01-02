@@ -6,7 +6,9 @@ use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
 use crate::api::keys::instance::*;
 use crate::db::read_filters::StringFilter;
-use crate::domain::instance::info::{GameVersion, InstanceIcon};
+use crate::domain::instance::info::{GameVersion, InstanceIcon, Modpack};
+use crate::domain::modplatforms::curseforge::filters::{ModFileParameters, ModParameters};
+use crate::domain::modplatforms::modrinth::search::{ProjectID, VersionID};
 use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::{DateTime, Utc};
@@ -30,9 +32,13 @@ use self::importer::InstanceImportManager;
 use self::log::GameLog;
 use self::run::PersistenceManager;
 
+use super::metadata::cache;
+use super::modplatforms::curseforge::CurseForge;
 use super::ManagerRef;
 
-use crate::domain::instance::{self as domain, GameLogId, GroupId, InstanceFolder, InstanceId};
+use crate::domain::instance::{
+    self as domain, GameLogId, GroupId, InstanceFolder, InstanceId, InstanceModpackInfo,
+};
 use domain::info;
 
 pub mod explore;
@@ -55,6 +61,7 @@ pub struct InstanceManager {
     import_manager: InstanceImportManager,
     export_manager: InstanceExportManager,
     game_logs: RwLock<HashMap<GameLogId, (InstanceId, watch::Receiver<GameLog>)>>,
+    modpack_info_semaphore: Mutex<()>,
 }
 
 impl Default for InstanceManager {
@@ -74,6 +81,7 @@ impl InstanceManager {
             import_manager: InstanceImportManager::new(),
             export_manager: InstanceExportManager::new(),
             game_logs: RwLock::new(HashMap::new()),
+            modpack_info_semaphore: Mutex::new(()),
         }
     }
 }
@@ -1449,6 +1457,80 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         })
     }
 
+    pub async fn get_modpack_info(
+        self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<Option<InstanceModpackInfo>> {
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let instance = match &instance.type_ {
+            InstanceType::Invalid(_) => bail!(InvalidInstanceDataError),
+            InstanceType::Valid(x) => x,
+        };
+
+        let modpack = match &instance.config.modpack {
+            Some(modpack) => modpack.clone(),
+            None => {
+                return Ok(None);
+            }
+        };
+
+        drop(instances);
+
+        let _guard = self.modpack_info_semaphore.lock().await;
+
+        let modpack_info = match modpack {
+            info::Modpack::Curseforge(curseforge) => {
+                cache::curseforge::modpack::get_modpack_metadata(&self.app, curseforge).await?
+            }
+            info::Modpack::Modrinth(modrinth) => {
+                cache::modrinth::modpack::get_modpack_metadata(&self.app, modrinth).await?
+            }
+        };
+
+        Ok(Some(modpack_info))
+    }
+
+    pub async fn get_modpack_icon(
+        self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let instance = match &instance.type_ {
+            InstanceType::Invalid(_) => bail!(InvalidInstanceDataError),
+            InstanceType::Valid(x) => x,
+        };
+
+        let modpack = match &instance.config.modpack {
+            Some(modpack) => modpack.clone(),
+            None => {
+                return Ok(None);
+            }
+        };
+
+        drop(instances);
+
+        let _guard = self.modpack_info_semaphore.lock().await;
+
+        let modpack_info = match modpack {
+            info::Modpack::Curseforge(curseforge) => {
+                cache::curseforge::modpack::get_modpack_icon(&self.app, curseforge).await?
+            }
+            info::Modpack::Modrinth(modrinth) => {
+                cache::modrinth::modpack::get_modpack_icon(&self.app, modrinth).await?
+            }
+        };
+
+        Ok(Some(modpack_info))
+    }
+
     pub async fn instance_icon(
         self,
         instance_id: InstanceId,
@@ -2185,6 +2267,115 @@ mod test {
 
         list = app.instance_manager().list_groups().await?;
         assert_eq!(list, expected);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_modpack_info() -> anyhow::Result<()> {
+        let mut app = crate::setup_managers_for_test().await;
+
+        let default_group_id = app.instance_manager().get_default_group().await?;
+        let default_group = &app.instance_manager().list_groups().await?[0];
+        let curseforge_instance_id = app
+            .instance_manager()
+            .create_instance(
+                default_group_id,
+                String::from("curseforge instance"),
+                false,
+                InstanceVersionSource::Modpack(info::Modpack::Curseforge(
+                    info::CurseforgeModpack {
+                        // RLCraft
+                        project_id: 285109,
+                        file_id: 4612979,
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+
+        let modrinth_instance_id = app
+            .instance_manager()
+            .create_instance(
+                default_group_id,
+                String::from("modrinth instance"),
+                false,
+                InstanceVersionSource::Modpack(info::Modpack::Modrinth(info::ModrinthModpack {
+                    // Fabulously Optimized
+                    project_id: String::from("1KVo5zza"),
+                    version_id: String::from("HH3vor7X"),
+                })),
+                String::new(),
+            )
+            .await?;
+
+        assert_eq!(
+            app.prisma_client
+                .curse_forge_modpack_cache()
+                .find_many(vec![])
+                .exec()
+                .await?
+                .len(),
+            0
+        );
+
+        assert_eq!(
+            app.prisma_client
+                .modrinth_modpack_cache()
+                .find_many(vec![])
+                .exec()
+                .await?
+                .len(),
+            0
+        );
+
+        app.instance_manager()
+            .get_modpack_info(curseforge_instance_id)
+            .await?;
+
+        app.instance_manager()
+            .get_modpack_info(modrinth_instance_id)
+            .await?;
+
+        assert_eq!(
+            app.prisma_client
+                .curse_forge_modpack_cache()
+                .find_many(vec![])
+                .exec()
+                .await?
+                .len(),
+            1
+        );
+
+        assert_eq!(
+            app.prisma_client
+                .modrinth_modpack_cache()
+                .find_many(vec![])
+                .exec()
+                .await?
+                .len(),
+            1
+        );
+
+        assert_eq!(
+            app.prisma_client
+                .curse_forge_modpack_image_cache()
+                .find_many(vec![])
+                .exec()
+                .await?
+                .len(),
+            1
+        );
+
+        assert_eq!(
+            app.prisma_client
+                .modrinth_modpack_image_cache()
+                .find_many(vec![])
+                .exec()
+                .await?
+                .len(),
+            1
+        );
 
         Ok(())
     }

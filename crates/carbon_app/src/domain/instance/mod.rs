@@ -43,6 +43,14 @@ pub struct InstanceDetails {
 }
 
 #[derive(Debug)]
+pub struct InstanceModpackInfo {
+    pub name: String,
+    pub version_name: String,
+    pub url_slug: String,
+    pub has_image: bool,
+}
+
+#[derive(Debug)]
 pub struct InstanceSettingsUpdate {
     pub instance_id: InstanceId,
     pub name: Option<String>,

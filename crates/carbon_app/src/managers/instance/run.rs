@@ -160,6 +160,11 @@ impl ManagerRef<'_, InstanceManager> {
 
         let app = self.app.clone();
         let instance_shortpath = instance.shortpath.clone();
+
+        drop(data);
+        drop(instance);
+        drop(instances);
+
         let installation_task = tokio::spawn(async move {
             let instance_manager = app.instance_manager();
             let task = task;
@@ -243,6 +248,10 @@ impl ManagerRef<'_, InstanceManager> {
                     }
 
                     t_request.start_opaque();
+
+                    if config.modpack.is_some() {
+                        app.instance_manager().get_modpack_info(instance_id).await?;
+                    }
 
                     let file = match (cffile_path.is_file(), mrfile_path.is_file(), &config.modpack) {
                         (false, false, None) => {
