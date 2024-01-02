@@ -21,7 +21,7 @@ export default function getAdSize() {
     };
   } else {
     return {
-      minWidth: 1500,
+      minWidth: 1280,
       minHeight: 770,
       width: 1600,
       height: 770,
