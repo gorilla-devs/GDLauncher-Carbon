@@ -6,6 +6,7 @@ import HeaderLink from "./HeaderLink.astro";
 import Twitter from "../assets/twitter.svg";
 import Discord from "../assets/discord.svg";
 import NewsLetter from "./Newsletter";
+import { APP_URLS } from "../consts";
 ---
 
 <footer class="flex flex-col">
@@ -75,6 +76,32 @@ import NewsLetter from "./Newsletter";
       </Button>
     </div> -->
     <NewsLetter client:idle />
+	<div>
+      <span class="text-white font-medium pb-4">Download old GDL</span>
+      <ul>
+        <li>
+          <HeaderLink
+            href={APP_URLS.olddownload.win}
+          >
+            Windows
+          </HeaderLink>
+        </li>
+        <li>
+          <HeaderLink
+            href={APP_URLS.olddownload.macOs}
+          >
+            MacOs
+          </HeaderLink>
+        </li>
+        <li>
+          <HeaderLink
+            href={APP_URLS.olddownload.linux}
+          >
+            Linux
+          </HeaderLink>
+        </li>
+      </ul>
+    </div>
     <div>
       <span class="text-white font-medium pb-4">Get in Touch!</span>
       <ul class="flex gap-2">
