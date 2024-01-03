@@ -36,6 +36,20 @@ import GdxCF from "../components/GdxCF.astro";
         background-repeat: no-repeat;
         background-color: rgba(29, 32, 40, 1);
       }
+	  .wave {
+		
+  --width: 100%;
+  width: var(--width);
+  height: calc(var(--width) / 2);
+  background-color: rgba(29, 32, 40, 1);
+  /* border-radius: 126% / 47%; */
+      clip-path: polygon(0 20%, 50% 0, 100% 20%, 100% 100%, 0 100%);
+  position: absolute;
+  bottom: -100px;
+  overflow: hidden;
+  /* z-index: -1; */
+
+	  }
     </style></head
   >
 
@@ -71,13 +85,14 @@ import GdxCF from "../components/GdxCF.astro";
         <!-- <DownloadButtonDropdown client:only/> -->
         <Download />
       </div>
-	  <div class="relative mx-auto">
+	  <div class="relative mx-auto z-10">
 		<div class="relative">
 			<Image id="firstImg" src={Library} alt="gd launcher" class="mx-auto"/>
 		<Image id="secondImg" src={Export} alt="gd launcher" class="absolute right-0 bottom-0"/>
 		</div>
 		
 	  </div>
+	  <div class="wave"></div>
     </div>
 
     <WhatMakesGDSpecial />
