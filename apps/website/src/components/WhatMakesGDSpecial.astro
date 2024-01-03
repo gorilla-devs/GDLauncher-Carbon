@@ -119,13 +119,19 @@ import Feat7 from "../assets/feat7.svg";
     --offset: 3px;
     position: relative;
     overflow: hidden;
+    transition: all 0.5s ease-out;
   }
   .background__card:hover {
     cursor: pointer;
   }
-  .background__card:hover::before {
-    content: '';
-    background: conic-gradient(transparent 270deg, rgba(40, 101, 164, 1), transparent);
+
+  .background__card::before {
+    content: "";
+    background: conic-gradient(
+      transparent 270deg,
+      rgba(40, 101, 164, 1),
+      transparent
+    );
     position: absolute;
     top: 50%;
     left: 50%;
@@ -133,9 +139,12 @@ import Feat7 from "../assets/feat7.svg";
     aspect-ratio: 1;
     width: 100%;
     animation: rotate 3.5s linear infinite;
+    opacity: 0;
+    transition: opacity 0.5s ease-out;
   }
-  .background__card:hover::after {
-    content: '';
+
+  .background__card::after {
+    content: "";
     background: inherit;
     border-radius: inherit;
     position: absolute;
@@ -143,6 +152,37 @@ import Feat7 from "../assets/feat7.svg";
     height: calc(100% - 2 * var(--offset));
     width: calc(100% - 2 * var(--offset));
     z-index: 1;
+    opacity: 0;
+    transition: opacity 0.5s ease-out;
+  }
+
+  .background__card:hover::before {
+    content: "";
+    background: conic-gradient(
+      transparent 270deg,
+      rgba(40, 101, 164, 1),
+      transparent
+    );
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    aspect-ratio: 1;
+    width: 100%;
+    animation: rotate 3.5s linear infinite;
+    opacity: 1;
+    transition: opacity 0.5s ease-out;
+  }
+  .background__card:hover::after {
+    content: "";
+    background: inherit;
+    border-radius: inherit;
+    position: absolute;
+    inset: var(--offset);
+    height: calc(100% - 2 * var(--offset));
+    width: calc(100% - 2 * var(--offset));
+    z-index: 1;
+    opacity: 1;
   }
   .background__card > * {
     position: relative;
