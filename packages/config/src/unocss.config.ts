@@ -12,7 +12,7 @@ import transformerDirectives from "@unocss/transformer-directives";
 const safelist = Object.values(supportedLanguages).map(
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore
-  (lang) => `i-emojione-v1:flag-for-${lang}`
+  (lang) => `i-emojione-v1:flag-for-${lang}`,
 );
 
 const unocssConfig = {
@@ -34,8 +34,8 @@ const unocssConfig = {
       // hero: () =>
       //   import("@iconify-json/heroicons/icons.json").then((i) => i.default),
       ri: () => import("@iconify/json/json/ri.json").then((i) => i.default),
-      "devicon-plain": () =>
-        import("@iconify/json/json/devicon-plain.json").then((i) => i.default),
+      "fa6-solid": () =>
+        import("@iconify/json/json/fa6-solid.json").then((i) => i.default),
     }),
   ],
   rules: [["scrollbar-gutter", { "scrollbar-gutter": "stable" }]],

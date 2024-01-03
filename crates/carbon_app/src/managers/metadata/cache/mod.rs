@@ -42,8 +42,8 @@ use crate::domain::runtime_path::InstancesPath;
 use crate::managers::App;
 use crate::managers::ManagerRef;
 
-mod curseforge;
-mod modrinth;
+pub mod curseforge;
+pub mod modrinth;
 
 use curseforge::CurseforgeModCacher;
 use modrinth::ModrinthModCacher;
