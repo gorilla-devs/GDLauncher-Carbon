@@ -5,8 +5,28 @@ import Apple from "./assets/Apple";
 import Linux from "./assets/Linux";
 import Windows from "./assets/Windows";
 
-export const SITE_TITLE = "Astro Blog";
-export const SITE_DESCRIPTION = "Welcome to my website!";
+export const APP_URLS = {
+  socials: {
+    discord: "https://discord.gdlauncher.com",
+    github: "https://github.com/gorilla-devs/GDLauncher",
+    instagram: "https://www.instagram.com/gdlauncher",
+    twitter: "https://twitter.com/gdlauncher",
+  },
+  newsletter: "https://api.gdlauncher.com/v1",
+  kofi: "https://ko-fi.com/gdlauncher",
+  olddownload: {
+    win: "https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-win-setup.exe",
+    macOs:
+      "https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-mac-setup.dmg",
+    linux:
+      "https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-linux-setup.AppImage",
+    releases: "https://github.com/gorilla-devs/GDLauncher/releases",
+  },
+};
+export const ADD_USER_ENDPOINT = `${APP_URLS.newsletter}/mailing`;
+
+export const SITE_TITLE = "Gdl Blog";
+export const SITE_DESCRIPTION = "Welcome to gdlauncher!";
 
 export const DownloadItems: Array<{
   item: Element | string;

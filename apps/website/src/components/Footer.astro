@@ -9,7 +9,7 @@ import NewsLetter from "./Newsletter";
 ---
 
 <footer class="flex flex-col">
-  <div class="flex justify-between p-20">
+  <div class="flex justify-between p-20 gap-8">
     <div class="flex flex-col items-start basis-[50%]">
       <Image src={Logo} alt="BH Logo" class="pb-4" />
       <p class="text-graygd w-1/2">
@@ -74,7 +74,7 @@ import NewsLetter from "./Newsletter";
         SUBSCRIBE TO NEWSLETTER
       </Button>
     </div> -->
-    <NewsLetter client:only />
+    <NewsLetter client:idle />
     <div>
       <span class="text-white font-medium pb-4">Get in Touch!</span>
       <ul class="flex gap-2">

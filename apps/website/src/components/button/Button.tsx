@@ -10,7 +10,7 @@ import Linux from "../../assets/Linux";
 interface Props {
   transparent?: boolean;
   children: JSX.Element | JSX.Element[] | string;
-  onClick?: () => void;
+  onClick?: any;
   isDropdown?: boolean;
   icon?: JSX.Element | JSX.Element[] | string;
   items?: Array<{
