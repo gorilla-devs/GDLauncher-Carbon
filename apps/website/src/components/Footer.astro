@@ -10,7 +10,7 @@ import { APP_URLS } from "../consts";
 ---
 
 <footer class="flex flex-col">
-  <div class="flex justify-between p-20 gap-8">
+  <div class="flex justify-between p-20 gap-10">
     <div class="flex flex-col items-start basis-[50%]">
       <Image src={Logo} alt="BH Logo" class="pb-4" />
       <p class="text-graygd w-1/2">
@@ -76,29 +76,17 @@ import { APP_URLS } from "../consts";
       </Button>
     </div> -->
     <NewsLetter client:idle />
-	<div>
+    <div>
       <span class="text-white font-medium pb-4">Download old GDL</span>
       <ul>
         <li>
-          <HeaderLink
-            href={APP_URLS.olddownload.win}
-          >
-            Windows
-          </HeaderLink>
+          <HeaderLink href={APP_URLS.olddownload.win}>Windows</HeaderLink>
         </li>
         <li>
-          <HeaderLink
-            href={APP_URLS.olddownload.macOs}
-          >
-            MacOs
-          </HeaderLink>
+          <HeaderLink href={APP_URLS.olddownload.macOs}>MacOs</HeaderLink>
         </li>
         <li>
-          <HeaderLink
-            href={APP_URLS.olddownload.linux}
-          >
-            Linux
-          </HeaderLink>
+          <HeaderLink href={APP_URLS.olddownload.linux}>Linux</HeaderLink>
         </li>
       </ul>
     </div>
