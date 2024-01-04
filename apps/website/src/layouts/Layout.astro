@@ -17,15 +17,7 @@ const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
     <style>
       body {
         font-family: "Ubuntu", cursive;
-        /* background-color: rgba(29, 32, 40, 1); */
-        background-image: linear-gradient(
-            rgba(23, 29, 39, 0.3),
-            /* Your specified semi-transparent color */ rgba(23, 29, 39, 0.3)
-          ),
-          url("../assets/bg.svg");
-        background-size: cover;
-        /* background-position: center; */
-        background-repeat: no-repeat;
+
         background-color: rgba(29, 32, 40, 1);
         color: white;
         font-size: 20px;
@@ -37,11 +29,11 @@ const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
         border-radius: 12px;
       }
 
-      main {
+      /* main {
         max-width: 1020px;
         margin: 0 auto;
         padding: 0 20px;
-      }
+      } */
     </style>
   </head>
   <body>
