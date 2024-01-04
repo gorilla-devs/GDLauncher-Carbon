@@ -125,7 +125,12 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
 
     let app = AppInner::new(invalidation_sender, runtime_path).await;
 
-    let auto_manage_java = app.settings_manager().get_settings().await.unwrap().auto_manage_java;
+    let auto_manage_java = app
+        .settings_manager()
+        .get_settings()
+        .await
+        .unwrap()
+        .auto_manage_java;
 
     crate::managers::java::JavaManager::scan_and_sync(
         auto_manage_java,
