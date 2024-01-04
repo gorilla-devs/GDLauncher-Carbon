@@ -28,14 +28,15 @@ import { APP_URLS } from "../consts";
           <HeaderLink href="#">The Team</HeaderLink>
         </li>
         <li>
-          <HeaderLink href="#">Blog</HeaderLink>
+          <HeaderLink href="/blog">Blog</HeaderLink>
         </li>
         <li>
           <HeaderLink href="#">ModPacks</HeaderLink>
         </li>
         <li>
-          <HeaderLink href="#">Github</HeaderLink>
+          <HeaderLink href={APP_URLS.socials.github}>Github</HeaderLink>
         </li>
+		
       </ul>
     </div>
     <div>
@@ -104,9 +105,13 @@ import { APP_URLS } from "../consts";
           </HeaderLink>
         </li>
       </ul>
+	  <div class="flex flex-col">
       <span class="text-graygd"
         >(C) 2023 by GorillaDevs Inc. | All Right Reserved</span
       >
+	  <HeaderLink href="/terms-of-service">Terms of service</HeaderLink>
+	  <HeaderLink href="/privacy-statement">Privacy statement</HeaderLink>
+	  </div>
     </div>
   </div>
   <span class="text-graygd text-center pb-2 text-sm"

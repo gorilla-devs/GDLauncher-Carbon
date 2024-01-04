@@ -8,7 +8,7 @@ import Windows from "./assets/Windows";
 export const APP_URLS = {
   socials: {
     discord: "https://discord.gdlauncher.com",
-    github: "https://github.com/gorilla-devs/GDLauncher",
+    github: "https://github.com/gorilla-devs/GDLauncher-Carbon",
     instagram: "https://www.instagram.com/gdlauncher",
     twitter: "https://twitter.com/gdlauncher",
   },
