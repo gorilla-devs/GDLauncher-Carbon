@@ -18,14 +18,21 @@ import { marked } from "marked";
   pubDate={new Date("August 08 2021")}
   heroImage="/blog-placeholder-about.jpg"
 >
+
   <div id="root"></div>
 </Layout>
 <script>
   import { marked } from "marked";
   const root = document.getElementById("root");
+  
   const response = await fetch(
-    "https://raw.githubusercontent.com/gorilla-devs/ToS-Privacy/master/privacy-statement.md"
+    "https://raw.githubusercontent.com/gorilla-devs/ToS-Privacy/master/terms-of-service.md"
   );
   const data = await response.text();
-  root!.innerHTML = marked(data);
+root?.attachShadow({ mode: "open" });
+const shadow = root?.shadowRoot;
+  shadow!.innerHTML = marked(data);
 </script>
+<style>
+  
+</style>

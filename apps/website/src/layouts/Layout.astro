@@ -29,11 +29,13 @@ const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
         border-radius: 12px;
       }
 
-      /* main {
+      main {
         max-width: 1020px;
         margin: 0 auto;
         padding: 0 20px;
-      } */
+        
+      }
+       
     </style>
   </head>
   <body>
@@ -47,6 +49,7 @@ const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
             )
           }
         </div>
+        
         <slot />
       </article>
     </main>

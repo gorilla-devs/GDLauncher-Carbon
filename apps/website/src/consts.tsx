@@ -25,7 +25,7 @@ export const APP_URLS = {
 };
 export const ADD_USER_ENDPOINT = `${APP_URLS.newsletter}/mailing`;
 
-export const SITE_TITLE = "Gdl Blog";
+export const SITE_TITLE = "GdLauncher";
 export const SITE_DESCRIPTION = "Welcome to gdlauncher!";
 
 export const DownloadItems: Array<{
