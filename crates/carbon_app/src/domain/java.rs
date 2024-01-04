@@ -353,7 +353,7 @@ impl From<MinecraftJavaProfile> for SystemJavaProfileName {
     }
 }
 
-const SYSTEM_JAVA_PROFILE_NAME_PREFIX: &str = "__gdl_system_java_profile__";
+pub const SYSTEM_JAVA_PROFILE_NAME_PREFIX: &str = "__gdl_system_java_profile__";
 
 impl ToString for SystemJavaProfileName {
     fn to_string(&self) -> String {
@@ -395,12 +395,12 @@ impl TryFrom<&str> for SystemJavaProfileName {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SystemJavaProfile {
-    pub name: SystemJavaProfileName,
+pub struct JavaProfile {
+    pub name: String,
     pub java_id: Option<String>,
 }
 
-impl TryFrom<crate::db::java_profile::Data> for SystemJavaProfile {
+impl TryFrom<crate::db::java_profile::Data> for JavaProfile {
     type Error = anyhow::Error;
 
     fn try_from(data: crate::db::java_profile::Data) -> Result<Self, Self::Error> {

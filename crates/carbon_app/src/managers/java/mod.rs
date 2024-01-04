@@ -11,13 +11,13 @@ use self::{
 
 use super::ManagerRef;
 use crate::{
-    api::keys::java::GET_SYSTEM_JAVA_PROFILES,
+    api::keys::java::GET_JAVA_PROFILES,
     db::PrismaClient,
     domain::{
         instance::info::StandardVersion,
         java::{
-            Java, JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaVendor,
-            SystemJavaProfile, SystemJavaProfileName,
+            Java, JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaProfile, JavaVendor,
+            SystemJavaProfileName,
         },
     },
     managers::java::java_checker::RealJavaChecker,
@@ -33,7 +33,7 @@ pub mod discovery;
 pub mod java_checker;
 pub mod managed;
 mod parser;
-mod scan_and_sync;
+pub mod scan_and_sync;
 pub mod utils;
 
 pub(crate) struct JavaManager {
@@ -128,7 +128,7 @@ impl ManagerRef<'_, JavaManager> {
         Ok(result)
     }
 
-    pub async fn get_system_java_profiles(&self) -> anyhow::Result<Vec<SystemJavaProfile>> {
+    pub async fn get_system_java_profiles(&self) -> anyhow::Result<Vec<JavaProfile>> {
         let db = &self.app.prisma_client;
         let all_profiles = db
             .java_profile()
@@ -138,13 +138,27 @@ impl ManagerRef<'_, JavaManager> {
             .exec()
             .await?
             .into_iter()
-            .map(SystemJavaProfile::try_from)
+            .map(JavaProfile::try_from)
             .collect::<anyhow::Result<Vec<_>>>()?;
 
         Ok(all_profiles)
     }
 
-    pub async fn update_system_java_profile(
+    pub async fn get_java_profiles(&self) -> anyhow::Result<Vec<JavaProfile>> {
+        let db = &self.app.prisma_client;
+        let all_profiles = db
+            .java_profile()
+            .find_many(vec![])
+            .exec()
+            .await?
+            .into_iter()
+            .map(JavaProfile::try_from)
+            .collect::<anyhow::Result<Vec<_>>>()?;
+
+        Ok(all_profiles)
+    }
+
+    pub async fn update_java_profile(
         &self,
         profile_name: SystemJavaProfileName,
         java_id: String,
@@ -172,7 +186,7 @@ impl ManagerRef<'_, JavaManager> {
             .exec()
             .await?;
 
-        self.app.invalidate(GET_SYSTEM_JAVA_PROFILES, None);
+        self.app.invalidate(GET_JAVA_PROFILES, None);
 
         Ok(())
     }
@@ -256,7 +270,7 @@ impl ManagerRef<'_, JavaManager> {
             .get_system_java_profiles()
             .await?
             .into_iter()
-            .find(|profile| profile.name == target_profile)
+            .find(|profile| profile.name == target_profile.to_string())
             .ok_or_else(|| {
                 anyhow::anyhow!("system java profile not found for {target_profile:?}")
             })?;
@@ -363,7 +377,7 @@ impl ManagerRef<'_, JavaManager> {
             .app
             .prisma_client
             .java()
-            .find_unique(UniqueWhereParam::IdEquals(id.clone()))
+            .find_unique(crate::db::java::id::equals(id.clone()))
             .exec()
             .await?;
 
@@ -393,13 +407,10 @@ impl ManagerRef<'_, JavaManager> {
 
             let system_profiles_in_db = self.get_system_java_profiles().await?;
 
-            for SystemJavaProfile {
-                name: system_profile,
-                java_id,
-            } in system_profiles_in_db
-            {
-                if system_profile == target_profile
-                    || !system_profile.is_java_version_compatible(&java.version)
+            for JavaProfile { name, java_id } in system_profiles_in_db {
+                let system_profile_name = SystemJavaProfileName::try_from(&*name)?;
+                if system_profile_name == target_profile
+                    || !system_profile_name.is_java_version_compatible(&java.version)
                     || java_id.is_some()
                 {
                     continue;
@@ -409,7 +420,7 @@ impl ManagerRef<'_, JavaManager> {
                     .prisma_client
                     .java_profile()
                     .update(
-                        crate::db::java_profile::name::equals(system_profile.to_string()),
+                        crate::db::java_profile::name::equals(name),
                         vec![crate::db::java_profile::java::connect(
                             crate::db::java::id::equals(id.clone()),
                         )],
@@ -417,7 +428,7 @@ impl ManagerRef<'_, JavaManager> {
                     .exec()
                     .await?;
             }
-            self.app.invalidate(GET_SYSTEM_JAVA_PROFILES, None);
+            self.app.invalidate(GET_JAVA_PROFILES, None);
         }
 
         Ok(Some(java))
