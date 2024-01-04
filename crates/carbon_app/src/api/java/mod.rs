@@ -217,6 +217,7 @@ struct SetDefaultArgs {
 #[serde(rename_all = "camelCase")]
 pub enum FESystemJavaProfileName {
     Legacy,
+    LegacyPatchedV1,
     Alpha,
     Beta,
     Gamma,
@@ -229,6 +230,7 @@ impl From<crate::domain::java::SystemJavaProfileName> for FESystemJavaProfileNam
         use crate::domain::java::SystemJavaProfileName;
         match name {
             SystemJavaProfileName::Legacy => Self::Legacy,
+            SystemJavaProfileName::LegacyFixed1 => Self::LegacyPatchedV1,
             SystemJavaProfileName::Alpha => Self::Alpha,
             SystemJavaProfileName::Beta => Self::Beta,
             SystemJavaProfileName::Gamma => Self::Gamma,
@@ -242,6 +244,7 @@ impl From<FESystemJavaProfileName> for crate::domain::java::SystemJavaProfileNam
     fn from(name: FESystemJavaProfileName) -> Self {
         match name {
             FESystemJavaProfileName::Legacy => Self::Legacy,
+            FESystemJavaProfileName::LegacyPatchedV1 => Self::LegacyFixed1,
             FESystemJavaProfileName::Alpha => Self::Alpha,
             FESystemJavaProfileName::Beta => Self::Beta,
             FESystemJavaProfileName::Gamma => Self::Gamma,

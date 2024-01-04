@@ -203,10 +203,10 @@ const Java = () => {
         </Row>
         <div class="flex flex-col">
           <Show when={!settings.data?.autoManageJava}>
-            <div class="rounded-2xl overflow-hidden">
-              <Tabs variant="block">
-                <TabList>
-                  <Tab>
+            <div class="overflow-hidden">
+              <Tabs>
+                <TabList heightClass="h-14">
+                  <Tab class="w-1/2" centerContent>
                     <Trans
                       key="java.manage"
                       options={{
@@ -214,7 +214,7 @@ const Java = () => {
                       }}
                     />
                   </Tab>
-                  <Tab>
+                  <Tab class="w-1/2" centerContent>
                     <Trans
                       key="java.profiles"
                       options={{

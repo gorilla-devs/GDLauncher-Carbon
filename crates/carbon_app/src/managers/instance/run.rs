@@ -479,7 +479,11 @@ impl ManagerRef<'_, InstanceManager> {
                 t_request_version_info.update_items(2, 3);
 
                 let java = {
-                    let required_java = SystemJavaProfileName::from(
+                    // If instance has profile override, short circuit and use that
+                    // ....
+                    // else
+
+                    let mut required_java = SystemJavaProfileName::from(
                         daedalus::minecraft::MinecraftJavaProfile::try_from(
                             &version_info
                                 .java_version
@@ -491,15 +495,24 @@ impl ManagerRef<'_, InstanceManager> {
                         )?,
                     );
 
+                    // Forge 1.16.5 requires an older java 8 version so we inject the legacy fixed 1 profile
+                    if &version.release == "1.16.5" && *&version.modloaders.iter().find(|v| v.type_ == ModLoaderType::Forge).is_some() {
+                        required_java = SystemJavaProfileName::LegacyFixed1;
+                    }
+
                     tracing::debug!("Required java: {:?}", required_java);
 
-                    let usable_java = app.java_manager().get_usable_java(required_java).await?;
+                    let usable_java = app.java_manager().get_usable_java_for_profile_name(required_java).await?;
 
                     tracing::debug!("Usable java: {:?}", usable_java);
 
                     match usable_java {
                         Some(path) => path,
                         None => {
+                            if !app.settings_manager().get_settings().await?.auto_manage_java {
+                                return bail!("No usable java found and auto manage java is disabled");
+                            }
+
                             let t_download_java = task
                                 .subtask(Translation::InstanceTaskLaunchDownloadJava);
 
