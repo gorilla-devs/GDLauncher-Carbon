@@ -643,6 +643,7 @@ mod test {
             .await
             .unwrap();
 
+        JavaManager::ensure_profiles_in_db(db).await.unwrap();
         sync_system_java_profiles(db).await.unwrap();
 
         let all_profiles = db.java_profile().find_many(vec![]).exec().await.unwrap();
