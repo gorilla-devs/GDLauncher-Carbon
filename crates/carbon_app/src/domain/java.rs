@@ -315,6 +315,8 @@ impl JavaVersion {
 #[derive(Serialize, Deserialize, Debug, Copy, Clone, EnumIter, Eq, PartialEq)]
 pub enum SystemJavaProfileName {
     Legacy,
+    // LegacyFixed1 doesn't natively exist in metadata, it's only used to fix forge on 1.16.5 and patched at run.rs level
+    LegacyFixed1,
     Alpha,
     Beta,
     Gamma,
@@ -326,6 +328,9 @@ impl SystemJavaProfileName {
     pub fn is_java_version_compatible(&self, java_version: &JavaVersion) -> bool {
         match self {
             Self::Legacy => java_version.major == 8,
+            Self::LegacyFixed1 => {
+                java_version.major == 8 && java_version.patch.parse().unwrap_or(0) < 312
+            } // newer versions will break sometimes,
             Self::Alpha => java_version.major == 16,
             Self::Beta => java_version.major == 17,
             Self::Gamma => java_version.major == 17,
@@ -348,16 +353,21 @@ impl From<MinecraftJavaProfile> for SystemJavaProfileName {
     }
 }
 
+pub const SYSTEM_JAVA_PROFILE_NAME_PREFIX: &str = "__gdl_system_java_profile__";
+
 impl ToString for SystemJavaProfileName {
     fn to_string(&self) -> String {
-        match self {
-            Self::Legacy => "legacy".to_string(),
-            Self::Alpha => "alpha".to_string(),
-            Self::Beta => "beta".to_string(),
-            Self::Gamma => "gamma".to_string(),
-            Self::GammaSnapshot => "gamma_snapshot".to_string(),
-            Self::MinecraftJavaExe => "mc_java_exe".to_string(),
-        }
+        let name = match self {
+            Self::Legacy => "legacy",
+            Self::LegacyFixed1 => "legacy_fixed_1",
+            Self::Alpha => "alpha",
+            Self::Beta => "beta",
+            Self::Gamma => "gamma",
+            Self::GammaSnapshot => "gamma_snapshot",
+            Self::MinecraftJavaExe => "mc_java_exe",
+        };
+
+        format!("{}{}", SYSTEM_JAVA_PROFILE_NAME_PREFIX, name)
     }
 }
 
@@ -365,28 +375,39 @@ impl TryFrom<&str> for SystemJavaProfileName {
     type Error = anyhow::Error;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        match value {
+        if !value.starts_with(SYSTEM_JAVA_PROFILE_NAME_PREFIX) {
+            bail!("Invalid system java profile name: {}", value);
+        }
+
+        let name = value.strip_prefix(SYSTEM_JAVA_PROFILE_NAME_PREFIX).unwrap();
+
+        match name {
             "legacy" => Ok(Self::Legacy),
+            "legacy_fixed_1" => Ok(Self::LegacyFixed1),
             "alpha" => Ok(Self::Alpha),
             "beta" => Ok(Self::Beta),
             "gamma" => Ok(Self::Gamma),
             "gamma_snapshot" => Ok(Self::GammaSnapshot),
             "mc_java_exe" => Ok(Self::MinecraftJavaExe),
-            _ => bail!("Unknown system java profile name: {}", value),
+            _ => bail!("Invalid system java profile name: {}", value),
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SystemJavaProfile {
-    pub name: SystemJavaProfileName,
+pub struct JavaProfile {
+    pub name: String,
     pub java_id: Option<String>,
 }
 
-impl TryFrom<crate::db::java_system_profile::Data> for SystemJavaProfile {
+impl TryFrom<crate::db::java_profile::Data> for JavaProfile {
     type Error = anyhow::Error;
 
-    fn try_from(data: crate::db::java_system_profile::Data) -> Result<Self, Self::Error> {
+    fn try_from(data: crate::db::java_profile::Data) -> Result<Self, Self::Error> {
+        if !data.is_system_profile {
+            bail!("Cannot create system java profile from non-system profile");
+        }
+
         Ok(Self {
             name: data.name.as_str().try_into()?,
             java_id: data.java_id,

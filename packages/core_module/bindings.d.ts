@@ -21,12 +21,12 @@ export type Procedures = {
         { key: "instance.getLogs", input: never, result: GameLogEntry[] } | 
         { key: "instance.getModpackInfo", input: FEInstanceId | null, result: FEInstanceModpackInfo | null } | 
         { key: "java.getAvailableJavas", input: never, result: { [key: number]: FEJavaComponent[] } } | 
+        { key: "java.getJavaProfiles", input: never, result: FESystemJavaProfile[] } | 
         { key: "java.getManagedArch", input: never, result: FEManagedJavaArch[] } | 
         { key: "java.getManagedOS", input: never, result: FEManagedJavaOs[] } | 
         { key: "java.getManagedVendors", input: never, result: FEVendor[] } | 
         { key: "java.getManagedVersionsByVendor", input: FEVendor, result: FEManagedJavaOsMap } | 
         { key: "java.getSetupManagedJavaProgress", input: never, result: FEManagedJavaSetupProgress } | 
-        { key: "java.getSystemJavaProfiles", input: never, result: FESystemJavaProfile[] } | 
         { key: "mc.getFabricVersions", input: never, result: FEModdedManifest } | 
         { key: "mc.getForgeVersions", input: never, result: FEModdedManifest } | 
         { key: "mc.getMinecraftVersions", input: never, result: ManifestVersion[] } | 
@@ -94,7 +94,7 @@ export type Procedures = {
         { key: "instance.updateMod", input: UpdateMod, result: FETaskId } | 
         { key: "java.deleteJavaVersion", input: string, result: null } | 
         { key: "java.setupManagedJava", input: FEManagedJavaSetupArgs, result: string } | 
-        { key: "java.updateSystemJavaProfilePath", input: FEUpdateSystemJavaProfileArgs, result: null } | 
+        { key: "java.updateJavaProfilePath", input: FEUpdateSystemJavaProfileArgs, result: null } | 
         { key: "metrics.sendEvent", input: FEMetricsEvent, result: null } | 
         { key: "settings.setSettings", input: FESettingsUpdate, result: null } | 
         { key: "vtask.dismissTask", input: FETaskId, result: null },
@@ -122,6 +122,8 @@ export type CFFEModSearchParameters = { query: CFFEModSearchParametersQuery }
 
 export type FEInstanceModpackInfo = { name: string; version_name: string; url_slug: string; has_image: boolean }
 
+export type FESystemJavaProfile = { name: string; javaId: string | null }
+
 export type InstanceMod = { instance_id: FEInstanceId; mod_id: string }
 
 export type AccountStatus = "ok" | "expired" | "refreshing" | "invalid"
@@ -146,7 +148,7 @@ export type CFFEFilesParameters = { body: CFFEFilesParametersBody }
 
 export type MRFEVersionType = "alpha" | "beta" | "release"
 
-export type FESystemJavaProfileName = "legacy" | "alpha" | "beta" | "gamma" | "gammaSnapshot" | "minecraftJavaExe"
+export type FESystemJavaProfileName = "legacy" | "legacyPatchedV1" | "alpha" | "beta" | "gamma" | "gammaSnapshot" | "minecraftJavaExe"
 
 export type ImportScanStatus = "NoResults" | { SingleResult: ImportEntry } | { MultiResult: ImportEntry[] }
 
@@ -305,8 +307,6 @@ export type FEUnifiedSearchParameters = { searchQuery: string | null; categories
 export type MRFEUser = { username: string; name: string | null; email: string | null; bio: string | null; id: string; github_id: number | null; avatar_url: string | null; created: string; role: MRFEUserRole; badges: number }
 
 export type DuplicateInstance = { instance: FEInstanceId; new_name: string }
-
-export type FESystemJavaProfile = { name: FESystemJavaProfileName; javaId: string | null }
 
 /**
  * An image that have been uploaded to a project's gallery
