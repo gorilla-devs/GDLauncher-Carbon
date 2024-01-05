@@ -32,6 +32,7 @@ const posts = (await getCollection("blog")).sort(
       }
       main {
         width: 960px;
+        margin: 0 auto;
       }
       ul {
         display: flex;
@@ -68,19 +69,17 @@ const posts = (await getCollection("blog")).sort(
       }
       .title {
         margin: 0;
-        color: rgb(var(--black));
+        color: white;
         line-height: 1;
       }
       .date {
         margin: 0;
-        color: rgb(var(--gray));
+        color: rgba(147, 153, 170, 1);
       }
-      ul li a:hover h4,
-      ul li a:hover .date {
-        color: rgb(var(--accent));
-      }
+      
       ul a:hover img {
         box-shadow: var(--box-shadow);
+        transform: scale(1.05);
       }
       @media (max-width: 720px) {
         ul {
