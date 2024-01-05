@@ -10,6 +10,11 @@ import { marked } from "marked";
 //     console.log(data); // This is the content of the file
 //   })
 //   .catch((error) => console.error("Error fetching data: ", error));
+const response = await fetch(
+    "https://raw.githubusercontent.com/gorilla-devs/ToS-Privacy/master/terms-of-service.md"
+  );
+  const data = await response.text();
+  const md = marked(data);
 ---
 
 <Layout
@@ -19,9 +24,9 @@ import { marked } from "marked";
   heroImage="/blog-placeholder-about.jpg"
 >
 
-  <div id="root"></div>
+  <div set:html={md}></div>
 </Layout>
-<script>
+<!-- <script>
   import { marked } from "marked";
   const root = document.getElementById("root");
   
@@ -35,4 +40,4 @@ const shadow = root?.shadowRoot;
 </script>
 <style>
   
-</style>
+</style> -->
