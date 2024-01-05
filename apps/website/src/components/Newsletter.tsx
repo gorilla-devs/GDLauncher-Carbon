@@ -68,7 +68,12 @@ const NewsLetter = () => {
       <Show when={success()}>
         <div class="text-green-400">{success()}</div>
       </Show>
-      <Button intent="primary" size="small" onClick={handleSubmit as any}>
+      <Button
+        intent="primary"
+        size="small"
+        onClick={handleSubmit as any}
+        class="mt-3"
+      >
         SUBSCRIBE TO NEWSLETTER
       </Button>
     </div>

@@ -116,35 +116,27 @@ import Feat7 from "../assets/feat7.svg";
 <style>
   .background__card {
     background-color: rgba(39, 43, 53, 1);
-    --offset: 3px;
+    --offset: 2px;
     position: relative;
     overflow: hidden;
-    transition: all 0.5s ease-out;
   }
   .background__card:hover {
-    cursor: pointer;
+    cursor: default;
   }
-
   .background__card::before {
-    content: "";
-    background: conic-gradient(
-      transparent 270deg,
-      rgba(40, 101, 164, 1),
-      transparent
-    );
+    content: '';
+    background: conic-gradient(transparent 270deg, rgba(40, 101, 164, 1), transparent);
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     aspect-ratio: 1;
     width: 100%;
-    animation: rotate 3.5s linear infinite;
     opacity: 0;
-    transition: opacity 0.5s ease-out;
+    animation: rotate 3s linear infinite;
   }
-
   .background__card::after {
-    content: "";
+    content: '';
     background: inherit;
     border-radius: inherit;
     position: absolute;
@@ -152,37 +144,37 @@ import Feat7 from "../assets/feat7.svg";
     height: calc(100% - 2 * var(--offset));
     width: calc(100% - 2 * var(--offset));
     z-index: 1;
-    opacity: 0;
-    transition: opacity 0.5s ease-out;
+    
   }
+
+  .background__card::after,
+  .background__card::before {
+    transition: all 1s ease-in-out;
+  }
+
 
   .background__card:hover::before {
-    content: "";
-    background: conic-gradient(
-      transparent 270deg,
-      rgba(40, 101, 164, 1),
-      transparent
-    );
+    content: '';
+    background: conic-gradient(transparent 270deg, rgba(40, 101, 164, 1), transparent);
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     aspect-ratio: 1;
     width: 100%;
-    animation: rotate 3.5s linear infinite;
     opacity: 1;
-    transition: opacity 0.5s ease-out;
+    animation: rotate 3s linear infinite;
   }
   .background__card:hover::after {
-    content: "";
+    content: '';
     background: inherit;
     border-radius: inherit;
     position: absolute;
     inset: var(--offset);
     height: calc(100% - 2 * var(--offset));
     width: calc(100% - 2 * var(--offset));
-    z-index: 1;
     opacity: 1;
+    z-index: 1;
   }
   .background__card > * {
     position: relative;
@@ -191,9 +183,11 @@ import Feat7 from "../assets/feat7.svg";
   @keyframes rotate {
     0% {
       transform: translate(-50%, -50%) scale(1.4) rotate(0turn);
+      
     }
     100% {
       transform: translate(-50%, -50%) scale(1.4) rotate(1turn);
+      
     }
   }
 </style>
