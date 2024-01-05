@@ -86,7 +86,7 @@ import GdxCF from "../components/GdxCF.astro";
         <Download />
       </div>
 	  <div class="relative mx-auto z-10">
-		<div class="relative">
+		<div class="relative parallax">
 			<Image id="firstImg" src={Library} alt="gd launcher" class="mx-auto"/>
 		<Image id="secondImg" src={Export} alt="gd launcher" class="absolute right-0 bottom-0"/>
 		</div>
@@ -101,19 +101,12 @@ import GdxCF from "../components/GdxCF.astro";
   </body>
 </html>
 
+<script>
+  import vanilla from "vanilla-tilt";
 
-<!-- <style>
-	#secondImg {
-		animation: fade linear;
-		animation-timeline: view();
-	}
-	@keyframes fade {
-		from {
-			opacity: 0;
-		}
-		to {
-			opacity: 1;
-		}
-	}
-</style> -->
+  vanilla.init(document.querySelector(".parallax") as HTMLElement, {
+    max: 25,
+    speed: 200
+  })
+</script>
 
