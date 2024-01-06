@@ -209,7 +209,7 @@ impl ManagerRef<'_, InstanceManager> {
 
     pub async fn get_instance_update_channels(
         self,
-        instance_id: InstanceId
+        instance_id: InstanceId,
     ) -> anyhow::Result<Vec<PlatformModChannel>> {
         let instances = self.instances.read().await;
         let instance = instances
@@ -220,7 +220,10 @@ impl ManagerRef<'_, InstanceManager> {
         let config = data.config.clone();
         drop(instances);
 
-        Ok(self.instance_cfg_update_channels(&config).await?.into_owned())
+        Ok(self
+            .instance_cfg_update_channels(&config)
+            .await?
+            .into_owned())
     }
 
     pub async fn enable_mod(
@@ -529,7 +532,8 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
-        let metadata = m.metadata
+        let metadata = m
+            .metadata
             .expect("metadata must be associated with a ModFileCache entry");
 
         let cf = metadata
