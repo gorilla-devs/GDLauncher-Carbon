@@ -335,7 +335,7 @@ pub async fn generate_startup_command(
         auth_uuid: full_account.uuid,
         auth_access_token: player_token.clone(),
         auth_session: player_token,
-        user_type: "mojang".to_owned(),
+        user_type: "msa".to_owned(),
         version_type: version.type_.as_str().to_string(),
         user_properties: "{}".to_owned(),
     };
