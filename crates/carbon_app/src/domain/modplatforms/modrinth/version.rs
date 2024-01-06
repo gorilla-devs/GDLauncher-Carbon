@@ -247,3 +247,13 @@ impl From<VersionType> for ModChannel {
         }
     }
 }
+
+impl From<ModChannel> for VersionType {
+    fn from(value: ModChannel) -> Self {
+        match value {
+            ModChannel::Alpha => VersionType::Alpha,
+            ModChannel::Beta => VersionType::Beta,
+            ModChannel::Stable => VersionType::Release,
+        }
+    }
+}

@@ -32,6 +32,87 @@ pub enum FESearchAPI {
     Modrinth,
 }
 
+#[derive(Type, Debug, Deserialize, Serialize, Clone, Copy)]
+#[repr(i32)]
+pub enum ModChannel {
+    Alpha = 0,
+    Beta,
+    Stable,
+}
+
+impl Default for ModChannel {
+    fn default() -> Self {
+        Self::Stable
+    }
+}
+
+impl TryFrom<i32> for ModChannel {
+    type Error = anyhow::Error;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Alpha),
+            1 => Ok(Self::Beta),
+            2 => Ok(Self::Stable),
+            _ => Err(anyhow::anyhow!(
+                "Invalid mod channel id {value} not in range 0..=2"
+            )),
+        }
+    }
+}
+
+impl From<ModChannel> for crate::domain::modplatforms::ModChannel {
+    fn from(value: ModChannel) -> Self {
+        use crate::domain::modplatforms::ModChannel as Domain;
+
+        match value {
+            ModChannel::Alpha => Domain::Alpha,
+            ModChannel::Beta => Domain::Beta,
+            ModChannel::Stable => Domain::Stable,
+        }
+    }
+}
+
+impl From<crate::domain::modplatforms::ModChannel> for ModChannel {
+    fn from(value: crate::domain::modplatforms::ModChannel) -> Self {
+        use crate::domain::modplatforms::ModChannel as Domain;
+
+        match value {
+            Domain::Alpha => Self::Alpha,
+            Domain::Beta => Self::Beta,
+            Domain::Stable => Self::Stable,
+        }
+    }
+}
+
+#[derive(Type, Serialize, Deserialize, Debug, Copy, Clone)]
+pub enum PlatformModChannel {
+    Curseforge(ModChannel),
+    Modrinth(ModChannel),
+}
+
+impl From<PlatformModChannel> for crate::domain::modplatforms::PlatformModChannel {
+    fn from(value: PlatformModChannel) -> Self {
+        use crate::domain::modplatforms::PlatformModChannel as Domain;
+
+        match value {
+            PlatformModChannel::Curseforge(c) => Domain::Curseforge(c.into()),
+            PlatformModChannel::Modrinth(c) => Domain::Modrinth(c.into()),
+        }
+    }
+}
+
+impl From<crate::domain::modplatforms::PlatformModChannel> for PlatformModChannel {
+    fn from(value: crate::domain::modplatforms::PlatformModChannel) -> Self {
+        use crate::domain::modplatforms::PlatformModChannel as Domain;
+
+        match value {
+            Domain::Curseforge(c) => PlatformModChannel::Curseforge(c.into()),
+            Domain::Modrinth(c) => PlatformModChannel::Modrinth(c.into()),
+        }
+    }
+}
+
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
         // Curseforge

@@ -64,7 +64,7 @@ pub struct FileHash {
     pub algo: HashAlgo,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr, Copy, Clone)]
+#[derive(Debug, Serialize_repr, Deserialize_repr, Copy, Clone, PartialEq, Eq)]
 #[repr(u8)]
 pub enum FileReleaseType {
     Stable = 1,
@@ -610,6 +610,16 @@ impl From<FileReleaseType> for ModChannel {
             FileReleaseType::Alpha => ModChannel::Alpha,
             FileReleaseType::Beta => ModChannel::Beta,
             FileReleaseType::Stable => ModChannel::Stable,
+        }
+    }
+}
+
+impl From<ModChannel> for FileReleaseType {
+    fn from(value: ModChannel) -> Self {
+        match value {
+            ModChannel::Alpha => FileReleaseType::Alpha,
+            ModChannel::Beta => FileReleaseType::Beta,
+            ModChannel::Stable => FileReleaseType::Stable,
         }
     }
 }

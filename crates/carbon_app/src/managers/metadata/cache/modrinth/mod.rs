@@ -12,6 +12,7 @@ use crate::domain::instance::info::ModLoaderType;
 use crate::domain::modplatforms::modrinth::project::ProjectVersionsFilters;
 use crate::domain::modplatforms::modrinth::responses::VersionsResponse;
 use crate::domain::modplatforms::modrinth::search::ProjectID;
+use crate::domain::modplatforms::ModChannel;
 use crate::{
     db::read_filters::{DateTimeFilter, IntFilter},
     domain::{
@@ -414,7 +415,7 @@ async fn cache_modrinth_meta_unchecked(
         .exec()
         .await?;
 
-    let mut file_update_paths = HashSet::<(&str, ModLoaderType)>::new();
+    let mut file_update_paths = HashSet::<(&str, ModLoaderType, ModChannel)>::new();
 
     if let Some(versions) = &version_list {
         for version in &versions.0 {
@@ -428,7 +429,7 @@ async fn cache_modrinth_meta_unchecked(
                         continue;
                     };
 
-                    file_update_paths.insert((game_version, loader));
+                    file_update_paths.insert((game_version, loader, version.version_type.into()));
                 }
             }
         }
@@ -436,7 +437,13 @@ async fn cache_modrinth_meta_unchecked(
 
     let update_paths = file_update_paths
         .into_iter()
-        .map(|(gamever, loader)| format!("{gamever},{}", loader.to_string().to_lowercase()))
+        .map(|(gamever, loader, channel)| {
+            format!(
+                "{gamever},{},{}",
+                loader.to_string().to_lowercase(),
+                channel.as_str(),
+            )
+        })
         .join(";");
     dbg!(&update_paths);
 

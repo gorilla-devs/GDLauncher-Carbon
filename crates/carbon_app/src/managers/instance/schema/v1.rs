@@ -23,6 +23,8 @@ pub struct Instance {
     pub modpack: Option<Modpack>,
     pub game_configuration: GameConfig,
     #[serde(default)]
+    pub update_channels: Option<Vec<PlatformModChannel>>,
+    #[serde(default)]
     pub notes: String,
 }
 
@@ -108,7 +110,7 @@ pub struct MemoryRange {
     pub max_mb: u16,
 }
 
-use crate::domain::instance::info;
+use crate::domain::{instance::info, modplatforms::PlatformModChannel};
 
 impl From<Instance> for info::Instance {
     fn from(value: Instance) -> Self {
@@ -121,6 +123,7 @@ impl From<Instance> for info::Instance {
             seconds_played: value.seconds_played,
             modpack: value.modpack.map(Into::into),
             game_configuration: value.game_configuration.into(),
+            update_channels: value.update_channels,
             notes: value.notes,
         }
     }
@@ -137,6 +140,7 @@ impl From<info::Instance> for Instance {
             seconds_played: value.seconds_played,
             modpack: value.modpack.map(Into::into),
             game_configuration: value.game_configuration.into(),
+            update_channels: value.update_channels,
             notes: value.notes,
         }
     }

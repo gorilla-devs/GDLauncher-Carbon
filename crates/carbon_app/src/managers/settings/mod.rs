@@ -4,7 +4,7 @@ use super::ManagerRef;
 use crate::{
     api::{keys::settings::*, settings::FESettingsUpdate},
     db::app_configuration,
-    domain::runtime_path,
+    domain::{modplatforms::PlatformModChannel, runtime_path},
 };
 use anyhow::anyhow;
 use chrono::Utc;
@@ -165,11 +165,16 @@ impl ManagerRef<'_, SettingsManager> {
             something_changed = true;
         }
 
-        if let Some(preferred_mod_channel) = incoming_settings.preferred_mod_channel {
+        if let Some(preferred_mod_channels) = incoming_settings.preferred_mod_channels {
+            let pmcs = preferred_mod_channels
+                .into_iter()
+                .map(crate::domain::modplatforms::PlatformModChannel::from)
+                .collect::<Vec<_>>();
+
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::preferred_mod_channel::set(
-                    preferred_mod_channel as i32,
+                vec![app_configuration::preferred_mod_channels::set(
+                    PlatformModChannel::list_to_string(&pmcs[..]),
                 )],
             ));
         }

@@ -5,6 +5,8 @@ use std::collections::HashSet;
 use anyhow::bail;
 use chrono::{DateTime, Utc};
 
+use crate::domain::modplatforms::PlatformModChannel;
+
 #[derive(Debug, Clone)]
 pub struct Instance {
     pub name: String,
@@ -15,6 +17,7 @@ pub struct Instance {
     pub seconds_played: u64,
     pub modpack: Option<Modpack>,
     pub game_configuration: GameConfig,
+    pub update_channels: Option<Vec<PlatformModChannel>>,
     pub notes: String,
 }
 

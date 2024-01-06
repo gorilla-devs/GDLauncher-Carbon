@@ -1,4 +1,7 @@
+use std::borrow::Cow;
+
 use anyhow::{anyhow, bail};
+use futures::Future;
 use thiserror::Error;
 
 use crate::api::keys::instance::INSTANCE_MODS;
@@ -6,15 +9,18 @@ use crate::db::{
     curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
     modrinth_mod_cache as mrdb,
 };
-use crate::domain::instance as domain;
 use crate::domain::instance::info::{GameVersion, ModLoaderType};
-use crate::domain::modplatforms::curseforge;
+use crate::domain::instance::{self as domain, info};
 use crate::domain::modplatforms::curseforge::filters::{
     ModFilesParameters, ModFilesParametersQuery, ModParameters,
 };
+use crate::domain::modplatforms::curseforge::FileReleaseType;
 use crate::domain::modplatforms::modrinth::project::ProjectVersionsFilters;
 use crate::domain::modplatforms::modrinth::search::ProjectID;
+use crate::domain::modplatforms::modrinth::version::VersionType;
+use crate::domain::modplatforms::{curseforge, ModChannel, PlatformModChannel};
 use crate::managers::instance::InstanceType;
+use crate::managers::AppInner;
 use crate::{domain::vtask::VisualTaskId, managers::ManagerRef};
 
 use super::{
@@ -33,7 +39,10 @@ impl ManagerRef<'_, InstanceManager> {
             bail!("instance {} is not valid", *instance_id);
         };
 
-        let update_paths = match &data.config.game_configuration.version {
+        let config = data.config.clone();
+        drop(instances);
+
+        let update_paths = match &config.game_configuration.version {
             Some(GameVersion::Standard(version)) => {
                 let v = version.release.to_lowercase();
 
@@ -46,19 +55,22 @@ impl ManagerRef<'_, InstanceManager> {
             _ => Vec::new(),
         };
 
-        drop(instances);
+        let update_channels = self.instance_cfg_update_channels(&config).await?;
 
-        fn split_paths<'a>(paths: &'a str) -> Vec<(&'a str, &'a str)> {
+        fn split_paths<'a>(paths: &'a str) -> Vec<(&'a str, &'a str, &'a str)> {
             paths
                 .split(';')
                 .filter_map(|path| path.split_once(','))
+                .filter_map(|(v, lc)| lc.split_once(',').map(|(l, c)| (v, l, c)))
                 .collect()
         }
 
-        let has_update_for_paths = |paths: &Vec<(&str, &str)>| {
-            update_paths
-                .iter()
-                .any(|(v1, l1)| paths.iter().any(|(v2, l2)| v1 == v2 && l1 == l2))
+        let has_update_for_paths = |paths: &Vec<(&str, &str, &str)>, channels: Vec<ModChannel>| {
+            update_paths.iter().any(|(v1, l1)| {
+                paths.iter().any(|(v2, l2, c2)| {
+                    v1 == v2 && l1 == l2 && channels.iter().any(|c| c.as_str() == *c2)
+                })
+            })
         };
 
         let mods = self
@@ -110,7 +122,18 @@ impl ManagerRef<'_, InstanceManager> {
                     }),
                     has_curseforge_update: cf
                         .as_ref()
-                        .map(|v| has_update_for_paths(&split_paths(&v.update_paths)))
+                        .map(|v| {
+                            has_update_for_paths(
+                                &split_paths(&v.update_paths),
+                                update_channels
+                                    .iter()
+                                    .filter_map(|c| match c {
+                                        PlatformModChannel::Curseforge(c) => Some(*c),
+                                        _ => None,
+                                    })
+                                    .collect(),
+                            )
+                        })
                         .unwrap_or(false),
                     curseforge: cf.map(|m| domain::CurseForgeModMetadata {
                         project_id: m.project_id as u32,
@@ -129,7 +152,18 @@ impl ManagerRef<'_, InstanceManager> {
                     }),
                     has_modrinth_update: mr
                         .as_ref()
-                        .map(|v| has_update_for_paths(&split_paths(&v.update_paths)))
+                        .map(|v| {
+                            has_update_for_paths(
+                                &split_paths(&v.update_paths),
+                                update_channels
+                                    .iter()
+                                    .filter_map(|c| match c {
+                                        PlatformModChannel::Modrinth(c) => Some(*c),
+                                        _ => None,
+                                    })
+                                    .collect(),
+                            )
+                        })
                         .unwrap_or(false),
                     modrinth: m.metadata.and_then(|m| m.modrinth).flatten().map(|m| {
                         domain::ModrinthModMetadata {
@@ -152,6 +186,41 @@ impl ManagerRef<'_, InstanceManager> {
             });
 
         Ok(mods.collect::<Vec<_>>())
+    }
+
+    async fn instance_cfg_update_channels(
+        self,
+        config: &info::Instance,
+    ) -> anyhow::Result<Cow<Vec<PlatformModChannel>>> {
+        match &config.update_channels {
+            Some(channels) => Ok(Cow::Borrowed(channels)),
+            None => {
+                let pmcs = self
+                    .app
+                    .settings_manager()
+                    .get_settings()
+                    .await?
+                    .preferred_mod_channels;
+
+                Ok(Cow::Owned(PlatformModChannel::str_to_vec(&pmcs)?))
+            }
+        }
+    }
+
+    pub async fn get_instance_update_channels(
+        self,
+        instance_id: InstanceId
+    ) -> anyhow::Result<Vec<PlatformModChannel>> {
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let data = instance.type_.data()?;
+        let config = data.config.clone();
+        drop(instances);
+
+        Ok(self.instance_cfg_update_channels(&config).await?.into_owned())
     }
 
     pub async fn enable_mod(
@@ -306,7 +375,7 @@ impl ManagerRef<'_, InstanceManager> {
                 .game_configuration
                 .version
                 .as_ref()
-                .ok_or(anyhow::anyhow!("Can't find valid version"))?
+                .ok_or(anyhow!("Can't find valid version"))?
                 .clone()
         };
 
@@ -317,7 +386,7 @@ impl ManagerRef<'_, InstanceManager> {
                     .modloaders
                     .iter()
                     .next()
-                    .ok_or(anyhow::anyhow!("No modloader available"))?;
+                    .ok_or(anyhow!("No modloader available"))?;
 
                 (version.release.clone(), modloader.type_.to_string())
             }
@@ -335,9 +404,7 @@ impl ManagerRef<'_, InstanceManager> {
             .latest_files_indexes
             .iter()
             .find(|value| value.game_version == version)
-            .ok_or(anyhow::anyhow!(
-                "Can't find a valid version for this instance"
-            ))?
+            .ok_or(anyhow!("Can't find a valid version for this instance"))?
             .file_id
             .try_into()?;
 
@@ -384,7 +451,7 @@ impl ManagerRef<'_, InstanceManager> {
                 .game_configuration
                 .version
                 .as_ref()
-                .ok_or(anyhow::anyhow!("Can't find valid version"))?
+                .ok_or(anyhow!("Can't find valid version"))?
                 .clone()
         };
 
@@ -395,7 +462,7 @@ impl ManagerRef<'_, InstanceManager> {
                     .modloaders
                     .iter()
                     .next()
-                    .ok_or(anyhow::anyhow!("No modloader available"))?;
+                    .ok_or(anyhow!("No modloader available"))?;
 
                 (version.release.clone(), modloader.type_.to_string())
             }
@@ -414,9 +481,7 @@ impl ManagerRef<'_, InstanceManager> {
             })
             .await?
             .get(0)
-            .ok_or(anyhow::anyhow!(
-                "Can't find a valid version for this instance"
-            ))?
+            .ok_or(anyhow!("Can't find a valid version for this instance"))?
             .id
             .clone();
 
@@ -427,6 +492,169 @@ impl ManagerRef<'_, InstanceManager> {
         let task_id = installer.install(self.app, instance_id, true, None).await?;
 
         Ok(task_id)
+    }
+
+    /// Attempt to update a mod respecting the instance's (and the global) channel preference.
+    pub async fn update_mod(
+        self,
+        instance_id: InstanceId,
+        id: String,
+    ) -> anyhow::Result<VisualTaskId> {
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let data = instance.type_.data()?;
+        let config = data.config.clone();
+        drop(instances);
+
+        let Some(GameVersion::Standard(version)) = &config.game_configuration.version else {
+            bail!("Instance uses a custom game version file. Cannot resolve minecraft version for mod installation");
+        };
+
+        let update_channels = self.instance_cfg_update_channels(&config).await?;
+
+        let m = self
+            .app
+            .prisma_client
+            .mod_file_cache()
+            .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
+            .with(
+                fcdb::metadata::fetch()
+                    .with(metadb::curseforge::fetch())
+                    .with(metadb::modrinth::fetch()),
+            )
+            .exec()
+            .await?
+            .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
+
+        let metadata = m.metadata
+            .expect("metadata must be associated with a ModFileCache entry");
+
+        let cf = metadata
+            .curseforge
+            .expect("curseforge metadata was queried but not returned");
+
+        let mr = metadata
+            .modrinth
+            .expect("modrinth metadata was queried but not returned");
+
+        let mut cf_response = None;
+        let mut mr_response = None;
+
+        for channel in update_channels.iter() {
+            match channel {
+                PlatformModChannel::Curseforge(channel) => {
+                    let Some(cf) = &cf else { continue };
+
+                    if cf_response.is_none() {
+                        cf_response = Some(
+                            self.app
+                                .modplatforms_manager()
+                                .curseforge
+                                .get_mod_files(ModFilesParameters {
+                                    mod_id: cf.project_id,
+                                    query: ModFilesParametersQuery {
+                                        game_version: Some(version.release.clone()),
+                                        game_version_type_id: None,
+                                        mod_loader_type: version
+                                            .modloaders
+                                            .iter()
+                                            .next()
+                                            .map(|v| v.type_.into()),
+                                        index: None,
+                                        page_size: None,
+                                    },
+                                })
+                                .await?,
+                        );
+                    }
+
+                    if let Some(cfr) = &cf_response {
+                        let frt = FileReleaseType::from(*channel);
+
+                        let Some(file) = cfr.data.iter().find(|file| file.release_type == frt)
+                        else {
+                            continue;
+                        };
+
+                        // We already have the most preferred version installed.
+                        // There is no point to continuing as any version returned by
+                        // a future loop would be from a less preferred channel.
+                        if file.id == cf.file_id {
+                            break;
+                        }
+
+                        return self
+                            .install_curseforge_mod(
+                                instance_id,
+                                file.mod_id as u32,
+                                file.id as u32,
+                                false,
+                                Some(id),
+                            )
+                            .await;
+                    }
+                }
+                PlatformModChannel::Modrinth(channel) => {
+                    let Some(mr) = &mr else { continue };
+
+                    if mr_response.is_none() {
+                        mr_response = Some(
+                            self.app
+                                .modplatforms_manager()
+                                .modrinth
+                                .get_project_versions(ProjectVersionsFilters {
+                                    project_id: ProjectID(mr.project_id.clone()),
+                                    game_versions: Some(vec![version.release.clone()]),
+                                    loaders: Some(
+                                        version
+                                            .modloaders
+                                            .iter()
+                                            .map(|ml| ml.type_.to_string())
+                                            .collect(),
+                                    ),
+                                    limit: None,
+                                    offset: None,
+                                })
+                                .await?,
+                        );
+                    }
+
+                    if let Some(mrr) = &mr_response {
+                        let vtype = VersionType::from(*channel);
+
+                        let Some(version) =
+                            mrr.iter().find(|version| version.version_type == vtype)
+                        else {
+                            continue;
+                        };
+
+                        // We already have the most preferred version installed.
+                        // There is no point to continuing as any version returned by
+                        // a future loop would be from a less preferred channel.
+                        if version.id == mr.version_id {
+                            break;
+                        }
+
+                        return self
+                            .install_modrinth_mod(
+                                instance_id,
+                                version.project_id.clone(),
+                                version.id.clone(),
+                                false,
+                                Some(id),
+                            )
+                            .await;
+                    }
+                }
+            }
+        }
+
+        Err(anyhow!(
+            "unable to find newer mod version in availible update channels"
+        ))
     }
 
     pub async fn update_curseforge_mod(

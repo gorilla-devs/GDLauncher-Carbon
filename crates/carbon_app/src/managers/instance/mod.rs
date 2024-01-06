@@ -934,6 +934,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 extra_java_args: None,
                 memory: None,
             },
+            update_channels: None,
             notes,
         };
 
