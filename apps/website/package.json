@@ -17,6 +17,7 @@
     "@fontsource/ubuntu": "^5.0.8",
     "astro": "^4.0.5",
     "class-variance-authority": "^0.7.0",
+    "js-yaml": "^4.1.0",
     "lodash": "^4.17.21",
     "marked": "^9.0.3",
     "solid-icons": "^1.1.0",
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "@astrojs/tailwind": "^5.0.3",
+    "@types/js-yaml": "^4.0.9",
     "tailwindcss": "^3.3.6"
   }
 }
