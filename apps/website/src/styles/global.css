@@ -64,7 +64,6 @@ select {
 /*
   7. Avoid text overflows
 */
-
 p,
 h1,
 h2,
@@ -74,6 +73,7 @@ h5,
 h6 {
   overflow-wrap: break-word;
   margin-bottom: 20px;
+  color: white;
 }
 /*
   8. Create a root stacking context

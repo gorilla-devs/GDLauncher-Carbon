@@ -4,6 +4,7 @@ import BaseHead from "../components/BaseHead.astro";
 import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
 import FormattedDate from "../components/FormattedDate.astro";
+import "@fontsource/ubuntu";
 import DocsSideNav from "../components/DocsSideNav.astro";
 
 type Props = CollectionEntry<"docs">["data"];
@@ -15,6 +16,20 @@ const { title, category } = Astro.props;
   <head>
     <BaseHead title={title} description={category} />
     <style>
+      body {
+        font-family: "Ubuntu", cursive;
+        /* background-color: rgba(29, 32, 40, 1); */
+        background-image: linear-gradient(
+            rgba(23, 29, 39, 0.3),
+            /* Your specified semi-transparent color */ rgba(23, 29, 39, 0.3)
+          ),
+          url("../assets/bg.svg");
+        background-size: cover;
+        /* background-position: center; */
+        background-repeat: no-repeat;
+        background-color: rgba(29, 32, 40, 1);
+        
+      }
       main {
         width: calc(100% - 2em);
         max-width: 100%;
@@ -73,7 +88,7 @@ const { title, category } = Astro.props;
         class="max-w-[95vw] py-6 px-2 lg:px-6 mx-auto w-full"
       >
         <slot />
-        <Footer />
+        <!-- <Footer /> -->
       </main>
     </div>
 
