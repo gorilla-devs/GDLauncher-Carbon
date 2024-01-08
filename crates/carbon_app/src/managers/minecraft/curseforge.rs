@@ -168,7 +168,9 @@ pub async fn prepare_modpack_from_zip(
                 let CurseForgeResponse { data: mod_file, .. } = cf_manager
                     .get_mod_file(curseforge::filters::ModFileParameters { mod_id, file_id })
                     .await
-                    .map_err(|e| anyhow::anyhow!("Failed to get mod file: {:?} - {:?}", mod_id, file_id))?;
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to get mod file: {:?} - {:?}", mod_id, file_id)
+                    })?;
 
                 let instance_path =
                     class_id
