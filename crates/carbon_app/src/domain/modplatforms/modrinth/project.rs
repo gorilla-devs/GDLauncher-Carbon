@@ -214,6 +214,7 @@ pub enum ProjectType {
     Shader,
     Modpack,
     ResourcePack,
+    Plugin,
 }
 
 impl ProjectType {

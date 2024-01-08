@@ -239,8 +239,8 @@ impl ManagerRef<'_, InstanceManager> {
                 {
                     let cffile_path = setup_path.join("curseforge");
                     let mrfile_path = setup_path.join("modrinth");
-                    let skip_overlays_path = setup_path.join("modpack-skip-overlays");
-                    let skip_overlays = skip_overlays_path.is_dir();
+                    let skip_overrides_path = setup_path.join("modpack-skip-overlays");
+                    let skip_overrides = skip_overrides_path.is_dir();
 
                     enum Modplatform {
                         Curseforge,
@@ -375,12 +375,12 @@ impl ManagerRef<'_, InstanceManager> {
                                 &app,
                                 &cffile_path,
                                 &instance_path,
-                                skip_overlays,
+                                skip_overrides,
                                 modpack_progress_tx,
                             )
                                 .await?;
 
-                            tokio::fs::create_dir_all(skip_overlays_path).await?;
+                            tokio::fs::create_dir_all(skip_overrides_path).await?;
 
                             downloads.extend(modpack_info.downloadables);
 
@@ -410,9 +410,9 @@ impl ManagerRef<'_, InstanceManager> {
                                 }
                             });
 
-                            let modpack_info = modrinth::prepare_modpack_from_mrpack(&app, &mrfile_path, &instance_path, skip_overlays, modpack_progress_tx).await?;
+                            let modpack_info = modrinth::prepare_modpack_from_mrpack(&app, &mrfile_path, &instance_path, skip_overrides, modpack_progress_tx).await?;
 
-                            tokio::fs::create_dir_all(skip_overlays_path).await?;
+                            tokio::fs::create_dir_all(skip_overrides_path).await?;
 
                             downloads.extend(modpack_info.downloadables);
 

@@ -90,7 +90,7 @@ pub async fn prepare_modpack_from_zip(
     app: &App,
     zip_path: &Path,
     instance_path: &InstancePath,
-    skip_overlays: bool,
+    skip_overrides: bool,
     progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
 ) -> anyhow::Result<ModpackInfo> {
     let progress_percentage_sender = Arc::new(progress_percentage_sender);
@@ -163,16 +163,18 @@ pub async fn prepare_modpack_from_zip(
                 let cf_manager = &app.modplatforms_manager().curseforge;
                 let class_id = addons
                     .get(&mod_id)
-                    .ok_or(anyhow::anyhow!("Failed to get addon"))?;
+                    .ok_or(anyhow::anyhow!("Failed to get addon: {:?}", mod_id))?;
 
                 let CurseForgeResponse { data: mod_file, .. } = cf_manager
                     .get_mod_file(curseforge::filters::ModFileParameters { mod_id, file_id })
-                    .await?;
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to get mod file: {:?} - {:?}", mod_id, file_id))?;
 
                 let instance_path =
                     class_id
                         .clone()
                         .into_path(&instance_path, mc_version, &mc_manifest);
+
                 let downloadable = Downloadable::new(
                     mod_file
                         .download_url
@@ -180,6 +182,7 @@ pub async fn prepare_modpack_from_zip(
                     instance_path.join(mod_file.file_name),
                 )
                 .with_size(mod_file.file_length as u64);
+
                 progress_percentage_sender_clone.send_modify(|progress| {
                     progress.acquire_addon_metadata.set((
                         atomic_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1,
@@ -200,7 +203,7 @@ pub async fn prepare_modpack_from_zip(
             .collect::<Result<Vec<_>, _>>()?
     };
 
-    if !skip_overlays {
+    if !skip_overrides {
         let override_folder_name = manifest.overrides.clone();
         let override_full_path = instance_path.get_data_path();
         tokio::fs::create_dir_all(&override_full_path).await?;
