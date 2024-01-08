@@ -15,7 +15,7 @@ interface Props {
   icon?: JSX.Element | JSX.Element[] | string;
   items?: Array<{
     item: JSX.Element | JSX.Element[] | string;
-    onClick: () => void;
+    onClick?: () => void;
   }>;
 }
 
@@ -81,7 +81,7 @@ const Button = (props: ButtonProps & Props) => {
           items={
             props.items as Array<{
               item: Element | string;
-              onClick: () => void;
+              onClick?: () => void;
             }>
           }
         />

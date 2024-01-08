@@ -30,39 +30,26 @@ export const SITE_DESCRIPTION = "Welcome to gdlauncher!";
 
 export const DownloadItems: Array<{
   item: Element | string;
-  onClick: () => void;
 }> = [
   {
     item: (
-      <div class="flex items-center gap-2 p-1">
+      <a class="flex items-center gap-2 p-1">
         <Apple /> MacOS
-      </div>
+      </a>
     ) as Element,
-    onClick: () => {
-      window.location.href =
-        "https://cdn-raw.gdl.gg/launcher/GDLauncher__2.0.0-alpha.1703815106__mac__universal.dmg";
-    },
   },
   {
     item: (
-      <div class="flex items-center gap-2 p-1">
+      <a class="flex items-center gap-2 p-1">
         <Windows /> Windows
-      </div>
+      </a>
     ) as Element,
-    onClick: () => {
-      window.location.href =
-        "https://cdn-raw.gdl.gg/launcher/GDLauncher__2.0.0-alpha.1703815106__win__x64.exe";
-    },
   },
   {
     item: (
-      <div class="flex items-center gap-2 p-1">
+      <a class="flex items-center gap-2 p-1">
         <Linux /> Linux
-      </div>
+      </a>
     ) as Element,
-    onClick: () => {
-      window.location.href =
-        "https://cdn-raw.gdl.gg/launcher/GDLauncher__2.0.0-alpha.1703815106__linux__x64.AppImage";
-    },
   },
 ];

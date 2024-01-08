@@ -13,6 +13,7 @@ import "@fontsource/ubuntu";
 import { SITE_TITLE, SITE_DESCRIPTION, DownloadItems } from "../consts";
 import WhatMakesGDSpecial from "../components/WhatMakesGDSpecial.astro";
 import GdxCF from "../components/GdxCF.astro";
+import DownloadDropdown from "../components/DownloadDropdown.astro";
 
 Astro.locals.cache(60);
 ---
@@ -82,7 +83,8 @@ Astro.locals.cache(60);
         </div>
         <!-- <Button items={DownloadItems} isDropdown={true} intent="primary" size="medium">DOWNLOAD FOR</Button> -->
         <!-- <DownloadButtonDropdown client:only/> -->
-        <Download />
+        <!-- <Download /> -->
+        <DownloadDropdown />
       </div>
       <div class="relative mx-auto z-10">
         <div class="relative parallax">
@@ -106,12 +108,13 @@ Astro.locals.cache(60);
     <WhatMakesGDSpecial />
     <GdxCF />
     <Footer />
-  </body><script>
-    import vanilla from "vanilla-tilt";
+    <script>
+      import vanilla from "vanilla-tilt";
 
-    vanilla.init(document.querySelector(".parallax") as HTMLElement, {
-      max: 15,
-      speed: 200,
-    });
-  </script>
+      vanilla.init(document.querySelector(".parallax") as HTMLElement, {
+        max: 15,
+        speed: 200,
+      });
+    </script>
+  </body>
 </html>

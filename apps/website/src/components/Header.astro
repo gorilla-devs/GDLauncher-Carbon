@@ -4,7 +4,7 @@ import { Image } from "astro:assets";
 import Logo from "../assets/logo.svg";
 import Button from "./button/Button";
 import Separator from "./button/Separator.astro";
-import { DownloadForButton } from "./button/DownloadForButton";
+import DownloadButton from "./DownloadButton.astro";
 ---
 
 <header>
@@ -17,8 +17,7 @@ import { DownloadForButton } from "./button/DownloadForButton";
       <HeaderLink class="text-graygd">Modpacks</HeaderLink>
     </div>
     <div class="social-links">
-      <!-- <Button  intent="primary" className="uppercase"><div class="flex flex-row-reverse">download <Separator /></div></Button> -->
-      <DownloadForButton client:only />
+      <DownloadButton />
     </div>
   </nav>
 </header>
