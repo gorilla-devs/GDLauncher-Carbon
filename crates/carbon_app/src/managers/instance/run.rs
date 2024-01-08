@@ -378,7 +378,13 @@ impl ManagerRef<'_, InstanceManager> {
                                 skip_overrides,
                                 modpack_progress_tx,
                             )
-                                .await?;
+                                .await
+                                .map_err(
+                                    |e| {
+                                        tracing::error!("Error preparing modpack: {:?}", e);
+                                        e
+                                    }
+                                )?;
 
                             tokio::fs::create_dir_all(skip_overrides_path).await?;
 
@@ -455,7 +461,9 @@ impl ManagerRef<'_, InstanceManager> {
                 };
 
                 t_request_version_info.update_items(0, 3);
-                let manifest = app.minecraft_manager().get_minecraft_manifest().await?;
+                let manifest = app.minecraft_manager().get_minecraft_manifest().await.map_err(
+                    |e| anyhow::anyhow!("Error getting minecraft manifest: {:?}", e)
+                )?;
                 t_request_version_info.update_items(1, 3);
 
                 let manifest_version = manifest
@@ -467,7 +475,8 @@ impl ManagerRef<'_, InstanceManager> {
                 let mut version_info = app
                     .minecraft_manager()
                     .get_minecraft_version(manifest_version.clone())
-                    .await?;
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Error getting minecraft version: {:?}", e))?;
 
                 let lwjgl_group = get_lwjgl_meta(
                     &app.reqwest_client,

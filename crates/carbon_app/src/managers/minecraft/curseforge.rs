@@ -39,6 +39,7 @@ pub struct ModpackInfo {
     pub downloadables: Vec<Downloadable>,
 }
 
+#[tracing::instrument(skip(app, progress_percentage_sender))]
 pub async fn download_modpack_zip(
     app: &App,
     cf_addon: &File,
@@ -86,6 +87,7 @@ pub async fn download_modpack_zip(
     Ok(())
 }
 
+#[tracing::instrument(skip(app, progress_percentage_sender))]
 pub async fn prepare_modpack_from_zip(
     app: &App,
     zip_path: &Path,
