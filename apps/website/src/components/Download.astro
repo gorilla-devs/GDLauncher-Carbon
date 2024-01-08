@@ -8,6 +8,7 @@ import Logo5 from '../assets/5.svg';
 import Logo6 from '../assets/6.svg';
 import Logo7 from '../assets/7.svg';
 import { DownloadButtonDropdown } from './button/DownloadButtonDropdown';
+import DownloadDropdown from './DownloadDropdown.astro';
 
 
 
@@ -18,7 +19,7 @@ import { DownloadButtonDropdown } from './button/DownloadButtonDropdown';
     <Image src={Logo2} alt="item2" width={62} height={62} class="animated-logo opacity-0"/>
     <Image src={Logo3} alt="item3" width={62} height={62} class="animated-logo opacity-0"/>
     <div class="flex flex-col justify-between items-center">
-        <DownloadButtonDropdown client:only/>
+        <DownloadDropdown />
         <Image src={Logo4} alt="item4" width={62} height={62} class="animated-logo opacity-0"/>
     </div>
     <Image src={Logo7} alt="item7" width={62} height={62} class="-translate-y-2 animated-logo opacity-0"/>

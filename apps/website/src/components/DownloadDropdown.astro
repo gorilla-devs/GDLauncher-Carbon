@@ -17,33 +17,12 @@ const downloadLinks = yamlfiles
 ---
 
 <Button
-  items={[
-    {
-      item: (
-        <a class="flex items-center gap-2 p-1">
-          <Apple /> MacOS
-        </a>
-      ) as Element,
-    },
-    {
-      item: (
-        <a class="flex items-center gap-2 p-1">
-          <Windows /> Windows
-        </a>
-      ),
-    },
-    {
-      item: (
-        <a class="flex items-center gap-2 p-1">
-          <Linux /> Linux
-        </a>
-      ),
-    },
-  ]}
+  items={downloadLinks}
   isDropdown={true}
   intent="primary"
   size="medium"
   class="items-center"
+  client:only
 >
   <span>DOWNLOAD FOR</span>
   <AiOutlineArrowDown size={20} />

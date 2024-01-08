@@ -13,10 +13,7 @@ interface Props {
   onClick?: any;
   isDropdown?: boolean;
   icon?: JSX.Element | JSX.Element[] | string;
-  items?: Array<{
-    item: JSX.Element | JSX.Element[] | string;
-    onClick?: () => void;
-  }>;
+  items?: Array<string>;
 }
 
 const button = cva("button", {
@@ -78,12 +75,29 @@ const Button = (props: ButtonProps & Props) => {
 
       <Show when={props.isDropdown && items()}>
         <ButtonDropdown
-          items={
-            props.items as Array<{
-              item: Element | string;
-              onClick?: () => void;
-            }>
-          }
+          items={[
+            {
+              item: (
+                <a class="flex items-center gap-2 p-1" href={props.items![0]}>
+                  <Apple /> MacOS
+                </a>
+              ) as Element,
+            },
+            {
+              item: (
+                <a class="flex items-center gap-2 p-1" href={props.items![0]}>
+                  <Windows /> Windows
+                </a>
+              ) as Element,
+            },
+            {
+              item: (
+                <a class="flex items-center gap-2 p-1" href={props.items![0]}>
+                  <Linux /> Linux
+                </a>
+              ) as Element,
+            },
+          ]}
         />
       </Show>
     </button>
