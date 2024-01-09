@@ -11,17 +11,22 @@ import Feat7 from "../assets/feat7.svg";
 // Component Script (JavaScript)
 ---
 
-<div class="flex flex-col items-center justify-center p-8 ">
+<div class="flex flex-col items-center justify-center p-8">
   <Button intent="transparent" class="uppercase font-bold">
     Your All-In-One Minecraft Modded Launcher
   </Button>
-  <span class="text-[40px] text-white font-bold text-center">What makes</span>
-  <span class="text-[40px] text-white font-bold text-center"
-    >GDLauncher so special</span
+  <div class="flex flex-col py-4">
+    <span class="text-[40px] text-white font-bold text-center">What makes</span>
+    <span class="text-[40px] text-white font-bold text-center"
+      >GDLauncher so special</span
+    >
+  </div>
+
+  <div
+    class="grid grid-cols-1 gap-4 w-full md:w-[80%] justify-items-center p-4 md:grid-cols-2 lg:grid-cols-4"
   >
-  <div class="grid grid-cols-4 gap-4 w-[80%] p-4">
     <div
-      class="flex flex-col items-center text-center w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-full md:w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat1} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Modpack Integration</span>
@@ -32,7 +37,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-full md:w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat2} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Mods Manager</span>
@@ -43,7 +48,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-full md:w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat3} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Java Manager</span>
@@ -54,7 +59,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-full md:w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat4} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold"
@@ -67,7 +72,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-full md:w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat5} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Advanced Logs Manager</span>
@@ -78,7 +83,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-full md:w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat6} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Modload Support</span>
@@ -89,7 +94,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-full md:w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat7} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Modpack Autoupdater</span>
@@ -100,7 +105,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-full md:w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat1} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Custom Themes</span>
@@ -124,8 +129,12 @@ import Feat7 from "../assets/feat7.svg";
     cursor: default;
   }
   .background__card::before {
-    content: '';
-    background: conic-gradient(transparent 270deg, rgba(40, 101, 164, 1), transparent);
+    content: "";
+    background: conic-gradient(
+      transparent 270deg,
+      rgba(40, 101, 164, 1),
+      transparent
+    );
     position: absolute;
     top: 50%;
     left: 50%;
@@ -136,7 +145,7 @@ import Feat7 from "../assets/feat7.svg";
     animation: rotate 3s linear infinite;
   }
   .background__card::after {
-    content: '';
+    content: "";
     background: inherit;
     border-radius: inherit;
     position: absolute;
@@ -144,7 +153,6 @@ import Feat7 from "../assets/feat7.svg";
     height: calc(100% - 2 * var(--offset));
     width: calc(100% - 2 * var(--offset));
     z-index: 1;
-    
   }
 
   .background__card::after,
@@ -152,10 +160,13 @@ import Feat7 from "../assets/feat7.svg";
     transition: all 1s ease-in-out;
   }
 
-
   .background__card:hover::before {
-    content: '';
-    background: conic-gradient(transparent 270deg, rgba(40, 101, 164, 1), transparent);
+    content: "";
+    background: conic-gradient(
+      transparent 270deg,
+      rgba(40, 101, 164, 1),
+      transparent
+    );
     position: absolute;
     top: 50%;
     left: 50%;
@@ -166,7 +177,7 @@ import Feat7 from "../assets/feat7.svg";
     animation: rotate 3s linear infinite;
   }
   .background__card:hover::after {
-    content: '';
+    content: "";
     background: inherit;
     border-radius: inherit;
     position: absolute;
@@ -183,11 +194,9 @@ import Feat7 from "../assets/feat7.svg";
   @keyframes rotate {
     0% {
       transform: translate(-50%, -50%) scale(1.4) rotate(0turn);
-      
     }
     100% {
       transform: translate(-50%, -50%) scale(1.4) rotate(1turn);
-      
     }
   }
 </style>
