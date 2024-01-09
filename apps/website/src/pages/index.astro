@@ -50,6 +50,10 @@ Astro.locals.cache(60);
         overflow: hidden;
         /* z-index: -1; */
       }
+      .parallax > img {
+        height: 780px;
+        width: 100%;
+      }
     </style></head
   >
 
@@ -90,16 +94,18 @@ Astro.locals.cache(60);
         <div class="relative parallax">
           <Image
             id="firstImg"
-            src={Library}
+            src="https://cdn.gdl.gg/github-readme/home.png"
             alt="gd launcher"
             class="mx-auto"
+            height="1240"
+            width="718"
           />
-          <Image
+          <!-- <Image
             id="secondImg"
             src={Export}
             alt="gd launcher"
             class="absolute right-0 bottom-0"
-          />
+          /> -->
         </div>
       </div>
       <div class="wave"></div>
