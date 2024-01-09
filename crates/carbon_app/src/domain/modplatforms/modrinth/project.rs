@@ -216,6 +216,7 @@ pub enum ProjectType {
     ResourcePack,
     Plugin,
     Project,
+    DataPack,
 }
 
 impl ProjectType {

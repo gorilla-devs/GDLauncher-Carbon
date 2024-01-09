@@ -64,6 +64,7 @@ pub enum MRFEProjectType {
     ResourcePack,
     Plugin,
     Project,
+    DataPack,
 }
 
 impl From<ProjectType> for MRFEProjectType {
@@ -75,6 +76,7 @@ impl From<ProjectType> for MRFEProjectType {
             ProjectType::ResourcePack => MRFEProjectType::ResourcePack,
             ProjectType::Plugin => MRFEProjectType::Plugin,
             ProjectType::Project => MRFEProjectType::Project,
+            ProjectType::DataPack => MRFEProjectType::DataPack,
         }
     }
 }
@@ -88,6 +90,7 @@ impl From<MRFEProjectType> for ProjectType {
             MRFEProjectType::ResourcePack => ProjectType::ResourcePack,
             MRFEProjectType::Plugin => ProjectType::Plugin,
             MRFEProjectType::Project => ProjectType::Project,
+            MRFEProjectType::DataPack => ProjectType::DataPack,
         }
     }
 }
