@@ -215,6 +215,7 @@ pub enum ProjectType {
     Modpack,
     ResourcePack,
     Plugin,
+    Project,
 }
 
 impl ProjectType {

@@ -63,6 +63,7 @@ pub enum MRFEProjectType {
     Modpack,
     ResourcePack,
     Plugin,
+    Project,
 }
 
 impl From<ProjectType> for MRFEProjectType {
@@ -73,6 +74,7 @@ impl From<ProjectType> for MRFEProjectType {
             ProjectType::Modpack => MRFEProjectType::Modpack,
             ProjectType::ResourcePack => MRFEProjectType::ResourcePack,
             ProjectType::Plugin => MRFEProjectType::Plugin,
+            ProjectType::Project => MRFEProjectType::Project,
         }
     }
 }
@@ -85,6 +87,7 @@ impl From<MRFEProjectType> for ProjectType {
             MRFEProjectType::Modpack => ProjectType::Modpack,
             MRFEProjectType::ResourcePack => ProjectType::ResourcePack,
             MRFEProjectType::Plugin => ProjectType::Plugin,
+            MRFEProjectType::Project => ProjectType::Project,
         }
     }
 }
