@@ -75,6 +75,17 @@ h6 {
   margin-bottom: 20px;
   color: white;
 }
+h1 {
+  font-size: 2.5rem;
+}
+
+h2 {
+  font-size: 2rem;
+}
+
+h3 {
+  font-size: 1.75rem;
+}
 /*
   8. Create a root stacking context
 */
