@@ -660,6 +660,8 @@ struct UpdateInstance {
     extra_java_args: Option<Set<Option<String>>>,
     #[specta(optional)]
     memory: Option<Set<Option<MemoryRange>>>,
+    #[specta(optional)]
+    modpack_locked: Option<Set<Option<bool>>>,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -767,6 +769,12 @@ enum GameVersion {
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
+struct ModpackInfo {
+    modpack: Modpack,
+    locked: bool,
+}
+
+#[derive(Type, Debug, Serialize, Deserialize)]
 enum Modpack {
     Curseforge(CurseforgeModpack),
     Modrinth(ModrinthModpack),
@@ -814,7 +822,7 @@ struct InstanceDetails {
     name: String,
     favorite: bool,
     version: Option<String>,
-    modpack: Option<Modpack>,
+    modpack: Option<ModpackInfo>,
     global_java_args: bool,
     extra_java_args: Option<String>,
     memory: Option<MemoryRange>,
@@ -1133,6 +1141,15 @@ impl TryFrom<GameVersion> for domain::info::GameVersion {
     }
 }
 
+impl From<ModpackInfo> for domain::info::ModpackInfo {
+    fn from(value: ModpackInfo) -> Self {
+        Self {
+            modpack: value.modpack.into(),
+            locked: value.locked,
+        }
+    }
+}
+
 impl From<Modpack> for domain::info::Modpack {
     fn from(value: Modpack) -> Self {
         match value {
@@ -1156,6 +1173,15 @@ impl From<ModrinthModpack> for domain::info::ModrinthModpack {
         Self {
             project_id: value.project_id,
             version_id: value.version_id,
+        }
+    }
+}
+
+impl From<domain::info::ModpackInfo> for ModpackInfo {
+    fn from(value: domain::info::ModpackInfo) -> Self {
+        Self {
+            modpack: value.modpack.into(),
+            locked: value.locked,
         }
     }
 }
@@ -1459,6 +1485,7 @@ impl TryFrom<UpdateInstance> for domain::InstanceSettingsUpdate {
             global_java_args: value.global_java_args.map(|x| x.inner()),
             extra_java_args: value.extra_java_args.map(|x| x.inner()),
             memory: value.memory.map(|x| x.inner().map(Into::into)),
+            modpack_locked: value.modpack_locked.map(|x| x.inner()),
         })
     }
 }

@@ -1,5 +1,5 @@
 import { generateSequence } from "@/utils/helpers";
-import { queryClient, rspc } from "@/utils/rspcClient";
+import { port, queryClient, rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import { Button, Input, Slider, Switch } from "@gd/ui";
 import { useParams, useRouteData } from "@solidjs/router";
@@ -35,6 +35,65 @@ const Settings = () => {
   return (
     <Suspense fallback={null}>
       <RowsContainer>
+        <Show when={routeData?.instanceDetails?.data?.modpack}>
+          <Row>
+            <Title>
+              <Trans key="instance_settings.modpack_info" />
+            </Title>
+          </Row>
+          <div class="flex flex-col gap-4">
+            <div class="flex items-center gap-4">
+              <img
+                class="h-13 w-13 rounded-lg"
+                src={`http://localhost:${port}/instance/modpackIcon?instance_id=${params.id}`}
+              />
+              <div>
+                <div class="text-lg font-bold">
+                  {routeData.modpackInfo.data?.name}
+                </div>
+                <div>{routeData.modpackInfo.data?.version_name}</div>
+              </div>
+            </div>
+            <div class="flex gap-4">
+              <Show when={routeData.instanceDetails.data?.modpack?.locked}>
+                <Button
+                  type="outline"
+                  onClick={() => {
+                    updateInstanceMutation.mutate({
+                      modpack_locked: {
+                        Set: false
+                      },
+                      instance: parseInt(params.id, 10)
+                    });
+                  }}
+                >
+                  <i class="w-5 h-5 i-ri:lock-fill" />
+                  <Trans key="instance_settings.unlock" />
+                </Button>
+              </Show>
+              <Show when={!routeData.instanceDetails.data?.modpack?.locked}>
+                <div class="flex items-center gap-2">
+                  <i class="w-5 h-5 i-ri:lock-unlock-fill" />
+                  <Trans key="instance_settings.unlocked" />
+                </div>
+              </Show>
+              <Button
+                type="outline"
+                onClick={() => {
+                  updateInstanceMutation.mutate({
+                    modpack_locked: {
+                      Set: null
+                    },
+                    instance: parseInt(params.id, 10)
+                  });
+                }}
+              >
+                <i class="w-5 h-5 i-ri:git-branch-fill" />
+                <Trans key="instance_settings.unpair" />
+              </Button>
+            </div>
+          </div>
+        </Show>
         <Row>
           <Title>
             <Trans key="instance_settings.java_memory_title" />
@@ -52,13 +111,6 @@ const Settings = () => {
                         }
                       : null
                   },
-                  extra_java_args: null,
-                  global_java_args: null,
-                  modloader: null,
-                  name: null,
-                  notes: null,
-                  use_loaded_icon: null,
-                  version: null,
                   instance: parseInt(params.id, 10)
                 });
               }}
@@ -102,13 +154,6 @@ const Settings = () => {
 
                 updateInstanceMutation.mutate({
                   memory: { Set: { max_mb: val, min_mb: val } },
-                  extra_java_args: null,
-                  global_java_args: null,
-                  modloader: null,
-                  name: null,
-                  notes: null,
-                  use_loaded_icon: null,
-                  version: null,
                   instance: parseInt(params.id, 10)
                 });
               }}
@@ -129,14 +174,7 @@ const Settings = () => {
               const checked = e.target.checked;
 
               updateInstanceMutation.mutate({
-                memory: null,
                 extra_java_args: { Set: checked ? "" : null },
-                global_java_args: null,
-                modloader: null,
-                name: null,
-                notes: null,
-                use_loaded_icon: null,
-                version: null,
                 instance: parseInt(params.id, 10)
               });
             }}
@@ -158,14 +196,7 @@ const Settings = () => {
                 const checked = e.target.checked;
 
                 updateInstanceMutation.mutate({
-                  memory: null,
-                  extra_java_args: null,
                   global_java_args: { Set: checked },
-                  modloader: null,
-                  name: null,
-                  notes: null,
-                  use_loaded_icon: null,
-                  version: null,
                   instance: parseInt(params.id, 10)
                 });
               }}
@@ -186,14 +217,7 @@ const Settings = () => {
               value={routeData?.instanceDetails?.data?.extra_java_args || ""}
               onChange={(e) => {
                 updateInstanceMutation.mutate({
-                  memory: null,
                   extra_java_args: { Set: e.target.value },
-                  global_java_args: null,
-                  modloader: null,
-                  name: null,
-                  notes: null,
-                  use_loaded_icon: null,
-                  version: null,
                   instance: parseInt(params.id, 10)
                 });
               }}
@@ -205,14 +229,7 @@ const Settings = () => {
               textColor="text-red-500"
               onClick={() => {
                 updateInstanceMutation.mutate({
-                  memory: null,
                   extra_java_args: { Set: initialJavaArgs() },
-                  global_java_args: null,
-                  modloader: null,
-                  name: null,
-                  notes: null,
-                  use_loaded_icon: null,
-                  version: null,
                   instance: parseInt(params.id, 10)
                 });
               }}
@@ -226,14 +243,7 @@ const Settings = () => {
               textColor="text-red-500"
               onClick={() => {
                 updateInstanceMutation.mutate({
-                  memory: null,
                   extra_java_args: { Set: "" },
-                  global_java_args: null,
-                  modloader: null,
-                  name: null,
-                  notes: null,
-                  use_loaded_icon: null,
-                  version: null,
                   instance: parseInt(params.id, 10)
                 });
               }}

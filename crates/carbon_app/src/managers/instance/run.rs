@@ -253,7 +253,7 @@ impl ManagerRef<'_, InstanceManager> {
                         app.instance_manager().get_modpack_info(instance_id).await?;
                     }
 
-                    let file = match (cffile_path.is_file(), mrfile_path.is_file(), &config.modpack) {
+                    let file = match (cffile_path.is_file(), mrfile_path.is_file(), &config.modpack.as_ref().map(|m| m.modpack.clone())) {
                         (false, false, None) => {
                             t_request.complete_opaque();
                             None
@@ -1119,7 +1119,7 @@ impl ManagerRef<'_, InstanceManager> {
                             .get(0)
                             .cloned()
                             .map(|v| v.version),
-                        modplatform: instance_details.modpack.map(|v| v.to_string()),
+                        modplatform: instance_details.modpack.map(|v| v.modpack.to_string()),
                         version: instance_details.version.unwrap_or(String::from("unknown")),
                         seconds_taken: (now - initial_time).num_seconds() as u32,
                     })
@@ -1148,7 +1148,7 @@ impl ManagerRef<'_, InstanceManager> {
                             .get(0)
                             .cloned()
                             .map(|v| v.version),
-                        modplatform: instance_details.modpack.map(|v| v.to_string()),
+                        modplatform: instance_details.modpack.map(|v| v.modpack.to_string()),
                         version: instance_details.version.unwrap_or(String::from("unknown")),
                         xmx_memory: xmx_memory as u32,
                         xms_memory: xms_memory as u32,

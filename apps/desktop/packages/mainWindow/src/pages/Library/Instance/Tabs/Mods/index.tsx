@@ -1,4 +1,4 @@
-import { Button, Checkbox, Input, Skeleton, Switch } from "@gd/ui";
+import { Button, Checkbox, Input, Skeleton, Switch, Tooltip } from "@gd/ui";
 import { For, Show, createMemo, createSignal } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import Mod from "./Mod";
@@ -21,6 +21,9 @@ const Mods = () => {
     [id: string]: boolean;
   }>({});
   const routeData: ReturnType<typeof fetchData> = useRouteData();
+
+  const isInstanceLocked = () =>
+    routeData.instanceDetails.data?.modpack?.locked;
 
   const deleteModMutation = rspc.createMutation(["instance.deleteMod"]);
   const disableModMutation = rspc.createMutation(["instance.disableMod"]);
@@ -103,55 +106,83 @@ const Mods = () => {
           </div>
         </div>
         <div class="flex items-center gap-4">
-          <Switch
-            isIndeterminate={
-              selectedMods()?.some((mod) => mod.enabled) &&
-              selectedMods()?.some((mod) => !mod.enabled)
-            }
-            checked={selectedMods()?.every((mod) => mod.enabled) || false}
-            onChange={(event) => {
-              let action = event.target.checked;
-
-              if (
+          <Show when={isInstanceLocked()}>
+            <Tooltip
+              content={<Trans key="instance.locked_cannot_apply_changes" />}
+              placement="top"
+              class="max-w-38 text-ellipsis overflow-hidden"
+            >
+              <Switch
+                disabled
+                checked={selectedMods()?.every((mod) => mod.enabled) || false}
+              />
+            </Tooltip>
+          </Show>
+          <Show when={!isInstanceLocked()}>
+            <Switch
+              isIndeterminate={
                 selectedMods()?.some((mod) => mod.enabled) &&
                 selectedMods()?.some((mod) => !mod.enabled)
-              ) {
-                action = true;
               }
+              checked={selectedMods()?.every((mod) => mod.enabled) || false}
+              onChange={(event) => {
+                let action = event.target.checked;
 
-              const modsThatNeedApply = selectedMods()?.filter(
-                (mod) => mod.enabled !== action
-              );
-
-              for (const mod of modsThatNeedApply || []) {
-                if (action) {
-                  enableModMutation.mutate({
-                    instance_id: parseInt(params.id, 10),
-                    mod_id: mod.id
-                  });
-                } else {
-                  disableModMutation.mutate({
-                    instance_id: parseInt(params.id, 10),
-                    mod_id: mod.id
-                  });
+                if (
+                  selectedMods()?.some((mod) => mod.enabled) &&
+                  selectedMods()?.some((mod) => !mod.enabled)
+                ) {
+                  action = true;
                 }
-              }
-            }}
-          />
-          <div
-            class="flex items-center gap-2 cursor-pointer text-darkSlate-50 hover:text-red-500 transition duration-100 ease-in-out"
-            onClick={() => {
-              Object.keys(selectedModsMap).forEach((mod) => {
-                deleteModMutation.mutate({
-                  instance_id: parseInt(params.id, 10),
-                  mod_id: mod
+
+                const modsThatNeedApply = selectedMods()?.filter(
+                  (mod) => mod.enabled !== action
+                );
+
+                for (const mod of modsThatNeedApply || []) {
+                  if (action) {
+                    enableModMutation.mutate({
+                      instance_id: parseInt(params.id, 10),
+                      mod_id: mod.id
+                    });
+                  } else {
+                    disableModMutation.mutate({
+                      instance_id: parseInt(params.id, 10),
+                      mod_id: mod.id
+                    });
+                  }
+                }
+              }}
+            />
+          </Show>
+          <Show when={isInstanceLocked()}>
+            <Tooltip
+              content={<Trans key="instance.locked_cannot_apply_changes" />}
+              placement="top"
+              class="max-w-38 text-ellipsis overflow-hidden"
+            >
+              <div class="flex items-center gap-2 cursor-pointer text-darkSlate-50">
+                <span class="text-2xl i-ri:delete-bin-2-fill" />
+                <Trans key="instance.delete_mod" />
+              </div>
+            </Tooltip>
+          </Show>
+          <Show when={!isInstanceLocked()}>
+            <div
+              class="flex items-center gap-2 cursor-pointer text-darkSlate-50 hover:text-red-500 transition duration-100 ease-in-out"
+              onClick={() => {
+                Object.keys(selectedModsMap).forEach((mod) => {
+                  deleteModMutation.mutate({
+                    instance_id: parseInt(params.id, 10),
+                    mod_id: mod
+                  });
                 });
-              });
-            }}
-          >
-            <span class="text-2xl i-ri:delete-bin-2-fill" />
-            <Trans key="instance.delete_mod" />
-          </div>
+              }}
+            >
+              <span class="text-2xl i-ri:delete-bin-2-fill" />
+              <Trans key="instance.delete_mod" />
+            </div>
+          </Show>
         </div>
       </div>
 
@@ -211,16 +242,31 @@ const Mods = () => {
             >
               <span class="text-2xl i-ri:filter-line" />
             </div> */}
-            <Button
-              type="outline"
-              size="medium"
-              onClick={() => {
-                setLastType(null);
-                navigate(`/mods?instanceId=${params.id}`);
-              }}
-            >
-              <Trans key="instance.add_mod" />
-            </Button>
+            <Show when={isInstanceLocked()}>
+              <Tooltip
+                content={<Trans key="instance.locked_cannot_apply_changes" />}
+                placement="top"
+                class="max-w-38 text-ellipsis overflow-hidden"
+              >
+                <Button disabled type="outline" size="medium">
+                  <Trans key="instance.add_mod" />
+                </Button>
+              </Tooltip>
+            </Show>
+            <Show when={!isInstanceLocked()}>
+              <Button
+                disabled={isInstanceLocked()}
+                type="outline"
+                size="medium"
+                onClick={() => {
+                  setLastType(null);
+                  navigate(`/mods?instanceId=${params.id}`);
+                }}
+              >
+                <Trans key="instance.add_mod" />
+              </Button>
+            </Show>
+
             <div
               class="flex items-center gap-2 cursor-pointer duration-100 ease-in-out transition hover:text-white text-darkSlate-50"
               onClick={() => {
@@ -252,6 +298,7 @@ const Mods = () => {
                 mod={mod}
                 setSelectedMods={setSelectedModsMap}
                 selectMods={selectedModsMap}
+                isInstanceLocked={isInstanceLocked()}
               />
             )}
           </For>
