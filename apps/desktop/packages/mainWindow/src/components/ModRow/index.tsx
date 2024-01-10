@@ -5,7 +5,6 @@ import { Trans } from "@gd/i18n";
 import { Button, createNotification, Popover, Spinner } from "@gd/ui";
 import { formatDistanceToNowStrict } from "date-fns";
 import {
-  createEffect,
   createSignal,
   getOwner,
   Match,
@@ -30,6 +29,7 @@ import {
 } from "@/utils/mods";
 import Categories from "./Categories";
 import Authors from "./Authors";
+import ModDownloadButton from "../ModDownloadButton";
 
 const ModRow = (props: ModRowProps) => {
   const owner = getOwner();
@@ -58,6 +58,8 @@ const ModRow = (props: ModRowProps) => {
     }
   );
 
+  const instanceId = () => (props as ModProps)?.instanceId;
+
   const loadIconMutation = rspc.createMutation(["instance.loadIconUrl"]);
 
   const createInstanceMutation = rspc.createMutation(
@@ -77,18 +79,6 @@ const ModRow = (props: ModRowProps) => {
     }
   );
 
-  const supportsMcVersion = () => {
-    if (isCurseForgeData(props.data)) {
-      return props.data.curseforge.latestFilesIndexes.some(
-        (file) => file.gameVersion === (props as ModProps).mcVersion
-      );
-    }
-
-    return props.data.modrinth.versions.some(
-      (version) => version === (props as ModProps).mcVersion
-    );
-  };
-
   const handleExplore = () => {
     navigate(
       `/${mergedProps.type === "Modpack" ? "modpacks" : "mods"}/${getProjectId(
@@ -99,30 +89,24 @@ const ModRow = (props: ModRowProps) => {
     );
   };
 
-  const instanceId = () => (props as ModProps)?.instanceId;
-
-  const installModMutation = rspc.createMutation(
-    ["instance.installLatestMod"],
-    {
-      onMutate() {
-        setLoading(true);
-      }
-    }
-  );
-
-  const isModInstalled = () =>
-    (props as ModProps)?.installedMods?.find(
-      (mod) =>
-        (isCurseForgeData(props.data)
-          ? mod.curseforge?.project_id
-          : mod.modrinth?.project_id) === getProjectId(props)
-    ) !== undefined;
-
-  createEffect(() => {
-    if (isModInstalled()) {
-      setLoading(false);
-    }
-  });
+  const instanceCreationObj = (
+    fileId?: number | string,
+    projectId?: number | string
+  ) => {
+    return isCurseForgeData(props.data)
+      ? {
+          Curseforge: {
+            file_id: (fileId as number) || props.data.curseforge.mainFileId,
+            project_id: (projectId as number) || props.data.curseforge.id
+          }
+        }
+      : {
+          Modrinth: {
+            project_id: projectId?.toString() || props.data.modrinth.project_id,
+            version_id: fileId?.toString() as string
+          }
+        };
+  };
 
   let containerRef: HTMLDivElement;
   let resizeObserver: ResizeObserver;
@@ -210,34 +194,6 @@ const ModRow = (props: ModRowProps) => {
         </div>
       </div>
     );
-  };
-  const instanceCreationObj = (
-    fileId?: number | string,
-    projectId?: number | string
-  ) => {
-    return isCurseForgeData(props.data)
-      ? {
-          Curseforge: {
-            file_id: (fileId as number) || props.data.curseforge.mainFileId,
-            project_id: (projectId as number) || props.data.curseforge.id
-          }
-        }
-      : {
-          Modrinth: {
-            project_id: projectId?.toString() || props.data.modrinth.project_id,
-            version_id: fileId?.toString() as string
-          }
-        };
-  };
-
-  const latestModInstallObj = (projectId?: number | string) => {
-    return isCurseForgeData(props.data)
-      ? {
-          Curseforge: props.data.curseforge.id
-        }
-      : {
-          Modrinth: projectId?.toString() || props.data.modrinth.project_id
-        };
   };
 
   return (
@@ -338,48 +294,12 @@ const ModRow = (props: ModRowProps) => {
                       >
                         <Trans key="instance.explore_modpack" />
                       </Button>
-                      <Switch>
-                        <Match when={!isModInstalled()}>
-                          <Button
-                            size={isRowSmall() ? "small" : "medium"}
-                            loading={loading()}
-                            disabled={!instanceId() || !supportsMcVersion()}
-                            onClick={() => {
-                              runWithOwner(owner, async () => {
-                                if (props.type !== "Mod") return;
-                                if (instanceId()) {
-                                  installModMutation.mutate({
-                                    mod_source: latestModInstallObj(
-                                      getProjectId(props)
-                                    ),
-                                    instance_id: instanceId() as number
-                                  });
-                                }
-                              });
-                            }}
-                          >
-                            <Switch>
-                              <Match when={isNaN(instanceId() || NaN)}>
-                                <Trans key="instance.no_instance_selected" />
-                              </Match>
-                              <Match when={loading()}>
-                                <Spinner />
-                              </Match>
-                              <Match when={!loading()}>
-                                <Trans key="instance.download_latest" />
-                              </Match>
-                            </Switch>
-                          </Button>
-                        </Match>
-                        <Match when={isModInstalled()}>
-                          <Button
-                            size="small"
-                            variant={isModInstalled() ? "green" : "primary"}
-                          >
-                            <Trans key="mod.downloaded" />
-                          </Button>
-                        </Match>
-                      </Switch>
+                      <ModDownloadButton
+                        size={isRowSmall() ? "small" : "medium"}
+                        projectId={getProjectId(props)}
+                        isCurseforge={isCurseForgeData(props.data)}
+                        instanceId={instanceId()}
+                      />
                     </div>
                   </Match>
                 </Switch>

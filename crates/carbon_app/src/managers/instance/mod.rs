@@ -312,7 +312,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                         .config
                                         .modpack
                                         .as_ref()
-                                        .map(info::Modpack::as_platform),
+                                        .map(|modpack| modpack.modpack.as_platform()),
                                     state: (&status.state).into(),
                                 })
                             }
@@ -329,6 +329,15 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                     }
                                 })
                             }
+                        },
+                        locked: match status {
+                            InstanceType::Valid(status) => status
+                                .config
+                                .modpack
+                                .as_ref()
+                                .map(|modpack| modpack.locked)
+                                .unwrap_or(false),
+                            InstanceType::Invalid(status) => false,
                         },
                         last_played: match status {
                             InstanceType::Valid(status) => status.config.last_played,
@@ -927,7 +936,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             date_updated: Utc::now(),
             last_played: None,
             seconds_played: 0,
-            modpack,
+            modpack: modpack.map(|modpack| info::ModpackInfo {
+                modpack,
+                locked: true,
+            }),
             game_configuration: info::GameConfig {
                 version,
                 global_java_args: true,
@@ -1091,6 +1103,16 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         if let Some(memory) = update.memory {
             info.game_configuration.memory = memory;
+        }
+
+        if let Some(modpack_locked) = update.modpack_locked {
+            if let Some(modpack_locked) = modpack_locked {
+                if let Some(modpack) = &mut info.modpack {
+                    modpack.locked = modpack_locked;
+                }
+            } else {
+                info.modpack = None;
+            }
         }
 
         info.date_updated = Utc::now();
@@ -1439,6 +1461,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 None => None,
             },
             modpack: instance.config.modpack.clone(),
+            locked: instance
+                .config
+                .modpack
+                .as_ref()
+                .map(|x| x.locked)
+                .unwrap_or(false),
             global_java_args: instance.config.game_configuration.global_java_args,
             extra_java_args: instance.config.game_configuration.extra_java_args.clone(),
             memory: instance.config.game_configuration.memory,
@@ -1482,7 +1510,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let _guard = self.modpack_info_semaphore.lock().await;
 
-        let modpack_info = match modpack {
+        let modpack_info = match modpack.modpack {
             info::Modpack::Curseforge(curseforge) => {
                 cache::curseforge::modpack::get_modpack_metadata(&self.app, curseforge).await?
             }
@@ -1519,7 +1547,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let _guard = self.modpack_info_semaphore.lock().await;
 
-        let modpack_info = match modpack {
+        let modpack_info = match modpack.modpack {
             info::Modpack::Curseforge(curseforge) => {
                 cache::curseforge::modpack::get_modpack_icon(&self.app, curseforge).await?
             }
@@ -1615,6 +1643,7 @@ pub struct ListInstance {
     pub status: ListInstanceStatus,
     pub icon_revision: u32,
     pub last_played: Option<DateTime<Utc>>,
+    pub locked: bool,
     pub date_created: DateTime<Utc>,
     pub date_updated: DateTime<Utc>,
 }
@@ -2206,6 +2235,7 @@ mod test {
                     modpack_platform: None,
                     state: domain::LaunchState::Inactive { failed_task: None },
                 }),
+                locked: false,
                 last_played: None,
                 date_created: list[0].instances[0].date_created,
                 date_updated: list[0].instances[0].date_updated,
@@ -2235,6 +2265,7 @@ mod test {
                 global_java_args: None,
                 extra_java_args: None,
                 memory: None,
+                modpack_locked: None,
             })
             .await?;
 
