@@ -115,7 +115,7 @@ impl DeviceCode {
                     #[derive(Deserialize)]
                     struct MsAuthResponse {
                         access_token: String,
-                        //id_token: String,
+                        id_token: String,
                         refresh_token: String,
                         expires_in: i64,
                     }
@@ -127,7 +127,7 @@ impl DeviceCode {
 
                     break Ok(Ok(MsAuth {
                         access_token: response.access_token,
-                        //id_token: response.id_token,
+                        id_token: response.id_token,
                         refresh_token: response.refresh_token,
                         expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
                     }));
@@ -145,7 +145,7 @@ pub struct DeviceCodeExpiredError;
 #[derive(Debug, Clone)]
 pub struct MsAuth {
     pub access_token: String,
-    //pub id_token: String,
+    pub id_token: String,
     pub refresh_token: String,
     pub expires_at: DateTime<Utc>,
 }
@@ -160,6 +160,7 @@ impl MsAuth {
         #[derive(Deserialize)]
         struct RefreshResponse {
             access_token: String,
+            id_token: String,
             refresh_token: String,
             expires_in: i64,
         }
@@ -184,6 +185,7 @@ impl MsAuth {
 
         Ok(Self {
             access_token: response.access_token,
+            id_token: response.id_token,
             refresh_token: response.refresh_token,
             expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
         })

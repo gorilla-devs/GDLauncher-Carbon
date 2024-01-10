@@ -3,7 +3,10 @@
 #![allow(dead_code)]
 
 use crate::managers::{
-    java::{discovery::RealDiscovery, java_checker::RealJavaChecker},
+    java::{
+        discovery::{Discovery, RealDiscovery},
+        java_checker::RealJavaChecker,
+    },
     App, AppInner,
 };
 
@@ -121,9 +124,18 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
         .allow_origin(Any);
 
     let app = AppInner::new(invalidation_sender, runtime_path).await;
+
+    let auto_manage_java = app
+        .settings_manager()
+        .get_settings()
+        .await
+        .unwrap()
+        .auto_manage_java;
+
     crate::managers::java::JavaManager::scan_and_sync(
+        auto_manage_java,
         &app.prisma_client,
-        &RealDiscovery,
+        &RealDiscovery::new(app.settings_manager().runtime_path.clone()),
         &RealJavaChecker,
     )
     .await

@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use strum::IntoEnumIterator;
-use tracing::{trace, warn};
+use tracing::{info, trace, warn};
 
 use crate::{
     db::{read_filters::StringFilter, PrismaClient},
@@ -108,6 +108,7 @@ async fn update_java_component_in_db_to_invalid(
 
 #[tracing::instrument(level = "trace", skip_all)]
 pub async fn scan_and_sync_local<T, G>(
+    auto_manage_java: bool,
     db: &Arc<PrismaClient>,
     discovery: &T,
     java_checker: &G,
@@ -116,9 +117,8 @@ where
     T: Discovery,
     G: JavaChecker,
 {
-    let auto_manage_java = true;
     let local_javas = discovery.find_java_paths().await;
-    let java_profiles = db.java_system_profile().find_many(vec![]).exec().await?;
+    let java_profiles = db.java_profile().find_many(vec![]).exec().await?;
 
     trace!("Auto Manage Java is {}", auto_manage_java);
 
@@ -265,11 +265,13 @@ where
 }
 
 #[tracing::instrument(level = "trace", skip_all)]
-pub async fn scan_and_sync_managed<G>(
+pub async fn scan_and_sync_managed<T, G>(
     db: &Arc<PrismaClient>,
+    discovery: &T,
     java_checker: &G,
 ) -> anyhow::Result<()>
 where
+    T: Discovery,
     G: JavaChecker,
 {
     let managed_javas = db
@@ -280,7 +282,7 @@ where
         .exec()
         .await?;
 
-    for managed_java in managed_javas {
+    for managed_java in &managed_javas {
         let java_bin_info = java_checker
             .get_bin_info(
                 &PathBuf::from(managed_java.path.clone()),
@@ -289,7 +291,23 @@ where
             .await;
 
         if java_bin_info.is_err() {
-            update_java_component_in_db_to_invalid(db, managed_java.path).await?;
+            update_java_component_in_db_to_invalid(db, managed_java.path.clone()).await?;
+        }
+    }
+
+    let javas_on_disk = discovery.find_managed_java_paths().await;
+
+    for java_path in javas_on_disk.iter().filter(|path| {
+        !managed_javas
+            .iter()
+            .any(|java| java.path == path.to_string_lossy().to_string())
+    }) {
+        let java_bin_info = java_checker
+            .get_bin_info(&java_path, JavaComponentType::Managed)
+            .await;
+
+        if let Ok(java_component) = java_bin_info {
+            add_java_component_to_db(db, java_component).await?;
         }
     }
 
@@ -305,10 +323,8 @@ pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result
     for profile in SystemJavaProfileName::iter() {
         trace!("Syncing system java profile: {}", profile.to_string());
         let java_in_profile = db
-            .java_system_profile()
-            .find_unique(crate::db::java_system_profile::name::equals(
-                profile.to_string(),
-            ))
+            .java_profile()
+            .find_unique(crate::db::java_profile::name::equals(profile.to_string()))
             .exec()
             .await?
             .ok_or_else(|| {
@@ -349,10 +365,10 @@ pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result
                     java.path,
                     profile.to_string()
                 );
-                db.java_system_profile()
+                db.java_profile()
                     .update(
-                        crate::db::java_system_profile::name::equals(profile.to_string()),
-                        vec![crate::db::java_system_profile::java::connect(
+                        crate::db::java_profile::name::equals(profile.to_string()),
+                        vec![crate::db::java_profile::java::connect(
                             crate::db::java::id::equals(java.id.clone()),
                         )],
                     )
@@ -379,7 +395,7 @@ mod test {
             java_checker::{MockJavaChecker, MockJavaCheckerInvalid},
             scan_and_sync::{
                 add_java_component_to_db, scan_and_sync_custom, scan_and_sync_local,
-                sync_system_java_profiles,
+                scan_and_sync_managed, sync_system_java_profiles,
             },
             JavaManager,
         },
@@ -480,7 +496,7 @@ mod test {
             .await
             .unwrap();
 
-        scan_and_sync_local(db, discovery, java_checker)
+        scan_and_sync_local(true, db, discovery, java_checker)
             .await
             .unwrap();
 
@@ -511,7 +527,7 @@ mod test {
             .await
             .unwrap();
 
-        scan_and_sync_local(db, discovery, java_checker)
+        scan_and_sync_local(true, db, discovery, java_checker)
             .await
             .unwrap();
 
@@ -555,11 +571,40 @@ mod test {
     }
 
     #[tokio::test]
+    async fn test_scan_and_sync_managed_on_disk_but_not_on_database() {
+        let app = setup_managers_for_test().await;
+        let db = &app.prisma_client;
+        let discovery = &MockDiscovery;
+        let java_checker = &MockJavaChecker;
+
+        scan_and_sync_managed(db, discovery, java_checker)
+            .await
+            .unwrap();
+
+        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+
+        assert_eq!(java_components.len(), 3);
+        for java_component in java_components {
+            assert!(java_component.is_valid);
+        }
+    }
+
+    #[tokio::test]
     async fn test_sync_system_java_profiles_with_profiles() {
         let app = setup_managers_for_test().await;
         let db = &app.prisma_client;
 
         JavaManager::ensure_profiles_in_db(db).await.unwrap();
+
+        // manually set one of the profiles to non-system to make sure it gets updated to system
+        db.java_profile()
+            .update(
+                crate::db::java_profile::name::equals(SystemJavaProfileName::Legacy.to_string()),
+                vec![crate::db::java_profile::is_system_profile::set(false)],
+            )
+            .exec()
+            .await
+            .unwrap();
 
         db.java()
             .create_many(vec![
@@ -586,7 +631,7 @@ mod test {
                 (
                     "my_path3".to_string(),
                     14,
-                    "17.0.1".to_string(),
+                    "14.0.1".to_string(),
                     "local".to_string(),
                     "linux".to_string(),
                     "x86_64".to_string(),
@@ -598,17 +643,19 @@ mod test {
             .await
             .unwrap();
 
+        JavaManager::ensure_profiles_in_db(db).await.unwrap();
         sync_system_java_profiles(db).await.unwrap();
+
+        let all_profiles = db.java_profile().find_many(vec![]).exec().await.unwrap();
+        assert!(all_profiles.iter().all(|profile| profile.is_system_profile));
 
         // Expect 8 and 17 to be there, but not 14 since it's invalid and 16 because not provided
         let legacy_profile = db
-            .java_system_profile()
-            .find_unique(
-                crate::db::java_system_profile::UniqueWhereParam::NameEquals(
-                    SystemJavaProfileName::Legacy.to_string(),
-                ),
-            )
-            .with(crate::db::java_system_profile::java::fetch())
+            .java_profile()
+            .find_unique(crate::db::java_profile::UniqueWhereParam::NameEquals(
+                SystemJavaProfileName::Legacy.to_string(),
+            ))
+            .with(crate::db::java_profile::java::fetch())
             .exec()
             .await
             .unwrap()
@@ -619,13 +666,11 @@ mod test {
         assert!(legacy_profile.java.flatten().is_some());
 
         let alpha_profile = db
-            .java_system_profile()
-            .find_unique(
-                crate::db::java_system_profile::UniqueWhereParam::NameEquals(
-                    SystemJavaProfileName::Alpha.to_string(),
-                ),
-            )
-            .with(crate::db::java_system_profile::java::fetch())
+            .java_profile()
+            .find_unique(crate::db::java_profile::UniqueWhereParam::NameEquals(
+                SystemJavaProfileName::Alpha.to_string(),
+            ))
+            .with(crate::db::java_profile::java::fetch())
             .exec()
             .await
             .unwrap()
@@ -634,13 +679,11 @@ mod test {
         assert!(alpha_profile.java.flatten().is_none());
 
         let beta_profile = db
-            .java_system_profile()
-            .find_unique(
-                crate::db::java_system_profile::UniqueWhereParam::NameEquals(
-                    SystemJavaProfileName::Beta.to_string(),
-                ),
-            )
-            .with(crate::db::java_system_profile::java::fetch())
+            .java_profile()
+            .find_unique(crate::db::java_profile::UniqueWhereParam::NameEquals(
+                SystemJavaProfileName::Beta.to_string(),
+            ))
+            .with(crate::db::java_profile::java::fetch())
             .exec()
             .await
             .unwrap()
@@ -649,13 +692,11 @@ mod test {
         assert!(beta_profile.java.flatten().is_some());
 
         let gamma_profile = db
-            .java_system_profile()
-            .find_unique(
-                crate::db::java_system_profile::UniqueWhereParam::NameEquals(
-                    SystemJavaProfileName::Gamma.to_string(),
-                ),
-            )
-            .with(crate::db::java_system_profile::java::fetch())
+            .java_profile()
+            .find_unique(crate::db::java_profile::UniqueWhereParam::NameEquals(
+                SystemJavaProfileName::Gamma.to_string(),
+            ))
+            .with(crate::db::java_profile::java::fetch())
             .exec()
             .await
             .unwrap()
@@ -664,13 +705,11 @@ mod test {
         assert!(gamma_profile.java.flatten().is_some());
 
         let minecraft_exe_profile = db
-            .java_system_profile()
-            .find_unique(
-                crate::db::java_system_profile::UniqueWhereParam::NameEquals(
-                    SystemJavaProfileName::MinecraftJavaExe.to_string(),
-                ),
-            )
-            .with(crate::db::java_system_profile::java::fetch())
+            .java_profile()
+            .find_unique(crate::db::java_profile::UniqueWhereParam::NameEquals(
+                SystemJavaProfileName::MinecraftJavaExe.to_string(),
+            ))
+            .with(crate::db::java_profile::java::fetch())
             .exec()
             .await
             .unwrap()

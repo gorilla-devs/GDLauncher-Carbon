@@ -23,7 +23,7 @@ use super::router::router;
 use super::translation::Translation;
 use super::vtask::FETaskId;
 
-use crate::domain::instance as domain;
+use crate::domain::instance::{self as domain, InstanceModpackInfo};
 use crate::managers::instance as manager;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
@@ -85,9 +85,12 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         mutation LOAD_ICON_URL[app, url: String] {
-            app.instance_manager()
+            let icon = app.instance_manager()
                 .download_icon(url)
-                .await
+                .await?;
+
+            app.instance_manager().set_loaded_icon(icon).await;
+            Ok(())
         }
 
         mutation DELETE_GROUP[app, id: FEGroupId] {
@@ -163,6 +166,19 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .map(InstanceDetails::from);
 
             Ok(Some(result?))
+        }
+
+        query GET_MODPACK_INFO[app, id: Option<FEInstanceId>] {
+            let Some(id) = id else {
+                return Ok(None);
+            };
+
+            let result = app.instance_manager()
+                .get_modpack_info(id.into())
+                .await?
+                .map(FEInstanceModpackInfo::from);
+
+            Ok(result)
         }
 
         query INSTANCE_MODS[app, id: Option<FEInstanceId>] {
@@ -415,6 +431,11 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
     }
 
     #[derive(Deserialize)]
+    struct ModpackIconQuery {
+        instance_id: i32,
+    }
+
+    #[derive(Deserialize)]
     struct ModIconQuery {
         instance_id: i32,
         mod_id: String,
@@ -479,13 +500,34 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
             )
         )
         .route(
+            "/modpackIcon",
+            axum::routing::get(
+                |State(app): State<Arc<AppInner>>, Query(query): Query<ModpackIconQuery>| async move {
+                    let icon = app.instance_manager()
+                        .get_modpack_icon(domain::InstanceId(query.instance_id))
+                        .await
+                        .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
+
+                        Ok::<_, AxumError>(match icon {
+                            Some(icon) => {
+                                (StatusCode::OK, icon)
+                            }
+                            None => (StatusCode::NO_CONTENT, Vec::new()),
+                        })
+                }
+            )
+        )
+        .route(
             "/loadIcon",
             axum::routing::get(
                 |State(app): State<Arc<AppInner>>, Query(query): Query<IconPathQuery>| async move {
-                    app.instance_manager()
+                    let icon = app.instance_manager()
                         .load_icon(PathBuf::from(query.path))
                         .await
-                        .map_err(|e| FeError::from_anyhow(&e).make_axum())
+                        .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
+
+                    app.instance_manager().set_loaded_icon(icon).await;
+                    Ok::<_, AxumError>(())
                 }
             )
         )
@@ -618,6 +660,8 @@ struct UpdateInstance {
     extra_java_args: Option<Set<Option<String>>>,
     #[specta(optional)]
     memory: Option<Set<Option<MemoryRange>>>,
+    #[specta(optional)]
+    modpack_locked: Option<Set<Option<bool>>>,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -725,6 +769,12 @@ enum GameVersion {
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
+struct ModpackInfo {
+    modpack: Modpack,
+    locked: bool,
+}
+
+#[derive(Type, Debug, Serialize, Deserialize)]
 enum Modpack {
     Curseforge(CurseforgeModpack),
     Modrinth(ModrinthModpack),
@@ -772,7 +822,7 @@ struct InstanceDetails {
     name: String,
     favorite: bool,
     version: Option<String>,
-    modpack: Option<Modpack>,
+    modpack: Option<ModpackInfo>,
     global_java_args: bool,
     extra_java_args: Option<String>,
     memory: Option<MemoryRange>,
@@ -782,6 +832,25 @@ struct InstanceDetails {
     notes: String,
     state: LaunchState,
     icon_revision: u32,
+}
+
+#[derive(Type, Debug, Serialize, Deserialize)]
+pub struct FEInstanceModpackInfo {
+    pub name: String,
+    pub version_name: String,
+    pub url_slug: String,
+    pub has_image: bool,
+}
+
+impl From<InstanceModpackInfo> for FEInstanceModpackInfo {
+    fn from(value: InstanceModpackInfo) -> Self {
+        Self {
+            name: value.name,
+            version_name: value.version_name,
+            url_slug: value.url_slug,
+            has_image: value.has_image,
+        }
+    }
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -1072,6 +1141,15 @@ impl TryFrom<GameVersion> for domain::info::GameVersion {
     }
 }
 
+impl From<ModpackInfo> for domain::info::ModpackInfo {
+    fn from(value: ModpackInfo) -> Self {
+        Self {
+            modpack: value.modpack.into(),
+            locked: value.locked,
+        }
+    }
+}
+
 impl From<Modpack> for domain::info::Modpack {
     fn from(value: Modpack) -> Self {
         match value {
@@ -1095,6 +1173,15 @@ impl From<ModrinthModpack> for domain::info::ModrinthModpack {
         Self {
             project_id: value.project_id,
             version_id: value.version_id,
+        }
+    }
+}
+
+impl From<domain::info::ModpackInfo> for ModpackInfo {
+    fn from(value: domain::info::ModpackInfo) -> Self {
+        Self {
+            modpack: value.modpack.into(),
+            locked: value.locked,
         }
     }
 }
@@ -1398,6 +1485,7 @@ impl TryFrom<UpdateInstance> for domain::InstanceSettingsUpdate {
             global_java_args: value.global_java_args.map(|x| x.inner()),
             extra_java_args: value.extra_java_args.map(|x| x.inner()),
             memory: value.memory.map(|x| x.inner().map(Into::into)),
+            modpack_locked: value.modpack_locked.map(|x| x.inner()),
         })
     }
 }

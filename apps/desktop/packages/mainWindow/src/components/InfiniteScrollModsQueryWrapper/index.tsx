@@ -120,7 +120,7 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
     getQueryFunction(newValue);
     infiniteQuery.remove();
     infiniteQuery.refetch();
-    rowVirtualizer.scrollToIndex(0);
+    // rowVirtualizer.scrollToIndex(0);
   };
 
   if (lastType() !== mergedProps.type) {

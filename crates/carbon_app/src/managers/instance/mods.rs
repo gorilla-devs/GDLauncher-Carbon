@@ -23,6 +23,21 @@ use super::{
 };
 
 impl ManagerRef<'_, InstanceManager> {
+    async fn ensure_modpack_not_locked(&self, instance_id: InstanceId) -> anyhow::Result<()> {
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        if let Some(modpack) = instance.data()?.config.modpack.as_ref() {
+            if modpack.locked {
+                bail!("Modpack is locked");
+            }
+        }
+
+        Ok(())
+    }
+
     pub async fn list_mods(self, instance_id: InstanceId) -> anyhow::Result<Vec<domain::Mod>> {
         let instances = self.instances.read().await;
         let instance = instances
@@ -165,6 +180,8 @@ impl ManagerRef<'_, InstanceManager> {
             .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
+        self.ensure_modpack_not_locked(instance_id).await?;
+
         let shortpath = &instance.shortpath;
 
         let m = self
@@ -233,6 +250,8 @@ impl ManagerRef<'_, InstanceManager> {
             .get(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
+        self.ensure_modpack_not_locked(instance_id).await?;
+
         let shortpath = &instance.shortpath;
 
         let m = self
@@ -280,6 +299,8 @@ impl ManagerRef<'_, InstanceManager> {
         install_deps: bool,
         replaces_mod_id: Option<String>,
     ) -> anyhow::Result<VisualTaskId> {
+        self.ensure_modpack_not_locked(instance_id).await?;
+
         let installer = CurseforgeModInstaller::create(self.app, project_id, file_id)
             .await?
             .into_installer();
@@ -296,6 +317,8 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         project_id: u32,
     ) -> anyhow::Result<VisualTaskId> {
+        self.ensure_modpack_not_locked(instance_id).await?;
+
         let version = {
             let instances = self.instances.read().await;
             instances
@@ -319,7 +342,7 @@ impl ManagerRef<'_, InstanceManager> {
                     .next()
                     .ok_or(anyhow::anyhow!("No modloader available"))?;
 
-                (version.release.clone(), modloader.type_.to_string())
+                (version.release.clone(), modloader.type_)
             }
         };
 
@@ -327,18 +350,24 @@ impl ManagerRef<'_, InstanceManager> {
             .app
             .modplatforms_manager()
             .curseforge
-            .get_mod(ModParameters {
+            .get_mod_files(ModFilesParameters {
                 mod_id: project_id.try_into()?,
+                query: ModFilesParametersQuery {
+                    game_version: Some(version.clone()),
+                    game_version_type_id: None,
+                    mod_loader_type: Some(modloader.into()),
+                    index: None,
+                    page_size: Some(200),
+                },
             })
             .await?
             .data
-            .latest_files_indexes
             .iter()
-            .find(|value| value.game_version == version)
+            .find(|value| value.game_versions.contains(&version))
             .ok_or(anyhow::anyhow!(
                 "Can't find a valid version for this instance"
             ))?
-            .file_id
+            .id
             .try_into()?;
 
         let installer = CurseforgeModInstaller::create(self.app, project_id, file_id)
@@ -358,6 +387,8 @@ impl ManagerRef<'_, InstanceManager> {
         install_deps: bool,
         replaces_mod_id: Option<String>,
     ) -> anyhow::Result<VisualTaskId> {
+        self.ensure_modpack_not_locked(instance_id).await?;
+
         let installer = ModrinthModInstaller::create(self.app, project_id, version_id)
             .await?
             .into_installer();
@@ -374,6 +405,8 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         project_id: String,
     ) -> anyhow::Result<VisualTaskId> {
+        self.ensure_modpack_not_locked(instance_id).await?;
+
         let version = {
             let instances = self.instances.read().await;
             instances
@@ -434,6 +467,8 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         id: String,
     ) -> anyhow::Result<VisualTaskId> {
+        self.ensure_modpack_not_locked(instance_id).await?;
+
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
@@ -507,6 +542,8 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         id: String,
     ) -> anyhow::Result<VisualTaskId> {
+        self.ensure_modpack_not_locked(instance_id).await?;
+
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)

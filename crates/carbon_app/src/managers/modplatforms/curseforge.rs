@@ -260,7 +260,7 @@ impl CurseForge {
         &self,
         mod_parameters: FilesParameters,
     ) -> anyhow::Result<CurseForgeResponse<Vec<File>>> {
-        let url = self.base_url.join("files")?;
+        let url = self.base_url.join("mods/files")?;
 
         let body = serde_json::to_string(&mod_parameters.body)?;
 
@@ -269,7 +269,7 @@ impl CurseForge {
         let resp = self
             .client
             .post(url.as_str())
-            .json(&body)
+            .body(reqwest::Body::from(body))
             .send()
             .await?
             .json_with_context_reporting::<CurseForgeResponse<Vec<File>>>("curseforge::get_files")

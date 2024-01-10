@@ -99,6 +99,7 @@ const ModpackBrowser = () => {
             <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
               <Input
                 placeholder="Type Here"
+                value={infiniteQuery?.query.searchQuery || ""}
                 icon={<div class="i-ri:search-line" />}
                 class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
                 onInput={(e) => {

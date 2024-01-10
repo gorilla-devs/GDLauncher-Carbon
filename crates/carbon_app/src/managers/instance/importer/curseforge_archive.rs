@@ -243,18 +243,17 @@ impl InstanceImporter for CurseforgeArchiveImporter {
             None => InstanceVersionSource::Version(version),
         };
 
-        let mut use_icon = false;
-        if let Some(CfMetadata {
-            image_url: Some(ref image_url),
-            ..
-        }) = &instance.meta
-        {
-            app.instance_manager()
-                .download_icon(image_url.clone())
-                .await?;
-
-            use_icon = true;
-        }
+        let icon = match &instance.meta {
+            Some(CfMetadata {
+                image_url: Some(image_url),
+                ..
+            }) => Some(
+                app.instance_manager()
+                    .download_icon(image_url.clone())
+                    .await?,
+            ),
+            _ => None,
+        };
 
         let initializer = |instance_path: PathBuf| {
             let instance = &instance;
@@ -273,7 +272,7 @@ impl InstanceImporter for CurseforgeArchiveImporter {
             .create_instance_ext(
                 app.instance_manager().get_default_group().await?,
                 name.unwrap_or_else(|| instance.manifest.name.clone()),
-                use_icon,
+                icon,
                 instance_version_source,
                 String::new(),
                 initializer,
