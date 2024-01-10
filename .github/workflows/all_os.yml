@@ -23,7 +23,7 @@ jobs:
           path: GDLauncher
       - uses: actions/setup-node@v3
         with:
-          node-version: "18.16.0"
+          node-version: "18.17.0"
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.73.0
@@ -78,7 +78,7 @@ jobs:
           path: GDLauncher
       - uses: actions/setup-node@v3
         with:
-          node-version: "18.16.0"
+          node-version: "18.17.0"
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.73.0
@@ -133,7 +133,7 @@ jobs:
           path: GDLauncher
       - uses: actions/setup-node@v3
         with:
-          node-version: "18.16.0"
+          node-version: "18.17.0"
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.73.0
