@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use carbon_net::{Downloadable, Progress};
 use tokio::task::spawn_blocking;
+use tracing::trace;
 
 use crate::domain::modplatforms::curseforge::filters::{ModsParameters, ModsParametersBody};
 use crate::domain::modplatforms::curseforge::{self, CurseForgeResponse, File};
@@ -117,7 +118,7 @@ pub async fn prepare_modpack_from_zip(
     let downloadables = {
         let mut handles = Vec::new();
 
-        let semaphore = Arc::new(tokio::sync::Semaphore::new(20));
+        let semaphore = Arc::new(tokio::sync::Semaphore::new(10));
         let atomic_counter_download_metadata = Arc::new(std::sync::atomic::AtomicU64::new(0));
 
         let files_len = manifest.files.len() as u64;
@@ -167,12 +168,41 @@ pub async fn prepare_modpack_from_zip(
                     .get(&mod_id)
                     .ok_or(anyhow::anyhow!("Failed to get addon: {:?}", mod_id))?;
 
-                let CurseForgeResponse { data: mod_file, .. } = cf_manager
+                trace!("Downloading mod file: {:?} - {:?}", mod_id, file_id);
+
+                let mut response = cf_manager
                     .get_mod_file(curseforge::filters::ModFileParameters { mod_id, file_id })
-                    .await
-                    .map_err(|e| {
-                        anyhow::anyhow!("Failed to get mod file: {:?} - {:?}", mod_id, file_id)
-                    })?;
+                    .await;
+
+                let mut retry_count = 0;
+
+                while let Err(e) = response {
+                    retry_count += 1;
+                    if retry_count > 3 {
+                        return Err(e);
+                    }
+
+                    tracing::warn!(
+                        "Failed to get mod file: {:?} - {:?} - {:?}",
+                        mod_id,
+                        file_id,
+                        e
+                    );
+                    tracing::warn!("Retrying in 5 seconds - {}/3", retry_count);
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    response = cf_manager
+                        .get_mod_file(curseforge::filters::ModFileParameters { mod_id, file_id })
+                        .await;
+                }
+
+                let CurseForgeResponse { data: mod_file, .. } = response.map_err(|e| {
+                    anyhow::anyhow!(
+                        "Failed to get mod file: {:?} - {:?} - {:?}",
+                        mod_id,
+                        file_id,
+                        e
+                    )
+                })?;
 
                 let instance_path =
                     class_id
