@@ -5,6 +5,7 @@ import { Trans } from "@gd/i18n";
 import { Button, Popover, Spinner, Tooltip } from "@gd/ui";
 import { format } from "date-fns";
 import CopyIcon from "../CopyIcon";
+import ModDownloadButton from "../ModDownloadButton";
 
 export type Props = {
   modVersion: VersionRowTypeData;
@@ -164,39 +165,52 @@ const RowContainer = (props: Props & AdditionalProps) => {
           </div>
         </div>
         <div class="flex items-center">
-          <Button
-            type="primary"
-            variant={props.isInstalled ? "green" : undefined}
-            rounded={false}
-            disabled={props.disabled || props.isInstalled}
-            onClick={props.onPrimaryAction}
-          >
-            <div class="flex gap-2">
-              <Switch>
-                <Match when={props.type === "mod" && !props.instanceId}>
-                  <Trans key="rowcontainer.no_instance_selected" />
-                </Match>
-                <Match when={props.loading}>
-                  <Trans key="modpack.version_downloading" />
-                  <Spinner class="w-5 h-5" />
-                </Match>
-                <Match when={!props.loading && !props.isInstalled}>
+          <Switch>
+            <Match when={props.type === "mod"}>
+              <ModDownloadButton
+                size="medium"
+                projectId={props.modVersion.id}
+                fileId={props.modVersion.fileId}
+                isCurseforge={props.isCurseforge || false}
+                instanceId={props.instanceId}
+              />
+            </Match>
+            <Match when={props.type === "modpack"}>
+              <Button
+                type="primary"
+                variant={props.isInstalled ? "green" : undefined}
+                rounded={false}
+                disabled={props.disabled || props.isInstalled}
+                onClick={props.onPrimaryAction}
+              >
+                <div class="flex gap-2">
                   <Switch>
-                    <Match when={props.installedFile}>
-                      <Trans key="modpack.version_switch" />
+                    <Match when={props.type === "mod" && !props.instanceId}>
+                      <Trans key="rowcontainer.no_instance_selected" />
                     </Match>
-                    <Match when={!props.installedFile}>
-                      <Trans key="modpack.version_download" />
+                    <Match when={props.loading}>
+                      <Trans key="modpack.version_downloading" />
+                      <Spinner class="w-5 h-5" />
+                    </Match>
+                    <Match when={!props.loading && !props.isInstalled}>
+                      <Switch>
+                        <Match when={props.installedFile}>
+                          <Trans key="modpack.version_switch" />
+                        </Match>
+                        <Match when={!props.installedFile}>
+                          <Trans key="modpack.version_download" />
+                        </Match>
+                      </Switch>
+                      <div class="i-ri:download-2-fill w-5 h-5" />
+                    </Match>
+                    <Match when={!props.loading && props.isInstalled}>
+                      <Trans key="modpack.version_installed" />
                     </Match>
                   </Switch>
-                  <div class="i-ri:download-2-fill w-5 h-5" />
-                </Match>
-                <Match when={!props.loading && props.isInstalled}>
-                  <Trans key="modpack.version_installed" />
-                </Match>
-              </Switch>
-            </div>
-          </Button>
+                </div>
+              </Button>
+            </Match>
+          </Switch>
         </div>
       </Match>
       <Match when={!props.modVersion}>

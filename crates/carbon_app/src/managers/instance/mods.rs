@@ -342,7 +342,7 @@ impl ManagerRef<'_, InstanceManager> {
                     .next()
                     .ok_or(anyhow::anyhow!("No modloader available"))?;
 
-                (version.release.clone(), modloader.type_.to_string())
+                (version.release.clone(), modloader.type_)
             }
         };
 
@@ -350,18 +350,24 @@ impl ManagerRef<'_, InstanceManager> {
             .app
             .modplatforms_manager()
             .curseforge
-            .get_mod(ModParameters {
+            .get_mod_files(ModFilesParameters {
                 mod_id: project_id.try_into()?,
+                query: ModFilesParametersQuery {
+                    game_version: Some(version.clone()),
+                    game_version_type_id: None,
+                    mod_loader_type: Some(modloader.into()),
+                    index: None,
+                    page_size: Some(200),
+                },
             })
             .await?
             .data
-            .latest_files_indexes
             .iter()
-            .find(|value| value.game_version == version)
+            .find(|value| value.game_versions.contains(&version))
             .ok_or(anyhow::anyhow!(
                 "Can't find a valid version for this instance"
             ))?
-            .file_id
+            .id
             .try_into()?;
 
         let installer = CurseforgeModInstaller::create(self.app, project_id, file_id)
