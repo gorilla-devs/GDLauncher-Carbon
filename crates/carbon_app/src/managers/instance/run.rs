@@ -282,6 +282,8 @@ impl ManagerRef<'_, InstanceManager> {
                             let (modpack_progress_tx, mut modpack_progress_rx) =
                                 tokio::sync::watch::channel(UpdateValue::<(u64,u64)>::new((0, 0)));
 
+                            t_download_files.start_opaque();
+
                             tokio::spawn(async move {
                                 while modpack_progress_rx.changed().await.is_ok() {
                                     {
@@ -351,6 +353,8 @@ impl ManagerRef<'_, InstanceManager> {
                             let (modpack_progress_tx, mut modpack_progress_rx) =
                                 tokio::sync::watch::channel(curseforge::ProgressState::new());
 
+                            t_addon_metadata.start_opaque();
+
                             tokio::spawn(async move {
                                 let mut tracker = curseforge::ProgressState::new();
 
@@ -360,10 +364,6 @@ impl ManagerRef<'_, InstanceManager> {
 
                                         tracker.extract_addon_overrides.update_from(&progress.extract_addon_overrides, |(completed, total)| {
                                             t_extract_files.update_items(completed as u32, total as u32);
-                                        });
-
-                                        tracker.acquire_addon_metadata.update_from(&progress.acquire_addon_metadata, |(completed, total)| {
-                                            t_addon_metadata.update_items(completed as u32, total as u32);
                                         });
                                     }
 
@@ -376,6 +376,7 @@ impl ManagerRef<'_, InstanceManager> {
                                 &cffile_path,
                                 &instance_path,
                                 skip_overrides,
+                                t_addon_metadata,
                                 modpack_progress_tx,
                             )
                                 .await
