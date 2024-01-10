@@ -7,6 +7,17 @@ import Twitter from "../assets/twitter.svg";
 import Discord from "../assets/discord.svg";
 import NewsLetter from "./Newsletter";
 import { APP_URLS } from "../consts";
+import yaml from "js-yaml";
+
+const response = await Promise.all([
+  fetch("https://cdn-raw.gdl.gg/launcher/alpha.yml"),
+  fetch("https://cdn-raw.gdl.gg/launcher/alpha-mac.yml"),
+  fetch("https://cdn-raw.gdl.gg/launcher/alpha-linux.yml"),
+]);
+const yamlfiles = await Promise.all(response.map((val) => val.text()));
+const downloadLinks = yamlfiles
+  .map((val) => yaml.load(val))
+  .map((val: any) => `https://cdn-raw.gdl.gg/launcher/${val.path}`);
 ---
 
 <footer class="flex flex-col">
@@ -25,57 +36,32 @@ import { APP_URLS } from "../consts";
           <HeaderLink href="/">Home</HeaderLink>
         </li>
         <li>
-          <HeaderLink href="#">The Team</HeaderLink>
+          <HeaderLink href="/docs">Docs</HeaderLink>
         </li>
         <li>
           <HeaderLink href="/blog">Blog</HeaderLink>
         </li>
-        <li>
-          <HeaderLink href="#">ModPacks</HeaderLink>
-        </li>
+
         <li>
           <HeaderLink href={APP_URLS.socials.github}>Github</HeaderLink>
         </li>
-		
       </ul>
     </div>
     <div>
       <span class="text-white font-medium pb-4">Download</span>
       <ul>
         <li>
-          <HeaderLink
-            href="https://cdn-raw.gdl.gg/launcher/GDLauncher__2.0.0-alpha.1703815106__win__x64.exe"
-          >
-            Windows
-          </HeaderLink>
+          <HeaderLink href={downloadLinks[0]}>Windows</HeaderLink>
         </li>
         <li>
-          <HeaderLink
-            href="https://cdn-raw.gdl.gg/launcher/GDLauncher__2.0.0-alpha.1703815106__mac__universal.dmg"
-          >
-            MacOs
-          </HeaderLink>
+          <HeaderLink href={downloadLinks[1]}>MacOs</HeaderLink>
         </li>
         <li>
-          <HeaderLink
-            href="https://cdn-raw.gdl.gg/launcher/GDLauncher__2.0.0-alpha.1703815106__linux__x64.AppImage"
-          >
-            Linux
-          </HeaderLink>
+          <HeaderLink href={downloadLinks[2]}>Linux</HeaderLink>
         </li>
       </ul>
     </div>
-    <!-- <div class="flex flex-col gap-2">
-      <span class="text-white font-medium pb-4">Newsletter</span>
-      <input
-        type="email"
-        id="email"
-        class="bg-darkgd px-2 py-1 border-bluegd-500 border-[1px] rounded-md text-white outline-none"
-      />
-      <Button intent="primary" size="small" class="subscribe">
-        SUBSCRIBE TO NEWSLETTER
-      </Button>
-    </div> -->
+
     <NewsLetter client:idle />
     <div>
       <span class="text-white font-medium pb-4">Download old GDL</span>
@@ -95,23 +81,25 @@ import { APP_URLS } from "../consts";
       <span class="text-white font-medium pb-4">Get in Touch!</span>
       <ul class="flex gap-2">
         <li>
-          <HeaderLink href="#">
-            <Image src={Discord} alt="social twitter" />
+          <HeaderLink href="https://discord.gdlauncher.com/">
+            <Image src={Discord} alt="social discord" />
           </HeaderLink>
         </li>
         <li>
-          <HeaderLink href="#">
-            <Image src={Twitter} alt="social discord" />
+          <HeaderLink href="https://twitter.com/gdlauncher">
+            <Image src={Twitter} alt="social twitter" />
           </HeaderLink>
         </li>
       </ul>
-	  <div class="flex flex-col">
-      <span class="text-graygd"
-        >(C) 2023 by GorillaDevs Inc. | All Right Reserved</span
-      >
-	  <HeaderLink href="/terms-of-service" class="pt-4">Terms of service</HeaderLink>
-	  <HeaderLink href="/privacy-statement">Privacy statement</HeaderLink>
-	  </div>
+      <div class="flex flex-col">
+        <span class="text-graygd"
+          >(C) 2023 by GorillaDevs Inc. | All Right Reserved</span
+        >
+        <HeaderLink href="/terms-of-service" class="pt-4">
+          Terms of service
+        </HeaderLink>
+        <HeaderLink href="/privacy-statement">Privacy statement</HeaderLink>
+      </div>
     </div>
   </div>
   <span class="text-graygd text-center pb-2 text-sm"
