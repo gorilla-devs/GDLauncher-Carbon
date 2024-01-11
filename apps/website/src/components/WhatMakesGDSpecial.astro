@@ -11,13 +11,16 @@ import Feat7 from "../assets/feat7.svg";
 // Component Script (JavaScript)
 ---
 
-<div class="flex flex-col items-center justify-center p-8">
-  <Button intent="transparent" class="uppercase font-bold">
+<div class="flex flex-col items-center justify-center p-8 background relative">
+  <div class="absolute top-0 bg-[rgba(29, 32, 40, 1)] h-52 w-full -z-10"></div>
+  <Button intent="transparent" class="uppercase font-bold z-10">
     Your All-In-One Minecraft Modded Launcher
   </Button>
   <div class="flex flex-col py-4">
-    <span class="text-[40px] text-white font-bold text-center">What makes</span>
-    <span class="text-[40px] text-white font-bold text-center"
+    <span class="text-[40px] text-white font-bold text-center z-10"
+      >What makes</span
+    >
+    <span class="text-[40px] text-white font-bold text-center z-10"
       >GDLauncher so special</span
     >
   </div>
@@ -119,6 +122,14 @@ import Feat7 from "../assets/feat7.svg";
 </div>
 
 <style>
+  .background {
+    background-image: linear-gradient(
+        rgba(23, 29, 39, 0.3),
+        /* Your specified semi-transparent color */ rgba(23, 29, 39, 0.3)
+      ),
+      url("../assets/pattern.svg");
+    /* clip-path: polygon(0 20%, 50% 0, 100% 20%, 100% 100%, 0 100%); */
+  }
   .background__card {
     background-color: rgba(39, 43, 53, 1);
     --offset: 2px;
