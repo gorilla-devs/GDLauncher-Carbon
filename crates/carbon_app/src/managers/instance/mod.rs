@@ -6,7 +6,9 @@ use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
 use crate::api::keys::instance::*;
 use crate::db::read_filters::StringFilter;
-use crate::domain::instance::info::{GameVersion, InstanceIcon};
+use crate::domain::instance::info::{GameVersion, InstanceIcon, Modpack};
+use crate::domain::modplatforms::curseforge::filters::{ModFileParameters, ModParameters};
+use crate::domain::modplatforms::modrinth::search::{ProjectID, VersionID};
 use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::{DateTime, Utc};
@@ -30,9 +32,13 @@ use self::importer::InstanceImportManager;
 use self::log::GameLog;
 use self::run::PersistenceManager;
 
+use super::metadata::cache;
+use super::modplatforms::curseforge::CurseForge;
 use super::ManagerRef;
 
-use crate::domain::instance::{self as domain, GameLogId, GroupId, InstanceFolder, InstanceId};
+use crate::domain::instance::{
+    self as domain, GameLogId, GroupId, InstanceFolder, InstanceId, InstanceModpackInfo,
+};
 use domain::info;
 
 pub mod explore;
@@ -55,6 +61,7 @@ pub struct InstanceManager {
     import_manager: InstanceImportManager,
     export_manager: InstanceExportManager,
     game_logs: RwLock<HashMap<GameLogId, (InstanceId, watch::Receiver<GameLog>)>>,
+    modpack_info_semaphore: Mutex<()>,
 }
 
 impl Default for InstanceManager {
@@ -74,6 +81,7 @@ impl InstanceManager {
             import_manager: InstanceImportManager::new(),
             export_manager: InstanceExportManager::new(),
             game_logs: RwLock::new(HashMap::new()),
+            modpack_info_semaphore: Mutex::new(()),
         }
     }
 }
@@ -304,7 +312,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                         .config
                                         .modpack
                                         .as_ref()
-                                        .map(info::Modpack::as_platform),
+                                        .map(|modpack| modpack.modpack.as_platform()),
                                     state: (&status.state).into(),
                                 })
                             }
@@ -321,6 +329,15 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                     }
                                 })
                             }
+                        },
+                        locked: match status {
+                            InstanceType::Valid(status) => status
+                                .config
+                                .modpack
+                                .as_ref()
+                                .map(|modpack| modpack.locked)
+                                .unwrap_or(false),
+                            InstanceType::Invalid(status) => false,
                         },
                         last_played: match status {
                             InstanceType::Valid(status) => status.config.last_played,
@@ -811,7 +828,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         bail!("unable to sanitize instance name")
     }
 
-    pub async fn load_icon(self, icon: PathBuf) -> anyhow::Result<Vec<u8>> {
+    pub async fn load_icon(self, icon: PathBuf) -> anyhow::Result<(String, Vec<u8>)> {
         let data = tokio::fs::read(icon.clone())
             .await
             .with_context(|| format!("Reading file `{}`", icon.to_string_lossy()))?;
@@ -826,12 +843,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .to_string_lossy()
             .to_string();
 
-        *self.loaded_icon.lock().await = Some((icon_name, data.clone()));
-
-        Ok(data)
+        Ok((icon_name, data))
     }
 
-    pub async fn download_icon(self, url: String) -> anyhow::Result<()> {
+    pub async fn download_icon(self, url: String) -> anyhow::Result<(String, Vec<u8>)> {
         let extension = url
             .rsplit_once('/')
             .map(|(_, name)| name.rsplit_once('.'))
@@ -848,9 +863,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .bytes()
             .await?;
 
-        *self.loaded_icon.lock().await = Some((format!("icon.{extension}"), data.to_vec()));
+        Ok((format!("icon.{extension}"), data.to_vec()))
+    }
 
-        Ok(())
+    pub async fn set_loaded_icon(self, icon: (String, Vec<u8>)) {
+        *self.loaded_icon.lock().await = Some(icon);
     }
 
     pub async fn create_instance(
@@ -861,17 +878,20 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         version: InstanceVersionSource,
         notes: String,
     ) -> anyhow::Result<InstanceId> {
-        self.create_instance_ext(group, name, use_loaded_icon, version, notes, |_| async {
-            Ok(())
-        })
-        .await
+        let icon = match use_loaded_icon {
+            true => self.loaded_icon.lock().await.take(),
+            false => None,
+        };
+
+        self.create_instance_ext(group, name, icon, version, notes, |_| async { Ok(()) })
+            .await
     }
 
     pub async fn create_instance_ext<F, I>(
         self,
         group: GroupId,
         name: String,
-        use_loaded_icon: bool,
+        icon: Option<(String, Vec<u8>)>,
         version: InstanceVersionSource,
         notes: String,
         initializer: F,
@@ -890,15 +910,15 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         tokio::fs::create_dir(tmpdir.join("instance")).await?;
 
-        let icon = match (use_loaded_icon, self.loaded_icon.lock().await.take()) {
-            (true, Some((path, data))) => {
+        let icon = match icon {
+            Some((path, data)) => {
                 tokio::fs::write(tmpdir.join(&path), data)
                     .await
                     .context("saving instance icon")?;
 
                 InstanceIcon::RelativePath(path)
             }
-            _ => InstanceIcon::Default,
+            None => InstanceIcon::Default,
         };
 
         let (version, modpack) = match version {
@@ -916,7 +936,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             date_updated: Utc::now(),
             last_played: None,
             seconds_played: 0,
-            modpack,
+            modpack: modpack.map(|modpack| info::ModpackInfo {
+                modpack,
+                locked: true,
+            }),
             game_configuration: info::GameConfig {
                 version,
                 global_java_args: true,
@@ -1080,6 +1103,16 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         if let Some(memory) = update.memory {
             info.game_configuration.memory = memory;
+        }
+
+        if let Some(modpack_locked) = update.modpack_locked {
+            if let Some(modpack_locked) = modpack_locked {
+                if let Some(modpack) = &mut info.modpack {
+                    modpack.locked = modpack_locked;
+                }
+            } else {
+                info.modpack = None;
+            }
         }
 
         info.date_updated = Utc::now();
@@ -1428,6 +1461,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 None => None,
             },
             modpack: instance.config.modpack.clone(),
+            locked: instance
+                .config
+                .modpack
+                .as_ref()
+                .map(|x| x.locked)
+                .unwrap_or(false),
             global_java_args: instance.config.game_configuration.global_java_args,
             extra_java_args: instance.config.game_configuration.extra_java_args.clone(),
             memory: instance.config.game_configuration.memory,
@@ -1444,6 +1483,80 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             notes: instance.config.notes.clone(),
             icon_revision: 0,
         })
+    }
+
+    pub async fn get_modpack_info(
+        self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<Option<InstanceModpackInfo>> {
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let instance = match &instance.type_ {
+            InstanceType::Invalid(_) => bail!(InvalidInstanceDataError),
+            InstanceType::Valid(x) => x,
+        };
+
+        let modpack = match &instance.config.modpack {
+            Some(modpack) => modpack.clone(),
+            None => {
+                return Ok(None);
+            }
+        };
+
+        drop(instances);
+
+        let _guard = self.modpack_info_semaphore.lock().await;
+
+        let modpack_info = match modpack.modpack {
+            info::Modpack::Curseforge(curseforge) => {
+                cache::curseforge::modpack::get_modpack_metadata(&self.app, curseforge).await?
+            }
+            info::Modpack::Modrinth(modrinth) => {
+                cache::modrinth::modpack::get_modpack_metadata(&self.app, modrinth).await?
+            }
+        };
+
+        Ok(Some(modpack_info))
+    }
+
+    pub async fn get_modpack_icon(
+        self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let instance = match &instance.type_ {
+            InstanceType::Invalid(_) => bail!(InvalidInstanceDataError),
+            InstanceType::Valid(x) => x,
+        };
+
+        let modpack = match &instance.config.modpack {
+            Some(modpack) => modpack.clone(),
+            None => {
+                return Ok(None);
+            }
+        };
+
+        drop(instances);
+
+        let _guard = self.modpack_info_semaphore.lock().await;
+
+        let modpack_info = match modpack.modpack {
+            info::Modpack::Curseforge(curseforge) => {
+                cache::curseforge::modpack::get_modpack_icon(&self.app, curseforge).await?
+            }
+            info::Modpack::Modrinth(modrinth) => {
+                cache::modrinth::modpack::get_modpack_icon(&self.app, modrinth).await?
+            }
+        };
+
+        Ok(Some(modpack_info))
     }
 
     pub async fn instance_icon(
@@ -1530,6 +1643,7 @@ pub struct ListInstance {
     pub status: ListInstanceStatus,
     pub icon_revision: u32,
     pub last_played: Option<DateTime<Utc>>,
+    pub locked: bool,
     pub date_created: DateTime<Utc>,
     pub date_updated: DateTime<Utc>,
 }
@@ -2121,6 +2235,7 @@ mod test {
                     modpack_platform: None,
                     state: domain::LaunchState::Inactive { failed_task: None },
                 }),
+                locked: false,
                 last_played: None,
                 date_created: list[0].instances[0].date_created,
                 date_updated: list[0].instances[0].date_updated,
@@ -2150,6 +2265,7 @@ mod test {
                 global_java_args: None,
                 extra_java_args: None,
                 memory: None,
+                modpack_locked: None,
             })
             .await?;
 
@@ -2182,6 +2298,115 @@ mod test {
 
         list = app.instance_manager().list_groups().await?;
         assert_eq!(list, expected);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_modpack_info() -> anyhow::Result<()> {
+        let mut app = crate::setup_managers_for_test().await;
+
+        let default_group_id = app.instance_manager().get_default_group().await?;
+        let default_group = &app.instance_manager().list_groups().await?[0];
+        let curseforge_instance_id = app
+            .instance_manager()
+            .create_instance(
+                default_group_id,
+                String::from("curseforge instance"),
+                false,
+                InstanceVersionSource::Modpack(info::Modpack::Curseforge(
+                    info::CurseforgeModpack {
+                        // RLCraft
+                        project_id: 285109,
+                        file_id: 4612979,
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+
+        let modrinth_instance_id = app
+            .instance_manager()
+            .create_instance(
+                default_group_id,
+                String::from("modrinth instance"),
+                false,
+                InstanceVersionSource::Modpack(info::Modpack::Modrinth(info::ModrinthModpack {
+                    // Fabulously Optimized
+                    project_id: String::from("1KVo5zza"),
+                    version_id: String::from("HH3vor7X"),
+                })),
+                String::new(),
+            )
+            .await?;
+
+        assert_eq!(
+            app.prisma_client
+                .curse_forge_modpack_cache()
+                .find_many(vec![])
+                .exec()
+                .await?
+                .len(),
+            0
+        );
+
+        assert_eq!(
+            app.prisma_client
+                .modrinth_modpack_cache()
+                .find_many(vec![])
+                .exec()
+                .await?
+                .len(),
+            0
+        );
+
+        app.instance_manager()
+            .get_modpack_info(curseforge_instance_id)
+            .await?;
+
+        app.instance_manager()
+            .get_modpack_info(modrinth_instance_id)
+            .await?;
+
+        assert_eq!(
+            app.prisma_client
+                .curse_forge_modpack_cache()
+                .find_many(vec![])
+                .exec()
+                .await?
+                .len(),
+            1
+        );
+
+        assert_eq!(
+            app.prisma_client
+                .modrinth_modpack_cache()
+                .find_many(vec![])
+                .exec()
+                .await?
+                .len(),
+            1
+        );
+
+        assert_eq!(
+            app.prisma_client
+                .curse_forge_modpack_image_cache()
+                .find_many(vec![])
+                .exec()
+                .await?
+                .len(),
+            1
+        );
+
+        assert_eq!(
+            app.prisma_client
+                .modrinth_modpack_image_cache()
+                .find_many(vec![])
+                .exec()
+                .await?
+                .len(),
+            1
+        );
 
         Ok(())
     }

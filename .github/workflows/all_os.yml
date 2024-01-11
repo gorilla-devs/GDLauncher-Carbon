@@ -5,16 +5,11 @@ on: push
 env:
   CARGO_TERM_COLOR: always
 
-concurrency:
-  group: "${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}"
-  cancel-in-progress: true
-
 jobs:
   mac_universal:
     defaults:
       run:
         working-directory: ./GDLauncher
-    if: contains(github.ref, 'refs/heads/develop') || (github.event_name == 'push' && !contains(github.ref, 'refs/heads/develop') && !contains(github.ref, 'refs/heads/upstream') && contains(github.event.head_commit.message, '[RUN_ALL_CI_CHECKS]'))
     runs-on: macos-12
     timeout-minutes: 60
     steps:
@@ -23,10 +18,10 @@ jobs:
           path: GDLauncher
       - uses: actions/setup-node@v3
         with:
-          node-version: "18.16.0"
+          node-version: "18.17.0"
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.73.0
+          toolchain: 1.75.0
           targets: aarch64-apple-darwin, x86_64-apple-darwin
           components: clippy, rustfmt
       - name: Prepare
@@ -69,7 +64,6 @@ jobs:
     defaults:
       run:
         working-directory: ./GDLauncher
-    if: contains(github.ref, 'refs/heads/develop') || (github.event_name == 'push' && !contains(github.ref, 'refs/heads/develop') && contains(github.event.head_commit.message, '[RUN_ALL_CI_CHECKS]'))
     runs-on: ubuntu-22.04
     timeout-minutes: 60
     steps:
@@ -78,10 +72,10 @@ jobs:
           path: GDLauncher
       - uses: actions/setup-node@v3
         with:
-          node-version: "18.16.0"
+          node-version: "18.17.0"
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.73.0
+          toolchain: 1.75.0
           targets: x86_64-unknown-linux-gnu
           components: clippy, rustfmt
       - name: Prepare
@@ -124,7 +118,6 @@ jobs:
     defaults:
       run:
         working-directory: ./GDLauncher
-    if: contains(github.ref, 'refs/heads/develop') || (github.event_name == 'push' && !contains(github.ref, 'refs/heads/develop') && contains(github.event.head_commit.message, '[RUN_ALL_CI_CHECKS]'))
     runs-on: windows-2022
     timeout-minutes: 60
     steps:
@@ -133,10 +126,10 @@ jobs:
           path: GDLauncher
       - uses: actions/setup-node@v3
         with:
-          node-version: "18.16.0"
+          node-version: "18.17.0"
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.73.0
+          toolchain: 1.75.0
           targets: x86_64-pc-windows-msvc
           components: clippy, rustfmt
       - name: Prepare

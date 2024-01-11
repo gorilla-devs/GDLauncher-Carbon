@@ -28,6 +28,8 @@ use crate::{
 
 use super::{BundleSender, ModplatformCacher, UpdateNotifier};
 
+pub mod modpack;
+
 pub struct ModrinthModCacher;
 
 #[async_trait::async_trait]

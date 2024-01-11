@@ -3,6 +3,7 @@ import { useRouteData } from "@solidjs/router";
 import {
   For,
   Match,
+  Show,
   Suspense,
   Switch,
   createEffect,
@@ -38,31 +39,33 @@ const Home = () => {
     <div>
       <div class="overflow-hidden">
         <UnstableCard />
-        <div class="flex gap-4">
-          <div class="flex-1 flex-grow">
-            <Switch>
-              <Match when={news.length > 0 && isNewsVisible()}>
-                <News
-                  slides={news}
-                  onClick={(news) => {
-                    window.openExternalLink(news.url || "");
-                  }}
-                  fallBackImg={DefaultImg}
-                />
-              </Match>
-              <Match
-                when={
-                  (news.length === 0 && isNewsVisible()) ||
-                  routeData.settings.isLoading
-                }
-              >
-                <Skeleton.news />
-              </Match>
-            </Switch>
+        <Show when={isNewsVisible()}>
+          <div class="flex gap-4">
+            <div class="flex-1 flex-grow">
+              <Switch>
+                <Match when={news.length > 0}>
+                  <News
+                    slides={news}
+                    onClick={(news) => {
+                      window.openExternalLink(news.url || "");
+                    }}
+                    fallBackImg={DefaultImg}
+                  />
+                </Match>
+                <Match
+                  when={
+                    (news.length === 0 && isNewsVisible()) ||
+                    routeData.settings.isLoading
+                  }
+                >
+                  <Skeleton.news />
+                </Match>
+              </Switch>
+            </div>
+            <div class="w-[1px] bg-darkSlate-400 h-auto" />
+            <FeaturedModpackTile />
           </div>
-          <div class="w-[1px] bg-darkSlate-400 h-auto" />
-          <FeaturedModpackTile />
-        </div>
+        </Show>
         <Switch>
           <Match
             when={
