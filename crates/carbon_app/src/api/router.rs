@@ -37,6 +37,7 @@ macro_rules! router {
                     block.map_err(|e| {
                         let mut e = ::core::convert::Into::<$crate::error::FeError>::into(e);
                         e.extend($crate::error::CauseSegment::from_display($crate::api::router::Endpoint($endpoint.full)));
+                        ::tracing::debug!({ error = ?e }, "Returning error to frontend from {:?}", $endpoint.full);
                         e.make_rspc()
                     })
                 })

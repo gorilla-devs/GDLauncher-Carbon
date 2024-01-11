@@ -138,6 +138,8 @@ impl InstanceImporter for LegacyGDLauncherImporter {
         index: u32,
         name: Option<String>,
     ) -> anyhow::Result<VisualTaskId> {
+        trace!("Beginning legacy gdl import");
+
         let instance = self
             .state
             .read()
