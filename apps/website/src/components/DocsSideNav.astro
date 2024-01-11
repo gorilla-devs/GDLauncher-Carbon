@@ -29,7 +29,7 @@ const categories = [...new Set(pages.map((p) => p.data.category))];
                 class={`-ml-px border-l py-1 pl-4 text-graygd transition-all hover:border-slate-500 hover:text-slate-500
                   ${
                     pathname === `/docs/${slug}`
-                      ? "border-slate-600 font-semibold "
+                      ? "border-slate-600 font-semibold text-bluegd-400"
                       : " border-transparent dark:border-slate-600"
                   }
               `}
