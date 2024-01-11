@@ -214,6 +214,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                 tokio::fs::create_dir_all(instance_path.join(".setup").join("modpack-complete"))
                     .await?;
 
+                tracing::trace!("Copying files from legacy instance");
                 // create copy-filter function in file utils for all importers
                 crate::domain::runtime_path::copy_dir_filter(&instance.path, &path, |path| {
                     match path.to_str() {
