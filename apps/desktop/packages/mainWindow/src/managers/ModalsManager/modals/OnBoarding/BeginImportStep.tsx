@@ -22,6 +22,7 @@ const BeginImportStep = (props: {
         name: props.instances![i],
         index: i
       });
+      await new Promise((r) => setTimeout(r, 100));
     }
   }
   createMutations();
