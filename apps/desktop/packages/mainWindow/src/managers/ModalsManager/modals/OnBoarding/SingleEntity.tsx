@@ -22,7 +22,9 @@ import { setTaskIds } from "@/utils/import";
 
 const [step, setStep] = createSignal("selectionStep");
 const [instances, setInstances] = createSignal([]);
-export { step, setStep, instances, setInstances };
+
+const [globalInstances, setGlobalInstances] = createSignal<any[]>([]);
+export { step, setStep, instances, setInstances, globalInstances };
 
 const SingleEntity = (props: {
   entity: ImportEntityStatus;
@@ -85,6 +87,8 @@ const SingleEntity = (props: {
         if ("SingleResult" in data) {
           if ("Valid" in data.SingleResult) {
             const res = data.SingleResult;
+
+            setGlobalInstances([res.Valid]);
             setInstance({
               singleResult: res.Valid,
               multiResult: undefined,
@@ -93,6 +97,15 @@ const SingleEntity = (props: {
           }
         } else if ("MultiResult" in data) {
           const res = data.MultiResult;
+          setGlobalInstances(
+            res.map((e) => {
+              if ("Valid" in e) {
+                return e.Valid;
+              } else {
+                return e.Invalid;
+              }
+            })
+          );
           setInstance({
             multiResult: res.map((e) => {
               if ("Valid" in e) {
