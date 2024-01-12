@@ -2,6 +2,7 @@ import { For, createEffect, createSignal } from "solid-js";
 import SingleImport from "./SingleImport";
 import { rspc } from "@/utils/rspcClient";
 import { setTaskIds, taskIds } from "@/utils/import";
+import { globalInstances } from "./SingleEntity";
 
 const BeginImportStep = (props: {
   singleInstance?: string;
@@ -18,15 +19,22 @@ const BeginImportStep = (props: {
 
   async function createMutations() {
     for (let i = 0; i < props.instances!.length; i++) {
-      await importInstanceMutation.mutateAsync({
-        name: props.instances![i],
-        index: i
-      });
+      try {
+        await importInstanceMutation.mutateAsync({
+          name: props.instances![i],
+          index: globalInstances().findIndex(
+            (x) => x.instance_name === props.instances![i]
+          )
+        });
+      } catch (error) {
+        console.error(error);
+      }
+
       await new Promise((r) => setTimeout(r, 100));
     }
   }
   createMutations();
-
+  console.log(globalInstances());
   return (
     <div class=" w-full h-full p-2">
       <For each={props.instances}>
