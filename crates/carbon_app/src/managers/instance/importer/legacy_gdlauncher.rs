@@ -205,11 +205,11 @@ impl InstanceImporter for LegacyGDLauncherImporter {
         };
 
         let icon = match &instance.config.background {
-            Some(background) => Some(
-                app.instance_manager()
-                    .load_icon(instance.path.join(background))
-                    .await?,
-            ),
+            Some(background) => app
+                .instance_manager()
+                .load_icon(instance.path.join(background))
+                .await
+                .ok(),
             None => None,
         };
 
