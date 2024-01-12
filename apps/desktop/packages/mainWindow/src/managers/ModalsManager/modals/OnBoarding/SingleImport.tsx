@@ -12,6 +12,7 @@ const SingleImport = (props: {
   instanceIndex: number;
   instanceName: string;
   taskId?: number;
+  importState: string;
 }) => {
   const [progress, setProgress] = createSignal(0);
   const [state, setState] = createSignal("idle");
@@ -42,7 +43,9 @@ const SingleImport = (props: {
       }
     }
     try {
-      runner();
+      if (props.importState !== "error") {
+        runner();
+      }
     } catch (err) {
       console.error(err);
     }
@@ -58,7 +61,7 @@ const SingleImport = (props: {
             <div class="font-semibold">{progress()}%</div>
           </div>
         </Match>
-        <Match when={state() === "failed"}>
+        <Match when={state() === "failed" || props.importState === "error"}>
           <div>
             <div class="i-ph:x-bold text-2xl text-red-600" />
           </div>
