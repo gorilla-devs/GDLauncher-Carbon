@@ -14,6 +14,9 @@ const BeginImportStep = (props: {
     {
       onSuccess(taskId) {
         setTaskIds([...(taskIds() || []), taskId]);
+      },
+      onError() {
+        setTaskIds([...(taskIds() || []), undefined]);
       }
     }
   );

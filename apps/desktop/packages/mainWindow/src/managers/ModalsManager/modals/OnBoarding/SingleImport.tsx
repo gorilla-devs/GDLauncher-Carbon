@@ -43,9 +43,7 @@ const SingleImport = (props: {
       }
     }
     try {
-      if (props.importState !== "error") {
-        runner();
-      }
+      runner();
     } catch (err) {
       console.error(err);
     }
