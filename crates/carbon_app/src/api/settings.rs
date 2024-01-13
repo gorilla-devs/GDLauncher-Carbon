@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::{
     api::{
         keys::settings::{
@@ -11,7 +13,7 @@ use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    modplatforms::{ModChannel, PlatformModChannel},
+    modplatforms::{ModChannelWithUsage, ModPlatform, ModSources},
     Set,
 };
 
@@ -95,7 +97,7 @@ struct FESettings {
     startup_resolution: String,
     java_custom_args: String,
     auto_manage_java: bool,
-    preferred_mod_channels: Vec<PlatformModChannel>,
+    mod_sources: ModSources,
     terms_and_privacy_accepted: bool,
     metrics_enabled: bool,
     random_user_uuid: String,
@@ -119,12 +121,25 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             startup_resolution: data.startup_resolution,
             java_custom_args: data.java_custom_args,
             auto_manage_java: data.auto_manage_java,
-            preferred_mod_channels: crate::domain::modplatforms::PlatformModChannel::str_to_vec(
-                &data.preferred_mod_channels,
-            )?
-            .into_iter()
-            .map(PlatformModChannel::from)
-            .collect(),
+            mod_sources: ModSources {
+                channels: {
+                    use crate::domain::modplatforms::ModChannelWithUsage as DModChannelWithUsage;
+
+                    let mut channels = DModChannelWithUsage::str_to_vec(&data.mod_channels)?;
+                    DModChannelWithUsage::fixup_list(&mut channels);
+
+                    channels
+                        .into_iter()
+                        .map(ModChannelWithUsage::from)
+                        .collect()
+                },
+                platform_blacklist: data
+                    .mod_platform_blacklist
+                    .split(",")
+                    .map(crate::domain::modplatforms::ModPlatform::from_str)
+                    .map(|r| r.map(ModPlatform::from))
+                    .collect::<Result<_, _>>()?,
+            },
             terms_and_privacy_accepted: data.terms_and_privacy_accepted,
             metrics_enabled: data.metrics_enabled,
             random_user_uuid: data.random_user_uuid,
@@ -163,7 +178,7 @@ pub struct FESettingsUpdate {
     #[specta(optional)]
     pub auto_manage_java: Option<bool>,
     #[specta(optional)]
-    pub preferred_mod_channels: Option<Vec<PlatformModChannel>>,
+    pub mod_sources: Option<ModSources>,
     #[specta(optional)]
     pub terms_and_privacy_accepted: Option<bool>,
     #[specta(optional)]

@@ -25,6 +25,7 @@ use super::vtask::FETaskId;
 use super::Set;
 
 use crate::domain::instance::{self as domain, InstanceModpackInfo};
+use crate::domain::modplatforms as mpdomain;
 use crate::managers::instance as manager;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
@@ -313,14 +314,11 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             Ok(super::vtask::FETaskId::from(task))
         }
 
-        query GET_MOD_CHANNELS[app, instance_id: FEInstanceId] {
+        query GET_MOD_SOURCES[app, instance_id: FEInstanceId] {
             app.instance_manager()
-                .get_instance_update_channels(instance_id.into())
-            .await
-            .map(|channels| {
-                channels.into_iter()
-                    .map(super::modplatforms::PlatformModChannel::from).collect::<Vec<_>>()
-            })
+                .get_instance_mod_sources(instance_id.into())
+                .await
+                .map(super::modplatforms::ModSources::from)
         }
 
         mutation INSTALL_LATEST_MOD[app, imod: InstallLatestMod] {
@@ -659,6 +657,8 @@ struct UpdateInstance {
     extra_java_args: Option<Set<Option<String>>>,
     #[specta(optional)]
     memory: Option<Set<Option<MemoryRange>>>,
+    #[specta(optional)]
+    mod_sources: Option<Set<Option<super::modplatforms::ModSources>>>,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -1066,11 +1066,11 @@ impl From<domain::InstanceDetails> for InstanceDetails {
     }
 }
 
-impl From<domain::info::ModpackPlatform> for ModpackPlatform {
-    fn from(value: domain::info::ModpackPlatform) -> Self {
+impl From<mpdomain::ModPlatform> for ModpackPlatform {
+    fn from(value: mpdomain::ModPlatform) -> Self {
         match value {
-            domain::info::ModpackPlatform::Curseforge => Self::Curseforge,
-            domain::info::ModpackPlatform::Modrinth => Self::Modrinth,
+            mpdomain::ModPlatform::Curseforge => Self::Curseforge,
+            mpdomain::ModPlatform::Modrinth => Self::Modrinth,
         }
     }
 }
@@ -1444,6 +1444,7 @@ impl TryFrom<UpdateInstance> for domain::InstanceSettingsUpdate {
             global_java_args: value.global_java_args.map(|x| x.inner()),
             extra_java_args: value.extra_java_args.map(|x| x.inner()),
             memory: value.memory.map(|x| x.inner().map(Into::into)),
+            mod_sources: value.mod_sources.map(|x| x.inner().map(Into::into)),
         })
     }
 }

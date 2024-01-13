@@ -5,6 +5,8 @@ use uuid::Uuid;
 
 use crate::domain::vtask::VisualTaskId;
 
+use super::modplatforms::ModSources;
+
 pub mod info;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -61,6 +63,7 @@ pub struct InstanceSettingsUpdate {
     pub global_java_args: Option<bool>,
     pub extra_java_args: Option<Option<String>>,
     pub memory: Option<Option<(u16, u16)>>,
+    pub mod_sources: Option<Option<ModSources>>,
 }
 
 #[derive(Debug, PartialEq, Eq)]

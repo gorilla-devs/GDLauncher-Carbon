@@ -23,7 +23,7 @@ pub struct Instance {
     pub modpack: Option<Modpack>,
     pub game_configuration: GameConfig,
     #[serde(default)]
-    pub update_channels: Option<Vec<PlatformModChannel>>,
+    pub mod_sources: Option<ModSources>,
     #[serde(default)]
     pub notes: String,
 }
@@ -58,6 +58,25 @@ pub struct CurseforgeModpack {
 pub struct ModrinthModpack {
     pub project_id: String,
     pub version_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum ModPlatform {
+    Curseforge,
+    Modrinth,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum ModChannel {
+    Alpha,
+    Beta,
+    Stable,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ModChannelWithUsage {
+    pub channel: ModChannel,
+    pub allow_updates: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -110,7 +129,13 @@ pub struct MemoryRange {
     pub max_mb: u16,
 }
 
-use crate::domain::{instance::info, modplatforms::PlatformModChannel};
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ModSources {
+    pub channels: Vec<ModChannelWithUsage>,
+    pub platform_blacklist: Vec<ModPlatform>,
+}
+
+use crate::domain::{instance::info, modplatforms};
 
 impl From<Instance> for info::Instance {
     fn from(value: Instance) -> Self {
@@ -123,7 +148,7 @@ impl From<Instance> for info::Instance {
             seconds_played: value.seconds_played,
             modpack: value.modpack.map(Into::into),
             game_configuration: value.game_configuration.into(),
-            update_channels: value.update_channels,
+            mod_sources: value.mod_sources.map(Into::into),
             notes: value.notes,
         }
     }
@@ -140,7 +165,7 @@ impl From<info::Instance> for Instance {
             seconds_played: value.seconds_played,
             modpack: value.modpack.map(Into::into),
             game_configuration: value.game_configuration.into(),
-            update_channels: value.update_channels,
+            mod_sources: value.mod_sources.map(Into::into),
             notes: value.notes,
         }
     }
@@ -342,3 +367,38 @@ impl From<(u16, u16)> for MemoryRange {
         }
     }
 }
+
+use crate::mirror_into;
+
+mirror_into!(
+    ModPlatform,
+    modplatforms::ModPlatform,
+    |value| match value {
+        Other::Curseforge => Self::Curseforge,
+        Other::Modrinth => Self::Modrinth,
+    }
+);
+
+mirror_into!(ModChannel, modplatforms::ModChannel, |value| match value {
+    Other::Alpha => Self::Alpha,
+    Other::Beta => Self::Beta,
+    Other::Stable => Self::Stable,
+});
+
+mirror_into!(
+    ModChannelWithUsage,
+    modplatforms::ModChannelWithUsage,
+    |value| Self {
+        channel: value.channel.into(),
+        allow_updates: value.allow_updates,
+    }
+);
+
+mirror_into!(ModSources, modplatforms::ModSources, |value| Self {
+    channels: value.channels.into_iter().map(Into::into).collect(),
+    platform_blacklist: value
+        .platform_blacklist
+        .into_iter()
+        .map(Into::into)
+        .collect(),
+});

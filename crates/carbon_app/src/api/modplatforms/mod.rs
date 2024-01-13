@@ -17,7 +17,9 @@ use crate::{
         modplatforms::curseforge::structs::CFFEModLoaderType,
         router::router,
     },
+    domain::modplatforms as domain,
     managers::App,
+    mirror_into,
 };
 
 mod curseforge;
@@ -39,7 +41,6 @@ pub enum ModChannel {
     Beta,
     Stable,
 }
-
 impl Default for ModChannel {
     fn default() -> Self {
         Self::Stable
@@ -61,57 +62,50 @@ impl TryFrom<i32> for ModChannel {
     }
 }
 
-impl From<ModChannel> for crate::domain::modplatforms::ModChannel {
-    fn from(value: ModChannel) -> Self {
-        use crate::domain::modplatforms::ModChannel as Domain;
+mirror_into!(ModChannel, domain::ModChannel, |value| match value {
+    Other::Alpha => Self::Alpha,
+    Other::Beta => Self::Beta,
+    Other::Stable => Self::Stable,
+});
 
-        match value {
-            ModChannel::Alpha => Domain::Alpha,
-            ModChannel::Beta => Domain::Beta,
-            ModChannel::Stable => Domain::Stable,
-        }
+#[derive(Type, Debug, Deserialize, Serialize, Clone, Copy)]
+pub enum ModPlatform {
+    Curseforge,
+    Modrinth,
+}
+
+mirror_into!(ModPlatform, domain::ModPlatform, |value| match value {
+    Other::Curseforge => Self::Curseforge,
+    Other::Modrinth => Self::Modrinth,
+});
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone, Copy)]
+pub struct ModChannelWithUsage {
+    pub channel: ModChannel,
+    pub allow_updates: bool,
+}
+
+mirror_into!(ModChannelWithUsage, domain::ModChannelWithUsage, |value| {
+    Self {
+        channel: value.channel.into(),
+        allow_updates: value.allow_updates,
     }
+});
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
+pub struct ModSources {
+    pub channels: Vec<ModChannelWithUsage>,
+    pub platform_blacklist: Vec<ModPlatform>,
 }
 
-impl From<crate::domain::modplatforms::ModChannel> for ModChannel {
-    fn from(value: crate::domain::modplatforms::ModChannel) -> Self {
-        use crate::domain::modplatforms::ModChannel as Domain;
-
-        match value {
-            Domain::Alpha => Self::Alpha,
-            Domain::Beta => Self::Beta,
-            Domain::Stable => Self::Stable,
-        }
-    }
-}
-
-#[derive(Type, Serialize, Deserialize, Debug, Copy, Clone)]
-pub enum PlatformModChannel {
-    Curseforge(ModChannel),
-    Modrinth(ModChannel),
-}
-
-impl From<PlatformModChannel> for crate::domain::modplatforms::PlatformModChannel {
-    fn from(value: PlatformModChannel) -> Self {
-        use crate::domain::modplatforms::PlatformModChannel as Domain;
-
-        match value {
-            PlatformModChannel::Curseforge(c) => Domain::Curseforge(c.into()),
-            PlatformModChannel::Modrinth(c) => Domain::Modrinth(c.into()),
-        }
-    }
-}
-
-impl From<crate::domain::modplatforms::PlatformModChannel> for PlatformModChannel {
-    fn from(value: crate::domain::modplatforms::PlatformModChannel) -> Self {
-        use crate::domain::modplatforms::PlatformModChannel as Domain;
-
-        match value {
-            Domain::Curseforge(c) => PlatformModChannel::Curseforge(c.into()),
-            Domain::Modrinth(c) => PlatformModChannel::Modrinth(c.into()),
-        }
-    }
-}
+mirror_into!(ModSources, domain::ModSources, |value| Self {
+    channels: value.channels.into_iter().map(Into::into).collect(),
+    platform_blacklist: value
+        .platform_blacklist
+        .into_iter()
+        .map(Into::into)
+        .collect(),
+});
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {

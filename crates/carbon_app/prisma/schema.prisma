@@ -25,7 +25,8 @@ model AppConfiguration {
   defaultInstanceGroup            Int?
   isFirstLaunch                   Boolean   @default(true)
   autoManageJava                  Boolean   @default(true)
-  preferredModChannels            String    @default("curseforge.stable") // "<platform>.<channel>,<platform.channel>"
+  modPlatformBlacklist            String    @default("")
+  modChannels                     String    @default("stable,beta,alpha")
   // Legal / metrics
   randomUserUuid                  String    @default(uuid())
   secret                          Bytes

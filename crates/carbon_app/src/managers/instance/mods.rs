@@ -1,6 +1,8 @@
 use std::borrow::Cow;
+use std::str::FromStr;
 
 use anyhow::{anyhow, bail};
+use chrono::{DateTime, FixedOffset, Utc};
 use futures::Future;
 use thiserror::Error;
 
@@ -18,7 +20,9 @@ use crate::domain::modplatforms::curseforge::FileReleaseType;
 use crate::domain::modplatforms::modrinth::project::ProjectVersionsFilters;
 use crate::domain::modplatforms::modrinth::search::ProjectID;
 use crate::domain::modplatforms::modrinth::version::VersionType;
-use crate::domain::modplatforms::{curseforge, ModChannel, PlatformModChannel};
+use crate::domain::modplatforms::{
+    curseforge, modrinth, ModChannel, ModChannelWithUsage, ModPlatform, ModSources,
+};
 use crate::managers::instance::InstanceType;
 use crate::managers::AppInner;
 use crate::{domain::vtask::VisualTaskId, managers::ManagerRef};
@@ -55,7 +59,7 @@ impl ManagerRef<'_, InstanceManager> {
             _ => Vec::new(),
         };
 
-        let update_channels = self.instance_cfg_update_channels(&config).await?;
+        let mod_sources = self.instance_cfg_mod_sources(&config).await?;
 
         fn split_paths<'a>(paths: &'a str) -> Vec<(&'a str, &'a str, &'a str)> {
             paths
@@ -65,10 +69,15 @@ impl ManagerRef<'_, InstanceManager> {
                 .collect()
         }
 
-        let has_update_for_paths = |paths: &Vec<(&str, &str, &str)>, channels: Vec<ModChannel>| {
+        let has_update_for_paths = |paths: &Vec<(&str, &str, &str)>| {
             update_paths.iter().any(|(v1, l1)| {
                 paths.iter().any(|(v2, l2, c2)| {
-                    v1 == v2 && l1 == l2 && channels.iter().any(|c| c.as_str() == *c2)
+                    v1 == v2
+                        && l1 == l2
+                        && mod_sources
+                            .channels
+                            .iter()
+                            .any(|c| c.allow_updates && c.channel.as_str() == *c2)
                 })
             })
         };
@@ -122,17 +131,11 @@ impl ManagerRef<'_, InstanceManager> {
                     }),
                     has_curseforge_update: cf
                         .as_ref()
-                        .map(|v| {
-                            has_update_for_paths(
-                                &split_paths(&v.update_paths),
-                                update_channels
-                                    .iter()
-                                    .filter_map(|c| match c {
-                                        PlatformModChannel::Curseforge(c) => Some(*c),
-                                        _ => None,
-                                    })
-                                    .collect(),
-                            )
+                        .map(|cf| {
+                            !mod_sources
+                                .platform_blacklist
+                                .contains(&ModPlatform::Curseforge)
+                                && has_update_for_paths(&split_paths(&cf.update_paths))
                         })
                         .unwrap_or(false),
                     curseforge: cf.map(|m| domain::CurseForgeModMetadata {
@@ -152,17 +155,11 @@ impl ManagerRef<'_, InstanceManager> {
                     }),
                     has_modrinth_update: mr
                         .as_ref()
-                        .map(|v| {
-                            has_update_for_paths(
-                                &split_paths(&v.update_paths),
-                                update_channels
-                                    .iter()
-                                    .filter_map(|c| match c {
-                                        PlatformModChannel::Modrinth(c) => Some(*c),
-                                        _ => None,
-                                    })
-                                    .collect(),
-                            )
+                        .map(|mr| {
+                            !mod_sources
+                                .platform_blacklist
+                                .contains(&ModPlatform::Modrinth)
+                                && has_update_for_paths(&split_paths(&mr.update_paths))
                         })
                         .unwrap_or(false),
                     modrinth: m.metadata.and_then(|m| m.modrinth).flatten().map(|m| {
@@ -188,29 +185,34 @@ impl ManagerRef<'_, InstanceManager> {
         Ok(mods.collect::<Vec<_>>())
     }
 
-    async fn instance_cfg_update_channels(
+    async fn instance_cfg_mod_sources(
         self,
         config: &info::Instance,
-    ) -> anyhow::Result<Cow<Vec<PlatformModChannel>>> {
-        match &config.update_channels {
-            Some(channels) => Ok(Cow::Borrowed(channels)),
+    ) -> anyhow::Result<Cow<ModSources>> {
+        match &config.mod_sources {
+            Some(sources) => Ok(Cow::Borrowed(sources)),
             None => {
-                let pmcs = self
-                    .app
-                    .settings_manager()
-                    .get_settings()
-                    .await?
-                    .preferred_mod_channels;
+                let settings = self.app.settings_manager().get_settings().await?;
 
-                Ok(Cow::Owned(PlatformModChannel::str_to_vec(&pmcs)?))
+                let mut channels = ModChannelWithUsage::str_to_vec(&settings.mod_channels)?;
+                ModChannelWithUsage::fixup_list(&mut channels);
+
+                Ok(Cow::Owned(ModSources {
+                    channels,
+                    platform_blacklist: settings
+                        .mod_platform_blacklist
+                        .split(",")
+                        .map(FromStr::from_str)
+                        .collect::<Result<_, _>>()?,
+                }))
             }
         }
     }
 
-    pub async fn get_instance_update_channels(
+    pub async fn get_instance_mod_sources(
         self,
         instance_id: InstanceId,
-    ) -> anyhow::Result<Vec<PlatformModChannel>> {
+    ) -> anyhow::Result<ModSources> {
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
@@ -220,10 +222,7 @@ impl ManagerRef<'_, InstanceManager> {
         let config = data.config.clone();
         drop(instances);
 
-        Ok(self
-            .instance_cfg_update_channels(&config)
-            .await?
-            .into_owned())
+        Ok(self.instance_cfg_mod_sources(&config).await?.into_owned())
     }
 
     pub async fn enable_mod(
@@ -516,7 +515,7 @@ impl ManagerRef<'_, InstanceManager> {
             bail!("Instance uses a custom game version file. Cannot resolve minecraft version for mod installation");
         };
 
-        let update_channels = self.instance_cfg_update_channels(&config).await?;
+        let mod_sources = self.instance_cfg_mod_sources(&config).await?;
 
         let m = self
             .app
@@ -544,113 +543,145 @@ impl ManagerRef<'_, InstanceManager> {
             .modrinth
             .expect("modrinth metadata was queried but not returned");
 
-        let mut cf_response = None;
-        let mut mr_response = None;
+        enum RemoteVersion {
+            Curseforge(curseforge::File),
+            Modrinth(modrinth::version::Version),
+        }
 
-        for channel in update_channels.iter() {
-            match channel {
-                PlatformModChannel::Curseforge(channel) => {
-                    let Some(cf) = &cf else { continue };
-
-                    if cf_response.is_none() {
-                        cf_response = Some(
-                            self.app
-                                .modplatforms_manager()
-                                .curseforge
-                                .get_mod_files(ModFilesParameters {
-                                    mod_id: cf.project_id,
-                                    query: ModFilesParametersQuery {
-                                        game_version: Some(version.release.clone()),
-                                        game_version_type_id: None,
-                                        mod_loader_type: version
-                                            .modloaders
-                                            .iter()
-                                            .next()
-                                            .map(|v| v.type_.into()),
-                                        index: None,
-                                        page_size: None,
-                                    },
-                                })
-                                .await?,
-                        );
-                    }
-
-                    if let Some(cfr) = &cf_response {
-                        let frt = FileReleaseType::from(*channel);
-
-                        let Some(file) = cfr.data.iter().find(|file| file.release_type == frt)
-                        else {
-                            continue;
-                        };
-
-                        // We already have the most preferred version installed.
-                        // There is no point to continuing as any version returned by
-                        // a future loop would be from a less preferred channel.
-                        if file.id == cf.file_id {
-                            break;
-                        }
-
-                        return self
-                            .install_curseforge_mod(
-                                instance_id,
-                                file.mod_id as u32,
-                                file.id as u32,
-                                false,
-                                Some(id),
-                            )
-                            .await;
-                    }
+        impl RemoteVersion {
+            fn date(&self) -> DateTime<Utc> {
+                match self {
+                    Self::Curseforge(v) => v.file_date,
+                    Self::Modrinth(v) => v.date_published,
                 }
-                PlatformModChannel::Modrinth(channel) => {
-                    let Some(mr) = &mr else { continue };
+            }
 
-                    if mr_response.is_none() {
-                        mr_response = Some(
-                            self.app
-                                .modplatforms_manager()
-                                .modrinth
-                                .get_project_versions(ProjectVersionsFilters {
-                                    project_id: ProjectID(mr.project_id.clone()),
-                                    game_versions: Some(vec![version.release.clone()]),
-                                    loaders: Some(
-                                        version
-                                            .modloaders
-                                            .iter()
-                                            .map(|ml| ml.type_.to_string())
-                                            .collect(),
-                                    ),
-                                    limit: None,
-                                    offset: None,
-                                })
-                                .await?,
-                        );
-                    }
+            fn channel(&self) -> ModChannel {
+                match self {
+                    Self::Curseforge(v) => v.release_type.into(),
+                    Self::Modrinth(v) => v.version_type.into(),
+                }
+            }
+        }
 
-                    if let Some(mrr) = &mr_response {
-                        let vtype = VersionType::from(*channel);
+        impl PartialEq for RemoteVersion {
+            fn eq(&self, other: &Self) -> bool {
+                PartialEq::eq(&self.date(), &other.date())
+            }
+        }
 
-                        let Some(version) =
-                            mrr.iter().find(|version| version.version_type == vtype)
-                        else {
-                            continue;
-                        };
+        impl Eq for RemoteVersion {}
 
-                        // We already have the most preferred version installed.
-                        // There is no point to continuing as any version returned by
-                        // a future loop would be from a less preferred channel.
-                        if version.id == mr.version_id {
-                            break;
+        impl PartialOrd for RemoteVersion {
+            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+                PartialOrd::partial_cmp(&self.date(), &other.date())
+            }
+        }
+
+        impl Ord for RemoteVersion {
+            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+                Ord::cmp(&self.date(), &other.date())
+            }
+        }
+
+        let mut versions = Vec::new();
+
+        if let Some(cf) = &cf {
+            let response = self
+                .app
+                .modplatforms_manager()
+                .curseforge
+                .get_mod_files(ModFilesParameters {
+                    mod_id: cf.project_id,
+                    query: ModFilesParametersQuery {
+                        game_version: Some(version.release.clone()),
+                        game_version_type_id: None,
+                        mod_loader_type: version.modloaders.iter().next().map(|v| v.type_.into()),
+                        index: None,
+                        page_size: None,
+                    },
+                })
+                .await?;
+
+            versions.extend(
+                response
+                    .data
+                    .into_iter()
+                    .map(|f| RemoteVersion::Curseforge(f)),
+            );
+        }
+
+        if let Some(mr) = &mr {
+            let response = self
+                .app
+                .modplatforms_manager()
+                .modrinth
+                .get_project_versions(ProjectVersionsFilters {
+                    project_id: ProjectID(mr.project_id.clone()),
+                    game_versions: Some(vec![version.release.clone()]),
+                    loaders: Some(
+                        version
+                            .modloaders
+                            .iter()
+                            .map(|ml| ml.type_.to_string())
+                            .collect(),
+                    ),
+                    limit: None,
+                    offset: None,
+                })
+                .await?;
+
+            versions.extend(response.into_iter().map(|v| RemoteVersion::Modrinth(v)));
+        }
+
+        versions.sort();
+
+        'select: for channel in &mod_sources.channels {
+            if !channel.allow_updates {
+                continue;
+            }
+
+            for i in 0..versions.len() {
+                let version = &versions[i];
+
+                if version.channel() >= channel.channel {
+                    let version = versions.remove(i);
+
+                    match version {
+                        RemoteVersion::Curseforge(file) => {
+                            let cf = cf.expect("curseforge metadata must be present if operating on a curseforge version");
+
+                            if cf.file_id == file.id {
+                                break 'select;
+                            }
+
+                            return self
+                                .install_curseforge_mod(
+                                    instance_id,
+                                    file.mod_id as u32,
+                                    file.id as u32,
+                                    false,
+                                    Some(id),
+                                )
+                                .await;
                         }
+                        RemoteVersion::Modrinth(version) => {
+                            let mr = mr.expect("modrinth metadata must be present if operating on a modrinth version");
 
-                        return self
-                            .install_modrinth_mod(
-                                instance_id,
-                                version.project_id.clone(),
-                                version.id.clone(),
-                                false,
-                                Some(id),
-                            )
-                            .await;
+                            if mr.version_id == version.id {
+                                break 'select;
+                            }
+
+                            return self
+                                .install_modrinth_mod(
+                                    instance_id,
+                                    version.project_id,
+                                    version.id,
+                                    false,
+                                    Some(id),
+                                )
+                                .await;
+                        }
                     }
                 }
             }

@@ -1,5 +1,6 @@
 use std::{fmt, str::FromStr};
 
+use anyhow::{anyhow, bail};
 use itertools::Itertools;
 use serde::{de::Visitor, Deserialize, Serialize};
 
@@ -22,6 +23,10 @@ impl ModChannel {
             ModChannel::Stable => "stable",
         }
     }
+
+    fn all() -> [Self; 3] {
+        [Self::Stable, Self::Beta, Self::Alpha]
+    }
 }
 
 impl FromStr for ModChannel {
@@ -32,96 +37,116 @@ impl FromStr for ModChannel {
             "alpha" => Ok(Self::Alpha),
             "beta" => Ok(Self::Beta),
             "stable" => Ok(Self::Stable),
-            _ => Err(anyhow::anyhow!("unexpected ModChannel '{s}'")),
+            _ => Err(anyhow!("unexpected ModChannel '{s}'")),
         }
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum PlatformModChannel {
-    Curseforge(ModChannel),
-    Modrinth(ModChannel),
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum ModPlatform {
+    Curseforge,
+    Modrinth,
 }
 
-impl PlatformModChannel {
-    pub fn list_to_string(pmcs: &[Self]) -> String {
-        pmcs.iter().map(Self::to_string).join(",")
-    }
-
-    pub fn str_to_vec(pmcs: &str) -> anyhow::Result<Vec<Self>> {
-        pmcs.split(',')
-            .map(Self::from_str)
-            .collect::<Result<Vec<_>, _>>()
-    }
-}
-
-impl ToString for PlatformModChannel {
-    fn to_string(&self) -> String {
+impl ModPlatform {
+    pub fn as_str(&self) -> &'static str {
         match self {
-            Self::Curseforge(channel) => format!("curseforge.{}", channel.as_str(),),
-            Self::Modrinth(channel) => format!("modrinth.{}", channel.as_str(),),
+            Self::Curseforge => "curseforge",
+            Self::Modrinth => "modrinth",
         }
     }
 }
 
-impl FromStr for PlatformModChannel {
+impl FromStr for ModPlatform {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let Some((platform, channel)) = s.split_once('.') else {
-            return Err(anyhow::anyhow!(
-                "PlatformModChannel string '{s}' was not in the form 'platform.channel'"
-            ));
-        };
-
-        let channel = ModChannel::from_str(channel)?;
-
-        match platform {
-            "curseforge" => Ok(Self::Curseforge(channel)),
-            "modrinth" => Ok(Self::Modrinth(channel)),
-            _ => Err(anyhow::anyhow!(
-                "PlatformModChannel platform '{platform}' not recognised"
-            )),
+        match s {
+            "curseforge" => Ok(Self::Curseforge),
+            "modrinth" => Ok(Self::Modrinth),
+            _ => Err(anyhow!("unexpected ModPlatform '{s}'")),
         }
     }
 }
 
-impl<'a> Deserialize<'a> for PlatformModChannel {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'a>,
-    {
-        struct PMCVisitor;
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct ModChannelWithUsage {
+    pub channel: ModChannel,
+    pub allow_updates: bool,
+}
 
-        impl<'a> Visitor<'a> for PMCVisitor {
-            type Value = PlatformModChannel;
+impl ModChannelWithUsage {
+    pub fn slice_to_str(channels: &[Self]) -> String {
+        channels.iter().map(ToString::to_string).join(",")
+    }
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                write!(
-                    formatter,
-                    "platform mod channel string (<platform>.<channel>)"
-                )
-            }
+    pub fn str_to_vec(s: &str) -> anyhow::Result<Vec<Self>> {
+        s.split(",")
+            .map(FromStr::from_str)
+            .collect::<Result<Vec<_>, _>>()
+    }
 
-            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                PlatformModChannel::from_str(v).map_err(|e| serde::de::Error::custom(e))
-            }
+    /// Validate the channel list is correct.
+    ///
+    /// Use this when parsing a new value for the channel list.
+    pub fn validate_list(channels: &[Self]) -> anyhow::Result<()> {
+        let has_duplicates = channels
+            .iter()
+            .enumerate()
+            .any(|(i, c)| channels[..i].iter().any(|c2| c2.channel == c.channel));
+
+        if has_duplicates {
+            bail!("channel list {channels:?} contains the same channel multiple times")
         }
 
-        deserializer.deserialize_str(PMCVisitor)
+        if channels.len() < ModChannel::all().len() {
+            bail!("channel list {channels:?} is missing channels")
+        }
+
+        Ok(())
+    }
+
+    /// Fixup the given list if it is missing entries.
+    ///
+    /// Adds any missing channel entries in order with updates disabled.
+    pub fn fixup_list(channels: &mut Vec<Self>) {
+        let missing_channels = ModChannel::all()
+            .into_iter()
+            .filter(|c| !channels.iter().any(|c2| c2.channel == *c))
+            .collect::<Vec<_>>();
+
+        channels.extend(missing_channels.into_iter().map(|c| ModChannelWithUsage {
+            channel: c,
+            allow_updates: false,
+        }));
     }
 }
 
-impl Serialize for PlatformModChannel {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
+impl FromStr for ModChannelWithUsage {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (channel, updates) = s.split_once(':').ok_or_else(|| {
+            anyhow!("ModChannelWithUsage string '{s}' was not in the form 'channel:updates'")
+        })?;
+
+        Ok(Self {
+            channel: ModChannel::from_str(channel)?,
+            allow_updates: bool::from_str(updates)?,
+        })
     }
+}
+
+impl ToString for ModChannelWithUsage {
+    fn to_string(&self) -> String {
+        format!("{}:{}", self.channel.as_str(), self.allow_updates)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ModSources {
+    pub channels: Vec<ModChannelWithUsage>,
+    pub platform_blacklist: Vec<ModPlatform>,
 }
 
 #[cfg(test)]

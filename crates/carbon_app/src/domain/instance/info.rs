@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use anyhow::bail;
 use chrono::{DateTime, Utc};
 
-use crate::domain::modplatforms::PlatformModChannel;
+use crate::domain::modplatforms::{ModPlatform, ModSources};
 
 #[derive(Debug, Clone)]
 pub struct Instance {
@@ -17,7 +17,7 @@ pub struct Instance {
     pub seconds_played: u64,
     pub modpack: Option<Modpack>,
     pub game_configuration: GameConfig,
-    pub update_channels: Option<Vec<PlatformModChannel>>,
+    pub mod_sources: Option<ModSources>,
     pub notes: String,
 }
 
@@ -40,12 +40,6 @@ impl ToString for Modpack {
             Self::Modrinth(_) => "modrinth".to_string(),
         }
     }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum ModpackPlatform {
-    Curseforge,
-    Modrinth,
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
@@ -121,10 +115,10 @@ impl TryFrom<&str> for ModLoaderType {
 }
 
 impl Modpack {
-    pub fn as_platform(&self) -> ModpackPlatform {
+    pub fn as_platform(&self) -> ModPlatform {
         match self {
-            Self::Curseforge(_) => ModpackPlatform::Curseforge,
-            Self::Modrinth(_) => ModpackPlatform::Modrinth,
+            Self::Curseforge(_) => ModPlatform::Curseforge,
+            Self::Modrinth(_) => ModPlatform::Modrinth,
         }
     }
 }
