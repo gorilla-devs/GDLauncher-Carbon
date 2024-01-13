@@ -20,7 +20,7 @@ pub struct Instance {
     #[serde(default)]
     pub seconds_played: u64,
     #[serde(default)]
-    pub modpack: Option<Modpack>,
+    pub modpack: Option<ModpackInfo>,
     pub game_configuration: GameConfig,
     #[serde(default)]
     pub mod_sources: Option<ModSources>,
@@ -39,6 +39,14 @@ impl Default for InstanceIcon {
     fn default() -> Self {
         Self::Default
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ModpackInfo {
+    #[serde(flatten)]
+    pub modpack: Modpack,
+    #[serde(default)]
+    pub locked: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -189,6 +197,24 @@ impl From<info::InstanceIcon> for InstanceIcon {
         match value {
             Info::Default => Self::Default,
             Info::RelativePath(path) => Self::RelativePath(path),
+        }
+    }
+}
+
+impl From<ModpackInfo> for info::ModpackInfo {
+    fn from(value: ModpackInfo) -> Self {
+        Self {
+            modpack: value.modpack.into(),
+            locked: value.locked,
+        }
+    }
+}
+
+impl From<info::ModpackInfo> for ModpackInfo {
+    fn from(value: info::ModpackInfo) -> Self {
+        Self {
+            modpack: value.modpack.into(),
+            locked: value.locked,
         }
     }
 }

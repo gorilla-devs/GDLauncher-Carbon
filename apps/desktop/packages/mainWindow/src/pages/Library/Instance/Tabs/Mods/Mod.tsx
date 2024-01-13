@@ -21,6 +21,7 @@ type Props = {
   selectMods: {
     [id: string]: boolean;
   };
+  isInstanceLocked: boolean | undefined;
 };
 
 const CopiableEntity = (props: {
@@ -70,6 +71,24 @@ const Mod = (props: Props) => {
           ];
         }
       );
+    },
+    onError: (err, data) => {
+      console.log(err);
+
+      queryClient.setQueryData(
+        ["instance.getInstanceMods", data.instance_id],
+        (oldData: ModType[] | undefined) => {
+          const modIndex = oldData?.findIndex((mod) => mod.id === data.mod_id)!;
+          return [
+            ...oldData!.slice(0, modIndex),
+            {
+              ...oldData![modIndex],
+              enabled: false
+            },
+            ...oldData!.slice(modIndex + 1)
+          ];
+        }
+      );
     }
   });
 
@@ -89,10 +108,56 @@ const Mod = (props: Props) => {
           ];
         }
       );
+    },
+    onError: (err, data) => {
+      console.log(err);
+
+      queryClient.setQueryData(
+        ["instance.getInstanceMods", data.instance_id],
+        (oldData: ModType[] | undefined) => {
+          const modIndex = oldData?.findIndex((mod) => mod.id === data.mod_id)!;
+          return [
+            ...oldData!.slice(0, modIndex),
+            {
+              ...oldData![modIndex],
+              enabled: true
+            },
+            ...oldData!.slice(modIndex + 1)
+          ];
+        }
+      );
     }
   });
 
-  const deleteModMutation = rspc.createMutation(["instance.deleteMod"]);
+  const deleteModMutation = rspc.createMutation(["instance.deleteMod"], {
+    onMutate: (data) => {
+      queryClient.setQueryData(
+        ["instance.getInstanceMods", data.instance_id],
+        (oldData: ModType[] | undefined) => {
+          const modIndex = oldData?.findIndex((mod) => mod.id === data.mod_id)!;
+          return [...oldData!.slice(0, modIndex), ...oldData!.slice(modIndex)];
+        }
+      );
+    },
+    onError: (err, data) => {
+      console.log(err);
+
+      queryClient.setQueryData(
+        ["instance.getInstanceMods", data.instance_id],
+        (oldData: ModType[] | undefined) => {
+          const modIndex = oldData?.findIndex((mod) => mod.id === data.mod_id)!;
+          return [
+            ...oldData!.slice(0, modIndex),
+            {
+              ...oldData![modIndex],
+              enabled: true
+            },
+            ...oldData!.slice(modIndex + 1)
+          ];
+        }
+      );
+    }
+  });
 
   const imagePlatform = () => {
     if (props.mod.curseforge?.has_image) return "curseforge";
@@ -178,33 +243,88 @@ const Mod = (props: Props) => {
               <img src={ModrinthLogo} class="w-4 h-4" />
             </span>
           </Show>
-          <Switch
-            checked={props.mod.enabled}
-            onChange={(e) => {
-              if (instanceId() === undefined) return;
-              if (e.target.checked) {
-                enableModMutation.mutate({
-                  instance_id: parseInt(instanceId() as string, 10),
+          <Show when={props.isInstanceLocked}>
+            <Tooltip
+              content={<Trans key="instance.locked_cannot_apply_changes" />}
+              placement="top"
+              class="max-w-38 text-ellipsis overflow-hidden"
+            >
+              <Switch
+                disabled={props.isInstanceLocked}
+                checked={props.mod.enabled}
+                onChange={(e) => {
+                  if (instanceId() === undefined) return;
+                  if (e.target.checked) {
+                    enableModMutation.mutate({
+                      instance_id: parseInt(instanceId() as string, 10),
+                      mod_id: props.mod.id
+                    });
+                  } else {
+                    disableModMutation.mutate({
+                      instance_id: parseInt(instanceId() as string, 10),
+                      mod_id: props.mod.id
+                    });
+                  }
+                }}
+              />
+            </Tooltip>
+          </Show>
+          <Show when={!props.isInstanceLocked}>
+            <Switch
+              disabled={props.isInstanceLocked}
+              checked={props.mod.enabled}
+              onChange={(e) => {
+                if (instanceId() === undefined) return;
+                if (e.target.checked) {
+                  enableModMutation.mutate({
+                    instance_id: parseInt(instanceId() as string, 10),
+                    mod_id: props.mod.id
+                  });
+                } else {
+                  disableModMutation.mutate({
+                    instance_id: parseInt(instanceId() as string, 10),
+                    mod_id: props.mod.id
+                  });
+                }
+              }}
+            />
+          </Show>
+          <Show when={props.isInstanceLocked}>
+            <Tooltip
+              content={<Trans key="instance.locked_cannot_apply_changes" />}
+              placement="top"
+              class="max-w-38 text-ellipsis overflow-hidden"
+            >
+              <div
+                class="text-2xl text-darkSlate-500 duration-100 ease-in-out i-ri:delete-bin-2-fill"
+                onClick={(e) => {
+                  e.stopPropagation();
+
+                  if (props.isInstanceLocked) return;
+
+                  deleteModMutation.mutate({
+                    instance_id: parseInt(params.id, 10),
+                    mod_id: props.mod.id
+                  });
+                }}
+              />
+            </Tooltip>
+          </Show>
+          <Show when={!props.isInstanceLocked}>
+            <div
+              class="text-2xl text-darkSlate-500 duration-100 ease-in-out i-ri:delete-bin-2-fill transition-color hover:text-red-500"
+              onClick={(e) => {
+                e.stopPropagation();
+
+                if (props.isInstanceLocked) return;
+
+                deleteModMutation.mutate({
+                  instance_id: parseInt(params.id, 10),
                   mod_id: props.mod.id
                 });
-              } else {
-                disableModMutation.mutate({
-                  instance_id: parseInt(instanceId() as string, 10),
-                  mod_id: props.mod.id
-                });
-              }
-            }}
-          />
-          <div
-            class="text-2xl text-darkSlate-500 duration-100 ease-in-out cursor-pointer i-ri:delete-bin-2-fill transition-color hover:text-red-500"
-            onClick={(e) => {
-              e.stopPropagation();
-              deleteModMutation.mutate({
-                instance_id: parseInt(params.id, 10),
-                mod_id: props.mod.id
-              });
-            }}
-          />
+              }}
+            />
+          </Show>
           <div onClick={(e) => e.stopPropagation()}>
             <Popover
               noPadding
@@ -430,52 +550,59 @@ const Mod = (props: Props) => {
               onClose={() => setIsHoveringOptionsCard(false)}
               trigger="click"
               content={
-                <div
-                  class="flex flex-col text-darkSlate-100 bg-darkSlate-900 rounded-lg border-darkSlate-700 border-solid border-1 shadow-md shadow-darkSlate-90"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div class="p-4 text-md text-white font-bold max-w-50 truncate whitespace-nowrap">
-                    {props.mod.curseforge?.name ||
-                      props.mod.metadata?.name ||
-                      props.mod.filename}
-                  </div>
-                  <Show when={props.mod.modrinth}>
+                <>
+                  <Show when={!props.isInstanceLocked}>
                     <div
-                      class="p-4 text-md flex gap-4 justify-between hover:bg-darkSlate-800"
-                      onClick={() => {
-                        navigate(
-                          `/mods/${props.mod.modrinth
-                            ?.project_id}/modrinth/versions?instanceId=${instanceId()}`
-                        );
-                      }}
+                      class="flex flex-col text-darkSlate-100 bg-darkSlate-900 rounded-lg border-darkSlate-700 border-solid border-1 shadow-md shadow-darkSlate-90"
+                      onClick={(e) => e.stopPropagation()}
                     >
-                      <div>
-                        <Trans key="instance.switch_version" />
+                      <div class="p-4 text-md text-white font-bold max-w-50 truncate whitespace-nowrap">
+                        {props.mod.curseforge?.name ||
+                          props.mod.metadata?.name ||
+                          props.mod.filename}
                       </div>
-                      <div class="flex justify-center items-center">
-                        <img src={ModrinthLogo} class="w-4 h-4" />
-                      </div>
+                      <Show when={props.mod.modrinth}>
+                        <div
+                          class="p-4 text-md flex gap-4 justify-between hover:bg-darkSlate-800"
+                          onClick={() => {
+                            navigate(
+                              `/mods/${props.mod.modrinth
+                                ?.project_id}/modrinth/versions?instanceId=${instanceId()}`
+                            );
+                          }}
+                        >
+                          <div>
+                            <Trans key="instance.switch_version" />
+                          </div>
+                          <div class="flex justify-center items-center">
+                            <img src={ModrinthLogo} class="w-4 h-4" />
+                          </div>
+                        </div>
+                      </Show>
+                      <Show when={props.mod.curseforge}>
+                        <div
+                          class="hover:bg-darkSlate-800 p-4 text-md flex gap-4 justify-between"
+                          onClick={() => {
+                            navigate(
+                              `/mods/${props.mod.curseforge
+                                ?.project_id}/curseforge/versions?instanceId=${instanceId()}`
+                            );
+                          }}
+                        >
+                          <div>
+                            <Trans key="instance.switch_version" />
+                          </div>
+                          <div class="flex justify-center items-center">
+                            <img src={CurseforgeLogo} class="w-4 h-4" />
+                          </div>
+                        </div>
+                      </Show>
                     </div>
                   </Show>
-                  <Show when={props.mod.curseforge}>
-                    <div
-                      class="hover:bg-darkSlate-800 p-4 text-md flex gap-4 justify-between"
-                      onClick={() => {
-                        navigate(
-                          `/mods/${props.mod.curseforge
-                            ?.project_id}/curseforge/versions?instanceId=${instanceId()}`
-                        );
-                      }}
-                    >
-                      <div>
-                        <Trans key="instance.switch_version" />
-                      </div>
-                      <div class="flex justify-center items-center">
-                        <img src={CurseforgeLogo} class="w-4 h-4" />
-                      </div>
-                    </div>
+                  <Show when={props.isInstanceLocked}>
+                    <Trans key="instance.locked_cannot_apply_changes" />
                   </Show>
-                </div>
+                </>
               }
               placement="left-end"
               color="bg-darkSlate-900"

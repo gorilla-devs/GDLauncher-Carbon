@@ -227,7 +227,7 @@ const ModsBrowser = () => {
                   placeholder={t("mods.search_mods")}
                   icon={<div class="i-ri:search-line" />}
                   class="w-full text-darkSlate-50 rounded-full flex-1 max-w-none"
-                  value={infiniteQuery.query.searchQuery!}
+                  value={infiniteQuery.query.searchQuery || ""}
                   onInput={(e) => {
                     const target = e.target as HTMLInputElement;
                     infiniteQuery.setQuery({ searchQuery: target.value });

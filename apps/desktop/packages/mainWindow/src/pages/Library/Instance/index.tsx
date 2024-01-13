@@ -209,7 +209,7 @@ const Instance = () => {
 
   const curseforgeData = () =>
     routeData.instanceDetails.data?.modpack &&
-    getCurseForgeData(routeData.instanceDetails.data.modpack);
+    getCurseForgeData(routeData.instanceDetails.data.modpack.modpack);
 
   createEffect(() => {
     const isCurseforge = curseforgeData();
@@ -227,7 +227,7 @@ const Instance = () => {
 
   const modrinthData = () =>
     routeData.instanceDetails.data?.modpack &&
-    getModrinthData(routeData.instanceDetails.data.modpack);
+    getModrinthData(routeData.instanceDetails.data.modpack.modpack);
 
   createEffect(() => {
     const isModrinth = modrinthData();

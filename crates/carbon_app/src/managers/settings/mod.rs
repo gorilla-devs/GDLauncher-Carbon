@@ -220,6 +220,12 @@ impl ManagerRef<'_, SettingsManager> {
             self.app.invalidate(GET_SETTINGS, None);
         }
 
+        if let Some(auto_manage_java) = incoming_settings.auto_manage_java {
+            if auto_manage_java {
+                super::java::scan_and_sync::sync_system_java_profiles(db).await?;
+            }
+        }
+
         Ok(())
     }
 

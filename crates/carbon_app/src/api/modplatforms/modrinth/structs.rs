@@ -62,6 +62,9 @@ pub enum MRFEProjectType {
     Shader,
     Modpack,
     ResourcePack,
+    Plugin,
+    Project,
+    DataPack,
 }
 
 impl From<ProjectType> for MRFEProjectType {
@@ -71,6 +74,9 @@ impl From<ProjectType> for MRFEProjectType {
             ProjectType::Shader => MRFEProjectType::Shader,
             ProjectType::Modpack => MRFEProjectType::Modpack,
             ProjectType::ResourcePack => MRFEProjectType::ResourcePack,
+            ProjectType::Plugin => MRFEProjectType::Plugin,
+            ProjectType::Project => MRFEProjectType::Project,
+            ProjectType::DataPack => MRFEProjectType::DataPack,
         }
     }
 }
@@ -82,6 +88,9 @@ impl From<MRFEProjectType> for ProjectType {
             MRFEProjectType::Shader => ProjectType::Shader,
             MRFEProjectType::Modpack => ProjectType::Modpack,
             MRFEProjectType::ResourcePack => ProjectType::ResourcePack,
+            MRFEProjectType::Plugin => ProjectType::Plugin,
+            MRFEProjectType::Project => ProjectType::Project,
+            MRFEProjectType::DataPack => ProjectType::DataPack,
         }
     }
 }

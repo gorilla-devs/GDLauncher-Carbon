@@ -168,7 +168,7 @@ pub async fn export_curseforge(
                 let mut zip = zip::ZipWriter::new(File::create(&send_path)?);
                 let options = zip::write::FileOptions::default();
                 zip.start_file("manifest.json", options)?;
-                zip.write(&serde_json::to_vec_pretty(&manifest)?)?;
+                zip.write_all(&serde_json::to_vec_pretty(&manifest)?)?;
 
                 super::zip_excluding(&mut zip, options, &basepath, "overrides", &filter)?;
 

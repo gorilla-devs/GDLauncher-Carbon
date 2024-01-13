@@ -15,7 +15,7 @@ pub struct Instance {
     pub date_updated: DateTime<Utc>,
     pub last_played: Option<DateTime<Utc>>,
     pub seconds_played: u64,
-    pub modpack: Option<Modpack>,
+    pub modpack: Option<ModpackInfo>,
     pub game_configuration: GameConfig,
     pub mod_sources: Option<ModSources>,
     pub notes: String,
@@ -25,6 +25,12 @@ pub struct Instance {
 pub enum InstanceIcon {
     Default,
     RelativePath(String),
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub struct ModpackInfo {
+    pub modpack: Modpack,
+    pub locked: bool,
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]

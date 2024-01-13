@@ -2,6 +2,7 @@ use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 use anyhow::anyhow;
 use tokio::sync::RwLock;
+use tracing::trace;
 
 use crate::{
     api::keys::instance::*,
@@ -138,6 +139,8 @@ impl InstanceImporter for LegacyGDLauncherImporter {
         index: u32,
         name: Option<String>,
     ) -> anyhow::Result<VisualTaskId> {
+        trace!(?index, ?name, "Beginning legacy gdl import");
+
         let instance = self
             .state
             .read()
@@ -147,7 +150,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             .cloned()
             .ok_or_else(|| anyhow!("invalid importable instance index"))?;
 
-        let instance_version_source = 'a: {
+        let instance_version_source = 'version_source: {
             let modloader = match &*instance.config.loader.loader_type {
                 "forge" => Some(ModLoaderType::Forge),
                 "fabric" => Some(ModLoaderType::Fabric),
@@ -171,38 +174,42 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                 modloaders: modloader,
             });
 
-            if let Some(ref source) = instance.config.loader.source {
-                if source != "curseforge" {
-                    break 'a InstanceVersionSource::Version(standard_version);
+            'cf: {
+                if let Some(ref source) = instance.config.loader.source {
+                    if source != "curseforge" {
+                        break 'cf;
+                    }
+
+                    let Some(project_id) = instance.config.loader.project_id else {
+                        trace!("Legacy gdl import specifies curseforge source but is missing project id, ignoring");
+                        break 'cf;
+                    };
+                    let Some(file_id) = instance.config.loader.file_id else {
+                        trace!("Legacy gdl import specifies curseforge source but is missing file id, ignoring");
+                        break 'cf;
+                    };
+
+                    let curseforge_modpack = CurseforgeModpack {
+                        project_id: project_id as u32,
+                        file_id: file_id as u32,
+                    };
+
+                    break 'version_source InstanceVersionSource::ModpackWithKnownVersion(
+                        standard_version,
+                        Modpack::Curseforge(curseforge_modpack),
+                    );
                 }
-
-                let Some(project_id) = instance.config.loader.project_id else {
-                    return Err(anyhow!("Missing project id"));
-                };
-                let Some(file_id) = instance.config.loader.file_id else {
-                    return Err(anyhow!("Missing file id"));
-                };
-
-                let curseforge_modpack = CurseforgeModpack {
-                    project_id: project_id as u32,
-                    file_id: file_id as u32,
-                };
-
-                break 'a InstanceVersionSource::ModpackWithKnownVersion(
-                    standard_version,
-                    Modpack::Curseforge(curseforge_modpack),
-                );
-            } else {
-                break 'a InstanceVersionSource::Version(standard_version);
             }
+
+            InstanceVersionSource::Version(standard_version)
         };
 
         let icon = match &instance.config.background {
-            Some(background) => Some(
-                app.instance_manager()
-                    .load_icon(instance.path.join(background))
-                    .await?,
-            ),
+            Some(background) => app
+                .instance_manager()
+                .load_icon(instance.path.join(background))
+                .await
+                .ok(),
             None => None,
         };
 
@@ -214,6 +221,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                 tokio::fs::create_dir_all(instance_path.join(".setup").join("modpack-complete"))
                     .await?;
 
+                trace!("Copying files from legacy instance");
                 // create copy-filter function in file utils for all importers
                 crate::domain::runtime_path::copy_dir_filter(&instance.path, &path, |path| {
                     match path.to_str() {

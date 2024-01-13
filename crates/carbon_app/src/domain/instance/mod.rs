@@ -32,7 +32,8 @@ pub struct InstanceDetails {
     pub favorite: bool,
     pub name: String,
     pub version: Option<String>,
-    pub modpack: Option<info::Modpack>,
+    pub modpack: Option<info::ModpackInfo>,
+    pub locked: bool,
     pub global_java_args: bool,
     pub extra_java_args: Option<String>,
     pub memory: Option<(u16, u16)>,
@@ -64,6 +65,7 @@ pub struct InstanceSettingsUpdate {
     pub extra_java_args: Option<Option<String>>,
     pub memory: Option<Option<(u16, u16)>>,
     pub mod_sources: Option<Option<ModSources>>,
+    pub modpack_locked: Option<Option<bool>>,
 }
 
 #[derive(Debug, PartialEq, Eq)]

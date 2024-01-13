@@ -23,7 +23,7 @@ use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
 use thiserror::Error;
 use tokio::sync::{watch, Mutex, MutexGuard, RwLock};
-use tracing::info;
+use tracing::{info, trace};
 
 use crate::db::{self, read_filters::IntFilter};
 use db::instance::Data as CachedInstance;
@@ -313,7 +313,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                         .config
                                         .modpack
                                         .as_ref()
-                                        .map(info::Modpack::as_platform),
+                                        .map(|modpack| modpack.modpack.as_platform()),
                                     state: (&status.state).into(),
                                 })
                             }
@@ -330,6 +330,15 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                     }
                                 })
                             }
+                        },
+                        locked: match status {
+                            InstanceType::Valid(status) => status
+                                .config
+                                .modpack
+                                .as_ref()
+                                .map(|modpack| modpack.locked)
+                                .unwrap_or(false),
+                            InstanceType::Invalid(status) => false,
                         },
                         last_played: match status {
                             InstanceType::Valid(status) => status.config.last_played,
@@ -879,6 +888,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await
     }
 
+    #[tracing::instrument(skip(self, icon, initializer))]
     pub async fn create_instance_ext<F, I>(
         self,
         group: GroupId,
@@ -892,6 +902,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         F: FnOnce(PathBuf) -> I,
         I: Future<Output = anyhow::Result<()>>,
     {
+        trace!("Creating instance");
+
         let tmpdir = self
             .app
             .settings_manager()
@@ -928,7 +940,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             date_updated: Utc::now(),
             last_played: None,
             seconds_played: 0,
-            modpack,
+            modpack: modpack.map(|modpack| info::ModpackInfo {
+                modpack,
+                locked: true,
+            }),
             game_configuration: info::GameConfig {
                 version,
                 global_java_args: true,
@@ -948,8 +963,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await
             .context("writing setup marker")?;
 
-        let _lock = self.path_lock.lock().await;
-        let (shortpath, path) = self.next_folder(&name).await?;
+        trace!("Running extended instance initializer");
+        initializer(tmpdir.to_path_buf()).await?;
+        trace!("Finished extended instance initializer");
 
         tokio::fs::create_dir_all(
             self.app
@@ -960,17 +976,23 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         )
         .await?;
 
-        initializer(tmpdir.to_path_buf()).await?;
+        trace!("Locking path_lock");
+        let path_lock = self.path_lock.lock().await;
+        let (shortpath, path) = self.next_folder(&name).await?;
 
         tmpdir
-            .rename(path)
+            .rename(&path)
             .await
             .context("moving tmpdir to instance location")?;
+
+        trace!("Created instance folder at '{path:?}'. Unlocking path_lock");
+        drop(path_lock);
 
         let id = self
             .add_instance(name.clone(), shortpath.clone(), group)
             .await?;
 
+        trace!("Adding instance to instances list");
         self.instances.write().await.insert(
             id,
             Instance {
@@ -1097,6 +1119,16 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         if let Some(mod_sources) = update.mod_sources {
             info.mod_sources = mod_sources;
+        }
+
+        if let Some(modpack_locked) = update.modpack_locked {
+            if let Some(modpack_locked) = modpack_locked {
+                if let Some(modpack) = &mut info.modpack {
+                    modpack.locked = modpack_locked;
+                }
+            } else {
+                info.modpack = None;
+            }
         }
 
         info.date_updated = Utc::now();
@@ -1445,6 +1477,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 None => None,
             },
             modpack: instance.config.modpack.clone(),
+            locked: instance
+                .config
+                .modpack
+                .as_ref()
+                .map(|x| x.locked)
+                .unwrap_or(false),
             global_java_args: instance.config.game_configuration.global_java_args,
             extra_java_args: instance.config.game_configuration.extra_java_args.clone(),
             memory: instance.config.game_configuration.memory,
@@ -1488,7 +1526,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let _guard = self.modpack_info_semaphore.lock().await;
 
-        let modpack_info = match modpack {
+        let modpack_info = match modpack.modpack {
             info::Modpack::Curseforge(curseforge) => {
                 cache::curseforge::modpack::get_modpack_metadata(&self.app, curseforge).await?
             }
@@ -1525,7 +1563,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let _guard = self.modpack_info_semaphore.lock().await;
 
-        let modpack_info = match modpack {
+        let modpack_info = match modpack.modpack {
             info::Modpack::Curseforge(curseforge) => {
                 cache::curseforge::modpack::get_modpack_icon(&self.app, curseforge).await?
             }
@@ -1621,6 +1659,7 @@ pub struct ListInstance {
     pub status: ListInstanceStatus,
     pub icon_revision: u32,
     pub last_played: Option<DateTime<Utc>>,
+    pub locked: bool,
     pub date_created: DateTime<Utc>,
     pub date_updated: DateTime<Utc>,
 }
@@ -1770,6 +1809,7 @@ pub struct Mod {
     metadata: domain::ModFileMetadata,
 }
 
+#[derive(Debug)]
 pub enum InstanceVersionSource {
     Version(info::GameVersion),
     Modpack(info::Modpack),
@@ -2212,6 +2252,7 @@ mod test {
                     modpack_platform: None,
                     state: domain::LaunchState::Inactive { failed_task: None },
                 }),
+                locked: false,
                 last_played: None,
                 date_created: list[0].instances[0].date_created,
                 date_updated: list[0].instances[0].date_updated,
@@ -2241,6 +2282,7 @@ mod test {
                 global_java_args: None,
                 extra_java_args: None,
                 memory: None,
+                modpack_locked: None,
             })
             .await?;
 

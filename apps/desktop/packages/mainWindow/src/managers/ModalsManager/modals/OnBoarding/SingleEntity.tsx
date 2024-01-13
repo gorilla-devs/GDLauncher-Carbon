@@ -301,7 +301,7 @@ const SingleEntity = (props: {
             disabled={instances().length === 0}
             type="primary"
             onClick={() => {
-              setTaskIds(undefined);
+              setTaskIds([]);
               setStep("importStep");
             }}
           >
