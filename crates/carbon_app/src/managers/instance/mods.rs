@@ -79,6 +79,7 @@ impl ManagerRef<'_, InstanceManager> {
         fn split_paths<'a>(paths: &'a str) -> Vec<(&'a str, &'a str, &'a str)> {
             paths
                 .split(';')
+                .filter(|p| !p.is_empty())
                 .filter_map(|path| path.split_once(','))
                 .filter_map(|(v, lc)| lc.split_once(',').map(|(l, c)| (v, l, c)))
                 .collect()
@@ -217,6 +218,7 @@ impl ManagerRef<'_, InstanceManager> {
                     platform_blacklist: settings
                         .mod_platform_blacklist
                         .split(",")
+                        .filter(|p| !p.is_empty())
                         .map(FromStr::from_str)
                         .collect::<Result<_, _>>()?,
                 }))

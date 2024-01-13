@@ -136,6 +136,7 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
                 platform_blacklist: data
                     .mod_platform_blacklist
                     .split(",")
+                    .filter(|p| !p.is_empty())
                     .map(crate::domain::modplatforms::ModPlatform::from_str)
                     .map(|r| r.map(ModPlatform::from))
                     .collect::<Result<_, _>>()?,

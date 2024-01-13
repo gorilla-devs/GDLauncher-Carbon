@@ -82,6 +82,7 @@ impl ModChannelWithUsage {
 
     pub fn str_to_vec(s: &str) -> anyhow::Result<Vec<Self>> {
         s.split(",")
+            .filter(|v| !v.is_empty())
             .map(FromStr::from_str)
             .collect::<Result<Vec<_>, _>>()
     }
