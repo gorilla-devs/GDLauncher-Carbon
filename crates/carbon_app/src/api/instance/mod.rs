@@ -659,6 +659,7 @@ struct UpdateInstance {
     memory: Option<Set<Option<MemoryRange>>>,
     #[specta(optional)]
     mod_sources: Option<Set<Option<super::modplatforms::ModSources>>>,
+    #[specta(optional)]
     modpack_locked: Option<Set<Option<bool>>>,
 }
 
