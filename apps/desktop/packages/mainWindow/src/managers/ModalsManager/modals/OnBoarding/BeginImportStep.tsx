@@ -24,7 +24,7 @@ const BeginImportStep = (props: {
   async function createMutations() {
     for (let i = 0; i < props.instances!.length; i++) {
       try {
-        const response = await importInstanceMutation.mutateAsync({
+        await importInstanceMutation.mutateAsync({
           name: props.instances![i],
           index: globalInstances().findIndex(
             (x) => x.instance_name === props.instances![i]
