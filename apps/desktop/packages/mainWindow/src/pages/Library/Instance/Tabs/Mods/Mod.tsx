@@ -2,7 +2,14 @@ import { getInstanceIdFromPath } from "@/utils/routes";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { getCFModloaderIcon } from "@/utils/sidebar";
 import { Mod as ModType } from "@gd/core_module/bindings";
-import { Button, Checkbox, Popover, Switch, Tooltip } from "@gd/ui";
+import {
+  Button,
+  Checkbox,
+  Popover,
+  Switch,
+  Tooltip,
+  createNotification
+} from "@gd/ui";
 import { useLocation, useParams } from "@solidjs/router";
 import { SetStoreFunction, produce } from "solid-js/store";
 import { For, Show, createEffect, createSignal } from "solid-js";
@@ -54,6 +61,7 @@ const Mod = (props: Props) => {
 
   const navigate = useGDNavigate();
   const params = useParams();
+  const addNotification = createNotification();
   const location = useLocation();
   const instanceId = () => getInstanceIdFromPath(location.pathname);
 
@@ -62,12 +70,21 @@ const Mod = (props: Props) => {
   const updateModMutation = rspc.createMutation(["instance.updateMod"], {
     onSuccess: (data) => {
       setUpdateModTaskId(data);
+    },
+    onError: (err) => {
+      console.error(err);
+      addNotification(`Error updating mod: ${err.cause?.message}`, "error");
     }
   });
 
   createEffect(() => {
     if (task.data === null) {
       setUpdateModTaskId(null);
+    } else if (task.data?.progress.type === "Failed") {
+      addNotification(
+        `Error updating mod: ${task.data?.progress.value}`,
+        "error"
+      );
     }
   });
 
