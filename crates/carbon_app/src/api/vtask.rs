@@ -63,6 +63,7 @@ pub struct FETask {
 }
 
 #[derive(Type, Serialize)]
+#[serde(tag = "type", content = "value")]
 pub enum Progress {
     Indeterminate,
     Known(f32),

@@ -17,7 +17,7 @@ CREATE TABLE "AppConfiguration" (
     "isFirstLaunch" BOOLEAN NOT NULL DEFAULT true,
     "autoManageJava" BOOLEAN NOT NULL DEFAULT true,
     "modPlatformBlacklist" TEXT NOT NULL DEFAULT '',
-    "modChannels" TEXT NOT NULL DEFAULT 'stable,beta,alpha',
+    "modChannels" TEXT NOT NULL DEFAULT 'stable:true,beta:true,alpha:true',
     "randomUserUuid" TEXT NOT NULL,
     "secret" BLOB NOT NULL,
     "termsAndPrivacyAccepted" BOOLEAN NOT NULL DEFAULT false,

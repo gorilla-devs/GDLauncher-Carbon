@@ -1,30 +1,30 @@
 import { useTransContext } from "@gd/i18n";
 import LoadingGif from "/assets/images/image.gif";
 import { Progressbar } from "@gd/ui";
-import { rspcFetch } from "@/utils/rspcClient";
+import { rspc } from "@/utils/rspcClient";
 import { createEffect, createSignal } from "solid-js";
 import { setTaskId, taskId } from "@/utils/import";
-import { isProgressFailed } from "@/utils/instances";
 import { setExportStep } from "..";
 export default function Exporting() {
   const [t] = useTransContext();
   const [progress, setProgress] = createSignal(0);
+  const rspcContext = rspc.useContext();
 
   createEffect(() => {
     async function runner() {
       if (taskId() !== undefined) {
-        const task: any = (await rspcFetch(() => [
+        const task = await rspcContext.client.query([
           "vtask.getTask",
-          taskId() as number
-        ])) as any;
+          taskId() || null
+        ]);
 
-        if (task.data && task.data.progress) {
-          if (task.data.progress.Known) {
-            setProgress(Math.floor(task.data.progress.Known * 100));
+        if (task && task?.progress) {
+          if (task.progress.type === "Known") {
+            setProgress(Math.floor(task.progress.value * 100));
           }
         }
-        const isFailed = task.data && isProgressFailed(task.data.progress);
-        const isDownloaded = task.data === null;
+        const isFailed = task && task.progress;
+        const isDownloaded = task === null;
         if (isDownloaded || isFailed) {
           setTaskId(undefined);
         }

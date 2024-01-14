@@ -539,6 +539,8 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         id: String,
     ) -> anyhow::Result<VisualTaskId> {
+        self.ensure_modpack_not_locked(instance_id).await?;
+
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)

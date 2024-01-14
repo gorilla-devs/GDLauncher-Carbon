@@ -5,7 +5,7 @@ import { Mod as ModType } from "@gd/core_module/bindings";
 import { Button, Checkbox, Popover, Switch, Tooltip } from "@gd/ui";
 import { useLocation, useParams } from "@solidjs/router";
 import { SetStoreFunction, produce } from "solid-js/store";
-import { For, Show, createSignal } from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 import { getModImageUrl, getModpackPlatformIcon } from "@/utils/instances";
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg";
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg";
@@ -48,15 +48,31 @@ const CopiableEntity = (props: {
 const Mod = (props: Props) => {
   const [isHoveringInfoCard, setIsHoveringInfoCard] = createSignal(false);
   const [isHoveringOptionsCard, setIsHoveringOptionsCard] = createSignal(false);
+  const [updateModTaskId, setUpdateModTaskId] = createSignal<number | null>(
+    null
+  );
+
   const navigate = useGDNavigate();
   const params = useParams();
   const location = useLocation();
   const instanceId = () => getInstanceIdFromPath(location.pathname);
 
+  const task = rspc.createQuery(() => ["vtask.getTask", updateModTaskId()]);
+
+  const updateModMutation = rspc.createMutation(["instance.updateMod"], {
+    onSuccess: (data) => {
+      setUpdateModTaskId(data);
+    }
+  });
+
+  createEffect(() => {
+    if (task.data === null) {
+      setUpdateModTaskId(null);
+    }
+  });
+
   const enableModMutation = rspc.createMutation(["instance.enableMod"], {
     onMutate: (data) => {
-      console.log(data.mod_id);
-
       queryClient.setQueryData(
         ["instance.getInstanceMods", data.instance_id],
         (oldData: ModType[] | undefined) => {
@@ -174,6 +190,14 @@ const Mod = (props: Props) => {
     return parseInt(murmur2, 10) >>> 0;
   };
 
+  const updateModStatus = () => {
+    if (task.data?.progress.type === "Known") {
+      return Math.round(task.data?.progress.value * 100) + "%";
+    }
+
+    return null;
+  };
+
   return (
     <div
       class="w-full flex items-center py-2 px-6 box-border h-14 group hover:bg-darkSlate-700"
@@ -233,15 +257,45 @@ const Mod = (props: Props) => {
           </div>
         </div>
         <span class="flex gap-4 justify-center items-center">
-          <Show when={props.mod.curseforge}>
-            <span class="flex justify-center items-center">
-              <img src={CurseforgeLogo} class="w-4 h-4" />
-            </span>
+          <Show
+            when={
+              (props.mod.has_curseforge_update ||
+                props.mod.has_modrinth_update) &&
+              props.isInstanceLocked
+            }
+          >
+            <Tooltip
+              content={<Trans key="instance.locked_cannot_apply_changes" />}
+              placement="top"
+              class="flex max-w-38 text-ellipsis overflow-hidden"
+            >
+              <i class="w-5 h-5 text-darkSlate-500 i-ri:download-2-fill" />
+            </Tooltip>
           </Show>
-          <Show when={props.mod.modrinth}>
-            <span class="flex justify-center items-center">
-              <img src={ModrinthLogo} class="w-4 h-4" />
-            </span>
+          <Show
+            when={
+              (props.mod.has_curseforge_update ||
+                props.mod.has_modrinth_update) &&
+              !props.isInstanceLocked
+            }
+          >
+            <i
+              class="w-5 h-5"
+              classList={{
+                "i-ri:download-2-fill text-darkSlate-500 hover:text-green-500":
+                  updateModTaskId() === null,
+                "i-ri:loader-4-line animate-spin text-green-500":
+                  updateModTaskId() !== null || updateModMutation.isLoading
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                updateModMutation.mutate({
+                  instance_id: parseInt(params.id, 10),
+                  mod_id: props.mod.id
+                });
+              }}
+            />
+            <Show when={updateModTaskId() !== null}>{updateModStatus()}</Show>
           </Show>
           <Show when={props.isInstanceLocked}>
             <Tooltip
