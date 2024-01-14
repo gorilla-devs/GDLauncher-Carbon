@@ -35,6 +35,7 @@ interface Props {
 }
 const ThirdStep = (props: Props) => {
   const modalsContext = useModal();
+
   const [entity, setEntity] = createSignal<ImportEntityStatus | undefined>();
 
   const entities = rspc.createQuery(() => ["instance.getImportableEntities"]);
@@ -56,6 +57,7 @@ const ThirdStep = (props: Props) => {
       setEntity(entity);
     }
   };
+
   return (
     <div
       class={`flex flex-col items-center justify-between ${
