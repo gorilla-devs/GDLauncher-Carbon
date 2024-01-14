@@ -1,5 +1,5 @@
 import { useModal } from "../..";
-import { Button } from "@gd/ui";
+import { Button, createNotification } from "@gd/ui";
 import { rspc } from "@/utils/rspcClient";
 import { For, Match, Show, Switch, createSignal } from "solid-js";
 import { ImportEntityStatus } from "@gd/core_module/bindings";
@@ -35,6 +35,7 @@ interface Props {
 }
 const ThirdStep = (props: Props) => {
   const modalsContext = useModal();
+  const addNotification = createNotification();
   const [entity, setEntity] = createSignal<ImportEntityStatus | undefined>();
 
   const entities = rspc.createQuery(() => ["instance.getImportableEntities"]);
@@ -56,6 +57,12 @@ const ThirdStep = (props: Props) => {
       setEntity(entity);
     }
   };
+  addNotification(
+    "HMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM",
+    "error",
+    undefined,
+    1000000
+  );
   return (
     <div
       class={`flex flex-col items-center justify-between ${
