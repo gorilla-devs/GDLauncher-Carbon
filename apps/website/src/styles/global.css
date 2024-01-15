@@ -89,7 +89,11 @@ h3 {
 p {
   font-size: 16px;
 }
-
+li {
+  color: rgba(147, 153, 170, 1);
+  margin-bottom: 10px;
+  font-weight: bold;
+}
 /*
   8. Create a root stacking context
 */
