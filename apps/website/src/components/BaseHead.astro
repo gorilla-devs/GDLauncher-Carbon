@@ -1,5 +1,7 @@
 ---
 import composeCDNAssetLink from "../utils/composeCDNAssetLink";
+import { ViewTransitions } from "astro:transitions";
+import "../styles/global.css";
 
 export interface Props {
   title: string;
@@ -26,3 +28,5 @@ const { title, description, image } = Astro.props as Props;
   property="twitter:image"
   content={image || composeCDNAssetLink("gdlauncher_logo_og.png")}
 />
+
+<ViewTransitions />
