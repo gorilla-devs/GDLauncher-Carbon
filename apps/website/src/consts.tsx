@@ -6,6 +6,7 @@ import Linux from "./assets/Linux";
 import Windows from "./assets/Windows";
 
 export const APP_URLS = {
+  cdn: "https://edge.gdlauncher.com",
   socials: {
     discord: "https://discord.gdlauncher.com",
     github: "https://github.com/gorilla-devs/GDLauncher-Carbon",

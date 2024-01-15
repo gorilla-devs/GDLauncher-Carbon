@@ -5,19 +5,15 @@ import Button from "../components/button/Button";
 import Download from "../components/Download.astro";
 import { Image } from "astro:assets";
 import BHLogo from "../assets/bh.svg";
-import Library from "../assets/library.svg";
-import Export from "../assets/export.svg";
 import Footer from "../components/Footer.astro";
-import Subtract from "../assets/subtract.svg";
 import "@fontsource/ubuntu";
 import { SITE_TITLE, SITE_DESCRIPTION, DownloadItems } from "../consts";
 import WhatMakesGDSpecial from "../components/WhatMakesGDSpecial.astro";
 import GdxCF from "../components/GdxCF.astro";
-import DownloadDropdown from "../components/DownloadDropdown.astro";
 
 Astro.locals.cache(60);
 ---
-
+<BaseHead title="GDLauncher - A Custom Minecraft Launcher" description="GDLauncher - A Custom Minecraft Launcher" />
 <!doctype html>
 <html lang="en">
   <head>
