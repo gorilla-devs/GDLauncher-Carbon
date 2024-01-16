@@ -137,6 +137,7 @@ CREATE TABLE "CurseForgeModCache" (
     "urlslug" TEXT NOT NULL,
     "summary" TEXT NOT NULL,
     "authors" TEXT NOT NULL,
+    "releaseType" INTEGER NOT NULL,
     "updatePaths" TEXT NOT NULL,
     "cachedAt" DATETIME NOT NULL,
     CONSTRAINT "CurseForgeModCache_metadataId_fkey" FOREIGN KEY ("metadataId") REFERENCES "ModMetadata" ("id") ON DELETE CASCADE ON UPDATE CASCADE
@@ -152,6 +153,7 @@ CREATE TABLE "ModrinthModCache" (
     "urlslug" TEXT NOT NULL,
     "description" TEXT NOT NULL,
     "authors" TEXT NOT NULL,
+    "releaseType" INTEGER NOT NULL,
     "updatePaths" TEXT NOT NULL,
     "filename" TEXT NOT NULL,
     "fileUrl" TEXT NOT NULL,

@@ -147,6 +147,7 @@ model CurseForgeModCache {
   urlslug     String
   summary     String
   authors     String
+  releaseType Int    // alpha = 0, beta = 1, stable = 2
   updatePaths String // in the form `<gamever>,<modloader>,<channel>;<gamever>,<modloader>,<channel>` for every availible combination
   cachedAt    DateTime
   logoImage   CurseForgeModImageCache?
@@ -164,6 +165,7 @@ model ModrinthModCache {
   urlslug     String
   description String
   authors     String
+  releaseType Int    // alpha = 0, beta = 1, stable = 2
   updatePaths String // in the form `<gamever>,<modloader>,<channel>;<gamever>,<modloader>,<channel>` for every availible combination
   filename    String
   fileUrl     String

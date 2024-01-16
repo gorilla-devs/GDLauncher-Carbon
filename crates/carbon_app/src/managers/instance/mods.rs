@@ -85,18 +85,30 @@ impl ManagerRef<'_, InstanceManager> {
                 .collect()
         }
 
-        let has_update_for_paths = |paths: &Vec<(&str, &str, &str)>| {
-            update_paths.iter().any(|(v1, l1)| {
-                paths.iter().any(|(v2, l2, c2)| {
-                    v1 == v2
-                        && l1 == l2
-                        && mod_sources
-                            .channels
-                            .iter()
-                            .any(|c| c.allow_updates && c.channel.as_str() == *c2)
-                })
-            })
-        };
+        let has_update_for_paths =
+            |current_channel: ModChannel, paths: &Vec<(&str, &str, &str)>| {
+                let mut best_channel = ModChannel::Alpha;
+
+                paths
+                    .iter()
+                    .filter(|(v1, l1, _)| update_paths.iter().any(|(v2, l2)| v1 == v2 && l1 == l2))
+                    .filter_map(|(_, _, channel)| ModChannel::from_str(channel).ok())
+                    .filter(|channel| {
+                        if *channel >= best_channel
+                            && mod_sources
+                                .channels
+                                .iter()
+                                .any(|c| c.channel == *channel && c.allow_updates)
+                        {
+                            best_channel = *channel;
+                            true
+                        } else {
+                            false
+                        }
+                    })
+                    .next()
+                    .is_some()
+            };
 
         let mods = self
             .app
@@ -113,11 +125,11 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .into_iter()
             .map(|m| {
-                let (cf, mr) = m
+                let (mid, cf, mr) = m
                     .metadata
                     .clone()
-                    .map(|m| (m.curseforge.flatten(), m.modrinth.flatten()))
-                    .unwrap_or((None, None));
+                    .map(|m| (Some(m.id), m.curseforge.flatten(), m.modrinth.flatten()))
+                    .unwrap_or((None, None, None));
 
                 domain::Mod {
                     id: m.id,
@@ -148,10 +160,19 @@ impl ManagerRef<'_, InstanceManager> {
                     has_curseforge_update: cf
                         .as_ref()
                         .map(|cf| {
+                            let Ok(channel) = ModChannel::try_from(cf.release_type) else {
+                                tracing::error!(
+                                    "Invalid ModChannel in database for curseforge entry {}: {}",
+                                    mid.as_ref().unwrap(),
+                                    cf.release_type
+                                );
+                                return false;
+                            };
+
                             !mod_sources
                                 .platform_blacklist
                                 .contains(&ModPlatform::Curseforge)
-                                && has_update_for_paths(&split_paths(&cf.update_paths))
+                                && has_update_for_paths(channel, &split_paths(&cf.update_paths))
                         })
                         .unwrap_or(false),
                     curseforge: cf.map(|m| domain::CurseForgeModMetadata {
@@ -172,10 +193,19 @@ impl ManagerRef<'_, InstanceManager> {
                     has_modrinth_update: mr
                         .as_ref()
                         .map(|mr| {
+                            let Ok(channel) = ModChannel::try_from(mr.release_type) else {
+                                tracing::error!(
+                                    "Invalid ModChannel in database for modrinth entry {}: {}",
+                                    mid.as_ref().unwrap(),
+                                    mr.release_type
+                                );
+                                return false;
+                            };
+
                             !mod_sources
                                 .platform_blacklist
                                 .contains(&ModPlatform::Modrinth)
-                                && has_update_for_paths(&split_paths(&mr.update_paths))
+                                && has_update_for_paths(channel, &split_paths(&mr.update_paths))
                         })
                         .unwrap_or(false),
                     modrinth: m.metadata.and_then(|m| m.modrinth).flatten().map(|m| {
@@ -613,13 +643,13 @@ impl ManagerRef<'_, InstanceManager> {
 
         impl PartialOrd for RemoteVersion {
             fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-                PartialOrd::partial_cmp(&self.date(), &other.date())
+                PartialOrd::partial_cmp(&other.date(), &self.date())
             }
         }
 
         impl Ord for RemoteVersion {
             fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-                Ord::cmp(&self.date(), &other.date())
+                Ord::cmp(&other.date(), &self.date())
             }
         }
 

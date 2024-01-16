@@ -381,33 +381,36 @@ async fn cache_curseforge_meta_unchecked(
     }
 
     let file_update_paths = parse_update_paths(&fileinfo);
-    let mut updatable_path_indexes = Vec::<usize>::new();
+    let mut update_paths = Vec::<(String, ModLoaderType, ModChannel)>::new();
 
-    for file in &modinfo.latest_files {
+    let mut latest_files_sorted = modinfo.latest_files.iter().collect::<Vec<_>>();
+    latest_files_sorted.sort_by(|f1, f2| Ord::cmp(&f2.file_date, &f1.file_date));
+
+    for file in latest_files_sorted {
         if file.id == fileinfo.id {
-            continue;
+            break; // skip all older files than the one we currently have
         }
 
-        let update_paths = parse_update_paths(&file);
+        let nf_update_paths = parse_update_paths(&file);
 
-        for (pv, pl, _) in update_paths {
-            let idx = file_update_paths
+        for path in nf_update_paths {
+            let (pv, pl, pc) = &path;
+
+            let can_use = file_update_paths
                 .iter()
-                .position(|(pv2, pl2, _)| pv == *pv2 && pl == *pl2);
+                .any(|(pv2, pl2, pc2)| pv == pv2 && pl == pl2 && pc >= pc2);
 
-            if let Some(idx) = idx {
-                if !updatable_path_indexes.contains(&idx) {
-                    updatable_path_indexes.push(idx);
+            if can_use {
+                if !update_paths.contains(&path) {
+                    update_paths.push(path);
                 }
             }
         }
     }
 
-    let update_paths = file_update_paths
+    let update_paths = update_paths
         .iter()
-        .enumerate()
-        .filter(|(i, _)| updatable_path_indexes.contains(&i))
-        .map(|(_, (gamever, loader, channel))| {
+        .map(|(gamever, loader, channel)| {
             format!(
                 "{gamever},{},{}",
                 loader.to_string().to_lowercase(),
@@ -424,6 +427,7 @@ async fn cache_curseforge_meta_unchecked(
         modinfo.slug.clone(),
         modinfo.summary.clone(),
         modinfo.authors.iter().map(|a| &a.name).join(", "),
+        ModChannel::from(fileinfo.release_type) as i32,
         update_paths,
         chrono::Utc::now().into(),
         metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),

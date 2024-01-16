@@ -29,6 +29,17 @@ impl ModChannel {
     }
 }
 
+impl TryFrom<i32> for ModChannel {
+    type Error = anyhow::Error;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        Self::all()
+            .get(value as usize)
+            .map(|v| *v)
+            .ok_or_else(|| anyhow!("invalid mod channel id {value}"))
+    }
+}
+
 impl FromStr for ModChannel {
     type Err = anyhow::Error;
 
