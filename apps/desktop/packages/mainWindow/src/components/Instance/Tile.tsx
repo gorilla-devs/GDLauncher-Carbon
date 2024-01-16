@@ -486,14 +486,14 @@ const Tile = (props: Props) => {
               </h4>
               <div class="flex gap-2 text-darkSlate-50">
                 <span class="flex gap-2">
-                  <Show when={validInstance()?.modpack_platform}>
+                  {/* <Show when={validInstance()?.modpack_platform}>
                     <img
                       class="w-4 h-4"
                       src={getModpackPlatformIcon(
                         validInstance()?.modpack_platform as ModpackPlatform
                       )}
                     />
-                  </Show>
+                  </Show> */}
                   <Show when={props.modloader}>
                     <img
                       class="w-4 h-4"
@@ -502,9 +502,9 @@ const Tile = (props: Props) => {
                       )}
                     />
                   </Show>
-                  <Show when={props.modloader}>
+                  {/* <Show when={props.modloader}>
                     <p class="m-0">{props.modloader?.toString()}</p>
-                  </Show>
+                  </Show> */}
                 </span>
                 <p class="m-0">{props.version}</p>
               </div>
