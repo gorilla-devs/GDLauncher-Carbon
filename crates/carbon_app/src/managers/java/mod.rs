@@ -71,7 +71,10 @@ impl JavaManager {
             } else {
                 let creation: Result<crate::db::java_profile::Data, QueryError> = db_client
                     .java_profile()
-                    .create(profile.to_string(), vec![])
+                    .create(
+                        profile.to_string(),
+                        vec![crate::db::java_profile::is_system_profile::set(true)],
+                    )
                     .exec()
                     .await;
 

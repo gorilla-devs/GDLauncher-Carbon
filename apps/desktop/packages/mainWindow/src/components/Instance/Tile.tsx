@@ -49,6 +49,8 @@ const Tile = (props: Props) => {
     { variant: "default", isLoading: false },
     props
   );
+
+  const rspcContext = rspc.useContext();
   const [t] = useTransContext();
   const navigate = useGDNavigate();
   const modalsContext = useModal();
@@ -65,11 +67,6 @@ const Tile = (props: Props) => {
 
   const duplicateInstanceMutation = rspc.createMutation([
     "instance.duplicateInstance"
-  ]);
-
-  const instanceDetails = rspc.createQuery(() => [
-    "instance.getInstanceDetails",
-    props.instance.id
   ]);
 
   const handleOpenFolder = () => {
@@ -102,7 +99,12 @@ const Tile = (props: Props) => {
 
   const validInstance = () => getValideInstance(props.instance.status);
 
-  const handleEdit = () => {
+  const handleEdit = async () => {
+    const instanceDetails = await rspcContext.client.query([
+      "instance.getInstanceDetails",
+      props.instance.id
+    ]);
+
     modalsContext?.openModal(
       {
         name: "instanceCreation"
@@ -112,7 +114,7 @@ const Tile = (props: Props) => {
         modloader: validInstance()?.modloader,
         title: props.instance.name,
         mcVersion: validInstance()?.mc_version,
-        modloaderVersion: instanceDetails?.data?.modloaders[0]?.version,
+        modloaderVersion: instanceDetails?.modloaders[0].version,
         img: props.img
       }
     );

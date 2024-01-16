@@ -22,7 +22,7 @@ use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
 use thiserror::Error;
 use tokio::sync::{watch, Mutex, MutexGuard, RwLock};
-use tracing::info;
+use tracing::{info, trace};
 
 use crate::db::{self, read_filters::IntFilter};
 use db::instance::Data as CachedInstance;
@@ -887,6 +887,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await
     }
 
+    #[tracing::instrument(skip(self, icon, initializer))]
     pub async fn create_instance_ext<F, I>(
         self,
         group: GroupId,
@@ -900,6 +901,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         F: FnOnce(PathBuf) -> I,
         I: Future<Output = anyhow::Result<()>>,
     {
+        trace!("Creating instance");
+
         let tmpdir = self
             .app
             .settings_manager()
@@ -958,8 +961,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await
             .context("writing setup marker")?;
 
-        let _lock = self.path_lock.lock().await;
-        let (shortpath, path) = self.next_folder(&name).await?;
+        trace!("Running extended instance initializer");
+        initializer(tmpdir.to_path_buf()).await?;
+        trace!("Finished extended instance initializer");
 
         tokio::fs::create_dir_all(
             self.app
@@ -970,17 +974,23 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         )
         .await?;
 
-        initializer(tmpdir.to_path_buf()).await?;
+        trace!("Locking path_lock");
+        let path_lock = self.path_lock.lock().await;
+        let (shortpath, path) = self.next_folder(&name).await?;
 
         tmpdir
-            .rename(path)
+            .rename(&path)
             .await
             .context("moving tmpdir to instance location")?;
+
+        trace!("Created instance folder at '{path:?}'. Unlocking path_lock");
+        drop(path_lock);
 
         let id = self
             .add_instance(name.clone(), shortpath.clone(), group)
             .await?;
 
+        trace!("Adding instance to instances list");
         self.instances.write().await.insert(
             id,
             Instance {
@@ -1793,6 +1803,7 @@ pub struct Mod {
     metadata: domain::ModFileMetadata,
 }
 
+#[derive(Debug)]
 pub enum InstanceVersionSource {
     Version(info::GameVersion),
     Modpack(info::Modpack),

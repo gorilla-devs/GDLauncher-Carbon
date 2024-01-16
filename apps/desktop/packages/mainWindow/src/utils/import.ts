@@ -15,5 +15,5 @@ export const [loadingInstances, setLoadingInstances] = createStore<{
 export const [instances, setInstances] =
   createSignal<CreateQueryResult<any[], RSPCError>>();
 export const [taskId, setTaskId] = createSignal<undefined | number>(undefined);
-export const [taskIds, setTaskIds] = createSignal<number[]>([]);
+export const [taskIds, setTaskIds] = createSignal<(number | undefined)[]>([]);
 export const [currentInstanceIndex, setCurrentInstanceIndex] = createSignal(0);

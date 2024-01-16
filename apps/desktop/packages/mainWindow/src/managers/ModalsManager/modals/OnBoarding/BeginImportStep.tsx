@@ -1,4 +1,5 @@
-import { For, createEffect, createSignal } from "solid-js";
+
+import { For, createSignal } from "solid-js";
 import SingleImport from "./SingleImport";
 import { rspc } from "@/utils/rspcClient";
 import { setTaskIds, taskIds } from "@/utils/import";
@@ -8,11 +9,15 @@ const BeginImportStep = (props: {
   singleInstance?: string;
   instances?: Array<string>;
 }) => {
+  const [state, setState] = createSignal<string[]>([]);
   const importInstanceMutation = rspc.createMutation(
     ["instance.importInstance"],
     {
       onSuccess(taskId) {
         setTaskIds([...(taskIds() || []), taskId]);
+      },
+      onError() {
+        setTaskIds([...(taskIds() || []), undefined]);
       }
     }
   );
@@ -26,10 +31,12 @@ const BeginImportStep = (props: {
             (x) => x.instance_name === props.instances![i]
           )
         });
-      } catch (error) {
-        console.error(error);
-      }
 
+        setState([...state(), "success"]);
+      } catch (error) {
+        setState([...state(), "error"]);
+        continue;
+      }
       await new Promise((r) => setTimeout(r, 100));
     }
   }
@@ -43,6 +50,7 @@ const BeginImportStep = (props: {
             instanceIndex={index()}
             instanceName={instance}
             taskId={taskIds()[index()]}
+            importState={state()[index()]}
           />
         )}
       </For>
