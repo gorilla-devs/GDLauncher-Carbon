@@ -405,9 +405,6 @@ const Tile = (props: Props) => {
                 props?.onClick?.(e);
               }
             }}
-            classList={{
-              grayscale: props.isLoading || isInQueue()
-            }}
           >
             <Show when={props.isInvalid}>
               <div class="i-ri:alert-fill text-yellow-500 absolute top-1/2 -translate-y-1/2 z-10 text-2xl right-2" />
@@ -482,7 +479,7 @@ const Tile = (props: Props) => {
               >
                 {props.instance.name}
               </h4>
-              <div class="flex text-darkGray-50">
+              <div class="flex text-darkSlate-50">
                 <span class="flex gap-2">
                   <Show when={props.modloader}>
                     <img
