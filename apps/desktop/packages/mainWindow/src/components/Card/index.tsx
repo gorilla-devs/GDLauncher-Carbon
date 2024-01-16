@@ -47,12 +47,12 @@ const Card = (props: Props) => {
         <img src={getIcon(props.icon || "vanilla")} class="h-10 w-10" />
       </div>
       <div>
-        <h5 class="m-0 text-darkSlate-50 uppercase font-medium">
-          {mergedProps.title}
-        </h5>
         <p class="m-0 text-white font-bold text-xl whitespace-nowrap">
           {mergedProps.text}
         </p>
+        <h5 class="m-0 text-darkSlate-50 uppercase font-medium">
+          {mergedProps.title}
+        </h5>
       </div>
     </div>
   );
