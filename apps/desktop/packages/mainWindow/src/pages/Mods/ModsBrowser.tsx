@@ -352,6 +352,8 @@ const ModsBrowser = () => {
                                   modrinthCategories={
                                     routeData.modrinthCategories.data
                                   }
+                                  instanceDetails={instanceDetails.data!}
+                                  instanceMods={instanceMods.data || []}
                                 />
                               </Match>
                               <Match when={isLoaderRow() && !hasNextPage()}>

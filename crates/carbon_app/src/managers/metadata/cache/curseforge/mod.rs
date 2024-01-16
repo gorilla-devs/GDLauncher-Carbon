@@ -16,8 +16,10 @@ use crate::domain::instance::InstanceId;
 use crate::domain::modplatforms::curseforge::filters::ModsParameters;
 use crate::domain::modplatforms::curseforge::filters::ModsParametersBody;
 use crate::domain::modplatforms::curseforge::File;
+use crate::domain::modplatforms::curseforge::FileReleaseType;
 use crate::domain::modplatforms::curseforge::FingerprintsMatchesResult;
 use crate::domain::modplatforms::curseforge::Mod;
+use crate::domain::modplatforms::ModChannel;
 use crate::managers::App;
 
 use super::BundleSender;
@@ -351,11 +353,11 @@ async fn cache_curseforge_meta_unchecked(
 
     // This is undocumented, we're guessing what the valid values here are.
     // It seems to contain both game versions and modloaders
-    fn parse_update_paths(versions: &[String]) -> Vec<(String, ModLoaderType)> {
+    fn parse_update_paths(file_info: &File) -> Vec<(String, ModLoaderType, ModChannel)> {
         let mut game_versions = Vec::new();
         let mut loaders = Vec::new();
 
-        for entry in versions {
+        for entry in &file_info.game_versions {
             let entry = entry.to_lowercase();
             match ModLoaderType::try_from(&entry as &str) {
                 Ok(loader) => loaders.push(loader),
@@ -367,39 +369,54 @@ async fn cache_curseforge_meta_unchecked(
 
         for game_version in game_versions {
             for loader in &loaders {
-                pairs.push((game_version.to_lowercase(), *loader));
+                pairs.push((
+                    game_version.to_lowercase(),
+                    *loader,
+                    file_info.release_type.into(),
+                ));
             }
         }
 
         pairs
     }
 
-    let file_update_paths = parse_update_paths(&fileinfo.game_versions[..]);
-    let mut updatable_path_indexes = Vec::<usize>::new();
+    let file_update_paths = parse_update_paths(&fileinfo);
+    let mut update_paths = Vec::<(String, ModLoaderType, ModChannel)>::new();
 
-    for file in &modinfo.latest_files {
+    let mut latest_files_sorted = modinfo.latest_files.iter().collect::<Vec<_>>();
+    latest_files_sorted.sort_by(|f1, f2| Ord::cmp(&f2.file_date, &f1.file_date));
+
+    for file in latest_files_sorted {
         if file.id == fileinfo.id {
-            continue;
+            break; // skip all older files than the one we currently have
         }
 
-        let update_paths = parse_update_paths(&file.game_versions);
+        let nf_update_paths = parse_update_paths(&file);
 
-        for pair in update_paths {
-            let idx = file_update_paths.iter().position(|p| *p == pair);
+        for path in nf_update_paths {
+            let (pv, pl, pc) = &path;
 
-            if let Some(idx) = idx {
-                if !updatable_path_indexes.contains(&idx) {
-                    updatable_path_indexes.push(idx);
+            let can_use = file_update_paths
+                .iter()
+                .any(|(pv2, pl2, pc2)| pv == pv2 && pl == pl2 && pc >= pc2);
+
+            if can_use {
+                if !update_paths.contains(&path) {
+                    update_paths.push(path);
                 }
             }
         }
     }
 
-    let update_paths = file_update_paths
+    let update_paths = update_paths
         .iter()
-        .enumerate()
-        .filter(|(i, _)| updatable_path_indexes.contains(&i))
-        .map(|(_, (gamever, loader))| format!("{gamever},{}", loader.to_string().to_lowercase()))
+        .map(|(gamever, loader, channel)| {
+            format!(
+                "{gamever},{},{}",
+                loader.to_string().to_lowercase(),
+                channel.as_str(),
+            )
+        })
         .join(";");
 
     let o_insert_cfmeta = app.prisma_client.curse_forge_mod_cache().create(
@@ -410,6 +427,7 @@ async fn cache_curseforge_meta_unchecked(
         modinfo.slug.clone(),
         modinfo.summary.clone(),
         modinfo.authors.iter().map(|a| &a.name).join(", "),
+        ModChannel::from(fileinfo.release_type) as i32,
         update_paths,
         chrono::Utc::now().into(),
         metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),

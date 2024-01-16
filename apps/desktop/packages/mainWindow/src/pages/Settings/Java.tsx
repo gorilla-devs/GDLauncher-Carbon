@@ -66,7 +66,7 @@ const Java = () => {
 
   const DeleteIcon = (props: { id: string }) => (
     <div
-      class="text-darkSlate-50 i-ri:delete-bin-7-fill hover:text-red-500 ease-in-out duration-100 text-xl cursor-pointer transition-color"
+      class="text-darkSlate-50 hover:text-red-500 ease-in-out duration-100 text-xl cursor-pointer transition-color i-ri:delete-bin-7-fill"
       onClick={() => deleteJavaMutation.mutate(props.id)}
     />
   );
@@ -110,7 +110,7 @@ const Java = () => {
             <Slider
               min={256}
               max={mbTotalRAM()}
-              steps={1}
+              steps={1000}
               marks={generateSequence(2048, mbTotalRAM())}
               value={settings.data?.xmx}
               onChange={(val) =>
