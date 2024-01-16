@@ -80,6 +80,10 @@ const defaultModals = {
   whyAreAdsNeeded: {
     component: lazy(() => import("./modals/WhyAreAdsNeeded")),
     title: "Why are ads needed?"
+  },
+  modsUpdater: {
+    component: lazy(() => import("./modals/ModsUpdater")),
+    title: "Mods Updater"
   }
 };
 

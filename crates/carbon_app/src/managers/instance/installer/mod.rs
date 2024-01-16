@@ -26,7 +26,11 @@ use crate::{
         runtime_path::InstancePath,
         vtask::VisualTaskId,
     },
-    managers::{instance::Mod, vtask::VisualTask, AppInner},
+    managers::{
+        instance::Mod,
+        vtask::{TaskState, VisualTask},
+        AppInner,
+    },
 };
 
 use super::{Instance, InstanceData, InstanceType, InvalidInstanceIdError};
@@ -432,6 +436,12 @@ impl Installer {
                             lock.downloadable(&instance_path).await
                         };
 
+                        parent_task
+                            .lock()
+                            .await
+                            .edit(|data| data.state = TaskState::KnownProgress)
+                            .await;
+
                         if let Some(downloadable) = &downloadable {
                             let (progress_watch_tx, mut progress_watch_rx) =
                                 tokio::sync::watch::channel(carbon_net::Progress::new());
@@ -448,7 +458,7 @@ impl Installer {
                                         );
                                     }
 
-                                    tokio::time::sleep(Duration::from_millis(200)).await;
+                                    tokio::time::sleep(Duration::from_millis(30)).await;
                                 }
 
                                 t_download_file.complete_download();
@@ -568,9 +578,12 @@ impl ResourceInstaller for CurseforgeModInstaller {
             })
             .collect::<Vec<_>>();
 
+        let size = &self.file.file_length;
+
         Some(
             Downloadable::new(&self.download_url, install_path)
-                .with_checksum(checksums.get(0).cloned()),
+                .with_checksum(checksums.get(0).cloned())
+                .with_size(*size as u64),
         )
     }
 
@@ -829,8 +842,13 @@ impl ResourceInstaller for ModrinthModInstaller {
         let install_path = instance_path.get_mods_path().join(&self.file.filename);
 
         let checksum = Checksum::Sha1(self.file.hashes.sha1.clone());
+        let size = self.file.size;
 
-        Some(Downloadable::new(&self.download_url, install_path).with_checksum(Some(checksum)))
+        Some(
+            Downloadable::new(&self.download_url, install_path)
+                .with_checksum(Some(checksum))
+                .with_size(size as u64),
+        )
     }
 
     fn dependencies(

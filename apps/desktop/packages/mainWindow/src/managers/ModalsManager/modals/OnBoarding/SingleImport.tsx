@@ -1,7 +1,6 @@
 import { setTaskId } from "@/utils/import";
 import { taskIds } from "@/utils/import";
-import { isProgressFailed } from "@/utils/instances";
-import { rspcFetch } from "@/utils/rspcClient";
+import { rspc } from "@/utils/rspcClient";
 import { Progressbar } from "@gd/ui";
 import { Match, Switch, createEffect, createSignal } from "solid-js";
 
@@ -16,21 +15,23 @@ const SingleImport = (props: {
 }) => {
   const [progress, setProgress] = createSignal(0);
   const [state, setState] = createSignal("idle");
+  const rspcContext = rspc.useContext();
+
   createEffect(() => {
     async function runner() {
       if (taskIds() !== undefined) {
-        const task: any = (await rspcFetch(() => [
+        const task = await rspcContext.client.query([
           "vtask.getTask",
-          props.taskId as number
-        ])) as any;
+          props.taskId || null
+        ]);
 
-        if (task.data && task.data.progress) {
-          if (task.data.progress.Known) {
-            setProgress(Math.floor(task.data.progress.Known * 100));
+        if (task && task.progress) {
+          if (task.progress.type == "Known") {
+            setProgress(Math.floor(task.progress.value * 100));
           }
         }
-        const isFailed = task.data && isProgressFailed(task.data.progress);
-        const isDownloaded = task.data === null && progress() !== 0;
+        const isFailed = task && task.progress.type === "Failed";
+        const isDownloaded = task === null && progress() !== 0;
         if (isDownloaded || isFailed) {
           setTaskId(undefined);
         }

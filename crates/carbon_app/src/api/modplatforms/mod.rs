@@ -17,7 +17,9 @@ use crate::{
         modplatforms::curseforge::structs::CFFEModLoaderType,
         router::router,
     },
+    domain::modplatforms as domain,
     managers::App,
+    mirror_into,
 };
 
 mod curseforge;
@@ -31,6 +33,79 @@ pub enum FESearchAPI {
     Curseforge,
     Modrinth,
 }
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone, Copy)]
+#[repr(i32)]
+pub enum ModChannel {
+    Alpha = 0,
+    Beta,
+    Stable,
+}
+impl Default for ModChannel {
+    fn default() -> Self {
+        Self::Stable
+    }
+}
+
+impl TryFrom<i32> for ModChannel {
+    type Error = anyhow::Error;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Alpha),
+            1 => Ok(Self::Beta),
+            2 => Ok(Self::Stable),
+            _ => Err(anyhow::anyhow!(
+                "Invalid mod channel id {value} not in range 0..=2"
+            )),
+        }
+    }
+}
+
+mirror_into!(ModChannel, domain::ModChannel, |value| match value {
+    Other::Alpha => Self::Alpha,
+    Other::Beta => Self::Beta,
+    Other::Stable => Self::Stable,
+});
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone, Copy)]
+pub enum ModPlatform {
+    Curseforge,
+    Modrinth,
+}
+
+mirror_into!(ModPlatform, domain::ModPlatform, |value| match value {
+    Other::Curseforge => Self::Curseforge,
+    Other::Modrinth => Self::Modrinth,
+});
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone, Copy)]
+pub struct ModChannelWithUsage {
+    pub channel: ModChannel,
+    pub allow_updates: bool,
+}
+
+mirror_into!(ModChannelWithUsage, domain::ModChannelWithUsage, |value| {
+    Self {
+        channel: value.channel.into(),
+        allow_updates: value.allow_updates,
+    }
+});
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
+pub struct ModSources {
+    pub channels: Vec<ModChannelWithUsage>,
+    pub platform_blacklist: Vec<ModPlatform>,
+}
+
+mirror_into!(ModSources, domain::ModSources, |value| Self {
+    channels: value.channels.into_iter().map(Into::into).collect(),
+    platform_blacklist: value
+        .platform_blacklist
+        .into_iter()
+        .map(Into::into)
+        .collect(),
+});
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {

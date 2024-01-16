@@ -12,6 +12,8 @@ use crate::domain::instance::info::ModLoaderType;
 use crate::domain::modplatforms::modrinth::project::ProjectVersionsFilters;
 use crate::domain::modplatforms::modrinth::responses::VersionsResponse;
 use crate::domain::modplatforms::modrinth::search::ProjectID;
+use crate::domain::modplatforms::modrinth::version::Version;
+use crate::domain::modplatforms::ModChannel;
 use crate::{
     db::read_filters::{DateTimeFilter, IntFilter},
     domain::{
@@ -241,7 +243,7 @@ impl ModplatformCacher for ModrinthModCacher {
                 let r = cache_modrinth_meta_unchecked(
                     app,
                     metadata_id,
-                    version.id.clone(),
+                    &version,
                     file.hashes.sha512.clone(),
                     file.filename.clone(),
                     file.url.clone(),
@@ -396,7 +398,7 @@ impl ModplatformCacher for ModrinthModCacher {
 async fn cache_modrinth_meta_unchecked(
     app: &App,
     metadata_id: String,
-    version_id: String,
+    version: &Version,
     sha512: String,
     filename: String,
     file_url: String,
@@ -414,11 +416,11 @@ async fn cache_modrinth_meta_unchecked(
         .exec()
         .await?;
 
-    let mut file_update_paths = HashSet::<(&str, ModLoaderType)>::new();
+    let mut file_update_paths = HashSet::<(&str, ModLoaderType, ModChannel)>::new();
 
     if let Some(versions) = &version_list {
         for version in &versions.0 {
-            if version.id == version_id {
+            if version.id == version.id {
                 break;
             }
 
@@ -428,7 +430,7 @@ async fn cache_modrinth_meta_unchecked(
                         continue;
                     };
 
-                    file_update_paths.insert((game_version, loader));
+                    file_update_paths.insert((game_version, loader, version.version_type.into()));
                 }
             }
         }
@@ -436,18 +438,25 @@ async fn cache_modrinth_meta_unchecked(
 
     let update_paths = file_update_paths
         .into_iter()
-        .map(|(gamever, loader)| format!("{gamever},{}", loader.to_string().to_lowercase()))
+        .map(|(gamever, loader, channel)| {
+            format!(
+                "{gamever},{},{}",
+                loader.to_string().to_lowercase(),
+                channel.as_str(),
+            )
+        })
         .join(";");
     dbg!(&update_paths);
 
     let o_insert_mrmeta = app.prisma_client.modrinth_mod_cache().create(
         sha512.clone(),
         project.id,
-        version_id,
+        version.id.clone(),
         project.title,
         project.slug,
         project.description,
         authors,
+        ModChannel::from(version.version_type) as i32,
         update_paths,
         filename,
         file_url,

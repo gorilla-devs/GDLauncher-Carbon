@@ -246,6 +246,27 @@ macro_rules! assert_eq_display {
     };
 }
 
+#[macro_export]
+macro_rules! mirror_into {
+    ($a:path, $b:path, |$value:ident| $expr:expr) => {
+        impl From<$a> for $b {
+            fn from($value: $a) -> Self {
+                use $a as Other;
+
+                $expr
+            }
+        }
+
+        impl From<$b> for $a {
+            fn from($value: $b) -> Self {
+                use $b as Other;
+
+                $expr
+            }
+        }
+    };
+}
+
 #[cfg(test)]
 mod test {
     use crate::get_available_port;

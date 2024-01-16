@@ -1,4 +1,9 @@
-import { CFFEMod, MRFEProject } from "@gd/core_module/bindings";
+import {
+  CFFEMod,
+  InstanceDetails,
+  MRFEProject,
+  Mod
+} from "@gd/core_module/bindings";
 import { VersionRowTypeData } from "../InfiniteScrollVersionsQueryWrapper";
 import { For, Match, Show, Switch, createSignal } from "solid-js";
 import { Trans } from "@gd/i18n";
@@ -12,6 +17,8 @@ export type Props = {
   project: CFFEMod | MRFEProject | undefined;
   isCurseforge?: boolean;
   instanceId?: number | null;
+  instanceDetails?: InstanceDetails;
+  instanceMods?: Mod[];
   installedFile:
     | {
         id: string;
@@ -173,6 +180,8 @@ const RowContainer = (props: Props & AdditionalProps) => {
                 fileId={props.modVersion.fileId}
                 isCurseforge={props.isCurseforge || false}
                 instanceId={props.instanceId}
+                instanceDetails={props.instanceDetails}
+                instanceMods={props.instanceMods}
               />
             </Match>
             <Match when={props.type === "modpack"}>

@@ -7,7 +7,7 @@ use tracing::info;
 
 use crate::domain::runtime_path::InstancePath;
 
-use super::ModChannel;
+use super::{modrinth::UtcDateTime, ModChannel};
 
 pub mod filters;
 pub mod manifest;
@@ -32,7 +32,7 @@ pub struct File {
     pub release_type: FileReleaseType,
     pub file_status: FileStatus,
     pub hashes: Vec<FileHash>,
-    pub file_date: String, // Consider using a datetime library for date-time representation
+    pub file_date: UtcDateTime,
     pub file_length: u32,
     pub download_count: u32,
     pub download_url: Option<String>,
@@ -64,7 +64,7 @@ pub struct FileHash {
     pub algo: HashAlgo,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr, Copy, Clone)]
+#[derive(Debug, Serialize_repr, Deserialize_repr, Copy, Clone, PartialEq, Eq)]
 #[repr(u8)]
 pub enum FileReleaseType {
     Stable = 1,
@@ -610,6 +610,16 @@ impl From<FileReleaseType> for ModChannel {
             FileReleaseType::Alpha => ModChannel::Alpha,
             FileReleaseType::Beta => ModChannel::Beta,
             FileReleaseType::Stable => ModChannel::Stable,
+        }
+    }
+}
+
+impl From<ModChannel> for FileReleaseType {
+    fn from(value: ModChannel) -> Self {
+        match value {
+            ModChannel::Alpha => FileReleaseType::Alpha,
+            ModChannel::Beta => FileReleaseType::Beta,
+            ModChannel::Stable => FileReleaseType::Stable,
         }
     }
 }

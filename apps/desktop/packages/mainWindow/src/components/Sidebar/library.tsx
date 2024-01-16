@@ -115,7 +115,7 @@ const Sidebar = () => {
             />
           </Show>
         </div>
-        <Show when={routeData.instancesUngrouped.isLoading}>
+        <Show when={routeData.instancesUngrouped.isInitialLoading}>
           <Skeleton.sidebarInstances />
         </Show>
         <div

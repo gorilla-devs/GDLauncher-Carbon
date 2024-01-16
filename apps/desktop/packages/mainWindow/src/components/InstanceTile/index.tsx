@@ -3,8 +3,6 @@ import Tile from "../Instance/Tile";
 import {
   fetchImage,
   isListInstanceValid,
-  isProgressKnown,
-  isProgressFailed,
   getValideInstance,
   getPreparingState,
   getRunningState,
@@ -87,11 +85,11 @@ const InstanceTile = (props: {
         .data as FETask;
       setProgress("totalDownload", data.download_total);
       setProgress("downloaded", data.downloaded);
-      if (isProgressKnown(data.progress)) {
+      if (data.progress.type === "Known") {
         setProgress("subTasks", data.active_subtasks);
-        setProgress("percentage", data.progress.Known);
+        setProgress("percentage", data.progress.value);
         setIsLoading(true);
-      } else if (isProgressFailed(data.progress)) {
+      } else if (data.progress.type === "Failed") {
         setIsLoading(false);
       } else {
         setIsLoading(false);
@@ -117,9 +115,9 @@ const InstanceTile = (props: {
   });
 
   createEffect(() => {
-    if (failedTask.data && isProgressFailed(failedTask.data.progress)) {
+    if (failedTask.data && failedTask.data.progress.type === "Failed") {
       if (taskId()) dismissTaskMutation.mutate(taskId() as number);
-      setFailError(failedTask.data.progress.Failed.cause[0].display);
+      setFailError(failedTask.data.progress.value.cause[0].display);
     }
   });
 
