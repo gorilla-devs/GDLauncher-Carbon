@@ -11,6 +11,7 @@ const SingleImport = (props: {
   instanceIndex: number;
   instanceName: string;
   taskId?: number;
+  importState: string;
 }) => {
   const [progress, setProgress] = createSignal(0);
   const [state, setState] = createSignal("idle");
@@ -53,17 +54,18 @@ const SingleImport = (props: {
     <div class="flex gap-2 px-4 justify-between rounded-md">
       <span class="font-semibold">{props.instanceName}</span>
       <Switch>
+        <Match when={state() === "failed" || props.importState === "error"}>
+          <div>
+            <div class="i-ph:x-bold text-2xl text-red-600" />
+          </div>
+        </Match>
         <Match when={state() === "idle"}>
           <div class="flex w-30 items-center gap-4">
             <Progressbar percentage={progress()} />
             <div class="font-semibold">{progress()}%</div>
           </div>
         </Match>
-        <Match when={state() === "failed"}>
-          <div>
-            <div class="i-ph:x-bold text-2xl text-red-600" />
-          </div>
-        </Match>
+
         <Match when={state() === "completed"}>
           <div class="i-ic:round-check text-2xl text-green-600" />
         </Match>
