@@ -415,11 +415,11 @@ const Tile = (props: Props) => {
             <Show when={props.failError}>
               <div class="i-ri:alert-fill text-red-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
             </Show>
-            <div class="absolute ease-in-out duration-100 top-0 left-0 bottom-0 right-0 transition opacity-10 hover:bg-primary-500" />
+            <div class="absolute ease-in-out duration-100 top-0 left-0 bottom-0 right-0 transition opacity-10 hover:bg-darkGray-500" />
 
             <Show when={props.selected && !props.isLoading}>
-              <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-primary-500" />
-              <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
+              <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-darkGray-500" />
+              <div class="absolute left-0 top-0 bottom-0 bg-primary-500 w-1 rounded-r-md rounded-l-md" />
             </Show>
             <Show when={props.isRunning && !props.isLoading}>
               <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition" />
@@ -427,11 +427,11 @@ const Tile = (props: Props) => {
             </Show>
 
             <div
-              class="rounded-full absolute flex justify-center items-center cursor-pointer duration-100 will-change-transform right-5 transition-transform h-7 w-7"
+              class="rounded-full absolute flex justify-center items-center cursor-pointer duration-100 will-change-transform z-10 left-5 transition-transform h-7 w-7"
               classList={{
-                "bg-primary-500": !props.isRunning,
                 "scale-0": !props.isRunning,
-                "bg-red-500 scale-100": props.isRunning,
+                "scale-100": props.isRunning,
+
                 "group-hover:scale-100":
                   !props.isLoading &&
                   !isInQueue() &&
@@ -462,7 +462,7 @@ const Tile = (props: Props) => {
               />
             </Show>
             <div
-              class="bg-cover bg-center h-10 rounded-lg w-10"
+              class="bg-cover bg-center h-10 rounded-lg w-10 group-hover:opacity-20"
               style={{
                 "background-image": props.img
                   ? `url("${props.img as string}")`
@@ -529,7 +529,7 @@ const Tile = (props: Props) => {
 
             <Show when={props.selected && !props.isLoading}>
               <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-primary-500" />
-              <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
+              <div class="absolute left-0 top-0 bottom-0 bg-primary-500 w-1 rounded-r-md rounded-l-md" />
             </Show>
             <Show when={props.isRunning && !props.isLoading}>
               <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition" />
