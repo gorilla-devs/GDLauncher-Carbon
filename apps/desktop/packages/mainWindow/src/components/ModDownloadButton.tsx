@@ -1,6 +1,7 @@
 import { rspc } from "@/utils/rspcClient";
+import { InstanceDetails, Mod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { Button, Spinner, Tooltip } from "@gd/ui";
+import { Button, Progressbar, Spinner, Tooltip } from "@gd/ui";
 import {
   JSX,
   Match,
@@ -35,32 +36,41 @@ type ModDownloadButtonProps = {
   instanceId: number | null | undefined;
   size: "small" | "medium" | "large";
   isCurseforge: boolean;
+  instanceMods: Mod[] | undefined;
+  instanceDetails: InstanceDetails | undefined;
 };
 
 const ModDownloadButton = (props: ModDownloadButtonProps) => {
   const [loading, setLoading] = createSignal(false);
-
-  const instanceDetails = rspc.createQuery(() => [
-    "instance.getInstanceDetails",
-    props.instanceId || null
-  ]);
-
-  const instanceMods = rspc.createQuery(() => [
-    "instance.getInstanceMods",
-    props.instanceId || null
-  ]);
+  const [taskId, setTaskId] = createSignal<number | null>(null);
+  const [progress, setProgress] = createSignal<number | null>(null);
 
   const installLatestModMutation = rspc.createMutation(
     ["instance.installLatestMod"],
     {
       onMutate() {
         setLoading(true);
+      },
+      onSuccess(data) {
+        setTaskId(data);
       }
     }
   );
 
+  createEffect(() => {
+    if (taskId() !== null) {
+      const task = rspc.createQuery(() => ["vtask.getTask", taskId()]);
+
+      createEffect(() => {
+        if (task.data?.progress.type === "Known") {
+          setProgress(Math.round(task.data?.progress.value * 100));
+        }
+      });
+    }
+  });
+
   const installedMod = () =>
-    instanceMods.data?.find(
+    props.instanceMods?.find(
       (mod) =>
         (props.isCurseforge
           ? mod.curseforge?.project_id
@@ -71,6 +81,9 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   const installModMutation = rspc.createMutation(["instance.installMod"], {
     onMutate() {
       setLoading(true);
+    },
+    onSuccess(data) {
+      setTaskId(data);
     }
   });
 
@@ -117,18 +130,18 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     }
   };
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!props.instanceId || isInstalled()) return;
 
     if (!props.fileId) {
-      installLatestModMutation.mutate({
+      await installLatestModMutation.mutateAsync({
         instance_id: props.instanceId,
         mod_source: latestModInstallObj()
       });
     } else {
       const replacesMod = installedMod()?.id || null;
 
-      installModMutation.mutate({
+      await installModMutation.mutateAsync({
         mod_source: modInstallObj(),
         instance_id: props.instanceId,
         install_deps: !replacesMod,
@@ -140,23 +153,34 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   createEffect(() => {
     if (isInstalled()) {
       setLoading(false);
+      setTaskId(null);
+      setProgress(null);
     }
   });
 
   return (
-    <MaybeTooltip showTooltip={instanceDetails.data?.modpack?.locked}>
+    <MaybeTooltip showTooltip={props.instanceDetails?.modpack?.locked}>
       <Button
         uppercase
         size={props.size}
         variant={isInstalled() ? "green" : "primary"}
         disabled={
           !props.instanceId ||
-          (instanceDetails.data?.modpack?.locked && !isInstalled())
+          (props.instanceDetails?.modpack?.locked && !isInstalled())
         }
         onClick={handleDownload}
       >
         <Show when={loading()}>
           <Spinner />
+          <div
+            class="transition-width duration-100 ease-in-out"
+            classList={{
+              "w-0": progress() === null,
+              "w-14": progress() !== null
+            }}
+          >
+            <Progressbar color="bg-white" percentage={progress()!} />
+          </div>
         </Show>
         <Show when={!loading()}>
           <Switch>
@@ -166,17 +190,17 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
             <Match when={isInstalled()}>
               <Trans key="mod.downloaded" />
             </Match>
-            <Match when={instanceDetails.data?.modpack?.locked}>
+            <Match when={props.instanceDetails?.modpack?.locked}>
               <Trans key="instance.instance_locked" />
             </Match>
             <Match
-              when={!instanceDetails.data?.modpack?.locked && !props.fileId}
+              when={!props.instanceDetails?.modpack?.locked && !props.fileId}
             >
               <Trans key="instance.download_latest" />
             </Match>
             <Match
               when={
-                !instanceDetails.data?.modpack?.locked &&
+                !props.instanceDetails?.modpack?.locked &&
                 props.fileId &&
                 installedMod() &&
                 !isInstalled()
@@ -185,7 +209,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
               <Trans key="instance.switch_version" />
             </Match>
             <Match
-              when={!instanceDetails.data?.modpack?.locked && props.fileId}
+              when={!props.instanceDetails?.modpack?.locked && props.fileId}
             >
               <Trans key="instance.download_version" />
             </Match>

@@ -26,6 +26,11 @@ const Versions = () => {
     instanceId()
   ]);
 
+  const instanceDetails = rspc.createQuery(() => [
+    "instance.getInstanceDetails",
+    instanceId()
+  ]);
+
   createEffect(() => {
     if (!lastItem() || lastItem().index === infiniteQuery?.query.index) {
       return;
@@ -63,10 +68,6 @@ const Versions = () => {
     }
   };
 
-  createEffect(() => {
-    console.log(installedMod());
-  });
-
   return (
     <MainContainer
       virtualVersions={infiniteQuery?.rowVirtualizer?.getVirtualItems()}
@@ -77,6 +78,8 @@ const Versions = () => {
       modrinthProjectData={routeData.modrinthGetProject?.data}
       instanceId={instanceId()}
       installedMod={installedMod()}
+      instanceMods={instanceMods.data || undefined}
+      instanceDetails={instanceDetails?.data || undefined}
       isCurseforge={routeData.isCurseforge}
       isLoading={false}
       type="mod"
