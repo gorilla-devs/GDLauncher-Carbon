@@ -184,39 +184,7 @@ declare module 'astro:content' {
 	>;
 
 	type ContentEntryMap = {
-		"blog": {
-"curseforge-partnership-announcement.md": {
-	id: "curseforge-partnership-announcement.md";
-  slug: "curseforge-partnership-announcement";
-  body: string;
-  collection: "blog";
-  data: InferEntrySchema<"blog">
-} & { render(): Render[".md"] };
-};
-"docs": {
-"astro-language.mdx": {
-	id: "astro-language.mdx";
-  slug: "astro-language";
-  body: string;
-  collection: "docs";
-  data: InferEntrySchema<"docs">
-} & { render(): Render[".mdx"] };
-"integration-setup.mdx": {
-	id: "integration-setup.mdx";
-  slug: "integration-setup";
-  body: string;
-  collection: "docs";
-  data: InferEntrySchema<"docs">
-} & { render(): Render[".mdx"] };
-"using-mdx-files.mdx": {
-	id: "using-mdx-files.mdx";
-  slug: "using-mdx-files";
-  body: string;
-  collection: "docs";
-  data: InferEntrySchema<"docs">
-} & { render(): Render[".mdx"] };
-};
-
+		
 	};
 
 	type DataEntryMap = {
@@ -225,5 +193,5 @@ declare module 'astro:content' {
 
 	type AnyEntryMap = ContentEntryMap & DataEntryMap;
 
-	type ContentConfig = typeof import("../src/content/config");
+	type ContentConfig = never;
 }
