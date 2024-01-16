@@ -221,28 +221,36 @@ const Mods = () => {
               <Trans key="instance.delete_mod" />
             </div>
           </Show>
-          <Show when={isInstanceLocked()}>
-            <Tooltip
-              content={<Trans key="instance.locked_cannot_apply_changes" />}
-              placement="top"
-              class="max-w-38 text-ellipsis overflow-hidden"
-            >
-              <div class="flex items-center gap-2 text-darkSlate-50">
+          <Show
+            when={
+              selectedMods().filter(
+                (mod) => mod.has_curseforge_update || mod.has_modrinth_update
+              ).length > 0
+            }
+          >
+            <Show when={isInstanceLocked()}>
+              <Tooltip
+                content={<Trans key="instance.locked_cannot_apply_changes" />}
+                placement="top"
+                class="max-w-38 text-ellipsis overflow-hidden"
+              >
+                <div class="flex items-center gap-2 text-darkSlate-50">
+                  <span class="text-2xl i-ri:download-2-fill" />
+                  <Trans key="instance.update_mods" />
+                </div>
+              </Tooltip>
+            </Show>
+            <Show when={!isInstanceLocked()}>
+              <div
+                class="flex items-center gap-2 cursor-pointer text-darkSlate-50 hover:text-green-500 duration-100 ease-in-out transition"
+                onClick={() => {
+                  updateSelectedMods();
+                }}
+              >
                 <span class="text-2xl i-ri:download-2-fill" />
                 <Trans key="instance.update_mods" />
               </div>
-            </Tooltip>
-          </Show>
-          <Show when={!isInstanceLocked()}>
-            <div
-              class="flex items-center gap-2 cursor-pointer text-darkSlate-50 hover:text-green-500 duration-100 ease-in-out transition"
-              onClick={() => {
-                updateSelectedMods();
-              }}
-            >
-              <span class="text-2xl i-ri:download-2-fill" />
-              <Trans key="instance.update_mods" />
-            </div>
+            </Show>
           </Show>
         </div>
       </div>
@@ -328,39 +336,47 @@ const Mods = () => {
               </Button>
             </Show>
 
-            <Tooltip
-              content={
-                <>
-                  <Show when={isInstanceLocked()}>
-                    <Trans key="instance.locked_cannot_apply_changes" />
-                  </Show>
-                  <Show when={!isInstanceLocked()}>
-                    <Trans key="instance.update_all_mods" />
-                  </Show>
-                </>
+            <Show
+              when={
+                routeData.instanceMods?.filter(
+                  (mod) => mod.has_curseforge_update || mod.has_modrinth_update
+                ).length > 0
               }
-              placement="top"
-              class="max-w-38 text-ellipsis overflow-hidden"
             >
-              <div
-                class="flex items-center gap-2 duration-100 ease-in-out transition hover:text-green-500 text-darkSlate-50"
-                onClick={() => {
-                  if (isInstanceLocked()) return;
-
-                  updateAllMods();
-                }}
+              <Tooltip
+                content={
+                  <>
+                    <Show when={isInstanceLocked()}>
+                      <Trans key="instance.locked_cannot_apply_changes" />
+                    </Show>
+                    <Show when={!isInstanceLocked()}>
+                      <Trans key="instance.update_all_mods" />
+                    </Show>
+                  </>
+                }
+                placement="top"
+                class="max-w-38 text-ellipsis overflow-hidden"
               >
-                <span class="text-2xl i-ri:download-2-fill" />
                 <div
-                  classList={{
-                    "w-0": isInstanceLocked()
+                  class="flex items-center gap-2 duration-100 ease-in-out transition hover:text-green-500 text-darkSlate-50"
+                  onClick={() => {
+                    if (isInstanceLocked()) return;
+
+                    updateAllMods();
                   }}
-                  class="duration-100 transition-width"
                 >
-                  <Progressbar percentage={15} />
+                  <span class="text-2xl i-ri:download-2-fill" />
+                  <div
+                    classList={{
+                      "w-0": isInstanceLocked()
+                    }}
+                    class="duration-100 transition-width"
+                  >
+                    <Progressbar percentage={15} />
+                  </div>
                 </div>
-              </div>
-            </Tooltip>
+              </Tooltip>
+            </Show>
 
             <div
               class="flex items-center gap-2 cursor-pointer duration-100 ease-in-out transition hover:text-white text-darkSlate-50"

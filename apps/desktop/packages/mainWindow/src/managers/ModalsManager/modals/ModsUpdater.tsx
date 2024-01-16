@@ -4,7 +4,7 @@ import ModalLayout from "../ModalLayout";
 import { Trans } from "@gd/i18n";
 
 import { rspc } from "@/utils/rspcClient";
-import { createSignal } from "solid-js";
+import { createSignal, onCleanup } from "solid-js";
 import { Mod } from "@gd/core_module/bindings";
 import { RSPCError } from "@rspc/client";
 
@@ -18,6 +18,11 @@ const AppUpdate = (props: ModalProps) => {
   const addNotification = createNotification();
   const modalsContext = useModal();
   const [modsUpdated, setModsUpdated] = createSignal(0);
+  const [isDestroyed, setIsDestroyed] = createSignal(false);
+
+  onCleanup(() => {
+    setIsDestroyed(true);
+  });
 
   const updateModMutation = rspc.createMutation(["instance.updateMod"], {
     onError: (err) => {
@@ -42,6 +47,8 @@ const AppUpdate = (props: ModalProps) => {
       } finally {
         setModsUpdated((prev) => prev + 1);
       }
+
+      if (isDestroyed()) return;
     }
 
     addNotification("Mods updated successfully!", "success");
