@@ -42,8 +42,8 @@ use crate::domain::runtime_path::InstancesPath;
 use crate::managers::App;
 use crate::managers::ManagerRef;
 
-mod curseforge;
-mod modrinth;
+pub mod curseforge;
+pub mod modrinth;
 
 use curseforge::CurseforgeModCacher;
 use modrinth::ModrinthModCacher;
@@ -334,7 +334,7 @@ impl CacheTargets {
     }
 
     fn cancel_override(&mut self) {
-        if let Some(old) = self.priority.take() {
+        if let Some(old) = self.backend_override.take() {
             if let Some(callback) = old.callback {
                 callback.complete(Err(anyhow!("Backend override was canceled")));
             }
@@ -705,7 +705,7 @@ impl ManagerRef<'_, MetaCacheManager> {
 
                                 let cf = cf_tx.map(|tx| {
                                     mcm.curseforge_targets.send_modify_always(move |targets| {
-                                        targets.set_priority(CacheTarget {
+                                        targets.set_override(CacheTarget {
                                             instance_id,
                                             callback: Some(Box::new(
                                                 move |r: anyhow::Result<()>| {
@@ -718,7 +718,7 @@ impl ManagerRef<'_, MetaCacheManager> {
 
                                 let mr = mr_tx.map(|tx| {
                                     mcm.modrinth_targets.send_modify_always(move |targets| {
-                                        targets.set_priority(CacheTarget {
+                                        targets.set_override(CacheTarget {
                                             instance_id,
                                             callback: Some(Box::new(
                                                 move |r: anyhow::Result<()>| {
@@ -1090,6 +1090,8 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                 .get_instance_path(&instance.shortpath)
                 .get_mods_path();
 
+            drop(instances);
+
             let mut pathbuf = PathBuf::new();
             pathbuf.push(app.settings_manager().runtime_path.get_root().to_path());
             pathbuf.push(&subpath);
@@ -1185,12 +1187,16 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
 
             let entry_futures = modpaths.into_iter().map(|(subpath, (enabled, _))| {
                 let pathbuf = &pathbuf;
+                let update_notifier = &update_notifier;
 
                 async move {
                     app.meta_cache_manager()
                         .cache_mod_file_unchecked(instance_id, pathbuf, subpath, enabled)
-                        .await
-                        .map(|_| ())
+                        .await?;
+
+                    update_notifier.send(instance_id);
+
+                    Ok(())
                 }
             });
 

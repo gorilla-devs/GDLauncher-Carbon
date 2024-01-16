@@ -9,9 +9,11 @@ use chrono::{DateTime, Utc};
 pub struct Instance {
     pub name: String,
     pub icon: InstanceIcon,
+    pub date_created: DateTime<Utc>,
+    pub date_updated: DateTime<Utc>,
     pub last_played: Option<DateTime<Utc>>,
     pub seconds_played: u64,
-    pub modpack: Option<Modpack>,
+    pub modpack: Option<ModpackInfo>,
     pub game_configuration: GameConfig,
     pub notes: String,
 }
@@ -22,7 +24,13 @@ pub enum InstanceIcon {
     RelativePath(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub struct ModpackInfo {
+    pub modpack: Modpack,
+    pub locked: bool,
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum Modpack {
     Curseforge(CurseforgeModpack),
     Modrinth(ModrinthModpack),
@@ -43,13 +51,13 @@ pub enum ModpackPlatform {
     Modrinth,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct CurseforgeModpack {
     pub project_id: u32,
     pub file_id: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct ModrinthModpack {
     pub project_id: String,
     pub version_id: String,

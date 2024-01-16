@@ -17,7 +17,7 @@ import {
   FEUnifiedSearchType
 } from "@gd/core_module/bindings";
 import { createVirtualizer } from "@tanstack/solid-virtual";
-import { rspc } from "@/utils/rspcClient";
+import { rspc, rspcFetch } from "@/utils/rspcClient";
 import { instanceId, scrollTop, setInstanceId } from "@/utils/browser";
 import {
   modpacksQuery,
@@ -35,7 +35,7 @@ type InfiniteQueryType = {
   isLoading: boolean;
   setQuery: (_newValue: Partial<FEUnifiedSearchParameters>) => void;
   rowVirtualizer: any;
-  setParentRef: Setter<HTMLDivElement | undefined>;
+  setParentRef: Setter<Element | null>;
   allRows: () => FEUnifiedSearchResult[];
   setInstanceId: Setter<number | undefined>;
   instanceId: Accessor<number | undefined>;
@@ -53,15 +53,15 @@ export const useInfiniteModsQuery = () => {
   return useContext(InfiniteQueryContext) as InfiniteQueryType;
 };
 
-const [lastType, setLastType] = createSignal<FEUnifiedSearchType | null>(null);
+export const [lastType, setLastType] = createSignal<FEUnifiedSearchType | null>(
+  null
+);
 const [lastScrollPosition, setLastScrollPosition] = createSignal<number>(0);
 
 const InfiniteScrollModsQueryWrapper = (props: Props) => {
   const rspcContext = rspc.useContext();
-  const [_searchParams, setSearchParams] = useSearchParams();
-  const [parentRef, setParentRef] = createSignal<HTMLDivElement | undefined>(
-    undefined
-  );
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [parentRef, setParentRef] = createSignal<Element | null>(null);
 
   const mergedProps = mergeProps({ type: "modPack" }, props);
 
@@ -102,30 +102,6 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
     getCurrentScrollPosition();
   });
 
-  if (lastType() !== mergedProps.type) {
-    if (lastType() === "mod") {
-      setSearchParams({
-        instanceId: undefined
-      });
-      setInstanceId(undefined);
-    }
-
-    infiniteQuery.remove();
-    infiniteQuery.refetch();
-    getQueryFunction(defaultQuery);
-    parentRef()?.scrollTo(0, scrollTop());
-    setLastType(mergedProps.type);
-    setLastScrollPosition(0);
-  } else if (!infiniteQuery.isFetched) {
-    infiniteQuery.refetch();
-  } else {
-    queueMicrotask(() => {
-      parentRef()?.scrollTo({
-        top: lastScrollPosition()
-      });
-    });
-  }
-
   const allRows = () =>
     infiniteQuery.data ? infiniteQuery.data.pages.flatMap((d) => d.data) : [];
 
@@ -144,8 +120,47 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
     getQueryFunction(newValue);
     infiniteQuery.remove();
     infiniteQuery.refetch();
-    rowVirtualizer.scrollToIndex(0);
+    // rowVirtualizer.scrollToIndex(0);
   };
+
+  if (lastType() !== mergedProps.type) {
+    getQueryFunction(defaultQuery);
+
+    const _instanceId = parseInt(searchParams.instanceId, 10);
+    if (_instanceId && !lastType()) {
+      setInstanceId(_instanceId);
+
+      rspcFetch(() => ["instance.getInstanceDetails", _instanceId]).then(
+        (details) => {
+          setQueryWrapper({
+            modloaders: (details as any).data.modloaders.map(
+              (v: any) => v.type_
+            ),
+            gameVersions: [(details as any).data.version]
+          });
+        }
+      );
+    } else if (lastType() === "mod") {
+      setSearchParams({
+        instanceId: undefined
+      });
+      setInstanceId(undefined);
+    }
+
+    infiniteQuery.remove();
+    infiniteQuery.refetch();
+    parentRef()?.scrollTo(0, scrollTop());
+    setLastType(mergedProps.type);
+    setLastScrollPosition(0);
+  } else if (!infiniteQuery.isFetched) {
+    infiniteQuery.refetch();
+  } else {
+    queueMicrotask(() => {
+      parentRef()?.scrollTo({
+        top: lastScrollPosition()
+      });
+    });
+  }
 
   const context = {
     infiniteQuery,

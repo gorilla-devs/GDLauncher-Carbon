@@ -90,7 +90,7 @@ const NotificationsProvider = (props: Props) => {
         <For each={notifications()}>
           {(notification, i) => (
             <div
-              class="w-50 h-10 px-4 text-white fixed left-1/2 rounded-md flex justify-center items-center z-60"
+              class="w-50 h-15 overflow-y-scroll scrollbar-hide flex align-items-start justify-center px-4 text-white fixed left-1/2 rounded-md z-100"
               style={{
                 transform: `translate(-50%, ${
                   notification.position === "bottom"
@@ -98,6 +98,7 @@ const NotificationsProvider = (props: Props) => {
                     : `${i() * 45}`
                 }px)`,
                 transition: "transform 1s",
+                "overflow-wrap": "anywhere",
               }}
               classList={{
                 "bottom-10": notification.position === "bottom",
@@ -107,6 +108,7 @@ const NotificationsProvider = (props: Props) => {
                 "bg-red-200": notification.type === "error",
                 "bg-yellow-200": notification.type === "warning",
                 "bg-green-200": notification.type === "success",
+                "items-center": notification.name.length < 40,
               }}
             >
               <div

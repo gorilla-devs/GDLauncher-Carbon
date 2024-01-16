@@ -1,7 +1,7 @@
 use crate::api::java::managed::{FEManagedJavaSetupArgs, FEManagedJavaSetupProgress};
 use crate::api::managers::App;
 use crate::api::router::router;
-use crate::domain::java::{JavaComponentType, JavaVendor};
+use crate::domain::java::{JavaComponentType, JavaVendor, SYSTEM_JAVA_PROFILE_NAME_PREFIX};
 use crate::{api::keys::java::*, domain::java::Java};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
@@ -41,12 +41,12 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             get_setup_managed_java_progress(app, args).await
         }
 
-        query GET_SYSTEM_JAVA_PROFILES[app, args: ()] {
-            get_system_java_profiles(app, args).await
+        query GET_JAVA_PROFILES[app, args: ()] {
+            get_java_profiles(app, args).await
         }
 
-        mutation UPDATE_SYSTEM_JAVA_PROFILE_PATH[app, args: FEUpdateSystemJavaProfileArgs] {
-            update_system_java_profile_path(app, args).await
+        mutation UPDATE_JAVA_PROFILE_PATH[app, args: FEUpdateSystemJavaProfileArgs] {
+            update_java_profile_path(app, args).await
         }
 
         mutation DELETE_JAVA_VERSION[app, args: String] {
@@ -132,13 +132,10 @@ async fn get_setup_managed_java_progress(
     Ok(res.into())
 }
 
-async fn get_system_java_profiles(app: App, _args: ()) -> anyhow::Result<Vec<FESystemJavaProfile>> {
+async fn get_java_profiles(app: App, _args: ()) -> anyhow::Result<Vec<FEJavaProfile>> {
     let profiles = app.java_manager().get_system_java_profiles().await?;
 
-    Ok(profiles
-        .into_iter()
-        .map(FESystemJavaProfile::from)
-        .collect())
+    Ok(profiles.into_iter().map(FEJavaProfile::from).collect())
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -148,12 +145,12 @@ struct FEUpdateSystemJavaProfileArgs {
     pub java_id: String,
 }
 
-async fn update_system_java_profile_path(
+async fn update_java_profile_path(
     app: App,
     args: FEUpdateSystemJavaProfileArgs,
 ) -> anyhow::Result<()> {
     app.java_manager()
-        .update_system_java_profile(args.profile_name.into(), args.java_id)
+        .update_java_profile(args.profile_name.into(), args.java_id)
         .await
 }
 
@@ -217,6 +214,7 @@ struct SetDefaultArgs {
 #[serde(rename_all = "camelCase")]
 pub enum FESystemJavaProfileName {
     Legacy,
+    LegacyPatchedV1,
     Alpha,
     Beta,
     Gamma,
@@ -229,6 +227,7 @@ impl From<crate::domain::java::SystemJavaProfileName> for FESystemJavaProfileNam
         use crate::domain::java::SystemJavaProfileName;
         match name {
             SystemJavaProfileName::Legacy => Self::Legacy,
+            SystemJavaProfileName::LegacyFixed1 => Self::LegacyPatchedV1,
             SystemJavaProfileName::Alpha => Self::Alpha,
             SystemJavaProfileName::Beta => Self::Beta,
             SystemJavaProfileName::Gamma => Self::Gamma,
@@ -242,6 +241,7 @@ impl From<FESystemJavaProfileName> for crate::domain::java::SystemJavaProfileNam
     fn from(name: FESystemJavaProfileName) -> Self {
         match name {
             FESystemJavaProfileName::Legacy => Self::Legacy,
+            FESystemJavaProfileName::LegacyPatchedV1 => Self::LegacyFixed1,
             FESystemJavaProfileName::Alpha => Self::Alpha,
             FESystemJavaProfileName::Beta => Self::Beta,
             FESystemJavaProfileName::Gamma => Self::Gamma,
@@ -253,15 +253,19 @@ impl From<FESystemJavaProfileName> for crate::domain::java::SystemJavaProfileNam
 
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct FESystemJavaProfile {
-    name: FESystemJavaProfileName,
+struct FEJavaProfile {
+    name: String,
     java_id: Option<String>,
 }
 
-impl From<crate::domain::java::SystemJavaProfile> for FESystemJavaProfile {
-    fn from(profile: crate::domain::java::SystemJavaProfile) -> Self {
+impl From<crate::domain::java::JavaProfile> for FEJavaProfile {
+    fn from(profile: crate::domain::java::JavaProfile) -> Self {
         Self {
-            name: profile.name.into(),
+            name: profile
+                .name
+                .strip_prefix(SYSTEM_JAVA_PROFILE_NAME_PREFIX)
+                .unwrap_or(&profile.name)
+                .to_string(),
             java_id: profile.java_id,
         }
     }

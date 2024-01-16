@@ -2,17 +2,18 @@ export const NAVBAR_ROUTES = [
   {
     label: "library",
     path: "/library",
-    icon: "i-ri:ancient-pavilion-fill"
+    // icon: "i-ri:ancient-pavilion-fill"
+    icon: "i-ri:home-2-fill"
   },
   {
     label: "modpacks",
     path: "/modpacks",
-    icon: "i-ri:compass-line"
+    icon: "i-fa6-solid:cubes"
   },
   {
     label: "mods",
     path: "/mods",
-    icon: "i-ri:compass-line"
+    icon: "i-fa6-solid:cube"
   }
 ];
 

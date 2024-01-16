@@ -19,7 +19,7 @@ function Checkbox(props: Props) {
   });
 
   const getBackgroundColor = () => {
-    if (checked() && props.indeterminate) {
+    if (!checked() && props.indeterminate) {
       return "rgba(209, 213, 219, 0.2)"; // bg-light-300 with 20% opacity
     } else if (checked() && !props.disabled) {
       return "rgba(43, 107, 177, 1.0)"; // bg-primary-500 with 100% opacity
@@ -31,7 +31,7 @@ function Checkbox(props: Props) {
   return (
     <div class="flex  rounded-md items-center gap-2 font-sans">
       <div
-        class={`flex justify-center items-center h-5 w-5 min-w-5 min-h-5 rounded-md hover:border-lightGray hover:border-1 box-border cursor-pointer `}
+        class={`flex justify-center items-center h-5 w-5 min-w-5 min-h-5 rounded-md hover:border-darkSlate-300 hover:border-solid hover:border-1 box-border cursor-pointer `}
         classList={
           {
             // "bg-primary-500": checked() && !props.disabled,
@@ -49,7 +49,7 @@ function Checkbox(props: Props) {
           }
         }}
       >
-        <Show when={checked() && !props.indeterminate}>
+        <Show when={checked()}>
           <div
             class="i-ri:check-line text-white animate-bounce-scale"
             classList={{
@@ -58,7 +58,7 @@ function Checkbox(props: Props) {
             }}
           />
         </Show>
-        <Show when={checked() && props.indeterminate}>
+        <Show when={!checked() && props.indeterminate}>
           <div class="h-3 w-3 min-w-3 min-h-3 rounded-sm   bg-primary-500" />
         </Show>
       </div>

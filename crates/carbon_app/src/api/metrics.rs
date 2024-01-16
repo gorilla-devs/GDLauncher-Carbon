@@ -19,12 +19,23 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 #[serde(rename_all = "snake_case")]
 pub enum FEMetricsEvent {
     PageView(String),
+    FeaturedModpackInstalled {
+        campaign_id: String,
+        item_id: String,
+    },
 }
 
 impl From<FEMetricsEvent> for crate::domain::metrics::Event {
     fn from(event: FEMetricsEvent) -> Self {
         match event {
             FEMetricsEvent::PageView(page_url) => Self::PageView { page_url },
+            FEMetricsEvent::FeaturedModpackInstalled {
+                campaign_id,
+                item_id,
+            } => Self::FeaturedModpackInstalled {
+                campaign_id,
+                item_id,
+            },
         }
     }
 }

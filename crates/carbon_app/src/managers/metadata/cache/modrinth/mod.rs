@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
 
 use itertools::Itertools;
@@ -8,6 +8,10 @@ use crate::db::{
     mod_file_cache as fcdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
     modrinth_mod_image_cache as mrimgdb,
 };
+use crate::domain::instance::info::ModLoaderType;
+use crate::domain::modplatforms::modrinth::project::ProjectVersionsFilters;
+use crate::domain::modplatforms::modrinth::responses::VersionsResponse;
+use crate::domain::modplatforms::modrinth::search::ProjectID;
 use crate::{
     db::read_filters::{DateTimeFilter, IntFilter},
     domain::{
@@ -24,6 +28,8 @@ use crate::{
 
 use super::{BundleSender, ModplatformCacher, UpdateNotifier};
 
+pub mod modpack;
+
 pub struct ModrinthModCacher;
 
 #[async_trait::async_trait]
@@ -35,6 +41,7 @@ impl ModplatformCacher for ModrinthModCacher {
         VersionHashesResponse,
         ProjectsResponse,
         Vec<TeamResponse>,
+        HashMap<String, Option<VersionsResponse>>,
     );
 
     async fn query_platform(
@@ -127,12 +134,35 @@ impl ModplatformCacher for ModrinthModCacher {
                     })
                     .await?;
 
+                let mpm = app.modplatforms_manager();
+                let version_list_responses = futures::future::join_all(
+                    versions_response.0.iter().map(|(_, version)| async move {
+                        (
+                            version.id.clone(),
+                            mpm.modrinth
+                                .get_project_versions(ProjectVersionsFilters {
+                                    project_id: ProjectID(version.project_id.clone()),
+                                    game_versions: Some(version.game_versions.clone()),
+                                    loaders: Some(version.loaders.clone()),
+                                    limit: None,
+                                    offset: None,
+                                })
+                                .await
+                                .ok(),
+                        )
+                    }),
+                )
+                .await
+                .into_iter()
+                .collect::<HashMap<_, _>>();
+
                 sender.send((
                     sha512_hashes,
                     metadata,
                     versions_response,
                     projects_response,
                     teams_response,
+                    version_list_responses,
                 ));
             }
 
@@ -159,7 +189,7 @@ impl ModplatformCacher for ModrinthModCacher {
     async fn save_batch(
         app: &App,
         instance_id: InstanceId,
-        (sha512_hashes, batch, versions, projects, teams): Self::SaveBundle,
+        (sha512_hashes, batch, versions, projects, teams, version_lists): Self::SaveBundle,
     ) {
         trace!("processing modrinth mod batch for instance {instance_id}");
 
@@ -185,6 +215,7 @@ impl ModplatformCacher for ModrinthModCacher {
         );
         drop(ignored_hashes);
 
+        let version_lists = &version_lists;
         let futures = batch.into_iter().filter_map(|(metadata_id, sha512)| {
             let sha512_match = matches.remove(&sha512);
             sha512_match.map(|(project, team, version)| async move {
@@ -205,6 +236,8 @@ impl ModplatformCacher for ModrinthModCacher {
                     })
                     .join(", ");
 
+                let version_list = version_lists.get(&version.id).map(Option::as_ref).flatten();
+
                 let r = cache_modrinth_meta_unchecked(
                     app,
                     metadata_id,
@@ -214,6 +247,7 @@ impl ModplatformCacher for ModrinthModCacher {
                     file.url.clone(),
                     project.clone(),
                     authors,
+                    version_list,
                 )
                 .await;
 
@@ -368,6 +402,7 @@ async fn cache_modrinth_meta_unchecked(
     file_url: String,
     project: Project,
     authors: String,
+    version_list: Option<&VersionsResponse>,
 ) -> anyhow::Result<()> {
     let prev = app
         .prisma_client
@@ -379,6 +414,32 @@ async fn cache_modrinth_meta_unchecked(
         .exec()
         .await?;
 
+    let mut file_update_paths = HashSet::<(&str, ModLoaderType)>::new();
+
+    if let Some(versions) = &version_list {
+        for version in &versions.0 {
+            if version.id == version_id {
+                break;
+            }
+
+            for game_version in &version.game_versions {
+                for loader in &version.loaders {
+                    let Ok(loader) = ModLoaderType::try_from(loader as &str) else {
+                        continue;
+                    };
+
+                    file_update_paths.insert((game_version, loader));
+                }
+            }
+        }
+    }
+
+    let update_paths = file_update_paths
+        .into_iter()
+        .map(|(gamever, loader)| format!("{gamever},{}", loader.to_string().to_lowercase()))
+        .join(";");
+    dbg!(&update_paths);
+
     let o_insert_mrmeta = app.prisma_client.modrinth_mod_cache().create(
         sha512.clone(),
         project.id,
@@ -387,6 +448,7 @@ async fn cache_modrinth_meta_unchecked(
         project.slug,
         project.description,
         authors,
+        update_paths,
         filename,
         file_url,
         chrono::Utc::now().into(),

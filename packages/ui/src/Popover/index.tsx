@@ -5,6 +5,7 @@ import {
   createEffect,
   onMount,
   onCleanup,
+  mergeProps,
 } from "solid-js";
 import { Portal } from "solid-js/web";
 import { useFloating } from "solid-floating-ui";
@@ -21,12 +22,14 @@ import {
 type Props = {
   children: JSX.Element;
   content: JSX.Element | string | number;
+  trigger?: "click" | "hover";
   placement?: Placement;
-  hoverable?: string;
   color?: string;
   noTip?: boolean;
   noPadding?: boolean;
   opened?: boolean;
+  onOpen?: () => void;
+  onClose?: () => void;
 };
 
 type Point = { x: number; y: number };
@@ -48,7 +51,9 @@ function isPointInTriangle(
   return s >= 0 && t >= 0 && s + t <= D;
 }
 
-const Popover = (props: Props) => {
+const Popover = (_props: Props) => {
+  const props: Props = mergeProps({ trigger: "hover" as "hover" }, _props);
+
   const [isHoveringCard, setSsHoveringCard] = createSignal(false);
   const [PopoverOpened, setPopoverOpened] = createSignal(false);
   const [elementRef, setElementRef] = createSignal<HTMLDivElement>();
@@ -56,6 +61,22 @@ const Popover = (props: Props) => {
   const [triangleStart, setTriangleStart] = createSignal({ x: 0, y: 0 });
   const [openTimer, setOpenTimer] =
     createSignal<ReturnType<typeof setTimeout>>();
+
+  const open = () => {
+    if (props.trigger === "click") {
+      window.addEventListener("click", onClickWindow, true);
+    }
+    setPopoverOpened(true);
+    props.onOpen?.();
+  };
+
+  const close = () => {
+    if (props.trigger === "click") {
+      window.removeEventListener("click", onClickWindow, true);
+    }
+    setPopoverOpened(false);
+    props.onClose?.();
+  };
 
   const menuRect = () => {
     if (!PopoverRef()) return;
@@ -82,8 +103,10 @@ const Popover = (props: Props) => {
       !isPointInTriangle({ x: e.clientX, y: e.clientY }, a, b, c) &&
       !isHoveringCard()
     ) {
-      setPopoverOpened(false);
-    } else setPopoverOpened(true);
+      close();
+    } else {
+      open();
+    }
   };
 
   let debounceTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -96,12 +119,24 @@ const Popover = (props: Props) => {
     }, 50);
   };
 
+  const onClickWindow = (event: MouseEvent) => {
+    if (PopoverRef() && !PopoverRef()!.contains(event.target as any)) {
+      event.stopPropagation();
+      event.preventDefault();
+      close();
+    }
+  };
+
   onMount(() => {
-    window.addEventListener("mousemove", debouncedTrackMouse);
+    if (props.trigger === "hover") {
+      window.addEventListener("mousemove", debouncedTrackMouse);
+    }
   });
 
   onCleanup(() => {
-    window.removeEventListener("mousemove", debouncedTrackMouse);
+    if (props.trigger === "hover") {
+      window.removeEventListener("mousemove", debouncedTrackMouse);
+    }
   });
 
   const position = useFloating(elementRef, PopoverRef, {
@@ -125,18 +160,27 @@ const Popover = (props: Props) => {
   });
 
   createEffect(() => {
-    if (position.middlewareData.hide?.referenceHidden) setPopoverOpened(false);
+    if (position.middlewareData.hide?.referenceHidden) {
+      close();
+    }
   });
 
   return (
     <>
       <Show when={props.opened || PopoverOpened()}>
         <Portal>
+          <Show when={props.trigger === "click"}>
+            <div class="w-screen h-screen absolute top-0 left-0 backdrop-blur-[2px] z-50" />
+          </Show>
           <div
-            onMouseEnter={() => setSsHoveringCard(true)}
-            onMouseLeave={() => setSsHoveringCard(false)}
+            onMouseEnter={() => {
+              setSsHoveringCard(true);
+            }}
+            onMouseLeave={() => {
+              setSsHoveringCard(false);
+            }}
             ref={setPopoverRef}
-            class={`rounded-lg will-change z-[100] ${props.color || ""}`}
+            class={`rounded-lg will-change z-100 ${props.color || ""}`}
             style={{
               position: "absolute",
               top: `${position.y ?? 0}px`,
@@ -169,15 +213,28 @@ const Popover = (props: Props) => {
         onMouseEnter={(e) => {
           setTriangleStart({ x: e.clientX, y: e.clientY });
           setSsHoveringCard(true);
-          setOpenTimer(
-            setTimeout(() => {
-              setPopoverOpened(true);
-            }, 300)
-          );
+          if (props.trigger === "hover") {
+            setOpenTimer(
+              setTimeout(() => {
+                open();
+              }, 300)
+            );
+          }
         }}
         onMouseLeave={() => {
-          clearTimeout(openTimer());
+          if (props.trigger === "hover") {
+            clearTimeout(openTimer());
+          }
           setSsHoveringCard(false);
+        }}
+        onClick={() => {
+          if (props.trigger === "click") {
+            if (PopoverOpened()) {
+              close();
+            } else {
+              open();
+            }
+          }
         }}
       >
         {props.children}

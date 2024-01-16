@@ -6,6 +6,7 @@ console.log(autoUpdater.currentVersion);
 
 export default function initAutoUpdater(win: BrowserWindow) {
   autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
 
   ipcMain.handle(
     "checkForUpdates",
@@ -54,6 +55,7 @@ export default function initAutoUpdater(win: BrowserWindow) {
   autoUpdater.on("update-available", (updateInfo) => {
     console.log("Update available", updateInfo);
     win.webContents.send("updateAvailable", updateInfo);
+    autoUpdater.downloadUpdate();
   });
 
   autoUpdater.on("update-not-available", () => {
@@ -70,6 +72,7 @@ export default function initAutoUpdater(win: BrowserWindow) {
   });
 
   autoUpdater.on("update-downloaded", () => {
+    console.log("Update downloaded, ready to install");
     win?.webContents.send("updateDownloaded");
   });
 }

@@ -2,9 +2,8 @@
 import ContentWrapper from "@/components/ContentWrapper";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { Trans } from "@gd/i18n";
-import { Button, Skeleton, Spinner, Tab, TabList, Tabs } from "@gd/ui";
+import { Button, Skeleton, Tab, TabList, Tabs } from "@gd/ui";
 import {
-  Link,
   Outlet,
   useLocation,
   useParams,
@@ -14,8 +13,12 @@ import {
 import { For, Match, Show, Switch, createSignal } from "solid-js";
 import fetchData from "../mods.overview";
 import { format } from "date-fns";
-import { rspc } from "@/utils/rspcClient";
 import Authors from "@/pages/Library/Instance/Info/Authors";
+import ExploreVersionsNavbar from "@/components/ExploreVersionsNavbar";
+import InfiniteScrollVersionsQueryWrapper, {
+  useInfiniteVersionsQuery
+} from "@/components/InfiniteScrollVersionsQueryWrapper";
+import ModDownloadButton from "@/components/ModDownloadButton";
 
 const getTabIndexFromPath = (path: string) => {
   if (path.match(/\/(modpacks|mods)\/.+\/.+/g)) {
@@ -33,11 +36,25 @@ const getTabIndexFromPath = (path: string) => {
   return 0;
 };
 
+const InfiniteScrollQueryWrapper = () => {
+  const params = useParams();
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
+
+  return (
+    <InfiniteScrollVersionsQueryWrapper
+      modId={params.id}
+      modplatform={routeData.isCurseforge ? "curseforge" : "modrinth"}
+    >
+      <Modpack />
+    </InfiniteScrollVersionsQueryWrapper>
+  );
+};
+
 const Modpack = () => {
-  const [loading, setLoading] = createSignal(false);
   const navigate = useGDNavigate();
   const params = useParams();
   const routeData: ReturnType<typeof fetchData> = useRouteData();
+  const infiniteQuery = useInfiniteVersionsQuery();
 
   const location = useLocation();
   const indexTab = () => getTabIndexFromPath(location.pathname);
@@ -70,28 +87,10 @@ const Modpack = () => {
 
   const isFetching = () => routeData.modpackDetails?.isLoading;
 
-  const handleDownload = () => {
-    setLoading(true);
-    // Download latest
-  };
-
-  const instanceMods = rspc.createQuery(() => [
-    "instance.getInstanceMods",
-    instanceId()
-  ]);
-
   const projectId = () =>
     routeData.isCurseforge
       ? routeData.modpackDetails.data?.data.id
       : routeData.modpackDetails.data?.id;
-
-  const isModInstalled = () =>
-    instanceMods.data?.find(
-      (mod) =>
-        (routeData.isCurseforge
-          ? mod.curseforge?.project_id
-          : mod.modrinth?.project_id) === projectId()
-    ) !== undefined;
 
   return (
     <ContentWrapper>
@@ -99,6 +98,9 @@ const Modpack = () => {
         class="relative h-full bg-darkSlate-800 overflow-x-hidden overflow-auto max-h-full"
         style={{
           "scrollbar-gutter": "stable"
+        }}
+        ref={(el) => {
+          infiniteQuery.setParentRef(el);
         }}
         onScroll={() => {
           const rect = refStickyTabs.getBoundingClientRect();
@@ -121,7 +123,7 @@ const Modpack = () => {
             />
             <div class="z-20 top-5 sticky left-5 w-fit">
               <Button
-                onClick={() => navigate(`/mods?instanceId=${instanceId()}`)}
+                onClick={() => navigate(-1)}
                 icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
                 size="small"
                 type="secondary"
@@ -175,7 +177,6 @@ const Modpack = () => {
                       </div>
                       <div class="p-0 border-0 lg:border-r-2 border-darkSlate-500 flex gap-2 items-center lg:px-2">
                         <div class="i-ri:time-fill" />
-
                         <Switch>
                           <Match when={!isFetching()}>
                             <Show
@@ -221,33 +222,12 @@ const Modpack = () => {
                       </div>
                     </div>
                     <div class="flex items-center gap-2 mt-2 lg:mt-0">
-                      <Switch>
-                        <Match when={!isModInstalled()}>
-                          <Button
-                            uppercase
-                            size="large"
-                            disabled={
-                              routeData.modpackDetails.isInitialLoading ||
-                              !instanceId()
-                            }
-                            onClick={() => handleDownload()}
-                          >
-                            <Show when={loading()}>
-                              <Spinner />
-                            </Show>
-                            <Show when={!loading()}>
-                              <Trans key="modpack.download" />
-                            </Show>
-                          </Button>
-                        </Match>
-                        <Match when={isModInstalled()}>
-                          <Button
-                            variant={isModInstalled() ? "green" : "primary"}
-                          >
-                            <Trans key="mod.downloaded" />
-                          </Button>
-                        </Match>
-                      </Switch>
+                      <ModDownloadButton
+                        size="large"
+                        projectId={projectId()}
+                        isCurseforge={routeData.isCurseforge}
+                        instanceId={instanceId()}
+                      />
                     </div>
                   </div>
                 </div>
@@ -262,55 +242,59 @@ const Modpack = () => {
                 ref={(el) => {
                   refStickyTabs = el;
                 }}
-                class="sticky top-0 flex items-center justify-between px-4 z-10 bg-darkSlate-800 mb-4"
+                class="sticky top-0 flex flex-col px-4 pb-0 z-10 bg-darkSlate-800"
               >
-                <Show when={isSticky()}>
-                  <span class="mr-4">
-                    <Button
-                      onClick={() =>
-                        navigate(`/mods?instanceId=${instanceId()}`)
-                      }
+                <div class="flex items-center justify-between">
+                  <Show when={isSticky()}>
+                    <span class="mr-4">
+                      <Button
+                        onClick={() =>
+                          navigate(`/mods?instanceId=${instanceId()}`)
+                        }
+                        size="small"
+                        type="secondary"
+                      >
+                        <div class="text-2xl i-ri:arrow-drop-left-line" />
+                        <Trans key="instance.step_back" />
+                      </Button>
+                    </span>
+                  </Show>
+                  <Tabs index={indexTab()}>
+                    <div class="h-14">
+                      <TabList>
+                        <For each={instancePages()}>
+                          {(page) => (
+                            <Tab
+                              onClick={() => {
+                                navigate(`${page.path}${location.search}`);
+                              }}
+                            >
+                              {page.label}
+                            </Tab>
+                          )}
+                        </For>
+                      </TabList>
+                    </div>
+                  </Tabs>
+                  <Show when={isSticky()}>
+                    <ModDownloadButton
                       size="small"
-                      type="secondary"
-                    >
-                      <div class="text-2xl i-ri:arrow-drop-left-line" />
-                      <Trans key="instance.step_back" />
-                    </Button>
-                  </span>
-                </Show>
-                <Tabs index={indexTab()}>
-                  <TabList>
-                    <For each={instancePages()}>
-                      {(page) => (
-                        <Link
-                          href={`${page.path}${location.search}`}
-                          class="no-underline"
-                        >
-                          <Tab class="bg-transparent">{page.label}</Tab>
-                        </Link>
-                      )}
-                    </For>
-                  </TabList>
-                </Tabs>
-                <Show when={isSticky()}>
-                  <Button
-                    uppercase
-                    size="small"
-                    disabled={
-                      routeData.modpackDetails.isInitialLoading || !instanceId()
+                      projectId={projectId()}
+                      isCurseforge={routeData.isCurseforge}
+                      instanceId={instanceId()}
+                    />
+                  </Show>
+                </div>
+                <Show when={indexTab() === 3}>
+                  <ExploreVersionsNavbar
+                    modplatform={
+                      routeData.isCurseforge ? "curseforge" : "modrinth"
                     }
-                    onClick={() => handleDownload()}
-                  >
-                    <Show when={loading()}>
-                      <Spinner />
-                    </Show>
-                    <Show when={!loading()}>
-                      <Trans key="modpack.download" />
-                    </Show>
-                  </Button>
+                    type="mod"
+                  />
                 </Show>
               </div>
-              <div class="px-4 z-0">
+              <div class="p-4 z-0">
                 <Outlet />
               </div>
             </div>
@@ -321,4 +305,4 @@ const Modpack = () => {
   );
 };
 
-export default Modpack;
+export default InfiniteScrollQueryWrapper;

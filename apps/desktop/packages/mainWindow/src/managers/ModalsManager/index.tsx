@@ -53,6 +53,10 @@ const defaultModals = {
     component: lazy(() => import("./modals/InstanceCreation")),
     title: "New Instance"
   },
+  exportInstance: {
+    component: lazy(() => import("./modals/InstanceExport")),
+    title: "Export Instance"
+  },
   notification: {
     component: lazy(() => import("./modals/Notification")),
     title: "Notification"
@@ -180,9 +184,9 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                 .preventClose;
 
               return (
-                <div class="h-screen w-screen absolute inset-0 flex">
+                <div class="h-screen w-screen flex absolute inset-0">
                   <div
-                    class="relative flex flex-grow h-full justify-center items-center z-999"
+                    class="flex h-full items-center relative flex-grow justify-center z-999"
                     onMouseDown={() => {
                       if (!preventClose) {
                         closeModal();
@@ -192,7 +196,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                     <div
                       style={{ "z-index": `${index() + 1}` }}
                       onMouseDown={(e) => e.stopPropagation()}
-                      class="duration-100 ease-in-out animate-enterScaleIn h-3/4"
+                      class="duration-100 ease-in-out animate-enterScaleIn"
                     >
                       <Dynamic
                         component={ModalComponent}

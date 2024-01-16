@@ -1,6 +1,10 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { domReady } from "./utils";
-import type { Log } from "../main/coreModule";
+
+export type Log = {
+  type: "info" | "error";
+  message: string;
+};
 
 function pathJoin(...paths: string[]) {
   let pathSep = "/";

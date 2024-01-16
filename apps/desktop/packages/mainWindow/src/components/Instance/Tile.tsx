@@ -9,14 +9,19 @@ import {
   ModpackPlatform
 } from "@gd/core_module/bindings";
 import { For, Match, Show, Switch, mergeProps } from "solid-js";
-import { ContextMenu } from "../ContextMenu";
 import { Trans, useTransContext } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
-import { Spinner, Tooltip } from "@gd/ui";
+import { ContextMenu, Spinner, Tooltip } from "@gd/ui";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { useModal } from "@/managers/ModalsManager";
 import { getModpackPlatformIcon, getValideInstance } from "@/utils/instances";
+import { setInstanceId } from "@/utils/browser";
+import {
+  setExportStep,
+  setPayload
+} from "@/managers/ModalsManager/modals/InstanceExport";
+import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/atoms/ExportCheckboxParent";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
 
@@ -44,6 +49,8 @@ const Tile = (props: Props) => {
     { variant: "default", isLoading: false },
     props
   );
+
+  const rspcContext = rspc.useContext();
   const [t] = useTransContext();
   const navigate = useGDNavigate();
   const modalsContext = useModal();
@@ -60,11 +67,6 @@ const Tile = (props: Props) => {
 
   const duplicateInstanceMutation = rspc.createMutation([
     "instance.duplicateInstance"
-  ]);
-
-  const instanceDetails = rspc.createQuery(() => [
-    "instance.getInstanceDetails",
-    props.instance.id
   ]);
 
   const handleOpenFolder = () => {
@@ -97,7 +99,12 @@ const Tile = (props: Props) => {
 
   const validInstance = () => getValideInstance(props.instance.status);
 
-  const handleEdit = () => {
+  const handleEdit = async () => {
+    const instanceDetails = await rspcContext.client.query([
+      "instance.getInstanceDetails",
+      props.instance.id
+    ]);
+
     modalsContext?.openModal(
       {
         name: "instanceCreation"
@@ -107,7 +114,7 @@ const Tile = (props: Props) => {
         modloader: validInstance()?.modloader,
         title: props.instance.name,
         mcVersion: validInstance()?.mc_version,
-        modloaderVersion: instanceDetails?.data?.modloaders[0]?.version,
+        modloaderVersion: instanceDetails?.modloaders[0].version,
         img: props.img
       }
     );
@@ -153,6 +160,27 @@ const Tile = (props: Props) => {
       action: handleOpenFolder
     },
     {
+      icon: "i-mingcute:file-export-fill",
+      label: t("instance.export_instance"),
+      action: () => {
+        const instanceId = props.instance.id;
+        setInstanceId(instanceId);
+        setPayload({
+          target: "Curseforge",
+          save_path: undefined,
+          link_mods: true,
+          filter: { entries: {} },
+
+          instance_id: instanceId
+        });
+        setExportStep(0);
+        setCheckedFiles([]);
+        modalsContext?.openModal({
+          name: "exportInstance"
+        });
+      }
+    },
+    {
       id: "delete",
       icon: "i-ri:delete-bin-2-fill",
       label: t("instance.action_delete"),
@@ -196,7 +224,7 @@ const Tile = (props: Props) => {
           >
             <div class="relative rounded-2xl overflow-hidden h-38 w-38 border-1 border-solid border-darkSlate-600">
               <div
-                class="flex justify-center relative items-center rounded-2xl overflow-hidden h-38 w-38 bg-cover bg-center max-w-38 hover:opacity-60 hover:bg-darkSlate-600"
+                class="flex justify-center relative items-center rounded-2xl overflow-hidden h-38 w-38 bg-cover bg-center max-w-38"
                 classList={{
                   grayscale: props.isLoading || isInQueue(),
                   "cursor-pointer":

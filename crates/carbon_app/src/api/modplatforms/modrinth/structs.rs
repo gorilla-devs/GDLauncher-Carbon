@@ -62,6 +62,9 @@ pub enum MRFEProjectType {
     Shader,
     Modpack,
     ResourcePack,
+    Plugin,
+    Project,
+    DataPack,
 }
 
 impl From<ProjectType> for MRFEProjectType {
@@ -71,6 +74,9 @@ impl From<ProjectType> for MRFEProjectType {
             ProjectType::Shader => MRFEProjectType::Shader,
             ProjectType::Modpack => MRFEProjectType::Modpack,
             ProjectType::ResourcePack => MRFEProjectType::ResourcePack,
+            ProjectType::Plugin => MRFEProjectType::Plugin,
+            ProjectType::Project => MRFEProjectType::Project,
+            ProjectType::DataPack => MRFEProjectType::DataPack,
         }
     }
 }
@@ -82,6 +88,9 @@ impl From<MRFEProjectType> for ProjectType {
             MRFEProjectType::Shader => ProjectType::Shader,
             MRFEProjectType::Modpack => ProjectType::Modpack,
             MRFEProjectType::ResourcePack => ProjectType::ResourcePack,
+            MRFEProjectType::Plugin => ProjectType::Plugin,
+            MRFEProjectType::Project => ProjectType::Project,
+            MRFEProjectType::DataPack => ProjectType::DataPack,
         }
     }
 }
@@ -994,6 +1003,7 @@ pub enum MRFEProjectStatus {
     Archived,
     /// The project has been submitted for approval and is being reviewed
     Processing,
+    Withheld,
     Unknown,
 }
 
@@ -1006,6 +1016,7 @@ impl From<ProjectStatus> for MRFEProjectStatus {
             ProjectStatus::Unlisted => MRFEProjectStatus::Unlisted,
             ProjectStatus::Archived => MRFEProjectStatus::Archived,
             ProjectStatus::Processing => MRFEProjectStatus::Processing,
+            ProjectStatus::Withheld => MRFEProjectStatus::Withheld,
             ProjectStatus::Unknown => MRFEProjectStatus::Unknown,
         }
     }
@@ -1020,6 +1031,7 @@ impl From<MRFEProjectStatus> for ProjectStatus {
             MRFEProjectStatus::Unlisted => ProjectStatus::Unlisted,
             MRFEProjectStatus::Archived => ProjectStatus::Archived,
             MRFEProjectStatus::Processing => ProjectStatus::Processing,
+            MRFEProjectStatus::Withheld => ProjectStatus::Withheld,
             MRFEProjectStatus::Unknown => ProjectStatus::Unknown,
         }
     }

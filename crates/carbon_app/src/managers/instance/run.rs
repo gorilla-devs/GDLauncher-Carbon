@@ -160,6 +160,11 @@ impl ManagerRef<'_, InstanceManager> {
 
         let app = self.app.clone();
         let instance_shortpath = instance.shortpath.clone();
+
+        drop(data);
+        drop(instance);
+        drop(instances);
+
         let installation_task = tokio::spawn(async move {
             let instance_manager = app.instance_manager();
             let task = task;
@@ -234,8 +239,8 @@ impl ManagerRef<'_, InstanceManager> {
                 {
                     let cffile_path = setup_path.join("curseforge");
                     let mrfile_path = setup_path.join("modrinth");
-                    let skip_overlays_path = setup_path.join("modpack-skip-overlays");
-                    let skip_overlays = skip_overlays_path.is_dir();
+                    let skip_overrides_path = setup_path.join("modpack-skip-overlays");
+                    let skip_overrides = skip_overrides_path.is_dir();
 
                     enum Modplatform {
                         Curseforge,
@@ -244,7 +249,11 @@ impl ManagerRef<'_, InstanceManager> {
 
                     t_request.start_opaque();
 
-                    let file = match (cffile_path.is_file(), mrfile_path.is_file(), &config.modpack) {
+                    if config.modpack.is_some() {
+                        app.instance_manager().get_modpack_info(instance_id).await?;
+                    }
+
+                    let file = match (cffile_path.is_file(), mrfile_path.is_file(), &config.modpack.as_ref().map(|m| m.modpack.clone())) {
                         (false, false, None) => {
                             t_request.complete_opaque();
                             None
@@ -272,6 +281,8 @@ impl ManagerRef<'_, InstanceManager> {
 
                             let (modpack_progress_tx, mut modpack_progress_rx) =
                                 tokio::sync::watch::channel(UpdateValue::<(u64,u64)>::new((0, 0)));
+
+                            t_download_files.start_opaque();
 
                             tokio::spawn(async move {
                                 while modpack_progress_rx.changed().await.is_ok() {
@@ -342,6 +353,8 @@ impl ManagerRef<'_, InstanceManager> {
                             let (modpack_progress_tx, mut modpack_progress_rx) =
                                 tokio::sync::watch::channel(curseforge::ProgressState::new());
 
+                            t_addon_metadata.start_opaque();
+
                             tokio::spawn(async move {
                                 let mut tracker = curseforge::ProgressState::new();
 
@@ -351,10 +364,6 @@ impl ManagerRef<'_, InstanceManager> {
 
                                         tracker.extract_addon_overrides.update_from(&progress.extract_addon_overrides, |(completed, total)| {
                                             t_extract_files.update_items(completed as u32, total as u32);
-                                        });
-
-                                        tracker.acquire_addon_metadata.update_from(&progress.acquire_addon_metadata, |(completed, total)| {
-                                            t_addon_metadata.update_items(completed as u32, total as u32);
                                         });
                                     }
 
@@ -366,12 +375,19 @@ impl ManagerRef<'_, InstanceManager> {
                                 &app,
                                 &cffile_path,
                                 &instance_path,
-                                skip_overlays,
+                                skip_overrides,
+                                t_addon_metadata,
                                 modpack_progress_tx,
                             )
-                                .await?;
+                                .await
+                                .map_err(
+                                    |e| {
+                                        tracing::error!("Error preparing modpack: {:?}", e);
+                                        e
+                                    }
+                                )?;
 
-                            tokio::fs::create_dir_all(skip_overlays_path).await?;
+                            tokio::fs::create_dir_all(skip_overrides_path).await?;
 
                             downloads.extend(modpack_info.downloadables);
 
@@ -401,9 +417,9 @@ impl ManagerRef<'_, InstanceManager> {
                                 }
                             });
 
-                            let modpack_info = modrinth::prepare_modpack_from_mrpack(&app, &mrfile_path, &instance_path, skip_overlays, modpack_progress_tx).await?;
+                            let modpack_info = modrinth::prepare_modpack_from_mrpack(&app, &mrfile_path, &instance_path, skip_overrides, modpack_progress_tx).await?;
 
-                            tokio::fs::create_dir_all(skip_overlays_path).await?;
+                            tokio::fs::create_dir_all(skip_overrides_path).await?;
 
                             downloads.extend(modpack_info.downloadables);
 
@@ -446,7 +462,9 @@ impl ManagerRef<'_, InstanceManager> {
                 };
 
                 t_request_version_info.update_items(0, 3);
-                let manifest = app.minecraft_manager().get_minecraft_manifest().await?;
+                let manifest = app.minecraft_manager().get_minecraft_manifest().await.map_err(
+                    |e| anyhow::anyhow!("Error getting minecraft manifest: {:?}", e)
+                )?;
                 t_request_version_info.update_items(1, 3);
 
                 let manifest_version = manifest
@@ -458,7 +476,8 @@ impl ManagerRef<'_, InstanceManager> {
                 let mut version_info = app
                     .minecraft_manager()
                     .get_minecraft_version(manifest_version.clone())
-                    .await?;
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Error getting minecraft version: {:?}", e))?;
 
                 let lwjgl_group = get_lwjgl_meta(
                     &app.reqwest_client,
@@ -470,7 +489,11 @@ impl ManagerRef<'_, InstanceManager> {
                 t_request_version_info.update_items(2, 3);
 
                 let java = {
-                    let required_java = SystemJavaProfileName::from(
+                    // If instance has profile override, short circuit and use that
+                    // ....
+                    // else
+
+                    let mut required_java = SystemJavaProfileName::from(
                         daedalus::minecraft::MinecraftJavaProfile::try_from(
                             &version_info
                                 .java_version
@@ -482,15 +505,24 @@ impl ManagerRef<'_, InstanceManager> {
                         )?,
                     );
 
+                    // Forge 1.16.5 requires an older java 8 version so we inject the legacy fixed 1 profile
+                    if &version.release == "1.16.5" && *&version.modloaders.iter().find(|v| v.type_ == ModLoaderType::Forge).is_some() {
+                        required_java = SystemJavaProfileName::LegacyFixed1;
+                    }
+
                     tracing::debug!("Required java: {:?}", required_java);
 
-                    let usable_java = app.java_manager().get_usable_java(required_java).await?;
+                    let usable_java = app.java_manager().get_usable_java_for_profile_name(required_java).await?;
 
                     tracing::debug!("Usable java: {:?}", usable_java);
 
                     match usable_java {
                         Some(path) => path,
                         None => {
+                            if !app.settings_manager().get_settings().await?.auto_manage_java {
+                                return bail!("No usable java found and auto manage java is disabled");
+                            }
+
                             let t_download_java = task
                                 .subtask(Translation::InstanceTaskLaunchDownloadJava);
 
@@ -630,8 +662,9 @@ impl ManagerRef<'_, InstanceManager> {
                                 .find(|v| {
                                     let exact_match = v.id == format!("{}-{}", version.release, neoforge_version);
                                     let fuzzy_match = v.id.starts_with(&format!("{}-{}", version.release, neoforge_version));
+                                    let only_version = v.id == neoforge_version;
 
-                                    exact_match || fuzzy_match
+                                    exact_match || fuzzy_match || only_version
                                 })
                                 .ok_or_else(|| {
                                     anyhow!(
@@ -1087,7 +1120,7 @@ impl ManagerRef<'_, InstanceManager> {
                             .get(0)
                             .cloned()
                             .map(|v| v.version),
-                        modplatform: instance_details.modpack.map(|v| v.to_string()),
+                        modplatform: instance_details.modpack.map(|v| v.modpack.to_string()),
                         version: instance_details.version.unwrap_or(String::from("unknown")),
                         seconds_taken: (now - initial_time).num_seconds() as u32,
                     })
@@ -1116,7 +1149,7 @@ impl ManagerRef<'_, InstanceManager> {
                             .get(0)
                             .cloned()
                             .map(|v| v.version),
-                        modplatform: instance_details.modpack.map(|v| v.to_string()),
+                        modplatform: instance_details.modpack.map(|v| v.modpack.to_string()),
                         version: instance_details.version.unwrap_or(String::from("unknown")),
                         xmx_memory: xmx_memory as u32,
                         xms_memory: xms_memory as u32,

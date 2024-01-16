@@ -111,10 +111,25 @@ const Dropdown = (props: Props) => {
       const selectedOptionIndex = props.options.findIndex(
         (option) => option.key === selectedValue().key
       );
+
+      const isElementFullyViewable = (element: HTMLElement) => {
+        const elementRect = element.getBoundingClientRect();
+        const parentRect = (menuRef() as HTMLElement).getBoundingClientRect();
+
+        return (
+          elementRect.top >= parentRect.top &&
+          elementRect.bottom <= parentRect.bottom
+        );
+      };
+
       if (selectedOptionIndex !== -1) {
-        (menuRef() as HTMLUListElement).children[
+        const selectedOption = (menuRef() as HTMLUListElement).children[
           selectedOptionIndex
-        ].scrollIntoView();
+        ] as HTMLElement;
+
+        if (!isElementFullyViewable(selectedOption)) {
+          selectedOption.scrollIntoView();
+        }
       }
     }
   });

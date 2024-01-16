@@ -22,7 +22,9 @@ import { setTaskIds } from "@/utils/import";
 
 const [step, setStep] = createSignal("selectionStep");
 const [instances, setInstances] = createSignal([]);
-export { step, setStep, instances, setInstances };
+
+const [globalInstances, setGlobalInstances] = createSignal<any[]>([]);
+export { step, setStep, instances, setInstances, globalInstances };
 
 const SingleEntity = (props: {
   entity: ImportEntityStatus;
@@ -85,6 +87,8 @@ const SingleEntity = (props: {
         if ("SingleResult" in data) {
           if ("Valid" in data.SingleResult) {
             const res = data.SingleResult;
+
+            setGlobalInstances([res.Valid]);
             setInstance({
               singleResult: res.Valid,
               multiResult: undefined,
@@ -93,6 +97,15 @@ const SingleEntity = (props: {
           }
         } else if ("MultiResult" in data) {
           const res = data.MultiResult;
+          setGlobalInstances(
+            res.map((e) => {
+              if ("Valid" in e) {
+                return e.Valid;
+              } else {
+                return e.Invalid;
+              }
+            })
+          );
           setInstance({
             multiResult: res.map((e) => {
               if ("Valid" in e) {
@@ -114,7 +127,9 @@ const SingleEntity = (props: {
       }
     }
   });
-
+  createEffect(() => {
+    console.log(instances());
+  });
   return (
     <>
       <div class="flex-1 w-full flex flex-col items-center justify-center p-4">
@@ -230,10 +245,10 @@ const SingleEntity = (props: {
                           {t("instance.select_all_mods")}
                         </span>
                       }
-                      checked={instances().length !== 0}
-                      indeterminate={
-                        instances().length !== instance.multiResult?.length
+                      checked={
+                        instances().length === instance.multiResult?.length
                       }
+                      indeterminate={instances().length !== 0}
                       onChange={(e) => {
                         if (e) {
                           setInstances(
@@ -299,7 +314,7 @@ const SingleEntity = (props: {
             disabled={instances().length === 0}
             type="primary"
             onClick={() => {
-              setTaskIds(undefined);
+              setTaskIds([]);
               setStep("importStep");
             }}
           >

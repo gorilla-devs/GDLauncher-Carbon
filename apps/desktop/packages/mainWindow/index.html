@@ -59,7 +59,7 @@
 
       html,
       body {
-        background: #1d2028;
+        background: var(--darkSlate-800);
         color: white;
       }
 
@@ -77,13 +77,17 @@
         cursor: default !important;
       }
 
+      input {
+        cursor: text !important;
+      }
+
       .appFatalCrash {
         position: fixed;
         top: 0;
         left: 0;
         width: 100vw;
         height: 100vh;
-        background: var(--darkSlate-700);
+        background: var(--darkSlate-800);
         display: flex;
         flex-direction: column;
         justify-content: space-between;
@@ -105,10 +109,12 @@
         document.documentElement.style.setProperty(`--${key}`, mainTheme[key]);
       }
       // TODO: handle sourcemaps decoding + sentry
-      window.onerror = (msg, url, line, col, error) => {
-        window.fatalError(msg, url.split("/").slice(-3).join(" -> "));
-        return true;
-      };
+      if (!import.meta.env.DEV) {
+        window.onerror = (msg, url, line, col, error) => {
+          window.fatalError(msg, url.split("/").slice(-3).join(" -> "));
+          return true;
+        };
+      }
     </script>
   </head>
   <body style="margin: 0; padding: 0; overflow: hidden" spellcheck="false">

@@ -65,110 +65,95 @@ const AppNavbar = () => {
 
   return (
     <Show when={!isLogin()}>
-      <nav class="flex items-center bg-darkSlate-800 text-white px-5 h-15">
-        <div class="flex w-full">
-          <div class="flex items-center w-36">
-            <img
-              src={GDLauncherWideLogo}
-              class="cursor-pointer h-9"
-              onClick={() => navigate("/library")}
-            />
-          </div>
-          <ul class="flex text-white w-full m-0 items-center list-none gap-6 pl-10">
-            <Tabs index={selectedIndex()}>
-              <TabList aligment="between">
-                <div class="flex gap-6">
-                  <For each={NAVBAR_ROUTES}>
-                    {(route) => {
-                      const isMatch = useMatch(() => route.path);
-
-                      return (
-                        <div
-                          onClick={() =>
-                            navigate(route.path, {
-                              getLastInstance: true
-                            })
-                          }
-                          class="no-underline"
-                          classList={{
-                            "text-white": !!isMatch(),
-                            "text-slate-400": !isMatch()
-                          }}
-                        >
-                          <Tab>
-                            <div class="flex items-center gap-2">
-                              <Show when={route.icon}>
-                                <i class={"w-5 h-5 " + route.icon} />
-                              </Show>
-                              <li class="no-underline">{route.label}</li>
-                            </div>
-                          </Tab>
+      <nav class="flex items-center bg-darkSlate-800 text-white px-5 h-20">
+        <div class="flex items-center" style={{ width: "19rem" }}>
+          <img
+            src={GDLauncherWideLogo}
+            class="h-9"
+            onClick={() => navigate("/library")}
+          />
+        </div>
+        <div class="flex text-white w-full items-center list-none gap-6 h-full">
+          <Tabs index={selectedIndex()}>
+            <TabList aligment="between">
+              <div class="flex gap-6 h-full">
+                <For each={NAVBAR_ROUTES}>
+                  {(route) => {
+                    return (
+                      <Tab
+                        onClick={() =>
+                          navigate(route.path, {
+                            getLastInstance: true
+                          })
+                        }
+                      >
+                        <div class="flex items-center gap-2">
+                          <Show when={route.icon}>
+                            <i class={"w-5 h-5 " + route.icon} />
+                          </Show>
+                          <div class="no-underline">{route.label}</div>
                         </div>
-                      );
-                    }}
-                  </For>
-                </div>
-                <Spacing class="hidden w-full lg:block" />
-                <Tab ignored noPadding>
-                  <Button
-                    size="small"
-                    class="w-max"
-                    type="primary"
-                    onClick={() => {
-                      modalsContext?.openModal({
-                        name: "instanceCreation"
+                      </Tab>
+                    );
+                  }}
+                </For>
+              </div>
+              <Spacing class="hidden w-full lg:block" />
+              <Tab ignored noPadding>
+                <Button
+                  class="w-max"
+                  size="small"
+                  type="primary"
+                  onClick={() => {
+                    modalsContext?.openModal({
+                      name: "instanceCreation"
+                    });
+                  }}
+                >
+                  <i class="i-ri:add-fill" />
+                  <Trans key="sidebar.add_instance" />
+                </Button>
+              </Tab>
+
+              <div class="flex gap-6 items-center">
+                <div
+                  onClick={() => {
+                    if (!(!!isSettings() || !!isSettingsNested()))
+                      navigate("/settings", {
+                        getLastInstance: true
                       });
-                    }}
-                  >
-                    <Trans
-                      key="sidebar.add_instance"
-                      options={{
-                        defaultValue: "Add Instance"
+                  }}
+                >
+                  <Tab>
+                    <div
+                      class="text-2xl i-ri:settings-3-fill"
+                      classList={{
+                        "text-white": !!isSettings() || !!isSettingsNested()
                       }}
                     />
-                  </Button>
-                </Tab>
-                <div class="flex gap-6 items-center">
-                  <div
-                    onClick={() => {
-                      if (!(!!isSettings() || !!isSettingsNested()))
-                        navigate("/settings", {
-                          getLastInstance: true
-                        });
-                    }}
-                  >
-                    <Tab>
-                      <div
-                        class="text-darkSlate-50 text-2xl cursor-pointer i-ri:settings-3-fill"
-                        classList={{
-                          "bg-primary-500":
-                            !!isSettings() || !!isSettingsNested()
-                        }}
-                      />
-                    </Tab>
-                  </div>
-                  <Show when={updateAvailable()}>
-                    <Tab ignored>
-                      <div
-                        class="text-2xl cursor-pointer text-green-600 i-ri:download-2-fill"
-                        onClick={() =>
-                          modalsContext?.openModal({ name: "appUpdate" })
-                        }
-                      />
-                    </Tab>
-                  </Show>
+                  </Tab>
                 </div>
-              </TabList>
-            </Tabs>
-          </ul>
-          <div class="flex justify-end lg:min-w-52 lg:ml-4 ml-2">
-            <Show when={routeData?.accounts.data}>
-              <AccountsDropdown
-                accounts={accounts}
-                value={routeData.activeUuid.data}
-              />
-            </Show>
-          </div>
+                <Show when={updateAvailable()}>
+                  <Tab ignored>
+                    <div
+                      class="text-2xl text-green-600 i-ri:download-2-fill"
+                      onClick={() =>
+                        modalsContext?.openModal({ name: "appUpdate" })
+                      }
+                    />
+                  </Tab>
+                </Show>
+              </div>
+            </TabList>
+          </Tabs>
+        </div>
+        <div class="flex justify-end lg:min-w-52 lg:ml-4 ml-2">
+          <Show when={routeData?.accounts.data}>
+            <AccountsDropdown
+              accounts={accounts}
+              value={routeData.activeUuid.data}
+            />
+          </Show>
         </div>
       </nav>
     </Show>

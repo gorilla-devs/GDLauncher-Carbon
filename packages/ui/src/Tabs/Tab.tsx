@@ -17,6 +17,7 @@ interface Props extends JSX.HTMLAttributes<HTMLDivElement> {
   ignored?: boolean;
   noPointer?: boolean;
   noPadding?: boolean;
+  centerContent?: boolean;
 }
 
 const Tab = (_props: Props) => {
@@ -65,9 +66,15 @@ const Tab = (_props: Props) => {
       classList={{
         "w-full": tabsContext?.variant() === "block",
         "w-auto": tabsContext?.variant() === "traditional",
+        "h-full":
+          tabsContext?.variant() === "underline" &&
+          tabsContext?.orientation() === "horizontal",
         "cursor-pointer": !props.noPointer,
         "flex flex-col justify-center": props.noPadding,
+        "text-white": tabsContext?.isSelectedIndex(index()),
+        "text-darkSlate-50": !tabsContext?.isSelectedIndex(index()),
       }}
+      class="bg-darkSlate-800 hover:text-white flex items-center"
       ref={(el) => {
         ref = el;
       }}
@@ -80,14 +87,10 @@ const Tab = (_props: Props) => {
       <Switch>
         <Match when={tabsContext?.variant() === "underline"}>
           <div
-            class={`bg-darkSlate-800 font-500 capitalize ${
+            class={`hover:text-white transition-colors font-500 capitalize flex items-center h-full ${
               tabsContext?.paddingX?.() || ""
             } ${tabsContext?.paddingY?.() || ""}`}
             classList={{
-              "py-5":
-                tabsContext?.orientation() === "horizontal" &&
-                !tabsContext?.paddingY?.() &&
-                !props.noPadding,
               "border-box": tabsContext?.orientation() === "horizontal",
               "py-2":
                 tabsContext?.orientation() === "vertical" &&
@@ -96,8 +99,7 @@ const Tab = (_props: Props) => {
               "px-5":
                 tabsContext?.orientation() === "vertical" &&
                 !tabsContext?.paddingX?.(),
-              "text-white": tabsContext?.isSelectedIndex(index()),
-              "text-darkSlate-50": !tabsContext?.isSelectedIndex(index()),
+              "justify-center": props.centerContent,
             }}
           >
             {props.children}
@@ -105,7 +107,7 @@ const Tab = (_props: Props) => {
         </Match>
         <Match when={tabsContext?.variant() === "block"}>
           <div
-            class={`flex gap-1 justify-center items-center flex-1 h-full cursor-pointer rounded-xl font-500 capitalize box-border ${
+            class={`flex gap-1 hover:text-white justify-center items-center flex-1 h-full cursor-pointer rounded-xl font-500 capitalize box-border ${
               tabsContext?.paddingX?.() || ""
             } ${tabsContext?.paddingY?.() || ""}`}
             classList={{
@@ -132,7 +134,7 @@ const Tab = (_props: Props) => {
         </Match>
         <Match when={tabsContext?.variant() === "traditional"}>
           <div
-            class={`flex gap-1 justify-center items-center bg-darkSlate-800 flex-1 h-full font-500 capitalize box-border rounded-t-xl ${
+            class={`flex gap-1 hover:text-white justify-center items-center bg-darkSlate-800 flex-1 h-full font-500 capitalize box-border rounded-t-xl ${
               tabsContext?.paddingX?.() || ""
             } ${tabsContext?.paddingY?.() || ""}`}
             classList={{

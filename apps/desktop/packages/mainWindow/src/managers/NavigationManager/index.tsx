@@ -10,7 +10,7 @@ type NavigateOptions = {
   getLastInstance?: boolean;
 };
 
-type Context = (_path: string, _options?: NavigateOptions) => void;
+type Context = (_path: string | number, _options?: NavigateOptions) => void;
 
 const NavigationContext = createContext<Context>();
 
@@ -18,7 +18,12 @@ export const [lastPathVisited, setLastPathVisited] = createSignal("/");
 
 export const NavigationManager = (props: { children: JSX.Element }) => {
   const navigate = useNavigate();
-  const manager = (path: string, options?: NavigateOptions) => {
+  const manager = (path: string | number, options?: NavigateOptions) => {
+    if (typeof path == "number") {
+      navigate(path);
+      return;
+    }
+
     if (isLibraryPath(path) && options?.getLastInstance) {
       const parameters = path.split("?")[1];
       const instanceId = getInstanceIdFromPath(path);

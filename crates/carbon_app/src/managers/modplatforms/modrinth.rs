@@ -113,17 +113,9 @@ impl Modrinth {
         let mut url = self
             .base_url
             .join(&format!("project/{}/version", &*filters.project_id))?;
-        {
-            let mut query_pairs = url.query_pairs_mut();
 
-            if let Some(game_version) = filters.game_version {
-                query_pairs.append_pair("game_versions", &format!(r#"["{}"]"#, &game_version));
-            }
-
-            if let Some(loaders) = filters.loaders {
-                query_pairs.append_pair("loaders", &format!(r#"["{}"]"#, &loaders));
-            }
-        }
+        let query = filters.into_query_parameters()?;
+        url.set_query(Some(&query));
 
         trace!("GET {}", url);
 
@@ -399,8 +391,10 @@ mod test {
         let results = modrinth
             .get_project_versions(ProjectVersionsFilters {
                 project_id: ProjectID("u6dRKJwZ".to_string()),
-                game_version: None,
+                game_versions: None,
                 loaders: None,
+                offset: None,
+                limit: None,
             })
             .await?;
         tracing::debug!("Versions: {:?}", results);

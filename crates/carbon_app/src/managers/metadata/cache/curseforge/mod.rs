@@ -11,9 +11,11 @@ use tracing::trace;
 
 use crate::db::read_filters::DateTimeFilter;
 use crate::db::read_filters::IntFilter;
+use crate::domain::instance::info::ModLoaderType;
 use crate::domain::instance::InstanceId;
 use crate::domain::modplatforms::curseforge::filters::ModsParameters;
 use crate::domain::modplatforms::curseforge::filters::ModsParametersBody;
+use crate::domain::modplatforms::curseforge::File;
 use crate::domain::modplatforms::curseforge::FingerprintsMatchesResult;
 use crate::domain::modplatforms::curseforge::Mod;
 use crate::managers::App;
@@ -25,6 +27,8 @@ use crate::db::{
     curse_forge_mod_cache as cfdb, curse_forge_mod_image_cache as cfimgdb, mod_file_cache as fcdb,
     mod_metadata as metadb,
 };
+
+pub mod modpack;
 
 pub struct CurseforgeModCacher;
 
@@ -156,11 +160,15 @@ impl ModplatformCacher for CurseforgeModCacher {
         trace!("processing curseforge mod batch for instance {instance_id}");
 
         let mut matches = fp_response
-            .exact_fingerprints
+            .exact_matches
             .into_iter()
-            .zip(fp_response.exact_matches.into_iter())
-            .zip(mods_response.into_iter())
-            .map(|((fingerprint, fileinfo), modinfo)| (fingerprint, (fileinfo, modinfo)))
+            .map(|fp_match| {
+                mods_response
+                    .iter()
+                    .find(|m| m.id == fp_match.file.mod_id)
+                    .map(|m| (fp_match.file.file_fingerprint, (fp_match, m)))
+            })
+            .flatten()
             .collect::<HashMap<_, _>>();
 
         let mcm = app.meta_cache_manager();
@@ -169,19 +177,19 @@ impl ModplatformCacher for CurseforgeModCacher {
         drop(ignored_hashes);
 
         let futures = batch.into_iter().filter_map(|(metadata_id, murmur2)| {
-            let fpmatch = matches.remove(&murmur2);
-            fpmatch.map(|(fileinfo, modinfo)| async move {
+            let fp_match = matches.get(&murmur2);
+            fp_match.map(|(fp_match, modinfo)| async move {
                 let r = cache_curseforge_meta_unchecked(
                     app,
                     metadata_id.clone(),
-                    fileinfo.file.id,
+                    &fp_match.file,
                     murmur2,
-                    modinfo,
+                    &modinfo,
                 )
                 .await;
 
                 if let Err(e) = r {
-                    error!({ error = ?e, metadata_id, file_id = ?fileinfo.file.id }, "Could not store curseforge mod metadata. Will not attempt to download again for this session.");
+                    error!({ error = ?e, metadata_id, file_id = ?fp_match.file.id }, "Could not store curseforge mod metadata. Will not attempt to download again for this session.");
 
                     mcm.ignored_remote_cf_hashes.write().await.insert(murmur2);
                 }
@@ -327,9 +335,9 @@ impl ModplatformCacher for CurseforgeModCacher {
 async fn cache_curseforge_meta_unchecked(
     app: &App,
     metadata_id: String,
-    file_id: i32,
+    fileinfo: &File,
     murmur2: u32,
-    modinfo: Mod,
+    modinfo: &Mod,
 ) -> anyhow::Result<()> {
     let prev = app
         .prisma_client
@@ -341,14 +349,68 @@ async fn cache_curseforge_meta_unchecked(
         .exec()
         .await?;
 
+    // This is undocumented, we're guessing what the valid values here are.
+    // It seems to contain both game versions and modloaders
+    fn parse_update_paths(versions: &[String]) -> Vec<(String, ModLoaderType)> {
+        let mut game_versions = Vec::new();
+        let mut loaders = Vec::new();
+
+        for entry in versions {
+            let entry = entry.to_lowercase();
+            match ModLoaderType::try_from(&entry as &str) {
+                Ok(loader) => loaders.push(loader),
+                Err(_) => game_versions.push(entry),
+            }
+        }
+
+        let mut pairs = Vec::new();
+
+        for game_version in game_versions {
+            for loader in &loaders {
+                pairs.push((game_version.to_lowercase(), *loader));
+            }
+        }
+
+        pairs
+    }
+
+    let file_update_paths = parse_update_paths(&fileinfo.game_versions[..]);
+    let mut updatable_path_indexes = Vec::<usize>::new();
+
+    for file in &modinfo.latest_files {
+        if file.id == fileinfo.id {
+            continue;
+        }
+
+        let update_paths = parse_update_paths(&file.game_versions);
+
+        for pair in update_paths {
+            let idx = file_update_paths.iter().position(|p| *p == pair);
+
+            if let Some(idx) = idx {
+                if !updatable_path_indexes.contains(&idx) {
+                    updatable_path_indexes.push(idx);
+                }
+            }
+        }
+    }
+
+    let update_paths = file_update_paths
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| updatable_path_indexes.contains(&i))
+        .map(|(_, (gamever, loader))| format!("{gamever},{}", loader.to_string().to_lowercase()))
+        .join(";");
+
     let o_insert_cfmeta = app.prisma_client.curse_forge_mod_cache().create(
         murmur2 as i32,
         modinfo.id,
-        file_id,
-        modinfo.name,
-        modinfo.slug,
-        modinfo.summary,
-        modinfo.authors.into_iter().map(|a| a.name).join(", "),
+        fileinfo.id,
+        modinfo.name.clone(),
+        modinfo.slug.clone(),
+        modinfo.summary.clone(),
+        modinfo.authors.iter().map(|a| &a.name).join(", "),
+        update_paths,
         chrono::Utc::now().into(),
         metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),
         Vec::new(),
@@ -367,7 +429,7 @@ async fn cache_curseforge_meta_unchecked(
                 .expect("logo_image was requested but not returned by prisma")
         })
         .flatten();
-    let new_image = modinfo.logo.map(|it| it.url);
+    let new_image = modinfo.logo.as_ref().map(|it| &it.url).cloned();
 
     let image = match (new_image, old_image) {
         (Some(new), Some(old)) => Some((old.up_to_date == 1 && new == old.url, new, old.data)),

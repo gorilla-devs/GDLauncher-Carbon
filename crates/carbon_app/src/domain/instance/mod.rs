@@ -30,7 +30,8 @@ pub struct InstanceDetails {
     pub favorite: bool,
     pub name: String,
     pub version: Option<String>,
-    pub modpack: Option<info::Modpack>,
+    pub modpack: Option<info::ModpackInfo>,
+    pub locked: bool,
     pub global_java_args: bool,
     pub extra_java_args: Option<String>,
     pub memory: Option<(u16, u16)>,
@@ -40,6 +41,14 @@ pub struct InstanceDetails {
     pub state: LaunchState,
     pub notes: String,
     pub icon_revision: u32,
+}
+
+#[derive(Debug)]
+pub struct InstanceModpackInfo {
+    pub name: String,
+    pub version_name: String,
+    pub url_slug: String,
+    pub has_image: bool,
 }
 
 #[derive(Debug)]
@@ -53,6 +62,7 @@ pub struct InstanceSettingsUpdate {
     pub global_java_args: Option<bool>,
     pub extra_java_args: Option<Option<String>>,
     pub memory: Option<Option<(u16, u16)>>,
+    pub modpack_locked: Option<Option<bool>>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -75,6 +85,8 @@ pub struct Mod {
     pub metadata: Option<ModFileMetadata>,
     pub curseforge: Option<CurseForgeModMetadata>,
     pub modrinth: Option<ModrinthModMetadata>,
+    pub has_curseforge_update: bool,
+    pub has_modrinth_update: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -85,6 +97,9 @@ pub struct ModFileMetadata {
     pub description: Option<String>,
     pub authors: Option<String>,
     pub modloaders: Vec<info::ModLoaderType>,
+    pub sha_512: Vec<u8>,
+    pub sha_1: Vec<u8>,
+    pub murmur_2: i32,
     pub has_image: bool,
 }
 

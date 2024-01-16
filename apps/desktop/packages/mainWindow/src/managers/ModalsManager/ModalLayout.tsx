@@ -13,6 +13,7 @@ interface Props extends ModalProps {
   background?: JSX.Element;
   height?: string;
   width?: string;
+  scrollable?: string;
 }
 
 const ModalLayout = (props: Props) => {
@@ -42,10 +43,10 @@ const ModalLayout = (props: Props) => {
       >
         <Show when={props.background}>{props.background}</Show>
         <Show when={!props.noHeader}>
-          <div class="flex items-center bg-darkSlate-800 justify-between px-5 box-border h-12 rounded-t-2xl">
+          <div class="flex items-center justify-between bg-darkSlate-800 px-5 box-border h-12 rounded-t-2xl">
             <h3>{props.title}</h3>
             <div
-              class="cursor-pointer text-darkSlate-500 h-5 w-5 i-ri:close-fill"
+              class="h-5 w-5 cursor-pointer text-darkSlate-500 i-ri:close-fill"
               onClick={() => {
                 if (!props.preventClose) {
                   navigate(location.pathname);
@@ -56,7 +57,9 @@ const ModalLayout = (props: Props) => {
           </div>
         </Show>
         <div
-          class="box-border overflow-hidden z-10 h-full"
+          class={`box-border ${
+            props.scrollable ? props.scrollable : "overflow-hidden"
+          } z-10 h-full`}
           classList={{
             "p-5": !props.noPadding
           }}

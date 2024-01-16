@@ -1,12 +1,16 @@
 use std::borrow::BorrowMut;
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
 use carbon_net::{Downloadable, Progress};
 use tokio::task::spawn_blocking;
+use tracing::trace;
 
+use crate::domain::modplatforms::curseforge::filters::{ModsParameters, ModsParametersBody};
 use crate::domain::modplatforms::curseforge::{self, CurseForgeResponse, File};
 use crate::domain::runtime_path::InstancePath;
+use crate::managers::vtask::Subtask;
 use crate::managers::App;
 
 use super::UpdateValue;
@@ -19,14 +23,12 @@ use super::UpdateValue;
 #[derive(Debug, Copy, Clone)]
 pub struct ProgressState {
     pub extract_addon_overrides: UpdateValue<(u64, u64)>,
-    pub acquire_addon_metadata: UpdateValue<(u64, u64)>,
 }
 
 impl ProgressState {
     pub fn new() -> Self {
         Self {
             extract_addon_overrides: UpdateValue::new((0, 0)),
-            acquire_addon_metadata: UpdateValue::new((0, 0)),
         }
     }
 }
@@ -37,6 +39,7 @@ pub struct ModpackInfo {
     pub downloadables: Vec<Downloadable>,
 }
 
+#[tracing::instrument(skip(app, progress_percentage_sender))]
 pub async fn download_modpack_zip(
     app: &App,
     cf_addon: &File,
@@ -84,11 +87,13 @@ pub async fn download_modpack_zip(
     Ok(())
 }
 
+#[tracing::instrument(skip(app, t_addon_metadata, progress_percentage_sender))]
 pub async fn prepare_modpack_from_zip(
     app: &App,
     zip_path: &Path,
     instance_path: &InstancePath,
-    skip_overlays: bool,
+    skip_overrides: bool,
+    t_addon_metadata: Subtask,
     progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
 ) -> anyhow::Result<ModpackInfo> {
     let progress_percentage_sender = Arc::new(progress_percentage_sender);
@@ -106,62 +111,90 @@ pub async fn prepare_modpack_from_zip(
     })
     .await??;
 
+    let mc_manifest = Arc::new(app.minecraft_manager().get_minecraft_manifest().await?);
+
+    let mc_version = manifest.minecraft.version.clone();
+
     let downloadables = {
-        let mut handles = Vec::new();
+        let mut downloadables = Vec::new();
 
-        let semaphore = Arc::new(tokio::sync::Semaphore::new(20));
-        let atomic_counter_download_metadata = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let cf_manager = &app.modplatforms_manager().curseforge;
+        let addons = Arc::new(
+            cf_manager
+                .get_mods(ModsParameters {
+                    body: ModsParametersBody {
+                        mod_ids: manifest
+                            .files
+                            .iter()
+                            .map(|file| file.project_id)
+                            .collect::<Vec<_>>(),
+                    },
+                })
+                .await?
+                .data
+                .into_iter()
+                .map(|addon| {
+                    (
+                        addon.id,
+                        addon.class_id.unwrap_or(curseforge::ClassId::Mods),
+                    )
+                })
+                .collect::<HashMap<_, _>>(),
+        );
 
-        let files_len = manifest.files.len() as u64;
+        let all_addons = app
+            .modplatforms_manager()
+            .curseforge
+            .get_files(curseforge::filters::FilesParameters {
+                body: curseforge::filters::FilesParametersBody {
+                    file_ids: manifest
+                        .files
+                        .iter()
+                        .map(|file| file.file_id)
+                        .collect::<Vec<_>>(),
+                },
+            })
+            .await?
+            .data
+            .into_iter()
+            .map(|file| (file.id, file))
+            .collect::<HashMap<_, _>>();
 
         for file in &manifest.files {
-            let semaphore = semaphore.clone();
-            let app = app.clone();
-            let instance_path = instance_path.clone();
-            let progress_percentage_sender_clone = progress_percentage_sender.clone();
-            let atomic_counter = atomic_counter_download_metadata.clone();
-
             let mod_id = file.project_id;
             let file_id = file.file_id;
 
-            let handle = tokio::spawn(async move {
-                let _ = semaphore.acquire().await?;
+            let mod_file = all_addons
+                .get(&file_id)
+                .ok_or(anyhow::anyhow!("Failed to get mod file: {:?}", file_id))?;
 
-                let cf_manager = &app.modplatforms_manager().curseforge;
+            let class_id = addons
+                .get(&mod_id)
+                .ok_or(anyhow::anyhow!("Failed to get addon: {:?}", mod_id))?;
 
-                let CurseForgeResponse { data: mod_file, .. } = cf_manager
-                    .get_mod_file(curseforge::filters::ModFileParameters { mod_id, file_id })
-                    .await?;
+            let instance_path =
+                class_id
+                    .clone()
+                    .into_path(&instance_path, mc_version.clone(), &mc_manifest);
 
-                let instance_path = instance_path.get_mods_path(); // TODO: they could also be other things
-                let downloadable = Downloadable::new(
-                    mod_file
-                        .download_url
-                        .ok_or(anyhow::anyhow!("Failed to get download url for mod"))?,
-                    instance_path.join(mod_file.file_name),
-                )
-                .with_size(mod_file.file_length as u64);
-                progress_percentage_sender_clone.send_modify(|progress| {
-                    progress.acquire_addon_metadata.set((
-                        atomic_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1,
-                        files_len,
-                    ));
-                });
+            let downloadable = Downloadable::new(
+                mod_file
+                    .download_url
+                    .as_ref()
+                    .ok_or(anyhow::anyhow!("Failed to get download url for mod"))?,
+                instance_path.join(&mod_file.file_name),
+            )
+            .with_size(mod_file.file_length as u64);
 
-                Ok::<Downloadable, anyhow::Error>(downloadable)
-            });
-
-            handles.push(handle);
+            downloadables.push(downloadable);
         }
 
-        futures::future::join_all(handles)
-            .await
-            .into_iter()
-            .flatten()
-            .collect::<Result<Vec<_>, _>>()?
+        downloadables
     };
 
-    if !skip_overlays {
+    t_addon_metadata.complete_opaque();
+
+    if !skip_overrides {
         let override_folder_name = manifest.overrides.clone();
         let override_full_path = instance_path.get_data_path();
         tokio::fs::create_dir_all(&override_full_path).await?;
