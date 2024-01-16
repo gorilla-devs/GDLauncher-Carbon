@@ -2283,6 +2283,7 @@ mod test {
                 extra_java_args: None,
                 memory: None,
                 modpack_locked: None,
+                mod_sources: None,
             })
             .await?;
 
