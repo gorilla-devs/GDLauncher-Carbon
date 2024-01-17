@@ -263,7 +263,7 @@ const SingleEntity = (props: {
                         }
                       }}
                     />
-                    <div class="w-full h-[90%] overflow-hidden flex flex-col gap-2">
+                    <div class="w-full h-[240px] overflow-y-auto flex flex-col gap-2">
                       <For each={instance.multiResult}>
                         {(entry) => (
                           <SingleCheckBox
