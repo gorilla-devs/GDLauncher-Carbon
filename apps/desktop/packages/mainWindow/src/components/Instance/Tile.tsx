@@ -452,8 +452,8 @@ const Tile = (props: Props) => {
               <div
                 class="text-white"
                 classList={{
-                  "i-ri:play-fill text-lg": !props.isRunning,
-                  "i-ri:stop-fill text-md": props.isRunning
+                  "i-ri:play-fill text-2xl": !props.isRunning,
+                  "i-ri:stop-fill text-lg": props.isRunning
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
