@@ -33,14 +33,17 @@ const SingleEntity = (props: {
   const [t] = useTransContext();
   const [path, setPath] = createSignal<string | undefined>(undefined);
   const [inputValue, setInputValue] = createSignal(path());
+
   const [instance, setInstance] = createStore<{
     noResult: string | undefined;
     singleResult: ImportableInstance | undefined;
     multiResult: (ImportableInstance | InvalidImportEntry)[] | undefined;
+    isLoading?: boolean;
   }>({
     noResult: undefined,
     singleResult: undefined,
-    multiResult: undefined
+    multiResult: undefined,
+    isLoading: false
   });
 
   const entityDefaultPath = rspc.createQuery(() => [
@@ -82,7 +85,14 @@ const SingleEntity = (props: {
     const status = importScanStatus.data;
     if (status) {
       const data = status.status;
-
+      if (status.scanning) {
+        setInstance({
+          isLoading: true,
+          noResult: undefined,
+          singleResult: undefined,
+          multiResult: undefined
+        });
+      }
       if (typeof data === "object") {
         if ("SingleResult" in data) {
           if ("Valid" in data.SingleResult) {
@@ -92,7 +102,8 @@ const SingleEntity = (props: {
             setInstance({
               singleResult: res.Valid,
               multiResult: undefined,
-              noResult: undefined
+              noResult: undefined,
+              isLoading: false
             });
           }
         } else if ("MultiResult" in data) {
@@ -115,14 +126,16 @@ const SingleEntity = (props: {
               }
             }),
             singleResult: undefined,
-            noResult: undefined
+            noResult: undefined,
+            isLoading: false
           });
         }
       } else {
         setInstance({
           noResult: data,
           singleResult: undefined,
-          multiResult: undefined
+          multiResult: undefined,
+          isLoading: false
         });
       }
     }
@@ -288,6 +301,11 @@ const SingleEntity = (props: {
                       />
                     )}
                   </For>
+                </Match>
+                <Match when={instance.isLoading === true}>
+                  <div class="w-full h-full flex items-center justify-center">
+                    <div class="i-formkit:spinner animate-spin w-10 h-10 text-sky-800" />
+                  </div>
                 </Match>
               </Switch>
             </Match>
