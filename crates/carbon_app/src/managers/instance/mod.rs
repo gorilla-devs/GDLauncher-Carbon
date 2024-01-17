@@ -9,6 +9,7 @@ use crate::db::read_filters::StringFilter;
 use crate::domain::instance::info::{GameVersion, InstanceIcon, Modpack};
 use crate::domain::modplatforms::curseforge::filters::{ModFileParameters, ModParameters};
 use crate::domain::modplatforms::modrinth::search::{ProjectID, VersionID};
+use crate::domain::modplatforms::ModPlatform;
 use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::{DateTime, Utc};
@@ -949,6 +950,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 extra_java_args: None,
                 memory: None,
             },
+            mod_sources: None,
             notes,
         };
 
@@ -1113,6 +1115,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         if let Some(memory) = update.memory {
             info.game_configuration.memory = memory;
+        }
+
+        if let Some(mod_sources) = update.mod_sources {
+            info.mod_sources = mod_sources;
         }
 
         if let Some(modpack_locked) = update.modpack_locked {
@@ -1668,7 +1674,7 @@ pub enum ListInstanceStatus {
 pub struct ValidListInstance {
     pub mc_version: Option<String>,
     pub modloader: Option<info::ModLoaderType>,
-    pub modpack_platform: Option<info::ModpackPlatform>,
+    pub modpack_platform: Option<ModPlatform>,
     pub state: domain::LaunchState,
 }
 
@@ -2277,6 +2283,7 @@ mod test {
                 extra_java_args: None,
                 memory: None,
                 modpack_locked: None,
+                mod_sources: None,
             })
             .await?;
 

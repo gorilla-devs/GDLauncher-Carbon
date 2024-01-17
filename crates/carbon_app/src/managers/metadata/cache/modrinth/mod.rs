@@ -14,6 +14,7 @@ use crate::domain::modplatforms::modrinth::project::ProjectVersionsFilters;
 use crate::domain::modplatforms::modrinth::responses::VersionsResponse;
 use crate::domain::modplatforms::modrinth::search::{ProjectID, VersionIDs};
 use crate::domain::modplatforms::modrinth::version::Version;
+use crate::domain::modplatforms::ModChannel;
 use crate::{
     db::read_filters::{DateTimeFilter, IntFilter},
     domain::{
@@ -248,7 +249,7 @@ impl ModplatformCacher for ModrinthModCacher {
                 let r = cache_modrinth_meta_unchecked(
                     app,
                     metadata_id,
-                    version.id.clone(),
+                    &version,
                     file.hashes.sha512.clone(),
                     file.filename.clone(),
                     file.url.clone(),
@@ -403,7 +404,7 @@ impl ModplatformCacher for ModrinthModCacher {
 async fn cache_modrinth_meta_unchecked(
     app: &App,
     metadata_id: String,
-    version_id: String,
+    version: &Version,
     sha512: String,
     filename: String,
     file_url: String,
@@ -421,44 +422,48 @@ async fn cache_modrinth_meta_unchecked(
         .exec()
         .await?;
 
-    let mut file_update_paths = HashSet::<(&str, ModLoaderType)>::new();
+    let mut file_update_paths = HashSet::<(&str, ModLoaderType, ModChannel)>::new();
 
-    println!("MR caching for {version_id}");
-    if let Some(this_version) = versions.iter().find(|v| v.id == version_id) {
-        for version in versions {
-            if version.project_id != project.id
-                || version.id == version_id
-                || !this_version.game_versions.iter().any(|v| version.game_versions.contains(v))
-                || !this_version.loaders.iter().any(|l| version.loaders.contains(l))
+    for other_version in versions {
+        if other_version.project_id != project.id
+            || other_version.id == version.id
+            || !version.game_versions.iter().any(|v| other_version.game_versions.contains(v))
+            || !version.loaders.iter().any(|l| other_version.loaders.contains(l))
             {
-                continue;
+                break;
             }
 
-            for game_version in &version.game_versions {
-                for loader in &version.loaders {
-                    let Ok(loader) = ModLoaderType::try_from(loader as &str) else {
-                        continue;
-                    };
+        for game_version in &other_version.game_versions {
+            for loader in &other_version.loaders {
+                let Ok(loader) = ModLoaderType::try_from(loader as &str) else {
+                    continue;
+                };
 
-                    file_update_paths.insert((game_version, loader));
-                }
+                file_update_paths.insert((game_version, loader, other_version.version_type.into()));
             }
         }
     }
 
     let update_paths = file_update_paths
         .into_iter()
-        .map(|(gamever, loader)| format!("{gamever},{}", loader.to_string().to_lowercase()))
+        .map(|(gamever, loader, channel)| {
+            format!(
+                "{gamever},{},{}",
+                loader.to_string().to_lowercase(),
+                channel.as_str(),
+            )
+        })
         .join(";");
 
     let o_insert_mrmeta = app.prisma_client.modrinth_mod_cache().create(
         sha512.clone(),
         project.id,
-        version_id,
+        version.id.clone(),
         project.title,
         project.slug,
         project.description,
         authors,
+        ModChannel::from(version.version_type) as i32,
         update_paths,
         filename,
         file_url,

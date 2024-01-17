@@ -28,7 +28,7 @@ type Hash = {
   };
 };
 
-const defaultModals: Hash = {
+const defaultModals = {
   privacyStatement: {
     component: lazy(() => import("./modals/PrivacyStatement")),
     title: "Privacy Statement"
@@ -80,12 +80,14 @@ const defaultModals: Hash = {
   whyAreAdsNeeded: {
     component: lazy(() => import("./modals/WhyAreAdsNeeded")),
     title: "Why are ads needed?"
+  },
+  modsUpdater: {
+    component: lazy(() => import("./modals/ModsUpdater")),
+    title: "Mods Updater"
   }
 };
 
-type ModalName = {
-  [K in keyof typeof defaultModals as string extends K ? K : never]: K;
-}[keyof typeof defaultModals];
+type ModalName = keyof typeof defaultModals;
 
 type Modal = { name: ModalName; url?: string };
 
@@ -179,9 +181,11 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
           <For each={modalStack()}>
             {(modal, index) => {
               const ModalComponent = defaultModals[modal.name].component;
-              const noHeader = defaultModals[modal.name].noHeader || false;
-              const title = defaultModals[modal.name].title || "";
-              const preventClose = defaultModals[modal.name].preventClose;
+              const noHeader =
+                (defaultModals as Hash)[modal.name].noHeader || false;
+              const title = (defaultModals as Hash)[modal.name].title || "";
+              const preventClose = (defaultModals as Hash)[modal.name]
+                .preventClose;
 
               return (
                 <div class="h-screen w-screen flex absolute inset-0">

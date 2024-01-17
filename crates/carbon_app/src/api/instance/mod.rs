@@ -22,8 +22,10 @@ use super::keys::instance::*;
 use super::router::router;
 use super::translation::Translation;
 use super::vtask::FETaskId;
+use super::Set;
 
 use crate::domain::instance::{self as domain, InstanceModpackInfo};
+use crate::domain::modplatforms as mpdomain;
 use crate::managers::instance as manager;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
@@ -304,24 +306,19 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         mutation UPDATE_MOD[app, args: UpdateMod] {
-            let task = match args.mod_source {
-                ModSourceType::Curseforge => {
-                    app.instance_manager()
-                        .update_curseforge_mod(
-                            args.instance_id.into(),
-                            args.mod_id,
-                        ).await?
-                },
-                ModSourceType::Modrinth => {
-                    app.instance_manager()
-                        .update_modrinth_mod(
-                            args.instance_id.into(),
-                            args.mod_id,
-                        ).await?
-                }
-            };
+            let task = app.instance_manager().update_mod(
+                args.instance_id.into(),
+                args.mod_id,
+            ).await?;
 
             Ok(super::vtask::FETaskId::from(task))
+        }
+
+        query GET_MOD_SOURCES[app, instance_id: FEInstanceId] {
+            app.instance_manager()
+                .get_instance_mod_sources(instance_id.into())
+                .await
+                .map(super::modplatforms::ModSources::from)
         }
 
         mutation INSTALL_LATEST_MOD[app, imod: InstallLatestMod] {
@@ -661,6 +658,8 @@ struct UpdateInstance {
     #[specta(optional)]
     memory: Option<Set<Option<MemoryRange>>>,
     #[specta(optional)]
+    mod_sources: Option<Set<Option<super::modplatforms::ModSources>>>,
+    #[specta(optional)]
     modpack_locked: Option<Set<Option<bool>>>,
 }
 
@@ -674,19 +673,6 @@ struct DuplicateInstance {
 struct SetFavorite {
     instance: FEInstanceId,
     favorite: bool,
-}
-
-#[derive(Type, Debug, Deserialize)]
-enum Set<T> {
-    Set(T),
-}
-
-impl<T> Set<T> {
-    fn inner(self) -> T {
-        match self {
-            Self::Set(t) => t,
-        }
-    }
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -730,7 +716,6 @@ struct InstallMod {
 #[derive(Type, Debug, Deserialize)]
 struct UpdateMod {
     instance_id: FEInstanceId,
-    mod_source: ModSourceType,
     mod_id: String,
 }
 
@@ -1089,11 +1074,11 @@ impl From<domain::InstanceDetails> for InstanceDetails {
     }
 }
 
-impl From<domain::info::ModpackPlatform> for ModpackPlatform {
-    fn from(value: domain::info::ModpackPlatform) -> Self {
+impl From<mpdomain::ModPlatform> for ModpackPlatform {
+    fn from(value: mpdomain::ModPlatform) -> Self {
         match value {
-            domain::info::ModpackPlatform::Curseforge => Self::Curseforge,
-            domain::info::ModpackPlatform::Modrinth => Self::Modrinth,
+            mpdomain::ModPlatform::Curseforge => Self::Curseforge,
+            mpdomain::ModPlatform::Modrinth => Self::Modrinth,
         }
     }
 }
@@ -1485,6 +1470,7 @@ impl TryFrom<UpdateInstance> for domain::InstanceSettingsUpdate {
             global_java_args: value.global_java_args.map(|x| x.inner()),
             extra_java_args: value.extra_java_args.map(|x| x.inner()),
             memory: value.memory.map(|x| x.inner().map(Into::into)),
+            mod_sources: value.mod_sources.map(|x| x.inner().map(Into::into)),
             modpack_locked: value.modpack_locked.map(|x| x.inner()),
         })
     }

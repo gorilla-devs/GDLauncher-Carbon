@@ -1,7 +1,12 @@
 import { For, JSX, Suspense, onMount } from "solid-js";
 import { Skeleton } from "@gd/ui";
 import { Props as RowContainerProps } from "@/components/Browser/RowContainer";
-import { CFFEMod, MRFEProject } from "@gd/core_module/bindings";
+import {
+  CFFEMod,
+  InstanceDetails,
+  MRFEProject,
+  Mod
+} from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { VersionRowTypeData } from "../InfiniteScrollVersionsQueryWrapper";
 
@@ -14,6 +19,8 @@ type Props = {
   modrinthProjectData: MRFEProject | undefined;
   instanceId?: number;
   installedMod?: { id: string; remoteId: string };
+  instanceMods?: Mod[];
+  instanceDetails?: InstanceDetails;
   isCurseforge: boolean;
   isLoading: boolean;
   children: (_: RowContainerProps) => JSX.Element;
@@ -80,6 +87,8 @@ const MainContainer = (props: Props) => {
                     modVersion={props.versions[modFile.index]}
                     instanceId={props.instanceId}
                     type={props.type}
+                    instanceMods={props.instanceMods}
+                    instanceDetails={props.instanceDetails}
                   />
                 </div>
               );

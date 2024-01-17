@@ -299,6 +299,8 @@ const ModRow = (props: ModRowProps) => {
                         projectId={getProjectId(props)}
                         isCurseforge={isCurseForgeData(props.data)}
                         instanceId={instanceId()}
+                        instanceDetails={(props as ModProps).instanceDetails}
+                        instanceMods={(props as ModProps).instanceMods}
                       />
                     </div>
                   </Match>

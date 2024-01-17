@@ -4,10 +4,11 @@ use super::ManagerRef;
 use crate::{
     api::{keys::settings::*, settings::FESettingsUpdate},
     db::app_configuration,
-    domain::runtime_path,
+    domain::{self as domain, modplatforms::ModChannelWithUsage, runtime_path},
 };
 use anyhow::anyhow;
 use chrono::Utc;
+use itertools::Itertools;
 use reqwest_middleware::ClientWithMiddleware;
 use std::path::PathBuf;
 
@@ -52,13 +53,11 @@ impl ManagerRef<'_, SettingsManager> {
 
         let mut queries = vec![];
 
-        let mut something_changed = false;
         if let Some(theme) = incoming_settings.theme {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
                 vec![app_configuration::theme::set(theme)],
             ));
-            something_changed = true;
         }
 
         if let Some(language) = incoming_settings.language {
@@ -66,7 +65,6 @@ impl ManagerRef<'_, SettingsManager> {
                 app_configuration::id::equals(0),
                 vec![app_configuration::language::set(language)],
             ));
-            something_changed = true;
         }
 
         if let Some(reduced_motion) = incoming_settings.reduced_motion {
@@ -74,7 +72,6 @@ impl ManagerRef<'_, SettingsManager> {
                 app_configuration::id::equals(0),
                 vec![app_configuration::reduced_motion::set(reduced_motion)],
             ));
-            something_changed = true;
         }
 
         if let Some(discord_integration) = incoming_settings.discord_integration {
@@ -84,7 +81,6 @@ impl ManagerRef<'_, SettingsManager> {
                     discord_integration,
                 )],
             ));
-            something_changed = true;
         }
 
         if let Some(release_channel) = incoming_settings.release_channel {
@@ -94,7 +90,6 @@ impl ManagerRef<'_, SettingsManager> {
                     release_channel.into(),
                 )],
             ));
-            something_changed = true;
         }
 
         if let Some(concurrent_downloads) = incoming_settings.concurrent_downloads {
@@ -104,7 +99,6 @@ impl ManagerRef<'_, SettingsManager> {
                     concurrent_downloads,
                 )],
             ));
-            something_changed = true;
         }
 
         if let Some(show_news) = incoming_settings.show_news {
@@ -112,7 +106,6 @@ impl ManagerRef<'_, SettingsManager> {
                 app_configuration::id::equals(0),
                 vec![app_configuration::show_news::set(show_news)],
             ));
-            something_changed = true;
         }
 
         if let Some(xmx) = incoming_settings.xmx {
@@ -120,7 +113,6 @@ impl ManagerRef<'_, SettingsManager> {
                 app_configuration::id::equals(0),
                 vec![app_configuration::xmx::set(xmx)],
             ));
-            something_changed = true;
         }
 
         if let Some(xms) = incoming_settings.xms {
@@ -128,7 +120,6 @@ impl ManagerRef<'_, SettingsManager> {
                 app_configuration::id::equals(0),
                 vec![app_configuration::xms::set(xms)],
             ));
-            something_changed = true;
         }
 
         if let Some(is_first_launch) = incoming_settings.is_first_launch {
@@ -136,7 +127,6 @@ impl ManagerRef<'_, SettingsManager> {
                 app_configuration::id::equals(0),
                 vec![app_configuration::is_first_launch::set(is_first_launch)],
             ));
-            something_changed = true;
         }
 
         if let Some(startup_resolution) = incoming_settings.startup_resolution {
@@ -146,7 +136,6 @@ impl ManagerRef<'_, SettingsManager> {
                     startup_resolution,
                 )],
             ));
-            something_changed = true;
         }
 
         if let Some(java_custom_args) = incoming_settings.java_custom_args {
@@ -154,7 +143,6 @@ impl ManagerRef<'_, SettingsManager> {
                 app_configuration::id::equals(0),
                 vec![app_configuration::java_custom_args::set(java_custom_args)],
             ));
-            something_changed = true;
         }
 
         if let Some(auto_manage_java) = incoming_settings.auto_manage_java {
@@ -162,15 +150,31 @@ impl ManagerRef<'_, SettingsManager> {
                 app_configuration::id::equals(0),
                 vec![app_configuration::auto_manage_java::set(auto_manage_java)],
             ));
-            something_changed = true;
         }
 
-        if let Some(preferred_mod_channel) = incoming_settings.preferred_mod_channel {
+        if let Some(mod_sources) = incoming_settings.mod_sources {
+            let platform_blacklist = mod_sources
+                .platform_blacklist
+                .into_iter()
+                .map(domain::modplatforms::ModPlatform::from)
+                .map(|p| domain::modplatforms::ModPlatform::as_str(&p))
+                .join(",");
+
+            let channels = mod_sources
+                .channels
+                .into_iter()
+                .map(Into::into)
+                .collect::<Vec<_>>();
+            ModChannelWithUsage::validate_list(&channels)?;
+
+            let channels_str = ModChannelWithUsage::slice_to_str(&channels);
+
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::preferred_mod_channel::set(
-                    preferred_mod_channel as i32,
-                )],
+                vec![
+                    app_configuration::mod_platform_blacklist::set(platform_blacklist),
+                    app_configuration::mod_channels::set(channels_str),
+                ],
             ));
         }
 
@@ -190,8 +194,6 @@ impl ManagerRef<'_, SettingsManager> {
                     &secret,
                 )
                 .await?;
-
-            something_changed = true;
         }
 
         if let Some(metrics_enabled) = incoming_settings.metrics_enabled {
@@ -211,11 +213,9 @@ impl ManagerRef<'_, SettingsManager> {
                     &secret,
                 )
                 .await?;
-
-            something_changed = true;
         }
 
-        if something_changed {
+        if !queries.is_empty() {
             db._batch(queries).await?;
             self.app.invalidate(GET_SETTINGS, None);
         }

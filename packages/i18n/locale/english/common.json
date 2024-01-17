@@ -115,6 +115,8 @@
   "instance.switch_version": "Switch Version",
   "instance.no_modpacks_text": "At the moment there is no modpacks.",
   "instance.go_to_installed_mods": "Go to installed mods",
+  "instance.update_all_mods": "Update all mods",
+  "instance.update_mods": "Update mods",
   "instance_selected_mods_count": "{{selected}}/{{total}} selected",
   "modpack.download": "Download",
   "modpack.mcVersion": "Minecraft version",
@@ -254,7 +256,6 @@
   "onboarding.retry": "Retry",
   "onboarding.begin_import": "Begin import",
   "instance.no_instance_found": "No Instances found on this path",
-
   "instance.export_path": "Export path",
   "instance.exported_to": "Exported correctly to",
   "instance.open_folder": "Open the folder",
@@ -361,5 +362,7 @@
   "ads.paragraph-5": "While ads support the free version of our app, we also offer optional subscriptions for those who prefer an ad-free experience. These subscriptions help fund our operations while providing an alternative for users who wish to remove ads.",
   "ads.paragraph-6": "We don't have direct control over what ads are displayed, but we try to make the experience as unobtrusive as possible, ensuring ads don't disrupt the experience.",
   "ads.paragraph-7": "Thank you for being part of our journey. Your support is instrumental in shaping the future of GDLauncher and enhancing the Minecraft experience for everyone in our community.",
-  "ads.paragraph-8": "Sincerely, The GDLauncher Team"
+  "ads.paragraph-8": "Sincerely, The GDLauncher Team",
+  "mods_updater.updating_mods_count": "Updating {{mods}} / {{total}} mods",
+  "mods_updater.updating_mod_text": "Updating mod {{mod_name}}"
 }

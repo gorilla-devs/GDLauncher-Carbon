@@ -1,10 +1,8 @@
 /* eslint-disable solid/no-innerhtml */
 import {
-  FeError,
   InvalidListInstance,
   LaunchState,
   ListInstanceStatus,
-  Progress,
   FESubtask,
   FETaskId,
   UngroupedInstance,
@@ -168,18 +166,6 @@ export const isInstanceRunning = (
   launchState: LaunchState
 ): launchState is { Running: { start_time: string; log_id: number } } => {
   return typeof launchState === "object" && "Running" in launchState;
-};
-
-export const isProgressKnown = (
-  progress: Progress
-): progress is { Known: number } => {
-  return (progress as { Known: number }).Known !== undefined;
-};
-
-export const isProgressFailed = (
-  progress: Progress
-): progress is { Failed: FeError } => {
-  return (progress as { Failed: FeError })?.Failed !== undefined;
 };
 
 export const isModpackCurseforge = (

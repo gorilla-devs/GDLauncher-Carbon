@@ -25,7 +25,8 @@ model AppConfiguration {
   defaultInstanceGroup            Int?
   isFirstLaunch                   Boolean   @default(true)
   autoManageJava                  Boolean   @default(true)
-  preferredModChannel             Int       @default(2) // 0 = >= alpha, 1 = >= beta, 2 = stable
+  modPlatformBlacklist            String    @default("")
+  modChannels                     String    @default("stable:true,beta:true,alpha:true")
   // Legal / metrics
   randomUserUuid                  String    @default(uuid())
   secret                          Bytes
@@ -146,7 +147,8 @@ model CurseForgeModCache {
   urlslug     String
   summary     String
   authors     String
-  updatePaths String // in the form `<gamever>,<modloader>;<gamever>,<modloader>` for every availible combination
+  releaseType Int    // alpha = 0, beta = 1, stable = 2
+  updatePaths String // in the form `<gamever>,<modloader>,<channel>;<gamever>,<modloader>,<channel>` for every availible combination
   cachedAt    DateTime
   logoImage   CurseForgeModImageCache?
   metadata    ModMetadata              @relation(fields: [metadataId], references: [id], onDelete: Cascade)
@@ -163,7 +165,8 @@ model ModrinthModCache {
   urlslug     String
   description String
   authors     String
-  updatePaths String // in the form `<gamever>,<modloader>;<gamever>,<modloader>` for every availible combination
+  releaseType Int    // alpha = 0, beta = 1, stable = 2
+  updatePaths String // in the form `<gamever>,<modloader>,<channel>;<gamever>,<modloader>,<channel>` for every availible combination
   filename    String
   fileUrl     String
   cachedAt    DateTime
