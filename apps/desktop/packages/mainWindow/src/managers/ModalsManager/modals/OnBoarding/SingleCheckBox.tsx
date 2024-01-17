@@ -1,5 +1,5 @@
 import { Checkbox } from "@gd/ui";
-import { Setter, createEffect } from "solid-js";
+import { Setter } from "solid-js";
 import { instances } from "./SingleEntity";
 
 interface Props {
