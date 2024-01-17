@@ -13,6 +13,7 @@ use hyper::{HeaderMap, StatusCode};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
+use crate::api::modplatforms::RemoteVersion;
 use crate::error::{AxumError, FeError};
 use crate::managers::instance::log::LogEntrySourceKind;
 use crate::managers::instance::InstanceMoveTarget;
@@ -312,6 +313,14 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             ).await?;
 
             Ok(super::vtask::FETaskId::from(task))
+        }
+
+        query FIND_MOD_UPDATE[app, args: UpdateMod] {
+            app.instance_manager().find_mod_update(
+                args.instance_id.into(),
+                args.mod_id,
+            ).await
+            .map(|v| v.map(RemoteVersion::from))
         }
 
         query GET_MOD_SOURCES[app, instance_id: FEInstanceId] {
@@ -899,13 +908,13 @@ struct Mod {
     enabled: bool,
     metadata: Option<ModFileMetadata>,
     curseforge: Option<CurseForgeModMetadata>,
-    has_curseforge_update: bool,
     modrinth: Option<ModrinthModMetadata>,
-    has_modrinth_update: bool,
+    has_update: bool,
 }
 
 #[derive(Type, Debug, Serialize)]
 struct ModFileMetadata {
+    id: String,
     modid: Option<String>,
     name: Option<String>,
     version: Option<String>,
@@ -1347,9 +1356,8 @@ impl From<domain::Mod> for Mod {
             enabled: value.enabled,
             metadata: value.metadata.map(Into::into),
             curseforge: value.curseforge.map(Into::into),
-            has_curseforge_update: value.has_curseforge_update,
             modrinth: value.modrinth.map(Into::into),
-            has_modrinth_update: value.has_modrinth_update,
+            has_update: value.has_update,
         }
     }
 }
@@ -1357,6 +1365,7 @@ impl From<domain::Mod> for Mod {
 impl From<domain::ModFileMetadata> for ModFileMetadata {
     fn from(value: domain::ModFileMetadata) -> Self {
         Self {
+            id: value.id,
             modid: value.modid,
             name: value.name,
             version: value.version,

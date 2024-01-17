@@ -22,6 +22,11 @@ use crate::{
     mirror_into,
 };
 
+use self::{
+    curseforge::structs::CFFEFile,
+    modrinth::structs::{MRFEVersion, MRFEVersionFile},
+};
+
 mod curseforge;
 mod filters;
 mod modrinth;
@@ -106,6 +111,23 @@ mirror_into!(ModSources, domain::ModSources, |value| Self {
         .map(Into::into)
         .collect(),
 });
+
+#[derive(Type, Debug, Serialize)]
+pub enum RemoteVersion {
+    Curseforge(CFFEFile),
+    Modrinth(MRFEVersion),
+}
+
+impl From<domain::RemoteVersion> for RemoteVersion {
+    fn from(value: domain::RemoteVersion) -> Self {
+        use domain::RemoteVersion as Other;
+
+        match value {
+            Other::Curseforge(cf) => Self::Curseforge(cf.into()),
+            Other::Modrinth(mr) => Self::Modrinth(mr.into()),
+        }
+    }
+}
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {

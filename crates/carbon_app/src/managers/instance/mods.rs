@@ -21,7 +21,7 @@ use crate::domain::modplatforms::modrinth::project::ProjectVersionsFilters;
 use crate::domain::modplatforms::modrinth::search::ProjectID;
 use crate::domain::modplatforms::modrinth::version::VersionType;
 use crate::domain::modplatforms::{
-    curseforge, modrinth, ModChannel, ModChannelWithUsage, ModPlatform, ModSources,
+    curseforge, modrinth, ModChannel, ModChannelWithUsage, ModPlatform, ModSources, RemoteVersion,
 };
 use crate::managers::instance::InstanceType;
 use crate::managers::AppInner;
@@ -131,11 +131,50 @@ impl ManagerRef<'_, InstanceManager> {
                     .map(|m| (Some(m.id), m.curseforge.flatten(), m.modrinth.flatten()))
                     .unwrap_or((None, None, None));
 
+                let has_curseforge_update = cf
+                    .as_ref()
+                    .map(|cf| {
+                        let Ok(channel) = ModChannel::try_from(cf.release_type) else {
+                            tracing::error!(
+                                "Invalid ModChannel in database for curseforge entry {}: {}",
+                                mid.as_ref().unwrap(),
+                                cf.release_type
+                            );
+                            return false;
+                        };
+
+                        !mod_sources
+                            .platform_blacklist
+                            .contains(&ModPlatform::Curseforge)
+                            && has_update_for_paths(channel, &split_paths(&cf.update_paths))
+                    })
+                    .unwrap_or(false);
+
+                let has_modrinth_update = mr
+                    .as_ref()
+                    .map(|mr| {
+                        let Ok(channel) = ModChannel::try_from(mr.release_type) else {
+                            tracing::error!(
+                                "Invalid ModChannel in database for modrinth entry {}: {}",
+                                mid.as_ref().unwrap(),
+                                mr.release_type
+                            );
+                            return false;
+                        };
+
+                        !mod_sources
+                            .platform_blacklist
+                            .contains(&ModPlatform::Modrinth)
+                            && has_update_for_paths(channel, &split_paths(&mr.update_paths))
+                    })
+                    .unwrap_or(false);
+
                 domain::Mod {
                     id: m.id,
                     filename: m.filename,
                     enabled: m.enabled,
                     metadata: m.metadata.as_ref().map(|m| domain::ModFileMetadata {
+                        id: m.id.clone(),
                         modid: m.modid.clone(),
                         name: m.name.clone(),
                         version: m.version.clone(),
@@ -157,24 +196,6 @@ impl ManagerRef<'_, InstanceManager> {
                             .flatten()
                             .is_some(),
                     }),
-                    has_curseforge_update: cf
-                        .as_ref()
-                        .map(|cf| {
-                            let Ok(channel) = ModChannel::try_from(cf.release_type) else {
-                                tracing::error!(
-                                    "Invalid ModChannel in database for curseforge entry {}: {}",
-                                    mid.as_ref().unwrap(),
-                                    cf.release_type
-                                );
-                                return false;
-                            };
-
-                            !mod_sources
-                                .platform_blacklist
-                                .contains(&ModPlatform::Curseforge)
-                                && has_update_for_paths(channel, &split_paths(&cf.update_paths))
-                        })
-                        .unwrap_or(false),
                     curseforge: cf.map(|m| domain::CurseForgeModMetadata {
                         project_id: m.project_id as u32,
                         file_id: m.file_id as u32,
@@ -190,24 +211,6 @@ impl ManagerRef<'_, InstanceManager> {
                             .flatten()
                             .is_some(),
                     }),
-                    has_modrinth_update: mr
-                        .as_ref()
-                        .map(|mr| {
-                            let Ok(channel) = ModChannel::try_from(mr.release_type) else {
-                                tracing::error!(
-                                    "Invalid ModChannel in database for modrinth entry {}: {}",
-                                    mid.as_ref().unwrap(),
-                                    mr.release_type
-                                );
-                                return false;
-                            };
-
-                            !mod_sources
-                                .platform_blacklist
-                                .contains(&ModPlatform::Modrinth)
-                                && has_update_for_paths(channel, &split_paths(&mr.update_paths))
-                        })
-                        .unwrap_or(false),
                     modrinth: m.metadata.and_then(|m| m.modrinth).flatten().map(|m| {
                         domain::ModrinthModMetadata {
                             project_id: m.project_id,
@@ -225,6 +228,7 @@ impl ManagerRef<'_, InstanceManager> {
                                 .is_some(),
                         }
                     }),
+                    has_update: has_curseforge_update || has_modrinth_update,
                 }
             });
 
@@ -563,14 +567,12 @@ impl ManagerRef<'_, InstanceManager> {
         Ok(task_id)
     }
 
-    /// Attempt to update a mod respecting the instance's (and the global) channel preference.
-    pub async fn update_mod(
+    /// Attempt to find an update for a mod respecting the instance's (and the global) channel preference.
+    pub async fn find_mod_update(
         self,
         instance_id: InstanceId,
         id: String,
-    ) -> anyhow::Result<VisualTaskId> {
-        self.ensure_modpack_not_locked(instance_id).await?;
-
+    ) -> anyhow::Result<Option<RemoteVersion>> {
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
@@ -611,11 +613,6 @@ impl ManagerRef<'_, InstanceManager> {
         let mr = metadata
             .modrinth
             .expect("modrinth metadata was queried but not returned");
-
-        enum RemoteVersion {
-            Curseforge(curseforge::File),
-            Modrinth(modrinth::version::Version),
-        }
 
         impl RemoteVersion {
             fn date(&self) -> DateTime<Utc> {
@@ -716,23 +713,13 @@ impl ManagerRef<'_, InstanceManager> {
                 if version.channel() >= channel.channel {
                     let version = versions.remove(i);
 
-                    match version {
+                    match &version {
                         RemoteVersion::Curseforge(file) => {
                             let cf = cf.expect("curseforge metadata must be present if operating on a curseforge version");
 
                             if cf.file_id == file.id {
                                 break 'select;
                             }
-
-                            return self
-                                .install_curseforge_mod(
-                                    instance_id,
-                                    file.mod_id as u32,
-                                    file.id as u32,
-                                    false,
-                                    Some(id),
-                                )
-                                .await;
                         }
                         RemoteVersion::Modrinth(version) => {
                             let mr = mr.expect("modrinth metadata must be present if operating on a modrinth version");
@@ -740,25 +727,51 @@ impl ManagerRef<'_, InstanceManager> {
                             if mr.version_id == version.id {
                                 break 'select;
                             }
-
-                            return self
-                                .install_modrinth_mod(
-                                    instance_id,
-                                    version.project_id,
-                                    version.id,
-                                    false,
-                                    Some(id),
-                                )
-                                .await;
                         }
                     }
+
+                    return Ok(Some(version));
                 }
             }
         }
 
-        Err(anyhow!(
-            "unable to find newer mod version in availible update channels"
-        ))
+        Ok(None)
+    }
+
+    pub async fn update_mod(
+        self,
+        instance_id: InstanceId,
+        id: String,
+    ) -> anyhow::Result<VisualTaskId> {
+        self.ensure_modpack_not_locked(instance_id).await?;
+
+        let update = self.find_mod_update(instance_id, id.clone()).await?;
+
+        match update {
+            Some(RemoteVersion::Curseforge(file)) => {
+                self.install_curseforge_mod(
+                    instance_id,
+                    file.mod_id as u32,
+                    file.id as u32,
+                    false,
+                    Some(id),
+                )
+                .await
+            }
+            Some(RemoteVersion::Modrinth(version)) => {
+                self.install_modrinth_mod(
+                    instance_id,
+                    version.project_id,
+                    version.id,
+                    false,
+                    Some(id),
+                )
+                .await
+            }
+            None => Err(anyhow!(
+                "unable to find newer mod version in availible update channels"
+            )),
+        }
     }
 
     pub async fn update_curseforge_mod(

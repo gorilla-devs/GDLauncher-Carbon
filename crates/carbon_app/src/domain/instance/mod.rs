@@ -88,12 +88,12 @@ pub struct Mod {
     pub metadata: Option<ModFileMetadata>,
     pub curseforge: Option<CurseForgeModMetadata>,
     pub modrinth: Option<ModrinthModMetadata>,
-    pub has_curseforge_update: bool,
-    pub has_modrinth_update: bool,
+    pub has_update: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ModFileMetadata {
+    pub id: String,
     pub modid: Option<String>,
     pub name: Option<String>,
     pub version: Option<String>,
