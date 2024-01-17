@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};
 
+use anyhow::anyhow;
 use itertools::Itertools;
 use tracing::{debug, error, trace, warn};
 
@@ -11,7 +12,7 @@ use crate::db::{
 use crate::domain::instance::info::ModLoaderType;
 use crate::domain::modplatforms::modrinth::project::ProjectVersionsFilters;
 use crate::domain::modplatforms::modrinth::responses::VersionsResponse;
-use crate::domain::modplatforms::modrinth::search::ProjectID;
+use crate::domain::modplatforms::modrinth::search::{ProjectID, VersionIDs};
 use crate::domain::modplatforms::modrinth::version::Version;
 use crate::domain::modplatforms::ModChannel;
 use crate::{
@@ -43,7 +44,7 @@ impl ModplatformCacher for ModrinthModCacher {
         VersionHashesResponse,
         ProjectsResponse,
         Vec<TeamResponse>,
-        HashMap<String, Option<VersionsResponse>>,
+        Vec<Version>,
     );
 
     async fn query_platform(
@@ -137,26 +138,35 @@ impl ModplatformCacher for ModrinthModCacher {
                     .await?;
 
                 let mpm = app.modplatforms_manager();
-                let version_list_responses = futures::future::join_all(
-                    versions_response.0.iter().map(|(_, version)| async move {
-                        (
-                            version.id.clone(),
-                            mpm.modrinth
-                                .get_project_versions(ProjectVersionsFilters {
-                                    project_id: ProjectID(version.project_id.clone()),
-                                    game_versions: Some(version.game_versions.clone()),
-                                    loaders: Some(version.loaders.clone()),
-                                    limit: None,
-                                    offset: None,
-                                })
-                                .await
-                                .ok(),
-                        )
-                    }),
-                )
-                .await
-                .into_iter()
-                .collect::<HashMap<_, _>>();
+
+                let combined_versions_list = projects_response
+                    .iter()
+                    .map(|project| &project.versions)
+                    .flatten()
+                    .map(|v| v.clone())
+                    .collect::<Vec<_>>();
+
+                let mpm = app.modplatforms_manager();
+                let combined_version_futures = combined_versions_list
+                    .chunks(1000) // ~13 chars per version, 1000 worked fine at time of testing
+                    .map(|chunk| {
+                        mpm.modrinth.get_versions(VersionIDs {
+                            ids: chunk.to_vec(),
+                        })
+                    });
+
+                let combined_versions_response =
+                    futures::future::join_all(combined_version_futures)
+                        .await
+                        .into_iter()
+                        .fold(Ok::<_, anyhow::Error>(Vec::new()), |a, c| match (a, c) {
+                            (Ok(mut a), Ok(c)) => {
+                                a.extend(c.0);
+                                Ok(a)
+                            }
+                            (Err(e), _) => Err(anyhow!(e)),
+                            (_, Err(e)) => Err(anyhow!(e)),
+                        })?;
 
                 sender.send((
                     sha512_hashes,
@@ -164,7 +174,7 @@ impl ModplatformCacher for ModrinthModCacher {
                     versions_response,
                     projects_response,
                     teams_response,
-                    version_list_responses,
+                    combined_versions_response,
                 ));
             }
 
@@ -191,7 +201,7 @@ impl ModplatformCacher for ModrinthModCacher {
     async fn save_batch(
         app: &App,
         instance_id: InstanceId,
-        (sha512_hashes, batch, versions, projects, teams, version_lists): Self::SaveBundle,
+        (sha512_hashes, batch, versions, projects, teams, combined_versions): Self::SaveBundle,
     ) {
         trace!("processing modrinth mod batch for instance {instance_id}");
 
@@ -217,7 +227,7 @@ impl ModplatformCacher for ModrinthModCacher {
         );
         drop(ignored_hashes);
 
-        let version_lists = &version_lists;
+        let combined_versions = &combined_versions;
         let futures = batch.into_iter().filter_map(|(metadata_id, sha512)| {
             let sha512_match = matches.remove(&sha512);
             sha512_match.map(|(project, team, version)| async move {
@@ -238,8 +248,6 @@ impl ModplatformCacher for ModrinthModCacher {
                     })
                     .join(", ");
 
-                let version_list = version_lists.get(&version.id).map(Option::as_ref).flatten();
-
                 let r = cache_modrinth_meta_unchecked(
                     app,
                     metadata_id,
@@ -249,7 +257,7 @@ impl ModplatformCacher for ModrinthModCacher {
                     file.url.clone(),
                     project.clone(),
                     authors,
-                    version_list,
+                    &combined_versions[..],
                 )
                 .await;
 
@@ -404,7 +412,7 @@ async fn cache_modrinth_meta_unchecked(
     file_url: String,
     project: Project,
     authors: String,
-    version_list: Option<&VersionsResponse>,
+    versions: &[Version],
 ) -> anyhow::Result<()> {
     let prev = app
         .prisma_client
@@ -418,20 +426,28 @@ async fn cache_modrinth_meta_unchecked(
 
     let mut file_update_paths = HashSet::<(&str, ModLoaderType, ModChannel)>::new();
 
-    if let Some(versions) = &version_list {
-        for version in &versions.0 {
-            if version.id == version.id {
-                break;
-            }
+    for other_version in versions {
+        if other_version.project_id != project.id
+            || other_version.id == version.id
+            || !version
+                .game_versions
+                .iter()
+                .any(|v| other_version.game_versions.contains(v))
+            || !version
+                .loaders
+                .iter()
+                .any(|l| other_version.loaders.contains(l))
+        {
+            break;
+        }
 
-            for game_version in &version.game_versions {
-                for loader in &version.loaders {
-                    let Ok(loader) = ModLoaderType::try_from(loader as &str) else {
-                        continue;
-                    };
+        for game_version in &other_version.game_versions {
+            for loader in &other_version.loaders {
+                let Ok(loader) = ModLoaderType::try_from(loader as &str) else {
+                    continue;
+                };
 
-                    file_update_paths.insert((game_version, loader, version.version_type.into()));
-                }
+                file_update_paths.insert((game_version, loader, other_version.version_type.into()));
             }
         }
     }
@@ -446,7 +462,6 @@ async fn cache_modrinth_meta_unchecked(
             )
         })
         .join(";");
-    dbg!(&update_paths);
 
     let o_insert_mrmeta = app.prisma_client.modrinth_mod_cache().create(
         sha512.clone(),
