@@ -139,7 +139,8 @@ impl ModplatformCacher for ModrinthModCacher {
 
                 let mpm = app.modplatforms_manager();
 
-                let combined_versions_list = projects_response.iter()
+                let combined_versions_list = projects_response
+                    .iter()
                     .map(|project| &project.versions)
                     .flatten()
                     .map(|v| v.clone())
@@ -149,22 +150,23 @@ impl ModplatformCacher for ModrinthModCacher {
                 let combined_version_futures = combined_versions_list
                     .chunks(1000) // ~13 chars per version, 1000 worked fine at time of testing
                     .map(|chunk| {
-                        mpm.modrinth
-                            .get_versions(VersionIDs {
-                                ids: chunk.to_vec(),
-                            })
+                        mpm.modrinth.get_versions(VersionIDs {
+                            ids: chunk.to_vec(),
+                        })
                     });
 
-                let combined_versions_response = futures::future::join_all(combined_version_futures).await
-                    .into_iter()
-                    .fold(Ok::<_, anyhow::Error>(Vec::new()), |a, c| match (a, c) {
-                        (Ok(mut a), Ok(c)) => {
-                            a.extend(c.0);
-                            Ok(a)
-                        },
-                        (Err(e), _) => Err(anyhow!(e)),
-                        (_, Err(e)) => Err(anyhow!(e)),
-                    })?;
+                let combined_versions_response =
+                    futures::future::join_all(combined_version_futures)
+                        .await
+                        .into_iter()
+                        .fold(Ok::<_, anyhow::Error>(Vec::new()), |a, c| match (a, c) {
+                            (Ok(mut a), Ok(c)) => {
+                                a.extend(c.0);
+                                Ok(a)
+                            }
+                            (Err(e), _) => Err(anyhow!(e)),
+                            (_, Err(e)) => Err(anyhow!(e)),
+                        })?;
 
                 sender.send((
                     sha512_hashes,
@@ -427,11 +429,17 @@ async fn cache_modrinth_meta_unchecked(
     for other_version in versions {
         if other_version.project_id != project.id
             || other_version.id == version.id
-            || !version.game_versions.iter().any(|v| other_version.game_versions.contains(v))
-            || !version.loaders.iter().any(|l| other_version.loaders.contains(l))
-            {
-                break;
-            }
+            || !version
+                .game_versions
+                .iter()
+                .any(|v| other_version.game_versions.contains(v))
+            || !version
+                .loaders
+                .iter()
+                .any(|l| other_version.loaders.contains(l))
+        {
+            break;
+        }
 
         for game_version in &other_version.game_versions {
             for loader in &other_version.loaders {
