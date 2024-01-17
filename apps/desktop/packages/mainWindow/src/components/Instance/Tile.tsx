@@ -493,7 +493,7 @@ const Tile = (props: Props) => {
                 {props.instance.name}
               </h4>
               <div class="flex text-darkSlate-50">
-                <span class="flex gap-2">
+                <span class="flex gap-2 items-center">
                   <Show when={props.modloader}>
                     <img
                       class="w-4 h-4"
@@ -502,8 +502,9 @@ const Tile = (props: Props) => {
                       )}
                     />
                   </Show>
+                  <p class="m-0">{props.version}</p>
                 </span>
-                <p class="m-0">{props.version}</p>
+
                 <Show when={props.isLoading}>
                   <div class="m-0 flex gap-2">
                     <div class="i-clarity:download-line text-green-500"></div>
