@@ -414,7 +414,17 @@ const Tile = (props: Props) => {
             <Show when={props.failError}>
               <div class="i-ri:alert-fill text-red-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
             </Show>
-            <div class="absolute ease-in-out duration-100 top-0 left-0 bottom-0 right-0 transition opacity-10 hover:bg-primary-800" />
+            <div
+              class="absolute ease-in-out duration-100 top-0 left-0 bottom-0 right-0 transition opacity-10"
+              classList={{
+                "hover:bg-primary-800":
+                  !props.isLoading &&
+                  !isInQueue() &&
+                  !props.isInvalid &&
+                  !props.failError &&
+                  !props.isRunning
+              }}
+            />
 
             <Show when={props.selected && !props.isLoading}>
               <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-primary-800" />
@@ -461,14 +471,15 @@ const Tile = (props: Props) => {
               />
             </Show>
             <div
-              class="bg-cover bg-center h-10 rounded-lg w-10 group-hover:opacity-20"
+              class="bg-cover bg-center h-10 rounded-lg w-10"
               style={{
                 "background-image": props.img
                   ? `url("${props.img as string}")`
                   : `url("${DefaultImg}")`
               }}
               classList={{
-                grayscale: props.isLoading
+                grayscale: props.isLoading,
+                "group-hover:opacity-20": !props.isLoading
               }}
             />
             <div class="flex flex-col">
