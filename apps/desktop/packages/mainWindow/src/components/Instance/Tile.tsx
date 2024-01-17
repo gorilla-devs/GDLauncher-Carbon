@@ -480,7 +480,8 @@ const Tile = (props: Props) => {
               classList={{
                 grayscale: props.isLoading,
                 "group-hover:opacity-50 group-hover:blur-[1.5px] transition ease-in-out duration-150":
-                  !props.isLoading
+                  !props.isLoading && !props.isRunning,
+                "opacity-50 blur-[1.5px]": props.isRunning
               }}
             />
             <div class="flex flex-col">
