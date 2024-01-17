@@ -8,6 +8,7 @@ import { JSX, createContext, createSignal, useContext } from "solid-js";
 
 type NavigateOptions = {
   getLastInstance?: boolean;
+  replace?: boolean;
 };
 
 type Context = (_path: string | number, _options?: NavigateOptions) => void;
@@ -34,7 +35,7 @@ export const NavigationManager = (props: { children: JSX.Element }) => {
       navigate(route);
     } else {
       setLastPathVisited(path);
-      navigate(path);
+      navigate(path, { replace: options?.replace });
     }
   };
 
