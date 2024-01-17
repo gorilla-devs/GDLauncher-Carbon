@@ -479,7 +479,7 @@ const Tile = (props: Props) => {
               }}
               classList={{
                 grayscale: props.isLoading,
-                "group-hover:opacity-20 group-hover:blur-[1.5px]":
+                "group-hover:opacity-50 group-hover:blur-[1.5px] transition ease-in-out duration-150":
                   !props.isLoading
               }}
             />
@@ -581,7 +581,7 @@ const Tile = (props: Props) => {
                 }}
               >
                 <div
-                  class="text-white text-lg"
+                  class="text-white text-lg transition-all duration-100 ease-in-out"
                   classList={{
                     "i-ri:play-fill": !props.isRunning,
                     "i-ri:stop-fill": props.isRunning
