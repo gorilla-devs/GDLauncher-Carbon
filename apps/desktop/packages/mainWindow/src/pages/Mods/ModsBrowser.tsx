@@ -174,7 +174,7 @@ const ModsBrowser = () => {
             <div class="flex flex-col bg-darkSlate-800 top-0 z-10 sticky left-0 right-0">
               <Show when={instanceDetails.data}>
                 <div
-                  class="border-1 border-solid h-10 mb-4 rounded-lg overflow-hidden box-border flex items-center justify-between border-darkSlate-500 relative p-2"
+                  class="border-1 border-solid h-10 mb-4 rounded-lg overflow-hidden box-border flex items-center justify-between border-darkSlate-500 relative"
                   style={{
                     "background-image": imageResource()
                       ? `url("${imageResource()}")`
