@@ -137,12 +137,12 @@ const Overview = () => {
             routeData.modpackInfo.data
           }
         >
-          <div class="relative flex p-5 rounded-xl box-border bg-darkSlate-700 w-full flex-1 min-h-23 h-max overflow-hidden min-w-max">
+          <div class="relative flex p-5 rounded-xl box-border bg-darkSlate-700 w-full min-h-23 h-max overflow-hidden">
             <FadedBanner
               imageUrl={`http://localhost:${port}/instance/modpackIcon?instance_id=${params.id}`}
             >
               <div class="flex flex-col justify-between items-start w-full z-10 gap-6 2xl:flex-row 2xl:items-center 2xl:gap-14">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-1">
                   <img
                     class="h-13 w-13 rounded-lg"
                     src={`http://localhost:${port}/instance/modpackIcon?instance_id=${params.id}`}
@@ -160,7 +160,9 @@ const Overview = () => {
                       </div>
                       <div class="flex items-center gap-2">
                         <div class="w-3 h-3 i-ri:file-fill" />
-                        <div>{routeData.modpackInfo.data?.version_name}</div>
+                        <div class="truncate whitespace-break-spaces">
+                          {routeData.modpackInfo.data?.version_name}
+                        </div>
                       </div>
                     </div>
                   </div>
