@@ -113,6 +113,7 @@ mirror_into!(ModSources, domain::ModSources, |value| Self {
 });
 
 #[derive(Type, Debug, Serialize)]
+#[serde(tag = "platform")]
 pub enum RemoteVersion {
     Curseforge(CFFEFile),
     Modrinth(MRFEVersion),

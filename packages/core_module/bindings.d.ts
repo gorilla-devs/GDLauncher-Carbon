@@ -345,7 +345,7 @@ export type LatestModSource = { Curseforge: number } | { Modrinth: string }
 
 export type MRFEProjectIDs = string[]
 
-export type RemoteVersion = { Curseforge: CFFEFile } | { Modrinth: MRFEVersion }
+export type RemoteVersion = ({ platform: "Curseforge" } & CFFEFile) | ({ platform: "Modrinth" } & MRFEVersion)
 
 export type FEModdedManifestVersion = { id: string; stable: boolean; loaders: FEModdedManifestLoaderVersion[] }
 
