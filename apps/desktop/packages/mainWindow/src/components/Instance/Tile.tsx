@@ -507,7 +507,9 @@ const Tile = (props: Props) => {
                 <Show when={props.isLoading}>
                   <div class="m-0 flex gap-2">
                     <div class="i-clarity:download-line text-green-500"></div>
-                    <span>{Math.round(props.percentage as number)}%</span>
+                    <span class="font-bold">
+                      {Math.round(props.percentage as number)}%
+                    </span>
                     <span>
                       {Math.round(props.downloaded || 0)}MB/
                       {Math.round(props.totalDownload || 0)}MB
