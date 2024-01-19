@@ -274,13 +274,7 @@ const Mod = (props: Props) => {
           </div>
         </div>
         <span class="flex gap-4 justify-center items-center">
-          <Show
-            when={
-              (props.mod.has_curseforge_update ||
-                props.mod.has_modrinth_update) &&
-              props.isInstanceLocked
-            }
-          >
+          <Show when={props.mod.has_update && props.isInstanceLocked}>
             <Tooltip
               content={<Trans key="instance.locked_cannot_apply_changes" />}
               placement="top"
@@ -289,13 +283,7 @@ const Mod = (props: Props) => {
               <i class="w-5 h-5 text-darkSlate-500 i-ri:download-2-fill" />
             </Tooltip>
           </Show>
-          <Show
-            when={
-              (props.mod.has_curseforge_update ||
-                props.mod.has_modrinth_update) &&
-              !props.isInstanceLocked
-            }
-          >
+          <Show when={props.mod.has_update && !props.isInstanceLocked}>
             <i
               class="w-5 h-5"
               classList={{
@@ -438,6 +426,12 @@ const Mod = (props: Props) => {
                     <Show when={props.mod.metadata}>
                       <div class="text-xl text-white mt-4">
                         <Trans key="instance.local_metadata" />
+                      </div>
+                      <div class="flex justify-between w-full text-sm">
+                        <div class="w-50">
+                          <Trans key="instance.metadata_id" />
+                        </div>
+                        <CopiableEntity text={props.mod.metadata?.id} />
                       </div>
                       <div class="flex justify-between w-full text-sm">
                         <div class="w-50">

@@ -202,6 +202,7 @@
   "instance.file_name": "File name:",
   "instance.local_metadata": "Local Metadata",
   "instance.metadata_name": "Name:",
+  "instance.metadata_id": "Id:",
   "instance.metadata_version": "Version:",
   "instance.metadata_sha_1": "Sha-1:",
   "instance.metadata_sha_512": "Sha-512:",
