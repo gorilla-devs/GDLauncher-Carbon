@@ -24,11 +24,13 @@ import { InstancesStore, isListInstanceValid } from "@/utils/instances";
 import InstanceTile from "../InstanceTile";
 import skull from "/assets/images/icons/skull.png";
 import { CFFEModLoaderType } from "@gd/core_module/bindings";
+import { queryClient } from "@/utils/rspcClient";
 
 const Sidebar = () => {
   const location = useLocation();
   const [t] = useTransContext();
-
+  const cache = queryClient.getQueryCache();
+  const queryState = cache.find(["instance.getInstancesUngrouped"]);
   const instanceId = () => getInstanceIdFromPath(location.pathname);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const [instances, setInstances] = createStore<InstancesStore>({});
@@ -87,7 +89,7 @@ const Sidebar = () => {
     );
   };
   createEffect(() => {
-    console.log(routeData.instancesUngrouped.data);
+    console.log("here the cache", queryState);
   });
   return (
     <SiderbarWrapper noPadding>
