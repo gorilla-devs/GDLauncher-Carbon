@@ -334,6 +334,7 @@
   "app_update.join_our_discord": "MacOS builds are not digitally signed yet. This means that it is not able to auto update. Please join our discord to access the link to the new version",
   "app_update.discord_link": "Discord Link",
   "app_update.download": "Download",
+  "app_update.downloading": "Downloading... ({{progress}}%)",
   "app_update.apply_and_restart": "Apply And Restart",
   "app_update.current_version": "Current Version",
   "app_update.available_version": "Available Version",
