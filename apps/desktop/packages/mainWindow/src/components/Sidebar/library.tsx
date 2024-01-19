@@ -86,7 +86,9 @@ const Sidebar = () => {
       </Switch>
     );
   };
-
+  createEffect(() => {
+    console.log(routeData.instancesUngrouped.data);
+  });
   return (
     <SiderbarWrapper noPadding>
       <div class="h-full w-full box-border transition-all flex flex-col gap-2 pt-5 pb-5">
@@ -140,9 +142,13 @@ const Sidebar = () => {
                   <Suspense
                     fallback={
                       isSidebarOpened() ? (
-                        <Skeleton.sidebarInstance />
+                        <Show when={routeData.instancesUngrouped.isLoading}>
+                          <Skeleton.sidebarInstance />
+                        </Show>
                       ) : (
-                        <Skeleton.sidebarInstanceSmall />
+                        <Show when={routeData.instancesUngrouped.isLoading}>
+                          <Skeleton.sidebarInstanceSmall />
+                        </Show>
                       )
                     }
                   >
@@ -171,9 +177,13 @@ const Sidebar = () => {
                     <Suspense
                       fallback={
                         isSidebarOpened() ? (
-                          <Skeleton.sidebarInstance />
+                          <Show when={routeData.instancesUngrouped.isLoading}>
+                            <Skeleton.sidebarInstance />
+                          </Show>
                         ) : (
-                          <Skeleton.sidebarInstanceSmall />
+                          <Show when={routeData.instancesUngrouped.isLoading}>
+                            <Skeleton.sidebarInstanceSmall />
+                          </Show>
                         )
                       }
                     >
