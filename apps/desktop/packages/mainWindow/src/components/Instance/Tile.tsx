@@ -490,15 +490,15 @@ const Tile = (props: Props) => {
               }}
             />
             <div class="flex flex-col">
-              <h4
-                class="m-0 text-ellipsis text-ellipsis overflow-hidden max-w-38 max-h-9"
+              <div
+                class="m-0 font-bold text-sm text-ellipsis text-ellipsis overflow-hidden max-w-38 max-h-9"
                 // classList={{
                 //   "text-darkSlate-50": mergedProps.isLoading,
                 //   "text-white": !mergedProps.isLoading
                 // }}
               >
                 {props.instance.name}
-              </h4>
+              </div>
               <div class="flex text-darkSlate-50">
                 <span class="flex gap-2 items-center">
                   <Show when={props.modloader}>
