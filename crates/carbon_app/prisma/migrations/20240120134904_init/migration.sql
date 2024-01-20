@@ -55,6 +55,7 @@ CREATE TABLE "Account" (
     "accessToken" TEXT,
     "tokenExpires" DATETIME,
     "msRefreshToken" TEXT,
+    "idToken" TEXT,
     "lastUsed" DATETIME NOT NULL,
     "skinId" TEXT
 );

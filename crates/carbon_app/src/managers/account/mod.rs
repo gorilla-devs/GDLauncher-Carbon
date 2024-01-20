@@ -215,11 +215,13 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     access_token,
                     refresh_token,
                     token_expires,
+                    id_token,
                     skin_id,
                 } => set_params.extend([
                     SetParam::SetAccessToken(Some(access_token)),
                     SetParam::SetMsRefreshToken(refresh_token),
                     SetParam::SetTokenExpires(Some(token_expires)),
+                    SetParam::SetIdToken(id_token),
                     SetParam::SetSkinId(skin_id),
                 ]),
             }
@@ -245,11 +247,13 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     access_token,
                     refresh_token,
                     token_expires,
+                    id_token,
                     skin_id,
                 } => vec![
                     SetParam::SetAccessToken(Some(access_token)),
                     SetParam::SetMsRefreshToken(refresh_token),
                     SetParam::SetTokenExpires(Some(token_expires)),
+                    SetParam::SetIdToken(id_token),
                     SetParam::SetSkinId(skin_id),
                 ],
             };
@@ -350,6 +354,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                             type_: FullAccountType::Microsoft {
                                 access_token: access_token.clone(),
                                 refresh_token: None,
+                                id_token: None,
                                 token_expires: token_expires.clone(),
                                 skin_id: skin_id.clone(),
                             },
@@ -810,6 +815,7 @@ pub enum FullAccountType {
     Microsoft {
         access_token: String,
         refresh_token: Option<String>,
+        id_token: Option<String>,
         token_expires: DateTime<FixedOffset>,
         skin_id: Option<String>,
     },
@@ -846,6 +852,7 @@ impl TryFrom<db::account::Data> for FullAccount {
                 Some(access_token) => FullAccountType::Microsoft {
                     access_token,
                     refresh_token: value.ms_refresh_token,
+                    id_token: value.id_token,
                     token_expires: value.token_expires.ok_or_else(|| {
                         FullAccountLoadError::MissingExpiration(value.uuid.clone())
                     })?,
@@ -880,11 +887,13 @@ impl From<FullAccount> for AccountWithStatus {
                 FullAccountType::Microsoft {
                     refresh_token: None,
                     ..
-                } => AccountStatus::Invalid,
+                }
+                | FullAccountType::Microsoft { id_token: None, .. } => AccountStatus::Invalid,
                 FullAccountType::Microsoft {
                     access_token,
                     token_expires,
                     refresh_token: Some(_),
+                    id_token: Some(_),
                     skin_id: _,
                 } => match Utc::now() > DateTime::<Utc>::from(token_expires) {
                     true => AccountStatus::Expired,
@@ -906,6 +915,7 @@ impl From<api::FullAccount> for FullAccount {
             type_: FullAccountType::Microsoft {
                 access_token: value.mc.auth.access_token,
                 refresh_token: Some(value.ms.refresh_token),
+                id_token: Some(value.ms.id_token),
                 token_expires: DateTime::<FixedOffset>::from(value.mc.auth.expires_at),
                 skin_id: value.mc.profile.skin.map(|skin| skin.id),
             },
