@@ -61,9 +61,7 @@ const Mods = () => {
         name: "modsUpdater"
       },
       {
-        mods: routeData.instanceMods.filter(
-          (mod) => mod.has_curseforge_update || mod.has_modrinth_update
-        ),
+        mods: routeData.instanceMods.filter((mod) => mod.has_update),
         instanceId: parseInt(params.id, 10)
       }
     );
@@ -75,9 +73,7 @@ const Mods = () => {
         name: "modsUpdater"
       },
       {
-        mods: selectedMods().filter(
-          (mod) => mod.has_curseforge_update || mod.has_modrinth_update
-        ),
+        mods: selectedMods().filter((mod) => mod.has_update),
         instanceId: parseInt(params.id, 10)
       }
     );
@@ -222,11 +218,7 @@ const Mods = () => {
             </div>
           </Show>
           <Show
-            when={
-              selectedMods().filter(
-                (mod) => mod.has_curseforge_update || mod.has_modrinth_update
-              ).length > 0
-            }
+            when={selectedMods().filter((mod) => mod.has_update).length > 0}
           >
             <Show when={isInstanceLocked()}>
               <Tooltip
@@ -338,9 +330,8 @@ const Mods = () => {
 
             <Show
               when={
-                routeData.instanceMods?.filter(
-                  (mod) => mod.has_curseforge_update || mod.has_modrinth_update
-                ).length > 0
+                routeData.instanceMods?.filter((mod) => mod.has_update).length >
+                0
               }
             >
               <Tooltip
@@ -402,7 +393,9 @@ const Mods = () => {
           fallback={<NoMods />}
         >
           <For
-            each={(filteredMods() || []).sort(sortAlphabetically) as Modtype[]}
+            each={
+              [...(filteredMods() || [])].sort(sortAlphabetically) as Modtype[]
+            }
           >
             {(mod) => (
               <Mod

@@ -197,6 +197,7 @@
   "addons_versions.hash": "Hash:",
   "addons_versions.status": "Status:",
   "addons_versions.release_type": "Release type:",
+  "instance.update_available_from": "Update available from {{platform}}",
   "instance.mods_technical_info_for": "Technical info for \"<0>{{mod_name}}</0>\"",
   "instance.id": "Id:",
   "instance.file_name": "File name:",
