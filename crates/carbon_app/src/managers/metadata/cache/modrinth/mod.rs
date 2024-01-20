@@ -468,6 +468,7 @@ async fn cache_modrinth_meta_unchecked(
         project.id,
         version.id.clone(),
         project.title,
+        version.name.clone(),
         project.slug,
         project.description,
         authors,
