@@ -6,6 +6,8 @@ use std::{
     sync::atomic::{self, AtomicUsize},
 };
 
+use tokio::io::AsyncWriteExt;
+
 #[derive(Clone)]
 pub struct RuntimePath(PathBuf);
 
@@ -218,7 +220,11 @@ impl TempPath {
         data: impl AsRef<[u8]>,
     ) -> anyhow::Result<()> {
         let tmp = self.maketmpfile().await?;
-        tokio::fs::write(&*tmp, data).await?;
+
+        let mut fd = tokio::fs::File::create(&*tmp).await?;
+        fd.write_all(data.as_ref()).await?;
+        fd.sync_all().await?;
+
         tmp.rename(path).await?;
 
         Ok(())

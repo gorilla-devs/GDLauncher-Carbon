@@ -144,6 +144,7 @@ model CurseForgeModCache {
   projectId   Int
   fileId      Int
   name        String
+  version     String
   urlslug     String
   summary     String
   authors     String
@@ -162,6 +163,7 @@ model ModrinthModCache {
   projectId   String
   versionId   String
   title       String
+  version     String
   urlslug     String
   description String
   authors     String

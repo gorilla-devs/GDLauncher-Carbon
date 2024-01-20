@@ -97,6 +97,7 @@ keys! {
         INSTALL_MOD                                 = "installMod";
         INSTALL_LATEST_MOD                          = "installLatestMod";
         UPDATE_MOD                                  = "updateMod";
+        FIND_MOD_UPDATE                             = "findModUpdate";
         GET_MOD_SOURCES                             = "getModSources";
         GET_IMPORTABLE_ENTITIES                     = "getImportableEntities";
         GET_IMPORT_ENTITY_DEFAULT_PATH              = "getImportEntityDefaultPath";

@@ -55,7 +55,7 @@ const AppUpdate = (props: ModalProps) => {
               <Trans key={releaseChannelTransKey()} />
             </span>
           </div>
-          <hr class="w-full border-darkSlate-50 mt-4" />
+          <hr class="w-full mt-4 border-darkSlate-50" />
           <div class="flex items-center relative mt-4 justify-between divide-y divide-yellow-500/50">
             <div class="flex flex-col gap-4">
               <div class="font-bold text-left">
@@ -72,45 +72,37 @@ const AppUpdate = (props: ModalProps) => {
             </div>
           </div>
           <hr class="w-full border-darkSlate-50 mt-8" />
-          <Show when={updateProgress()}>
+          <Show when={Boolean(updateProgress())}>
             <Progressbar percentage={updateProgress()} />
           </Show>
           <div class="flex items-center justify-center flex-1 mb-4 mt-20">
-            <Switch>
-              <Match when={os()?.platform === "darwin"}>
-                <Button
-                  icon={
-                    <div class="text-lg cursor-pointer i-ri:external-link-line" />
-                  }
-                  iconRight
-                  onClick={() => {
-                    window.openExternalLink("https://discord.gdlauncher.com");
-                  }}
-                >
-                  <Trans key="app_update.discord_link" />
-                </Button>
-              </Match>
-              <Match when={os()?.platform !== "darwin"}>
-                <Button
-                  onClick={() => {
-                    if (updateDownloaded()) {
-                      window.installUpdate();
-                    } else {
-                      window.downloadUpdate();
-                    }
-                  }}
-                >
-                  <Switch>
-                    <Match when={!updateDownloaded()}>
-                      <Trans key="app_update.download" />
-                    </Match>
-                    <Match when={updateDownloaded()}>
-                      <Trans key="app_update.apply_and_restart" />
-                    </Match>
-                  </Switch>
-                </Button>
-              </Match>
-            </Switch>
+            <Button
+              onClick={() => {
+                if (updateDownloaded()) {
+                  window.installUpdate();
+                } else if (updateAvailable() && !updateProgress()) {
+                  window.downloadUpdate();
+                }
+              }}
+              disabled={!updateDownloaded() || Boolean(updateProgress())}
+            >
+              <Switch>
+                <Match when={Boolean(updateProgress())}>
+                  <Trans
+                    key="app_update.downloading"
+                    options={{
+                      progress: updateProgress()
+                    }}
+                  />
+                </Match>
+                <Match when={updateDownloaded()}>
+                  <Trans key="app_update.apply_and_restart" />
+                </Match>
+                <Match when={updateAvailable()}>
+                  <Trans key="app_update.download" />
+                </Match>
+              </Switch>
+            </Button>
           </div>
         </div>
       </Show>
