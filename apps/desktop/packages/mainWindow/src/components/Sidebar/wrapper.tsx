@@ -29,7 +29,7 @@ const SiderbarWrapper = (props: Props) => {
   return (
     <div
       style={{
-        width: isSidebarOpened() || !mergedProps.collapsable ? "18rem" : "5rem"
+        width: isSidebarOpened() || !mergedProps.collapsable ? "17rem" : "5rem"
       }}
       classList={{
         "p-5": !props.noPadding

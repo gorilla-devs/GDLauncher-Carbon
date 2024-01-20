@@ -91,7 +91,7 @@ const Sidebar = () => {
   });
   return (
     <SiderbarWrapper noPadding>
-      <div class="h-full w-full box-border transition-all flex flex-col gap-2 pt-5 pb-5">
+      <div class="h-full w-full box-border transition-all flex flex-col gap-2 px-5 pt-5 pb-5">
         <div class="px-3 max-w-[190px] mt-[calc(2.5rem-1.25rem)] mb-3">
           <Show
             when={isSidebarOpened()}

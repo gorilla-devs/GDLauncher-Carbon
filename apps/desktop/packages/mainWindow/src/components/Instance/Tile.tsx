@@ -213,7 +213,7 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "default"}>
         <ContextMenu menuItems={menuItems()}>
           <div
-            class="flex justify-center flex-col relative select-none group items-start z-50"
+            class="flex justify-center flex-col relative select-none group items-start"
             onClick={(e) => {
               e.stopPropagation();
               if (
@@ -420,9 +420,9 @@ const Tile = (props: Props) => {
               <div class="i-ri:alert-fill text-red-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
             </Show>
             <div
-              class="absolute ease-in-out duration-100 top-0 left-0 bottom-0 right-0 transition opacity-10"
+              class="absolute ease-in-out duration-100 top-0 left-0 bottom-0 right-0  transition opacity-10"
               classList={{
-                "hover:bg-primary-800":
+                "group-hover:bg-primary-800":
                   !props.isLoading &&
                   !isInQueue() &&
                   !props.isInvalid &&
@@ -441,7 +441,7 @@ const Tile = (props: Props) => {
             </Show>
 
             <div
-              class="rounded-full absolute flex justify-center items-center cursor-pointer duration-100 will-change-transform z-10 left-5 transition-transform h-7 w-7"
+              class="rounded-full absolute flex justify-center items-center  cursor-pointer duration-100 will-change-transform left-5 transition-transform  h-7 w-7 z-20"
               classList={{
                 "scale-0": !props.isRunning,
                 "scale-100": props.isRunning,
@@ -457,8 +457,8 @@ const Tile = (props: Props) => {
               <div
                 class="text-white"
                 classList={{
-                  "i-ri:play-fill text-2xl": !props.isRunning,
-                  "i-ri:stop-fill text-lg": props.isRunning
+                  "i-ri:play-fill text-2xl  ": !props.isRunning,
+                  "i-ri:stop-fill text-lg  ": props.isRunning
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -484,14 +484,14 @@ const Tile = (props: Props) => {
               }}
               classList={{
                 grayscale: props.isLoading,
-                "group-hover:opacity-50 group-hover:blur-[1.5px] transition ease-in-out duration-150":
+                "group-hover:opacity-50 group-hover:blur-[1.5px]  transition ease-in-out duration-150":
                   !props.isLoading && !props.isRunning,
                 "opacity-50 blur-[1.5px]": props.isRunning
               }}
             />
-            <div class="flex flex-col">
+            <div class="flex flex-col truncate">
               <h4
-                class="m-0 text-ellipsis text-ellipsis overflow-hidden max-w-38 max-h-9"
+                class="m-0 text-ellipsis text-ellipsis overflow-hidden max-w-38 max-h-9 text-sm"
                 // classList={{
                 //   "text-darkSlate-50": mergedProps.isLoading,
                 //   "text-white": !mergedProps.isLoading
@@ -509,16 +509,16 @@ const Tile = (props: Props) => {
                       )}
                     />
                   </Show>
-                  <p class="m-0">{props.version}</p>
+                  <p class="m-0 text-sm">{props.version}</p>
                 </span>
 
                 <Show when={props.isLoading}>
-                  <div class="m-0 flex gap-2">
+                  <div class="m-0 flex gap-1">
                     <div class="i-clarity:download-line text-green-500"></div>
-                    <span class="font-bold">
+                    <span class="font-bold text-sm">
                       {Math.round(props.percentage as number)}%
                     </span>
-                    <span>
+                    <span class="text-sm">
                       {Math.round(props.downloaded || 0)}MB/
                       {Math.round(props.totalDownload || 0)}MB
                     </span>
