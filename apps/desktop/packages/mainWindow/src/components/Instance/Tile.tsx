@@ -274,6 +274,7 @@ const Tile = (props: Props) => {
                       !props.failError &&
                       !props.isRunning
                   }}
+                  style={{ "pointer-events": "auto" }}
                   onClick={(e) => {
                     e.stopPropagation();
                     handlePlayClick();
