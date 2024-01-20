@@ -285,10 +285,6 @@ const Tile = (props: Props) => {
                       "i-ri:play-fill": !props.isRunning,
                       "i-ri:stop-fill text-xl": props.isRunning
                     }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePlayClick();
-                    }}
                   />
                 </div>
 
@@ -479,7 +475,7 @@ const Tile = (props: Props) => {
               />
             </Show>
             <div
-              class="bg-cover bg-center h-10 rounded-lg w-10"
+              class="bg-cover bg-center h-10 rounded-lg w-10 min-w-10 max-w-10"
               style={{
                 "background-image": props.img
                   ? `url("${props.img as string}")`
