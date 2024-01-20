@@ -1,6 +1,5 @@
 import { initNews } from "@/utils/news";
 import { rspc } from "@/utils/rspcClient";
-import { createSignal } from "solid-js";
 
 const fetchData = () => {
   const groups = rspc.createQuery(() => ["instance.getGroups"]);
