@@ -161,6 +161,11 @@ pub struct ModSources {
     pub platform_blacklist: Vec<ModPlatform>,
 }
 
+pub enum RemoteVersion {
+    Curseforge(curseforge::File),
+    Modrinth(modrinth::version::Version),
+}
+
 #[cfg(test)]
 mod test {
     use serde::{Deserialize, Serialize};
