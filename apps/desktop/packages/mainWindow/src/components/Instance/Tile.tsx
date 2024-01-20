@@ -196,10 +196,14 @@ const Tile = (props: Props) => {
   };
 
   const handlePlayClick = () => {
-    if (props.isPreparing) return;
+    if (props.isPreparing) {
+      return;
+    }
     if (props.isRunning) {
       killInstanceMutation.mutate(props.instance.id);
-    } else launchInstanceMutation.mutate(props.instance.id);
+    } else {
+      launchInstanceMutation.mutate(props.instance.id);
+    }
   };
 
   const isInQueue = () => props.isPreparing && !props.isLoading;
@@ -280,6 +284,10 @@ const Tile = (props: Props) => {
                     classList={{
                       "i-ri:play-fill": !props.isRunning,
                       "i-ri:stop-fill text-xl": props.isRunning
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePlayClick();
                     }}
                   />
                 </div>
