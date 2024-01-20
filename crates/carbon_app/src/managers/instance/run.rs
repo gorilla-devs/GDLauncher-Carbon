@@ -25,7 +25,7 @@ use crate::{
         ManagerRef,
     },
 };
-use anyhow::{anyhow, bail};
+use anyhow::{anyhow, bail, Context};
 use chrono::{DateTime, Local, Utc};
 use futures::Future;
 use itertools::Itertools;
@@ -484,7 +484,8 @@ impl ManagerRef<'_, InstanceManager> {
                     &version_info,
                     &app.minecraft_manager().meta_base_url,
                 )
-                .await?;
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Error getting lwjgl meta: {:?}", e))?;
 
                 t_request_version_info.update_items(2, 3);
 
@@ -593,7 +594,9 @@ impl ManagerRef<'_, InstanceManager> {
                                 anyhow::bail!("Forge version is empty");
                             }
 
-                            let forge_manifest = app.minecraft_manager().get_forge_manifest().await?;
+                            let forge_manifest = app.minecraft_manager().get_forge_manifest().await.with_context(
+                                || format!("Error getting forge manifest for version {}", version.release)
+                            )?;
 
                             let forge_version =
                                 match forge_version.strip_prefix(&format!("{}-", version.release)) {

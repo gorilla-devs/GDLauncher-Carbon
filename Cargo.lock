@@ -821,8 +821,8 @@ dependencies = [
 
 [[package]]
 name = "daedalus"
-version = "0.1.20"
-source = "git+https://github.com/gorilla-devs/daedalus?rev=5ab34fb44f5b37d0ac2df9e9dfdb12039cd3117e#5ab34fb44f5b37d0ac2df9e9dfdb12039cd3117e"
+version = "0.1.21"
+source = "git+https://github.com/gorilla-devs/daedalus?rev=dc73cbdcf06df0c5f5d2da33037234ad672b9cdd#dc73cbdcf06df0c5f5d2da33037234ad672b9cdd"
 dependencies = [
  "bytes",
  "chrono",
