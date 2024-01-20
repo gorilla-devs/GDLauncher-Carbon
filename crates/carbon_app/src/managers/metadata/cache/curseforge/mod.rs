@@ -424,6 +424,7 @@ async fn cache_curseforge_meta_unchecked(
         modinfo.id,
         fileinfo.id,
         modinfo.name.clone(),
+        fileinfo.display_name.clone(),
         modinfo.slug.clone(),
         modinfo.summary.clone(),
         modinfo.authors.iter().map(|a| &a.name).join(", "),

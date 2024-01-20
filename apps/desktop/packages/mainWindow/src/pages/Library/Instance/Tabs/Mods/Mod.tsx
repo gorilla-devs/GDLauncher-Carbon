@@ -1,18 +1,31 @@
 import { getInstanceIdFromPath } from "@/utils/routes";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { getCFModloaderIcon } from "@/utils/sidebar";
-import { Mod as ModType } from "@gd/core_module/bindings";
+import {
+  CFFEFile,
+  MRFEVersion,
+  Mod as ModType
+} from "@gd/core_module/bindings";
 import {
   Button,
   Checkbox,
   Popover,
+  Spinner,
   Switch,
   Tooltip,
   createNotification
 } from "@gd/ui";
 import { useLocation, useParams } from "@solidjs/router";
 import { SetStoreFunction, produce } from "solid-js/store";
-import { For, Show, createEffect, createSignal } from "solid-js";
+import {
+  For,
+  Match,
+  Switch as SolidSwitch,
+  Show,
+  Suspense,
+  createEffect,
+  createSignal
+} from "solid-js";
 import { getModImageUrl, getModpackPlatformIcon } from "@/utils/instances";
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg";
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg";
@@ -48,6 +61,47 @@ const CopiableEntity = (props: {
           <CopyIcon text={props.text} />
         </div>
       </Show>
+    </div>
+  );
+};
+
+const ModUpdateTooltip = (props: {
+  modId: string;
+  modName: string;
+  instanceId: number;
+}) => {
+  const updatePreview = rspc.createQuery(() => [
+    "instance.findModUpdate",
+    {
+      instance_id: props.instanceId,
+      mod_id: props.modId
+    }
+  ]);
+
+  return (
+    <div class="text-lightSlate-200 w-80 h-40 flex flex-col items-center gap-4">
+      <div class="text-lg mb-4">
+        <Trans
+          key="instance.update_available_from"
+          options={{
+            platform: updatePreview.data?.platform
+          }}
+        />
+      </div>
+      <Suspense fallback={<Spinner />}>
+        <div>
+          <div class="text-sm text-lightSlate-200">{props.modName}</div>
+        </div>
+        <div class="w-5 h-5 text-lightSlate-200 i-ri:arrow-down-s-line" />
+        <SolidSwitch>
+          <Match when={updatePreview.data?.platform === "Curseforge"}>
+            {(updatePreview.data as CFFEFile).displayName}
+          </Match>
+          <Match when={updatePreview.data?.platform === "Modrinth"}>
+            {(updatePreview.data as MRFEVersion).name}
+          </Match>
+        </SolidSwitch>
+      </Suspense>
     </div>
   );
 };
@@ -274,13 +328,7 @@ const Mod = (props: Props) => {
           </div>
         </div>
         <span class="flex gap-4 justify-center items-center">
-          <Show
-            when={
-              (props.mod.has_curseforge_update ||
-                props.mod.has_modrinth_update) &&
-              props.isInstanceLocked
-            }
-          >
+          <Show when={props.mod.has_update && props.isInstanceLocked}>
             <Tooltip
               content={<Trans key="instance.locked_cannot_apply_changes" />}
               placement="top"
@@ -289,29 +337,62 @@ const Mod = (props: Props) => {
               <i class="w-5 h-5 text-darkSlate-500 i-ri:download-2-fill" />
             </Tooltip>
           </Show>
-          <Show
-            when={
-              (props.mod.has_curseforge_update ||
-                props.mod.has_modrinth_update) &&
-              !props.isInstanceLocked
-            }
-          >
-            <i
-              class="w-5 h-5"
-              classList={{
-                "i-ri:download-2-fill text-darkSlate-500 hover:text-green-500":
-                  updateModTaskId() === null,
-                "i-ri:loader-4-line animate-spin text-green-500":
-                  updateModTaskId() !== null || updateModMutation.isLoading
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                updateModMutation.mutate({
-                  instance_id: parseInt(params.id, 10),
-                  mod_id: props.mod.id
-                });
-              }}
-            />
+          <Show when={props.mod.has_update && !props.isInstanceLocked}>
+            <Show
+              when={updateModTaskId() !== null || updateModMutation.isLoading}
+            >
+              <i
+                class="flex w-5 h-5"
+                classList={{
+                  "i-ri:download-2-fill text-darkSlate-500 hover:text-green-500":
+                    updateModTaskId() === null,
+                  "i-ri:loader-4-line animate-spin text-green-500":
+                    updateModTaskId() !== null || updateModMutation.isLoading
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  updateModMutation.mutate({
+                    instance_id: parseInt(params.id, 10),
+                    mod_id: props.mod.id
+                  });
+                }}
+              />
+            </Show>
+            <Show
+              when={updateModTaskId() === null && !updateModMutation.isLoading}
+            >
+              <Tooltip
+                content={
+                  <ModUpdateTooltip
+                    modId={props.mod.id}
+                    modName={
+                      props.mod.curseforge?.version ||
+                      props.mod.modrinth?.version ||
+                      props.mod.metadata?.version ||
+                      props.mod.filename
+                    }
+                    instanceId={parseInt(instanceId() as string, 10)}
+                  />
+                }
+              >
+                <i
+                  class="flex w-5 h-5"
+                  classList={{
+                    "i-ri:download-2-fill text-darkSlate-500 hover:text-green-500":
+                      updateModTaskId() === null,
+                    "i-ri:loader-4-line animate-spin text-green-500":
+                      updateModTaskId() !== null || updateModMutation.isLoading
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    updateModMutation.mutate({
+                      instance_id: parseInt(params.id, 10),
+                      mod_id: props.mod.id
+                    });
+                  }}
+                />
+              </Tooltip>
+            </Show>
             <Show when={updateModTaskId() !== null}>{updateModStatus()}</Show>
           </Show>
           <Show when={props.isInstanceLocked}>
@@ -438,6 +519,12 @@ const Mod = (props: Props) => {
                     <Show when={props.mod.metadata}>
                       <div class="text-xl text-white mt-4">
                         <Trans key="instance.local_metadata" />
+                      </div>
+                      <div class="flex justify-between w-full text-sm">
+                        <div class="w-50">
+                          <Trans key="instance.metadata_id" />
+                        </div>
+                        <CopiableEntity text={props.mod.metadata?.id} />
                       </div>
                       <div class="flex justify-between w-full text-sm">
                         <div class="w-50">

@@ -28,8 +28,6 @@ const VersionRow = (props: Props) => {
           }
         };
 
-    console.log(mod);
-
     installModMutation.mutate({
       mod_source: mod,
       instance_id: props.instanceId!,

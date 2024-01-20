@@ -490,7 +490,7 @@ const Tile = (props: Props) => {
               }}
             />
             <div class="flex flex-col truncate">
-              <h4
+              <div
                 class="m-0 text-ellipsis text-ellipsis overflow-hidden max-w-38 max-h-9 text-sm"
                 // classList={{
                 //   "text-darkSlate-50": mergedProps.isLoading,
@@ -498,7 +498,7 @@ const Tile = (props: Props) => {
                 // }}
               >
                 {props.instance.name}
-              </h4>
+              </div>
               <div class="flex text-darkSlate-50">
                 <span class="flex gap-2 items-center">
                   <Show when={props.modloader}>
