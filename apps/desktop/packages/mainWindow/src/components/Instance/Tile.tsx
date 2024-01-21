@@ -196,10 +196,14 @@ const Tile = (props: Props) => {
   };
 
   const handlePlayClick = () => {
-    if (props.isPreparing) return;
+    if (props.isPreparing) {
+      return;
+    }
     if (props.isRunning) {
       killInstanceMutation.mutate(props.instance.id);
-    } else launchInstanceMutation.mutate(props.instance.id);
+    } else {
+      launchInstanceMutation.mutate(props.instance.id);
+    }
   };
 
   const isInQueue = () => props.isPreparing && !props.isLoading;
@@ -209,7 +213,7 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "default"}>
         <ContextMenu menuItems={menuItems()}>
           <div
-            class="flex justify-center flex-col relative select-none group items-start z-50"
+            class="flex justify-center flex-col relative select-none group items-start"
             onClick={(e) => {
               e.stopPropagation();
               if (
@@ -270,6 +274,7 @@ const Tile = (props: Props) => {
                       !props.failError &&
                       !props.isRunning
                   }}
+                  style={{ "pointer-events": "auto" }}
                   onClick={(e) => {
                     e.stopPropagation();
                     handlePlayClick();
@@ -407,9 +412,6 @@ const Tile = (props: Props) => {
                 props?.onClick?.(e);
               }
             }}
-            classList={{
-              grayscale: props.isLoading || isInQueue()
-            }}
           >
             <Show when={props.isInvalid}>
               <div class="i-ri:alert-fill text-yellow-500 absolute top-1/2 -translate-y-1/2 z-10 text-2xl right-2" />
@@ -417,11 +419,21 @@ const Tile = (props: Props) => {
             <Show when={props.failError}>
               <div class="i-ri:alert-fill text-red-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
             </Show>
-            <div class="absolute ease-in-out duration-100 top-0 left-0 bottom-0 right-0 transition opacity-10 hover:bg-primary-500" />
+            <div
+              class="absolute ease-in-out duration-100 top-0 left-0 bottom-0 right-0  transition opacity-10"
+              classList={{
+                "group-hover:bg-primary-800":
+                  !props.isLoading &&
+                  !isInQueue() &&
+                  !props.isInvalid &&
+                  !props.failError &&
+                  !props.isRunning
+              }}
+            />
 
             <Show when={props.selected && !props.isLoading}>
-              <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-primary-500" />
-              <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
+              <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-primary-800" />
+              <div class="absolute left-0 top-0 bottom-0 bg-primary-500 w-1 rounded-r-md rounded-l-md" />
             </Show>
             <Show when={props.isRunning && !props.isLoading}>
               <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition" />
@@ -429,11 +441,11 @@ const Tile = (props: Props) => {
             </Show>
 
             <div
-              class="rounded-full absolute flex justify-center items-center cursor-pointer duration-100 will-change-transform right-5 transition-transform h-7 w-7"
+              class="rounded-full absolute flex justify-center items-center  cursor-pointer duration-100 will-change-transform left-5 transition-transform  h-7 w-7 z-20"
               classList={{
-                "bg-primary-500": !props.isRunning,
                 "scale-0": !props.isRunning,
-                "bg-red-500 scale-100": props.isRunning,
+                "scale-100": props.isRunning,
+
                 "group-hover:scale-100":
                   !props.isLoading &&
                   !isInQueue() &&
@@ -445,8 +457,8 @@ const Tile = (props: Props) => {
               <div
                 class="text-white"
                 classList={{
-                  "i-ri:play-fill text-lg": !props.isRunning,
-                  "i-ri:stop-fill text-md": props.isRunning
+                  "i-ri:play-fill text-2xl  ": !props.isRunning,
+                  "i-ri:stop-fill text-lg  ": props.isRunning
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -464,36 +476,31 @@ const Tile = (props: Props) => {
               />
             </Show>
             <div
-              class="bg-cover bg-center h-10 rounded-lg w-10"
+              class="bg-cover bg-center h-10 rounded-lg w-10 min-w-10 max-w-10"
               style={{
                 "background-image": props.img
                   ? `url("${props.img as string}")`
                   : `url("${DefaultImg}")`
               }}
               classList={{
-                grayscale: props.isLoading
+                grayscale: props.isLoading,
+                "group-hover:opacity-50 group-hover:blur-[1.5px]  transition ease-in-out duration-150":
+                  !props.isLoading && !props.isRunning,
+                "opacity-50 blur-[1.5px]": props.isRunning
               }}
             />
-            <div class="flex flex-col">
-              <h4
-                class="m-0 text-ellipsis text-ellipsis overflow-hidden max-w-38 max-h-9"
-                classList={{
-                  "text-darkSlate-50": mergedProps.isLoading,
-                  "text-white": !mergedProps.isLoading
-                }}
+            <div class="flex flex-col truncate">
+              <div
+                class="m-0 text-ellipsis text-ellipsis overflow-hidden max-w-38 max-h-9 text-sm"
+                // classList={{
+                //   "text-darkSlate-50": mergedProps.isLoading,
+                //   "text-white": !mergedProps.isLoading
+                // }}
               >
                 {props.instance.name}
-              </h4>
-              <div class="flex gap-2 text-darkSlate-50">
-                <span class="flex gap-2">
-                  <Show when={validInstance()?.modpack_platform}>
-                    <img
-                      class="w-4 h-4"
-                      src={getModpackPlatformIcon(
-                        validInstance()?.modpack_platform as ModpackPlatform
-                      )}
-                    />
-                  </Show>
+              </div>
+              <div class="flex text-darkSlate-50">
+                <span class="flex gap-2 items-center">
                   <Show when={props.modloader}>
                     <img
                       class="w-4 h-4"
@@ -502,11 +509,21 @@ const Tile = (props: Props) => {
                       )}
                     />
                   </Show>
-                  <Show when={props.modloader}>
-                    <p class="m-0">{props.modloader?.toString()}</p>
-                  </Show>
+                  <p class="m-0 text-sm">{props.version}</p>
                 </span>
-                <p class="m-0">{props.version}</p>
+
+                <Show when={props.isLoading}>
+                  <div class="m-0 flex gap-1">
+                    <div class="i-clarity:download-line text-green-500"></div>
+                    <span class="font-bold text-sm">
+                      {Math.round(props.percentage as number)}%
+                    </span>
+                    <span class="text-sm">
+                      {Math.round(props.downloaded || 0)}MB/
+                      {Math.round(props.totalDownload || 0)}MB
+                    </span>
+                  </div>
+                </Show>
               </div>
             </div>
           </div>
@@ -531,7 +548,7 @@ const Tile = (props: Props) => {
 
             <Show when={props.selected && !props.isLoading}>
               <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-primary-500" />
-              <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
+              <div class="absolute left-0 top-0 bottom-0 bg-primary-500 w-1 rounded-r-md rounded-l-md" />
             </Show>
             <Show when={props.isRunning && !props.isLoading}>
               <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition" />
@@ -570,7 +587,7 @@ const Tile = (props: Props) => {
                 }}
               >
                 <div
-                  class="text-white text-lg"
+                  class="text-white text-lg transition-all duration-100 ease-in-out"
                   classList={{
                     "i-ri:play-fill": !props.isRunning,
                     "i-ri:stop-fill": props.isRunning

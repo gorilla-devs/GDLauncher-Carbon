@@ -369,17 +369,23 @@ const Mods = () => {
               </Tooltip>
             </Show>
 
-            <div
-              class="flex items-center gap-2 cursor-pointer duration-100 ease-in-out transition hover:text-white text-darkSlate-50"
-              onClick={() => {
-                openFolderMutation.mutate({
-                  folder: "Mods",
-                  instance_id: parseInt(params.id, 10)
-                });
-              }}
+            <Tooltip
+              content={<Trans key="instance.open_mods_folder" />}
+              placement="top"
+              class="max-w-38 text-ellipsis overflow-hidden"
             >
-              <span class="text-2xl i-ri:folder-open-fill" />
-            </div>
+              <div
+                class="flex items-center gap-2 cursor-pointer duration-100 ease-in-out transition hover:text-white text-darkSlate-50"
+                onClick={() => {
+                  openFolderMutation.mutate({
+                    folder: "Mods",
+                    instance_id: parseInt(params.id, 10)
+                  });
+                }}
+              >
+                <span class="text-2xl i-ri:folder-open-fill" />
+              </div>
+            </Tooltip>
           </div>
         </div>
       </div>

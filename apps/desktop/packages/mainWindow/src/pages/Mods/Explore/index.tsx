@@ -279,7 +279,9 @@ const Modpack = () => {
                           {(page) => (
                             <Tab
                               onClick={() => {
-                                navigate(`${page.path}${location.search}`);
+                                navigate(`${page.path}${location.search}`, {
+                                  replace: true
+                                });
                               }}
                             >
                               {page.label}

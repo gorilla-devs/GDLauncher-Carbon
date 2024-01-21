@@ -338,19 +338,8 @@ const Mod = (props: Props) => {
             </Tooltip>
           </Show>
           <Show when={props.mod.has_update && !props.isInstanceLocked}>
-            <Tooltip
-              content={
-                <ModUpdateTooltip
-                  modId={props.mod.id}
-                  modName={
-                    props.mod.curseforge?.version ||
-                    props.mod.modrinth?.version ||
-                    props.mod.metadata?.version ||
-                    props.mod.filename
-                  }
-                  instanceId={parseInt(instanceId() as string, 10)}
-                />
-              }
+            <Show
+              when={updateModTaskId() !== null || updateModMutation.isLoading}
             >
               <i
                 class="flex w-5 h-5"
@@ -368,7 +357,42 @@ const Mod = (props: Props) => {
                   });
                 }}
               />
-            </Tooltip>
+            </Show>
+            <Show
+              when={updateModTaskId() === null && !updateModMutation.isLoading}
+            >
+              <Tooltip
+                content={
+                  <ModUpdateTooltip
+                    modId={props.mod.id}
+                    modName={
+                      props.mod.curseforge?.version ||
+                      props.mod.modrinth?.version ||
+                      props.mod.metadata?.version ||
+                      props.mod.filename
+                    }
+                    instanceId={parseInt(instanceId() as string, 10)}
+                  />
+                }
+              >
+                <i
+                  class="flex w-5 h-5"
+                  classList={{
+                    "i-ri:download-2-fill text-darkSlate-500 hover:text-green-500":
+                      updateModTaskId() === null,
+                    "i-ri:loader-4-line animate-spin text-green-500":
+                      updateModTaskId() !== null || updateModMutation.isLoading
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    updateModMutation.mutate({
+                      instance_id: parseInt(params.id, 10),
+                      mod_id: props.mod.id
+                    });
+                  }}
+                />
+              </Tooltip>
+            </Show>
             <Show when={updateModTaskId() !== null}>{updateModStatus()}</Show>
           </Show>
           <Show when={props.isInstanceLocked}>
