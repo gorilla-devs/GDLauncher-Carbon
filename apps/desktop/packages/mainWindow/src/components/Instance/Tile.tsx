@@ -263,10 +263,12 @@ const Tile = (props: Props) => {
                 <div
                   class="group flex justify-center items-center absolute rounded-full cursor-pointer ease-in-out duration-100 hidden transition-all h-12 w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
                   classList={{
+                    "scale-100 bg-red-500": props.isLoading,
                     "bg-primary-500 hover:bg-primary-400 text-2xl hover:text-3xl hover:drop-shadow-2xl":
                       !props.isRunning,
                     "scale-0": !props.isRunning,
                     "bg-red-500 scale-100": props.isRunning,
+
                     "group-hover:scale-100 group-hover:drop-shadow-xl":
                       !props.isLoading &&
                       !isInQueue() &&
@@ -283,6 +285,7 @@ const Tile = (props: Props) => {
                   <div
                     class="text-white"
                     classList={{
+                      "i-vaadin:spinner text-xl": props.isLoading,
                       "i-ri:play-fill": !props.isRunning,
                       "i-ri:stop-fill text-xl": props.isRunning
                     }}
@@ -401,7 +404,7 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "sidebar"}>
         <ContextMenu menuItems={menuItems()}>
           <div
-            class="group relative group select-none flex items-center w-full box-border cursor-pointer gap-4 px-3 h-14 erelative"
+            class="group relative group select-none flex items-center w-full box-border  cursor-pointer gap-4 px-6 h-14 erelative"
             onClick={(e) => {
               if (
                 !props.isLoading &&
