@@ -492,7 +492,7 @@ const Tile = (props: Props) => {
                 />
               </div>
               <Show when={props.isLoading}>
-                <div class="absolute top-2 left-2">
+                <div class="absolute top-3 left-[11px]">
                   <Spinner />
                 </div>
               </Show>
