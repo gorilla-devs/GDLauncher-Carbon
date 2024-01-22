@@ -1182,6 +1182,25 @@ impl ManagerRef<'_, InstanceManager> {
             .get_mut(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
+        let action_to_take = self
+            .app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .launcher_action_on_game_launch;
+
+        match &state {
+            LaunchState::Inactive { .. } => {
+                // println to stdout is used by the launcher to detect when the game is closed
+                println!("_INSTANCE_STATE_:GAME_CLOSED|{action_to_take}");
+            }
+            LaunchState::Preparing(_) => (),
+            LaunchState::Running(_) => {
+                // println to stdout is used by the launcher to detect when the game is closed
+                println!("_INSTANCE_STATE_:GAME_LAUNCHED|{action_to_take}");
+            }
+        };
+
         debug!("changing state of instance {instance_id} to {state:?}");
         instance.data_mut()?.state = state;
         self.app.invalidate(GET_INSTANCES_UNGROUPED, None);

@@ -108,6 +108,8 @@ export type ModpackInfo = { modpack: Modpack; locked: boolean }
 
 export type ExploreQuery = { instance_id: FEInstanceId; path: string[] }
 
+export type FESettingsUpdate = { theme?: string | null; language?: string | null; reducedMotion?: boolean | null; discordIntegration?: boolean | null; releaseChannel?: FEReleaseChannel | null; concurrentDownloads?: number | null; showNews?: boolean | null; xmx?: number | null; xms?: number | null; isFirstLaunch?: boolean | null; launcherActionOnGameLaunch?: FELauncherActionOnGameLaunch | null; startupResolution?: string | null; javaCustomArgs?: string | null; autoManageJava?: boolean | null; modSources?: ModSources | null; termsAndPrivacyAccepted?: boolean | null; metricsEnabled?: boolean | null }
+
 export type ExportTarget = "Curseforge" | "Modrinth"
 
 export type ConfigurationParseError = { type_: ConfigurationParseErrorType; message: string; line: number; config_text: string }
@@ -127,8 +129,6 @@ export type CFFESortableGameVersion = { gameVersionName: string; gameVersionPadd
 export type ExploreEntry = { name: string; type: ExploreEntryType }
 
 export type AccountStatus = "ok" | "expired" | "refreshing" | "invalid"
-
-export type FESettingsUpdate = { theme?: string | null; language?: string | null; reducedMotion?: boolean | null; discordIntegration?: boolean | null; releaseChannel?: FEReleaseChannel | null; concurrentDownloads?: number | null; showNews?: boolean | null; xmx?: number | null; xms?: number | null; isFirstLaunch?: boolean | null; startupResolution?: string | null; javaCustomArgs?: string | null; autoManageJava?: boolean | null; modSources?: ModSources | null; termsAndPrivacyAccepted?: boolean | null; metricsEnabled?: boolean | null }
 
 export type GameVersion = { Standard: StandardVersion }
 
@@ -407,6 +407,8 @@ export type CFFEModAuthor = { id: number; name: string; url: string }
 
 export type ValidListInstance = { mc_version: string | null; modloader: FEInstanceModloaderType | null; modpack_platform: ModpackPlatform | null; state: LaunchState }
 
+export type FELauncherActionOnGameLaunch = "quitApp" | "closeWindow" | "minimizeWindow" | "hideWindow" | "none"
+
 export type UpdateInstance = { instance: FEInstanceId; name?: Set<string> | null; use_loaded_icon?: Set<boolean> | null; notes?: Set<string> | null; version?: Set<string> | null; modloader?: Set<ModLoader | null> | null; global_java_args?: Set<boolean> | null; extra_java_args?: Set<string | null> | null; memory?: Set<MemoryRange | null> | null; mod_sources?: Set<ModSources | null> | null; modpack_locked?: Set<boolean | null> | null }
 
 export type ListInstance = { id: FEInstanceId; name: string; favorite: boolean; status: ListInstanceStatus; icon_revision: number; last_played: string | null; date_created: string; date_updated: string }
@@ -447,7 +449,7 @@ export type FECategoriesResponse = { data: CFFECategory[]; pagination: CFFEPagin
 
 export type FullImportScanStatus = { scanning: boolean; status: ImportScanStatus }
 
-export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: FEReleaseChannel; concurrentDownloads: number; showNews: boolean; xmx: number; xms: number; isFirstLaunch: boolean; startupResolution: string; javaCustomArgs: string; autoManageJava: boolean; modSources: ModSources; termsAndPrivacyAccepted: boolean; metricsEnabled: boolean; randomUserUuid: string }
+export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: FEReleaseChannel; concurrentDownloads: number; launcherActionOnGameLaunch: FELauncherActionOnGameLaunch; showNews: boolean; xmx: number; xms: number; isFirstLaunch: boolean; startupResolution: string; javaCustomArgs: string; autoManageJava: boolean; modSources: ModSources; termsAndPrivacyAccepted: boolean; metricsEnabled: boolean; randomUserUuid: string }
 
 export type MRFESearchFacetAnd = MRFESearchFacetOr[]
 
