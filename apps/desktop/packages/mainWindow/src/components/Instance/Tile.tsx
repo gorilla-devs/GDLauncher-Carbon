@@ -443,33 +443,6 @@ const Tile = (props: Props) => {
               <div class="absolute right-0 top-0 bottom-0 w-1" />
             </Show>
 
-            <div
-              class="rounded-full absolute flex justify-center items-center  cursor-pointer duration-100 will-change-transform left-5 transition-transform  h-7 w-7 z-20"
-              classList={{
-                "scale-0": !props.isRunning,
-                "scale-100": props.isRunning,
-
-                "group-hover:scale-100":
-                  !props.isLoading &&
-                  !isInQueue() &&
-                  !props.isInvalid &&
-                  !props.failError &&
-                  !props.isRunning
-              }}
-            >
-              <div
-                class="text-white"
-                classList={{
-                  "i-ri:play-fill text-2xl  ": !props.isRunning,
-                  "i-ri:stop-fill text-lg  ": props.isRunning
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePlayClick();
-                }}
-              />
-            </div>
-
             <Show when={props.isLoading && props.percentage !== undefined}>
               <div
                 class="absolute top-0 left-0 bottom-0 opacity-10 bg-white"
@@ -478,20 +451,49 @@ const Tile = (props: Props) => {
                 }}
               />
             </Show>
-            <div
-              class="bg-cover bg-center h-10 rounded-lg w-10 min-w-10 max-w-10"
-              style={{
-                "background-image": props.img
-                  ? `url("${props.img as string}")`
-                  : `url("${DefaultImg}")`
-              }}
-              classList={{
-                grayscale: props.isLoading,
-                "group-hover:opacity-50 group-hover:blur-[1.5px]  transition ease-in-out duration-150":
-                  !props.isLoading && !props.isRunning,
-                "opacity-50 blur-[1.5px]": props.isRunning
-              }}
-            />
+            <div class="relative">
+              <div
+                class="bg-cover bg-center h-10 rounded-lg w-10 min-w-10 max-w-10"
+                style={{
+                  "background-image": props.img
+                    ? `url("${props.img as string}")`
+                    : `url("${DefaultImg}")`
+                }}
+                classList={{
+                  grayscale: props.isLoading,
+                  "group-hover:opacity-50 group-hover:blur-[1.5px]  transition ease-in-out duration-150":
+                    !props.isLoading && !props.isRunning,
+                  "opacity-50 blur-[1.5px]": props.isRunning
+                }}
+              />
+              <div
+                class="rounded-full absolute flex justify-center items-center  cursor-pointer duration-100 will-change-transform top-2 left-2 transition-transform  h-7 w-7 z-20"
+                classList={{
+                  "scale-0": !props.isRunning,
+                  "scale-100": props.isRunning,
+
+                  "group-hover:scale-100":
+                    !props.isLoading &&
+                    !isInQueue() &&
+                    !props.isInvalid &&
+                    !props.failError &&
+                    !props.isRunning
+                }}
+              >
+                <div
+                  class="text-white"
+                  classList={{
+                    "i-ri:play-fill text-2xl  ": !props.isRunning,
+                    "i-ri:stop-fill text-lg  ": props.isRunning
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePlayClick();
+                  }}
+                />
+              </div>
+            </div>
+
             <div class="flex flex-col truncate">
               <div
                 class="m-0 text-ellipsis text-ellipsis overflow-hidden max-w-38 max-h-9 text-sm"
