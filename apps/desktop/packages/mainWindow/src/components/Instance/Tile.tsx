@@ -285,7 +285,6 @@ const Tile = (props: Props) => {
                   <div
                     class="text-white"
                     classList={{
-                      "i-vaadin:spinner text-xl": props.isLoading,
                       "i-ri:play-fill": !props.isRunning,
                       "i-ri:stop-fill text-xl": props.isRunning
                     }}
@@ -492,6 +491,11 @@ const Tile = (props: Props) => {
                   }}
                 />
               </div>
+              <Show when={props.isLoading}>
+                <div class="absolute top-2 left-2">
+                  <Spinner />
+                </div>
+              </Show>
             </div>
 
             <div class="flex flex-col truncate">
