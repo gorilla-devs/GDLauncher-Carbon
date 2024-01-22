@@ -27,7 +27,7 @@ import getAdSize from "./adSize";
 import handleUncaughtException from "./handleUncaughtException";
 import initAutoUpdater from "./autoUpdater";
 import "./appMenu";
-import { FEActionOnGameLaunch } from "@gd/core_module/bindings";
+import { FELauncherActionOnGameLaunch } from "@gd/core_module/bindings";
 
 export const RUNTIME_PATH_OVERRIDE_NAME = "runtime_path_override";
 const RUNTIME_PATH_DEFAULT_NAME = "data";
@@ -243,7 +243,7 @@ const loadCoreModule: CoreModule = () =>
         } else if (row.startsWith("_INSTANCE_STATE_:")) {
           const rightPart = row.split(":")[1];
           const event = rightPart.split("|")[0];
-          const action: FEActionOnGameLaunch = rightPart.split("|")[1];
+          const action: FELauncherActionOnGameLaunch = rightPart.split("|")[1];
 
           if (event === "GAME_LAUNCHED") {
             isGameRunning = true;
