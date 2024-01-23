@@ -15,14 +15,13 @@ export default function Exporting() {
 
   createEffect(() => {
     async function runner() {
-      console.log("==============1================");
       console.log("failed", failing());
       if (taskId() !== undefined) {
         const task = await rspcContext.client.query([
           "vtask.getTask",
           taskId() || null
         ]);
-        console.log("==============2================");
+
         if (task && task?.progress) {
           if (task.progress.type === "Known") {
             setProgress(Math.floor(task.progress.value * 100));
