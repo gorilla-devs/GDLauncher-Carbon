@@ -459,10 +459,10 @@ const Tile = (props: Props) => {
                     : `url("${DefaultImg}")`
                 }}
                 classList={{
-                  grayscale: props.isLoading,
                   "group-hover:opacity-50 group-hover:blur-[1.5px]  transition ease-in-out duration-150":
                     !props.isLoading && !props.isRunning,
-                  "opacity-50 blur-[1.5px]": props.isRunning
+                  "opacity-50 blur-[1.5px]": props.isRunning,
+                  grayscale: props.isLoading || isInQueue()
                 }}
               />
               <div
@@ -491,7 +491,7 @@ const Tile = (props: Props) => {
                   }}
                 />
               </div>
-              <Show when={props.isLoading}>
+              <Show when={props.isLoading || isInQueue()}>
                 <div class="absolute top-3 left-[11px]">
                   <Spinner />
                 </div>

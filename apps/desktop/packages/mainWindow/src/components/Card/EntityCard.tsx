@@ -17,7 +17,9 @@ const EntityCard = (props: EntityCardProps) => {
     <li
       class={`rounded-lg p-4 text-center ${
         props.entity.supported ? "cursor-pointer" : ""
-      } gap-2 shadow-md  transform flex-col hover:bg-[#1d2029ca]  hover:shadow-lg list-none flex items-center  ${
+      } gap-3 shadow-md  transform flex-col ${
+        props.entity.selection_type ? "hover:bg-[#1d2029ca]" : ""
+      }  hover:shadow-lg list-none flex items-center  ${
         props.entity.supported ? "" : "bg-opacity-50"
       } backdrop-blur-lg justify-center inline-block ${
         props.className ? props.className : "h-20 w-auto"
