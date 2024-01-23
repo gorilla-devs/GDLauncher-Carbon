@@ -288,7 +288,7 @@ const General = () => {
                   launcherActionOnGameLaunch: action
                 });
               }}
-            />{" "}
+            />
           </RightHandSide>
         </Row>
         <Row>
