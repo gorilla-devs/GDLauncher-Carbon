@@ -12,7 +12,7 @@ export const Card = (
 ) => {
   return (
     <div
-      class={`h-20 w-50 flex-1 rounded-md`}
+      class="flex-1"
       onClick={() => {
         setPayload({
           ...payload,
