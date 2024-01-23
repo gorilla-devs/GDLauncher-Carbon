@@ -11,9 +11,9 @@ export default function getAdSize() {
     // Smaller ads (160/600)
     return {
       minWidth: 1024,
-      minHeight: 770,
+      minHeight: 790,
       width: 1024,
-      height: 770,
+      height: 790,
       adSize: {
         width: 160,
         height: 600
@@ -22,9 +22,9 @@ export default function getAdSize() {
   } else {
     return {
       minWidth: 1280,
-      minHeight: 770,
+      minHeight: 790,
       width: 1600,
-      height: 770,
+      height: 790,
       adSize: {
         width: 400,
         height: 600
