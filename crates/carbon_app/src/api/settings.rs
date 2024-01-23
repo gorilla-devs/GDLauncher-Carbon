@@ -95,7 +95,7 @@ struct FESettings {
     xmx: i32,
     xms: i32,
     is_first_launch: bool,
-    startup_resolution: String,
+    game_resolution: Option<String>,
     java_custom_args: String,
     auto_manage_java: bool,
     mod_sources: ModSources,
@@ -120,7 +120,7 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             xms: data.xms,
             is_first_launch: data.is_first_launch,
             launcher_action_on_game_launch: data.launcher_action_on_game_launch.try_into()?,
-            startup_resolution: data.startup_resolution,
+            game_resolution: data.game_resolution,
             java_custom_args: data.java_custom_args,
             auto_manage_java: data.auto_manage_java,
             mod_sources: ModSources {
@@ -193,37 +193,37 @@ impl TryFrom<String> for FELauncherActionOnGameLaunch {
 #[serde(rename_all = "camelCase")]
 pub struct FESettingsUpdate {
     #[specta(optional)]
-    pub theme: Option<String>,
+    pub theme: Option<Set<String>>,
     #[specta(optional)]
-    pub language: Option<String>,
+    pub language: Option<Set<String>>,
     #[specta(optional)]
-    pub reduced_motion: Option<bool>,
+    pub reduced_motion: Option<Set<bool>>,
     #[specta(optional)]
-    pub discord_integration: Option<bool>,
+    pub discord_integration: Option<Set<bool>>,
     #[specta(optional)]
-    pub release_channel: Option<FEReleaseChannel>,
+    pub release_channel: Option<Set<FEReleaseChannel>>,
     #[specta(optional)]
-    pub concurrent_downloads: Option<i32>,
+    pub concurrent_downloads: Option<Set<i32>>,
     #[specta(optional)]
-    pub show_news: Option<bool>,
+    pub show_news: Option<Set<bool>>,
     #[specta(optional)]
-    pub xmx: Option<i32>,
+    pub xmx: Option<Set<i32>>,
     #[specta(optional)]
-    pub xms: Option<i32>,
+    pub xms: Option<Set<i32>>,
     #[specta(optional)]
-    pub is_first_launch: Option<bool>,
+    pub is_first_launch: Option<Set<bool>>,
     #[specta(optional)]
-    pub launcher_action_on_game_launch: Option<FELauncherActionOnGameLaunch>,
+    pub launcher_action_on_game_launch: Option<Set<FELauncherActionOnGameLaunch>>,
     #[specta(optional)]
-    pub startup_resolution: Option<String>,
+    pub game_resolution: Option<Set<Option<String>>>,
     #[specta(optional)]
-    pub java_custom_args: Option<String>,
+    pub java_custom_args: Option<Set<String>>,
     #[specta(optional)]
-    pub auto_manage_java: Option<bool>,
+    pub auto_manage_java: Option<Set<bool>>,
     #[specta(optional)]
-    pub mod_sources: Option<ModSources>,
+    pub mod_sources: Option<Set<ModSources>>,
     #[specta(optional)]
-    pub terms_and_privacy_accepted: Option<bool>,
+    pub terms_and_privacy_accepted: Option<Set<bool>>,
     #[specta(optional)]
-    pub metrics_enabled: Option<bool>,
+    pub metrics_enabled: Option<Set<bool>>,
 }

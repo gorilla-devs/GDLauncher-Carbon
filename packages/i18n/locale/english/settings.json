@@ -12,6 +12,7 @@
   "concurrent_downloads_title": "Concurrent Downloads",
   "concurrent_downloads_text": "Select the number of concurrent downloads. If you have a slow connection, select at most 3",
   "game_resolution_title": "Game Resolution",
+  "game_resolution_text": "Select the game resolution. This will be used to launch the game. Default means the launcher will not specify a value and the game will launch with the default resolution .",
   "resolution_width": "width",
   "resolution_height": "height",
   "resolution_presets": "presets",

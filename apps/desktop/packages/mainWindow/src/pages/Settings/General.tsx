@@ -72,7 +72,9 @@ const General = () => {
               ]}
               onChange={(channel) => {
                 settingsMutation.mutate({
-                  releaseChannel: channel.key as FEReleaseChannel
+                  releaseChannel: {
+                    Set: channel.key as FEReleaseChannel
+                  }
                 });
               }}
             />
@@ -106,50 +108,45 @@ const General = () => {
               }))}
               onChange={(downloads) => {
                 settingsMutation.mutate({
-                  concurrentDownloads: parseInt(downloads.key as string, 10)
+                  concurrentDownloads: {
+                    Set: parseInt(downloads.key as string, 10)
+                  }
                 });
               }}
             />
           </RightHandSide>
         </Row>
         <Row>
-          <Title>
-            <Trans
-              key="settings:game_resolution_title"
-              options={{
-                defaultValue: "Game Resolution"
-              }}
-            />
+          <Title description={<Trans key="settings:game_resolution_text" />}>
+            <Trans key="settings:game_resolution_title" />
           </Title>
           <RightHandSide>
             <Dropdown
+              value={settings.gameResolution || "default"}
               placeholder={t("settings:resolution_presets") || ""}
               options={[
-                { label: "800x600", key: "800x600" },
-                { label: "1024x768", key: "1024x768" },
-                { label: "1920x1080", key: "1920x1080" }
+                { label: "Default", key: "default" },
+                { label: "854 x 480 (100%)", key: "854x480" },
+                { label: "1046 x 588 (150%)", key: "1046x588" },
+                { label: "1208 x 679 (200%)", key: "1208x679" },
+                { label: "1479 x 831 (300%)", key: "1479x831" }
               ]}
+              onChange={(option) => {
+                settingsMutation.mutate({
+                  gameResolution: {
+                    Set:
+                      option.key.toString() === "default"
+                        ? null
+                        : option.key.toString()
+                  }
+                });
+              }}
             />
           </RightHandSide>
         </Row>
         <Row>
-          <Title
-            description={
-              <Trans
-                key="settings:instance_sorting_text"
-                options={{
-                  defaultValue:
-                    "Select the method in which instances should be sorted."
-                }}
-              />
-            }
-          >
-            <Trans
-              key="settings:instance_sorting_title"
-              options={{
-                defaultValue: "Instance Sorting"
-              }}
-            />
+          <Title description={<Trans key="settings:instance_sorting_text" />}>
+            <Trans key="settings:instance_sorting_title" />
           </Title>
           <RightHandSide>
             <Dropdown
@@ -183,7 +180,9 @@ const General = () => {
               checked={settings.showNews}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  showNews: e.currentTarget.checked
+                  showNews: {
+                    Set: e.currentTarget.checked
+                  }
                 });
               }}
             />
@@ -213,7 +212,9 @@ const General = () => {
               checked={settings.discordIntegration}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  discordIntegration: e.currentTarget.checked
+                  discordIntegration: {
+                    Set: e.currentTarget.checked
+                  }
                 });
               }}
             />
@@ -285,7 +286,9 @@ const General = () => {
                 }
 
                 settingsMutation.mutate({
-                  launcherActionOnGameLaunch: action
+                  launcherActionOnGameLaunch: {
+                    Set: action
+                  }
                 });
               }}
             />
@@ -315,7 +318,9 @@ const General = () => {
               checked={settings.reducedMotion}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  reducedMotion: e.currentTarget.checked
+                  reducedMotion: {
+                    Set: e.currentTarget.checked
+                  }
                 });
               }}
             />
