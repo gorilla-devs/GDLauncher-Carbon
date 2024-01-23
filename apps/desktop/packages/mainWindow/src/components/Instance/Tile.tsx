@@ -374,7 +374,7 @@ const Tile = (props: Props) => {
               </Tooltip>
             </h4>
             <Switch>
-              <Match when={!props.isLoading}>
+              <Match when={!props.isLoading && !props.isPreparing}>
                 <div class="flex gap-2 justify-between text-lightGray-900">
                   <span class="flex gap-1">
                     <Show when={props.modloader}>
@@ -509,17 +509,19 @@ const Tile = (props: Props) => {
                 {props.instance.name}
               </div>
               <div class="flex text-darkSlate-50">
-                <span class="flex gap-2 items-center">
-                  <Show when={props.modloader}>
-                    <img
-                      class="w-4 h-4"
-                      src={getCFModloaderIcon(
-                        props.modloader as CFFEModLoaderType
-                      )}
-                    />
-                  </Show>
-                  <p class="m-0 text-sm">{props.version}</p>
-                </span>
+                <Show when={!props.isLoading}>
+                  <span class="flex gap-2 items-center">
+                    <Show when={props.modloader}>
+                      <img
+                        class="w-4 h-4"
+                        src={getCFModloaderIcon(
+                          props.modloader as CFFEModLoaderType
+                        )}
+                      />
+                    </Show>
+                    <p class="m-0 text-sm">{props.version}</p>
+                  </span>
+                </Show>
 
                 <Show when={props.isLoading}>
                   <div class="m-0 flex gap-1">
