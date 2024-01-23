@@ -6,7 +6,11 @@ import SettingsData from "./settings.general.data";
 import { useRouteData } from "@solidjs/router";
 import { createEffect } from "solid-js";
 import { createStore } from "solid-js/store";
-import { FEReleaseChannel, FESettings } from "@gd/core_module/bindings";
+import {
+  FELauncherActionOnGameLaunch,
+  FEReleaseChannel,
+  FESettings
+} from "@gd/core_module/bindings";
 import Row from "./components/Row";
 import RightHandSide from "./components/RightHandSide";
 import PageTitle from "./components/PageTitle";
@@ -218,24 +222,73 @@ const General = () => {
         <Row>
           <Title
             description={
-              <Trans
-                key="settings:hide_launcher_playing_text"
-                options={{
-                  defaultValue:
-                    "Automatically hide the launcher when launching an instance. You will still be able to open it from the icon tray."
-                }}
-              />
+              <Trans key="settings:launcher_action_on_game_launch_text" />
             }
           >
-            <Trans
-              key="settings:hide_launcher_playing_title"
-              options={{
-                defaultValue: "Hide launcher while playing"
-              }}
-            />
+            <Trans key="settings:launcher_action_on_game_launch_title" />
           </Title>
           <RightHandSide>
-            <Switch />
+            <Dropdown
+              value={settings.launcherActionOnGameLaunch.toString()}
+              options={[
+                {
+                  label: t("settings:launcher_action_on_game_launch_none"),
+                  key: "none"
+                },
+                {
+                  label: t(
+                    "settings:launcher_action_on_game_launch_minimize_window"
+                  ),
+                  key: "minimizeWindow"
+                },
+                {
+                  label: t(
+                    "settings:launcher_action_on_game_launch_close_window"
+                  ),
+                  key: "closeWindow"
+                },
+                {
+                  label: t(
+                    "settings:launcher_action_on_game_launch_hide_window"
+                  ),
+                  key: "hideWindow"
+                },
+                {
+                  label: t("settings:launcher_action_on_game_launch_quit_app"),
+                  key: "quitApp"
+                }
+              ]}
+              onChange={(downloads) => {
+                let action: FELauncherActionOnGameLaunch | undefined;
+
+                switch (downloads.key) {
+                  case "minimizeWindow":
+                    action = "minimizeWindow";
+                    break;
+                  case "closeWindow":
+                    action = "closeWindow";
+                    break;
+                  case "hideWindow":
+                    action = "hideWindow";
+                    break;
+                  case "quitApp":
+                    action = "quitApp";
+                    break;
+                  case "none":
+                    action = "none";
+                    break;
+                }
+
+                if (!action) {
+                  console.error("Invalid action", downloads.key);
+                  return;
+                }
+
+                settingsMutation.mutate({
+                  launcherActionOnGameLaunch: action
+                });
+              }}
+            />{" "}
           </RightHandSide>
         </Row>
         <Row>
