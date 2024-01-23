@@ -143,7 +143,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .map(FEInstanceId::from)
         }
 
-        mutation UPDATE_INSTANCE[app, details: UpdateInstance] {
+        mutation UPDATE_INSTANCE[app, details: FEUpdateInstance] {
             app.instance_manager()
                 .update_instance(details.try_into()?)
                 .await
@@ -648,7 +648,7 @@ struct CreateInstance {
 }
 
 #[derive(Type, Debug, Deserialize)]
-struct UpdateInstance {
+struct FEUpdateInstance {
     instance: FEInstanceId,
     #[specta(optional)]
     name: Option<Set<String>>,
@@ -1467,10 +1467,10 @@ impl From<MemoryRange> for (u16, u16) {
     }
 }
 
-impl TryFrom<UpdateInstance> for domain::InstanceSettingsUpdate {
+impl TryFrom<FEUpdateInstance> for domain::InstanceSettingsUpdate {
     type Error = anyhow::Error;
 
-    fn try_from(value: UpdateInstance) -> anyhow::Result<Self> {
+    fn try_from(value: FEUpdateInstance) -> anyhow::Result<Self> {
         Ok(Self {
             instance_id: value.instance.into(),
             name: value.name.map(|x| x.inner()),
