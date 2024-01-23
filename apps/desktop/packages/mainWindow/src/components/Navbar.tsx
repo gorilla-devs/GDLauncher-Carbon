@@ -113,7 +113,7 @@ const AppNavbar = () => {
                     });
                   }}
                 >
-                  <i class="i-ri:add-fill" />
+                  <i class="flex i-ri:add-fill" />
                   <Trans key="sidebar.add_instance" />
                 </Button>
               </Tab>
