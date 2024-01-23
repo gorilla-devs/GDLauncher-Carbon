@@ -133,24 +133,28 @@ const Tile = (props: Props) => {
     {
       icon: props.isRunning ? "i-ri:stop-fill" : "i-ri:play-fill",
       label: props.isRunning ? t("instance.stop") : t("instance.action_play"),
-      action: handlePlay
+      action: handlePlay,
+      disabled: props.isLoading
     },
     {
       icon: "i-ri:pencil-fill",
       label: t("instance.action_edit"),
-      action: handleEdit
+      action: handleEdit,
+      disabled: props.isLoading
     },
     {
       icon: "i-ri:settings-3-fill",
       label: t("instance.action_settings"),
-      action: handleSettings
+      action: handleSettings,
+      disabled: props.isLoading
     },
     ...(!props.isInvalid
       ? [
           {
             icon: "i-ri:file-copy-fill",
             label: t("instance.action_duplicate"),
-            action: handleDuplicate
+            action: handleDuplicate,
+            disabled: props.isLoading
           }
         ]
       : []),
@@ -178,13 +182,15 @@ const Tile = (props: Props) => {
         modalsContext?.openModal({
           name: "exportInstance"
         });
-      }
+      },
+      disabled: props.isLoading
     },
     {
       id: "delete",
       icon: "i-ri:delete-bin-2-fill",
       label: t("instance.action_delete"),
-      action: handleDelete
+      action: handleDelete,
+      disabled: props.isLoading
     }
   ];
 
