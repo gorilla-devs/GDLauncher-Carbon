@@ -83,7 +83,7 @@ pub async fn download_modpack_zip(
 
     carbon_net::download_file(&file_downloadable, Some(download_progress_sender)).await?;
 
-    file.rename(target_path).await?;
+    file.try_rename_or_move(target_path).await?;
     Ok(())
 }
 

@@ -90,6 +90,7 @@ struct FESettings {
     discord_integration: bool,
     release_channel: FEReleaseChannel,
     concurrent_downloads: i32,
+    launcher_action_on_game_launch: FELauncherActionOnGameLaunch,
     show_news: bool,
     xmx: i32,
     xms: i32,
@@ -118,6 +119,7 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             xmx: data.xmx,
             xms: data.xms,
             is_first_launch: data.is_first_launch,
+            launcher_action_on_game_launch: data.launcher_action_on_game_launch.try_into()?,
             startup_resolution: data.startup_resolution,
             java_custom_args: data.java_custom_args,
             auto_manage_java: data.auto_manage_java,
@@ -148,6 +150,44 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
     }
 }
 
+#[derive(Type, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub enum FELauncherActionOnGameLaunch {
+    QuitApp,
+    CloseWindow,
+    MinimizeWindow,
+    HideWindow,
+    None,
+}
+
+impl From<FELauncherActionOnGameLaunch> for String {
+    fn from(value: FELauncherActionOnGameLaunch) -> Self {
+        match value {
+            FELauncherActionOnGameLaunch::QuitApp => "quitApp",
+            FELauncherActionOnGameLaunch::CloseWindow => "closeWindow",
+            FELauncherActionOnGameLaunch::MinimizeWindow => "minimizeWindow",
+            FELauncherActionOnGameLaunch::HideWindow => "hideWindow",
+            FELauncherActionOnGameLaunch::None => "none",
+        }
+        .to_string()
+    }
+}
+
+impl TryFrom<String> for FELauncherActionOnGameLaunch {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match &*value {
+            "quitApp" => Ok(Self::QuitApp),
+            "closeWindow" => Ok(Self::CloseWindow),
+            "minimizeWindow" => Ok(Self::MinimizeWindow),
+            "hideWindow" => Ok(Self::HideWindow),
+            "none" => Ok(Self::None),
+            _ => Err(anyhow::anyhow!("Invalid action on game launch")),
+        }
+    }
+}
+
 // When updating this, make sure to also update set_settings
 #[derive(Type, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -172,6 +212,8 @@ pub struct FESettingsUpdate {
     pub xms: Option<i32>,
     #[specta(optional)]
     pub is_first_launch: Option<bool>,
+    #[specta(optional)]
+    pub launcher_action_on_game_launch: Option<FELauncherActionOnGameLaunch>,
     #[specta(optional)]
     pub startup_resolution: Option<String>,
     #[specta(optional)]

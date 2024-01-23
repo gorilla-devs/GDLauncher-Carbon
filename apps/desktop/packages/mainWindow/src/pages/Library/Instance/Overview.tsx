@@ -22,22 +22,30 @@ const Overview = () => {
   const [t] = useTransContext();
 
   const modpackPlatform = () => {
-    if ("Curseforge" in (routeData.instanceDetails.data?.modpack || {})) {
+    if (
+      "Curseforge" in (routeData.instanceDetails.data?.modpack?.modpack || {})
+    ) {
       return "Curseforge";
-    } else if ("Modrinth" in (routeData.instanceDetails.data?.modpack || {})) {
+    } else if (
+      "Modrinth" in (routeData.instanceDetails.data?.modpack?.modpack || {})
+    ) {
       return "Modrinth";
     }
   };
 
   const modpackProjectId = () => {
-    if ("Curseforge" in (routeData.instanceDetails.data?.modpack || {})) {
+    if (
+      "Curseforge" in (routeData.instanceDetails.data?.modpack?.modpack || {})
+    ) {
       return (
-        (routeData.instanceDetails.data?.modpack as any)
+        (routeData.instanceDetails.data?.modpack?.modpack as any)
           ?.Curseforge as CurseforgeModpack
       ).project_id;
-    } else if ("Modrinth" in (routeData.instanceDetails.data?.modpack || {})) {
+    } else if (
+      "Modrinth" in (routeData.instanceDetails.data?.modpack?.modpack || {})
+    ) {
       return (
-        (routeData.instanceDetails.data?.modpack as any)
+        (routeData.instanceDetails.data?.modpack?.modpack as any)
           ?.Modrinth as ModrinthModpack
       ).project_id;
     }
@@ -123,7 +131,7 @@ const Overview = () => {
         </Show>
         <Show
           when={
-            routeData.instanceDetails.data?.modpack &&
+            routeData.instanceDetails.data?.modpack?.modpack &&
             routeData.modpackInfo.isLoading
           }
         >
@@ -133,7 +141,7 @@ const Overview = () => {
         </Show>
         <Show
           when={
-            routeData.instanceDetails.data?.modpack &&
+            routeData.instanceDetails.data?.modpack?.modpack &&
             routeData.modpackInfo.data
           }
         >

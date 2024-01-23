@@ -92,6 +92,17 @@ impl ManagerRef<'_, SettingsManager> {
             ));
         }
 
+        if let Some(launcher_action_on_game_launch) =
+            incoming_settings.launcher_action_on_game_launch
+        {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![app_configuration::launcher_action_on_game_launch::set(
+                    launcher_action_on_game_launch.into(),
+                )],
+            ));
+        }
+
         if let Some(concurrent_downloads) = incoming_settings.concurrent_downloads {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),

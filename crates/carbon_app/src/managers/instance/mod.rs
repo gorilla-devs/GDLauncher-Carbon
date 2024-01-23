@@ -981,7 +981,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let (shortpath, path) = self.next_folder(&name).await?;
 
         tmpdir
-            .rename(&path)
+            .try_rename_or_move(&path)
             .await
             .context("moving tmpdir to instance location")?;
 

@@ -200,7 +200,7 @@ pub async fn export_modrinth(
             })
             .await??;
 
-            tmpfile.rename(save_path).await?;
+            tmpfile.try_rename_or_move(save_path).await?;
 
             t_create_bundle.complete_opaque();
 

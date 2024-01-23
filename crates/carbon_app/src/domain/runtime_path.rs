@@ -6,6 +6,7 @@ use std::{
     sync::atomic::{self, AtomicUsize},
 };
 
+use anyhow::Context;
 use tokio::io::AsyncWriteExt;
 
 #[derive(Clone)]
@@ -225,7 +226,7 @@ impl TempPath {
         fd.write_all(data.as_ref()).await?;
         fd.sync_all().await?;
 
-        tmp.rename(path).await?;
+        tmp.try_rename_or_move(path).await?;
 
         Ok(())
     }
@@ -282,8 +283,22 @@ impl<T: tempentry::TempEntryType> TempEntry<T> {
         path
     }
 
-    pub async fn rename(self, path: impl AsRef<Path>) -> std::io::Result<()> {
-        tokio::fs::rename(self.into_path(), path).await
+    pub async fn try_rename_or_move(self, path: impl AsRef<Path>) -> anyhow::Result<()> {
+        let res = tokio::fs::rename(&*self, &path).await;
+
+        if let Err(err) = &res {
+            tokio::fs::copy(&path, &*self)
+                .await
+                .with_context(|| {
+                    format!(
+                        "failed to copy {} to {}",
+                        path.as_ref().display(),
+                        (&*self).display()
+                    )
+                })?;
+        }
+
+        Ok(())
     }
 }
 
