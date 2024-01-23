@@ -15,6 +15,11 @@ const skipIntroAnimation =
     .find((arg) => arg.startsWith("--skipIntroAnimation="))
     ?.split("=")[1] === "true";
 
-if (skipIntroAnimation) {
-  contextBridge.exposeInMainWorld("skipIntroAnimation", skipIntroAnimation);
+const isDev = import.meta.env.DEV;
+
+if (isDev || skipIntroAnimation) {
+  contextBridge.exposeInMainWorld(
+    "skipIntroAnimation",
+    isDev || skipIntroAnimation
+  );
 }
