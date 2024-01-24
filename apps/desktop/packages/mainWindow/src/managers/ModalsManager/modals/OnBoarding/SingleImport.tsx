@@ -15,32 +15,53 @@ const SingleImport = (props: {
 }) => {
   const [progress, setProgress] = createSignal(0);
   const [state, setState] = createSignal("idle");
-  const rspcContext = rspc.useContext();
+  // const rspcContext = rspc.useContext();
 
   createEffect(() => {
     async function runner() {
       if (taskIds() !== undefined) {
-        const task = await rspcContext.client.query([
-          "vtask.getTask",
-          props.taskId || null
-        ]);
-
-        if (task && task.progress) {
-          if (task.progress.type == "Known") {
-            setProgress(Math.floor(task.progress.value * 100));
+        rspc.createQuery(() => ["vtask.getTask", props.taskId || null], {
+          onSuccess: (task) => {
+            console.log(task);
+            if (task && task.progress) {
+              if (task.progress.type == "Known") {
+                setProgress(Math.floor(task.progress.value * 100));
+              }
+            }
+            const isFailed = task && task.progress.type === "Failed";
+            const isDownloaded = task === null && progress() !== 0;
+            if (isDownloaded || isFailed) {
+              setTaskId(undefined);
+            }
+            if (isFailed) {
+              setState("failed");
+            } else if (isDownloaded) {
+              setState("completed");
+              setIsDownloaded(true);
+            }
           }
-        }
-        const isFailed = task && task.progress.type === "Failed";
-        const isDownloaded = task === null && progress() !== 0;
-        if (isDownloaded || isFailed) {
-          setTaskId(undefined);
-        }
-        if (isFailed) {
-          setState("failed");
-        } else if (isDownloaded) {
-          setState("completed");
-          setIsDownloaded(true);
-        }
+        });
+        // const task = await rspcContext.client.query([
+        //   "vtask.getTask",
+        //   props.taskId || null
+        // ]);
+        // console.log(task);
+        // if (task && task.progress) {
+        //   if (task.progress.type == "Known") {
+        //     setProgress(Math.floor(task.progress.value * 100));
+        //   }
+        // }
+        // const isFailed = task && task.progress.type === "Failed";
+        // const isDownloaded = task === null && progress() !== 0;
+        // if (isDownloaded || isFailed) {
+        //   setTaskId(undefined);
+        // }
+        // if (isFailed) {
+        //   setState("failed");
+        // } else if (isDownloaded) {
+        //   setState("completed");
+        //   setIsDownloaded(true);
+        // }
       }
     }
     try {

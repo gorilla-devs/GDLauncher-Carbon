@@ -86,9 +86,6 @@ const Sidebar = () => {
       </Switch>
     );
   };
-  createEffect(() => {
-    console.log(routeData.instancesUngrouped.data);
-  });
   return (
     <SiderbarWrapper noPadding>
       <div class="h-full w-full box-border transition-all flex flex-col gap-2 pt-5 pb-5">
