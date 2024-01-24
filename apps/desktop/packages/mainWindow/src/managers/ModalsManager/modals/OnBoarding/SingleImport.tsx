@@ -22,7 +22,6 @@ const SingleImport = (props: {
       if (taskIds() !== undefined) {
         rspc.createQuery(() => ["vtask.getTask", props.taskId || null], {
           onSuccess: (task) => {
-            console.log(task);
             if (task && task.progress) {
               if (task.progress.type == "Known") {
                 setProgress(Math.floor(task.progress.value * 100));
