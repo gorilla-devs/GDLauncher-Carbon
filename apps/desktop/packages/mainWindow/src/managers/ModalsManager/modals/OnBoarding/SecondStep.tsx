@@ -11,8 +11,8 @@ const SecondStep = (props: Props) => {
   let setSettingsMutation = rspc.createMutation(["settings.setSettings"]);
   let settingsQuery = rspc.createQuery(() => ["settings.getSettings"]);
   return (
-    <div class="flex flex-col justify-between lg:w-160 h-full box-border">
-      <div class="flex flex-col min-h-60 justify-center">
+    <div class="flex flex-col justify-between h-full lg:w-160 box-border">
+      <div class="flex flex-col justify-center min-h-60">
         <div class="flex items-center gap-4 w-100 lg:w-[35rem]">
           <p class="text-left text-darkSlate-100 m-0 font-normal w-fit leading-7">
             <Trans
@@ -26,7 +26,11 @@ const SecondStep = (props: Props) => {
           <Switch
             checked={settingsQuery.data?.autoManageJava}
             onChange={(e) => {
-              setSettingsMutation.mutate({ autoManageJava: e.target.checked });
+              setSettingsMutation.mutate({
+                autoManageJava: {
+                  Set: e.target.checked
+                }
+              });
             }}
           />
         </div>

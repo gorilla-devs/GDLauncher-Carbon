@@ -56,7 +56,7 @@ const SingleImport = (props: {
       <Switch>
         <Match when={state() === "failed" || props.importState === "error"}>
           <div>
-            <div class="i-ph:x-bold text-2xl text-red-600" />
+            <div class="text-2xl i-ph:x-bold text-red-600" />
           </div>
         </Match>
         <Match when={state() === "idle"}>
@@ -67,7 +67,7 @@ const SingleImport = (props: {
         </Match>
 
         <Match when={state() === "completed"}>
-          <div class="i-ic:round-check text-2xl text-green-600" />
+          <div class="text-2xl i-ic:round-check text-green-600" />
         </Match>
       </Switch>
     </div>

@@ -13,7 +13,7 @@ export default function ExportDone(props: { path: string }) {
         <span>{`${t("instance.exported_to")} :`}</span>
       </Show>
 
-      <div class="bg-[#1D2028] text-center w-full p-2 rounded-md leading-10">
+      <div class="text-center w-full p-2 rounded-md bg-[#1D2028] leading-10">
         {failedMsg() ? failedMsg() : props.path}
       </div>
 

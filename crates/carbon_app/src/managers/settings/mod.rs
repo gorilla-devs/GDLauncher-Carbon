@@ -148,7 +148,7 @@ impl ManagerRef<'_, SettingsManager> {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
                 vec![app_configuration::game_resolution::set(
-                    game_resolution.inner(),
+                    game_resolution.inner().map(Into::into),
                 )],
             ));
         }

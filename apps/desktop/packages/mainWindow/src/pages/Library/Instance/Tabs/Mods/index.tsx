@@ -117,7 +117,7 @@ const Mods = () => {
   return (
     <div>
       <div
-        class="flex items-center justify-between h-16 bg-darkSlate-900 shadow-md duration-100 ease-in-out border-darkSlate-700 border-solid border-1 fixed bottom-4 mx-auto left-1/2 -translate-x-1/2 rounded-md pr-6 z-50 shadow-darkSlate-900 transition-transform origin-left w-130"
+        class="flex items-center justify-between h-16 bg-darkSlate-900 shadow-md duration-100 ease-in-out border-darkSlate-700 border-solid border-1 fixed bottom-4 mx-auto left-1/2 -translate-x-1/2 rounded-md z-50 shadow-darkSlate-900 transition-transform origin-left pr-6 w-130"
         classList={{
           "translate-y-24": selectedMods()?.length === 0
         }}

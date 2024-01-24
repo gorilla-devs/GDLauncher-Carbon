@@ -232,7 +232,7 @@ const Tile = (props: Props) => {
               }
             }}
           >
-            <div class="relative rounded-2xl overflow-hidden h-38 w-38 border-1 border-solid border-darkSlate-600">
+            <div class="relative rounded-2xl overflow-hidden border-1 border-solid h-38 w-38 border-darkSlate-600">
               <div
                 class="flex justify-center relative items-center rounded-2xl overflow-hidden h-38 w-38 bg-cover bg-center max-w-38"
                 classList={{
@@ -255,7 +255,7 @@ const Tile = (props: Props) => {
                   <h2 class="text-sm text-center z-20">
                     <Trans key="instance.error_invalid" />
                   </h2>
-                  <div class="w-full rounded-2xl z-10 absolute right-0 h-full top-0 left-0 bottom-0 bg-gradient-to-l from-black opacity-50 from-30%" />
+                  <div class="w-full rounded-2xl z-10 absolute right-0 h-full top-0 bottom-0 left-0 bg-gradient-to-l from-black opacity-50 from-30%" />
                   <div class="z-10 absolute top-0 bottom-0 left-0 right-0 from-black opacity-50 w-full h-full rounded-2xl bg-gradient-to-t" />
                   <div class="absolute z-10 text-2xl i-ri:alert-fill text-yellow-500 top-1 right-1" />
                 </Show>
@@ -267,7 +267,7 @@ const Tile = (props: Props) => {
                 </Show>
 
                 <div
-                  class="group flex justify-center items-center absolute rounded-full cursor-pointer ease-in-out duration-100 hidden transition-all h-12 w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
+                  class="group flex justify-center items-center absolute rounded-full cursor-pointer ease-in-out duration-100 hidden h-12 w-12 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
                   classList={{
                     "scale-100 bg-red-500": props.isLoading,
                     "bg-primary-500 hover:bg-primary-400 text-2xl hover:text-3xl hover:drop-shadow-2xl":
@@ -409,7 +409,7 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "sidebar"}>
         <ContextMenu menuItems={menuItems()}>
           <div
-            class="group relative group select-none flex items-center w-full box-border  cursor-pointer gap-4 px-6 h-14 erelative"
+            class="group relative group select-none flex items-center w-full box-border cursor-pointer gap-4 px-6 h-14 erelative"
             onClick={(e) => {
               if (
                 !props.isLoading &&
@@ -428,7 +428,7 @@ const Tile = (props: Props) => {
               <div class="i-ri:alert-fill text-red-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
             </Show>
             <div
-              class="absolute ease-in-out duration-100 top-0 left-0 bottom-0 right-0  transition opacity-10"
+              class="absolute ease-in-out duration-100 top-0 left-0 bottom-0 right-0 transition opacity-10"
               classList={{
                 "group-hover:bg-primary-800":
                   !props.isLoading &&
@@ -472,7 +472,7 @@ const Tile = (props: Props) => {
                 }}
               />
               <div
-                class="rounded-full absolute flex justify-center items-center  cursor-pointer duration-100 will-change-transform top-2 left-2 transition-transform  h-7 w-7 z-20"
+                class="rounded-full absolute flex justify-center items-center cursor-pointer duration-100 will-change-transform top-2 transition-transform z-20 left-2 h-7 w-7"
                 classList={{
                   "scale-0": !props.isRunning,
                   "scale-100": props.isRunning,
@@ -506,7 +506,7 @@ const Tile = (props: Props) => {
 
             <div class="flex flex-col truncate">
               <div
-                class="m-0 text-ellipsis text-ellipsis overflow-hidden max-w-38 max-h-9 text-sm"
+                class="m-0 text-ellipsis text-ellipsis overflow-hidden max-w-38 text-sm max-h-9"
                 // classList={{
                 //   "text-darkSlate-50": mergedProps.isLoading,
                 //   "text-white": !mergedProps.isLoading
@@ -531,7 +531,7 @@ const Tile = (props: Props) => {
 
                 <Show when={props.isLoading}>
                   <div class="m-0 flex gap-1">
-                    <div class="i-clarity:download-line text-green-500"></div>
+                    <div class="text-green-500 i-clarity:download-line" />
                     <span class="font-bold text-sm">
                       {Math.round(props.percentage as number)}%
                     </span>
@@ -590,7 +590,7 @@ const Tile = (props: Props) => {
               </Show>
 
               <div
-                class="h-7 w-7 right-5 rounded-full flex justify-center items-center cursor-pointer transition-transform duration-100 will-change-transform"
+                class="h-7 w-7 rounded-full flex justify-center items-center cursor-pointer transition-transform duration-100 will-change-transform right-5"
                 classList={{
                   "bg-primary-500": !props.isRunning,
                   "scale-0": !props.isRunning,
@@ -604,7 +604,7 @@ const Tile = (props: Props) => {
                 }}
               >
                 <div
-                  class="text-white text-lg transition-all duration-100 ease-in-out"
+                  class="text-white transition-all duration-100 ease-in-out text-lg"
                   classList={{
                     "i-ri:play-fill": !props.isRunning,
                     "i-ri:stop-fill": props.isRunning

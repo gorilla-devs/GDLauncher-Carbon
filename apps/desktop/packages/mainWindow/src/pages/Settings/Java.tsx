@@ -115,7 +115,9 @@ const Java = () => {
               value={settings.data?.xmx}
               onChange={(val) =>
                 settingsMutation.mutate({
-                  xmx: val
+                  xmx: {
+                    Set: val
+                  }
                 })
               }
             />
@@ -124,7 +126,9 @@ const Java = () => {
               value={settings.data?.xmx}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  xmx: parseInt(e.currentTarget.value, 10)
+                  xmx: {
+                    Set: parseInt(e.currentTarget.value, 10)
+                  }
                 });
               }}
             />
@@ -145,7 +149,9 @@ const Java = () => {
               value={settings.data?.javaCustomArgs}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  javaCustomArgs: e.target.value
+                  javaCustomArgs: {
+                    Set: e.target.value
+                  }
                 });
               }}
             />
@@ -157,7 +163,9 @@ const Java = () => {
                 size="small"
                 onClick={() => {
                   settingsMutation.mutate({
-                    javaCustomArgs: initialJavaArgs()
+                    javaCustomArgs: {
+                      Set: initialJavaArgs() || ""
+                    }
                   });
                 }}
               >
@@ -172,7 +180,9 @@ const Java = () => {
                 size="small"
                 onClick={() => {
                   settingsMutation.mutate({
-                    javaCustomArgs: ""
+                    javaCustomArgs: {
+                      Set: ""
+                    }
                   });
                 }}
               >
@@ -195,7 +205,9 @@ const Java = () => {
               checked={settings.data?.autoManageJava}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  autoManageJava: e.target.checked
+                  autoManageJava: {
+                    Set: e.target.checked
+                  }
                 });
               }}
             />

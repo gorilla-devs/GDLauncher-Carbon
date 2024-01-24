@@ -132,12 +132,12 @@ const ExploreVersionsNavbar = (props: Props) => {
   };
 
   return (
-    <div class="h-12 w-full flex gap-4 my-4">
+    <div class="w-full flex gap-4 h-12 my-4">
       <Switch>
         <Match when={!isNaN(instanceId)}>
           <div class="flex gap-2">
             <div
-              class="h-full w-12 flex-1"
+              class="h-full flex-1 w-12"
               style={{
                 "background-image": imageResource()
                   ? `url("${imageResource() as string}")`

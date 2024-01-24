@@ -120,12 +120,14 @@ const TermsAndConditions = (props: Props) => {
               onClick={async () => {
                 setLoadingButton(true);
                 try {
-                  const res = await settingsMutation.mutateAsync({
-                    termsAndPrivacyAccepted: true,
-                    metricsEnabled: acceptedMetrics()
+                  await settingsMutation.mutateAsync({
+                    termsAndPrivacyAccepted: {
+                      Set: true
+                    },
+                    metricsEnabled: {
+                      Set: acceptedMetrics()
+                    }
                   });
-
-                  console.log(res);
 
                   props.nextStep();
                 } catch {

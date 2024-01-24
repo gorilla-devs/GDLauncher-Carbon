@@ -648,6 +648,7 @@ struct CreateInstance {
 }
 
 #[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct FEUpdateInstance {
     instance: FEInstanceId,
     #[specta(optional)]
@@ -666,6 +667,8 @@ struct FEUpdateInstance {
     extra_java_args: Option<Set<Option<String>>>,
     #[specta(optional)]
     memory: Option<Set<Option<MemoryRange>>>,
+    #[specta(optional)]
+    game_resolution: Option<Set<Option<GameResolution>>>,
     #[specta(optional)]
     mod_sources: Option<Set<Option<super::modplatforms::ModSources>>>,
     #[specta(optional)]
@@ -811,7 +814,33 @@ enum MoveInstanceTarget {
     EndOfGroup(FEGroupId),
 }
 
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(tag = "type", content = "value")]
+pub enum GameResolution {
+    Standard(u16, u16),
+    Custom(u16, u16),
+}
+
+impl From<domain::info::GameResolution> for GameResolution {
+    fn from(value: domain::info::GameResolution) -> Self {
+        match value {
+            domain::info::GameResolution::Standard(w, h) => Self::Standard(w, h),
+            domain::info::GameResolution::Custom(w, h) => Self::Custom(w, h),
+        }
+    }
+}
+
+impl From<GameResolution> for domain::info::GameResolution {
+    fn from(value: GameResolution) -> Self {
+        match value {
+            GameResolution::Standard(w, h) => Self::Standard(w, h),
+            GameResolution::Custom(w, h) => Self::Custom(w, h),
+        }
+    }
+}
+
 #[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct InstanceDetails {
     name: String,
     favorite: bool,
@@ -820,6 +849,7 @@ struct InstanceDetails {
     global_java_args: bool,
     extra_java_args: Option<String>,
     memory: Option<MemoryRange>,
+    game_resolution: Option<GameResolution>,
     last_played: Option<DateTime<Utc>>,
     seconds_played: u32,
     modloaders: Vec<ModLoader>,
@@ -1075,6 +1105,7 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             global_java_args: value.global_java_args,
             extra_java_args: value.extra_java_args,
             memory: value.memory.map(Into::into),
+            game_resolution: value.game_resolution.map(Into::into),
             last_played: value.last_played,
             seconds_played: value.seconds_played,
             modloaders: value.modloaders.into_iter().map(Into::into).collect(),
@@ -1483,6 +1514,7 @@ impl TryFrom<FEUpdateInstance> for domain::InstanceSettingsUpdate {
             global_java_args: value.global_java_args.map(|x| x.inner()),
             extra_java_args: value.extra_java_args.map(|x| x.inner()),
             memory: value.memory.map(|x| x.inner().map(Into::into)),
+            game_resolution: value.game_resolution.map(|x| x.inner().map(Into::into)),
             mod_sources: value.mod_sources.map(|x| x.inner().map(Into::into)),
             modpack_locked: value.modpack_locked.map(|x| x.inner()),
         })

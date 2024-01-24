@@ -79,7 +79,7 @@ const ModUpdateTooltip = (props: {
   ]);
 
   return (
-    <div class="text-lightSlate-200 w-80 h-40 flex flex-col items-center gap-4">
+    <div class="text-lightSlate-200 h-40 flex flex-col items-center gap-4 w-80">
       <div class="text-lg mb-4">
         <Trans
           key="instance.update_available_from"
@@ -287,7 +287,7 @@ const Mod = (props: Props) => {
       <div class="flex justify-between items-center w-full gap-4">
         <div class="flex gap-4 justify-between items-center">
           <div
-            class="opacity-0 group-hover:opacity-100 transition-opacity duration-100 ease-in-out"
+            class="duration-100 ease-in-out opacity-0 group-hover:opacity-100 transition-opacity"
             classList={{
               "opacity-100":
                 props.selectMods[props.mod.id] ||

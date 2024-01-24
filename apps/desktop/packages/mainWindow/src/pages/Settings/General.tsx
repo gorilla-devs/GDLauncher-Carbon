@@ -1,10 +1,10 @@
-import { Button, Dropdown, Switch } from "@gd/ui";
+import { Button, Dropdown, Input, Switch } from "@gd/ui";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { Trans, useTransContext } from "@gd/i18n";
-import { queryClient, rspc } from "@/utils/rspcClient";
+import { rspc } from "@/utils/rspcClient";
 import SettingsData from "./settings.general.data";
 import { useRouteData } from "@solidjs/router";
-import { createEffect } from "solid-js";
+import { Show, createEffect } from "solid-js";
 import { createStore } from "solid-js/store";
 import {
   FELauncherActionOnGameLaunch,
@@ -28,15 +28,31 @@ const General = () => {
     routeData?.data?.data || {}
   );
 
-  const settingsMutation = rspc.createMutation(["settings.setSettings"], {
-    onMutate: (newSettings) => {
-      queryClient.setQueryData(["settings.getSettings"], newSettings);
-    }
-  });
+  const settingsMutation = rspc.createMutation(["settings.setSettings"]);
 
   createEffect(() => {
     if (routeData.data.data) setSettings(routeData.data.data);
   });
+
+  const templateGameResolution = () => {
+    return [
+      { label: "854 x 480 (100%)", key: "Standard:854x480" },
+      { label: "1046 x 588 (150%)", key: "Standard:1046x588" },
+      { label: "1208 x 679 (200%)", key: "Standard:1208x679" },
+      { label: "1479 x 831 (300%)", key: "Standard:1479x831" }
+    ];
+  };
+
+  const gameResolutionDropdownKey = () => {
+    if (!settings.gameResolution) return "default";
+
+    if (settings.gameResolution.type === "Standard") {
+      const gameResolution = settings.gameResolution.value.join("x");
+      return `Standard:${gameResolution}`;
+    }
+
+    return "custom";
+  };
 
   return (
     <>
@@ -121,27 +137,97 @@ const General = () => {
             <Trans key="settings:game_resolution_title" />
           </Title>
           <RightHandSide>
-            <Dropdown
-              value={settings.gameResolution || "default"}
-              placeholder={t("settings:resolution_presets") || ""}
-              options={[
-                { label: "Default", key: "default" },
-                { label: "854 x 480 (100%)", key: "854x480" },
-                { label: "1046 x 588 (150%)", key: "1046x588" },
-                { label: "1208 x 679 (200%)", key: "1208x679" },
-                { label: "1479 x 831 (300%)", key: "1479x831" }
-              ]}
-              onChange={(option) => {
-                settingsMutation.mutate({
-                  gameResolution: {
-                    Set:
-                      option.key.toString() === "default"
-                        ? null
-                        : option.key.toString()
+            <div class="flex flex-col items-end gap-4">
+              <Dropdown
+                value={gameResolutionDropdownKey()}
+                placeholder={t("settings:resolution_presets")}
+                options={[
+                  { label: "Default", key: "default" },
+                  ...templateGameResolution(),
+                  { label: "Custom", key: "custom" }
+                ]}
+                onChange={(option) => {
+                  let value: {
+                    type: "Standard" | "Custom";
+                    value: [number, number];
+                  } | null = null;
+
+                  if (option.key === "custom") {
+                    value = {
+                      type: "Custom",
+                      value: [854, 480]
+                    };
+                  } else if (option.key === "default") {
+                    value = null;
+                  } else {
+                    const [width, height] = option.key
+                      .toString()
+                      .split(":")[1]
+                      .split("x");
+                    value = {
+                      type: "Standard",
+                      value: [parseInt(width, 10), parseInt(height, 10)]
+                    };
                   }
-                });
-              }}
-            />
+
+                  settingsMutation.mutate({
+                    gameResolution: {
+                      Set: value
+                    }
+                  });
+                }}
+              />
+              <Show when={settings.gameResolution?.type === "Custom"}>
+                <div class="flex flex-col gap-4">
+                  <div class="flex items-center justify-end gap-4">
+                    <div>
+                      <Trans key="settings:width" />
+                    </div>
+                    <Input
+                      class="w-24"
+                      type="number"
+                      value={settings?.gameResolution?.value[0]}
+                      onChange={(e) => {
+                        settingsMutation.mutate({
+                          gameResolution: {
+                            Set: {
+                              type: "Custom",
+                              value: [
+                                parseInt(e.currentTarget.value, 10),
+                                settings?.gameResolution?.value[1]!
+                              ]
+                            }
+                          }
+                        });
+                      }}
+                    />
+                  </div>
+                  <div class="flex items-center justify-end gap-4">
+                    <div>
+                      <Trans key="settings:height" />
+                    </div>
+                    <Input
+                      class="w-24"
+                      type="number"
+                      value={settings?.gameResolution?.value[1]}
+                      onChange={(e) => {
+                        settingsMutation.mutate({
+                          gameResolution: {
+                            Set: {
+                              type: "Custom",
+                              value: [
+                                settings?.gameResolution?.value[0]!,
+                                parseInt(e.currentTarget.value, 10)
+                              ]
+                            }
+                          }
+                        });
+                      }}
+                    />
+                  </div>
+                </div>
+              </Show>
+            </div>
           </RightHandSide>
         </Row>
         <Row>

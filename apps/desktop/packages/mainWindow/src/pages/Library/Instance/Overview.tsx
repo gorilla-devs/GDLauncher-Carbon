@@ -102,12 +102,12 @@ const Overview = () => {
             class="flex-1"
           />
         </Show>
-        <Show when={routeData.instanceDetails.data?.seconds_played}>
+        <Show when={routeData.instanceDetails.data?.secondsPlayed}>
           <Card
             title={t("instance.overview_card_played_time_title")}
             text={formatDistance(
               new Date(
-                routeData.instanceDetails.data?.last_played || Date.now()
+                routeData.instanceDetails.data?.lastPlayed || Date.now()
               ).getTime(),
               Date.now()
             )}
@@ -115,13 +115,13 @@ const Overview = () => {
             class="flex-1"
           />
         </Show>
-        <Show when={routeData.instanceDetails.data?.last_played}>
+        <Show when={routeData.instanceDetails.data?.lastPlayed}>
           <Card
             title={t("instance.overview_card_last_played_title")}
             text={format(
               new Date(
                 (routeData.instanceDetails.data as InstanceDetails)
-                  ?.last_played as string
+                  ?.lastPlayed as string
               ),
               "PPP"
             )}
@@ -145,7 +145,7 @@ const Overview = () => {
             routeData.modpackInfo.data
           }
         >
-          <div class="relative flex p-5 rounded-xl box-border bg-darkSlate-700 w-full min-h-23 h-max overflow-hidden">
+          <div class="relative flex p-5 rounded-xl box-border bg-darkSlate-700 w-full overflow-hidden min-h-23 h-max">
             <FadedBanner
               imageUrl={`http://localhost:${port}/instance/modpackIcon?instance_id=${params.id}`}
             >

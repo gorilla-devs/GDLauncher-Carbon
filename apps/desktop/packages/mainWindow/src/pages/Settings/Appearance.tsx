@@ -43,7 +43,9 @@ const Appearance = () => {
                   style={{ "background-color": shade1 }}
                   onClick={() => {
                     settingsMutation.mutate({
-                      theme: theme
+                      theme: {
+                        Set: theme
+                      }
                     });
                   }}
                 >

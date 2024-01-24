@@ -86,7 +86,7 @@ const ThirdStep = (props: Props) => {
         </Match>
         <Match when={!entity()}>
           <div class="flex-1 w-full">
-            <ul class="grid grid-cols-3 gap-2 p-0">
+            <ul class="grid gap-2 p-0 grid-cols-3">
               <For
                 each={entities.data?.sort(
                   (a, b) =>

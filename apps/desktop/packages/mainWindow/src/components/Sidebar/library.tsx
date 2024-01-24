@@ -103,7 +103,7 @@ const Sidebar = () => {
                   inputRef?.focus();
                 }}
               >
-                <div class="duration-100 ease-in-out transition i-ri:search-line text-darkSlate-500 group-hover:text-darkSlate-50" />
+                <div class="duration-100 ease-in-out transition text-darkSlate-500 i-ri:search-line group-hover:text-darkSlate-50" />
               </div>
             }
           >

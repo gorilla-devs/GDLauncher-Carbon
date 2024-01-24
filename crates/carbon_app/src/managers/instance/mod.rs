@@ -949,6 +949,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 global_java_args: true,
                 extra_java_args: None,
                 memory: None,
+                game_resolution: None,
             },
             mod_sources: None,
             notes,
@@ -1111,6 +1112,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         if let Some(extra_java_args) = update.extra_java_args {
             info.game_configuration.extra_java_args = extra_java_args;
+        }
+
+        if let Some(game_resolution) = update.game_resolution {
+            info.game_configuration.game_resolution = game_resolution;
         }
 
         if let Some(memory) = update.memory {
@@ -1486,6 +1491,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             global_java_args: instance.config.game_configuration.global_java_args,
             extra_java_args: instance.config.game_configuration.extra_java_args.clone(),
             memory: instance.config.game_configuration.memory,
+            game_resolution: instance.config.game_configuration.game_resolution.clone(),
             last_played: instance.config.last_played,
             seconds_played: instance.config.seconds_played as u32,
             modloaders: match &instance.config.game_configuration.version {
@@ -2282,6 +2288,7 @@ mod test {
                 global_java_args: None,
                 extra_java_args: None,
                 memory: None,
+                game_resolution: None,
                 modpack_locked: None,
                 mod_sources: None,
             })

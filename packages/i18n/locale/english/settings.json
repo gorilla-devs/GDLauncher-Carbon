@@ -33,6 +33,8 @@
   "potato_mode_text": "You got a potato PC? Don't worry! We've got you covered. Enable this and all animations and special effects will be disabled.",
   "rerun_onboarding": "Rerun Onboarding",
   "game_resolution": "Game Resolution",
+  "width": "Width",
+  "height": "Height",
   "appearance": "Appearance",
   "theme_default": "Default",
   "theme_light": "Light",

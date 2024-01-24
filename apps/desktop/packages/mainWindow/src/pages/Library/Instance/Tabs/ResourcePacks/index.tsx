@@ -187,7 +187,7 @@ const ResourcePacks = () => {
             />
           </Button>
         </div>
-        <div class="flex justify-between text-darkSlate-50 mb-6 z-10">
+        <div class="flex justify-between text-darkSlate-50 z-10 mb-6">
           <div class="flex gap-4">
             <div class="flex items-center gap-2 cursor-pointer">
               <Checkbox checked={true} disabled={false} />

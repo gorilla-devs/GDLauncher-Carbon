@@ -11,7 +11,7 @@ const CopyIcon = (props: Props) => {
 
   return (
     <div
-      class="i-ri:clipboard-line transition-transform duration-200 hover:scale-120 hover:text-white"
+      class="hover:text-white i-ri:clipboard-line transition-transform duration-200 hover:scale-120"
       classList={{
         "animate-scaleBounce": clicked()
       }}

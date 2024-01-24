@@ -265,6 +265,7 @@ pub async fn generate_startup_command(
     full_account: FullAccount,
     xmx_memory: u16,
     xms_memory: u16,
+    game_resolution: Option<(u16, u16)>,
     extra_java_args: &str,
     runtime_path: &RuntimePath,
     version: VersionInfo,
@@ -504,7 +505,13 @@ pub async fn generate_startup_command(
     command.push("-Dorg.lwjgl.util.Debug=true".to_string());
 
     command.push(version.main_class);
+
     substitute_arguments(&mut command, arguments.get(&ArgumentType::Game).unwrap());
+
+    if let Some(game_resolution) = game_resolution {
+        command.push(format!("--width={}", game_resolution.0));
+        command.push(format!("--height={}", game_resolution.1));
+    }
 
     Ok(command)
 }
@@ -515,6 +522,7 @@ pub async fn launch_minecraft(
     full_account: FullAccount,
     xmx_memory: u16,
     xms_memory: u16,
+    game_resolution: Option<(u16, u16)>,
     extra_java_args: &str,
     runtime_path: &RuntimePath,
     version: VersionInfo,
@@ -526,6 +534,7 @@ pub async fn launch_minecraft(
         full_account,
         xmx_memory,
         xms_memory,
+        game_resolution,
         extra_java_args,
         runtime_path,
         version,
@@ -698,6 +707,7 @@ mod tests {
             full_account,
             2048,
             2048,
+            None,
             "",
             &runtime_path,
             version,

@@ -81,6 +81,49 @@ impl From<FEReleaseChannel> for String {
     }
 }
 
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(tag = "type", content = "value")]
+pub enum GameResolution {
+    Standard(u16, u16),
+    Custom(u16, u16),
+}
+
+impl From<GameResolution> for String {
+    fn from(value: GameResolution) -> Self {
+        match value {
+            GameResolution::Standard(width, height) => format!("standard:{}x{}", width, height),
+            GameResolution::Custom(width, height) => format!("custom:{}x{}", width, height),
+        }
+    }
+}
+
+impl FromStr for GameResolution {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut parts = s.split(':');
+        let kind = parts.next().ok_or_else(|| anyhow::anyhow!("Invalid resolution"))?;
+        let game_resolution = parts
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Invalid resolution"))?;
+        let mut resolution_parts = game_resolution.split('x');
+        let width = resolution_parts
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Invalid resolution"))?
+            .parse::<u16>()?;
+        let height = resolution_parts
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Invalid resolution"))?
+            .parse::<u16>()?;
+
+        match kind {
+            "standard" => Ok(Self::Standard(width, height)),
+            "custom" => Ok(Self::Custom(width, height)),
+            _ => Err(anyhow::anyhow!("Invalid resolution")),
+        }
+    }
+}
+
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct FESettings {
@@ -95,7 +138,7 @@ struct FESettings {
     xmx: i32,
     xms: i32,
     is_first_launch: bool,
-    game_resolution: Option<String>,
+    game_resolution: Option<GameResolution>,
     java_custom_args: String,
     auto_manage_java: bool,
     mod_sources: ModSources,
@@ -120,7 +163,7 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             xms: data.xms,
             is_first_launch: data.is_first_launch,
             launcher_action_on_game_launch: data.launcher_action_on_game_launch.try_into()?,
-            game_resolution: data.game_resolution,
+            game_resolution: data.game_resolution.and_then(|r| GameResolution::from_str(&r).ok()),
             java_custom_args: data.java_custom_args,
             auto_manage_java: data.auto_manage_java,
             mod_sources: ModSources {
@@ -215,7 +258,7 @@ pub struct FESettingsUpdate {
     #[specta(optional)]
     pub launcher_action_on_game_launch: Option<Set<FELauncherActionOnGameLaunch>>,
     #[specta(optional)]
-    pub game_resolution: Option<Set<Option<String>>>,
+    pub game_resolution: Option<Set<Option<GameResolution>>>,
     #[specta(optional)]
     pub java_custom_args: Option<Set<String>>,
     #[specta(optional)]
