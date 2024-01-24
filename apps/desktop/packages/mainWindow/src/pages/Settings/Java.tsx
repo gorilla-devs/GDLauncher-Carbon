@@ -14,7 +14,7 @@ import { useRouteData } from "@solidjs/router";
 import { For, Match, Show, Switch, createMemo } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
 import { useModal } from "@/managers/ModalsManager";
-import { queryClient, rspc } from "@/utils/rspcClient";
+import { rspc } from "@/utils/rspcClient";
 import { FEJavaComponentType } from "@gd/core_module/bindings";
 import PageTitle from "./components/PageTitle";
 import Row from "./components/Row";
@@ -32,14 +32,7 @@ const Java = () => {
 
   const settings = rspc.createQuery(() => ["settings.getSettings"]);
 
-  const settingsMutation = rspc.createMutation(["settings.setSettings"], {
-    onMutate: (newSettings) => {
-      // queryClient.setQueryData(["settings.getSettings"], {
-      //   ...settings?.data,
-      //   ...newSettings
-      // });
-    }
-  });
+  const settingsMutation = rspc.createMutation(["settings.setSettings"]);
 
   let deleteJavaMutation = rspc.createMutation(["java.deleteJavaVersion"]);
 
@@ -202,7 +195,7 @@ const Java = () => {
               <Tabs>
                 <TabList heightClass="h-14">
                   <Tab class="w-1/2" centerContent>
-                    <Trans key="java.manage" />
+                    <Trans key="java.javas" />
                   </Tab>
                   <Tab class="w-1/2" centerContent>
                     <Trans key="java.profiles" />
@@ -229,24 +222,39 @@ const Java = () => {
                       <For each={Object.entries(javas())}>
                         {([javaVersion, obj]) => (
                           <div class="p-4 rounded-xl border-1 border-solid border-darkSlate-600">
-                            <h3 class="m-0 mb-4">{javaVersion}</h3>
+                            <h3 class="m-0 mb-4">
+                              <Trans
+                                key="java.java_version_number"
+                                options={{
+                                  version: javaVersion
+                                }}
+                              />
+                            </h3>
                             <Show when={obj.length > 0}>
                               <div class="flex flex-col gap-4">
                                 <For each={obj}>
                                   {(java) => (
-                                    <div class="border-1 border-solid border-darkSlate-600 flex justify-between items-center bg-darkSlate-700 rounded-lg px-4 py-2">
-                                      <span class="text-xs text-darkSlate-100">
-                                        {java.path}
-                                      </span>
-                                      <div class="flex gap-2 justify-center items-center">
-                                        <span>{java.type}</span>
-                                        {mapJavaTypeToAction(
-                                          java.type,
-                                          java.id
-                                        )}
-                                        <Show when={javaInProfile(java.id)}>
-                                          <div class="text-green-500 i-ri:checkbox-circle-fill" />
+                                    <div class="bg-darkSlate-700 rounded-md px-4 py-2">
+                                      <div class="flex justify-between text-xl text-lightSlate-400">
+                                        <div>{java.version}</div>
+                                        <Show when={java.isValid}>
+                                          <div class="i-ri:check-fill text-green-400" />
                                         </Show>
+                                      </div>
+                                      <div class="flex justify-between">
+                                        <div class="block text-xs text-lightSlate-700 overflow-hidden w-30 whitespace-nowrap overflow-ellipsis">
+                                          {java.path}
+                                        </div>
+                                        <div class="flex gap-2 justify-center items-center">
+                                          <span>{java.type}</span>
+                                          {mapJavaTypeToAction(
+                                            java.type,
+                                            java.id
+                                          )}
+                                          <Show when={javaInProfile(java.id)}>
+                                            <div class="text-green-500 i-ri:checkbox-circle-fill" />
+                                          </Show>
+                                        </div>
                                       </div>
                                     </div>
                                   )}
