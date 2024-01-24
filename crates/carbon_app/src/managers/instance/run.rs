@@ -538,6 +538,8 @@ impl ManagerRef<'_, InstanceManager> {
 
                     tracing::debug!("Required java: {:?}", required_java);
 
+                    let auto_manage_java = app.settings_manager().get_settings().await?.auto_manage_java;
+
                     let usable_java = app.java_manager().get_usable_java_for_profile_name(required_java).await?;
 
                     tracing::debug!("Usable java: {:?}", usable_java);
@@ -545,7 +547,7 @@ impl ManagerRef<'_, InstanceManager> {
                     match usable_java {
                         Some(path) => path,
                         None => {
-                            if !app.settings_manager().get_settings().await?.auto_manage_java {
+                            if !auto_manage_java {
                                 return bail!("No usable java found and auto manage java is disabled");
                             }
 
