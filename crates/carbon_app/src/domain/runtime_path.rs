@@ -287,15 +287,13 @@ impl<T: tempentry::TempEntryType> TempEntry<T> {
         let res = tokio::fs::rename(&*self, &path).await;
 
         if let Err(err) = &res {
-            tokio::fs::copy(&path, &*self)
-                .await
-                .with_context(|| {
-                    format!(
-                        "failed to copy {} to {}",
-                        path.as_ref().display(),
-                        (&*self).display()
-                    )
-                })?;
+            tokio::fs::copy(&path, &*self).await.with_context(|| {
+                format!(
+                    "failed to copy {} to {}",
+                    path.as_ref().display(),
+                    (&*self).display()
+                )
+            })?;
         }
 
         Ok(())

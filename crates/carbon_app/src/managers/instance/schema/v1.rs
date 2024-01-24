@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
-use serde::de::{Visitor, self};
-use serde::{Deserialize, Serialize, Deserializer, Serializer};
+use serde::de::{self, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashSet;
 use std::fmt;
 

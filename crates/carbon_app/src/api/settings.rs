@@ -102,7 +102,9 @@ impl FromStr for GameResolution {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut parts = s.split(':');
-        let kind = parts.next().ok_or_else(|| anyhow::anyhow!("Invalid resolution"))?;
+        let kind = parts
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Invalid resolution"))?;
         let game_resolution = parts
             .next()
             .ok_or_else(|| anyhow::anyhow!("Invalid resolution"))?;
@@ -163,7 +165,9 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             xms: data.xms,
             is_first_launch: data.is_first_launch,
             launcher_action_on_game_launch: data.launcher_action_on_game_launch.try_into()?,
-            game_resolution: data.game_resolution.and_then(|r| GameResolution::from_str(&r).ok()),
+            game_resolution: data
+                .game_resolution
+                .and_then(|r| GameResolution::from_str(&r).ok()),
             java_custom_args: data.java_custom_args,
             auto_manage_java: data.auto_manage_java,
             mod_sources: ModSources {
