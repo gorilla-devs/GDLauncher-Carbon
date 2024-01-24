@@ -34,10 +34,10 @@ const Java = () => {
 
   const settingsMutation = rspc.createMutation(["settings.setSettings"], {
     onMutate: (newSettings) => {
-      queryClient.setQueryData(["settings.getSettings"], {
-        ...settings?.data,
-        ...newSettings
-      });
+      // queryClient.setQueryData(["settings.getSettings"], {
+      //   ...settings?.data,
+      //   ...newSettings
+      // });
     }
   });
 
@@ -99,12 +99,7 @@ const Java = () => {
       <RowsContainer>
         <Row forceContentBelow>
           <Title>
-            <Trans
-              key="java.java_memory_title"
-              options={{
-                defaultValue: "Java Memory"
-              }}
-            />
+            <Trans key="java.java_memory_title" />
           </Title>
           <Center>
             <Slider
@@ -113,13 +108,13 @@ const Java = () => {
               steps={1000}
               marks={generateSequence(2048, mbTotalRAM())}
               value={settings.data?.xmx}
-              onChange={(val) =>
+              onChange={(val) => {
                 settingsMutation.mutate({
                   xmx: {
                     Set: val
                   }
-                })
-              }
+                });
+              }}
             />
             <Input
               class="w-26"
@@ -136,12 +131,7 @@ const Java = () => {
         </Row>
         <Row class="flex-col items-stretch">
           <Title>
-            <Trans
-              key="java.java_arguments_title"
-              options={{
-                defaultValue: "Java Arguments"
-              }}
-            />
+            <Trans key="java.java_arguments_title" />
           </Title>
           <div class="flex gap-4 justify-center items-center">
             <Input
@@ -157,7 +147,6 @@ const Java = () => {
             />
             <Tooltip content={<Trans key="tooltip.undo" />}>
               <Button
-                rounded={false}
                 type="secondary"
                 class="h-10"
                 size="small"
@@ -174,7 +163,6 @@ const Java = () => {
             </Tooltip>
             <Tooltip content={<Trans key="tooltip.reset" />}>
               <Button
-                rounded={false}
                 type="secondary"
                 class="h-10"
                 size="small"
@@ -193,12 +181,7 @@ const Java = () => {
         </Row>
         <Row>
           <Title>
-            <Trans
-              key="java.auto_handle_java"
-              options={{
-                defaultValue: "Auto handle java"
-              }}
-            />
+            <Trans key="java.auto_handle_java" />
           </Title>
           <RightHandSide>
             <GDSwitch
@@ -219,33 +202,17 @@ const Java = () => {
               <Tabs>
                 <TabList heightClass="h-14">
                   <Tab class="w-1/2" centerContent>
-                    <Trans
-                      key="java.manage"
-                      options={{
-                        defaultValue: "Manage"
-                      }}
-                    />
+                    <Trans key="java.manage" />
                   </Tab>
                   <Tab class="w-1/2" centerContent>
-                    <Trans
-                      key="java.profiles"
-                      options={{
-                        defaultValue: "Profiles"
-                      }}
-                    />
+                    <Trans key="java.profiles" />
                   </Tab>
                 </TabList>
                 <TabPanel>
                   <div class="h-full bg-darkSlate-900 p-4 min-h-96">
                     <div class="flex justify-between items-center mb-4">
                       <h2 class="m-0 text-sm font-normal">
-                        <Trans
-                          key="java.found_java_text"
-                          options={{
-                            defaultValue:
-                              "We found the following java versions on your pc"
-                          }}
-                        />
+                        <Trans key="java.found_java_text" />
                       </h2>
                       <Button
                         rounded={false}
@@ -288,12 +255,7 @@ const Java = () => {
                             </Show>
                             <Show when={obj.length === 0}>
                               <p>
-                                <Trans
-                                  key="java.no_found_java_text"
-                                  options={{
-                                    defaultValue: "No java available"
-                                  }}
-                                />
+                                <Trans key="java.no_found_java_text" />
                               </p>
                             </Show>
                           </div>
