@@ -16,7 +16,7 @@ import {
   FETask
 } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
-import { port, rspc } from "@/utils/rspcClient";
+import { rspc } from "@/utils/rspcClient";
 import { createStore } from "solid-js/store";
 import { bytesToMB } from "@/utils/helpers";
 import { RSPCError } from "@rspc/client";

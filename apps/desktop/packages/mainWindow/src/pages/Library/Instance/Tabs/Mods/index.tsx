@@ -30,6 +30,8 @@ const Mods = () => {
   const [selectedModsMap, setSelectedModsMap] = createStore<{
     [id: string]: boolean;
   }>({});
+  const [isModStatusToggleLoading, setIsModStatusToggleLoading] =
+    createSignal(false);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const isInstanceLocked = () =>
@@ -158,8 +160,13 @@ const Mods = () => {
                 selectedMods()?.some((mod) => mod.enabled) &&
                 selectedMods()?.some((mod) => !mod.enabled)
               }
+              isLoading={isModStatusToggleLoading()}
               checked={selectedMods()?.every((mod) => mod.enabled) || false}
-              onChange={(event) => {
+              onChange={async (event) => {
+                if (isModStatusToggleLoading()) return;
+
+                setIsModStatusToggleLoading(true);
+
                 let action = event.target.checked;
 
                 if (
@@ -175,17 +182,21 @@ const Mods = () => {
 
                 for (const mod of modsThatNeedApply || []) {
                   if (action) {
-                    enableModMutation.mutate({
+                    await enableModMutation.mutateAsync({
                       instance_id: parseInt(params.id, 10),
                       mod_id: mod.id
                     });
                   } else {
-                    disableModMutation.mutate({
+                    await disableModMutation.mutateAsync({
                       instance_id: parseInt(params.id, 10),
                       mod_id: mod.id
                     });
                   }
+
+                  await new Promise((resolve) => setTimeout(resolve, 10));
                 }
+
+                setIsModStatusToggleLoading(false);
               }}
             />
           </Show>

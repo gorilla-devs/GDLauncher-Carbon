@@ -7,7 +7,7 @@ import { Checkbox, Dropdown } from "@gd/ui";
 import { useSearchParams } from "@solidjs/router";
 import { Match, Switch, createMemo, createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
-import { port, rspc } from "@/utils/rspcClient";
+import { rspc } from "@/utils/rspcClient";
 import { useInfiniteVersionsQuery } from "../InfiniteScrollVersionsQueryWrapper";
 import { getInstanceImageUrl } from "@/utils/instances";
 

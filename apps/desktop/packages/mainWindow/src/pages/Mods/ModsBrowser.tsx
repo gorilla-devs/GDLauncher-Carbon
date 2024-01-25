@@ -27,7 +27,7 @@ import {
   NoMoreModpacks
 } from "../Modpacks/ModpacksStatus";
 import { useRouteData, useSearchParams } from "@solidjs/router";
-import { port, rspc } from "@/utils/rspcClient";
+import { rspc } from "@/utils/rspcClient";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { getInstanceImageUrl } from "@/utils/instances";

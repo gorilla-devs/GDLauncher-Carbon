@@ -401,24 +401,7 @@ const Mod = (props: Props) => {
               placement="top"
               class="max-w-38 text-ellipsis overflow-hidden"
             >
-              <Switch
-                disabled={props.isInstanceLocked}
-                checked={props.mod.enabled}
-                onChange={(e) => {
-                  if (instanceId() === undefined) return;
-                  if (e.target.checked) {
-                    enableModMutation.mutate({
-                      instance_id: parseInt(instanceId() as string, 10),
-                      mod_id: props.mod.id
-                    });
-                  } else {
-                    disableModMutation.mutate({
-                      instance_id: parseInt(instanceId() as string, 10),
-                      mod_id: props.mod.id
-                    });
-                  }
-                }}
-              />
+              <Switch disabled checked={props.mod.enabled} />
             </Tooltip>
           </Show>
           <Show when={!props.isInstanceLocked}>
@@ -612,8 +595,9 @@ const Mod = (props: Props) => {
                           size="small"
                           onClick={() => {
                             navigate(
-                              `/mods/${props.mod.curseforge
-                                ?.project_id}/curseforge?instanceId=${instanceId()}`
+                              `/mods/${
+                                props.mod.curseforge?.project_id
+                              }/curseforge?instanceId=${instanceId()}`
                             );
                           }}
                         >
@@ -662,8 +646,9 @@ const Mod = (props: Props) => {
                           size="small"
                           onClick={() => {
                             navigate(
-                              `/mods/${props.mod.modrinth
-                                ?.project_id}/modrith?instanceId=${instanceId()}`
+                              `/mods/${
+                                props.mod.modrinth?.project_id
+                              }/modrith?instanceId=${instanceId()}`
                             );
                           }}
                         >
@@ -724,8 +709,9 @@ const Mod = (props: Props) => {
                           class="p-4 text-md flex gap-4 justify-between hover:bg-darkSlate-800"
                           onClick={() => {
                             navigate(
-                              `/mods/${props.mod.modrinth
-                                ?.project_id}/modrinth/versions?instanceId=${instanceId()}`
+                              `/mods/${
+                                props.mod.modrinth?.project_id
+                              }/modrinth/versions?instanceId=${instanceId()}`
                             );
                           }}
                         >
@@ -742,8 +728,9 @@ const Mod = (props: Props) => {
                           class="hover:bg-darkSlate-800 p-4 text-md flex gap-4 justify-between"
                           onClick={() => {
                             navigate(
-                              `/mods/${props.mod.curseforge
-                                ?.project_id}/curseforge/versions?instanceId=${instanceId()}`
+                              `/mods/${
+                                props.mod.curseforge?.project_id
+                              }/curseforge/versions?instanceId=${instanceId()}`
                             );
                           }}
                         >
