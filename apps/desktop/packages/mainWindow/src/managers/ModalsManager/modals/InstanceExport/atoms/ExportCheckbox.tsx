@@ -93,6 +93,7 @@ const ExportCheckbox = (props: {
       );
     }
   });
+
   createEffect(() => {
     const obj = buildNestedObject(checkedFiles());
     console.log(obj);
