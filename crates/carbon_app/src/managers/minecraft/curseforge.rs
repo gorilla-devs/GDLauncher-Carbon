@@ -2,12 +2,15 @@ use std::borrow::BorrowMut;
 use std::path::Path;
 use std::sync::Arc;
 
+use itertools::Itertools;
+
 use carbon_net::{Downloadable, Progress};
 use tokio::task::spawn_blocking;
 
-use crate::domain::modplatforms::curseforge::{self, CurseForgeResponse, File};
+use crate::domain::modplatforms::curseforge::{self, CurseForgeResponse, File, HashAlgo};
 use crate::domain::runtime_path::InstancePath;
 use crate::managers::App;
+use crate::managers::instance::modpack::packinfo::PackInfo;
 
 use super::UpdateValue;
 
@@ -34,7 +37,8 @@ impl ProgressState {
 #[derive(Debug)]
 pub struct ModpackInfo {
     pub manifest: curseforge::manifest::Manifest,
-    pub downloadables: Vec<Downloadable>,
+    // (downloadable, existing path from packinfo)
+    pub downloadables: Vec<(Downloadable, Option<String>)>,
 }
 
 pub async fn download_modpack_zip(
@@ -89,6 +93,7 @@ pub async fn prepare_modpack_from_zip(
     zip_path: &Path,
     instance_path: &InstancePath,
     skip_overlays: bool,
+    packinfo: Option<&Arc<PackInfo>>,
     progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
 ) -> anyhow::Result<ModpackInfo> {
     let progress_percentage_sender = Arc::new(progress_percentage_sender);
@@ -124,6 +129,7 @@ pub async fn prepare_modpack_from_zip(
             let mod_id = file.project_id;
             let file_id = file.file_id;
 
+            let packinfo = packinfo.cloned();
             let handle = tokio::spawn(async move {
                 let _ = semaphore.acquire().await?;
 
@@ -132,6 +138,33 @@ pub async fn prepare_modpack_from_zip(
                 let CurseForgeResponse { data: mod_file, .. } = cf_manager
                     .get_mod_file(curseforge::filters::ModFileParameters { mod_id, file_id })
                     .await?;
+
+                let existing_path = packinfo.map(|packinfo| 'a: {
+                    let packinfo_path = format!("/mods/{}", mod_file.file_name);
+
+                    if let Some(pihashes) = packinfo.files.get(&packinfo_path) {
+                        tracing::warn!(?pihashes, ?mod_file.hashes);
+
+                        let md5hash = mod_file.hashes.iter()
+                            .filter_map(|hash| match hash.algo {
+                                HashAlgo::Md5 => Some(&hash.value),
+                                _ => None,
+                            })
+                            .find_map(|hash| {
+                                let mut array = [0u8; 16];
+                                hex::decode_to_slice(&hash, &mut array).ok()?;
+                                Some(array)
+                            });
+
+                        if let Some(md5) = md5hash {
+                            if md5 == pihashes.md5 {
+                                break 'a Some(packinfo_path)
+                            }
+                        }
+                    }
+
+                    None
+                }).flatten();
 
                 let instance_path = instance_path.get_mods_path(); // TODO: they could also be other things
                 let downloadable = Downloadable::new(
@@ -148,11 +181,13 @@ pub async fn prepare_modpack_from_zip(
                     ));
                 });
 
-                Ok::<Downloadable, anyhow::Error>(downloadable)
+                Ok::<_, anyhow::Error>((downloadable, existing_path))
             });
 
             handles.push(handle);
         }
+
+        use itertools::Itertools;
 
         futures::future::join_all(handles)
             .await

@@ -40,6 +40,7 @@ pub mod export;
 pub mod importer;
 pub mod installer;
 pub mod log;
+pub mod modpack;
 mod mods;
 mod run;
 mod schema;
@@ -205,6 +206,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     config,
                     state: run::LaunchState::Inactive { failed_task: None },
                     icon_revision: 0,
+                    modpack_update_curseforge: None,
+                    modpack_update_modrinth: None,
                 };
 
                 Ok(Some(Instance {
@@ -948,6 +951,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     config: info,
                     state: run::LaunchState::Inactive { failed_task: None },
                     icon_revision: 0,
+                    modpack_update_curseforge: None,
+                    modpack_update_modrinth: None,
                 }),
             },
         );
@@ -1268,6 +1273,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     config: new_info,
                     state: run::LaunchState::Inactive { failed_task: None },
                     icon_revision: 0,
+                    modpack_update_curseforge: None,
+                    modpack_update_modrinth: None,
                 }),
             },
         );
@@ -1644,6 +1651,8 @@ pub struct InstanceData {
     favorite: bool,
     config: info::Instance,
     state: run::LaunchState,
+    modpack_update_curseforge: Option<bool>,
+    modpack_update_modrinth: Option<bool>,
     icon_revision: u32,
 }
 
