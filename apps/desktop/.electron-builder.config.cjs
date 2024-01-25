@@ -92,7 +92,7 @@ module.exports = {
     extendInfo: "./entitlements.mac.plist",
     hardenedRuntime: true,
     gatekeeperAssess: false,
-    teamId: process.env.APPLE_TEAM_ID
+    notarize: false
   },
   dmg: {
     sign: false
