@@ -582,7 +582,7 @@ struct ListInstance {
     name: String,
     favorite: bool,
     status: ListInstanceStatus,
-    icon_revision: u32,
+    icon_revision: Option<u32>,
     last_played: Option<DateTime<Utc>>,
     date_created: DateTime<Utc>,
     date_updated: DateTime<Utc>,
@@ -855,7 +855,7 @@ struct InstanceDetails {
     modloaders: Vec<ModLoader>,
     notes: String,
     state: LaunchState,
-    icon_revision: u32,
+    icon_revision: Option<u32>,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]

@@ -211,11 +211,16 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await
         {
             Ok(config) => {
+                let icon_revision = match &config.icon {
+                    InstanceIcon::Default => None,
+                    InstanceIcon::RelativePath(_) => Some(1),
+                };
+
                 let instance = InstanceData {
                     favorite: cached.map(|cached| cached.favorite).unwrap_or(false),
                     config,
                     state: run::LaunchState::Inactive { failed_task: None },
-                    icon_revision: 0,
+                    icon_revision,
                 };
 
                 Ok(Some(Instance {
@@ -287,7 +292,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         favorite: instance.favorite,
                         icon_revision: match &status {
                             InstanceType::Valid(data) => data.icon_revision,
-                            InstanceType::Invalid(_) => 0,
+                            InstanceType::Invalid(_) => None,
                         },
                         status: match status {
                             InstanceType::Valid(status) => {
@@ -994,6 +999,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         trace!("Adding instance to instances list");
+
+        let icon_revision = match &info.icon {
+            InstanceIcon::Default => None,
+            InstanceIcon::RelativePath(_) => Some(1),
+        };
+
         self.instances.write().await.insert(
             id,
             Instance {
@@ -1002,7 +1013,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     favorite: false,
                     config: info,
                     state: run::LaunchState::Inactive { failed_task: None },
-                    icon_revision: 0,
+                    icon_revision,
                 }),
             },
         );
@@ -1060,7 +1071,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             };
 
             info.icon = icon;
-            data.icon_revision += 1;
+            data.icon_revision = match info.icon {
+                InstanceIcon::Default => None,
+                InstanceIcon::RelativePath(_) => Some(data.icon_revision.unwrap_or(1) + 1),
+            };
         }
 
         if let Some(name) = update.name.clone() {
@@ -1321,6 +1335,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         .await??;
 
         let json = schema::make_instance_config(new_info.clone())?;
+
+        let icon_revision = match &new_info.icon {
+            InstanceIcon::Default => None,
+            InstanceIcon::RelativePath(_) => Some(1),
+        };
+
         tokio::fs::write(&tmpdir.join("instance.json"), json).await?;
 
         tokio::fs::rename(&tmppath, new_path).await?;
@@ -1340,7 +1360,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     favorite: false,
                     config: new_info,
                     state: run::LaunchState::Inactive { failed_task: None },
-                    icon_revision: 0,
+                    icon_revision,
                 }),
             },
         );
@@ -1473,6 +1493,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             InstanceType::Valid(x) => x,
         };
 
+        let icon_revision = match &instance.config.icon {
+            InstanceIcon::Default => None,
+            InstanceIcon::RelativePath(_) => instance.icon_revision,
+        };
+
         Ok(domain::InstanceDetails {
             favorite: instance.favorite,
             name: instance.config.name.clone(),
@@ -1503,7 +1528,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             },
             state: (&instance.state).into(),
             notes: instance.config.notes.clone(),
-            icon_revision: 0,
+            icon_revision,
         })
     }
 
@@ -1663,7 +1688,7 @@ pub struct ListInstance {
     pub name: String,
     pub favorite: bool,
     pub status: ListInstanceStatus,
-    pub icon_revision: u32,
+    pub icon_revision: Option<u32>,
     pub last_played: Option<DateTime<Utc>>,
     pub locked: bool,
     pub date_created: DateTime<Utc>,
@@ -1803,7 +1828,7 @@ pub struct InstanceData {
     favorite: bool,
     config: info::Instance,
     state: run::LaunchState,
-    icon_revision: u32,
+    icon_revision: Option<u32>,
 }
 
 #[derive(Debug, Clone)]
@@ -2251,7 +2276,7 @@ mod test {
                 id: instance_id,
                 name: String::from("test"),
                 favorite: false,
-                icon_revision: 0,
+                icon_revision: None,
                 status: ListInstanceStatus::Valid(ValidListInstance {
                     mc_version: Some(String::from("1.7.10")),
                     modloader: None,

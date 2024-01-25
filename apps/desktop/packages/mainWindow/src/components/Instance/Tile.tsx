@@ -246,7 +246,7 @@ const Tile = (props: Props) => {
                 }}
                 style={{
                   "background-image": props.img
-                    ? `url("${props.img as string}")`
+                    ? `url("${props.img}")`
                     : `url("${DefaultImg}")`,
                   "background-size": props.img ? "cover" : "120%"
                 }}

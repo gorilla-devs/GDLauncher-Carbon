@@ -43,7 +43,7 @@ pub struct InstanceDetails {
     pub modloaders: Vec<info::ModLoader>,
     pub state: LaunchState,
     pub notes: String,
-    pub icon_revision: u32,
+    pub icon_revision: Option<u32>,
 }
 
 #[derive(Debug)]
