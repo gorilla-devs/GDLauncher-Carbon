@@ -3,7 +3,6 @@ import { Button, Dropdown, Input, Skeleton } from "@gd/ui";
 import {
   createEffect,
   createMemo,
-  createResource,
   createSignal,
   For,
   Match,
@@ -22,7 +21,6 @@ import { CurseForgeSortFields, ModrinthSortFields } from "@/utils/constants";
 import ModRow from "@/components/ModRow";
 import fetchData from "./modsBrowser.data";
 import { useInfiniteModsQuery } from "@/components/InfiniteScrollModsQueryWrapper";
-import { fetchImage } from "@/utils/instances";
 import { FetchingModpacks, NoModpacksAvailable } from "./ModsStatus";
 import {
   ErrorFetchingModpacks,
@@ -32,6 +30,7 @@ import { useRouteData, useSearchParams } from "@solidjs/router";
 import { rspc } from "@/utils/rspcClient";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
+import { getInstanceImageUrl } from "@/utils/instances";
 
 const ModsBrowser = () => {
   const [t] = useTransContext();
@@ -119,8 +118,6 @@ const ModsBrowser = () => {
       ? infiniteQuery.infiniteQuery.data.pages.flatMap((d) => d.data)
       : [];
 
-  const [imageResource] = createResource(instanceId, fetchImage);
-
   // const instanceModloaders = () =>
   //   instanceDetails.data?.modloaders.map((modloader) => modloader.type_);
 
@@ -176,9 +173,13 @@ const ModsBrowser = () => {
                 <div
                   class="border-1 border-solid h-10 mb-4 rounded-lg overflow-hidden box-border flex items-center justify-between border-darkSlate-500 relative"
                   style={{
-                    "background-image": imageResource()
-                      ? `url("${imageResource()}")`
-                      : `url("${DefaultImg}")`
+                    "background-image":
+                      instanceDetails.data?.iconRevision && instanceId()
+                        ? `url("${getInstanceImageUrl(
+                            instanceId()!,
+                            instanceDetails.data?.iconRevision
+                          )}")`
+                        : `url("${DefaultImg}")`
                   }}
                 >
                   <div class="absolute z-0 bg-gradient-to-r from-darkSlate-700 from-50% inset-0" />
@@ -199,8 +200,11 @@ const ModsBrowser = () => {
                     <div
                       class="bg-center bg-cover w-6 h-6"
                       style={{
-                        "background-image": imageResource()
-                          ? `url("${imageResource()}")`
+                        "background-image": instanceDetails.data?.iconRevision
+                          ? `url("${getInstanceImageUrl(
+                              instanceId()!,
+                              instanceDetails.data?.iconRevision
+                            )}")`
                           : `url("${DefaultImg}")`
                       }}
                     />

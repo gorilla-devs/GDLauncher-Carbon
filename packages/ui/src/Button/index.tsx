@@ -188,6 +188,7 @@ function Button(props: Props) {
 
   return (
     <button
+      {...(others as JSX.ButtonHTMLAttributes<HTMLButtonElement>)}
       classList={{
         ...getVariant(
           props.type || "primary",
@@ -203,7 +204,6 @@ function Button(props: Props) {
         ),
         ...props.classList,
       }}
-      {...(others as JSX.ButtonHTMLAttributes<HTMLButtonElement>)}
       style={{
         ...(mergedProps.type === "transparent" && {
           background: "rgba(0, 0, 0, 0.9)",

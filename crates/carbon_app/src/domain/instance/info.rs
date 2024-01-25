@@ -60,12 +60,19 @@ pub struct ModrinthModpack {
     pub version_id: String,
 }
 
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub enum GameResolution {
+    Standard(u16, u16),
+    Custom(u16, u16),
+}
+
 #[derive(Debug, Clone)]
 pub struct GameConfig {
     pub version: Option<GameVersion>,
     pub global_java_args: bool,
     pub extra_java_args: Option<String>,
     pub memory: Option<(u16, u16)>,
+    pub game_resolution: Option<GameResolution>,
 }
 
 #[derive(Debug, Clone)]

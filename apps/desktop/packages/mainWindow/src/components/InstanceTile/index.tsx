@@ -1,13 +1,13 @@
-import { createEffect, createResource, createSignal } from "solid-js";
+import { createEffect, createSignal } from "solid-js";
 import Tile from "../Instance/Tile";
 import {
-  fetchImage,
   isListInstanceValid,
   getValideInstance,
   getPreparingState,
   getRunningState,
   getInValideInstance,
-  getInactiveState
+  getInactiveState,
+  getInstanceImageUrl
 } from "@/utils/instances";
 import {
   ListInstance,
@@ -42,10 +42,7 @@ const InstanceTile = (props: {
     percentage: 0,
     subTasks: undefined
   });
-  const [imageResource, { refetch }] = createResource(
-    () => props.instance.id,
-    fetchImage
-  );
+
   const navigate = useGDNavigate();
 
   const validInstance = () => getValideInstance(props.instance.status);
@@ -69,12 +66,6 @@ const InstanceTile = (props: {
   createEffect(() => {
     if (taskId() !== undefined) {
       setTask(rspc.createQuery(() => ["vtask.getTask", taskId() as number]));
-    }
-  });
-
-  createEffect(() => {
-    if (props.instance.icon_revision !== undefined) {
-      refetch();
     }
   });
 
@@ -136,7 +127,11 @@ const InstanceTile = (props: {
       isRunning={!!isRunning()}
       isPreparing={isPreparingState() !== undefined}
       variant={type()}
-      img={imageResource()}
+      img={
+        props.instance.icon_revision
+          ? getInstanceImageUrl(props.instance.id, props.instance.icon_revision)
+          : undefined
+      }
       selected={props.selected}
       isLoading={isLoading()}
       percentage={progress.percentage * 100}

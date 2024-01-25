@@ -78,13 +78,13 @@ pub fn build_axum_vanilla_router() -> axum::Router<Arc<AppInner>> {
         .nest("/instance", instance::mount_axum_router())
 }
 
-#[derive(Type, Debug, Deserialize)]
-enum Set<T> {
+#[derive(Type, Debug, Deserialize, Clone)]
+pub enum Set<T> {
     Set(T),
 }
 
 impl<T> Set<T> {
-    fn inner(self) -> T {
+    pub fn inner(self) -> T {
         match self {
             Self::Set(t) => t,
         }

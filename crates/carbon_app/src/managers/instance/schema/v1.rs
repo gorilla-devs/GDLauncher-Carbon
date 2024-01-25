@@ -1,6 +1,8 @@
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::de::{self, Visitor};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashSet;
+use std::fmt;
 
 fn get_current_datetime() -> DateTime<Utc> {
     Utc::now()
@@ -88,14 +90,89 @@ pub struct ModChannelWithUsage {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "type", content = "value")]
+pub enum GameResolution {
+    Standard(u16, u16),
+    Custom(u16, u16),
+}
+
+fn serialize_resolution<S>(
+    game_resolution: &Option<GameResolution>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match game_resolution {
+        Some(GameResolution::Standard(width, height)) => {
+            serializer.serialize_str(&format!("standard:{}x{}", width, height))
+        }
+        Some(GameResolution::Custom(width, height)) => {
+            serializer.serialize_str(&format!("custom:{}x{}", width, height))
+        }
+        None => serializer.serialize_none(),
+    }
+}
+
+// Custom deserialization function for GameResolution
+fn deserialize_resolution<'de, D>(deserializer: D) -> Result<Option<GameResolution>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct ResolutionVisitor;
+
+    impl<'de> Visitor<'de> for ResolutionVisitor {
+        type Value = Option<GameResolution>;
+
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a game_resolution string in the format `type:widthxheight`")
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Option<GameResolution>, E>
+        where
+            E: de::Error,
+        {
+            let parts: Vec<&str> = value.split(':').collect();
+            if parts.len() != 2 {
+                return Err(E::custom("invalid format"));
+            }
+
+            let size_parts: Vec<&str> = parts[1].split('x').collect();
+            if size_parts.len() != 2 {
+                return Err(E::custom("invalid size format"));
+            }
+
+            let width: u16 = size_parts[0].parse().map_err(de::Error::custom)?;
+            let height: u16 = size_parts[1].parse().map_err(de::Error::custom)?;
+
+            match parts[0] {
+                "standard" => Ok(Some(GameResolution::Standard(width, height))),
+                "custom" => Ok(Some(GameResolution::Custom(width, height))),
+                _ => Err(E::custom("unknown game_resolution type")),
+            }
+        }
+    }
+
+    deserializer.deserialize_str(ResolutionVisitor)
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GameConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<GameVersion>,
     #[serde(default = "default_global_java_args")]
     pub global_java_args: bool,
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub extra_java_args: Option<String>,
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub memory: Option<MemoryRange>,
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_resolution")]
+    #[serde(serialize_with = "serialize_resolution")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub game_resolution: Option<GameResolution>,
 }
 
 fn default_global_java_args() -> bool {
@@ -280,6 +357,7 @@ impl From<GameConfig> for info::GameConfig {
             global_java_args: value.global_java_args,
             extra_java_args: value.extra_java_args,
             memory: value.memory.map(Into::into),
+            game_resolution: value.game_resolution.map(Into::into),
         }
     }
 }
@@ -291,6 +369,29 @@ impl From<info::GameConfig> for GameConfig {
             global_java_args: value.global_java_args,
             extra_java_args: value.extra_java_args,
             memory: value.memory.map(Into::into),
+            game_resolution: value.game_resolution.map(Into::into),
+        }
+    }
+}
+
+impl From<GameResolution> for info::GameResolution {
+    fn from(value: GameResolution) -> Self {
+        use GameResolution as Schema;
+
+        match value {
+            Schema::Standard(w, h) => Self::Standard(w, h),
+            Schema::Custom(w, h) => Self::Custom(w, h),
+        }
+    }
+}
+
+impl From<info::GameResolution> for GameResolution {
+    fn from(value: info::GameResolution) -> Self {
+        use info::GameResolution as Info;
+
+        match value {
+            Info::Standard(w, h) => Self::Standard(w, h),
+            Info::Custom(w, h) => Self::Custom(w, h),
         }
     }
 }

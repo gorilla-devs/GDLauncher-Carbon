@@ -148,7 +148,7 @@ const ExportCheckbox = (props: {
                 ? "i-ep:arrow-down-bold"
                 : "i-ep:arrow-down-bold rotate-[270deg]"
             } bg-darkSlate-500`}
-          ></div>
+          />
           <Checkbox
             indeterminate={checkedFiles().some((item) =>
               isSubsetOf(props.folder.path as Array<string>, item)
@@ -176,7 +176,7 @@ const ExportCheckbox = (props: {
           </For> */}
           <For each={(props.initialData as any) || contents()}>
             {(item) => (
-              <div class="flex flex-row justify-between items-center ">
+              <div class="flex justify-between items-center flex-row">
                 <Switch>
                   <Match when={item.type === "Directory"}>
                     <ExportCheckbox
@@ -193,7 +193,7 @@ const ExportCheckbox = (props: {
                   </Match>
                   <Match when={item.type !== "Directory"}>
                     <div class="flex items-center gap-2 p-1">
-                      <div class="w-[16px] h-[16px]"></div>
+                      <div class="w-[16px] h-[16px]" />
                       <FileCheckbox name={item.name} file={props.folder} />
                       {/* <Checkbox
                         checked={checkedFiles().some((checkedItem) =>

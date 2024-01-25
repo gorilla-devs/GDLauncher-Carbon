@@ -165,7 +165,7 @@ const Logs = () => {
           </Button>
         </Tooltip>
       </div>
-      <div class="pb-4 max-h-full flex flex-col divide-y divide-x-none divide-solid divide-darkSlate-500 select-text">
+      <div class="pb-4 max-h-full flex flex-col divide-y divide-darkSlate-500 divide-x-none divide-solid select-text">
         <Switch>
           <Match when={(instanceLogss().length || 0) > 0}>
             <For each={instanceLogss()}>

@@ -79,7 +79,7 @@ const ModUpdateTooltip = (props: {
   ]);
 
   return (
-    <div class="text-lightSlate-200 w-80 h-40 flex flex-col items-center gap-4">
+    <div class="text-lightSlate-200 h-40 flex flex-col items-center gap-4 w-80">
       <div class="text-lg mb-4">
         <Trans
           key="instance.update_available_from"
@@ -287,7 +287,7 @@ const Mod = (props: Props) => {
       <div class="flex justify-between items-center w-full gap-4">
         <div class="flex gap-4 justify-between items-center">
           <div
-            class="opacity-0 group-hover:opacity-100 transition-opacity duration-100 ease-in-out"
+            class="duration-100 ease-in-out opacity-0 group-hover:opacity-100 transition-opacity"
             classList={{
               "opacity-100":
                 props.selectMods[props.mod.id] ||
@@ -401,24 +401,7 @@ const Mod = (props: Props) => {
               placement="top"
               class="max-w-38 text-ellipsis overflow-hidden"
             >
-              <Switch
-                disabled={props.isInstanceLocked}
-                checked={props.mod.enabled}
-                onChange={(e) => {
-                  if (instanceId() === undefined) return;
-                  if (e.target.checked) {
-                    enableModMutation.mutate({
-                      instance_id: parseInt(instanceId() as string, 10),
-                      mod_id: props.mod.id
-                    });
-                  } else {
-                    disableModMutation.mutate({
-                      instance_id: parseInt(instanceId() as string, 10),
-                      mod_id: props.mod.id
-                    });
-                  }
-                }}
-              />
+              <Switch disabled checked={props.mod.enabled} />
             </Tooltip>
           </Show>
           <Show when={!props.isInstanceLocked}>
@@ -612,8 +595,9 @@ const Mod = (props: Props) => {
                           size="small"
                           onClick={() => {
                             navigate(
-                              `/mods/${props.mod.curseforge
-                                ?.project_id}/curseforge?instanceId=${instanceId()}`
+                              `/mods/${
+                                props.mod.curseforge?.project_id
+                              }/curseforge?instanceId=${instanceId()}`
                             );
                           }}
                         >
@@ -662,8 +646,9 @@ const Mod = (props: Props) => {
                           size="small"
                           onClick={() => {
                             navigate(
-                              `/mods/${props.mod.modrinth
-                                ?.project_id}/modrith?instanceId=${instanceId()}`
+                              `/mods/${
+                                props.mod.modrinth?.project_id
+                              }/modrith?instanceId=${instanceId()}`
                             );
                           }}
                         >
@@ -724,8 +709,9 @@ const Mod = (props: Props) => {
                           class="p-4 text-md flex gap-4 justify-between hover:bg-darkSlate-800"
                           onClick={() => {
                             navigate(
-                              `/mods/${props.mod.modrinth
-                                ?.project_id}/modrinth/versions?instanceId=${instanceId()}`
+                              `/mods/${
+                                props.mod.modrinth?.project_id
+                              }/modrinth/versions?instanceId=${instanceId()}`
                             );
                           }}
                         >
@@ -742,8 +728,9 @@ const Mod = (props: Props) => {
                           class="hover:bg-darkSlate-800 p-4 text-md flex gap-4 justify-between"
                           onClick={() => {
                             navigate(
-                              `/mods/${props.mod.curseforge
-                                ?.project_id}/curseforge/versions?instanceId=${instanceId()}`
+                              `/mods/${
+                                props.mod.curseforge?.project_id
+                              }/curseforge/versions?instanceId=${instanceId()}`
                             );
                           }}
                         >

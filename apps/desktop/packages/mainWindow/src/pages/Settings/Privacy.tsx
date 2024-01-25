@@ -45,7 +45,9 @@ const Privacy = () => {
               checked={settings.data?.metricsEnabled}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  metricsEnabled: e.currentTarget.checked
+                  metricsEnabled: {
+                    Set: e.currentTarget.checked
+                  }
                 });
               }}
             />

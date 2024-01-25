@@ -173,7 +173,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
         <Show when={loading()}>
           <Spinner />
           <div
-            class="transition-width duration-100 ease-in-out"
+            class="duration-100 ease-in-out transition-width"
             classList={{
               "w-0": progress() === null,
               "w-14": progress() !== null

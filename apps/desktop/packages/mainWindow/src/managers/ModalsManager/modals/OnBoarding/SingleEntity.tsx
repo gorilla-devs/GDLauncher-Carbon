@@ -146,7 +146,7 @@ const SingleEntity = (props: {
   return (
     <>
       <div class="flex-1 w-full flex flex-col items-center justify-center p-4">
-        <div class="flex flex-col items-start justify-start w-full gap-2">
+        <div class="flex flex-col items-start w-full gap-2 justify-start">
           <span class="font-bold">
             {props.entity.entity} <Trans key="instance.import_path" />:
           </span>
@@ -304,7 +304,7 @@ const SingleEntity = (props: {
                 </Match>
                 <Match when={instance.isLoading === true}>
                   <div class="w-full h-full flex items-center justify-center">
-                    <div class="i-formkit:spinner animate-spin w-10 h-10 text-sky-800" />
+                    <div class="animate-spin w-10 h-10 i-formkit:spinner text-sky-800" />
                   </div>
                 </Match>
               </Switch>

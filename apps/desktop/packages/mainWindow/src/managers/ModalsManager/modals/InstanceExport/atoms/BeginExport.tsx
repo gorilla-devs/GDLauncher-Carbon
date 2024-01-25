@@ -8,6 +8,7 @@ import { ExportArgs, ExportEntry } from "@gd/core_module/bindings";
 import { instanceId } from "@/utils/browser";
 import { buildNestedObject, checkedFiles } from "./ExportCheckboxParent";
 import _ from "lodash";
+import { setFailedMsg } from "./Exporting";
 
 function convertNestedObject(obj: any): any {
   const result: any = {};
@@ -48,6 +49,7 @@ const BeginExport = () => {
 
   const handleExportInstance = () => {
     setPayload((prev) => ({ ...prev, instance_id: instanceId() }));
+    setFailedMsg(undefined);
     const obj = buildNestedObject(checkedFiles());
     const converted = convertNestedObject({ entries: obj });
     setPayload((prev) => ({ ...prev, filter: converted }));

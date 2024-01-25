@@ -15,32 +15,52 @@ const SingleImport = (props: {
 }) => {
   const [progress, setProgress] = createSignal(0);
   const [state, setState] = createSignal("idle");
-  const rspcContext = rspc.useContext();
+  // const rspcContext = rspc.useContext();
 
   createEffect(() => {
     async function runner() {
       if (taskIds() !== undefined) {
-        const task = await rspcContext.client.query([
-          "vtask.getTask",
-          props.taskId || null
-        ]);
-
-        if (task && task.progress) {
-          if (task.progress.type == "Known") {
-            setProgress(Math.floor(task.progress.value * 100));
+        rspc.createQuery(() => ["vtask.getTask", props.taskId || null], {
+          onSuccess: (task) => {
+            if (task && task.progress) {
+              if (task.progress.type == "Known") {
+                setProgress(Math.floor(task.progress.value * 100));
+              }
+            }
+            const isFailed = task && task.progress.type === "Failed";
+            const isDownloaded = task === null && progress() !== 0;
+            if (isDownloaded || isFailed) {
+              setTaskId(undefined);
+            }
+            if (isFailed) {
+              setState("failed");
+            } else if (isDownloaded) {
+              setState("completed");
+              setIsDownloaded(true);
+            }
           }
-        }
-        const isFailed = task && task.progress.type === "Failed";
-        const isDownloaded = task === null && progress() !== 0;
-        if (isDownloaded || isFailed) {
-          setTaskId(undefined);
-        }
-        if (isFailed) {
-          setState("failed");
-        } else if (isDownloaded) {
-          setState("completed");
-          setIsDownloaded(true);
-        }
+        });
+        // const task = await rspcContext.client.query([
+        //   "vtask.getTask",
+        //   props.taskId || null
+        // ]);
+        // console.log(task);
+        // if (task && task.progress) {
+        //   if (task.progress.type == "Known") {
+        //     setProgress(Math.floor(task.progress.value * 100));
+        //   }
+        // }
+        // const isFailed = task && task.progress.type === "Failed";
+        // const isDownloaded = task === null && progress() !== 0;
+        // if (isDownloaded || isFailed) {
+        //   setTaskId(undefined);
+        // }
+        // if (isFailed) {
+        //   setState("failed");
+        // } else if (isDownloaded) {
+        //   setState("completed");
+        //   setIsDownloaded(true);
+        // }
       }
     }
     try {
@@ -56,7 +76,7 @@ const SingleImport = (props: {
       <Switch>
         <Match when={state() === "failed" || props.importState === "error"}>
           <div>
-            <div class="i-ph:x-bold text-2xl text-red-600" />
+            <div class="text-2xl i-ph:x-bold text-red-600" />
           </div>
         </Match>
         <Match when={state() === "idle"}>
@@ -67,7 +87,7 @@ const SingleImport = (props: {
         </Match>
 
         <Match when={state() === "completed"}>
-          <div class="i-ic:round-check text-2xl text-green-600" />
+          <div class="text-2xl i-ic:round-check text-green-600" />
         </Match>
       </Switch>
     </div>

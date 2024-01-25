@@ -33,9 +33,9 @@ const ExportFormat = () => {
     { title: "Modrinth", id: 2 }
   ];
   return (
-    <div class="flex flex-col  ">
+    <div class="flex flex-col">
       <span>{t("instance.export_format")}</span>
-      <ul class="flex  gap-2 p-0">
+      <ul class="flex gap-2 p-0">
         <For
           each={entities.data
             ?.sort(

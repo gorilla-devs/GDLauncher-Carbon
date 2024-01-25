@@ -89,7 +89,7 @@ const AppUpdate = (props: ModalProps) => {
               mod_name: currentModName()
             }}
           />
-          <i class="i-ri:loader-4-line text-6xl animate-spin mt-10" />
+          <i class="i-ri:loader-4-line animate-spin text-6xl mt-10" />
         </div>
       </div>
     </ModalLayout>

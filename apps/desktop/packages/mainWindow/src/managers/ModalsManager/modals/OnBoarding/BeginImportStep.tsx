@@ -40,7 +40,7 @@ const BeginImportStep = (props: {
   }
   createMutations();
   return (
-    <div class=" w-full h-full p-2">
+    <div class="w-full overflow-y-auto p-2 h-[240px]">
       <For each={props.instances}>
         {(instance, index) => (
           <SingleImport

@@ -81,6 +81,51 @@ impl From<FEReleaseChannel> for String {
     }
 }
 
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(tag = "type", content = "value")]
+pub enum GameResolution {
+    Standard(u16, u16),
+    Custom(u16, u16),
+}
+
+impl From<GameResolution> for String {
+    fn from(value: GameResolution) -> Self {
+        match value {
+            GameResolution::Standard(width, height) => format!("standard:{}x{}", width, height),
+            GameResolution::Custom(width, height) => format!("custom:{}x{}", width, height),
+        }
+    }
+}
+
+impl FromStr for GameResolution {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut parts = s.split(':');
+        let kind = parts
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Invalid resolution"))?;
+        let game_resolution = parts
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Invalid resolution"))?;
+        let mut resolution_parts = game_resolution.split('x');
+        let width = resolution_parts
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Invalid resolution"))?
+            .parse::<u16>()?;
+        let height = resolution_parts
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Invalid resolution"))?
+            .parse::<u16>()?;
+
+        match kind {
+            "standard" => Ok(Self::Standard(width, height)),
+            "custom" => Ok(Self::Custom(width, height)),
+            _ => Err(anyhow::anyhow!("Invalid resolution")),
+        }
+    }
+}
+
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct FESettings {
@@ -95,7 +140,7 @@ struct FESettings {
     xmx: i32,
     xms: i32,
     is_first_launch: bool,
-    startup_resolution: String,
+    game_resolution: Option<GameResolution>,
     java_custom_args: String,
     auto_manage_java: bool,
     mod_sources: ModSources,
@@ -120,7 +165,9 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             xms: data.xms,
             is_first_launch: data.is_first_launch,
             launcher_action_on_game_launch: data.launcher_action_on_game_launch.try_into()?,
-            startup_resolution: data.startup_resolution,
+            game_resolution: data
+                .game_resolution
+                .and_then(|r| GameResolution::from_str(&r).ok()),
             java_custom_args: data.java_custom_args,
             auto_manage_java: data.auto_manage_java,
             mod_sources: ModSources {
@@ -193,37 +240,37 @@ impl TryFrom<String> for FELauncherActionOnGameLaunch {
 #[serde(rename_all = "camelCase")]
 pub struct FESettingsUpdate {
     #[specta(optional)]
-    pub theme: Option<String>,
+    pub theme: Option<Set<String>>,
     #[specta(optional)]
-    pub language: Option<String>,
+    pub language: Option<Set<String>>,
     #[specta(optional)]
-    pub reduced_motion: Option<bool>,
+    pub reduced_motion: Option<Set<bool>>,
     #[specta(optional)]
-    pub discord_integration: Option<bool>,
+    pub discord_integration: Option<Set<bool>>,
     #[specta(optional)]
-    pub release_channel: Option<FEReleaseChannel>,
+    pub release_channel: Option<Set<FEReleaseChannel>>,
     #[specta(optional)]
-    pub concurrent_downloads: Option<i32>,
+    pub concurrent_downloads: Option<Set<i32>>,
     #[specta(optional)]
-    pub show_news: Option<bool>,
+    pub show_news: Option<Set<bool>>,
     #[specta(optional)]
-    pub xmx: Option<i32>,
+    pub xmx: Option<Set<i32>>,
     #[specta(optional)]
-    pub xms: Option<i32>,
+    pub xms: Option<Set<i32>>,
     #[specta(optional)]
-    pub is_first_launch: Option<bool>,
+    pub is_first_launch: Option<Set<bool>>,
     #[specta(optional)]
-    pub launcher_action_on_game_launch: Option<FELauncherActionOnGameLaunch>,
+    pub launcher_action_on_game_launch: Option<Set<FELauncherActionOnGameLaunch>>,
     #[specta(optional)]
-    pub startup_resolution: Option<String>,
+    pub game_resolution: Option<Set<Option<GameResolution>>>,
     #[specta(optional)]
-    pub java_custom_args: Option<String>,
+    pub java_custom_args: Option<Set<String>>,
     #[specta(optional)]
-    pub auto_manage_java: Option<bool>,
+    pub auto_manage_java: Option<Set<bool>>,
     #[specta(optional)]
-    pub mod_sources: Option<ModSources>,
+    pub mod_sources: Option<Set<ModSources>>,
     #[specta(optional)]
-    pub terms_and_privacy_accepted: Option<bool>,
+    pub terms_and_privacy_accepted: Option<Set<bool>>,
     #[specta(optional)]
-    pub metrics_enabled: Option<bool>,
+    pub metrics_enabled: Option<Set<bool>>,
 }

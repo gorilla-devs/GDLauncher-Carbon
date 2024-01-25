@@ -188,15 +188,11 @@ export const getModrinthData = (modpack: Modpack) => {
   if ("Modrinth" in modpack) return modpack.Modrinth;
 };
 
-export const fetchImage = async (id: number) => {
-  const imageUrl = `http://localhost:${port}/instance/instanceIcon?id=${id}`;
-  const image = await fetch(imageUrl);
-
-  const imageNotPresent = image.status === 204;
-
-  if (!imageNotPresent) {
-    return imageUrl;
-  } else return "";
+export const getInstanceImageUrl = (
+  instanceId: string | number,
+  rev: string | number
+) => {
+  return `http://localhost:${port}/instance/instanceIcon?id=${instanceId}&rev=${rev}`;
 };
 
 export const getModImageUrl = (

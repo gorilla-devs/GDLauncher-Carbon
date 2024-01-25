@@ -155,7 +155,7 @@ const CodeStep = (props: Props) => {
         <Popover
           noTip
           content={
-            <div class="px-4 pb-6 max-w-100">
+            <div class="px-4 max-w-100 pb-6">
               <h3>
                 <Trans key="login.troubles_logging_in" />
               </h3>
@@ -163,7 +163,7 @@ const CodeStep = (props: Props) => {
                 <Trans key="login.link_not_working_help" />
               </div>
               <div
-                class="text-lightSlate-600 hover:text-lightSlate-50 flex gap-2 items-center"
+                class="text-lightSlate-600 flex gap-2 items-center hover:text-lightSlate-50"
                 onClick={() => {
                   navigator.clipboard.writeText(deviceCodeLink()!);
                   addNotification("The link has been copied");

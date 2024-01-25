@@ -123,6 +123,31 @@ impl ManagerRef<'_, InstanceManager> {
                 .map(|s| s as &str)
                 .unwrap_or("");
 
+        let game_resolution = match config.game_configuration.game_resolution.as_ref() {
+            Some(res) => match res {
+                info::GameResolution::Custom(w, h) => Some((*w, *h)),
+                info::GameResolution::Standard(w, h) => Some((*w, *h)),
+            },
+            None => {
+                let settings = self.app.settings_manager().get_settings().await?;
+                settings.game_resolution.and_then(|res_str| {
+                    let split_res = res_str
+                        .split_once(':')
+                        .and_then(|(_, res)| res.split_once('x'))
+                        .and_then(|(w, h)| {
+                            w.parse::<u16>()
+                                .ok()
+                                .and_then(|w| h.parse::<u16>().ok().map(|h| (w, h)))
+                        });
+
+                    match split_res {
+                        Some((w, h)) => Some((w, h)),
+                        None => None,
+                    }
+                })
+            }
+        };
+
         let runtime_path = self.app.settings_manager().runtime_path.clone();
         let instance_path = runtime_path
             .get_instances()
@@ -513,6 +538,8 @@ impl ManagerRef<'_, InstanceManager> {
 
                     tracing::debug!("Required java: {:?}", required_java);
 
+                    let auto_manage_java = app.settings_manager().get_settings().await?.auto_manage_java;
+
                     let usable_java = app.java_manager().get_usable_java_for_profile_name(required_java).await?;
 
                     tracing::debug!("Usable java: {:?}", usable_java);
@@ -520,7 +547,7 @@ impl ManagerRef<'_, InstanceManager> {
                     match usable_java {
                         Some(path) => path,
                         None => {
-                            if !app.settings_manager().get_settings().await?.auto_manage_java {
+                            if !auto_manage_java {
                                 return bail!("No usable java found and auto manage java is disabled");
                             }
 
@@ -964,6 +991,7 @@ impl ManagerRef<'_, InstanceManager> {
                             account,
                             xmx_memory,
                             xms_memory,
+                            game_resolution,
                             &extra_java_args,
                             &runtime_path,
                             version_info,

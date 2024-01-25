@@ -30,6 +30,8 @@ const Mods = () => {
   const [selectedModsMap, setSelectedModsMap] = createStore<{
     [id: string]: boolean;
   }>({});
+  const [isModStatusToggleLoading, setIsModStatusToggleLoading] =
+    createSignal(false);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const isInstanceLocked = () =>
@@ -117,7 +119,7 @@ const Mods = () => {
   return (
     <div>
       <div
-        class="flex items-center justify-between h-16 bg-darkSlate-900 shadow-md duration-100 ease-in-out border-darkSlate-700 border-solid border-1 fixed bottom-4 mx-auto left-1/2 -translate-x-1/2 rounded-md pr-6 z-50 shadow-darkSlate-900 transition-transform origin-left w-130"
+        class="flex items-center justify-between h-16 bg-darkSlate-900 shadow-md duration-100 ease-in-out border-darkSlate-700 border-solid border-1 fixed bottom-4 mx-auto left-1/2 -translate-x-1/2 rounded-md z-50 shadow-darkSlate-900 transition-transform origin-left pr-6 w-130"
         classList={{
           "translate-y-24": selectedMods()?.length === 0
         }}
@@ -158,8 +160,13 @@ const Mods = () => {
                 selectedMods()?.some((mod) => mod.enabled) &&
                 selectedMods()?.some((mod) => !mod.enabled)
               }
+              isLoading={isModStatusToggleLoading()}
               checked={selectedMods()?.every((mod) => mod.enabled) || false}
-              onChange={(event) => {
+              onChange={async (event) => {
+                if (isModStatusToggleLoading()) return;
+
+                setIsModStatusToggleLoading(true);
+
                 let action = event.target.checked;
 
                 if (
@@ -175,17 +182,21 @@ const Mods = () => {
 
                 for (const mod of modsThatNeedApply || []) {
                   if (action) {
-                    enableModMutation.mutate({
+                    await enableModMutation.mutateAsync({
                       instance_id: parseInt(params.id, 10),
                       mod_id: mod.id
                     });
                   } else {
-                    disableModMutation.mutate({
+                    await disableModMutation.mutateAsync({
                       instance_id: parseInt(params.id, 10),
                       mod_id: mod.id
                     });
                   }
+
+                  await new Promise((resolve) => setTimeout(resolve, 10));
                 }
+
+                setIsModStatusToggleLoading(false);
               }}
             />
           </Show>

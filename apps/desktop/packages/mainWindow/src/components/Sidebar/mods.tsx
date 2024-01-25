@@ -5,7 +5,6 @@ import fetchData from "@/pages/Mods/modsBrowser.data";
 import { useRouteData, useSearchParams } from "@solidjs/router";
 import {
   createMemo,
-  createResource,
   For,
   getOwner,
   Match,
@@ -24,7 +23,7 @@ import { ModpackPlatforms } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
 import {
   CategoryIcon,
-  fetchImage,
+  getInstanceImageUrl,
   getValideInstance,
   PlatformIcon
 } from "@/utils/instances";
@@ -202,18 +201,17 @@ const Sidebar = () => {
               >
                 <For each={filteredInstances() || []}>
                   {(instance) => {
-                    const [imageResource] = createResource(
-                      () => instance.id,
-                      fetchImage
-                    );
                     return (
                       <Radio name="instance" value={instance.id}>
                         <div class="flex items-center justify-between gap-2">
                           <div
                             class="w-6 h-6 bg-center bg-cover"
                             style={{
-                              "background-image": imageResource()
-                                ? `url("${imageResource()}")`
+                              "background-image": instance.icon_revision
+                                ? `url("${getInstanceImageUrl(
+                                    instance.id,
+                                    instance.icon_revision
+                                  )}")`
                                 : `url("${DefaultImg}")`
                             }}
                           />

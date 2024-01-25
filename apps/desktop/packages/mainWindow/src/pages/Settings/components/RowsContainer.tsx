@@ -7,7 +7,9 @@ type Props = {
 function RowsContainer(props: Props) {
   const c = children(() => props.children);
 
-  return <div class="divide-y divide-darkSlate-600">{c()}</div>;
+  return (
+    <div class="flex flex-col divide-y gap-4 divide-darkSlate-600">{c()}</div>
+  );
 }
 
 export default RowsContainer;

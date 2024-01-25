@@ -39,7 +39,7 @@ const CopiableEntity = (props: {
   text: string | undefined | null | number;
 }) => {
   return (
-    <div class="text-lightSlate-200 flex items-center w-60">
+    <div class="flex items-center text-lightSlate-200 w-60">
       <div class="truncate">
         <Tooltip
           content={<div class="max-w-110 break-all">{props.text || "-"}</div>}
@@ -63,10 +63,10 @@ const RowContainer = (props: Props & AdditionalProps) => {
     <Switch>
       <Match when={props.modVersion}>
         <div class="py-2 flex flex-col justify-center">
-          <h4 class="m-0 font-medium text-md pb-2">
+          <h4 class="m-0 pb-2 font-medium text-md">
             {props.modVersion.name.replaceAll(".zip", "")}
           </h4>
-          <div class="flex text-sm divide-darkSlate-500 text-lightGray-800 divide-x-1 gap-2">
+          <div class="flex text-sm gap-2 divide-darkSlate-500 text-lightGray-800 divide-x-1">
             <Trans key="explore_versions.tags" />
             <For each={props.modVersion.gameVersions}>
               {(version) => <div>{version}</div>}
@@ -98,10 +98,10 @@ const RowContainer = (props: Props & AdditionalProps) => {
               onClose={() => setIsHoveringInfoCard(false)}
               content={
                 <div
-                  class="p-4 text-darkSlate-100 bg-darkSlate-900 rounded-lg border-darkSlate-700 border-solid border-1 shadow-md shadow-darkSlate-90 w-110"
+                  class="bg-darkSlate-900 rounded-lg shadow-md p-4 text-darkSlate-100 border-darkSlate-700 border-solid border-1 shadow-darkSlate-90 w-110"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div class="text-xl text-white font-bold mb-4">
+                  <div class="text-white font-bold mb-4 text-xl">
                     <Trans
                       key="addons_versions.technical_info_for"
                       options={{
@@ -163,7 +163,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
               color="bg-darkSlate-900"
             >
               <div
-                class="text-2xl text-darkSlate-500 duration-100 ease-in-out cursor-pointer i-ri:information-fill transition-color hover:text-white"
+                class="duration-100 ease-in-out cursor-pointer hover:text-white text-2xl text-darkSlate-500 i-ri:information-fill transition-color"
                 classList={{
                   "text-white": isHoveringInfoCard()
                 }}
@@ -210,7 +210,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
                           <Trans key="modpack.version_download" />
                         </Match>
                       </Switch>
-                      <div class="i-ri:download-2-fill w-5 h-5" />
+                      <div class="w-5 h-5 i-ri:download-2-fill" />
                     </Match>
                     <Match when={!props.loading && props.isInstalled}>
                       <Trans key="modpack.version_installed" />

@@ -18,7 +18,7 @@ model AppConfiguration {
   activeAccountUuid               String?
   concurrentDownloads             Int       @default(8)
   showNews                        Boolean   @default(true)
-  startupResolution               String    @default("854x480")
+  gameResolution                  String?
   launcherActionOnGameLaunch      String    @default("none")
   javaCustomArgs                  String    @default("")
   xmx                             Int

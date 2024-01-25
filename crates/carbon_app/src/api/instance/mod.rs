@@ -143,7 +143,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .map(FEInstanceId::from)
         }
 
-        mutation UPDATE_INSTANCE[app, details: UpdateInstance] {
+        mutation UPDATE_INSTANCE[app, details: FEUpdateInstance] {
             app.instance_manager()
                 .update_instance(details.try_into()?)
                 .await
@@ -582,7 +582,7 @@ struct ListInstance {
     name: String,
     favorite: bool,
     status: ListInstanceStatus,
-    icon_revision: u32,
+    icon_revision: Option<u32>,
     last_played: Option<DateTime<Utc>>,
     date_created: DateTime<Utc>,
     date_updated: DateTime<Utc>,
@@ -648,7 +648,8 @@ struct CreateInstance {
 }
 
 #[derive(Type, Debug, Deserialize)]
-struct UpdateInstance {
+#[serde(rename_all = "camelCase")]
+struct FEUpdateInstance {
     instance: FEInstanceId,
     #[specta(optional)]
     name: Option<Set<String>>,
@@ -666,6 +667,8 @@ struct UpdateInstance {
     extra_java_args: Option<Set<Option<String>>>,
     #[specta(optional)]
     memory: Option<Set<Option<MemoryRange>>>,
+    #[specta(optional)]
+    game_resolution: Option<Set<Option<GameResolution>>>,
     #[specta(optional)]
     mod_sources: Option<Set<Option<super::modplatforms::ModSources>>>,
     #[specta(optional)]
@@ -811,7 +814,33 @@ enum MoveInstanceTarget {
     EndOfGroup(FEGroupId),
 }
 
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(tag = "type", content = "value")]
+pub enum GameResolution {
+    Standard(u16, u16),
+    Custom(u16, u16),
+}
+
+impl From<domain::info::GameResolution> for GameResolution {
+    fn from(value: domain::info::GameResolution) -> Self {
+        match value {
+            domain::info::GameResolution::Standard(w, h) => Self::Standard(w, h),
+            domain::info::GameResolution::Custom(w, h) => Self::Custom(w, h),
+        }
+    }
+}
+
+impl From<GameResolution> for domain::info::GameResolution {
+    fn from(value: GameResolution) -> Self {
+        match value {
+            GameResolution::Standard(w, h) => Self::Standard(w, h),
+            GameResolution::Custom(w, h) => Self::Custom(w, h),
+        }
+    }
+}
+
 #[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct InstanceDetails {
     name: String,
     favorite: bool,
@@ -820,12 +849,13 @@ struct InstanceDetails {
     global_java_args: bool,
     extra_java_args: Option<String>,
     memory: Option<MemoryRange>,
+    game_resolution: Option<GameResolution>,
     last_played: Option<DateTime<Utc>>,
     seconds_played: u32,
     modloaders: Vec<ModLoader>,
     notes: String,
     state: LaunchState,
-    icon_revision: u32,
+    icon_revision: Option<u32>,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -1075,6 +1105,7 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             global_java_args: value.global_java_args,
             extra_java_args: value.extra_java_args,
             memory: value.memory.map(Into::into),
+            game_resolution: value.game_resolution.map(Into::into),
             last_played: value.last_played,
             seconds_played: value.seconds_played,
             modloaders: value.modloaders.into_iter().map(Into::into).collect(),
@@ -1467,10 +1498,10 @@ impl From<MemoryRange> for (u16, u16) {
     }
 }
 
-impl TryFrom<UpdateInstance> for domain::InstanceSettingsUpdate {
+impl TryFrom<FEUpdateInstance> for domain::InstanceSettingsUpdate {
     type Error = anyhow::Error;
 
-    fn try_from(value: UpdateInstance) -> anyhow::Result<Self> {
+    fn try_from(value: FEUpdateInstance) -> anyhow::Result<Self> {
         Ok(Self {
             instance_id: value.instance.into(),
             name: value.name.map(|x| x.inner()),
@@ -1483,6 +1514,7 @@ impl TryFrom<UpdateInstance> for domain::InstanceSettingsUpdate {
             global_java_args: value.global_java_args.map(|x| x.inner()),
             extra_java_args: value.extra_java_args.map(|x| x.inner()),
             memory: value.memory.map(|x| x.inner().map(Into::into)),
+            game_resolution: value.game_resolution.map(|x| x.inner().map(Into::into)),
             mod_sources: value.mod_sources.map(|x| x.inner().map(Into::into)),
             modpack_locked: value.modpack_locked.map(|x| x.inner()),
         })

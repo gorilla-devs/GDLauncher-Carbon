@@ -37,12 +37,13 @@ pub struct InstanceDetails {
     pub global_java_args: bool,
     pub extra_java_args: Option<String>,
     pub memory: Option<(u16, u16)>,
+    pub game_resolution: Option<info::GameResolution>,
     pub last_played: Option<DateTime<Utc>>,
     pub seconds_played: u32,
     pub modloaders: Vec<info::ModLoader>,
     pub state: LaunchState,
     pub notes: String,
-    pub icon_revision: u32,
+    pub icon_revision: Option<u32>,
 }
 
 #[derive(Debug)]
@@ -64,6 +65,7 @@ pub struct InstanceSettingsUpdate {
     pub global_java_args: Option<bool>,
     pub extra_java_args: Option<Option<String>>,
     pub memory: Option<Option<(u16, u16)>>,
+    pub game_resolution: Option<Option<info::GameResolution>>,
     pub mod_sources: Option<Option<ModSources>>,
     pub modpack_locked: Option<Option<bool>>,
 }

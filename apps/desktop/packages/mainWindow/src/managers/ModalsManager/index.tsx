@@ -123,9 +123,8 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
       if (indexToRemove >= 0) {
         newStack.splice(indexToRemove, 1);
-        const newParams: { [k: string]: string | null } = Object.fromEntries(
-          urlSearchParams()
-        );
+        const newParams: { [k: string]: string | null } =
+          Object.fromEntries(urlSearchParams());
 
         for (let key in Object.fromEntries(urlSearchParams())) {
           if (key !== `m[${indexToRemove + 1}]`) {

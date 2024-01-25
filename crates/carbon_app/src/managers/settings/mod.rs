@@ -56,21 +56,23 @@ impl ManagerRef<'_, SettingsManager> {
         if let Some(theme) = incoming_settings.theme {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::theme::set(theme)],
+                vec![app_configuration::theme::set(theme.inner())],
             ));
         }
 
         if let Some(language) = incoming_settings.language {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::language::set(language)],
+                vec![app_configuration::language::set(language.inner())],
             ));
         }
 
         if let Some(reduced_motion) = incoming_settings.reduced_motion {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::reduced_motion::set(reduced_motion)],
+                vec![app_configuration::reduced_motion::set(
+                    reduced_motion.inner(),
+                )],
             ));
         }
 
@@ -78,7 +80,7 @@ impl ManagerRef<'_, SettingsManager> {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
                 vec![app_configuration::discord_integration::set(
-                    discord_integration,
+                    discord_integration.inner(),
                 )],
             ));
         }
@@ -87,7 +89,7 @@ impl ManagerRef<'_, SettingsManager> {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
                 vec![app_configuration::release_channel::set(
-                    release_channel.into(),
+                    release_channel.inner().into(),
                 )],
             ));
         }
@@ -98,7 +100,7 @@ impl ManagerRef<'_, SettingsManager> {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
                 vec![app_configuration::launcher_action_on_game_launch::set(
-                    launcher_action_on_game_launch.into(),
+                    launcher_action_on_game_launch.inner().into(),
                 )],
             ));
         }
@@ -107,7 +109,7 @@ impl ManagerRef<'_, SettingsManager> {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
                 vec![app_configuration::concurrent_downloads::set(
-                    concurrent_downloads,
+                    concurrent_downloads.inner(),
                 )],
             ));
         }
@@ -115,36 +117,38 @@ impl ManagerRef<'_, SettingsManager> {
         if let Some(show_news) = incoming_settings.show_news {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::show_news::set(show_news)],
+                vec![app_configuration::show_news::set(show_news.inner())],
             ));
         }
 
         if let Some(xmx) = incoming_settings.xmx {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::xmx::set(xmx)],
+                vec![app_configuration::xmx::set(xmx.inner())],
             ));
         }
 
         if let Some(xms) = incoming_settings.xms {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::xms::set(xms)],
+                vec![app_configuration::xms::set(xms.inner())],
             ));
         }
 
         if let Some(is_first_launch) = incoming_settings.is_first_launch {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::is_first_launch::set(is_first_launch)],
+                vec![app_configuration::is_first_launch::set(
+                    is_first_launch.inner(),
+                )],
             ));
         }
 
-        if let Some(startup_resolution) = incoming_settings.startup_resolution {
+        if let Some(game_resolution) = incoming_settings.game_resolution {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::startup_resolution::set(
-                    startup_resolution,
+                vec![app_configuration::game_resolution::set(
+                    game_resolution.inner().map(Into::into),
                 )],
             ));
         }
@@ -152,18 +156,24 @@ impl ManagerRef<'_, SettingsManager> {
         if let Some(java_custom_args) = incoming_settings.java_custom_args {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::java_custom_args::set(java_custom_args)],
+                vec![app_configuration::java_custom_args::set(
+                    java_custom_args.inner(),
+                )],
             ));
         }
 
-        if let Some(auto_manage_java) = incoming_settings.auto_manage_java {
+        if let Some(auto_manage_java) = incoming_settings.auto_manage_java.as_ref() {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::auto_manage_java::set(auto_manage_java)],
+                vec![app_configuration::auto_manage_java::set(
+                    auto_manage_java.clone().inner(),
+                )],
             ));
         }
 
         if let Some(mod_sources) = incoming_settings.mod_sources {
+            let mod_sources = mod_sources.inner();
+
             let platform_blacklist = mod_sources
                 .platform_blacklist
                 .into_iter()
@@ -190,6 +200,7 @@ impl ManagerRef<'_, SettingsManager> {
         }
 
         if let Some(terms_and_privacy_accepted) = incoming_settings.terms_and_privacy_accepted {
+            let terms_and_privacy_accepted = terms_and_privacy_accepted.inner();
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
                 vec![app_configuration::terms_and_privacy_accepted::set(
@@ -208,6 +219,7 @@ impl ManagerRef<'_, SettingsManager> {
         }
 
         if let Some(metrics_enabled) = incoming_settings.metrics_enabled {
+            let metrics_enabled = metrics_enabled.inner();
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
                 vec![
@@ -232,7 +244,7 @@ impl ManagerRef<'_, SettingsManager> {
         }
 
         if let Some(auto_manage_java) = incoming_settings.auto_manage_java {
-            if auto_manage_java {
+            if auto_manage_java.inner() {
                 super::java::scan_and_sync::sync_system_java_profiles(db).await?;
             }
         }
