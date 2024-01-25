@@ -134,19 +134,19 @@ const Tile = (props: Props) => {
       icon: props.isRunning ? "i-ri:stop-fill" : "i-ri:play-fill",
       label: props.isRunning ? t("instance.stop") : t("instance.action_play"),
       action: handlePlay,
-      disabled: props.isLoading
+      disabled: props.isLoading || isInQueue()
     },
     {
       icon: "i-ri:pencil-fill",
       label: t("instance.action_edit"),
       action: handleEdit,
-      disabled: props.isLoading
+      disabled: props.isLoading || isInQueue()
     },
     {
       icon: "i-ri:settings-3-fill",
       label: t("instance.action_settings"),
       action: handleSettings,
-      disabled: props.isLoading
+      disabled: props.isLoading || isInQueue()
     },
     ...(!props.isInvalid
       ? [
@@ -154,7 +154,7 @@ const Tile = (props: Props) => {
             icon: "i-ri:file-copy-fill",
             label: t("instance.action_duplicate"),
             action: handleDuplicate,
-            disabled: props.isLoading
+            disabled: props.isLoading || isInQueue()
           }
         ]
       : []),
@@ -183,14 +183,14 @@ const Tile = (props: Props) => {
           name: "exportInstance"
         });
       },
-      disabled: props.isLoading
+      disabled: props.isLoading || isInQueue()
     },
     {
       id: "delete",
       icon: "i-ri:delete-bin-2-fill",
       label: t("instance.action_delete"),
       action: handleDelete,
-      disabled: props.isLoading
+      disabled: props.isLoading || isInQueue()
     }
   ];
 
