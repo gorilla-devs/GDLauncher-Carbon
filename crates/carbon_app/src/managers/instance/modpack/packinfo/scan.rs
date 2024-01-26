@@ -8,7 +8,7 @@ use sha2::Sha512;
 
 use crate::util::NormalizedWalkdir;
 
-pub async fn scan_dir(path: &Path) -> anyhow::Result<super::PackInfo> {
+pub async fn scan_dir(path: &Path, filter: Option<&Vec<&str>>) -> anyhow::Result<super::PackInfo> {
     let mut futures = Vec::new();
 
     let mut walker = NormalizedWalkdir::new(path)?;
@@ -18,9 +18,20 @@ pub async fn scan_dir(path: &Path) -> anyhow::Result<super::PackInfo> {
         }
 
         let path = entry.entry.path();
-        let relpath = entry.relative_path.to_string();
+        let mut relpath = entry.relative_path.to_string();
+
+        if let Some(filter) = filter.as_ref() {
+            if !filter.contains(&(&relpath as &str)) {
+                continue
+            }
+        }
+
         futures.push(async move {
             let content = tokio::fs::read(path).await?;
+
+            if relpath.ends_with(".disabled") {
+                relpath.truncate(relpath.len() - ".disabled".len());
+            }
 
             let hashes = tokio::task::spawn_blocking(move || {
                 let sha512: [u8; 64] = Sha512::digest(&content).into();

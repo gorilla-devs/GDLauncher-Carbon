@@ -524,6 +524,8 @@ impl ManagerRef<'_, InstanceManager> {
                             .config = config;
                     }
 
+                    // normally there would be a problem here because we would be skipping any mods removed by users
+                    // but since we dont try to update those anyway its fine.
                     let mut files = skipped_mods;
                     // snapshot filetree before applying
                     let mut walker = NormalizedWalkdir::new(&staging_dir.join("instance"))?;
@@ -549,11 +551,18 @@ impl ManagerRef<'_, InstanceManager> {
                     let r: anyhow::Result<_> = async {
                         if let Some(packinfo) = packinfo {
                             for (oldfile, oldfilehash) in &packinfo.files { // TODO: diff in a way that stays sane across a crash
-                                let original_file = instance_root.join("instance").join(&oldfile[1..]);
+                                let mut original_file = instance_root.join("instance").join(&oldfile[1..]);
 
                                 if !original_file.exists() {
-                                    // either the user deleted it or we already deleted it in the next check, skip
-                                    continue
+                                    let mut name = original_file.file_name().unwrap().to_owned();
+                                    name.push(".disabled");
+                                    original_file.set_file_name(name);
+                                    tracing::warn!(?original_file, "disabled?");
+
+                                    if !original_file.exists() {
+                                        // either the user deleted it or we already deleted it in the next check, skip
+                                        continue
+                                    }
                                 }
 
                                 let original_conent = tokio::fs::read(&original_file).await?;
@@ -981,7 +990,18 @@ impl ManagerRef<'_, InstanceManager> {
                     trace!("marking modpack initialization as complete");
 
                     if do_modpack_install {
-                        let packinfo = packinfo::scan_dir(&instance_path.get_data_path()).await?;
+                        let staging_path = setup_path.join("staging.json");
+
+                        let staged_text;
+                        let mut filter = None;
+
+                        if staging_path.exists() {
+                            staged_text = tokio::fs::read_to_string(staging_path).await?;
+                            filter = Some(serde_json::from_str::<Vec<&str>>(&staged_text)
+                                .context("could not parse staging snapshot for packinfo creation")?);
+                        }
+
+                        let packinfo = packinfo::scan_dir(&instance_path.get_data_path(), filter.as_ref()).await?;
                         let packinfo_str = packinfo::make_packinfo(packinfo)?;
                         tokio::fs::write(instance_path.get_root().join("packinfo.json"), packinfo_str).await?;
                     }
