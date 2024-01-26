@@ -26,14 +26,9 @@ pub async fn scan_dir(path: &Path) -> anyhow::Result<super::PackInfo> {
                 let sha512: [u8; 64] = Sha512::digest(&content).into();
                 let md5 = Md5::digest(&content).into();
 
-                let mut murmur_content = content.clone();
-                murmur_content.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
-                let murmur2 = murmurhash32::murmurhash2(&murmur_content);
-
                 super::FileHashes {
                     sha512,
                     md5,
-                    murmur2,
                 }
             })
             .await?;

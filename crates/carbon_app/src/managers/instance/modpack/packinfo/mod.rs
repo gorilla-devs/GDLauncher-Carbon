@@ -15,7 +15,6 @@ pub struct PackInfo {
 pub struct FileHashes {
     pub sha512: [u8; 64],
     pub md5: [u8; 16],
-    pub murmur2: u32,
 }
 
 #[derive(Serialize, Deserialize)]

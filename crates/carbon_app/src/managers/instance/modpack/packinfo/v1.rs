@@ -15,7 +15,6 @@ pub struct PackInfo {
 pub struct FileHashes {
     pub sha512: HexSha512,
     pub md5: HexMd5,
-    pub murmur2: u32,
 }
 
 /// Will panic when serialized if N2 != N * 2
@@ -79,7 +78,6 @@ impl From<FileHashes> for super::FileHashes {
         Self {
             sha512: value.sha512.0,
             md5: value.md5.0,
-            murmur2: value.murmur2,
         }
     }
 }
@@ -101,7 +99,6 @@ impl From<super::FileHashes> for FileHashes {
         Self {
             sha512: Hex(value.sha512),
             md5: Hex(value.md5),
-            murmur2: value.murmur2,
         }
     }
 }

@@ -33,7 +33,7 @@ use anyhow::{anyhow, bail, Context};
 use chrono::{DateTime, Local, Utc};
 use futures::Future;
 use itertools::Itertools;
-use sha2::Sha256;
+use md5::{Md5, Digest};
 use std::fmt::Debug;
 use std::io;
 use std::path::{PathBuf, Path};
@@ -541,26 +541,40 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let overwrite_changed = !change_version_path.exists(); // TODO
 
-                    /*if packinfo.is_some() != overwrite_changed {
-                        bail!("attempted to overwrite pack files with packinfo present. bailing out to preserve data as this is likely an error");
-                    }*/
+                    let staged_text = tokio::fs::read_to_string(setup_path.join("staging.json")).await?;
+                    let staging_snapshot = serde_json::from_str::<Vec<&str>>(&staged_text)
+                        .context("could not parse staging snapshot")?;
 
                     debug!("Applying staged instance files");
                     let r: anyhow::Result<_> = async {
                         if let Some(packinfo) = packinfo {
                             for (oldfile, oldfilehash) in &packinfo.files { // TODO: diff in a way that stays sane across a crash
-                                let staged_file = staging_dir.join("instance").join(oldfile);
-                                let original_file = instance_root.join("instance").join(oldfile);
+                                let original_file = instance_root.join("instance").join(&oldfile[1..]);
 
                                 if !original_file.exists() {
-                                    tracing::warn!(?oldfile, ?staged_file, ?original_file);
+                                    // either the user deleted it or we already deleted it in the next check, skip
+                                    continue
                                 }
 
-                                if mark_file.exists() { // we already applied this file and were interrupted
+                                let original_conent = tokio::fs::read(&original_file).await?;
+                                let original_md5: [u8; 16] = Md5::digest(&original_conent).into();
+
+                                if original_md5 != oldfilehash.md5 {
+                                    // the user has modified this file so we shouldn't touch it
+                                    continue
                                 }
 
-                                if !staged_file.exists() { // file was deleted by pack update
+                                if !staging_snapshot.contains(&(&oldfile as &str)) {
+                                    // file is not present in new version and old version was not changed, delete
+                                    tokio::fs::remove_file(original_file).await?;
+                                    continue
+                                }
 
+                                let staged_file = staging_dir.join("instance").join(&oldfile[1..]);
+
+                                if staged_file.is_file() {
+                                    // old file matches the snapshotted version and new file is present, replace
+                                    tokio::fs::rename(staged_file, original_file).await?;
                                 }
                             }
                         }
@@ -568,31 +582,16 @@ impl ManagerRef<'_, InstanceManager> {
                         for entry in walkdir::WalkDir::new(&staging_dir) {
                             let entry = entry?;
 
-                            let srcpath = entry.path().to_path_buf();
-                            let relpath = srcpath.strip_prefix(&staging_dir).unwrap();
-                            let destpath = instance_root.join(relpath);
+                            let staged_file = entry.path().to_path_buf();
+                            let relpath = staged_file.strip_prefix(&staging_dir).unwrap();
+                            let original_file = instance_root.join(relpath);
 
-                            if entry.metadata()?.is_dir() {
-                                tokio::fs::create_dir_all(destpath).await?;
-                            } else {
-                                /*if let Some(pi) = packinfo.map(|pi| relpath.to_str().map(|rp| pi.files.get(rp)).flatten()).flatten() {
-                                    if !destpath.exists() {
-                                        trace!("skipping staged file {relpath:?} as original file was deleted");
-                                        continue
-                                    }
+                            if entry.metadata()?.is_file() && !original_file.exists() {
+                                // there was no record of this file in the packinfo or it would've been moved previously,
+                                // and the user has not created one in its place, add the file
 
-                                    let original_content = tokio::fs::read(destpath).await?;
-                                    let original_sha512: [u8; 64] = tokio::task::spawn_blocking(move || Sha256::digest(&src_content)).await??;
-
-                                    if original_sha512 != pi.sha512 {
-                                        trace!("skipping staged file {relpath:?} as original file was modified");
-                                        continue
-                                    }
-                                }*/
-
-                                tokio::fs::create_dir_all(destpath.parent().unwrap()).await?;
-                                tokio::fs::rename(srcpath, destpath).await?;
-                                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                                tokio::fs::create_dir_all(original_file.parent().unwrap()).await?;
+                                tokio::fs::rename(staged_file, original_file).await?;
                             }
                         }
 
@@ -600,7 +599,7 @@ impl ManagerRef<'_, InstanceManager> {
                     }.await;
 
                     if let Err(e) = r {
-                        return Err(e.context("Failed to walk instance staging area to apply changes"));
+                        return Err(e.context("Failed to apply staged instance changes"));
                     }
 
                     trace!("Cleaning up staging directory");
