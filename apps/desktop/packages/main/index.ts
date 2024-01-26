@@ -9,6 +9,7 @@ import {
   ipcMain,
   Menu,
   OpenDialogOptions,
+  SaveDialogOptions,
   screen,
   session,
   shell
@@ -26,11 +27,16 @@ import getAdSize from "./adSize";
 import handleUncaughtException from "./handleUncaughtException";
 import initAutoUpdater from "./autoUpdater";
 import "./appMenu";
+import { FELauncherActionOnGameLaunch } from "@gd/core_module/bindings";
 
 export const RUNTIME_PATH_OVERRIDE_NAME = "runtime_path_override";
 const RUNTIME_PATH_DEFAULT_NAME = "data";
 
 export let CURRENT_RUNTIME_PATH: string | null = null;
+
+let win: BrowserWindow | null = null;
+
+let isGameRunning = false;
 
 export function initRTPath(override: string | null | undefined) {
   if (override) {
@@ -234,6 +240,49 @@ const loadCoreModule: CoreModule = () =>
             port,
             kill: () => coreModule?.kill()
           });
+        } else if (row.startsWith("_INSTANCE_STATE_:")) {
+          const rightPart = row.split(":")[1];
+          const event = rightPart.split("|")[0];
+          const action: FELauncherActionOnGameLaunch = rightPart.split("|")[1];
+
+          if (event === "GAME_LAUNCHED") {
+            isGameRunning = true;
+            switch (action) {
+              case "closeWindow":
+                win?.close();
+                win = null;
+                break;
+              case "hideWindow":
+                win?.hide();
+                break;
+              case "minimizeWindow":
+                win?.minimize();
+                break;
+              case "none":
+                break;
+              case "quitApp":
+                app.quit();
+                break;
+            }
+          } else if (event === "GAME_CLOSED") {
+            isGameRunning = false;
+            switch (action) {
+              case "closeWindow":
+                if (!win) {
+                  createWindow(true);
+                }
+                break;
+              case "hideWindow":
+              case "minimizeWindow":
+                win?.show();
+                break;
+              case "none":
+                break;
+              case "quitApp":
+                // There's nothing we can do
+                break;
+            }
+          }
         }
       }
       console.log(`[CORE] Message: ${dataString}`);
@@ -287,12 +336,12 @@ if (process.defaultApp) {
   app.setAsDefaultProtocolClient("gdlauncher");
 }
 
-let win: BrowserWindow | null = null;
-
 const menu = Menu.buildFromTemplate([]);
 Menu.setApplicationMenu(menu);
 
-async function createWindow() {
+async function createWindow(
+  skipIntroAnimation = false
+): Promise<BrowserWindow> {
   const { minWidth, minHeight, width, height } = getAdSize();
 
   win = new BrowserWindow({
@@ -309,128 +358,16 @@ async function createWindow() {
       preload: join(__dirname, "../preload/index.cjs"),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: app.isPackaged
+      sandbox: app.isPackaged,
+      webSecurity: true,
+      additionalArguments: [`--skipIntroAnimation=${skipIntroAnimation}`]
     }
-  });
-
-  initAutoUpdater(win);
-
-  screen.addListener(
-    "display-metrics-changed",
-    (_, display, changedMetrics) => {
-      const { minWidth, minHeight } = getAdSize();
-      if (changedMetrics.includes("workArea")) {
-        win?.setMinimumSize(minWidth, minHeight);
-        win?.setSize(minWidth, minHeight);
-        win?.webContents.send("adSizeChanged", getAdSize().adSize);
-      }
-    }
-  );
-
-  // Handlers
-  ipcMain.handle("getAdSize", async () => {
-    return getAdSize().adSize;
-  });
-
-  ipcMain.handle("openFileDialog", async (_, opts: OpenDialogOptions) => {
-    return dialog.showOpenDialog(opts);
-  });
-
-  ipcMain.handle("getCurrentOS", async () => {
-    return { platform: os.platform(), arch: os.arch() };
-  });
-
-  ipcMain.handle("openCMPWindow", async () => {
-    // @ts-ignore
-    app.overwolf.openCMPWindow();
-  });
-
-  ipcMain.handle("getUserData", async () => {
-    return app.getPath("userData");
-  });
-
-  ipcMain.handle("getInitialRuntimePath", async () => {
-    return path.join(app.getPath("userData"), RUNTIME_PATH_DEFAULT_NAME);
-  });
-
-  ipcMain.handle("getRuntimePath", async () => {
-    return CURRENT_RUNTIME_PATH;
-  });
-
-  ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
-    if (newPath === CURRENT_RUNTIME_PATH) {
-      return;
-    }
-
-    const runtimeOverridePath = path.join(
-      app.getPath("userData"),
-      RUNTIME_PATH_OVERRIDE_NAME
-    );
-
-    await fs.mkdir(newPath, { recursive: true });
-
-    (await coreModule).kill();
-
-    // TODO: Copy with progress
-    await fse.copy(CURRENT_RUNTIME_PATH!, newPath, {
-      overwrite: true,
-      errorOnExist: false
-    });
-
-    await fs.writeFile(runtimeOverridePath, newPath);
-
-    await fse.remove(CURRENT_RUNTIME_PATH!);
-
-    // TODO: with a bit of work we can change the RTPath without actually restarting the app
-    app.relaunch();
-    app.exit();
-  });
-
-  ipcMain.handle("validateRuntimePath", async (_, newPath: string | null) => {
-    if (!newPath || newPath === CURRENT_RUNTIME_PATH) {
-      return false;
-    }
-
-    const pathExists = await fse.pathExists(newPath);
-    if (!pathExists) {
-      return true;
-    }
-
-    const newPathStat = await fs.stat(newPath);
-    if (!newPathStat.isDirectory()) {
-      return false;
-    }
-
-    const files = await fs.readdir(newPath);
-    if (files.length > 0) {
-      return false;
-    }
-
-    return true;
-  });
-
-  ipcMain.handle("getCoreModulePort", async () => {
-    let port = null;
-    try {
-      port = (await coreModule).port;
-    } catch (e) {
-      return (e as any).logs;
-    }
-
-    return port;
   });
 
   win.webContents.on("will-navigate", (e, url) => {
     if (win && url !== win.webContents.getURL()) {
       e.preventDefault();
       shell.openExternal(url);
-    }
-  });
-
-  win.webContents.on("render-process-gone", (event, detailed) => {
-    console.log("render-process-gone", detailed);
-    if (detailed.reason === "crashed") {
-      win?.webContents.reload();
     }
   });
 
@@ -500,15 +437,118 @@ async function createWindow() {
     return { action: "deny" };
   });
 
-  ipcMain.handle("relaunch", () => {
-    console.info("relaunching app...");
-
-    app.relaunch();
-    app.exit();
-  });
+  return win;
 }
 
-app.whenReady().then(() => {
+// Handlers
+ipcMain.handle("relaunch", () => {
+  console.info("relaunching app...");
+
+  app.relaunch();
+  app.exit();
+});
+
+ipcMain.handle("getAdSize", async () => {
+  return getAdSize().adSize;
+});
+
+ipcMain.handle("openFileDialog", async (_, opts: OpenDialogOptions) => {
+  return dialog.showOpenDialog(opts);
+});
+
+ipcMain.handle("showSaveDialog", async (_, opts: SaveDialogOptions) => {
+  return dialog.showSaveDialog(opts);
+});
+
+ipcMain.handle("getCurrentOS", async () => {
+  return { platform: os.platform(), arch: os.arch() };
+});
+
+ipcMain.handle("openFolder", async (_, path) => {
+  shell.showItemInFolder(path);
+});
+
+ipcMain.handle("openCMPWindow", async () => {
+  // @ts-ignore
+  app.overwolf.openCMPWindow();
+});
+
+ipcMain.handle("getUserData", async () => {
+  return app.getPath("userData");
+});
+
+ipcMain.handle("getInitialRuntimePath", async () => {
+  return path.join(app.getPath("userData"), RUNTIME_PATH_DEFAULT_NAME);
+});
+
+ipcMain.handle("getRuntimePath", async () => {
+  return CURRENT_RUNTIME_PATH;
+});
+
+ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
+  if (newPath === CURRENT_RUNTIME_PATH) {
+    return;
+  }
+
+  const runtimeOverridePath = path.join(
+    app.getPath("userData"),
+    RUNTIME_PATH_OVERRIDE_NAME
+  );
+
+  await fs.mkdir(newPath, { recursive: true });
+
+  (await coreModule).kill();
+
+  // TODO: Copy with progress
+  await fse.copy(CURRENT_RUNTIME_PATH!, newPath, {
+    overwrite: true,
+    errorOnExist: false
+  });
+
+  await fs.writeFile(runtimeOverridePath, newPath);
+
+  await fse.remove(CURRENT_RUNTIME_PATH!);
+
+  // TODO: with a bit of work we can change the RTPath without actually restarting the app
+  app.relaunch();
+  app.exit();
+});
+
+ipcMain.handle("validateRuntimePath", async (_, newPath: string | null) => {
+  if (!newPath || newPath === CURRENT_RUNTIME_PATH) {
+    return false;
+  }
+
+  const pathExists = await fse.pathExists(newPath);
+  if (!pathExists) {
+    return true;
+  }
+
+  const newPathStat = await fs.stat(newPath);
+  if (!newPathStat.isDirectory()) {
+    return false;
+  }
+
+  const files = await fs.readdir(newPath);
+  if (files.length > 0) {
+    return false;
+  }
+
+  return true;
+});
+
+ipcMain.handle("getCoreModulePort", async () => {
+  let port = null;
+  try {
+    port = (await coreModule).port;
+  } catch (e) {
+    return (e as any).logs;
+  }
+
+  return port;
+});
+
+app.whenReady().then(async () => {
   // Expose chrome's accessibility tree by default
   app.setAccessibilitySupportEnabled(true);
 
@@ -539,10 +579,28 @@ app.whenReady().then(() => {
       });
     }
   );
-  createWindow();
+  await createWindow();
+
+  screen.addListener(
+    "display-metrics-changed",
+    (_, display, changedMetrics) => {
+      const { minWidth, minHeight } = getAdSize();
+      if (changedMetrics.includes("workArea")) {
+        win?.setMinimumSize(minWidth, minHeight);
+        win?.setSize(minWidth, minHeight);
+        win?.webContents.send("adSizeChanged", getAdSize().adSize);
+      }
+    }
+  );
+
+  initAutoUpdater(win);
 });
 
 app.on("window-all-closed", async () => {
+  if (isGameRunning) {
+    return;
+  }
+
   try {
     let _coreModule = await coreModule;
     _coreModule.kill();
@@ -553,12 +611,34 @@ app.on("window-all-closed", async () => {
   app.quit();
 });
 
+app.on("before-quit", async () => {
+  try {
+    let _coreModule = await coreModule;
+    _coreModule.kill();
+  } catch {
+    // No op
+  }
+});
+
 app.on("second-instance", (_e, _argv) => {
   if (win) {
     // Focus on the main window if the user tried to open another
     if (win.isMinimized()) win.restore();
     win.focus();
+  } else {
+    createWindow(true);
   }
+});
+
+app.on("activate", () => {
+  if (!win) {
+    createWindow(true);
+  }
+});
+
+app.on("render-process-gone", (event, webContents, detailed) => {
+  console.log("render-process-gone", detailed);
+  webContents.reload();
 });
 
 app.on("open-url", (event, url) => {

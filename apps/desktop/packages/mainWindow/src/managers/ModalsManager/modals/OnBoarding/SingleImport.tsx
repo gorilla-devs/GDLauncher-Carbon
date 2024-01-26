@@ -1,9 +1,7 @@
 import { setTaskId } from "@/utils/import";
-import { setTaskIds, taskIds } from "@/utils/import";
-import { isProgressFailed } from "@/utils/instances";
-import { rspc, rspcFetch } from "@/utils/rspcClient";
-import { Trans, useTransContext } from "@gd/i18n";
-import { Button, Progressbar } from "@gd/ui";
+import { taskIds } from "@/utils/import";
+import { rspc } from "@/utils/rspcClient";
+import { Progressbar } from "@gd/ui";
 import { Match, Switch, createEffect, createSignal } from "solid-js";
 
 const [isDownloaded, setIsDownloaded] = createSignal(false);
@@ -12,67 +10,57 @@ export { isDownloaded };
 const SingleImport = (props: {
   instanceIndex: number;
   instanceName: string;
+  taskId?: number;
+  importState: string;
 }) => {
-  const [t] = useTransContext();
   const [progress, setProgress] = createSignal(0);
   const [state, setState] = createSignal("idle");
-  const importInstanceMutation = rspc.createMutation(
-    ["instance.importInstance"],
-    {
-      onSuccess(taskId) {
-        setTaskIds((prev: any) => {
-          if (prev) {
-            if (props.instanceName in prev) {
-              {
-                if (state() === "failed") {
-                  return {
-                    ...prev,
-                    [props.instanceName]: taskId
-                  };
-                } else {
-                  return prev;
-                }
-              }
-            } else {
-              return {
-                ...prev,
-                [props.instanceName]: taskId
-              };
-            }
-          } else {
-            return {
-              [props.instanceName]: taskId
-            };
-          }
-        });
-      }
-    }
-  );
+  // const rspcContext = rspc.useContext();
+
   createEffect(() => {
     async function runner() {
       if (taskIds() !== undefined) {
-        const taskId = (taskIds() as any)[props.instanceName];
-        const task: any = (await rspcFetch(() => [
-          "vtask.getTask",
-          taskId as number
-        ])) as any;
-
-        if (task.data && task.data.progress) {
-          if (task.data.progress.Known) {
-            setProgress(Math.floor(task.data.progress.Known * 100));
+        rspc.createQuery(() => ["vtask.getTask", props.taskId || null], {
+          onSuccess: (task) => {
+            if (task && task.progress) {
+              if (task.progress.type == "Known") {
+                setProgress(Math.floor(task.progress.value * 100));
+              }
+            }
+            const isFailed = task && task.progress.type === "Failed";
+            const isDownloaded = task === null && progress() !== 0;
+            if (isDownloaded || isFailed) {
+              setTaskId(undefined);
+            }
+            if (isFailed) {
+              setState("failed");
+            } else if (isDownloaded) {
+              setState("completed");
+              setIsDownloaded(true);
+            }
           }
-        }
-        const isFailed = task.data && isProgressFailed(task.data.progress);
-        const isDownloaded = task.data === null;
-        if (isDownloaded || isFailed) {
-          setTaskId(undefined);
-        }
-        if (isFailed) {
-          setState("failed");
-        } else if (isDownloaded) {
-          setState("completed");
-          setIsDownloaded(true);
-        }
+        });
+        // const task = await rspcContext.client.query([
+        //   "vtask.getTask",
+        //   props.taskId || null
+        // ]);
+        // console.log(task);
+        // if (task && task.progress) {
+        //   if (task.progress.type == "Known") {
+        //     setProgress(Math.floor(task.progress.value * 100));
+        //   }
+        // }
+        // const isFailed = task && task.progress.type === "Failed";
+        // const isDownloaded = task === null && progress() !== 0;
+        // if (isDownloaded || isFailed) {
+        //   setTaskId(undefined);
+        // }
+        // if (isFailed) {
+        //   setState("failed");
+        // } else if (isDownloaded) {
+        //   setState("completed");
+        //   setIsDownloaded(true);
+        // }
       }
     }
     try {
@@ -81,43 +69,25 @@ const SingleImport = (props: {
       console.error(err);
     }
   });
-  createEffect(() => {
-    if (!taskIds()) {
-      importInstanceMutation.mutate({
-        name: props.instanceName,
-        index: props.instanceIndex
-      });
-    }
-  });
+
   return (
     <div class="flex gap-2 px-4 justify-between rounded-md">
       <span class="font-semibold">{props.instanceName}</span>
       <Switch>
+        <Match when={state() === "failed" || props.importState === "error"}>
+          <div>
+            <div class="text-2xl i-ph:x-bold text-red-600" />
+          </div>
+        </Match>
         <Match when={state() === "idle"}>
           <div class="flex w-30 items-center gap-4">
             <Progressbar percentage={progress()} />
             <div class="font-semibold">{progress()}%</div>
           </div>
         </Match>
-        <Match when={state() === t("instance.failed")}>
-          <div>
-            <Button
-              type="primary"
-              class="bg-red-500"
-              onClick={() => {
-                setProgress(0);
-                importInstanceMutation.mutate({
-                  name: props.instanceName,
-                  index: props.instanceIndex
-                });
-              }}
-            >
-              <Trans key="onboarding.retry" />
-            </Button>
-          </div>
-        </Match>
+
         <Match when={state() === "completed"}>
-          <div class="i-ic:round-check text-2xl text-green-600" />
+          <div class="text-2xl i-ic:round-check text-green-600" />
         </Match>
       </Switch>
     </div>

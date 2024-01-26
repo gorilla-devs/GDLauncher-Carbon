@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use chrono::DateTime;
+use chrono::Utc;
 use rspc::Type;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
@@ -48,7 +50,7 @@ pub struct CFFEFile {
     pub release_type: CFFEFileReleaseType,
     pub file_status: CFFEFileStatus,
     pub hashes: Vec<CFFEFileHash>,
-    pub file_date: String, // Consider using a datetime library for date-time representation
+    pub file_date: DateTime<Utc>,
     pub file_length: u32,
     pub download_count: u32,
     pub download_url: Option<String>,
@@ -560,7 +562,7 @@ pub struct CFFEMod {
     pub is_featured: bool,
     pub primary_category_id: i32,
     pub categories: Vec<CFFECategory>,
-    pub class_id: Option<i32>, // TODO: Add all options to enum and use it
+    pub class_id: Option<CFFEClassId>,
     pub authors: Vec<CFFEModAuthor>,
     pub logo: Option<CFFEModAsset>,
     pub screenshots: Vec<CFFEModAsset>,
@@ -594,7 +596,7 @@ impl From<mpcf::Mod> for CFFEMod {
                 .into_iter()
                 .map(|c| c.into())
                 .collect(),
-            class_id: minecraft_mod.class_id,
+            class_id: minecraft_mod.class_id.map(Into::into),
             authors: minecraft_mod
                 .authors
                 .into_iter()
@@ -632,7 +634,13 @@ impl From<mpcf::Mod> for CFFEMod {
 #[serde(rename_all = "camelCase")]
 pub enum CFFEClassId {
     Mods,
+    ResourcePacks,
     Modpacks,
+    Customizations,
+    BukkitPlugins,
+    Worlds,
+    Addons,
+    Shaders,
     Other(u16),
 }
 
@@ -640,7 +648,13 @@ impl From<mpcf::ClassId> for CFFEClassId {
     fn from(class_id: mpcf::ClassId) -> Self {
         match class_id {
             mpcf::ClassId::Mods => CFFEClassId::Mods,
+            mpcf::ClassId::ResourcePacks => CFFEClassId::ResourcePacks,
             mpcf::ClassId::Modpacks => CFFEClassId::Modpacks,
+            mpcf::ClassId::Customizations => CFFEClassId::Customizations,
+            mpcf::ClassId::BukkitPlugins => CFFEClassId::BukkitPlugins,
+            mpcf::ClassId::Worlds => CFFEClassId::Worlds,
+            mpcf::ClassId::Addons => CFFEClassId::Addons,
+            mpcf::ClassId::Shaders => CFFEClassId::Shaders,
             mpcf::ClassId::Other(other) => CFFEClassId::Other(other),
         }
     }
@@ -650,7 +664,13 @@ impl From<CFFEClassId> for mpcf::ClassId {
     fn from(class_id: CFFEClassId) -> Self {
         match class_id {
             CFFEClassId::Mods => mpcf::ClassId::Mods,
+            CFFEClassId::ResourcePacks => mpcf::ClassId::ResourcePacks,
             CFFEClassId::Modpacks => mpcf::ClassId::Modpacks,
+            CFFEClassId::Customizations => mpcf::ClassId::Customizations,
+            CFFEClassId::BukkitPlugins => mpcf::ClassId::BukkitPlugins,
+            CFFEClassId::Worlds => mpcf::ClassId::Worlds,
+            CFFEClassId::Addons => mpcf::ClassId::Addons,
+            CFFEClassId::Shaders => mpcf::ClassId::Shaders,
             CFFEClassId::Other(other) => mpcf::ClassId::Other(other),
         }
     }

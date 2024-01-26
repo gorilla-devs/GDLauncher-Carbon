@@ -1,7 +1,7 @@
 import { generateSequence } from "@/utils/helpers";
-import { queryClient, rspc } from "@/utils/rspcClient";
-import { Trans } from "@gd/i18n";
-import { Button, Input, Slider, Switch } from "@gd/ui";
+import { port, queryClient, rspc } from "@/utils/rspcClient";
+import { Trans, useTransContext } from "@gd/i18n";
+import { Button, Dropdown, Input, Slider, Switch } from "@gd/ui";
 import { useParams, useRouteData } from "@solidjs/router";
 import fetchData from "../../instance.data";
 import { Show, Suspense, createMemo } from "solid-js";
@@ -12,6 +12,7 @@ import RowsContainer from "@/pages/Settings/components/RowsContainer";
 import RightHandSide from "@/pages/Settings/components/RightHandSide";
 
 const Settings = () => {
+  const [t] = useTransContext();
   const params = useParams();
   const updateInstanceMutation = rspc.createMutation(
     ["instance.updateInstance"],
@@ -27,14 +28,92 @@ const Settings = () => {
   const initialJavaArgs = createMemo((prev: string | null) => {
     if (prev) return prev;
 
-    return routeData?.instanceDetails?.data?.extra_java_args as string | null;
+    return routeData?.instanceDetails?.data?.extraJavaArgs as string | null;
   }, null);
 
   const mbTotalRAM = () => Number(routeData.totalRam.data) / 1024 / 1024;
 
+  const templateGameResolution = () => {
+    return [
+      { label: "854 x 480 (100%)", key: "Standard:854x480" },
+      { label: "1046 x 588 (150%)", key: "Standard:1046x588" },
+      { label: "1208 x 679 (200%)", key: "Standard:1208x679" },
+      { label: "1479 x 831 (300%)", key: "Standard:1479x831" }
+    ];
+  };
+
+  const gameResolutionDropdownKey = () => {
+    if (routeData?.instanceDetails?.data?.gameResolution?.type === "Standard") {
+      const gameResolution =
+        routeData?.instanceDetails?.data?.gameResolution.value.join("x");
+      return `Standard:${gameResolution}`;
+    }
+
+    return "custom";
+  };
+
   return (
     <Suspense fallback={null}>
       <RowsContainer>
+        <Show when={routeData?.instanceDetails?.data?.modpack}>
+          <Row>
+            <Title>
+              <Trans key="instance_settings.modpack_info" />
+            </Title>
+          </Row>
+          <div class="flex flex-col gap-4">
+            <div class="flex items-center gap-4">
+              <img
+                class="h-13 w-13 rounded-lg"
+                src={`http://localhost:${port}/instance/modpackIcon?instance_id=${params.id}`}
+              />
+              <div>
+                <div class="text-lg font-bold">
+                  {routeData.modpackInfo.data?.name}
+                </div>
+                <div>{routeData.modpackInfo.data?.version_name}</div>
+              </div>
+            </div>
+            <div class="flex gap-4">
+              <Show when={routeData.instanceDetails.data?.modpack?.locked}>
+                <Button
+                  type="outline"
+                  onClick={() => {
+                    updateInstanceMutation.mutate({
+                      modpackLocked: {
+                        Set: false
+                      },
+                      instance: parseInt(params.id, 10)
+                    });
+                  }}
+                >
+                  <i class="w-5 h-5 i-ri:lock-fill" />
+                  <Trans key="instance_settings.unlock" />
+                </Button>
+              </Show>
+              <Show when={!routeData.instanceDetails.data?.modpack?.locked}>
+                <div class="flex items-center gap-2">
+                  <i class="w-5 h-5 i-ri:lock-unlock-fill" />
+                  <Trans key="instance_settings.unlocked" />
+                </div>
+              </Show>
+              <Button
+                type="outline"
+                onClick={() => {
+                  updateInstanceMutation.mutate({
+                    modpackLocked: {
+                      Set: null
+                    },
+                    instance: parseInt(params.id, 10)
+                  });
+                }}
+              >
+                <i class="w-5 h-5 i-ri:git-branch-fill" />
+                <Trans key="instance_settings.unpair" />
+              </Button>
+            </div>
+          </div>
+        </Show>
         <Row>
           <Title>
             <Trans key="instance_settings.java_memory_title" />
@@ -52,13 +131,6 @@ const Settings = () => {
                         }
                       : null
                   },
-                  extra_java_args: null,
-                  global_java_args: null,
-                  modloader: null,
-                  name: null,
-                  notes: null,
-                  use_loaded_icon: null,
-                  version: null,
                   instance: parseInt(params.id, 10)
                 });
               }}
@@ -102,13 +174,6 @@ const Settings = () => {
 
                 updateInstanceMutation.mutate({
                   memory: { Set: { max_mb: val, min_mb: val } },
-                  extra_java_args: null,
-                  global_java_args: null,
-                  modloader: null,
-                  name: null,
-                  notes: null,
-                  use_loaded_icon: null,
-                  version: null,
                   instance: parseInt(params.id, 10)
                 });
               }}
@@ -122,21 +187,14 @@ const Settings = () => {
           </Title>
           <Switch
             checked={
-              routeData?.instanceDetails?.data?.extra_java_args !== null &&
-              routeData?.instanceDetails?.data?.extra_java_args !== undefined
+              routeData?.instanceDetails?.data?.extraJavaArgs !== null &&
+              routeData?.instanceDetails?.data?.extraJavaArgs !== undefined
             }
             onChange={(e) => {
               const checked = e.target.checked;
 
               updateInstanceMutation.mutate({
-                memory: null,
-                extra_java_args: { Set: checked ? "" : null },
-                global_java_args: null,
-                modloader: null,
-                name: null,
-                notes: null,
-                use_loaded_icon: null,
-                version: null,
+                extraJavaArgs: { Set: checked ? "" : null },
                 instance: parseInt(params.id, 10)
               });
             }}
@@ -144,8 +202,8 @@ const Settings = () => {
         </Row>
         <Show
           when={
-            routeData?.instanceDetails?.data?.extra_java_args !== null &&
-            routeData?.instanceDetails?.data?.extra_java_args !== undefined
+            routeData?.instanceDetails?.data?.extraJavaArgs !== null &&
+            routeData?.instanceDetails?.data?.extraJavaArgs !== undefined
           }
         >
           <div class="flex w-full justify-between items-center -mt-8">
@@ -153,47 +211,28 @@ const Settings = () => {
               <Trans key="instance_settings.prepend_global_java_args" />
             </h5>
             <Switch
-              checked={routeData?.instanceDetails?.data?.global_java_args}
+              checked={routeData?.instanceDetails?.data?.globalJavaArgs}
               onChange={(e) => {
                 const checked = e.target.checked;
 
                 updateInstanceMutation.mutate({
-                  memory: null,
-                  extra_java_args: null,
-                  global_java_args: { Set: checked },
-                  modloader: null,
-                  name: null,
-                  notes: null,
-                  use_loaded_icon: null,
-                  version: null,
+                  globalJavaArgs: { Set: checked },
                   instance: parseInt(params.id, 10)
                 });
               }}
             />
           </div>
           <div class="flex w-full gap-4 items-center">
-            <Show when={routeData?.instanceDetails?.data?.global_java_args}>
-              <Input
-                class="w-1/3"
-                inputClass="font-bold"
-                disabled
-                value="{GLOBAL_JAVA_ARGS}"
-              />
+            <Show when={routeData?.instanceDetails?.data?.globalJavaArgs}>
+              {"{GLOBAL_JAVA_ARGS}"}
               <div>+</div>
             </Show>
             <Input
               class="w-full"
-              value={routeData?.instanceDetails?.data?.extra_java_args || ""}
+              value={routeData?.instanceDetails?.data?.extraJavaArgs || ""}
               onChange={(e) => {
                 updateInstanceMutation.mutate({
-                  memory: null,
-                  extra_java_args: { Set: e.target.value },
-                  global_java_args: null,
-                  modloader: null,
-                  name: null,
-                  notes: null,
-                  use_loaded_icon: null,
-                  version: null,
+                  extraJavaArgs: { Set: e.target.value },
                   instance: parseInt(params.id, 10)
                 });
               }}
@@ -205,14 +244,7 @@ const Settings = () => {
               textColor="text-red-500"
               onClick={() => {
                 updateInstanceMutation.mutate({
-                  memory: null,
-                  extra_java_args: { Set: initialJavaArgs() },
-                  global_java_args: null,
-                  modloader: null,
-                  name: null,
-                  notes: null,
-                  use_loaded_icon: null,
-                  version: null,
+                  extraJavaArgs: { Set: initialJavaArgs() },
                   instance: parseInt(params.id, 10)
                 });
               }}
@@ -226,20 +258,139 @@ const Settings = () => {
               textColor="text-red-500"
               onClick={() => {
                 updateInstanceMutation.mutate({
-                  memory: null,
-                  extra_java_args: { Set: "" },
-                  global_java_args: null,
-                  modloader: null,
-                  name: null,
-                  notes: null,
-                  use_loaded_icon: null,
-                  version: null,
+                  extraJavaArgs: { Set: "" },
                   instance: parseInt(params.id, 10)
                 });
               }}
             >
               <i class="w-5 h-5 i-ri:close-fill" />
             </Button>
+          </div>
+        </Show>
+        <Row>
+          <Title
+            description={<Trans key="instance_settings.game_resolution_text" />}
+          >
+            <Trans key="instance_settings.game_resolution_title" />
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={!!routeData?.instanceDetails?.data?.gameResolution}
+              onChange={(e) => {
+                updateInstanceMutation.mutate({
+                  gameResolution: {
+                    Set: e.target.checked
+                      ? { type: "Standard", value: [854, 480] }
+                      : null
+                  },
+                  instance: parseInt(params.id, 10)
+                });
+              }}
+            />
+          </RightHandSide>
+        </Row>
+        <Show when={routeData?.instanceDetails?.data?.gameResolution}>
+          <div class="flex gap-4">
+            <Dropdown
+              value={gameResolutionDropdownKey()}
+              placeholder={t("settings:resolution_presets")}
+              options={[
+                ...templateGameResolution(),
+                { label: "Custom", key: "custom" }
+              ]}
+              onChange={(option) => {
+                let value: {
+                  type: "Standard" | "Custom";
+                  value: [number, number];
+                } | null = null;
+
+                if (option.key === "custom") {
+                  value = {
+                    type: "Custom",
+                    value: [854, 480]
+                  };
+                } else {
+                  const [width, height] = option.key
+                    .toString()
+                    .split(":")[1]
+                    .split("x");
+                  value = {
+                    type: "Standard",
+                    value: [parseInt(width, 10), parseInt(height, 10)]
+                  };
+                }
+
+                updateInstanceMutation.mutate({
+                  gameResolution: {
+                    Set: value
+                  },
+                  instance: parseInt(params.id, 10)
+                });
+              }}
+            />
+            <Show
+              when={
+                routeData?.instanceDetails?.data?.gameResolution?.type ===
+                "Custom"
+              }
+            >
+              <div class="flex gap-4">
+                <div class="flex items-center gap-4">
+                  <div>
+                    <Trans key="instance_settings.width" />
+                  </div>
+                  <Input
+                    class="w-24"
+                    type="number"
+                    value={
+                      routeData?.instanceDetails?.data?.gameResolution?.value[0]
+                    }
+                    onChange={(e) => {
+                      updateInstanceMutation.mutate({
+                        gameResolution: {
+                          Set: {
+                            type: "Custom",
+                            value: [
+                              parseInt(e.currentTarget.value, 10),
+                              routeData?.instanceDetails?.data?.gameResolution
+                                ?.value[1]!
+                            ]
+                          }
+                        },
+                        instance: parseInt(params.id, 10)
+                      });
+                    }}
+                  />
+                </div>
+                <div class="flex items-center gap-4">
+                  <div>
+                    <Trans key="instance_settings.height" />
+                  </div>
+                  <Input
+                    class="w-24"
+                    type="number"
+                    value={
+                      routeData?.instanceDetails?.data?.gameResolution?.value[1]
+                    }
+                    onChange={(e) => {
+                      updateInstanceMutation.mutate({
+                        gameResolution: {
+                          Set: {
+                            type: "Custom",
+                            value: [
+                              routeData?.instanceDetails?.data?.gameResolution
+                                ?.value[0]!,
+                              parseInt(e.currentTarget.value, 10)
+                            ]
+                          }
+                        },
+                        instance: parseInt(params.id, 10)
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+            </Show>
           </div>
         </Show>
       </RowsContainer>

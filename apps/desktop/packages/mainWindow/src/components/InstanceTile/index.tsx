@@ -1,15 +1,13 @@
-import { createEffect, createResource, createSignal } from "solid-js";
+import { createEffect, createSignal } from "solid-js";
 import Tile from "../Instance/Tile";
 import {
-  fetchImage,
   isListInstanceValid,
-  isProgressKnown,
-  isProgressFailed,
   getValideInstance,
   getPreparingState,
   getRunningState,
   getInValideInstance,
-  getInactiveState
+  getInactiveState,
+  getInstanceImageUrl
 } from "@/utils/instances";
 import {
   ListInstance,
@@ -44,10 +42,7 @@ const InstanceTile = (props: {
     percentage: 0,
     subTasks: undefined
   });
-  const [imageResource, { refetch }] = createResource(
-    () => props.instance.id,
-    fetchImage
-  );
+
   const navigate = useGDNavigate();
 
   const validInstance = () => getValideInstance(props.instance.status);
@@ -75,23 +70,17 @@ const InstanceTile = (props: {
   });
 
   createEffect(() => {
-    if (props.instance.icon_revision !== undefined) {
-      refetch();
-    }
-  });
-
-  createEffect(() => {
     setFailError("");
     if (task() !== null && task()?.data) {
       const data = (task() as CreateQueryResult<FETask | null, RSPCError>)
         .data as FETask;
       setProgress("totalDownload", data.download_total);
       setProgress("downloaded", data.downloaded);
-      if (isProgressKnown(data.progress)) {
+      if (data.progress.type === "Known") {
         setProgress("subTasks", data.active_subtasks);
-        setProgress("percentage", data.progress.Known);
+        setProgress("percentage", data.progress.value);
         setIsLoading(true);
-      } else if (isProgressFailed(data.progress)) {
+      } else if (data.progress.type === "Failed") {
         setIsLoading(false);
       } else {
         setIsLoading(false);
@@ -117,9 +106,9 @@ const InstanceTile = (props: {
   });
 
   createEffect(() => {
-    if (failedTask.data && isProgressFailed(failedTask.data.progress)) {
+    if (failedTask.data && failedTask.data.progress.type === "Failed") {
       if (taskId()) dismissTaskMutation.mutate(taskId() as number);
-      setFailError(failedTask.data.progress.Failed.cause[0].display);
+      setFailError(failedTask.data.progress.value.cause[0].display);
     }
   });
 
@@ -138,7 +127,11 @@ const InstanceTile = (props: {
       isRunning={!!isRunning()}
       isPreparing={isPreparingState() !== undefined}
       variant={type()}
-      img={imageResource()}
+      img={
+        props.instance.icon_revision
+          ? getInstanceImageUrl(props.instance.id, props.instance.icon_revision)
+          : undefined
+      }
       selected={props.selected}
       isLoading={isLoading()}
       percentage={progress.percentage * 100}

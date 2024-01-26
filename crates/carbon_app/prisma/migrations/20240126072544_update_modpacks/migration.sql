@@ -8,9 +8,11 @@ CREATE TABLE "new_Instance" (
     "hasPackUpdate" BOOLEAN NOT NULL DEFAULT false,
     "index" INTEGER NOT NULL,
     "groupId" INTEGER NOT NULL,
-    CONSTRAINT "Instance_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "InstanceGroup" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "javaProfileId" TEXT,
+    CONSTRAINT "Instance_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "InstanceGroup" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT "Instance_javaProfileId_fkey" FOREIGN KEY ("javaProfileId") REFERENCES "JavaProfile" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
-INSERT INTO "new_Instance" ("favorite", "groupId", "id", "index", "name", "shortpath") SELECT "favorite", "groupId", "id", "index", "name", "shortpath" FROM "Instance";
+INSERT INTO "new_Instance" ("favorite", "groupId", "id", "index", "javaProfileId", "name", "shortpath") SELECT "favorite", "groupId", "id", "index", "javaProfileId", "name", "shortpath" FROM "Instance";
 DROP TABLE "Instance";
 ALTER TABLE "new_Instance" RENAME TO "Instance";
 CREATE UNIQUE INDEX "Instance_shortpath_key" ON "Instance"("shortpath");

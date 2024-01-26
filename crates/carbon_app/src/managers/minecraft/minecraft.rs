@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
@@ -265,19 +265,23 @@ pub async fn generate_startup_command(
     full_account: FullAccount,
     xmx_memory: u16,
     xms_memory: u16,
+    game_resolution: Option<(u16, u16)>,
     extra_java_args: &str,
     runtime_path: &RuntimePath,
     version: VersionInfo,
     lwjgl_group: &LibraryGroup,
     instance_path: InstancePath,
 ) -> anyhow::Result<Vec<String>> {
-    let libraries = chain_lwjgl_libs_with_base_libs(
+    let mut libraries = chain_lwjgl_libs_with_base_libs(
         &version.libraries,
         &lwjgl_group.libraries,
         &java_component.arch,
         &runtime_path.get_libraries(),
         true,
     );
+
+    let tmp_set: HashSet<_> = libraries.drain(..).collect();
+    libraries.extend(tmp_set.into_iter());
 
     let libraries = libraries
         .into_iter()
@@ -332,7 +336,7 @@ pub async fn generate_startup_command(
         auth_uuid: full_account.uuid,
         auth_access_token: player_token.clone(),
         auth_session: player_token,
-        user_type: "mojang".to_owned(),
+        user_type: "msa".to_owned(),
         version_type: version.type_.as_str().to_string(),
         user_properties: "{}".to_owned(),
     };
@@ -501,7 +505,13 @@ pub async fn generate_startup_command(
     command.push("-Dorg.lwjgl.util.Debug=true".to_string());
 
     command.push(version.main_class);
+
     substitute_arguments(&mut command, arguments.get(&ArgumentType::Game).unwrap());
+
+    if let Some(game_resolution) = game_resolution {
+        command.push(format!("--width={}", game_resolution.0));
+        command.push(format!("--height={}", game_resolution.1));
+    }
 
     Ok(command)
 }
@@ -512,6 +522,7 @@ pub async fn launch_minecraft(
     full_account: FullAccount,
     xmx_memory: u16,
     xms_memory: u16,
+    game_resolution: Option<(u16, u16)>,
     extra_java_args: &str,
     runtime_path: &RuntimePath,
     version: VersionInfo,
@@ -523,6 +534,7 @@ pub async fn launch_minecraft(
         full_account,
         xmx_memory,
         xms_memory,
+        game_resolution,
         extra_java_args,
         runtime_path,
         version,
@@ -695,6 +707,7 @@ mod tests {
             full_account,
             2048,
             2048,
+            None,
             "",
             &runtime_path,
             version,

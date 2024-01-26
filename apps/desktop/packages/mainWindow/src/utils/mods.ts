@@ -2,6 +2,7 @@ import {
   CFFEFileIndex,
   CFFEMod,
   FEUnifiedSearchResult,
+  InstanceDetails,
   Mod,
   MRFECategoriesResponse,
   MRFEVersion
@@ -23,6 +24,8 @@ export type ModProps = BaseProps & {
   mcVersion?: string;
   installedMods: Mod[];
   instanceId: number | null;
+  instanceMods?: Mod[];
+  instanceDetails?: InstanceDetails;
   modrinthCategories?: MRFECategoriesResponse | undefined;
 };
 

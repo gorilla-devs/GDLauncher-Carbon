@@ -7,13 +7,13 @@ use std::fmt::{Debug, Display};
 use rspc::Type;
 use serde::Serialize;
 
-#[derive(Type, Serialize)]
+#[derive(Debug, Type, Serialize)]
 pub struct FeError {
     cause: Vec<CauseSegment>,
     backtrace: String,
 }
 
-#[derive(Type, Serialize)]
+#[derive(Debug, Type, Serialize)]
 pub struct CauseSegment {
     pub display: String,
     pub debug: String,

@@ -22,7 +22,9 @@ import { setTaskIds } from "@/utils/import";
 
 const [step, setStep] = createSignal("selectionStep");
 const [instances, setInstances] = createSignal([]);
-export { step, setStep, instances, setInstances };
+
+const [globalInstances, setGlobalInstances] = createSignal<any[]>([]);
+export { step, setStep, instances, setInstances, globalInstances };
 
 const SingleEntity = (props: {
   entity: ImportEntityStatus;
@@ -31,14 +33,17 @@ const SingleEntity = (props: {
   const [t] = useTransContext();
   const [path, setPath] = createSignal<string | undefined>(undefined);
   const [inputValue, setInputValue] = createSignal(path());
+
   const [instance, setInstance] = createStore<{
     noResult: string | undefined;
     singleResult: ImportableInstance | undefined;
     multiResult: (ImportableInstance | InvalidImportEntry)[] | undefined;
+    isLoading?: boolean;
   }>({
     noResult: undefined,
     singleResult: undefined,
-    multiResult: undefined
+    multiResult: undefined,
+    isLoading: false
   });
 
   const entityDefaultPath = rspc.createQuery(() => [
@@ -80,19 +85,38 @@ const SingleEntity = (props: {
     const status = importScanStatus.data;
     if (status) {
       const data = status.status;
-
+      if (status.scanning) {
+        setInstance({
+          isLoading: true,
+          noResult: undefined,
+          singleResult: undefined,
+          multiResult: undefined
+        });
+      }
       if (typeof data === "object") {
         if ("SingleResult" in data) {
           if ("Valid" in data.SingleResult) {
             const res = data.SingleResult;
+
+            setGlobalInstances([res.Valid]);
             setInstance({
               singleResult: res.Valid,
               multiResult: undefined,
-              noResult: undefined
+              noResult: undefined,
+              isLoading: false
             });
           }
         } else if ("MultiResult" in data) {
           const res = data.MultiResult;
+          setGlobalInstances(
+            res.map((e) => {
+              if ("Valid" in e) {
+                return e.Valid;
+              } else {
+                return e.Invalid;
+              }
+            })
+          );
           setInstance({
             multiResult: res.map((e) => {
               if ("Valid" in e) {
@@ -102,23 +126,27 @@ const SingleEntity = (props: {
               }
             }),
             singleResult: undefined,
-            noResult: undefined
+            noResult: undefined,
+            isLoading: false
           });
         }
       } else {
         setInstance({
           noResult: data,
           singleResult: undefined,
-          multiResult: undefined
+          multiResult: undefined,
+          isLoading: false
         });
       }
     }
   });
-
+  createEffect(() => {
+    console.log(instances());
+  });
   return (
     <>
       <div class="flex-1 w-full flex flex-col items-center justify-center p-4">
-        <div class="flex flex-col items-start justify-start w-full gap-2">
+        <div class="flex flex-col items-start w-full gap-2 justify-start">
           <span class="font-bold">
             {props.entity.entity} <Trans key="instance.import_path" />:
           </span>
@@ -230,10 +258,10 @@ const SingleEntity = (props: {
                           {t("instance.select_all_mods")}
                         </span>
                       }
-                      checked={instances().length !== 0}
-                      indeterminate={
-                        instances().length !== instance.multiResult?.length
+                      checked={
+                        instances().length === instance.multiResult?.length
                       }
+                      indeterminate={instances().length !== 0}
                       onChange={(e) => {
                         if (e) {
                           setInstances(
@@ -248,7 +276,7 @@ const SingleEntity = (props: {
                         }
                       }}
                     />
-                    <div class="w-full h-[90%] overflow-hidden flex flex-col gap-2">
+                    <div class="w-full h-[240px] overflow-y-auto flex flex-col gap-2">
                       <For each={instance.multiResult}>
                         {(entry) => (
                           <SingleCheckBox
@@ -273,6 +301,11 @@ const SingleEntity = (props: {
                       />
                     )}
                   </For>
+                </Match>
+                <Match when={instance.isLoading === true}>
+                  <div class="w-full h-full flex items-center justify-center">
+                    <div class="animate-spin w-10 h-10 i-formkit:spinner text-sky-800" />
+                  </div>
                 </Match>
               </Switch>
             </Match>
@@ -299,7 +332,7 @@ const SingleEntity = (props: {
             disabled={instances().length === 0}
             type="primary"
             onClick={() => {
-              setTaskIds(undefined);
+              setTaskIds([]);
               setStep("importStep");
             }}
           >

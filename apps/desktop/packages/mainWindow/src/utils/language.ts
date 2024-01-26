@@ -31,7 +31,9 @@ export default async function changeLanguage(lang: string) {
   }
 
   settingsMutation.mutate({
-    language: lang
+    language: {
+      Set: lang
+    }
   });
 
   changeLanguage(lang);

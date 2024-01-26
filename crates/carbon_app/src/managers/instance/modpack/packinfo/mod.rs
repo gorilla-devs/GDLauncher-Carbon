@@ -7,6 +7,7 @@ mod v1;
 
 pub use scan::scan_dir;
 
+#[derive(Debug)]
 pub struct PackInfo {
     pub files: HashMap<String, FileHashes>,
 }

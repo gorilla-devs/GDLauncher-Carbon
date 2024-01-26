@@ -9,7 +9,7 @@ const ContentWrapper = (props: Props) => {
   const dynamicPathRegex = /(\/library|modpacks|mods)\/(\d+)(\/.*)?/;
 
   return (
-    <div class="flex justify-center text-white w-full box-border flex-1 h-full bg-darkSlate-700 p-5 overflow-auto max-h-full pb-0">
+    <div class="flex justify-center text-white w-full box-border p-4 flex-1 h-full bg-darkSlate-700 overflow-auto max-h-full pb-0">
       <div
         class="w-full box-border overflow-auto flex bg-darkSlate-800 relative flex-col h-auto rounded-2xl rounded-b-none"
         classList={{

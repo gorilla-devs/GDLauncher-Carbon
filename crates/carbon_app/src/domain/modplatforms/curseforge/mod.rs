@@ -1,9 +1,13 @@
 use crate::domain::instance::info as generic;
+use daedalus::minecraft::VersionManifest;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
+use tracing::info;
 
-use super::ModChannel;
+use crate::domain::runtime_path::InstancePath;
+
+use super::{modrinth::UtcDateTime, ModChannel};
 
 pub mod filters;
 pub mod manifest;
@@ -28,7 +32,7 @@ pub struct File {
     pub release_type: FileReleaseType,
     pub file_status: FileStatus,
     pub hashes: Vec<FileHash>,
-    pub file_date: String, // Consider using a datetime library for date-time representation
+    pub file_date: UtcDateTime,
     pub file_length: u32,
     pub download_count: u32,
     pub download_url: Option<String>,
@@ -60,7 +64,7 @@ pub struct FileHash {
     pub algo: HashAlgo,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr, Copy, Clone)]
+#[derive(Debug, Serialize_repr, Deserialize_repr, Copy, Clone, PartialEq, Eq)]
 #[repr(u8)]
 pub enum FileReleaseType {
     Stable = 1,
@@ -239,7 +243,7 @@ pub struct Mod {
     pub is_featured: bool,
     pub primary_category_id: i32,
     pub categories: Vec<Category>,
-    pub class_id: Option<i32>, // TODO: Add all options to enum and use it
+    pub class_id: Option<ClassId>,
     pub authors: Vec<ModAuthor>,
     pub logo: Option<ModAsset>,
     pub screenshots: Vec<ModAsset>,
@@ -255,12 +259,60 @@ pub struct Mod {
     pub thumbs_up_count: i32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[repr(u16)]
 pub enum ClassId {
     Mods = 6,
+    ResourcePacks = 12,
     Modpacks = 4471,
+    Customizations = 4546,
+    BukkitPlugins = 5,
+    Worlds = 17,
+    Addons = 4559,
+    Shaders = 6552,
     Other(u16),
+}
+
+impl ClassId {
+    pub fn into_path(
+        self,
+        instance_path: &InstancePath,
+        game_version: String,
+        mc_manifest: &VersionManifest,
+    ) -> PathBuf {
+        match self {
+            Self::ResourcePacks => {
+                // anything older than 1.6.1 is in the texturepacks folder
+                let index_1_6_1 = mc_manifest
+                    .versions
+                    .iter()
+                    .position(|v| v.id == "1.6.1")
+                    .unwrap_or(0);
+
+                let manifest_version = mc_manifest
+                    .versions
+                    .iter()
+                    .position(|v| v.id == game_version)
+                    .unwrap_or(0);
+
+                info!(
+                    "Index 1.6.1: {} | manifest index current game version ({}): {}",
+                    index_1_6_1, game_version, manifest_version
+                );
+
+                // current game version needs to be below 1.6.1, so the index needs to be higher
+                if manifest_version > index_1_6_1 {
+                    instance_path.get_texturepacks_path()
+                } else {
+                    instance_path.get_resourcepacks_path()
+                }
+            }
+            Self::BukkitPlugins => instance_path.get_plugins_path(),
+            Self::Worlds => instance_path.get_saves_path(),
+            Self::Shaders => instance_path.get_shaderpacks_path(),
+            _ => instance_path.get_mods_path(),
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for ClassId {
@@ -271,7 +323,13 @@ impl<'de> Deserialize<'de> for ClassId {
         let n = u16::deserialize(deserializer)?;
         match n {
             6 => Ok(Self::Mods),
+            12 => Ok(Self::ResourcePacks),
             4471 => Ok(Self::Modpacks),
+            4546 => Ok(Self::Customizations),
+            5 => Ok(Self::BukkitPlugins),
+            17 => Ok(Self::Worlds),
+            4559 => Ok(Self::Addons),
+            6552 => Ok(Self::Shaders),
             other => Ok(Self::Other(other)),
         }
     }
@@ -284,7 +342,13 @@ impl Serialize for ClassId {
     {
         serializer.serialize_u16(match self {
             Self::Mods => 6,
+            Self::ResourcePacks => 12,
             Self::Modpacks => 4471,
+            Self::Customizations => 4546,
+            Self::BukkitPlugins => 5,
+            Self::Worlds => 17,
+            Self::Addons => 4559,
+            Self::Shaders => 6552,
             Self::Other(other) => *other,
         })
     }
@@ -546,6 +610,16 @@ impl From<FileReleaseType> for ModChannel {
             FileReleaseType::Alpha => ModChannel::Alpha,
             FileReleaseType::Beta => ModChannel::Beta,
             FileReleaseType::Stable => ModChannel::Stable,
+        }
+    }
+}
+
+impl From<ModChannel> for FileReleaseType {
+    fn from(value: ModChannel) -> Self {
+        match value {
+            ModChannel::Alpha => FileReleaseType::Alpha,
+            ModChannel::Beta => FileReleaseType::Beta,
+            ModChannel::Stable => FileReleaseType::Stable,
         }
     }
 }

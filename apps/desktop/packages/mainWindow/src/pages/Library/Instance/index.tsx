@@ -1,21 +1,14 @@
 /* eslint-disable i18next/no-literal-string */
 import getRouteIndex from "@/route/getRouteIndex";
 import { Trans, useTransContext } from "@gd/i18n";
-import { Tabs, TabList, Tab, Button } from "@gd/ui";
-import {
-  Link,
-  Outlet,
-  useLocation,
-  useParams,
-  useRouteData
-} from "@solidjs/router";
+import { Tabs, TabList, Tab, Button, ContextMenu } from "@gd/ui";
+import { Outlet, useLocation, useParams, useRouteData } from "@solidjs/router";
 import {
   For,
   Match,
   Show,
   Switch,
   createEffect,
-  createResource,
   createSignal,
   onCleanup,
   onMount
@@ -30,18 +23,25 @@ import {
   UngroupedInstance
 } from "@gd/core_module/bindings";
 import {
-  fetchImage,
   getCurseForgeData,
+  getInstanceImageUrl,
   getModrinthData,
   getPreparingState,
   getRunningState
 } from "@/utils/instances";
 import DefaultImg from "/assets/images/default-instance-img.png";
-import { ContextMenu } from "@/components/ContextMenu";
+// import { ContextMenu } from "@/components/ContextMenu";
 import { useModal } from "@/managers/ModalsManager";
 import { convertSecondsToHumanTime } from "@/utils/helpers";
 import Authors from "./Info/Authors";
 import { getCFModloaderIcon } from "@/utils/sidebar";
+import { setInstanceId } from "@/utils/browser";
+import { getInstanceIdFromPath } from "@/utils/routes";
+import {
+  setPayload,
+  setExportStep
+} from "@/managers/ModalsManager/modals/InstanceExport";
+import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/atoms/ExportCheckboxParent";
 
 type InstancePage = {
   label: string;
@@ -62,10 +62,6 @@ const Instance = () => {
   const [modpackDetails, setModpackDetails] = createSignal<
     FEModResponse | MRFEProject | undefined
   >(undefined);
-  const [imageUrl, { refetch }] = createResource(
-    () => parseInt(params.id, 10),
-    fetchImage
-  );
 
   const [t] = useTransContext();
   const modalsContext = useModal();
@@ -208,7 +204,7 @@ const Instance = () => {
 
   const curseforgeData = () =>
     routeData.instanceDetails.data?.modpack &&
-    getCurseForgeData(routeData.instanceDetails.data.modpack);
+    getCurseForgeData(routeData.instanceDetails.data.modpack.modpack);
 
   createEffect(() => {
     const isCurseforge = curseforgeData();
@@ -226,7 +222,7 @@ const Instance = () => {
 
   const modrinthData = () =>
     routeData.instanceDetails.data?.modpack &&
-    getModrinthData(routeData.instanceDetails.data.modpack);
+    getModrinthData(routeData.instanceDetails.data.modpack.modpack);
 
   createEffect(() => {
     const isModrinth = modrinthData();
@@ -245,7 +241,7 @@ const Instance = () => {
     if (newName()) {
       updateInstanceMutation.mutate({
         name: { Set: newName() },
-        use_loaded_icon: null,
+        useLoadedIcon: null,
         memory: null,
         notes: null,
         instance: parseInt(params.id, 10)
@@ -327,14 +323,30 @@ const Instance = () => {
       icon: "i-ri:folder-open-fill",
       label: t("instance.action_open_folder"),
       action: handleOpenFolder
+    },
+    {
+      icon: "i-mingcute:file-export-fill",
+      label: t("instance.export_instance"),
+      action: () => {
+        const instanceId = getInstanceIdFromPath(location.pathname);
+        setInstanceId(parseInt(instanceId as string, 10));
+
+        setPayload({
+          target: "Curseforge",
+          save_path: undefined,
+          link_mods: true,
+          filter: { entries: {} },
+          instance_id: parseInt(instanceId as string, 10)
+        });
+        setCheckedFiles([]);
+        setExportStep(0);
+
+        modalsContext?.openModal({
+          name: "exportInstance"
+        });
+      }
     }
   ];
-
-  createEffect(() => {
-    if (routeData.instanceDetails.data?.icon_revision !== undefined) {
-      refetch();
-    }
-  });
 
   createEffect(() => {
     if (
@@ -369,20 +381,49 @@ const Instance = () => {
         class="relative flex flex-col justify-between ease-in-out transition-all ease-in-out items-stretch bg-cover bg-center min-h-60 transition-100"
         style={{
           transition: "height 0.2s",
-          "background-image": imageUrl()
-            ? `url("${imageUrl()}")`
+          "background-image": routeData.instanceDetails.data?.iconRevision
+            ? `url("${getInstanceImageUrl(
+                params.id,
+                routeData.instanceDetails.data?.iconRevision
+              )}")`
             : `url("${DefaultImg}")`
         }}
       >
         <div class="h-full bg-gradient-to-t from-darkSlate-800">
-          <div class="z-50 sticky top-5 left-5 w-fit">
+          <div class="sticky top-5 left-5 w-fit z-50">
             <Button
+              rounded
               onClick={() => navigate("/library")}
-              icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
               size="small"
               type="transparent"
             >
-              <Trans key="instance.step_back" />
+              <div class="text-xl i-ri:arrow-drop-left-line" />
+            </Button>
+          </div>
+          <div class="z-50 top-5 right-5 w-fit flex absolute gap-2">
+            <ContextMenu menuItems={menuItems()} trigger="click">
+              <Button rounded size="small" type="transparent">
+                <div class="text-xl i-ri:more-2-fill" />
+              </Button>
+            </ContextMenu>
+            <Button
+              onClick={() =>
+                setFavoriteMutation.mutate({
+                  instance: parseInt(params.id, 10),
+                  favorite: !routeData.instanceDetails.data?.favorite
+                })
+              }
+              rounded
+              size="small"
+              type="transparent"
+            >
+              <div
+                class="text-xl"
+                classList={{
+                  "text-yellow-500 i-ri:star-s-fill": isFavorite(),
+                  "i-ri:star-line": !isFavorite()
+                }}
+              />
             </Button>
           </div>
           <div class="flex justify-center sticky w-full bg-gradient-to-t from-darkSlate-800 box-border px-6 h-24 top-52 z-20 pb-2">
@@ -392,8 +433,12 @@ const Instance = () => {
                   <div
                     class="bg-center bg-cover h-16 w-16 rounded-xl"
                     style={{
-                      "background-image": imageUrl()
-                        ? `url("${imageUrl()}")`
+                      "background-image": routeData.instanceDetails.data
+                        ?.iconRevision
+                        ? `url("${getInstanceImageUrl(
+                            params.id,
+                            routeData.instanceDetails.data?.iconRevision
+                          )}")`
                         : `url("${DefaultImg}")`
                     }}
                   />
@@ -440,14 +485,14 @@ const Instance = () => {
                         classList={{ "bg-darkSlate-800 pl-2": editableName() }}
                       >
                         <div
-                          class="cursor-pointer ease-in-out z-10 transition text-white i-ri:check-fill text-3xl duration-50 hover:text-green-500"
+                          class="cursor-pointer ease-in-out z-10 transition text-white text-3xl i-ri:check-fill duration-50 hover:text-green-500"
                           classList={{
                             hidden: !editableName()
                           }}
                           onClick={() => handleNameChange()}
                         />
                         <div
-                          class="cursor-pointer ease-in-out text-white transition text-3xl duration-50 z-10 hover:text-red-500 i-ri:close-fill"
+                          class="cursor-pointer ease-in-out text-white transition text-3xl duration-50 z-10 i-ri:close-fill hover:text-red-500"
                           classList={{
                             hidden: !editableName()
                           }}
@@ -490,7 +535,7 @@ const Instance = () => {
                         </div>
                         <Show
                           when={
-                            routeData.instanceDetails.data?.seconds_played !==
+                            routeData.instanceDetails.data?.secondsPlayed !==
                             undefined
                           }
                         >
@@ -501,7 +546,7 @@ const Instance = () => {
                                 (
                                   routeData.instanceDetails
                                     .data as InstanceDetails
-                                ).seconds_played
+                                ).secondsPlayed
                               )}
                             </span>
                           </div>
@@ -513,40 +558,8 @@ const Instance = () => {
                         />
                       </div>
                       <div class="flex items-center gap-2 mt-2 lg:mt-0">
-                        <ContextMenu menuItems={menuItems()} trigger="click">
-                          <div
-                            class="flex justify-center items-center cursor-pointer rounded-full h-8 w-8"
-                            style={{
-                              background: "rgba(255, 255, 255, 0.1)"
-                            }}
-                          >
-                            <div class="text-xl i-ri:more-2-fill" />
-                          </div>
-                        </ContextMenu>
-                        <div
-                          class="rounded-full h-8 flex justify-center items-center cursor-pointer w-8"
-                          style={{
-                            background: "rgba(255, 255, 255, 0.1)"
-                          }}
-                          onClick={() =>
-                            setFavoriteMutation.mutate({
-                              instance: parseInt(params.id, 10),
-                              favorite:
-                                !routeData.instanceDetails.data?.favorite
-                            })
-                          }
-                        >
-                          <div
-                            class="text-xl"
-                            classList={{
-                              "text-yellow-500 i-ri:star-s-fill": isFavorite(),
-                              "i-ri:star-line": !isFavorite()
-                            }}
-                          />
-                        </div>
                         <Button
                           uppercase
-                          type="glow"
                           size="large"
                           variant={isRunning() && "red"}
                           loading={isPreparing() !== undefined}
@@ -564,9 +577,11 @@ const Instance = () => {
                         >
                           <Switch>
                             <Match when={!isRunning()}>
+                              <i class="i-ri:play-fill" />
                               <Trans key="instance.play" />
                             </Match>
                             <Match when={isRunning()}>
+                              <i class="i-ri:stop-fill" />
                               <Trans key="instance.stop" />
                             </Match>
                           </Switch>
@@ -589,7 +604,7 @@ const Instance = () => {
         >
           <div class="bg-darkSlate-800 w-full">
             <div
-              class="sticky flex items-center justify-between z-10 bg-darkSlate-800 top-0 mb-4"
+              class="sticky flex items-center justify-between z-10 bg-darkSlate-800 top-0 h-14"
               classList={{
                 "px-6": instancePages()[selectedIndex()]?.noPadding
               }}
@@ -597,9 +612,9 @@ const Instance = () => {
                 refStickyTabs = el;
               }}
             >
-              <div class="flex items-center">
-                <span
-                  class="mr-4 transition-transform duration-100 ease-in-out origin-left"
+              <div class="flex items-center h-full">
+                <div
+                  class="transition-transform duration-100 ease-in-out mr-4 origin-left"
                   classList={{
                     "scale-x-100": isSticky(),
                     "scale-x-0": !isSticky()
@@ -616,28 +631,34 @@ const Instance = () => {
                   >
                     <Trans key="instance.step_back" />
                   </Button>
-                </span>
+                </div>
                 <div
-                  class="transition-transform duration-100 ease-in-out origin-left"
+                  class="transition-transform duration-100 ease-in-out origin-left h-full flex items-center"
                   style={{
                     transform: `translateX(${tabsTranslate()}px)`
                   }}
                 >
                   <Tabs index={selectedIndex()}>
                     <TabList>
-                      <For each={instancePages()}>
-                        {(page: InstancePage) => (
-                          <Link href={page.path} class="no-underline">
-                            <Tab class="bg-transparent">{page.label}</Tab>
-                          </Link>
-                        )}
-                      </For>
+                      <div class="flex gap-6 h-full">
+                        <For each={instancePages()}>
+                          {(page: InstancePage) => (
+                            <Tab
+                              onClick={() => {
+                                navigate(page.path);
+                              }}
+                            >
+                              {page.label}
+                            </Tab>
+                          )}
+                        </For>
+                      </div>
                     </TabList>
                   </Tabs>
                 </div>
               </div>
-              <span
-                class="ml-4 transition-transform duration-100 ease-in-out origin-right"
+              <div
+                class="transition-transform duration-100 ease-in-out ml-4 origin-right"
                 classList={{
                   "scale-x-100": isSticky(),
                   "scale-x-0": !isSticky()
@@ -645,7 +666,6 @@ const Instance = () => {
               >
                 <Button
                   uppercase
-                  type="glow"
                   size="small"
                   variant={isRunning() && "red"}
                   loading={isPreparing() !== undefined}
@@ -659,16 +679,20 @@ const Instance = () => {
                 >
                   <Switch>
                     <Match when={!isRunning()}>
+                      <i class="i-ri:play-fill" />
                       <Trans key="instance.play" />
                     </Match>
                     <Match when={isRunning()}>
+                      <i class="i-ri:stop-fill" />
                       <Trans key="instance.stop" />
                     </Match>
                   </Switch>
                 </Button>
-              </span>
+              </div>
             </div>
-            <Outlet />
+            <div class="py-4">
+              <Outlet />
+            </div>
           </div>
         </div>
       </div>

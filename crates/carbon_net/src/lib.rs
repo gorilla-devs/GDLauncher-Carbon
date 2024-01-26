@@ -219,7 +219,7 @@ pub async fn download_multiple(
 
     let downloads = Arc::new(tokio::sync::Semaphore::new(concurrency));
 
-    let mut tasks: Vec<tokio::task::JoinHandle<Result<_, DownloadError>>> = vec![];
+    let mut tasks: Vec<(tokio::task::JoinHandle<Result<_, DownloadError>>, String)> = vec![];
 
     let arced_progress = Arc::new(progress);
 
@@ -236,10 +236,11 @@ pub async fn download_multiple(
         let file_counter = Arc::clone(&file_counter);
         let size = Arc::clone(&total_size);
         let url = file.url.clone();
+        let url_clone = file.url.clone();
         let path = file.path.clone();
         let client = client.clone();
 
-        tasks.push(tokio::spawn(async move {
+        let task = tokio::spawn(async move {
             let _permit = semaphore
                 .acquire()
                 .await
@@ -445,11 +446,17 @@ pub async fn download_multiple(
             }
 
             Ok(())
-        }));
+        });
+
+        tasks.push((task, url_clone));
     }
 
-    for task in tasks {
-        task.await??;
+    for (task, url) in tasks {
+        let res = task.await?;
+        if let Err(e) = res {
+            tracing::error!({ error = ?e }, "Download failed for {}", url);
+            return Err(e);
+        }
     }
 
     Ok(())

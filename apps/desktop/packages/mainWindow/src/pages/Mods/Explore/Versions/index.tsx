@@ -2,8 +2,8 @@ import { useRouteData, useSearchParams } from "@solidjs/router";
 import fetchData from "../../mods.versions";
 import VersionRow from "./VersionRow";
 import { rspc } from "@/utils/rspcClient";
-import { CFFEFile, MRFEVersion } from "@gd/core_module/bindings";
 import MainContainer from "@/components/Browser/MainContainer";
+import { useInfiniteVersionsQuery } from "@/components/InfiniteScrollVersionsQueryWrapper";
 import { createEffect } from "solid-js";
 
 const Versions = () => {
@@ -11,69 +11,56 @@ const Versions = () => {
 
   const [searchParams] = useSearchParams();
 
-  const instanceId = () => parseInt(searchParams.instanceId, 10);
+  const infiniteQuery = useInfiniteVersionsQuery();
 
-  const instanceDetails = rspc.createQuery(() => [
-    "instance.getInstanceDetails",
-    instanceId()
-  ]);
+  const rows = () => infiniteQuery.allRows();
+
+  const allVirtualRows = () => infiniteQuery.rowVirtualizer.getVirtualItems();
+
+  const lastItem = () => allVirtualRows()[allVirtualRows()?.length - 1];
+
+  const instanceId = () => parseInt(searchParams.instanceId, 10);
 
   const instanceMods = rspc.createQuery(() => [
     "instance.getInstanceMods",
     instanceId()
   ]);
 
-  const modplatform = () => instanceDetails.data?.modloaders[0].type_;
+  const instanceDetails = rspc.createQuery(() => [
+    "instance.getInstanceDetails",
+    instanceId()
+  ]);
 
-  const versions = () => {
-    function compareModloader(version: string): boolean {
-      if (modplatform() === "quilt") {
-        return version === "fabric" || version === "quilt";
-      }
-
-      return version === modplatform();
+  createEffect(() => {
+    if (!lastItem() || lastItem().index === infiniteQuery?.query.index) {
+      return;
     }
 
-    const mrVersions = routeData.modrinthProjectVersions?.data?.filter(
-      (version) => {
-        if (
-          routeData.modrinthGetProject.data?.project_type === "mod" &&
-          modplatform()
-        ) {
-          return version.loaders.some(compareModloader);
-        }
-        return true;
-      }
-    );
+    const lastItemIndex = infiniteQuery?.infiniteQuery.hasNextPage
+      ? lastItem().index - 1
+      : lastItem().index;
 
-    const cfVersions = routeData.curseforgeGetModFiles?.data?.data.filter(
-      (version) => {
-        if (
-          routeData.curseforgeGetMod.data?.data.classId === 6 &&
-          modplatform()
-        ) {
-          return version.gameVersions.some((_version) =>
-            compareModloader(_version.toLowerCase())
-          );
-        }
-        return true;
-      }
-    );
-
-    return mrVersions || cfVersions || [];
-  };
+    if (
+      lastItemIndex >= rows().length - 1 &&
+      infiniteQuery?.infiniteQuery.hasNextPage &&
+      !infiniteQuery.infiniteQuery.isFetchingNextPage &&
+      !infiniteQuery.isLoading
+    ) {
+      infiniteQuery.infiniteQuery.fetchNextPage();
+    }
+  });
 
   const installedMod = () => {
-    for (const version of versions()) {
+    for (const version of rows()) {
       if (instanceMods.data) {
         for (const mod of instanceMods.data) {
           if (
-            mod.curseforge?.file_id === (version as CFFEFile).id ||
-            mod.modrinth?.version_id === (version as MRFEVersion).id
+            mod.curseforge?.file_id.toString() === version?.fileId ||
+            mod.modrinth?.version_id === version?.fileId
           ) {
             return {
-              id: mod.id,
-              remoteId: version.id.toString()
+              id: mod?.id,
+              remoteId: version?.fileId.toString()
             };
           }
         }
@@ -81,22 +68,21 @@ const Versions = () => {
     }
   };
 
-  createEffect(() => {
-    console.log(routeData);
-  });
-
   return (
     <MainContainer
-      versions={versions()}
+      virtualVersions={infiniteQuery?.rowVirtualizer?.getVirtualItems()}
+      measureElement={infiniteQuery?.rowVirtualizer?.measureElement}
+      totalVirtualHeight={infiniteQuery?.rowVirtualizer?.getTotalSize() || 0}
+      versions={rows()}
       curseforgeProjectData={routeData.curseforgeGetMod?.data?.data}
       modrinthProjectData={routeData.modrinthGetProject?.data}
       instanceId={instanceId()}
       installedMod={installedMod()}
+      instanceMods={instanceMods.data || undefined}
+      instanceDetails={instanceDetails?.data || undefined}
       isCurseforge={routeData.isCurseforge}
-      isLoading={
-        (routeData.modrinthGetProject as any)?.isLoading ||
-        (routeData.curseforgeGetModFiles as any)?.isLoading
-      }
+      isLoading={false}
+      type="mod"
     >
       {VersionRow}
     </MainContainer>

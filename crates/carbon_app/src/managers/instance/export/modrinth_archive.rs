@@ -191,7 +191,7 @@ pub async fn export_modrinth(
                 let mut zip = zip::ZipWriter::new(File::create(send_path)?);
                 let options = zip::write::FileOptions::default();
                 zip.start_file("modrinth.index.json", options)?;
-                zip.write(&serde_json::to_vec_pretty(&manifest)?)?;
+                zip.write_all(&serde_json::to_vec_pretty(&manifest)?)?;
 
                 super::zip_excluding(&mut zip, options, &basepath, "overrides", &filter)?;
 
@@ -200,7 +200,7 @@ pub async fn export_modrinth(
             })
             .await??;
 
-            tmpfile.rename(save_path).await?;
+            tmpfile.try_rename_or_move(save_path).await?;
 
             t_create_bundle.complete_opaque();
 

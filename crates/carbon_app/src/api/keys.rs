@@ -56,8 +56,8 @@ keys! {
         GET_MANAGED_VERSIONS_BY_VENDOR              = "getManagedVersionsByVendor";
         SETUP_MANAGED_JAVA                          = "setupManagedJava";
         GET_SETUP_MANAGED_JAVA_PROGRESS             = "getSetupManagedJavaProgress";
-        GET_SYSTEM_JAVA_PROFILES                    = "getSystemJavaProfiles";
-        UPDATE_SYSTEM_JAVA_PROFILE_PATH             = "updateSystemJavaProfilePath";
+        GET_JAVA_PROFILES                           = "getJavaProfiles";
+        UPDATE_JAVA_PROFILE_PATH                    = "updateJavaProfilePath";
         DELETE_JAVA_VERSION                         = "deleteJavaVersion";
     }
 
@@ -96,7 +96,10 @@ keys! {
         DISABLE_MOD                                 = "disableMod";
         DELETE_MOD                                  = "deleteMod";
         INSTALL_MOD                                 = "installMod";
+        INSTALL_LATEST_MOD                          = "installLatestMod";
         UPDATE_MOD                                  = "updateMod";
+        FIND_MOD_UPDATE                             = "findModUpdate";
+        GET_MOD_SOURCES                             = "getModSources";
         GET_IMPORTABLE_ENTITIES                     = "getImportableEntities";
         GET_IMPORT_ENTITY_DEFAULT_PATH              = "getImportEntityDefaultPath";
         SET_IMPORT_SCAN_TARGET                      = "setImportScanTarget";
@@ -105,6 +108,7 @@ keys! {
         IMPORT_INSTANCE                             = "importInstance";
         EXPLORE                                     = "explore";
         EXPORT                                      = "export";
+        GET_MODPACK_INFO                            = "getModpackInfo";
     }
 
     vtask {

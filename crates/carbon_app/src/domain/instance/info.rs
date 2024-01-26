@@ -5,6 +5,8 @@ use std::collections::HashSet;
 use anyhow::bail;
 use chrono::{DateTime, Utc};
 
+use crate::domain::modplatforms::{ModPlatform, ModSources};
+
 #[derive(Debug, Clone)]
 pub struct Instance {
     pub name: String,
@@ -13,8 +15,9 @@ pub struct Instance {
     pub date_updated: DateTime<Utc>,
     pub last_played: Option<DateTime<Utc>>,
     pub seconds_played: u64,
-    pub modpack: Option<Modpack>,
+    pub modpack: Option<ModpackInfo>,
     pub game_configuration: GameConfig,
+    pub mod_sources: Option<ModSources>,
     pub notes: String,
 }
 
@@ -24,7 +27,13 @@ pub enum InstanceIcon {
     RelativePath(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub struct ModpackInfo {
+    pub modpack: Modpack,
+    pub locked: bool,
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum Modpack {
     Curseforge(CurseforgeModpack),
     Modrinth(ModrinthModpack),
@@ -39,22 +48,22 @@ impl ToString for Modpack {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum ModpackPlatform {
-    Curseforge,
-    Modrinth,
-}
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct CurseforgeModpack {
     pub project_id: u32,
     pub file_id: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct ModrinthModpack {
     pub project_id: String,
     pub version_id: String,
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub enum GameResolution {
+    Standard(u16, u16),
+    Custom(u16, u16),
 }
 
 #[derive(Debug, Clone)]
@@ -63,6 +72,7 @@ pub struct GameConfig {
     pub global_java_args: bool,
     pub extra_java_args: Option<String>,
     pub memory: Option<(u16, u16)>,
+    pub game_resolution: Option<GameResolution>,
 }
 
 #[derive(Debug, Clone)]
@@ -118,10 +128,10 @@ impl TryFrom<&str> for ModLoaderType {
 }
 
 impl Modpack {
-    pub fn as_platform(&self) -> ModpackPlatform {
+    pub fn as_platform(&self) -> ModPlatform {
         match self {
-            Self::Curseforge(_) => ModpackPlatform::Curseforge,
-            Self::Modrinth(_) => ModpackPlatform::Modrinth,
+            Self::Curseforge(_) => ModPlatform::Curseforge,
+            Self::Modrinth(_) => ModPlatform::Modrinth,
         }
     }
 }

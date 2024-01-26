@@ -25,7 +25,7 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
             <Trans key="settings:confirm_change_runtime_path_text" />
           </div>
           <div class="h-h-full">
-            <div class="text-red-400 font-bold">
+            <div class="font-bold text-red-400">
               <Trans key="settings:runtime_path_old_path" />
             </div>
             <div class="bg-darkSlate-900 p-4 mt-4">
@@ -33,7 +33,7 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
             </div>
           </div>
           <div class="h-h-full">
-            <div class="text-green-400 font-bold">
+            <div class="font-bold text-green-400">
               <Trans key="settings:runtime_path_new_path" />
             </div>
             <div class="bg-darkSlate-900 p-4 mt-4">
@@ -65,10 +65,10 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
       </ModalLayout>
       <Show when={props.data.isChangingRuntimePath()}>
         <Portal>
-          <div class="fixed inset-0 bg-black z-100 backdrop-blur-sm flex flex-col items-center justify-center bg-opacity-65">
+          <div class="inset-0 z-100 backdrop-blur-sm flex flex-col items-center justify-center fixed bg-black bg-opacity-65">
             <div class="flex text-2xl items-center">
               <Trans key="settings:applying_new_runtime_path" />
-              <div class="i-ri:loader-4-line animate-spin ml-2" />
+              <div class="ml-2 i-ri:loader-4-line animate-spin" />
             </div>
             <div class="mt-4">
               <Trans key="settings:do_not_close_app" />

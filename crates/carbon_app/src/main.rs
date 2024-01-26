@@ -3,7 +3,10 @@
 #![allow(dead_code)]
 
 use crate::managers::{
-    java::{discovery::RealDiscovery, java_checker::RealJavaChecker},
+    java::{
+        discovery::{Discovery, RealDiscovery},
+        java_checker::RealJavaChecker,
+    },
     App, AppInner,
 };
 
@@ -122,9 +125,18 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
         .allow_origin(Any);
 
     let app = AppInner::new(invalidation_sender, runtime_path).await;
+
+    let auto_manage_java = app
+        .settings_manager()
+        .get_settings()
+        .await
+        .unwrap()
+        .auto_manage_java;
+
     crate::managers::java::JavaManager::scan_and_sync(
+        auto_manage_java,
         &app.prisma_client,
-        &RealDiscovery,
+        &RealDiscovery::new(app.settings_manager().runtime_path.clone()),
         &RealJavaChecker,
     )
     .await
@@ -231,6 +243,27 @@ macro_rules! assert_eq_display {
                 a_val = $a,
                 b_val = $b,
             );
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! mirror_into {
+    ($a:path, $b:path, |$value:ident| $expr:expr) => {
+        impl From<$a> for $b {
+            fn from($value: $a) -> Self {
+                use $a as Other;
+
+                $expr
+            }
+        }
+
+        impl From<$b> for $a {
+            fn from($value: $b) -> Self {
+                use $b as Other;
+
+                $expr
+            }
         }
     };
 }

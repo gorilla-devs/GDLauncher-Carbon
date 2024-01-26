@@ -60,9 +60,12 @@ const getVariant = (
     "items-center": true,
     "gap-2": true,
     relative: true,
-    "py-4 px-8": isLarge && !isLoading,
-    "py-3 px-5": isMedium && !isLoading,
-    "py-2 px-4": isSmall && !isLoading,
+    "py-4 px-8": isLarge && !isLoading && !rounded,
+    "py-3 px-5": isMedium && !isLoading && !rounded,
+    "py-2 px-4": isSmall && !isLoading && !rounded,
+    "p-4": isLarge && !isLoading && rounded,
+    "p-3": isMedium && !isLoading && rounded,
+    "p-2": isSmall && !isLoading && rounded,
     "h-12": isLarge,
     "h-11": isMedium,
     "h-9": isSmall,
@@ -122,7 +125,10 @@ const getVariant = (
       // "backdrop-blur-md": true,
       "bg-darkSlate-800": true,
       "text-darkSlate-500": isDisabled,
-      "border-0": true,
+      "border-1": true,
+      "border-transparent": true,
+      "hover:border-1": !isDisabled,
+      "hover:border-white": !isDisabled,
     },
   };
 
@@ -175,29 +181,32 @@ function Button(props: Props) {
       size: "large",
       uppercase: false,
       iconRight: false,
-      rounded: true,
+      rounded: false,
     },
     props
   );
 
   return (
     <button
-      classList={getVariant(
-        props.type || "primary",
-        mergedProps.rounded,
-        props.size || "medium",
-        !!props.disabled,
-        mergedProps.uppercase,
-        !!props.iconRight,
-        !!props.loading,
-        props.variant || "primary",
-        props.cursor,
-        props.textColor
-      )}
       {...(others as JSX.ButtonHTMLAttributes<HTMLButtonElement>)}
+      classList={{
+        ...getVariant(
+          props.type || "primary",
+          mergedProps.rounded,
+          props.size || "medium",
+          !!props.disabled,
+          mergedProps.uppercase,
+          !!props.iconRight,
+          !!props.loading,
+          props.variant || "primary",
+          props.cursor,
+          props.textColor
+        ),
+        ...props.classList,
+      }}
       style={{
         ...(mergedProps.type === "transparent" && {
-          background: "rgba(0, 0, 0, 0.4)",
+          background: "rgba(0, 0, 0, 0.9)",
         }),
         ...props.style,
       }}

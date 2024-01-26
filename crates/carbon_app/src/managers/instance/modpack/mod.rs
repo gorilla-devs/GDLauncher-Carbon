@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     domain::{
         instance::{
-            info::{self, CurseforgeModpack, Modpack, ModrinthModpack},
+            info::{self, CurseforgeModpack, Modpack, ModrinthModpack, ModpackInfo},
             InstanceId,
         },
         modplatforms::{
@@ -33,7 +33,10 @@ impl ManagerRef<'_, InstanceManager> {
                 InstanceType::Valid(InstanceData {
                     config:
                         info::Instance {
-                            modpack: Some(Modpack::Curseforge(modpack)),
+                            modpack: Some(ModpackInfo {
+                                modpack: Modpack::Curseforge(modpack),
+                                ..
+                            }),
                             ..
                         },
                     ..
@@ -65,7 +68,10 @@ impl ManagerRef<'_, InstanceManager> {
             let InstanceType::Valid(InstanceData {
                 config:
                     info::Instance {
-                        modpack: Some(Modpack::Curseforge(modpack)),
+                        modpack: Some(ModpackInfo {
+                            modpack: Modpack::Curseforge(modpack),
+                            ..
+                        }),
                         ..
                     },
                 modpack_update_curseforge,
@@ -100,7 +106,10 @@ impl ManagerRef<'_, InstanceManager> {
                 InstanceType::Valid(InstanceData {
                     config:
                         info::Instance {
-                            modpack: Some(Modpack::Modrinth(modpack)),
+                            modpack: Some(ModpackInfo {
+                                modpack: Modpack::Modrinth(modpack),
+                                ..
+                            }),
                             ..
                         },
                     ..
@@ -118,8 +127,10 @@ impl ManagerRef<'_, InstanceManager> {
                             .modrinth
                             .get_project_versions(ProjectVersionsFilters {
                                 project_id: ProjectID(project_id),
-                                loaders: Vec::new(),
-                                game_versions: Vec::new(),
+                                game_versions: Some(Vec::new()),
+                                loaders: Some(Vec::new()),
+                                offset: None,
+                                limit: None,
                             })
                             .await,
                     )
@@ -141,7 +152,10 @@ impl ManagerRef<'_, InstanceManager> {
             let InstanceType::Valid(InstanceData {
                 config:
                     info::Instance {
-                        modpack: Some(Modpack::Modrinth(modpack)),
+                        modpack: Some(ModpackInfo {
+                            modpack: Modpack::Modrinth(modpack),
+                            ..
+                        }),
                         ..
                     },
                 modpack_update_modrinth,
@@ -187,7 +201,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         drop(instances);
 
-        let pack_version_text = serde_json::to_string(&PackVersionFile::from(modpack))?;
+        let pack_version_text = serde_json::to_string(&PackVersionFile::from(modpack.modpack))?;
 
         let setup_path = instance_path.get_root().join(".setup");
 

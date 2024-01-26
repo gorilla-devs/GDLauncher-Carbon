@@ -18,14 +18,16 @@ model AppConfiguration {
   activeAccountUuid               String?
   concurrentDownloads             Int       @default(8)
   showNews                        Boolean   @default(true)
-  startupResolution               String    @default("854x480")
+  gameResolution                  String?
+  launcherActionOnGameLaunch      String    @default("none")
   javaCustomArgs                  String    @default("")
   xmx                             Int
   xms                             Int       @default(1024)
   defaultInstanceGroup            Int?
   isFirstLaunch                   Boolean   @default(true)
   autoManageJava                  Boolean   @default(true)
-  preferredModChannel             Int       @default(2) // 0 = >= alpha, 1 = >= beta, 2 = stable
+  modPlatformBlacklist            String    @default("")
+  modChannels                     String    @default("stable:true,beta:true,alpha:true")
   // Legal / metrics
   randomUserUuid                  String    @default(uuid())
   secret                          Bytes
@@ -36,23 +38,25 @@ model AppConfiguration {
 }
 
 model Java {
-  id          String              @id @unique @default(uuid())
-  path        String              @unique
+  id          String        @id @unique @default(uuid())
+  path        String        @unique
   major       Int
   fullVersion String
   type        String
   os          String
   arch        String
   vendor      String
-  isValid     Boolean             @default(true)
-  JavaProfile JavaSystemProfile[]
+  isValid     Boolean       @default(true)
+  JavaProfile JavaProfile[]
 }
 
-model JavaSystemProfile {
-  id     String  @id @unique @default(uuid())
-  name   String  @unique
-  java   Java?   @relation(fields: [javaId], references: [id])
-  javaId String?
+model JavaProfile {
+  id              String     @id @default(uuid())
+  name            String     @unique
+  isSystemProfile Boolean    @default(false)
+  java            Java?      @relation(fields: [javaId], references: [id])
+  javaId          String?
+  Instance        Instance[]
 }
 
 model Account {
@@ -62,6 +66,7 @@ model Account {
   accessToken    String?
   tokenExpires   DateTime?
   msRefreshToken String?
+  idToken        String?
   lastUsed       DateTime
   skinId         String?
 }
@@ -94,6 +99,8 @@ model Instance {
   index         Int
   group         InstanceGroup  @relation(fields: [groupId], references: [id])
   groupId       Int
+  javaProfile   JavaProfile?   @relation(fields: [javaProfileId], references: [id])
+  javaProfileId String?
   mods          ModFileCache[]
 }
 
@@ -104,7 +111,6 @@ model InstanceGroup {
   instances  Instance[]
 }
 
-// this one
 model ModFileCache {
   id         String      @id @default(uuid())
   instanceId Int
@@ -118,7 +124,6 @@ model ModFileCache {
   @@unique([instanceId, filename])
 }
 
-// this one
 model ModMetadata {
   id          String              @id
   murmur2     Int
@@ -136,65 +141,108 @@ model ModMetadata {
   cachedFiles ModFileCache[]
 }
 
-// this one
 model CurseForgeModCache {
-  metadataId  String      @id
+  metadataId  String                   @id
   murmur2     Int
   projectId   Int
   fileId      Int
   name        String
+  version     String
   urlslug     String
   summary     String
   authors     String
-	updatePaths String // in the form `<gamever>,<modloader>;<gamever>,<modloader>` for every availible combination
+  releaseType Int // alpha = 0, beta = 1, stable = 2
+  updatePaths String // in the form `<gamever>,<modloader>,<channel>;<gamever>,<modloader>,<channel>` for every availible combination
   cachedAt    DateTime
-	logoImage   CurseForgeModImageCache?
-  metadata    ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Cascade)
+  logoImage   CurseForgeModImageCache?
+  metadata    ModMetadata              @relation(fields: [metadataId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, fileId])
 }
 
-// this one
 model ModrinthModCache {
-  metadataId  String      @id
+  metadataId  String                 @id
   sha512      String
   projectId   String
   versionId   String
   title       String
+  version     String
   urlslug     String
   description String
   authors     String
-	updatePaths String // in the form `<gamever>,<modloader>;<gamever>,<modloader>` for every availible combination
+  releaseType Int // alpha = 0, beta = 1, stable = 2
+  updatePaths String // in the form `<gamever>,<modloader>,<channel>;<gamever>,<modloader>,<channel>` for every availible combination
   filename    String
   fileUrl     String
   cachedAt    DateTime
   logoImage   ModrinthModImageCache?
-  metadata    ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Cascade)
+  metadata    ModMetadata            @relation(fields: [metadataId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, versionId])
 }
 
-// this one
 model LocalModImageCache {
-  metadataId String @id
+  metadataId String      @id
   data       Bytes
   metadata   ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Cascade)
 }
 
-// this one
 model CurseForgeModImageCache {
-  metadataId String @id
+  metadataId String             @id
   url        String
   data       Bytes?
-  upToDate   Int @default(0)
+  upToDate   Int                @default(0)
   metadata   CurseForgeModCache @relation(fields: [metadataId], references: [metadataId], onDelete: Cascade)
 }
 
-// this one
 model ModrinthModImageCache {
-  metadataId String @id
+  metadataId String           @id
   url        String
   data       Bytes?
-  upToDate   Int @default(0)
+  upToDate   Int              @default(0)
   metadata   ModrinthModCache @relation(fields: [metadataId], references: [metadataId], onDelete: Cascade)
+}
+
+model CurseForgeModpackCache {
+  projectId   Int
+  fileId      Int
+  modpackName String
+  versionName String
+  urlSlug     String
+  logoImage   CurseForgeModpackImageCache?
+  updatedAt   DateTime                     @updatedAt
+
+  @@id([projectId, fileId])
+}
+
+model ModrinthModpackCache {
+  projectId   String
+  versionId   String
+  modpackName String
+  versionName String
+  urlSlug     String
+  logoImage   ModrinthModpackImageCache?
+  updatedAt   DateTime                   @updatedAt
+
+  @@id([projectId, versionId])
+}
+
+model CurseForgeModpackImageCache {
+  projectId              Int
+  fileId                 Int
+  url                    String
+  data                   Bytes?
+  CurseForgeModpackCache CurseForgeModpackCache @relation(fields: [projectId, fileId], references: [projectId, fileId], onDelete: Cascade)
+
+  @@id([projectId, fileId])
+}
+
+model ModrinthModpackImageCache {
+  projectId            String
+  versionId            String
+  url                  String
+  data                 Bytes?
+  ModrinthModpackCache ModrinthModpackCache @relation(fields: [projectId, versionId], references: [projectId, versionId], onDelete: Cascade)
+
+  @@id([projectId, versionId])
 }

@@ -1,73 +1,54 @@
 import RowContainer, { Props } from "@/components/Browser/RowContainer";
 import { rspc } from "@/utils/rspcClient";
-import { CFFEFile, MRFEVersion } from "@gd/core_module/bindings";
+import { ModSource } from "@gd/core_module/bindings";
 import { createEffect, createSignal } from "solid-js";
 
 const VersionRow = (props: Props) => {
   const [loading, setLoading] = createSignal(false);
-  const [taskId, setTaskId] = createSignal<number | null>(null);
-
-  const task = rspc.createQuery(() => ["vtask.getTask", taskId()]);
 
   const installModMutation = rspc.createMutation(["instance.installMod"], {
     onMutate() {
       setLoading(true);
-    },
-    onSuccess(data) {
-      setTaskId(data);
-    }
-  });
-
-  createEffect(() => {
-    if (
-      taskId() !== null &&
-      taskId() !== undefined &&
-      task.data !== undefined &&
-      task.data !== null
-    ) {
-      setLoading(false);
-      setTaskId(null);
     }
   });
 
   const onPrimaryAction = () => {
     if (!props.instanceId) return;
-    const mod = props.isCurseforge
+    const mod: ModSource = props.isCurseforge
       ? {
           Curseforge: {
-            file_id: (props.modVersion as CFFEFile).id,
-            project_id: (props.modVersion as CFFEFile).modId
+            project_id: parseInt(props.modVersion.id, 10),
+            file_id: parseInt(props.modVersion.fileId, 10)
           }
         }
       : {
           Modrinth: {
-            project_id: (props.modVersion as MRFEVersion).project_id,
-            version_id: (props.modVersion as MRFEVersion).id
+            project_id: props.modVersion.id,
+            version_id: props.modVersion.fileId
           }
         };
 
     installModMutation.mutate({
       mod_source: mod,
       instance_id: props.instanceId!,
-      install_deps: !props.instanceId,
+      install_deps: !props.installedFile?.id,
       replaces_mod: props.installedFile?.id || null
     });
   };
 
   const isInstalled = () => {
-    if (props.isCurseforge) {
-      return (
-        props.installedFile?.remoteId ===
-          (props.modVersion as CFFEFile).id.toString() &&
-        props.installedFile !== null
-      );
-    }
-
     return (
-      props.installedFile?.remoteId === (props.modVersion as MRFEVersion).id &&
+      props.installedFile?.remoteId.toString() ===
+        props.modVersion?.fileId.toString() &&
       props.installedFile?.remoteId !== null
     );
   };
+
+  createEffect(() => {
+    if (isInstalled()) {
+      setLoading(false);
+    }
+  });
 
   return (
     <RowContainer

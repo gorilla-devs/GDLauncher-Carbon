@@ -4,7 +4,7 @@ use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 use tokio::sync::{watch, RwLock};
-use tracing::debug;
+use tracing::{debug, trace};
 
 use crate::{
     api::keys::instance::*,
@@ -129,6 +129,8 @@ impl ManagerRef<'_, InstanceImportManager> {
         index: u32,
         name: Option<String>,
     ) -> anyhow::Result<VisualTaskId> {
+        trace!("Beginning import for option {index} with name {name:?}");
+
         match self.scanner.read().await.as_ref() {
             Some((_, scanner)) => Ok(scanner.begin_import(self.app, index, name).await?),
             None => Err(anyhow!("scan target is not set")),

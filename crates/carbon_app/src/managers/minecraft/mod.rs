@@ -323,6 +323,7 @@ mod tests {
             full_account,
             2048,
             2048,
+            None,
             "",
             runtime_path,
             version_info,

@@ -9,14 +9,19 @@ import {
   ModpackPlatform
 } from "@gd/core_module/bindings";
 import { For, Match, Show, Switch, mergeProps } from "solid-js";
-import { ContextMenu } from "../ContextMenu";
 import { Trans, useTransContext } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
-import { Spinner, Tooltip } from "@gd/ui";
+import { ContextMenu, Spinner, Tooltip } from "@gd/ui";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { useModal } from "@/managers/ModalsManager";
 import { getModpackPlatformIcon, getValideInstance } from "@/utils/instances";
+import { setInstanceId } from "@/utils/browser";
+import {
+  setExportStep,
+  setPayload
+} from "@/managers/ModalsManager/modals/InstanceExport";
+import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/atoms/ExportCheckboxParent";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
 
@@ -44,6 +49,8 @@ const Tile = (props: Props) => {
     { variant: "default", isLoading: false },
     props
   );
+
+  const rspcContext = rspc.useContext();
   const [t] = useTransContext();
   const navigate = useGDNavigate();
   const modalsContext = useModal();
@@ -60,11 +67,6 @@ const Tile = (props: Props) => {
 
   const duplicateInstanceMutation = rspc.createMutation([
     "instance.duplicateInstance"
-  ]);
-
-  const instanceDetails = rspc.createQuery(() => [
-    "instance.getInstanceDetails",
-    props.instance.id
   ]);
 
   const handleOpenFolder = () => {
@@ -97,7 +99,12 @@ const Tile = (props: Props) => {
 
   const validInstance = () => getValideInstance(props.instance.status);
 
-  const handleEdit = () => {
+  const handleEdit = async () => {
+    const instanceDetails = await rspcContext.client.query([
+      "instance.getInstanceDetails",
+      props.instance.id
+    ]);
+
     modalsContext?.openModal(
       {
         name: "instanceCreation"
@@ -107,7 +114,7 @@ const Tile = (props: Props) => {
         modloader: validInstance()?.modloader,
         title: props.instance.name,
         mcVersion: validInstance()?.mc_version,
-        modloaderVersion: instanceDetails?.data?.modloaders[0]?.version,
+        modloaderVersion: instanceDetails?.modloaders[0].version,
         img: props.img
       }
     );
@@ -126,24 +133,28 @@ const Tile = (props: Props) => {
     {
       icon: props.isRunning ? "i-ri:stop-fill" : "i-ri:play-fill",
       label: props.isRunning ? t("instance.stop") : t("instance.action_play"),
-      action: handlePlay
+      action: handlePlay,
+      disabled: props.isLoading || isInQueue()
     },
     {
       icon: "i-ri:pencil-fill",
       label: t("instance.action_edit"),
-      action: handleEdit
+      action: handleEdit,
+      disabled: props.isLoading || isInQueue()
     },
     {
       icon: "i-ri:settings-3-fill",
       label: t("instance.action_settings"),
-      action: handleSettings
+      action: handleSettings,
+      disabled: props.isLoading || isInQueue()
     },
     ...(!props.isInvalid
       ? [
           {
             icon: "i-ri:file-copy-fill",
             label: t("instance.action_duplicate"),
-            action: handleDuplicate
+            action: handleDuplicate,
+            disabled: props.isLoading || isInQueue()
           }
         ]
       : []),
@@ -153,10 +164,33 @@ const Tile = (props: Props) => {
       action: handleOpenFolder
     },
     {
+      icon: "i-mingcute:file-export-fill",
+      label: t("instance.export_instance"),
+      action: () => {
+        const instanceId = props.instance.id;
+        setInstanceId(instanceId);
+        setPayload({
+          target: "Curseforge",
+          save_path: undefined,
+          link_mods: true,
+          filter: { entries: {} },
+
+          instance_id: instanceId
+        });
+        setExportStep(0);
+        setCheckedFiles([]);
+        modalsContext?.openModal({
+          name: "exportInstance"
+        });
+      },
+      disabled: props.isLoading || isInQueue()
+    },
+    {
       id: "delete",
       icon: "i-ri:delete-bin-2-fill",
       label: t("instance.action_delete"),
-      action: handleDelete
+      action: handleDelete,
+      disabled: props.isLoading || isInQueue()
     }
   ];
 
@@ -168,10 +202,14 @@ const Tile = (props: Props) => {
   };
 
   const handlePlayClick = () => {
-    if (props.isPreparing) return;
+    if (props.isPreparing) {
+      return;
+    }
     if (props.isRunning) {
       killInstanceMutation.mutate(props.instance.id);
-    } else launchInstanceMutation.mutate(props.instance.id);
+    } else {
+      launchInstanceMutation.mutate(props.instance.id);
+    }
   };
 
   const isInQueue = () => props.isPreparing && !props.isLoading;
@@ -181,7 +219,7 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "default"}>
         <ContextMenu menuItems={menuItems()}>
           <div
-            class="flex justify-center flex-col relative select-none group items-start z-50"
+            class="flex justify-center flex-col relative select-none group items-start"
             onClick={(e) => {
               e.stopPropagation();
               if (
@@ -194,7 +232,7 @@ const Tile = (props: Props) => {
               }
             }}
           >
-            <div class="relative rounded-2xl overflow-hidden h-38 w-38 border-1 border-solid border-darkSlate-600">
+            <div class="relative rounded-2xl overflow-hidden border-1 border-solid h-38 w-38 border-darkSlate-600">
               <div
                 class="flex justify-center relative items-center rounded-2xl overflow-hidden h-38 w-38 bg-cover bg-center max-w-38"
                 classList={{
@@ -208,7 +246,7 @@ const Tile = (props: Props) => {
                 }}
                 style={{
                   "background-image": props.img
-                    ? `url("${props.img as string}")`
+                    ? `url("${props.img}")`
                     : `url("${DefaultImg}")`,
                   "background-size": props.img ? "cover" : "120%"
                 }}
@@ -217,7 +255,7 @@ const Tile = (props: Props) => {
                   <h2 class="text-sm text-center z-20">
                     <Trans key="instance.error_invalid" />
                   </h2>
-                  <div class="w-full rounded-2xl z-10 absolute right-0 h-full top-0 left-0 bottom-0 bg-gradient-to-l from-black opacity-50 from-30%" />
+                  <div class="w-full rounded-2xl z-10 absolute right-0 h-full top-0 bottom-0 left-0 bg-gradient-to-l from-black opacity-50 from-30%" />
                   <div class="z-10 absolute top-0 bottom-0 left-0 right-0 from-black opacity-50 w-full h-full rounded-2xl bg-gradient-to-t" />
                   <div class="absolute z-10 text-2xl i-ri:alert-fill text-yellow-500 top-1 right-1" />
                 </Show>
@@ -229,12 +267,14 @@ const Tile = (props: Props) => {
                 </Show>
 
                 <div
-                  class="group flex justify-center items-center absolute rounded-full cursor-pointer ease-in-out duration-100 hidden transition-all h-12 w-12 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
+                  class="group flex justify-center items-center absolute rounded-full cursor-pointer ease-in-out duration-100 hidden h-12 w-12 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
                   classList={{
+                    "scale-100 bg-red-500": props.isLoading,
                     "bg-primary-500 hover:bg-primary-400 text-2xl hover:text-3xl hover:drop-shadow-2xl":
                       !props.isRunning,
                     "scale-0": !props.isRunning,
                     "bg-red-500 scale-100": props.isRunning,
+
                     "group-hover:scale-100 group-hover:drop-shadow-xl":
                       !props.isLoading &&
                       !isInQueue() &&
@@ -242,6 +282,7 @@ const Tile = (props: Props) => {
                       !props.failError &&
                       !props.isRunning
                   }}
+                  style={{ "pointer-events": "auto" }}
                   onClick={(e) => {
                     e.stopPropagation();
                     handlePlayClick();
@@ -339,7 +380,7 @@ const Tile = (props: Props) => {
               </Tooltip>
             </h4>
             <Switch>
-              <Match when={!props.isLoading}>
+              <Match when={!props.isLoading && !props.isPreparing}>
                 <div class="flex gap-2 justify-between text-lightGray-900">
                   <span class="flex gap-1">
                     <Show when={props.modloader}>
@@ -368,7 +409,7 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "sidebar"}>
         <ContextMenu menuItems={menuItems()}>
           <div
-            class="group relative group select-none flex items-center w-full box-border cursor-pointer gap-4 px-3 h-14 erelative"
+            class="group relative group select-none flex items-center w-full box-border cursor-pointer gap-4 px-6 h-14 erelative"
             onClick={(e) => {
               if (
                 !props.isLoading &&
@@ -379,9 +420,6 @@ const Tile = (props: Props) => {
                 props?.onClick?.(e);
               }
             }}
-            classList={{
-              grayscale: props.isLoading || isInQueue()
-            }}
           >
             <Show when={props.isInvalid}>
               <div class="i-ri:alert-fill text-yellow-500 absolute top-1/2 -translate-y-1/2 z-10 text-2xl right-2" />
@@ -389,43 +427,26 @@ const Tile = (props: Props) => {
             <Show when={props.failError}>
               <div class="i-ri:alert-fill text-red-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
             </Show>
-            <div class="absolute ease-in-out duration-100 top-0 left-0 bottom-0 right-0 transition opacity-10 hover:bg-primary-500" />
-
-            <Show when={props.selected && !props.isLoading}>
-              <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-primary-500" />
-              <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
-            </Show>
-            <Show when={props.isRunning && !props.isLoading}>
-              <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition" />
-              <div class="absolute right-0 top-0 bottom-0 w-1" />
-            </Show>
-
             <div
-              class="rounded-full absolute flex justify-center items-center cursor-pointer duration-100 will-change-transform right-5 transition-transform h-7 w-7"
+              class="absolute ease-in-out duration-100 top-0 left-0 bottom-0 right-0 transition opacity-10"
               classList={{
-                "bg-primary-500": !props.isRunning,
-                "scale-0": !props.isRunning,
-                "bg-red-500 scale-100": props.isRunning,
-                "group-hover:scale-100":
+                "group-hover:bg-primary-800":
                   !props.isLoading &&
                   !isInQueue() &&
                   !props.isInvalid &&
                   !props.failError &&
                   !props.isRunning
               }}
-            >
-              <div
-                class="text-white"
-                classList={{
-                  "i-ri:play-fill text-lg": !props.isRunning,
-                  "i-ri:stop-fill text-md": props.isRunning
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePlayClick();
-                }}
-              />
-            </div>
+            />
+
+            <Show when={props.selected && !props.isLoading}>
+              <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-primary-800" />
+              <div class="absolute left-0 top-0 bottom-0 bg-primary-500 w-1 rounded-r-md rounded-l-md" />
+            </Show>
+            <Show when={props.isRunning && !props.isLoading}>
+              <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition" />
+              <div class="absolute right-0 top-0 bottom-0 w-1" />
+            </Show>
 
             <Show when={props.isLoading && props.percentage !== undefined}>
               <div
@@ -435,50 +456,91 @@ const Tile = (props: Props) => {
                 }}
               />
             </Show>
-            <div
-              class="bg-cover bg-center h-10 rounded-lg w-10"
-              style={{
-                "background-image": props.img
-                  ? `url("${props.img as string}")`
-                  : `url("${DefaultImg}")`
-              }}
-              classList={{
-                grayscale: props.isLoading
-              }}
-            />
-            <div class="flex flex-col">
-              <h4
-                class="m-0 text-ellipsis text-ellipsis overflow-hidden max-w-38 max-h-9"
+            <div class="relative">
+              <div
+                class="bg-cover bg-center h-10 rounded-lg w-10 min-w-10 max-w-10"
+                style={{
+                  "background-image": props.img
+                    ? `url("${props.img as string}")`
+                    : `url("${DefaultImg}")`
+                }}
                 classList={{
-                  "text-darkSlate-50": mergedProps.isLoading,
-                  "text-white": !mergedProps.isLoading
+                  "group-hover:opacity-50 group-hover:blur-[1.5px]  transition ease-in-out duration-150":
+                    !props.isLoading && !props.isRunning,
+                  "opacity-50 blur-[1.5px]": props.isRunning,
+                  grayscale: props.isLoading || isInQueue()
+                }}
+              />
+              <div
+                class="rounded-full absolute flex justify-center items-center cursor-pointer duration-100 will-change-transform top-2 transition-transform z-20 left-2 h-7 w-7"
+                classList={{
+                  "scale-0": !props.isRunning,
+                  "scale-100": props.isRunning,
+
+                  "group-hover:scale-100":
+                    !props.isLoading &&
+                    !isInQueue() &&
+                    !props.isInvalid &&
+                    !props.failError &&
+                    !props.isRunning
                 }}
               >
+                <div
+                  class="text-white"
+                  classList={{
+                    "i-ri:play-fill text-2xl  ": !props.isRunning,
+                    "i-ri:stop-fill text-lg  ": props.isRunning
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePlayClick();
+                  }}
+                />
+              </div>
+              <Show when={props.isLoading || isInQueue()}>
+                <div class="absolute top-3 left-[11px]">
+                  <Spinner />
+                </div>
+              </Show>
+            </div>
+
+            <div class="flex flex-col truncate">
+              <div
+                class="m-0 text-ellipsis text-ellipsis overflow-hidden max-w-38 text-sm max-h-9"
+                // classList={{
+                //   "text-darkSlate-50": mergedProps.isLoading,
+                //   "text-white": !mergedProps.isLoading
+                // }}
+              >
                 {props.instance.name}
-              </h4>
-              <div class="flex gap-2 text-darkSlate-50">
-                <span class="flex gap-2">
-                  <Show when={validInstance()?.modpack_platform}>
-                    <img
-                      class="w-4 h-4"
-                      src={getModpackPlatformIcon(
-                        validInstance()?.modpack_platform as ModpackPlatform
-                      )}
-                    />
-                  </Show>
-                  <Show when={props.modloader}>
-                    <img
-                      class="w-4 h-4"
-                      src={getCFModloaderIcon(
-                        props.modloader as CFFEModLoaderType
-                      )}
-                    />
-                  </Show>
-                  <Show when={props.modloader}>
-                    <p class="m-0">{props.modloader?.toString()}</p>
-                  </Show>
-                </span>
-                <p class="m-0">{props.version}</p>
+              </div>
+              <div class="flex text-darkSlate-50">
+                <Show when={!props.isLoading}>
+                  <span class="flex gap-2 items-center">
+                    <Show when={props.modloader}>
+                      <img
+                        class="w-4 h-4"
+                        src={getCFModloaderIcon(
+                          props.modloader as CFFEModLoaderType
+                        )}
+                      />
+                    </Show>
+                    <p class="m-0 text-sm">{props.version}</p>
+                  </span>
+                </Show>
+
+                <Show when={props.isLoading}>
+                  <div class="m-0 flex gap-1">
+                    <div class="text-green-500 i-clarity:download-line" />
+                    <span class="font-bold text-sm">
+                      {Math.round(props.percentage as number)}%
+                    </span>
+                    <span class="text-sm">
+                      {Math.round(props.downloaded || 0)}MB/
+                      {Math.round(props.totalDownload || 0)}MB
+                    </span>
+                  </div>
+                </Show>
               </div>
             </div>
           </div>
@@ -503,7 +565,7 @@ const Tile = (props: Props) => {
 
             <Show when={props.selected && !props.isLoading}>
               <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition bg-primary-500" />
-              <div class="absolute right-0 top-0 bottom-0 bg-primary-500 w-1" />
+              <div class="absolute left-0 top-0 bottom-0 bg-primary-500 w-1 rounded-r-md rounded-l-md" />
             </Show>
             <Show when={props.isRunning && !props.isLoading}>
               <div class="absolute ease-in-out duration-100 opacity-10 top-0 left-0 bottom-0 right-0 transition" />
@@ -528,7 +590,7 @@ const Tile = (props: Props) => {
               </Show>
 
               <div
-                class="h-7 w-7 right-5 rounded-full flex justify-center items-center cursor-pointer transition-transform duration-100 will-change-transform"
+                class="h-7 w-7 rounded-full flex justify-center items-center cursor-pointer transition-transform duration-100 will-change-transform right-5"
                 classList={{
                   "bg-primary-500": !props.isRunning,
                   "scale-0": !props.isRunning,
@@ -542,7 +604,7 @@ const Tile = (props: Props) => {
                 }}
               >
                 <div
-                  class="text-white text-lg"
+                  class="text-white transition-all duration-100 ease-in-out text-lg"
                   classList={{
                     "i-ri:play-fill": !props.isRunning,
                     "i-ri:stop-fill": props.isRunning

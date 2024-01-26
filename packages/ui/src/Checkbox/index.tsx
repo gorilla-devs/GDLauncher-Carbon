@@ -19,7 +19,7 @@ function Checkbox(props: Props) {
   });
 
   const getBackgroundColor = () => {
-    if (checked() && props.indeterminate) {
+    if (!checked() && props.indeterminate) {
       return "rgba(209, 213, 219, 0.2)"; // bg-light-300 with 20% opacity
     } else if (checked() && !props.disabled) {
       return "rgba(43, 107, 177, 1.0)"; // bg-primary-500 with 100% opacity
@@ -49,7 +49,7 @@ function Checkbox(props: Props) {
           }
         }}
       >
-        <Show when={checked() && !props.indeterminate}>
+        <Show when={checked()}>
           <div
             class="i-ri:check-line text-white animate-bounce-scale"
             classList={{
@@ -58,7 +58,7 @@ function Checkbox(props: Props) {
             }}
           />
         </Show>
-        <Show when={checked() && props.indeterminate}>
+        <Show when={!checked() && props.indeterminate}>
           <div class="h-3 w-3 min-w-3 min-h-3 rounded-sm   bg-primary-500" />
         </Show>
       </div>

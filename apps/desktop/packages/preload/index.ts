@@ -1,3 +1,5 @@
+import { contextBridge } from "electron";
+
 import "./loading";
 import "./core_module_loader";
 import "./minimumBounds";
@@ -7,3 +9,17 @@ import "./os";
 import "./overwolf";
 import "./runtimePath";
 import "./relaunch";
+
+const skipIntroAnimation =
+  process.argv
+    .find((arg) => arg.startsWith("--skipIntroAnimation="))
+    ?.split("=")[1] === "true";
+
+const isDev = import.meta.env.DEV;
+
+if (isDev || skipIntroAnimation) {
+  contextBridge.exposeInMainWorld(
+    "skipIntroAnimation",
+    isDev || skipIntroAnimation
+  );
+}

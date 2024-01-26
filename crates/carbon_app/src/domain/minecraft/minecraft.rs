@@ -102,14 +102,15 @@ pub fn library_into_lib_downloadable(
     let artifact = library.downloads.and_then(|v| v.artifact);
 
     if let Some(artifact) = artifact {
-        let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
-
-        return Some(carbon_net::Downloadable {
-            url: artifact.url,
-            path: PathBuf::from(base_path).join(artifact.path),
-            checksum,
-            size: Some(artifact.size as u64),
-        });
+        if let Some(url) = artifact.url {
+            let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
+            return Some(carbon_net::Downloadable {
+                url,
+                path: PathBuf::from(base_path).join(artifact.path),
+                checksum,
+                size: Some(artifact.size as u64),
+            });
+        }
     } else if let Some(base_url) = &library.url {
         return Some(carbon_net::Downloadable {
             url: format!("{}{}", base_url, library.name.path()),
@@ -142,10 +143,14 @@ pub fn library_into_natives_downloadable(
         return None;
     };
 
+    let Some(url) = mapping_class.url.clone() else {
+        return None;
+    };
+
     let checksum = Some(carbon_net::Checksum::Sha1(mapping_class.clone().sha1));
 
     Some(carbon_net::Downloadable {
-        url: mapping_class.url.clone(),
+        url,
         path: PathBuf::from(base_path).join(mapping_class.clone().path),
         checksum,
         size: Some(mapping_class.size as u64),

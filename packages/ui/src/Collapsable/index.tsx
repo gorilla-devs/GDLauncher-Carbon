@@ -15,7 +15,7 @@ const Collapsable = (props: Props) => {
       <div
         class="max-w-full h-8 flex gap-2 items-center cursor-pointer"
         classList={{
-          "px-3": props.size !== "small" && !props.noPadding,
+          "px-6": props.size !== "small" && !props.noPadding,
           "px-2": props.size === "small" && !props.noPadding,
         }}
         onClick={() => {

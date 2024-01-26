@@ -4,8 +4,9 @@ import { autoUpdater } from "electron-updater";
 
 console.log(autoUpdater.currentVersion);
 
-export default function initAutoUpdater(win: BrowserWindow) {
+export default function initAutoUpdater(win: BrowserWindow | null) {
   autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
 
   ipcMain.handle(
     "checkForUpdates",
@@ -53,16 +54,17 @@ export default function initAutoUpdater(win: BrowserWindow) {
 
   autoUpdater.on("update-available", (updateInfo) => {
     console.log("Update available", updateInfo);
-    win.webContents.send("updateAvailable", updateInfo);
+    win?.webContents.send("updateAvailable", updateInfo);
+    autoUpdater.downloadUpdate();
   });
 
   autoUpdater.on("update-not-available", () => {
-    win.webContents.send("updateNotAvailable");
+    win?.webContents.send("updateNotAvailable");
   });
 
   autoUpdater.on("download-progress", (progress) => {
     console.log("Download progress", progress);
-    win.webContents.send("downloadProgress", progress);
+    win?.webContents.send("downloadProgress", progress);
   });
 
   ipcMain.handle("installUpdate", async () => {
@@ -70,6 +72,7 @@ export default function initAutoUpdater(win: BrowserWindow) {
   });
 
   autoUpdater.on("update-downloaded", () => {
+    console.log("Update downloaded, ready to install");
     win?.webContents.send("updateDownloaded");
   });
 }
