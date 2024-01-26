@@ -9,10 +9,10 @@ use carbon_net::{Downloadable, Progress};
 use tokio::task::spawn_blocking;
 use tracing::trace;
 
+use crate::domain::modplatforms::curseforge::filters::{ModsParameters, ModsParametersBody};
 use crate::domain::modplatforms::curseforge::{self, CurseForgeResponse, File, HashAlgo};
 use crate::domain::runtime_path::InstancePath;
 use crate::managers::instance::modpack::packinfo::PackInfo;
-use crate::domain::modplatforms::curseforge::filters::{ModsParameters, ModsParametersBody};
 use crate::managers::vtask::Subtask;
 use crate::managers::App;
 
@@ -182,36 +182,36 @@ pub async fn prepare_modpack_from_zip(
                     .clone()
                     .into_path(&instance_path, mc_version.clone(), &mc_manifest);
 
-                let existing_path = packinfo
-                    .map(|packinfo| 'a: {
-                        let packinfo_path = format!("/mods/{}", mod_file.file_name);
+            let existing_path = packinfo
+                .map(|packinfo| 'a: {
+                    let packinfo_path = format!("/mods/{}", mod_file.file_name);
 
-                        if let Some(pihashes) = packinfo.files.get(&packinfo_path) {
-                            tracing::warn!(?pihashes, ?mod_file.hashes);
+                    if let Some(pihashes) = packinfo.files.get(&packinfo_path) {
+                        tracing::warn!(?pihashes, ?mod_file.hashes);
 
-                            let md5hash = mod_file
-                                .hashes
-                                .iter()
-                                .filter_map(|hash| match hash.algo {
-                                    HashAlgo::Md5 => Some(&hash.value),
-                                    _ => None,
-                                })
-                                .find_map(|hash| {
-                                    let mut array = [0u8; 16];
-                                    hex::decode_to_slice(&hash, &mut array).ok()?;
-                                    Some(array)
-                                });
+                        let md5hash = mod_file
+                            .hashes
+                            .iter()
+                            .filter_map(|hash| match hash.algo {
+                                HashAlgo::Md5 => Some(&hash.value),
+                                _ => None,
+                            })
+                            .find_map(|hash| {
+                                let mut array = [0u8; 16];
+                                hex::decode_to_slice(&hash, &mut array).ok()?;
+                                Some(array)
+                            });
 
-                            if let Some(md5) = md5hash {
-                                if md5 == pihashes.md5 {
-                                    break 'a Some(packinfo_path);
-                                }
+                        if let Some(md5) = md5hash {
+                            if md5 == pihashes.md5 {
+                                break 'a Some(packinfo_path);
                             }
                         }
+                    }
 
-                        None
-                    })
-                    .flatten();
+                    None
+                })
+                .flatten();
 
             let downloadable = Downloadable::new(
                 mod_file

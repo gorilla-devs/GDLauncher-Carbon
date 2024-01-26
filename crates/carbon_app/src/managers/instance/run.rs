@@ -1,4 +1,4 @@
-use crate::domain::instance::info::{self, Modpack, StandardVersion, ModpackInfo};
+use crate::domain::instance::info::{self, Modpack, ModpackInfo, StandardVersion};
 use crate::domain::java::SystemJavaProfileName;
 use crate::domain::metrics::Event;
 use crate::domain::modplatforms::curseforge::filters::ModFileParameters;

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     domain::{
         instance::{
-            info::{self, CurseforgeModpack, Modpack, ModrinthModpack, ModpackInfo},
+            info::{self, CurseforgeModpack, Modpack, ModpackInfo, ModrinthModpack},
             InstanceId,
         },
         modplatforms::{
@@ -14,7 +14,8 @@ use crate::{
                 filters::{ModParameters, ModsParameters, ModsParametersBody},
             },
             modrinth::{project::ProjectVersionsFilters, search::ProjectID},
-        }, vtask::VisualTaskId,
+        },
+        vtask::VisualTaskId,
     },
     managers::{instance::InvalidInstanceIdError, ManagerRef},
 };
@@ -33,10 +34,11 @@ impl ManagerRef<'_, InstanceManager> {
                 InstanceType::Valid(InstanceData {
                     config:
                         info::Instance {
-                            modpack: Some(ModpackInfo {
-                                modpack: Modpack::Curseforge(modpack),
-                                ..
-                            }),
+                            modpack:
+                                Some(ModpackInfo {
+                                    modpack: Modpack::Curseforge(modpack),
+                                    ..
+                                }),
                             ..
                         },
                     ..
@@ -68,10 +70,11 @@ impl ManagerRef<'_, InstanceManager> {
             let InstanceType::Valid(InstanceData {
                 config:
                     info::Instance {
-                        modpack: Some(ModpackInfo {
-                            modpack: Modpack::Curseforge(modpack),
-                            ..
-                        }),
+                        modpack:
+                            Some(ModpackInfo {
+                                modpack: Modpack::Curseforge(modpack),
+                                ..
+                            }),
                         ..
                     },
                 modpack_update_curseforge,
@@ -106,10 +109,11 @@ impl ManagerRef<'_, InstanceManager> {
                 InstanceType::Valid(InstanceData {
                     config:
                         info::Instance {
-                            modpack: Some(ModpackInfo {
-                                modpack: Modpack::Modrinth(modpack),
-                                ..
-                            }),
+                            modpack:
+                                Some(ModpackInfo {
+                                    modpack: Modpack::Modrinth(modpack),
+                                    ..
+                                }),
                             ..
                         },
                     ..
@@ -152,10 +156,11 @@ impl ManagerRef<'_, InstanceManager> {
             let InstanceType::Valid(InstanceData {
                 config:
                     info::Instance {
-                        modpack: Some(ModpackInfo {
-                            modpack: Modpack::Modrinth(modpack),
-                            ..
-                        }),
+                        modpack:
+                            Some(ModpackInfo {
+                                modpack: Modpack::Modrinth(modpack),
+                                ..
+                            }),
                         ..
                     },
                 modpack_update_modrinth,
@@ -217,7 +222,8 @@ impl ManagerRef<'_, InstanceManager> {
         tokio::fs::write(&*update_file, pack_version_text).await?;
         drop(update_file);
 
-        self.app.instance_manager()
+        self.app
+            .instance_manager()
             .prepare_game(instance_id, None, None)
             .await
             .map(|r| r.1)

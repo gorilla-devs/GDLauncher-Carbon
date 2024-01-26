@@ -22,7 +22,7 @@ pub async fn scan_dir(path: &Path, filter: Option<&Vec<&str>>) -> anyhow::Result
 
         if let Some(filter) = filter.as_ref() {
             if !filter.contains(&(&relpath as &str)) {
-                continue
+                continue;
             }
         }
 
