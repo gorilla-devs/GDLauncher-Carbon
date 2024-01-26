@@ -14,7 +14,7 @@ use crate::{
                 filters::{ModParameters, ModsParameters, ModsParametersBody},
             },
             modrinth::{project::ProjectVersionsFilters, search::ProjectID},
-        },
+        }, vtask::VisualTaskId,
     },
     managers::{instance::InvalidInstanceIdError, ManagerRef},
 };
@@ -22,7 +22,6 @@ use crate::{
 use super::{InstanceData, InstanceManager, InstanceType};
 
 pub mod packinfo;
-//mod curseforge;
 
 impl ManagerRef<'_, InstanceManager> {
     pub async fn check_curseforge_modpack_updates(self) -> anyhow::Result<()> {
@@ -166,11 +165,11 @@ impl ManagerRef<'_, InstanceManager> {
         Ok(())
     }
 
-    pub async fn change_modpack_version(
+    pub async fn change_modpack(
         self,
         instance_id: InstanceId,
         modpack: Modpack,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<VisualTaskId> {
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
@@ -191,6 +190,11 @@ impl ManagerRef<'_, InstanceManager> {
         let pack_version_text = serde_json::to_string(&PackVersionFile::from(modpack))?;
 
         let setup_path = instance_path.get_root().join(".setup");
+
+        if setup_path.exists() {
+            anyhow::bail!("Instance has not completed the setup phase, attempting to change the modpack may irreparably damage it.");
+        }
+
         let update_file_path = setup_path.join("change-pack-version.json");
 
         let update_file = runtime_path.get_temp().maketmpfile().await?;
@@ -199,7 +203,10 @@ impl ManagerRef<'_, InstanceManager> {
         tokio::fs::write(&*update_file, pack_version_text).await?;
         drop(update_file);
 
-        todo!("call run.rs")
+        self.app.instance_manager()
+            .prepare_game(instance_id, None, None)
+            .await
+            .map(|r| r.1)
     }
 }
 

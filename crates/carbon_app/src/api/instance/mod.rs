@@ -84,6 +84,16 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .map(FEInstanceId::from)
         }
 
+        mutation CHANGE_MODPACK[app, details: ChangeModpack] {
+            app.instance_manager()
+                .change_modpack(
+                    details.instance.into(),
+                    details.modpack.into(),
+                )
+                .await
+                .map(FETaskId::from)
+        }
+
         mutation LOAD_ICON_URL[app, url: String] {
             app.instance_manager()
                 .download_icon(url)
@@ -570,6 +580,12 @@ struct CreateInstance {
     use_loaded_icon: bool,
     version: CreateInstanceVersion,
     notes: String,
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct ChangeModpack {
+    instance: FEInstanceId,
+    modpack: Modpack,
 }
 
 #[derive(Type, Debug, Deserialize)]

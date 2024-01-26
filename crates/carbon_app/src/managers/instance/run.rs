@@ -252,7 +252,6 @@ impl ManagerRef<'_, InstanceManager> {
                 let mut downloads = Vec::new();
 
                 let change_version_path = setup_path.join("change-pack-version.json");
-                tracing::warn!(?change_version_path, "exists: {}", change_version_path.exists());
 
                 if let Some((t_request, t_download_packfile, t_download_files, t_extract_files, t_addon_metadata)) =
                     t_modpack
@@ -268,8 +267,6 @@ impl ManagerRef<'_, InstanceManager> {
                         Ok(text) => Some(Modpack::from(serde_json::from_str::<PackVersionFile>(&text)?)),
                         Err(_) => config.modpack.clone(),
                     };
-
-                    tracing::warn!(?modpack);
 
                     enum Modplatform {
                         Curseforge,
@@ -557,7 +554,6 @@ impl ManagerRef<'_, InstanceManager> {
                                     let mut name = original_file.file_name().unwrap().to_owned();
                                     name.push(".disabled");
                                     original_file.set_file_name(name);
-                                    tracing::warn!(?original_file, "disabled?");
 
                                     if !original_file.exists() {
                                         // either the user deleted it or we already deleted it in the next check, skip
