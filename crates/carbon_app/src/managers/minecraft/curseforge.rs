@@ -3,13 +3,16 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
+use itertools::Itertools;
+
 use carbon_net::{Downloadable, Progress};
 use tokio::task::spawn_blocking;
 use tracing::trace;
 
 use crate::domain::modplatforms::curseforge::filters::{ModsParameters, ModsParametersBody};
-use crate::domain::modplatforms::curseforge::{self, CurseForgeResponse, File};
+use crate::domain::modplatforms::curseforge::{self, CurseForgeResponse, File, HashAlgo};
 use crate::domain::runtime_path::InstancePath;
+use crate::managers::instance::modpack::packinfo::PackInfo;
 use crate::managers::vtask::Subtask;
 use crate::managers::App;
 
@@ -36,7 +39,8 @@ impl ProgressState {
 #[derive(Debug)]
 pub struct ModpackInfo {
     pub manifest: curseforge::manifest::Manifest,
-    pub downloadables: Vec<Downloadable>,
+    // (downloadable, existing path from packinfo)
+    pub downloadables: Vec<(Downloadable, Option<String>)>,
 }
 
 #[tracing::instrument(skip(app, progress_percentage_sender))]
@@ -93,6 +97,7 @@ pub async fn prepare_modpack_from_zip(
     zip_path: &Path,
     instance_path: &InstancePath,
     skip_overrides: bool,
+    packinfo: Option<&PackInfo>,
     t_addon_metadata: Subtask,
     progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
 ) -> anyhow::Result<ModpackInfo> {
@@ -177,6 +182,37 @@ pub async fn prepare_modpack_from_zip(
                     .clone()
                     .into_path(&instance_path, mc_version.clone(), &mc_manifest);
 
+            let existing_path = packinfo
+                .map(|packinfo| 'a: {
+                    let packinfo_path = format!("/mods/{}", mod_file.file_name);
+
+                    if let Some(pihashes) = packinfo.files.get(&packinfo_path) {
+                        tracing::warn!(?pihashes, ?mod_file.hashes);
+
+                        let md5hash = mod_file
+                            .hashes
+                            .iter()
+                            .filter_map(|hash| match hash.algo {
+                                HashAlgo::Md5 => Some(&hash.value),
+                                _ => None,
+                            })
+                            .find_map(|hash| {
+                                let mut array = [0u8; 16];
+                                hex::decode_to_slice(&hash, &mut array).ok()?;
+                                Some(array)
+                            });
+
+                        if let Some(md5) = md5hash {
+                            if md5 == pihashes.md5 {
+                                break 'a Some(packinfo_path);
+                            }
+                        }
+                    }
+
+                    None
+                })
+                .flatten();
+
             let downloadable = Downloadable::new(
                 mod_file
                     .download_url
@@ -186,7 +222,7 @@ pub async fn prepare_modpack_from_zip(
             )
             .with_size(mod_file.file_length as u64);
 
-            downloadables.push(downloadable);
+            downloadables.push((downloadable, existing_path));
         }
 
         downloadables

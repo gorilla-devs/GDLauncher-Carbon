@@ -1,15 +1,19 @@
-use crate::domain::instance::info::{self, Modpack, StandardVersion};
+use crate::domain::instance::info::{self, Modpack, ModpackInfo, StandardVersion};
 use crate::domain::java::SystemJavaProfileName;
 use crate::domain::metrics::Event;
 use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::modplatforms::modrinth::search::VersionID;
+use crate::domain::runtime_path::InstancePath;
 use crate::domain::vtask::VisualTaskId;
+use crate::managers::instance::modpack::packinfo;
 use crate::managers::java::managed::Step;
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
 use crate::managers::minecraft::modrinth;
 use crate::managers::minecraft::{curseforge, UpdateValue};
 use crate::managers::vtask::Subtask;
+use crate::util::NormalizedWalkdir;
 
+use super::modpack::PackVersionFile;
 use super::{InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError};
 use crate::api::keys::instance::*;
 use crate::api::translation::Translation;
@@ -29,15 +33,17 @@ use anyhow::{anyhow, bail, Context};
 use chrono::{DateTime, Local, Utc};
 use futures::Future;
 use itertools::Itertools;
+use md5::{Digest, Md5};
 use std::fmt::Debug;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::pin::Pin;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{watch, Semaphore};
 use tokio::task::JoinHandle;
 use tokio::{io::AsyncReadExt, sync::mpsc};
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 
 #[derive(Debug)]
 pub struct PersistenceManager {
@@ -200,25 +206,38 @@ impl ManagerRef<'_, InstanceManager> {
                 .await
                 .expect("the ensure lock semaphore should never be closed");
 
-            let setup_path = instance_path.get_root().join(".setup");
+            let instance_root = instance_path.get_root();
+            let setup_path = instance_root.join(".setup");
             let is_first_run = setup_path.is_dir();
 
             let mut time_at_start = None;
 
             let try_result: anyhow::Result<_> = async {
-
                 let do_modpack_install = is_first_run
                     && !setup_path.join("modpack-complete").is_dir();
 
-                let t_modpack = match do_modpack_install {
+                let staging_dir = setup_path.join("staging");
+                let do_modpack_staging = do_modpack_install && !setup_path.join("staging.json").exists();
+
+                let packinfo_path = instance_root.join("packinfo.json");
+                let packinfo = match tokio::fs::read_to_string(packinfo_path).await {
+                    Ok(text) => Some(packinfo::parse_packinfo(&text).context("while parsing packinfo json")?),
+                    Err(_) => None,
+                };
+
+
+                let t_modpack = match do_modpack_staging {
                     true => Some((
                         task.subtask(Translation::InstanceTaskLaunchRequestModpack),
+                        task.subtask(Translation::InstanceTaskLaunchDownloadModpack),
                         task.subtask(Translation::InstanceTaskLaunchDownloadModpackFiles),
                         task.subtask(Translation::InstanceTaskLaunchExtractModpackFiles),
                         task.subtask(Translation::InstanceTaskLaunchDownloadAddonMetadata),
                     )),
                     false => None,
                 };
+
+                let t_apply_staging = task.subtask(Translation::InstanceTaskLaunchApplyStagedPatches);
 
                 let t_request_version_info = task
                     .subtask(Translation::InstanceTaskLaunchRequestVersions);
@@ -259,13 +278,25 @@ impl ManagerRef<'_, InstanceManager> {
 
                 let mut downloads = Vec::new();
 
-                if let Some((t_request, t_download_files, t_extract_files, t_addon_metadata)) =
+                let change_version_path = setup_path.join("change-pack-version.json");
+
+                if let Some((t_request, t_download_packfile, t_download_files, t_extract_files, t_addon_metadata)) =
                     t_modpack
                 {
+                    let mut downloads = Vec::new();
+
                     let cffile_path = setup_path.join("curseforge");
                     let mrfile_path = setup_path.join("modrinth");
                     let skip_overrides_path = setup_path.join("modpack-skip-overlays");
                     let skip_overrides = skip_overrides_path.is_dir();
+
+                    let modpack = match tokio::fs::read_to_string(&change_version_path).await {
+                        Ok(text) => Some(Modpack::from(serde_json::from_str::<PackVersionFile>(&text)?)),
+                        Err(_) => {
+
+                            config.modpack.as_ref().map(|m| m.modpack.clone())
+                        },
+                    };
 
                     enum Modplatform {
                         Curseforge,
@@ -274,11 +305,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                     t_request.start_opaque();
 
-                    if config.modpack.is_some() {
-                        app.instance_manager().get_modpack_info(instance_id).await?;
-                    }
-
-                    let file = match (cffile_path.is_file(), mrfile_path.is_file(), &config.modpack.as_ref().map(|m| m.modpack.clone())) {
+                    let file = match (cffile_path.is_file(), mrfile_path.is_file(), &modpack) {
                         (false, false, None) => {
                             t_request.complete_opaque();
                             None
@@ -313,13 +340,13 @@ impl ManagerRef<'_, InstanceManager> {
                                 while modpack_progress_rx.changed().await.is_ok() {
                                     {
                                         let (downloaded, total) = modpack_progress_rx.borrow().0;
-                                        t_download_files.update_download(downloaded as u32, total as u32, true);
+                                        t_download_packfile.update_download(downloaded as u32, total as u32, true);
                                     }
 
                                     tokio::time::sleep(Duration::from_millis(200)).await;
                                 }
 
-                                t_download_files.complete_download();
+                                t_download_packfile.complete_download();
                             });
 
                             curseforge::download_modpack_zip(
@@ -358,13 +385,13 @@ impl ManagerRef<'_, InstanceManager> {
                                 while modpack_progress_rx.changed().await.is_ok() {
                                     {
                                         let (downloaded, total) = modpack_progress_rx.borrow().0;
-                                        t_download_files.update_download(downloaded as u32, total as u32, true);
+                                        t_download_packfile.update_download(downloaded as u32, total as u32, true);
                                     }
 
                                     tokio::time::sleep(Duration::from_millis(200)).await;
                                 }
 
-                                t_download_files.complete_download();
+                                t_download_packfile.complete_download();
                             });
 
                             modrinth::download_mrpack(&app, &file, &mrfile_path, modpack_progress_tx).await?;
@@ -372,6 +399,12 @@ impl ManagerRef<'_, InstanceManager> {
                             Some(Modplatform::Modrinth)
                        }
                     };
+
+                    tokio::fs::create_dir_all(&staging_dir).await?;
+
+                    let instance_prep_path = InstancePath::new(staging_dir.clone());
+
+                    let mut skipped_mods = Vec::new();
 
                     let v: Option<StandardVersion> = match file {
                         Some(Modplatform::Curseforge) => {
@@ -399,8 +432,9 @@ impl ManagerRef<'_, InstanceManager> {
                             let modpack_info = curseforge::prepare_modpack_from_zip(
                                 &app,
                                 &cffile_path,
-                                &instance_path,
+                                &instance_prep_path,
                                 skip_overrides,
+                                packinfo.as_ref(),
                                 t_addon_metadata,
                                 modpack_progress_tx,
                             )
@@ -414,7 +448,12 @@ impl ManagerRef<'_, InstanceManager> {
 
                             tokio::fs::create_dir_all(skip_overrides_path).await?;
 
-                            downloads.extend(modpack_info.downloadables);
+                            for (downloadable, skip) in modpack_info.downloadables {
+                                match skip {
+                                    Some(skippath) => skipped_mods.push(skippath),
+                                    None => downloads.push(downloadable),
+                                }
+                            }
 
                             Some(modpack_info.manifest.minecraft.try_into()?)
                         }
@@ -442,16 +481,53 @@ impl ManagerRef<'_, InstanceManager> {
                                 }
                             });
 
-                            let modpack_info = modrinth::prepare_modpack_from_mrpack(&app, &mrfile_path, &instance_path, skip_overrides, modpack_progress_tx).await?;
+                            let modpack_info = modrinth::prepare_modpack_from_mrpack(
+                                &app,
+                                &mrfile_path,
+                                &instance_prep_path,
+                                skip_overrides,
+                                packinfo.as_ref(),
+                                modpack_progress_tx
+                            ).await?;
 
                             tokio::fs::create_dir_all(skip_overrides_path).await?;
 
-                            downloads.extend(modpack_info.downloadables);
+                            for (downloadable, skip) in modpack_info.downloadables {
+                                match skip {
+                                    Some(skippath) => skipped_mods.push(skippath),
+                                    None => downloads.push(downloadable),
+                                }
+                            }
 
                             Some(modpack_info.index.dependencies.try_into()?)
                         }
                         None => None,
                     };
+
+                    let (progress_watch_tx, mut progress_watch_rx) =
+                        tokio::sync::watch::channel(carbon_net::Progress::new());
+
+                    // dropped when the sender is dropped
+                    tokio::spawn(async move {
+                        while progress_watch_rx.changed().await.is_ok() {
+                            {
+                                let progress = progress_watch_rx.borrow();
+                                t_download_files.update_download(
+                                    progress.current_size as u32,
+                                    progress.total_size as u32,
+                                    false,
+                                );
+                            }
+
+                            tokio::time::sleep(Duration::from_millis(200)).await;
+                        }
+
+                        t_download_files.complete_download();
+                    });
+
+                    let concurrency = app.settings_manager().get_settings().await?.concurrent_downloads;
+
+                    carbon_net::download_multiple(downloads, progress_watch_tx, concurrency as usize).await?;
 
                     if let Some(v) = v {
                         tracing::info!("Modpack version: {v:?}");
@@ -463,6 +539,15 @@ impl ManagerRef<'_, InstanceManager> {
                             .get_instances()
                             .to_path()
                             .join(instance_shortpath);
+
+                        config.modpack = modpack.map(|modpack| ModpackInfo {
+                            modpack,
+                            locked: config.modpack.map(|m| m.locked).unwrap_or(true),
+                        });
+
+                        if config.modpack.is_some() {
+                            app.instance_manager().get_modpack_info(instance_id).await?;
+                        }
 
                         config.game_configuration.version =
                             Some(GameVersion::Standard(StandardVersion {
@@ -479,7 +564,99 @@ impl ManagerRef<'_, InstanceManager> {
                             .data_mut()?
                             .config = config;
                     }
+
+                    // normally there would be a problem here because we would be skipping any mods removed by users
+                    // but since we dont try to update those anyway its fine.
+                    let mut files = skipped_mods;
+                    // snapshot filetree before applying
+                    let mut walker = NormalizedWalkdir::new(&staging_dir.join("instance"))?;
+                    while let Some(entry) = walker.next()? {
+                        if entry.is_dir { continue }
+                        files.push(entry.relative_path.to_string());
+                    }
+
+                    let snapshot = serde_json::to_string_pretty(&files)?;
+                    tokio::fs::write(setup_path.join("staging.json"), snapshot).await?;
                 }
+
+                if staging_dir.exists() {
+                    t_apply_staging.start_opaque();
+
+                    let overwrite_changed = !change_version_path.exists(); // TODO
+
+                    let staged_text = tokio::fs::read_to_string(setup_path.join("staging.json")).await?;
+                    let staging_snapshot = serde_json::from_str::<Vec<&str>>(&staged_text)
+                        .context("could not parse staging snapshot")?;
+
+                    debug!("Applying staged instance files");
+                    let r: anyhow::Result<_> = async {
+                        if let Some(packinfo) = packinfo {
+                            for (oldfile, oldfilehash) in &packinfo.files { // TODO: diff in a way that stays sane across a crash
+                                let mut original_file = instance_root.join("instance").join(&oldfile[1..]);
+
+                                if !original_file.exists() {
+                                    let mut name = original_file.file_name().unwrap().to_owned();
+                                    name.push(".disabled");
+                                    original_file.set_file_name(name);
+
+                                    if !original_file.exists() {
+                                        // either the user deleted it or we already deleted it in the next check, skip
+                                        continue
+                                    }
+                                }
+
+                                let original_conent = tokio::fs::read(&original_file).await?;
+                                let original_md5: [u8; 16] = Md5::digest(&original_conent).into();
+
+                                if original_md5 != oldfilehash.md5 {
+                                    // the user has modified this file so we shouldn't touch it
+                                    continue
+                                }
+
+                                if !staging_snapshot.contains(&(&oldfile as &str)) {
+                                    // file is not present in new version and old version was not changed, delete
+                                    tokio::fs::remove_file(original_file).await?;
+                                    continue
+                                }
+
+                                let staged_file = staging_dir.join("instance").join(&oldfile[1..]);
+
+                                if staged_file.is_file() {
+                                    // old file matches the snapshotted version and new file is present, replace
+                                    tokio::fs::rename(staged_file, original_file).await?;
+                                }
+                            }
+                        }
+
+                        for entry in walkdir::WalkDir::new(&staging_dir) {
+                            let entry = entry?;
+
+                            let staged_file = entry.path().to_path_buf();
+                            let relpath = staged_file.strip_prefix(&staging_dir).unwrap();
+                            let original_file = instance_root.join(relpath);
+
+                            if entry.metadata()?.is_file() && !original_file.exists() {
+                                // there was no record of this file in the packinfo or it would've been moved previously,
+                                // and the user has not created one in its place, add the file
+
+                                tokio::fs::create_dir_all(original_file.parent().unwrap()).await?;
+                                tokio::fs::rename(staged_file, original_file).await?;
+                            }
+                        }
+
+                        Ok(())
+                    }.await;
+
+                    if let Err(e) = r {
+                        return Err(e.context("Failed to apply staged instance changes"));
+                    }
+
+                    trace!("Cleaning up staging directory");
+                    tokio::fs::remove_dir_all(staging_dir).await?;
+                    trace!("Staging complete");
+                }
+
+                t_apply_staging.complete_opaque();
 
                 let version = match version {
                     Some(v) => v,
@@ -872,7 +1049,25 @@ impl ManagerRef<'_, InstanceManager> {
 
                 // update mod metadata and add modpack complete flag after mods are downloaded
                 if is_first_run {
-                    tracing::trace!("marking modpack initialization as complete");
+                    trace!("marking modpack initialization as complete");
+
+                    if do_modpack_install {
+                        let staging_path = setup_path.join("staging.json");
+
+                        let staged_text;
+                        let mut filter = None;
+
+                        if staging_path.exists() {
+                            staged_text = tokio::fs::read_to_string(staging_path).await?;
+                            filter = Some(serde_json::from_str::<Vec<&str>>(&staged_text)
+                                .context("could not parse staging snapshot for packinfo creation")?);
+                        }
+
+                        let packinfo = packinfo::scan_dir(&instance_path.get_data_path(), filter.as_ref()).await?;
+                        let packinfo_str = packinfo::make_packinfo(packinfo)?;
+                        tokio::fs::write(instance_path.get_root().join("packinfo.json"), packinfo_str).await?;
+                    }
+
                     tokio::fs::create_dir_all(setup_path.join("modpack-complete")).await?;
 
                     tracing::info!("queueing metadata caching for running instance");
@@ -881,7 +1076,7 @@ impl ManagerRef<'_, InstanceManager> {
                         .queue_caching(instance_id, true)
                         .await;
 
-                    tracing::trace!("queued metadata caching");
+                    trace!("queued metadata caching");
                 }
 
                 t_extract_natives.start_opaque();

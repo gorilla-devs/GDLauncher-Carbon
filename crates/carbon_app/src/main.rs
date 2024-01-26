@@ -30,6 +30,7 @@ mod platform;
 mod logger;
 mod once_send;
 mod runtime_path_override;
+mod util;
 
 #[tokio::main]
 pub async fn main() {
