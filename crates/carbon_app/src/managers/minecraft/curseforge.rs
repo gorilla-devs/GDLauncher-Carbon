@@ -9,8 +9,8 @@ use tokio::task::spawn_blocking;
 
 use crate::domain::modplatforms::curseforge::{self, CurseForgeResponse, File, HashAlgo};
 use crate::domain::runtime_path::InstancePath;
-use crate::managers::App;
 use crate::managers::instance::modpack::packinfo::PackInfo;
+use crate::managers::App;
 
 use super::UpdateValue;
 
@@ -139,32 +139,36 @@ pub async fn prepare_modpack_from_zip(
                     .get_mod_file(curseforge::filters::ModFileParameters { mod_id, file_id })
                     .await?;
 
-                let existing_path = packinfo.map(|packinfo| 'a: {
-                    let packinfo_path = format!("/mods/{}", mod_file.file_name);
+                let existing_path = packinfo
+                    .map(|packinfo| 'a: {
+                        let packinfo_path = format!("/mods/{}", mod_file.file_name);
 
-                    if let Some(pihashes) = packinfo.files.get(&packinfo_path) {
-                        tracing::warn!(?pihashes, ?mod_file.hashes);
+                        if let Some(pihashes) = packinfo.files.get(&packinfo_path) {
+                            tracing::warn!(?pihashes, ?mod_file.hashes);
 
-                        let md5hash = mod_file.hashes.iter()
-                            .filter_map(|hash| match hash.algo {
-                                HashAlgo::Md5 => Some(&hash.value),
-                                _ => None,
-                            })
-                            .find_map(|hash| {
-                                let mut array = [0u8; 16];
-                                hex::decode_to_slice(&hash, &mut array).ok()?;
-                                Some(array)
-                            });
+                            let md5hash = mod_file
+                                .hashes
+                                .iter()
+                                .filter_map(|hash| match hash.algo {
+                                    HashAlgo::Md5 => Some(&hash.value),
+                                    _ => None,
+                                })
+                                .find_map(|hash| {
+                                    let mut array = [0u8; 16];
+                                    hex::decode_to_slice(&hash, &mut array).ok()?;
+                                    Some(array)
+                                });
 
-                        if let Some(md5) = md5hash {
-                            if md5 == pihashes.md5 {
-                                break 'a Some(packinfo_path)
+                            if let Some(md5) = md5hash {
+                                if md5 == pihashes.md5 {
+                                    break 'a Some(packinfo_path);
+                                }
                             }
                         }
-                    }
 
-                    None
-                }).flatten();
+                        None
+                    })
+                    .flatten();
 
                 let instance_path = instance_path.get_mods_path(); // TODO: they could also be other things
                 let downloadable = Downloadable::new(

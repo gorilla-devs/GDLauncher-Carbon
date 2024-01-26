@@ -207,38 +207,45 @@ pub async fn prepare_modpack_from_mrpack(
 
         let instance_path = instance_path.clone();
 
-        required_files.into_iter().enumerate().map(|(i, file)| {
-            let _app = app.clone();
+        required_files
+            .into_iter()
+            .enumerate()
+            .map(|(i, file)| {
+                let _app = app.clone();
 
-            let data_path = instance_path.get_data_path();
+                let data_path = instance_path.get_data_path();
 
-            let existing_path = packinfo.map(|packinfo| {
-                let mut sha512 = [0u8; 64];
-                hex::decode_to_slice(file.hashes.sha512, &mut sha512).ok()?;
+                let existing_path = packinfo
+                    .map(|packinfo| {
+                        let mut sha512 = [0u8; 64];
+                        hex::decode_to_slice(file.hashes.sha512, &mut sha512).ok()?;
 
-                let packinfo_path = format!("/{}", file.path);
+                        let packinfo_path = format!("/{}", file.path);
 
-                match packinfo.files.get(&packinfo_path) {
-                    Some(hashes) if sha512 == hashes.sha512 => Some(packinfo_path),
-                    _ => None,
-                }
-            }).flatten();
+                        match packinfo.files.get(&packinfo_path) {
+                            Some(hashes) if sha512 == hashes.sha512 => Some(packinfo_path),
+                            _ => None,
+                        }
+                    })
+                    .flatten();
 
-            let target_path = secure_path_join(&data_path, &file.path)?;
+                let target_path = secure_path_join(&data_path, &file.path)?;
 
-            let downloadable = Downloadable::new(
-                file.downloads
-                    .first()
-                    .ok_or(anyhow::anyhow!("Failed to get download url for mod"))?
-                    .to_string(),
-                target_path,
-            )
+                let downloadable = Downloadable::new(
+                    file.downloads
+                        .first()
+                        .ok_or(anyhow::anyhow!("Failed to get download url for mod"))?
+                        .to_string(),
+                    target_path,
+                )
                 .with_size(file.file_size as u64);
 
-            progress_percentage_sender.send(ProgressState::AcquiringPackMetadata(i as u64, files_len))?;
+                progress_percentage_sender
+                    .send(ProgressState::AcquiringPackMetadata(i as u64, files_len))?;
 
-            Ok::<_, anyhow::Error>((downloadable, existing_path))
-        }).collect::<Result<Vec<_>, _>>()?
+                Ok::<_, anyhow::Error>((downloadable, existing_path))
+            })
+            .collect::<Result<Vec<_>, _>>()?
     };
 
     if !skip_overlays {

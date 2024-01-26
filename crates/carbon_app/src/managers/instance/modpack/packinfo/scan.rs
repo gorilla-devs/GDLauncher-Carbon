@@ -26,10 +26,7 @@ pub async fn scan_dir(path: &Path) -> anyhow::Result<super::PackInfo> {
                 let sha512: [u8; 64] = Sha512::digest(&content).into();
                 let md5 = Md5::digest(&content).into();
 
-                super::FileHashes {
-                    sha512,
-                    md5,
-                }
+                super::FileHashes { sha512, md5 }
             })
             .await?;
 

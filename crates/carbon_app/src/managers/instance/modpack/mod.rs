@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     domain::{
         instance::{
-            info::{self, Modpack, CurseforgeModpack, ModrinthModpack},
+            info::{self, CurseforgeModpack, Modpack, ModrinthModpack},
             InstanceId,
         },
         modplatforms::{
@@ -16,7 +16,7 @@ use crate::{
             modrinth::{project::ProjectVersionsFilters, search::ProjectID},
         },
     },
-    managers::{ManagerRef, instance::InvalidInstanceIdError},
+    managers::{instance::InvalidInstanceIdError, ManagerRef},
 };
 
 use super::{InstanceData, InstanceManager, InstanceType};
@@ -219,14 +219,20 @@ pub enum PackVersionFile {
 impl From<Modpack> for PackVersionFile {
     fn from(value: Modpack) -> Self {
         match value {
-            Modpack::Curseforge(CurseforgeModpack { project_id, file_id }) => Self::Curseforge {
+            Modpack::Curseforge(CurseforgeModpack {
+                project_id,
+                file_id,
+            }) => Self::Curseforge {
                 project_id,
                 file_id,
             },
-            Modpack::Modrinth(ModrinthModpack { project_id, version_id }) => Self::Modrinth {
+            Modpack::Modrinth(ModrinthModpack {
                 project_id,
                 version_id,
-            }
+            }) => Self::Modrinth {
+                project_id,
+                version_id,
+            },
         }
     }
 }
@@ -234,11 +240,17 @@ impl From<Modpack> for PackVersionFile {
 impl From<PackVersionFile> for Modpack {
     fn from(value: PackVersionFile) -> Self {
         match value {
-            PackVersionFile::Curseforge { project_id, file_id } => Self::Curseforge(CurseforgeModpack {
+            PackVersionFile::Curseforge {
+                project_id,
+                file_id,
+            } => Self::Curseforge(CurseforgeModpack {
                 project_id,
                 file_id,
             }),
-            PackVersionFile::Modrinth { project_id, version_id } => Self::Modrinth(ModrinthModpack {
+            PackVersionFile::Modrinth {
+                project_id,
+                version_id,
+            } => Self::Modrinth(ModrinthModpack {
                 project_id,
                 version_id,
             }),
