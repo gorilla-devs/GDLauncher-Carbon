@@ -565,7 +565,7 @@ export const AccountsDropdown = (props: Props) => {
                 }}
               >
                 <div
-                  class="text-darkSlate-50 transition ease-in-out i-ri:add-circle-fill h-4 w-4"
+                  class="text-darkSlate-50 ease-in-out transition i-ri:add-circle-fill h-4 w-4"
                   classList={{
                     "text-darkSlate-500": !!enrollmentInProgress(),
                     "group-hover:text-white": !enrollmentInProgress(),
@@ -623,7 +623,7 @@ export const AccountsDropdown = (props: Props) => {
                       }
                     }}
                   >
-                    <div class="text-sm hover:text-white transition ease-in-out i-ri:external-link-fill" />
+                    <div class="transition ease-in-out text-sm hover:text-white i-ri:external-link-fill" />
                   </div>
 
                   <div class="flex gap-1 items-center text-xs">
@@ -631,7 +631,7 @@ export const AccountsDropdown = (props: Props) => {
                       {loginDeviceCode()?.userCode}
                     </span>
                     <div
-                      class="cursor-pointer text-darkSlate-50 i-ri:file-copy-fill hover:text-white transition ease-in-out"
+                      class="cursor-pointer text-darkSlate-50 hover:text-white transition ease-in-out i-ri:file-copy-fill"
                       onClick={() => {
                         if (loginDeviceCode()?.userCode) {
                           navigator.clipboard.writeText(

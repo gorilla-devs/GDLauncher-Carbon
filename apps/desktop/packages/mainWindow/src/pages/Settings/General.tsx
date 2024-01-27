@@ -1,12 +1,16 @@
-import { Button, Dropdown, Switch } from "@gd/ui";
+import { Button, Dropdown, Input, Switch } from "@gd/ui";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { Trans, useTransContext } from "@gd/i18n";
-import { queryClient, rspc } from "@/utils/rspcClient";
+import { rspc } from "@/utils/rspcClient";
 import SettingsData from "./settings.general.data";
 import { useRouteData } from "@solidjs/router";
-import { createEffect } from "solid-js";
+import { Show, createEffect } from "solid-js";
 import { createStore } from "solid-js/store";
-import { FEReleaseChannel, FESettings } from "@gd/core_module/bindings";
+import {
+  FELauncherActionOnGameLaunch,
+  FEReleaseChannel,
+  FESettings
+} from "@gd/core_module/bindings";
 import Row from "./components/Row";
 import RightHandSide from "./components/RightHandSide";
 import PageTitle from "./components/PageTitle";
@@ -24,15 +28,31 @@ const General = () => {
     routeData?.data?.data || {}
   );
 
-  const settingsMutation = rspc.createMutation(["settings.setSettings"], {
-    onMutate: (newSettings) => {
-      queryClient.setQueryData(["settings.getSettings"], newSettings);
-    }
-  });
+  const settingsMutation = rspc.createMutation(["settings.setSettings"]);
 
   createEffect(() => {
     if (routeData.data.data) setSettings(routeData.data.data);
   });
+
+  const templateGameResolution = () => {
+    return [
+      { label: "854 x 480 (100%)", key: "Standard:854x480" },
+      { label: "1046 x 588 (150%)", key: "Standard:1046x588" },
+      { label: "1208 x 679 (200%)", key: "Standard:1208x679" },
+      { label: "1479 x 831 (300%)", key: "Standard:1479x831" }
+    ];
+  };
+
+  const gameResolutionDropdownKey = () => {
+    if (!settings.gameResolution) return "default";
+
+    if (settings.gameResolution.type === "Standard") {
+      const gameResolution = settings.gameResolution.value.join("x");
+      return `Standard:${gameResolution}`;
+    }
+
+    return "custom";
+  };
 
   return (
     <>
@@ -68,7 +88,9 @@ const General = () => {
               ]}
               onChange={(channel) => {
                 settingsMutation.mutate({
-                  releaseChannel: channel.key as FEReleaseChannel
+                  releaseChannel: {
+                    Set: channel.key as FEReleaseChannel
+                  }
                 });
               }}
             />
@@ -102,50 +124,115 @@ const General = () => {
               }))}
               onChange={(downloads) => {
                 settingsMutation.mutate({
-                  concurrentDownloads: parseInt(downloads.key as string, 10)
+                  concurrentDownloads: {
+                    Set: parseInt(downloads.key as string, 10)
+                  }
                 });
               }}
             />
           </RightHandSide>
         </Row>
         <Row>
-          <Title>
-            <Trans
-              key="settings:game_resolution_title"
-              options={{
-                defaultValue: "Game Resolution"
-              }}
-            />
+          <Title description={<Trans key="settings:game_resolution_text" />}>
+            <Trans key="settings:game_resolution_title" />
           </Title>
           <RightHandSide>
-            <Dropdown
-              placeholder={t("settings:resolution_presets") || ""}
-              options={[
-                { label: "800x600", key: "800x600" },
-                { label: "1024x768", key: "1024x768" },
-                { label: "1920x1080", key: "1920x1080" }
-              ]}
-            />
+            <div class="flex flex-col items-end gap-4">
+              <Dropdown
+                value={gameResolutionDropdownKey()}
+                placeholder={t("settings:resolution_presets")}
+                options={[
+                  { label: "Default", key: "default" },
+                  ...templateGameResolution(),
+                  { label: "Custom", key: "custom" }
+                ]}
+                onChange={(option) => {
+                  let value: {
+                    type: "Standard" | "Custom";
+                    value: [number, number];
+                  } | null = null;
+
+                  if (option.key === "custom") {
+                    value = {
+                      type: "Custom",
+                      value: [854, 480]
+                    };
+                  } else if (option.key === "default") {
+                    value = null;
+                  } else {
+                    const [width, height] = option.key
+                      .toString()
+                      .split(":")[1]
+                      .split("x");
+                    value = {
+                      type: "Standard",
+                      value: [parseInt(width, 10), parseInt(height, 10)]
+                    };
+                  }
+
+                  settingsMutation.mutate({
+                    gameResolution: {
+                      Set: value
+                    }
+                  });
+                }}
+              />
+              <Show when={settings.gameResolution?.type === "Custom"}>
+                <div class="flex flex-col gap-4">
+                  <div class="flex items-center justify-end gap-4">
+                    <div>
+                      <Trans key="settings:width" />
+                    </div>
+                    <Input
+                      class="w-24"
+                      type="number"
+                      value={settings?.gameResolution?.value[0]}
+                      onChange={(e) => {
+                        settingsMutation.mutate({
+                          gameResolution: {
+                            Set: {
+                              type: "Custom",
+                              value: [
+                                parseInt(e.currentTarget.value, 10),
+                                settings?.gameResolution?.value[1]!
+                              ]
+                            }
+                          }
+                        });
+                      }}
+                    />
+                  </div>
+                  <div class="flex items-center justify-end gap-4">
+                    <div>
+                      <Trans key="settings:height" />
+                    </div>
+                    <Input
+                      class="w-24"
+                      type="number"
+                      value={settings?.gameResolution?.value[1]}
+                      onChange={(e) => {
+                        settingsMutation.mutate({
+                          gameResolution: {
+                            Set: {
+                              type: "Custom",
+                              value: [
+                                settings?.gameResolution?.value[0]!,
+                                parseInt(e.currentTarget.value, 10)
+                              ]
+                            }
+                          }
+                        });
+                      }}
+                    />
+                  </div>
+                </div>
+              </Show>
+            </div>
           </RightHandSide>
         </Row>
         <Row>
-          <Title
-            description={
-              <Trans
-                key="settings:instance_sorting_text"
-                options={{
-                  defaultValue:
-                    "Select the method in which instances should be sorted."
-                }}
-              />
-            }
-          >
-            <Trans
-              key="settings:instance_sorting_title"
-              options={{
-                defaultValue: "Instance Sorting"
-              }}
-            />
+          <Title description={<Trans key="settings:instance_sorting_text" />}>
+            <Trans key="settings:instance_sorting_title" />
           </Title>
           <RightHandSide>
             <Dropdown
@@ -179,7 +266,9 @@ const General = () => {
               checked={settings.showNews}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  showNews: e.currentTarget.checked
+                  showNews: {
+                    Set: e.currentTarget.checked
+                  }
                 });
               }}
             />
@@ -209,7 +298,9 @@ const General = () => {
               checked={settings.discordIntegration}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  discordIntegration: e.currentTarget.checked
+                  discordIntegration: {
+                    Set: e.currentTarget.checked
+                  }
                 });
               }}
             />
@@ -218,24 +309,75 @@ const General = () => {
         <Row>
           <Title
             description={
-              <Trans
-                key="settings:hide_launcher_playing_text"
-                options={{
-                  defaultValue:
-                    "Automatically hide the launcher when launching an instance. You will still be able to open it from the icon tray."
-                }}
-              />
+              <Trans key="settings:launcher_action_on_game_launch_text" />
             }
           >
-            <Trans
-              key="settings:hide_launcher_playing_title"
-              options={{
-                defaultValue: "Hide launcher while playing"
-              }}
-            />
+            <Trans key="settings:launcher_action_on_game_launch_title" />
           </Title>
           <RightHandSide>
-            <Switch />
+            <Dropdown
+              value={settings.launcherActionOnGameLaunch.toString()}
+              options={[
+                {
+                  label: t("settings:launcher_action_on_game_launch_none"),
+                  key: "none"
+                },
+                {
+                  label: t(
+                    "settings:launcher_action_on_game_launch_minimize_window"
+                  ),
+                  key: "minimizeWindow"
+                },
+                {
+                  label: t(
+                    "settings:launcher_action_on_game_launch_close_window"
+                  ),
+                  key: "closeWindow"
+                },
+                {
+                  label: t(
+                    "settings:launcher_action_on_game_launch_hide_window"
+                  ),
+                  key: "hideWindow"
+                },
+                {
+                  label: t("settings:launcher_action_on_game_launch_quit_app"),
+                  key: "quitApp"
+                }
+              ]}
+              onChange={(downloads) => {
+                let action: FELauncherActionOnGameLaunch | undefined;
+
+                switch (downloads.key) {
+                  case "minimizeWindow":
+                    action = "minimizeWindow";
+                    break;
+                  case "closeWindow":
+                    action = "closeWindow";
+                    break;
+                  case "hideWindow":
+                    action = "hideWindow";
+                    break;
+                  case "quitApp":
+                    action = "quitApp";
+                    break;
+                  case "none":
+                    action = "none";
+                    break;
+                }
+
+                if (!action) {
+                  console.error("Invalid action", downloads.key);
+                  return;
+                }
+
+                settingsMutation.mutate({
+                  launcherActionOnGameLaunch: {
+                    Set: action
+                  }
+                });
+              }}
+            />
           </RightHandSide>
         </Row>
         <Row>
@@ -262,7 +404,9 @@ const General = () => {
               checked={settings.reducedMotion}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  reducedMotion: e.currentTarget.checked
+                  reducedMotion: {
+                    Set: e.currentTarget.checked
+                  }
                 });
               }}
             />

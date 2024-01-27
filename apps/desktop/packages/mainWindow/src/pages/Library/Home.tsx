@@ -62,7 +62,7 @@ const Home = () => {
                 </Match>
               </Switch>
             </div>
-            <div class="w-[1px] bg-darkSlate-400 h-auto" />
+            <div class="h-auto w-[1px] bg-darkSlate-400" />
             <FeaturedModpackTile />
           </div>
         </Show>

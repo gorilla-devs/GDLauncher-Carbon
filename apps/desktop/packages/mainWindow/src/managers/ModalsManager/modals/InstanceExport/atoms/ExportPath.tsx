@@ -31,7 +31,7 @@ const ExportPath = () => {
                 setPath("");
               }}
               class="i-material-symbols:close"
-            ></div>
+            />
           }
         />
         <div class="flex items-center justify-center p-2 bg-[#1D2028] rounded-lg">
@@ -61,7 +61,7 @@ const ExportPath = () => {
 
               setPayload({ ...payload, save_path: result.filePath });
             }}
-            class="i-material-symbols:folder-open-outline text-2xl  cursor-pointer"
+            class="text-2xl cursor-pointer i-material-symbols:folder-open-outline"
           />
         </div>
       </div>

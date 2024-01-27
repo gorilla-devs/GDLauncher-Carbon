@@ -75,6 +75,7 @@ keys! {
         GET_INSTANCES_UNGROUPED                     = "getInstancesUngrouped";
         CREATE_GROUP                                = "createGroup";
         CREATE_INSTANCE                             = "createInstance";
+        CHANGE_MODPACK                              = "changeModpack";
         LOAD_ICON_URL                               = "loadIconUrl";
         DELETE_GROUP                                = "deleteGroup";
         DELETE_INSTANCE                             = "deleteInstance";
@@ -97,6 +98,8 @@ keys! {
         INSTALL_MOD                                 = "installMod";
         INSTALL_LATEST_MOD                          = "installLatestMod";
         UPDATE_MOD                                  = "updateMod";
+        FIND_MOD_UPDATE                             = "findModUpdate";
+        GET_MOD_SOURCES                             = "getModSources";
         GET_IMPORTABLE_ENTITIES                     = "getImportableEntities";
         GET_IMPORT_ENTITY_DEFAULT_PATH              = "getImportEntityDefaultPath";
         SET_IMPORT_SCAN_TARGET                      = "setImportScanTarget";

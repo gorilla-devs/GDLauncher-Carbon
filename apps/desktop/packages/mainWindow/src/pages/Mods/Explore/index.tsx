@@ -19,6 +19,7 @@ import InfiniteScrollVersionsQueryWrapper, {
   useInfiniteVersionsQuery
 } from "@/components/InfiniteScrollVersionsQueryWrapper";
 import ModDownloadButton from "@/components/ModDownloadButton";
+import { rspc } from "@/utils/rspcClient";
 
 const getTabIndexFromPath = (path: string) => {
   if (path.match(/\/(modpacks|mods)\/.+\/.+/g)) {
@@ -62,6 +63,16 @@ const Modpack = () => {
   const [searchParams] = useSearchParams();
 
   const instanceId = () => parseInt(searchParams.instanceId, 10);
+
+  const instanceDetails = rspc.createQuery(() => [
+    "instance.getInstanceDetails",
+    instanceId()
+  ]);
+
+  const instanceMods = rspc.createQuery(() => [
+    "instance.getInstanceMods",
+    instanceId()
+  ]);
 
   const instancePages = () => [
     {
@@ -227,6 +238,8 @@ const Modpack = () => {
                         projectId={projectId()}
                         isCurseforge={routeData.isCurseforge}
                         instanceId={instanceId()}
+                        instanceDetails={instanceDetails.data || undefined}
+                        instanceMods={instanceMods.data || undefined}
                       />
                     </div>
                   </div>
@@ -266,7 +279,9 @@ const Modpack = () => {
                           {(page) => (
                             <Tab
                               onClick={() => {
-                                navigate(`${page.path}${location.search}`);
+                                navigate(`${page.path}${location.search}`, {
+                                  replace: true
+                                });
                               }}
                             >
                               {page.label}
@@ -282,6 +297,8 @@ const Modpack = () => {
                       projectId={projectId()}
                       isCurseforge={routeData.isCurseforge}
                       instanceId={instanceId()}
+                      instanceDetails={instanceDetails.data || undefined}
+                      instanceMods={instanceMods.data || undefined}
                     />
                   </Show>
                 </div>

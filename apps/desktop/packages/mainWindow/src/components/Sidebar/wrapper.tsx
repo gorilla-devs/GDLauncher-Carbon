@@ -29,7 +29,7 @@ const SiderbarWrapper = (props: Props) => {
   return (
     <div
       style={{
-        width: isSidebarOpened() || !mergedProps.collapsable ? "15rem" : "5rem"
+        width: isSidebarOpened() || !mergedProps.collapsable ? "17rem" : "5rem"
       }}
       classList={{
         "p-5": !props.noPadding
@@ -38,7 +38,7 @@ const SiderbarWrapper = (props: Props) => {
     >
       <Show when={mergedProps.collapsable}>
         <div
-          class="bg-darkSlate-700 absolute right-0 w-4 h-10 flex justify-center items-center cursor-pointer top-10 rounded-l-md"
+          class="bg-darkSlate-700 absolute right-0 w-4 h-10 flex justify-center items-center cursor-pointer rounded-l-md top-10"
           onClick={() => {
             if (mergedProps.collapsable) {
               if (props?.onCollapse) {

@@ -50,6 +50,7 @@ declare global {
     getRuntimePath: () => Promise<string>;
     changeRuntimePath: (newPath: string | null) => Promise<void>;
     validateRuntimePath: (newPath: string | null) => Promise<boolean>;
+    skipIntroAnimation: boolean;
   }
 }
 

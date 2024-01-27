@@ -49,35 +49,26 @@ render(
     });
 
     const [isReady, setIsReady] = createSignal(false);
+    const [isIntroAnimationFinished, setIsIntroAnimationFinished] =
+      createSignal(window.skipIntroAnimation);
 
     createEffect(() => {
-      if (process.env.NODE_ENV === "development") {
-        setIsReady(coreModuleLoaded.state === "ready");
-      }
+      if (!isIntroAnimationFinished()) return;
+
+      setIsReady(coreModuleLoaded.state === "ready");
     });
 
     return (
-      <Switch
-        fallback={
-          <div class="w-full flex justify-center items-center h-screen">
-            <RiveAppWapper
-              src={GDAnimation}
-              onStop={() => {
-                setIsReady(coreModuleLoaded.state === "ready");
-              }}
-            />
-          </div>
-        }
-      >
+      <Switch>
         <Match when={isReady()}>
           <InnerApp port={coreModuleLoaded() as unknown as number} />
         </Match>
-        <Match when={!isReady() && process.env.NODE_ENV !== "development"}>
+        <Match when={!isReady()}>
           <div class="w-full flex justify-center items-center h-screen">
             <RiveAppWapper
               src={GDAnimation}
               onStop={() => {
-                setIsReady(coreModuleLoaded.state === "ready");
+                setIsIntroAnimationFinished(true);
               }}
             />
           </div>

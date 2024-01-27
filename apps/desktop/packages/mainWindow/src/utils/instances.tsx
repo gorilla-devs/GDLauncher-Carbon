@@ -1,10 +1,8 @@
 /* eslint-disable solid/no-innerhtml */
 import {
-  FeError,
   InvalidListInstance,
   LaunchState,
   ListInstanceStatus,
-  Progress,
   FESubtask,
   FETaskId,
   UngroupedInstance,
@@ -170,18 +168,6 @@ export const isInstanceRunning = (
   return typeof launchState === "object" && "Running" in launchState;
 };
 
-export const isProgressKnown = (
-  progress: Progress
-): progress is { Known: number } => {
-  return (progress as { Known: number }).Known !== undefined;
-};
-
-export const isProgressFailed = (
-  progress: Progress
-): progress is { Failed: FeError } => {
-  return (progress as { Failed: FeError })?.Failed !== undefined;
-};
-
 export const isModpackCurseforge = (
   modpack: Modpack
 ): modpack is { Curseforge: CurseforgeModpack } => {
@@ -202,15 +188,11 @@ export const getModrinthData = (modpack: Modpack) => {
   if ("Modrinth" in modpack) return modpack.Modrinth;
 };
 
-export const fetchImage = async (id: number) => {
-  const imageUrl = `http://localhost:${port}/instance/instanceIcon?id=${id}`;
-  const image = await fetch(imageUrl);
-
-  const imageNotPresent = image.status === 204;
-
-  if (!imageNotPresent) {
-    return imageUrl;
-  } else return "";
+export const getInstanceImageUrl = (
+  instanceId: string | number,
+  rev: string | number
+) => {
+  return `http://localhost:${port}/instance/instanceIcon?id=${instanceId}&rev=${rev}`;
 };
 
 export const getModImageUrl = (

@@ -39,7 +39,7 @@ const InstanceExport = (props: ModalProps) => {
       scrollable="overflow-y-scroll scrollbar-hide"
       // height="h-96"
     >
-      <div class="flex flex-col p-4 w-120 ">
+      <div class="flex flex-col p-4 w-120">
         <Switch>
           <Match when={exportStep() === 0}>
             <ExportFormat />

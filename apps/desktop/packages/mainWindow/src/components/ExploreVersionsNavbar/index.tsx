@@ -1,4 +1,3 @@
-import { fetchImage } from "@/utils/instances";
 import { mcVersions } from "@/utils/mcVersion";
 import { supportedModloaders } from "@/utils/sidebar";
 import DefaultImg from "/assets/images/default-instance-img.png";
@@ -6,16 +5,11 @@ import { McType } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Checkbox, Dropdown } from "@gd/ui";
 import { useSearchParams } from "@solidjs/router";
-import {
-  Match,
-  Switch,
-  createMemo,
-  createResource,
-  createSignal
-} from "solid-js";
+import { Match, Switch, createMemo, createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 import { rspc } from "@/utils/rspcClient";
 import { useInfiniteVersionsQuery } from "../InfiniteScrollVersionsQueryWrapper";
+import { getInstanceImageUrl } from "@/utils/instances";
 
 const mapTypeToColor = (type: McType) => {
   return (
@@ -43,12 +37,12 @@ type Props = {
 
 const ExploreVersionsNavbar = (props: Props) => {
   const [searchParams, _setSearchParams] = useSearchParams();
-  const instanceId = parseInt(searchParams.instanceId, 10);
+  const instanceId = () => parseInt(searchParams.instanceId, 10);
 
   const infiniteQuery = useInfiniteVersionsQuery();
 
   const [overrideEnabled, setOverrideEnabled] = createSignal(
-    !instanceId || isNaN(instanceId)
+    !instanceId || isNaN(instanceId())
   );
 
   const [gameVersionFilters, _setGameVersionFilters] = createStore({
@@ -59,10 +53,8 @@ const ExploreVersionsNavbar = (props: Props) => {
 
   const instanceDetails = rspc.createQuery(() => [
     "instance.getInstanceDetails",
-    instanceId
+    instanceId()
   ]);
-
-  const [imageResource] = createResource(() => instanceId, fetchImage);
 
   const modloaders = () => {
     let res: { label: string; key: string }[] = [];
@@ -132,17 +124,22 @@ const ExploreVersionsNavbar = (props: Props) => {
   };
 
   return (
-    <div class="h-12 w-full flex gap-4 my-4">
+    <div class="w-full flex gap-4 h-12 my-4">
       <Switch>
-        <Match when={!isNaN(instanceId)}>
+        <Match when={!isNaN(instanceId())}>
           <div class="flex gap-2">
             <div
-              class="h-full w-12 flex-1"
+              class="h-full flex-1 w-12"
               style={{
-                "background-image": imageResource()
-                  ? `url("${imageResource() as string}")`
+                "background-image": instanceDetails.data?.iconRevision
+                  ? `url("${getInstanceImageUrl(
+                      instanceId(),
+                      instanceDetails.data?.iconRevision
+                    )}")`
                   : `url("${DefaultImg}")`,
-                "background-size": imageResource() ? "cover" : "120%"
+                "background-size": instanceDetails.data?.iconRevision
+                  ? "cover"
+                  : "120%"
               }}
             />
             <div class="flex flex-col justify-between">
@@ -158,7 +155,7 @@ const ExploreVersionsNavbar = (props: Props) => {
           </div>
         </Match>
         <Match
-          when={props.type === "mod" && (!instanceId || isNaN(instanceId))}
+          when={props.type === "mod" && (!instanceId || isNaN(instanceId()))}
         >
           <div class="flex items-center text-darkSlate-100">
             <Trans key="rowcontainer.no_instance_selected" />

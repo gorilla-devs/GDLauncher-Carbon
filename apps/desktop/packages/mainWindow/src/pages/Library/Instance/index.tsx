@@ -9,7 +9,6 @@ import {
   Show,
   Switch,
   createEffect,
-  createResource,
   createSignal,
   onCleanup,
   onMount
@@ -24,8 +23,8 @@ import {
   UngroupedInstance
 } from "@gd/core_module/bindings";
 import {
-  fetchImage,
   getCurseForgeData,
+  getInstanceImageUrl,
   getModrinthData,
   getPreparingState,
   getRunningState
@@ -63,10 +62,6 @@ const Instance = () => {
   const [modpackDetails, setModpackDetails] = createSignal<
     FEModResponse | MRFEProject | undefined
   >(undefined);
-  const [imageUrl, { refetch }] = createResource(
-    () => parseInt(params.id, 10),
-    fetchImage
-  );
 
   const [t] = useTransContext();
   const modalsContext = useModal();
@@ -246,7 +241,7 @@ const Instance = () => {
     if (newName()) {
       updateInstanceMutation.mutate({
         name: { Set: newName() },
-        use_loaded_icon: null,
+        useLoadedIcon: null,
         memory: null,
         notes: null,
         instance: parseInt(params.id, 10)
@@ -354,12 +349,6 @@ const Instance = () => {
   ];
 
   createEffect(() => {
-    if (routeData.instanceDetails.data?.icon_revision !== undefined) {
-      refetch();
-    }
-  });
-
-  createEffect(() => {
     if (
       routeData.instancesUngrouped.data &&
       !routeData.instancesUngrouped.data?.find(
@@ -392,13 +381,16 @@ const Instance = () => {
         class="relative flex flex-col justify-between ease-in-out transition-all ease-in-out items-stretch bg-cover bg-center min-h-60 transition-100"
         style={{
           transition: "height 0.2s",
-          "background-image": imageUrl()
-            ? `url("${imageUrl()}")`
+          "background-image": routeData.instanceDetails.data?.iconRevision
+            ? `url("${getInstanceImageUrl(
+                params.id,
+                routeData.instanceDetails.data?.iconRevision
+              )}")`
             : `url("${DefaultImg}")`
         }}
       >
         <div class="h-full bg-gradient-to-t from-darkSlate-800">
-          <div class="z-50 sticky top-5 left-5 w-fit">
+          <div class="sticky top-5 left-5 w-fit z-50">
             <Button
               rounded
               onClick={() => navigate("/library")}
@@ -441,8 +433,12 @@ const Instance = () => {
                   <div
                     class="bg-center bg-cover h-16 w-16 rounded-xl"
                     style={{
-                      "background-image": imageUrl()
-                        ? `url("${imageUrl()}")`
+                      "background-image": routeData.instanceDetails.data
+                        ?.iconRevision
+                        ? `url("${getInstanceImageUrl(
+                            params.id,
+                            routeData.instanceDetails.data?.iconRevision
+                          )}")`
                         : `url("${DefaultImg}")`
                     }}
                   />
@@ -489,14 +485,14 @@ const Instance = () => {
                         classList={{ "bg-darkSlate-800 pl-2": editableName() }}
                       >
                         <div
-                          class="cursor-pointer ease-in-out z-10 transition text-white i-ri:check-fill text-3xl duration-50 hover:text-green-500"
+                          class="cursor-pointer ease-in-out z-10 transition text-white text-3xl i-ri:check-fill duration-50 hover:text-green-500"
                           classList={{
                             hidden: !editableName()
                           }}
                           onClick={() => handleNameChange()}
                         />
                         <div
-                          class="cursor-pointer ease-in-out text-white transition text-3xl duration-50 z-10 hover:text-red-500 i-ri:close-fill"
+                          class="cursor-pointer ease-in-out text-white transition text-3xl duration-50 z-10 i-ri:close-fill hover:text-red-500"
                           classList={{
                             hidden: !editableName()
                           }}
@@ -539,7 +535,7 @@ const Instance = () => {
                         </div>
                         <Show
                           when={
-                            routeData.instanceDetails.data?.seconds_played !==
+                            routeData.instanceDetails.data?.secondsPlayed !==
                             undefined
                           }
                         >
@@ -550,7 +546,7 @@ const Instance = () => {
                                 (
                                   routeData.instanceDetails
                                     .data as InstanceDetails
-                                ).seconds_played
+                                ).secondsPlayed
                               )}
                             </span>
                           </div>
@@ -618,7 +614,7 @@ const Instance = () => {
             >
               <div class="flex items-center h-full">
                 <div
-                  class="mr-4 transition-transform duration-100 ease-in-out origin-left"
+                  class="transition-transform duration-100 ease-in-out mr-4 origin-left"
                   classList={{
                     "scale-x-100": isSticky(),
                     "scale-x-0": !isSticky()
@@ -662,7 +658,7 @@ const Instance = () => {
                 </div>
               </div>
               <div
-                class="ml-4 transition-transform duration-100 ease-in-out origin-right"
+                class="transition-transform duration-100 ease-in-out ml-4 origin-right"
                 classList={{
                   "scale-x-100": isSticky(),
                   "scale-x-0": !isSticky()

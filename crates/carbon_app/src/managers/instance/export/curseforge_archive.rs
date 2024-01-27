@@ -183,7 +183,7 @@ pub async fn export_curseforge(
                 tmpfile.to_string_lossy(),
                 save_path.to_string_lossy()
             );
-            tmpfile.rename(save_path).await?;
+            tmpfile.try_rename_or_move(save_path).await?;
 
             t_create_bundle.complete_opaque();
 

@@ -22,22 +22,30 @@ const Overview = () => {
   const [t] = useTransContext();
 
   const modpackPlatform = () => {
-    if ("Curseforge" in (routeData.instanceDetails.data?.modpack || {})) {
+    if (
+      "Curseforge" in (routeData.instanceDetails.data?.modpack?.modpack || {})
+    ) {
       return "Curseforge";
-    } else if ("Modrinth" in (routeData.instanceDetails.data?.modpack || {})) {
+    } else if (
+      "Modrinth" in (routeData.instanceDetails.data?.modpack?.modpack || {})
+    ) {
       return "Modrinth";
     }
   };
 
   const modpackProjectId = () => {
-    if ("Curseforge" in (routeData.instanceDetails.data?.modpack || {})) {
+    if (
+      "Curseforge" in (routeData.instanceDetails.data?.modpack?.modpack || {})
+    ) {
       return (
-        (routeData.instanceDetails.data?.modpack as any)
+        (routeData.instanceDetails.data?.modpack?.modpack as any)
           ?.Curseforge as CurseforgeModpack
       ).project_id;
-    } else if ("Modrinth" in (routeData.instanceDetails.data?.modpack || {})) {
+    } else if (
+      "Modrinth" in (routeData.instanceDetails.data?.modpack?.modpack || {})
+    ) {
       return (
-        (routeData.instanceDetails.data?.modpack as any)
+        (routeData.instanceDetails.data?.modpack?.modpack as any)
           ?.Modrinth as ModrinthModpack
       ).project_id;
     }
@@ -94,12 +102,12 @@ const Overview = () => {
             class="flex-1"
           />
         </Show>
-        <Show when={routeData.instanceDetails.data?.seconds_played}>
+        <Show when={routeData.instanceDetails.data?.secondsPlayed}>
           <Card
             title={t("instance.overview_card_played_time_title")}
             text={formatDistance(
               new Date(
-                routeData.instanceDetails.data?.last_played || Date.now()
+                routeData.instanceDetails.data?.lastPlayed || Date.now()
               ).getTime(),
               Date.now()
             )}
@@ -107,13 +115,13 @@ const Overview = () => {
             class="flex-1"
           />
         </Show>
-        <Show when={routeData.instanceDetails.data?.last_played}>
+        <Show when={routeData.instanceDetails.data?.lastPlayed}>
           <Card
             title={t("instance.overview_card_last_played_title")}
             text={format(
               new Date(
                 (routeData.instanceDetails.data as InstanceDetails)
-                  ?.last_played as string
+                  ?.lastPlayed as string
               ),
               "PPP"
             )}
@@ -123,7 +131,7 @@ const Overview = () => {
         </Show>
         <Show
           when={
-            routeData.instanceDetails.data?.modpack &&
+            routeData.instanceDetails.data?.modpack?.modpack &&
             routeData.modpackInfo.isLoading
           }
         >
@@ -133,16 +141,16 @@ const Overview = () => {
         </Show>
         <Show
           when={
-            routeData.instanceDetails.data?.modpack &&
+            routeData.instanceDetails.data?.modpack?.modpack &&
             routeData.modpackInfo.data
           }
         >
-          <div class="relative flex p-5 rounded-xl box-border bg-darkSlate-700 w-full flex-1 min-h-23 h-max overflow-hidden min-w-max">
+          <div class="relative flex p-5 rounded-xl box-border bg-darkSlate-700 w-full overflow-hidden min-h-23 h-max">
             <FadedBanner
               imageUrl={`http://localhost:${port}/instance/modpackIcon?instance_id=${params.id}`}
             >
               <div class="flex flex-col justify-between items-start w-full z-10 gap-6 2xl:flex-row 2xl:items-center 2xl:gap-14">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-1">
                   <img
                     class="h-13 w-13 rounded-lg"
                     src={`http://localhost:${port}/instance/modpackIcon?instance_id=${params.id}`}
@@ -160,7 +168,9 @@ const Overview = () => {
                       </div>
                       <div class="flex items-center gap-2">
                         <div class="w-3 h-3 i-ri:file-fill" />
-                        <div>{routeData.modpackInfo.data?.version_name}</div>
+                        <div class="truncate whitespace-break-spaces">
+                          {routeData.modpackInfo.data?.version_name}
+                        </div>
                       </div>
                     </div>
                   </div>

@@ -4,7 +4,7 @@ import { rspc } from "@/utils/rspcClient";
 import { For, Match, Show, Switch, createSignal } from "solid-js";
 import { ImportEntityStatus } from "@gd/core_module/bindings";
 import EntityCard from "@/components/Card/EntityCard";
-import SingleEntity from "./SingleEntity";
+import SingleEntity, { setInstances, setStep } from "./SingleEntity";
 
 import CurseForgeLogo from "/assets/images/icons/curseforge_logo.svg";
 import ATLauncherLogo from "/assets/images/icons/atlauncher_logo.svg";
@@ -33,6 +33,9 @@ interface Props {
   prevStep: () => void;
   isImportInstance?: boolean;
 }
+const [currentEntity, setCurrentEntity] = createSignal<
+  ImportEntityStatus | undefined
+>();
 const ThirdStep = (props: Props) => {
   const modalsContext = useModal();
 
@@ -52,9 +55,14 @@ const ThirdStep = (props: Props) => {
     PrismLogo
   ];
 
-  const handleClickEntity = (entity: ImportEntityStatus) => {
-    if (entity.supported) {
-      setEntity(entity);
+  const handleClickEntity = (ent: ImportEntityStatus) => {
+    if (ent.supported) {
+      if (currentEntity() && !(currentEntity()?.entity === ent.entity)) {
+        setStep("selectionStep");
+        setInstances([]);
+      }
+      setEntity(ent);
+      setCurrentEntity(ent);
     }
   };
 
@@ -78,7 +86,7 @@ const ThirdStep = (props: Props) => {
         </Match>
         <Match when={!entity()}>
           <div class="flex-1 w-full">
-            <ul class="grid grid-cols-3 gap-2 p-0">
+            <ul class="grid gap-2 p-0 grid-cols-3">
               <For
                 each={entities.data?.sort(
                   (a, b) =>

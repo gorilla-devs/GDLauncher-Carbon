@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use chrono::DateTime;
+use chrono::Utc;
 use rspc::Type;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
@@ -48,7 +50,7 @@ pub struct CFFEFile {
     pub release_type: CFFEFileReleaseType,
     pub file_status: CFFEFileStatus,
     pub hashes: Vec<CFFEFileHash>,
-    pub file_date: String, // Consider using a datetime library for date-time representation
+    pub file_date: DateTime<Utc>,
     pub file_length: u32,
     pub download_count: u32,
     pub download_url: Option<String>,

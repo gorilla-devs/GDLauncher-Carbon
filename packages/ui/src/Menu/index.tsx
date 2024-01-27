@@ -15,6 +15,7 @@ interface MenuItem {
   label: string;
   action: () => void;
   id?: string;
+  disabled?: boolean;
 }
 
 interface ContextMenuProps {
@@ -130,12 +131,17 @@ const ContextMenu = (props: ContextMenuProps) => {
             <For each={props.menuItems}>
               {(item) => (
                 <div
-                  class="flex items-center cursor-pointer w-full gap-1 px-3 h-8 hover:bg-darkSlate-700 py-1"
+                  class={`flex items-center cursor-pointer w-full gap-1 px-3 h-8 ${
+                    !item.disabled ? "hover:bg-darkSlate-700" : ""
+                  } py-1`}
                   classList={{
-                    "hover:text-red-600 text-red-500": item.id === "delete",
-                    "hover:text-white text-darkGray-50": !item.id,
+                    "opacity-20": item.disabled === true,
+                    "hover:text-red-600 text-red-500":
+                      item.id === "delete" && !item.disabled,
+                    "hover:text-white text-darkGray-50":
+                      !item.id && !item.disabled,
                   }}
-                  onClick={item.action}
+                  onClick={item.disabled === true ? undefined : item.action}
                 >
                   <Show when={item.icon}>
                     <div class={`${item.icon}`} />

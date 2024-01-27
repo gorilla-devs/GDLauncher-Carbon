@@ -1,4 +1,12 @@
-import { Button, Checkbox, Input, Skeleton, Switch, Tooltip } from "@gd/ui";
+import {
+  Button,
+  Checkbox,
+  Input,
+  Progressbar,
+  Skeleton,
+  Switch,
+  Tooltip
+} from "@gd/ui";
 import { For, Show, createMemo, createSignal } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import Mod from "./Mod";
@@ -10,16 +18,20 @@ import fetchData from "../../instance.data";
 import { Mod as Modtype } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { setLastType } from "@/components/InfiniteScrollModsQueryWrapper";
+import { useModal } from "@/managers/ModalsManager";
 
 const Mods = () => {
   const [t] = useTransContext();
   const params = useParams();
   const navigate = useGDNavigate();
+  const modalsContext = useModal();
 
   const [filter, setFilter] = createSignal("");
   const [selectedModsMap, setSelectedModsMap] = createStore<{
     [id: string]: boolean;
   }>({});
+  const [isModStatusToggleLoading, setIsModStatusToggleLoading] =
+    createSignal(false);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const isInstanceLocked = () =>
@@ -44,6 +56,30 @@ const Mods = () => {
   const selectedMods = createMemo(() => {
     return routeData.instanceMods?.filter((mod) => selectedModsMap[mod.id]);
   });
+
+  const updateAllMods = () => {
+    modalsContext?.openModal(
+      {
+        name: "modsUpdater"
+      },
+      {
+        mods: routeData.instanceMods.filter((mod) => mod.has_update),
+        instanceId: parseInt(params.id, 10)
+      }
+    );
+  };
+
+  const updateSelectedMods = () => {
+    modalsContext?.openModal(
+      {
+        name: "modsUpdater"
+      },
+      {
+        mods: selectedMods().filter((mod) => mod.has_update),
+        instanceId: parseInt(params.id, 10)
+      }
+    );
+  };
 
   const NoMods = () => {
     return (
@@ -83,7 +119,7 @@ const Mods = () => {
   return (
     <div>
       <div
-        class="flex items-center fixed justify-between bottom-4 h-16 bg-darkSlate-900 mx-auto left-1/2 -translate-x-1/2 rounded-md pr-6 z-50 shadow-md shadow-darkSlate-900 transition-transform duration-100 ease-in-out origin-left w-130 border-darkSlate-700 border-solid border-1"
+        class="flex items-center justify-between h-16 bg-darkSlate-900 shadow-md duration-100 ease-in-out border-darkSlate-700 border-solid border-1 fixed bottom-4 mx-auto left-1/2 -translate-x-1/2 rounded-md z-50 shadow-darkSlate-900 transition-transform origin-left pr-6 w-130"
         classList={{
           "translate-y-24": selectedMods()?.length === 0
         }}
@@ -93,7 +129,7 @@ const Mods = () => {
             class="flex items-center text-darkSlate-50 hover:text-white h-full px-6 mr-2"
             onClick={() => setSelectedModsMap(reconcile({}))}
           >
-            <div class="i-ri:close-fill text-2xl" />
+            <div class="text-2xl i-ri:close-fill" />
           </div>
           <div class="text-darkSlate-50">
             <Trans
@@ -124,8 +160,13 @@ const Mods = () => {
                 selectedMods()?.some((mod) => mod.enabled) &&
                 selectedMods()?.some((mod) => !mod.enabled)
               }
+              isLoading={isModStatusToggleLoading()}
               checked={selectedMods()?.every((mod) => mod.enabled) || false}
-              onChange={(event) => {
+              onChange={async (event) => {
+                if (isModStatusToggleLoading()) return;
+
+                setIsModStatusToggleLoading(true);
+
                 let action = event.target.checked;
 
                 if (
@@ -141,17 +182,21 @@ const Mods = () => {
 
                 for (const mod of modsThatNeedApply || []) {
                   if (action) {
-                    enableModMutation.mutate({
+                    await enableModMutation.mutateAsync({
                       instance_id: parseInt(params.id, 10),
                       mod_id: mod.id
                     });
                   } else {
-                    disableModMutation.mutate({
+                    await disableModMutation.mutateAsync({
                       instance_id: parseInt(params.id, 10),
                       mod_id: mod.id
                     });
                   }
+
+                  await new Promise((resolve) => setTimeout(resolve, 10));
                 }
+
+                setIsModStatusToggleLoading(false);
               }}
             />
           </Show>
@@ -169,7 +214,7 @@ const Mods = () => {
           </Show>
           <Show when={!isInstanceLocked()}>
             <div
-              class="flex items-center gap-2 cursor-pointer text-darkSlate-50 hover:text-red-500 transition duration-100 ease-in-out"
+              class="flex items-center gap-2 cursor-pointer text-darkSlate-50 hover:text-red-500 duration-100 ease-in-out transition"
               onClick={() => {
                 Object.keys(selectedModsMap).forEach((mod) => {
                   deleteModMutation.mutate({
@@ -183,10 +228,37 @@ const Mods = () => {
               <Trans key="instance.delete_mod" />
             </div>
           </Show>
+          <Show
+            when={selectedMods().filter((mod) => mod.has_update).length > 0}
+          >
+            <Show when={isInstanceLocked()}>
+              <Tooltip
+                content={<Trans key="instance.locked_cannot_apply_changes" />}
+                placement="top"
+                class="max-w-38 text-ellipsis overflow-hidden"
+              >
+                <div class="flex items-center gap-2 text-darkSlate-50">
+                  <span class="text-2xl i-ri:download-2-fill" />
+                  <Trans key="instance.update_mods" />
+                </div>
+              </Tooltip>
+            </Show>
+            <Show when={!isInstanceLocked()}>
+              <div
+                class="flex items-center gap-2 cursor-pointer text-darkSlate-50 hover:text-green-500 duration-100 ease-in-out transition"
+                onClick={() => {
+                  updateSelectedMods();
+                }}
+              >
+                <span class="text-2xl i-ri:download-2-fill" />
+                <Trans key="instance.update_mods" />
+              </div>
+            </Show>
+          </Show>
         </div>
       </div>
 
-      <div class="flex flex-col bg-darkSlate-800 transition-all duration-100 ease-in-out z-10 sticky top-14 px-6">
+      <div class="flex flex-col duration-100 ease-in-out px-6 bg-darkSlate-800 transition-all z-10 sticky top-14">
         <div class="flex justify-between items-center gap-1 pb-4 flex-wrap">
           <div class="flex items-center gap-4 cursor-pointer">
             <Checkbox
@@ -219,7 +291,7 @@ const Mods = () => {
               class="text-darkSlate-50 rounded-full"
             />
           </div>
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-4">
             {/* <p class="text-darkSlate-50">
               <Trans key="instance.sort_by" />
             </p>
@@ -267,17 +339,64 @@ const Mods = () => {
               </Button>
             </Show>
 
-            <div
-              class="flex items-center gap-2 cursor-pointer duration-100 ease-in-out transition hover:text-white text-darkSlate-50"
-              onClick={() => {
-                openFolderMutation.mutate({
-                  folder: "Mods",
-                  instance_id: parseInt(params.id, 10)
-                });
-              }}
+            <Show
+              when={
+                routeData.instanceMods?.filter((mod) => mod.has_update).length >
+                0
+              }
             >
-              <span class="text-2xl i-ri:folder-open-fill" />
-            </div>
+              <Tooltip
+                content={
+                  <>
+                    <Show when={isInstanceLocked()}>
+                      <Trans key="instance.locked_cannot_apply_changes" />
+                    </Show>
+                    <Show when={!isInstanceLocked()}>
+                      <Trans key="instance.update_all_mods" />
+                    </Show>
+                  </>
+                }
+                placement="top"
+                class="max-w-38 text-ellipsis overflow-hidden"
+              >
+                <div
+                  class="flex items-center gap-2 duration-100 ease-in-out transition hover:text-green-500 text-darkSlate-50"
+                  onClick={() => {
+                    if (isInstanceLocked()) return;
+
+                    updateAllMods();
+                  }}
+                >
+                  <span class="text-2xl i-ri:download-2-fill" />
+                  <div
+                    classList={{
+                      "w-0": isInstanceLocked()
+                    }}
+                    class="duration-100 transition-width"
+                  >
+                    <Progressbar percentage={15} />
+                  </div>
+                </div>
+              </Tooltip>
+            </Show>
+
+            <Tooltip
+              content={<Trans key="instance.open_mods_folder" />}
+              placement="top"
+              class="max-w-38 text-ellipsis overflow-hidden"
+            >
+              <div
+                class="flex items-center gap-2 cursor-pointer duration-100 ease-in-out transition hover:text-white text-darkSlate-50"
+                onClick={() => {
+                  openFolderMutation.mutate({
+                    folder: "Mods",
+                    instance_id: parseInt(params.id, 10)
+                  });
+                }}
+              >
+                <span class="text-2xl i-ri:folder-open-fill" />
+              </div>
+            </Tooltip>
           </div>
         </div>
       </div>
@@ -291,7 +410,9 @@ const Mods = () => {
           fallback={<NoMods />}
         >
           <For
-            each={(filteredMods() || []).sort(sortAlphabetically) as Modtype[]}
+            each={
+              [...(filteredMods() || [])].sort(sortAlphabetically) as Modtype[]
+            }
           >
             {(mod) => (
               <Mod

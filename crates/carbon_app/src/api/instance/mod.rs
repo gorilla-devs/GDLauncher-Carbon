@@ -13,6 +13,7 @@ use hyper::{HeaderMap, StatusCode};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 
+use crate::api::modplatforms::RemoteVersion;
 use crate::error::{AxumError, FeError};
 use crate::managers::instance::log::LogEntrySourceKind;
 use crate::managers::instance::InstanceMoveTarget;
@@ -22,8 +23,10 @@ use super::keys::instance::*;
 use super::router::router;
 use super::translation::Translation;
 use super::vtask::FETaskId;
+use super::Set;
 
 use crate::domain::instance::{self as domain, InstanceModpackInfo};
+use crate::domain::modplatforms as mpdomain;
 use crate::managers::instance as manager;
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
@@ -84,6 +87,16 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .map(FEInstanceId::from)
         }
 
+        mutation CHANGE_MODPACK[app, details: ChangeModpack] {
+            app.instance_manager()
+                .change_modpack(
+                    details.instance.into(),
+                    details.modpack.into(),
+                )
+                .await
+                .map(FETaskId::from)
+        }
+
         mutation LOAD_ICON_URL[app, url: String] {
             let icon = app.instance_manager()
                 .download_icon(url)
@@ -140,7 +153,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .map(FEInstanceId::from)
         }
 
-        mutation UPDATE_INSTANCE[app, details: UpdateInstance] {
+        mutation UPDATE_INSTANCE[app, details: FEUpdateInstance] {
             app.instance_manager()
                 .update_instance(details.try_into()?)
                 .await
@@ -304,24 +317,27 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
         }
 
         mutation UPDATE_MOD[app, args: UpdateMod] {
-            let task = match args.mod_source {
-                ModSourceType::Curseforge => {
-                    app.instance_manager()
-                        .update_curseforge_mod(
-                            args.instance_id.into(),
-                            args.mod_id,
-                        ).await?
-                },
-                ModSourceType::Modrinth => {
-                    app.instance_manager()
-                        .update_modrinth_mod(
-                            args.instance_id.into(),
-                            args.mod_id,
-                        ).await?
-                }
-            };
+            let task = app.instance_manager().update_mod(
+                args.instance_id.into(),
+                args.mod_id,
+            ).await?;
 
             Ok(super::vtask::FETaskId::from(task))
+        }
+
+        query FIND_MOD_UPDATE[app, args: UpdateMod] {
+            app.instance_manager().find_mod_update(
+                args.instance_id.into(),
+                args.mod_id,
+            ).await
+            .map(|v| v.map(RemoteVersion::from))
+        }
+
+        query GET_MOD_SOURCES[app, instance_id: FEInstanceId] {
+            app.instance_manager()
+                .get_instance_mod_sources(instance_id.into())
+                .await
+                .map(super::modplatforms::ModSources::from)
         }
 
         mutation INSTALL_LATEST_MOD[app, imod: InstallLatestMod] {
@@ -576,7 +592,7 @@ struct ListInstance {
     name: String,
     favorite: bool,
     status: ListInstanceStatus,
-    icon_revision: u32,
+    icon_revision: Option<u32>,
     last_played: Option<DateTime<Utc>>,
     date_created: DateTime<Utc>,
     date_updated: DateTime<Utc>,
@@ -642,7 +658,14 @@ struct CreateInstance {
 }
 
 #[derive(Type, Debug, Deserialize)]
-struct UpdateInstance {
+struct ChangeModpack {
+    instance: FEInstanceId,
+    modpack: Modpack,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FEUpdateInstance {
     instance: FEInstanceId,
     #[specta(optional)]
     name: Option<Set<String>>,
@@ -661,6 +684,10 @@ struct UpdateInstance {
     #[specta(optional)]
     memory: Option<Set<Option<MemoryRange>>>,
     #[specta(optional)]
+    game_resolution: Option<Set<Option<GameResolution>>>,
+    #[specta(optional)]
+    mod_sources: Option<Set<Option<super::modplatforms::ModSources>>>,
+    #[specta(optional)]
     modpack_locked: Option<Set<Option<bool>>>,
 }
 
@@ -674,19 +701,6 @@ struct DuplicateInstance {
 struct SetFavorite {
     instance: FEInstanceId,
     favorite: bool,
-}
-
-#[derive(Type, Debug, Deserialize)]
-enum Set<T> {
-    Set(T),
-}
-
-impl<T> Set<T> {
-    fn inner(self) -> T {
-        match self {
-            Self::Set(t) => t,
-        }
-    }
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -730,7 +744,6 @@ struct InstallMod {
 #[derive(Type, Debug, Deserialize)]
 struct UpdateMod {
     instance_id: FEInstanceId,
-    mod_source: ModSourceType,
     mod_id: String,
 }
 
@@ -817,7 +830,33 @@ enum MoveInstanceTarget {
     EndOfGroup(FEGroupId),
 }
 
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(tag = "type", content = "value")]
+pub enum GameResolution {
+    Standard(u16, u16),
+    Custom(u16, u16),
+}
+
+impl From<domain::info::GameResolution> for GameResolution {
+    fn from(value: domain::info::GameResolution) -> Self {
+        match value {
+            domain::info::GameResolution::Standard(w, h) => Self::Standard(w, h),
+            domain::info::GameResolution::Custom(w, h) => Self::Custom(w, h),
+        }
+    }
+}
+
+impl From<GameResolution> for domain::info::GameResolution {
+    fn from(value: GameResolution) -> Self {
+        match value {
+            GameResolution::Standard(w, h) => Self::Standard(w, h),
+            GameResolution::Custom(w, h) => Self::Custom(w, h),
+        }
+    }
+}
+
 #[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct InstanceDetails {
     name: String,
     favorite: bool,
@@ -826,12 +865,13 @@ struct InstanceDetails {
     global_java_args: bool,
     extra_java_args: Option<String>,
     memory: Option<MemoryRange>,
+    game_resolution: Option<GameResolution>,
     last_played: Option<DateTime<Utc>>,
     seconds_played: u32,
     modloaders: Vec<ModLoader>,
     notes: String,
     state: LaunchState,
-    icon_revision: u32,
+    icon_revision: Option<u32>,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -914,13 +954,13 @@ struct Mod {
     enabled: bool,
     metadata: Option<ModFileMetadata>,
     curseforge: Option<CurseForgeModMetadata>,
-    has_curseforge_update: bool,
     modrinth: Option<ModrinthModMetadata>,
-    has_modrinth_update: bool,
+    has_update: bool,
 }
 
 #[derive(Type, Debug, Serialize)]
 struct ModFileMetadata {
+    id: String,
     modid: Option<String>,
     name: Option<String>,
     version: Option<String>,
@@ -938,6 +978,7 @@ struct CurseForgeModMetadata {
     project_id: u32,
     file_id: u32,
     name: String,
+    version: String,
     urlslug: String,
     summary: String,
     authors: String,
@@ -949,6 +990,7 @@ struct ModrinthModMetadata {
     project_id: String,
     version_id: String,
     title: String,
+    version: String,
     urlslug: String,
     description: String,
     authors: String,
@@ -1079,6 +1121,7 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             global_java_args: value.global_java_args,
             extra_java_args: value.extra_java_args,
             memory: value.memory.map(Into::into),
+            game_resolution: value.game_resolution.map(Into::into),
             last_played: value.last_played,
             seconds_played: value.seconds_played,
             modloaders: value.modloaders.into_iter().map(Into::into).collect(),
@@ -1089,11 +1132,11 @@ impl From<domain::InstanceDetails> for InstanceDetails {
     }
 }
 
-impl From<domain::info::ModpackPlatform> for ModpackPlatform {
-    fn from(value: domain::info::ModpackPlatform) -> Self {
+impl From<mpdomain::ModPlatform> for ModpackPlatform {
+    fn from(value: mpdomain::ModPlatform) -> Self {
         match value {
-            domain::info::ModpackPlatform::Curseforge => Self::Curseforge,
-            domain::info::ModpackPlatform::Modrinth => Self::Modrinth,
+            mpdomain::ModPlatform::Curseforge => Self::Curseforge,
+            mpdomain::ModPlatform::Modrinth => Self::Modrinth,
         }
     }
 }
@@ -1362,9 +1405,8 @@ impl From<domain::Mod> for Mod {
             enabled: value.enabled,
             metadata: value.metadata.map(Into::into),
             curseforge: value.curseforge.map(Into::into),
-            has_curseforge_update: value.has_curseforge_update,
             modrinth: value.modrinth.map(Into::into),
-            has_modrinth_update: value.has_modrinth_update,
+            has_update: value.has_update,
         }
     }
 }
@@ -1372,6 +1414,7 @@ impl From<domain::Mod> for Mod {
 impl From<domain::ModFileMetadata> for ModFileMetadata {
     fn from(value: domain::ModFileMetadata) -> Self {
         Self {
+            id: value.id,
             modid: value.modid,
             name: value.name,
             version: value.version,
@@ -1392,6 +1435,7 @@ impl From<domain::CurseForgeModMetadata> for CurseForgeModMetadata {
             project_id: value.project_id,
             file_id: value.file_id,
             name: value.name,
+            version: value.version,
             urlslug: value.urlslug,
             summary: value.summary,
             authors: value.authors,
@@ -1406,6 +1450,7 @@ impl From<domain::ModrinthModMetadata> for ModrinthModMetadata {
             project_id: value.project_id,
             version_id: value.version_id,
             title: value.title,
+            version: value.version,
             urlslug: value.urlslug,
             description: value.description,
             authors: value.authors,
@@ -1469,10 +1514,10 @@ impl From<MemoryRange> for (u16, u16) {
     }
 }
 
-impl TryFrom<UpdateInstance> for domain::InstanceSettingsUpdate {
+impl TryFrom<FEUpdateInstance> for domain::InstanceSettingsUpdate {
     type Error = anyhow::Error;
 
-    fn try_from(value: UpdateInstance) -> anyhow::Result<Self> {
+    fn try_from(value: FEUpdateInstance) -> anyhow::Result<Self> {
         Ok(Self {
             instance_id: value.instance.into(),
             name: value.name.map(|x| x.inner()),
@@ -1485,6 +1530,8 @@ impl TryFrom<UpdateInstance> for domain::InstanceSettingsUpdate {
             global_java_args: value.global_java_args.map(|x| x.inner()),
             extra_java_args: value.extra_java_args.map(|x| x.inner()),
             memory: value.memory.map(|x| x.inner().map(Into::into)),
+            game_resolution: value.game_resolution.map(|x| x.inner().map(Into::into)),
+            mod_sources: value.mod_sources.map(|x| x.inner().map(Into::into)),
             modpack_locked: value.modpack_locked.map(|x| x.inner()),
         })
     }

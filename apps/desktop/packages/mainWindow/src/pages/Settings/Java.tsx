@@ -14,7 +14,7 @@ import { useRouteData } from "@solidjs/router";
 import { For, Match, Show, Switch, createMemo } from "solid-js";
 import SettingsJavaData from "./settings.java.data";
 import { useModal } from "@/managers/ModalsManager";
-import { queryClient, rspc } from "@/utils/rspcClient";
+import { rspc } from "@/utils/rspcClient";
 import { FEJavaComponentType } from "@gd/core_module/bindings";
 import PageTitle from "./components/PageTitle";
 import Row from "./components/Row";
@@ -32,14 +32,7 @@ const Java = () => {
 
   const settings = rspc.createQuery(() => ["settings.getSettings"]);
 
-  const settingsMutation = rspc.createMutation(["settings.setSettings"], {
-    onMutate: (newSettings) => {
-      queryClient.setQueryData(["settings.getSettings"], {
-        ...settings?.data,
-        ...newSettings
-      });
-    }
-  });
+  const settingsMutation = rspc.createMutation(["settings.setSettings"]);
 
   let deleteJavaMutation = rspc.createMutation(["java.deleteJavaVersion"]);
 
@@ -66,7 +59,7 @@ const Java = () => {
 
   const DeleteIcon = (props: { id: string }) => (
     <div
-      class="text-darkSlate-50 i-ri:delete-bin-7-fill hover:text-red-500 ease-in-out duration-100 text-xl cursor-pointer transition-color"
+      class="text-darkSlate-50 hover:text-red-500 ease-in-out duration-100 text-xl cursor-pointer transition-color i-ri:delete-bin-7-fill"
       onClick={() => deleteJavaMutation.mutate(props.id)}
     />
   );
@@ -99,32 +92,31 @@ const Java = () => {
       <RowsContainer>
         <Row forceContentBelow>
           <Title>
-            <Trans
-              key="java.java_memory_title"
-              options={{
-                defaultValue: "Java Memory"
-              }}
-            />
+            <Trans key="java.java_memory_title" />
           </Title>
           <Center>
             <Slider
               min={256}
               max={mbTotalRAM()}
-              steps={1}
+              steps={1000}
               marks={generateSequence(2048, mbTotalRAM())}
               value={settings.data?.xmx}
-              onChange={(val) =>
+              onChange={(val) => {
                 settingsMutation.mutate({
-                  xmx: val
-                })
-              }
+                  xmx: {
+                    Set: val
+                  }
+                });
+              }}
             />
             <Input
               class="w-26"
               value={settings.data?.xmx}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  xmx: parseInt(e.currentTarget.value, 10)
+                  xmx: {
+                    Set: parseInt(e.currentTarget.value, 10)
+                  }
                 });
               }}
             />
@@ -132,12 +124,7 @@ const Java = () => {
         </Row>
         <Row class="flex-col items-stretch">
           <Title>
-            <Trans
-              key="java.java_arguments_title"
-              options={{
-                defaultValue: "Java Arguments"
-              }}
-            />
+            <Trans key="java.java_arguments_title" />
           </Title>
           <div class="flex gap-4 justify-center items-center">
             <Input
@@ -145,19 +132,22 @@ const Java = () => {
               value={settings.data?.javaCustomArgs}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  javaCustomArgs: e.target.value
+                  javaCustomArgs: {
+                    Set: e.target.value
+                  }
                 });
               }}
             />
             <Tooltip content={<Trans key="tooltip.undo" />}>
               <Button
-                rounded={false}
                 type="secondary"
                 class="h-10"
                 size="small"
                 onClick={() => {
                   settingsMutation.mutate({
-                    javaCustomArgs: initialJavaArgs()
+                    javaCustomArgs: {
+                      Set: initialJavaArgs() || ""
+                    }
                   });
                 }}
               >
@@ -166,13 +156,14 @@ const Java = () => {
             </Tooltip>
             <Tooltip content={<Trans key="tooltip.reset" />}>
               <Button
-                rounded={false}
                 type="secondary"
                 class="h-10"
                 size="small"
                 onClick={() => {
                   settingsMutation.mutate({
-                    javaCustomArgs: ""
+                    javaCustomArgs: {
+                      Set: ""
+                    }
                   });
                 }}
               >
@@ -183,19 +174,16 @@ const Java = () => {
         </Row>
         <Row>
           <Title>
-            <Trans
-              key="java.auto_handle_java"
-              options={{
-                defaultValue: "Auto handle java"
-              }}
-            />
+            <Trans key="java.auto_handle_java" />
           </Title>
           <RightHandSide>
             <GDSwitch
               checked={settings.data?.autoManageJava}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  autoManageJava: e.target.checked
+                  autoManageJava: {
+                    Set: e.target.checked
+                  }
                 });
               }}
             />
@@ -207,33 +195,17 @@ const Java = () => {
               <Tabs>
                 <TabList heightClass="h-14">
                   <Tab class="w-1/2" centerContent>
-                    <Trans
-                      key="java.manage"
-                      options={{
-                        defaultValue: "Manage"
-                      }}
-                    />
+                    <Trans key="java.javas" />
                   </Tab>
                   <Tab class="w-1/2" centerContent>
-                    <Trans
-                      key="java.profiles"
-                      options={{
-                        defaultValue: "Profiles"
-                      }}
-                    />
+                    <Trans key="java.profiles" />
                   </Tab>
                 </TabList>
                 <TabPanel>
                   <div class="h-full bg-darkSlate-900 p-4 min-h-96">
                     <div class="flex justify-between items-center mb-4">
                       <h2 class="m-0 text-sm font-normal">
-                        <Trans
-                          key="java.found_java_text"
-                          options={{
-                            defaultValue:
-                              "We found the following java versions on your pc"
-                          }}
-                        />
+                        <Trans key="java.found_java_text" />
                       </h2>
                       <Button
                         rounded={false}
@@ -250,24 +222,39 @@ const Java = () => {
                       <For each={Object.entries(javas())}>
                         {([javaVersion, obj]) => (
                           <div class="p-4 rounded-xl border-1 border-solid border-darkSlate-600">
-                            <h3 class="m-0 mb-4">{javaVersion}</h3>
+                            <h3 class="m-0 mb-4">
+                              <Trans
+                                key="java.java_version_number"
+                                options={{
+                                  version: javaVersion
+                                }}
+                              />
+                            </h3>
                             <Show when={obj.length > 0}>
                               <div class="flex flex-col gap-4">
                                 <For each={obj}>
                                   {(java) => (
-                                    <div class="border-1 border-solid border-darkSlate-600 flex justify-between items-center bg-darkSlate-700 rounded-lg px-4 py-2">
-                                      <span class="text-xs text-darkSlate-100">
-                                        {java.path}
-                                      </span>
-                                      <div class="flex gap-2 justify-center items-center">
-                                        <span>{java.type}</span>
-                                        {mapJavaTypeToAction(
-                                          java.type,
-                                          java.id
-                                        )}
-                                        <Show when={javaInProfile(java.id)}>
-                                          <div class="text-green-500 i-ri:checkbox-circle-fill" />
+                                    <div class="bg-darkSlate-700 rounded-md px-4 py-2">
+                                      <div class="flex justify-between text-xl text-lightSlate-400">
+                                        <div>{java.version}</div>
+                                        <Show when={java.isValid}>
+                                          <div class="i-ri:check-fill text-green-400" />
                                         </Show>
+                                      </div>
+                                      <div class="flex justify-between">
+                                        <div class="block text-xs text-lightSlate-700 overflow-hidden w-30 whitespace-nowrap overflow-ellipsis">
+                                          {java.path}
+                                        </div>
+                                        <div class="flex gap-2 justify-center items-center">
+                                          <span>{java.type}</span>
+                                          {mapJavaTypeToAction(
+                                            java.type,
+                                            java.id
+                                          )}
+                                          <Show when={javaInProfile(java.id)}>
+                                            <div class="text-green-500 i-ri:checkbox-circle-fill" />
+                                          </Show>
+                                        </div>
                                       </div>
                                     </div>
                                   )}
@@ -276,12 +263,7 @@ const Java = () => {
                             </Show>
                             <Show when={obj.length === 0}>
                               <p>
-                                <Trans
-                                  key="java.no_found_java_text"
-                                  options={{
-                                    defaultValue: "No java available"
-                                  }}
-                                />
+                                <Trans key="java.no_found_java_text" />
                               </p>
                             </Show>
                           </div>

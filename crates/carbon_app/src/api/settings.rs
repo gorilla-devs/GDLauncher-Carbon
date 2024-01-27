@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use crate::{
     api::{
         keys::settings::{
@@ -9,6 +11,11 @@ use crate::{
 };
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
+
+use super::{
+    modplatforms::{ModChannelWithUsage, ModPlatform, ModSources},
+    Set,
+};
 
 pub(super) fn mount() -> impl RouterBuilderLike<App> {
     router! {
@@ -74,6 +81,51 @@ impl From<FEReleaseChannel> for String {
     }
 }
 
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(tag = "type", content = "value")]
+pub enum GameResolution {
+    Standard(u16, u16),
+    Custom(u16, u16),
+}
+
+impl From<GameResolution> for String {
+    fn from(value: GameResolution) -> Self {
+        match value {
+            GameResolution::Standard(width, height) => format!("standard:{}x{}", width, height),
+            GameResolution::Custom(width, height) => format!("custom:{}x{}", width, height),
+        }
+    }
+}
+
+impl FromStr for GameResolution {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut parts = s.split(':');
+        let kind = parts
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Invalid resolution"))?;
+        let game_resolution = parts
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Invalid resolution"))?;
+        let mut resolution_parts = game_resolution.split('x');
+        let width = resolution_parts
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Invalid resolution"))?
+            .parse::<u16>()?;
+        let height = resolution_parts
+            .next()
+            .ok_or_else(|| anyhow::anyhow!("Invalid resolution"))?
+            .parse::<u16>()?;
+
+        match kind {
+            "standard" => Ok(Self::Standard(width, height)),
+            "custom" => Ok(Self::Custom(width, height)),
+            _ => Err(anyhow::anyhow!("Invalid resolution")),
+        }
+    }
+}
+
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct FESettings {
@@ -83,59 +135,18 @@ struct FESettings {
     discord_integration: bool,
     release_channel: FEReleaseChannel,
     concurrent_downloads: i32,
+    launcher_action_on_game_launch: FELauncherActionOnGameLaunch,
     show_news: bool,
     xmx: i32,
     xms: i32,
     is_first_launch: bool,
-    startup_resolution: String,
+    game_resolution: Option<GameResolution>,
     java_custom_args: String,
     auto_manage_java: bool,
-    preferred_mod_channel: ModChannel,
+    mod_sources: ModSources,
     terms_and_privacy_accepted: bool,
     metrics_enabled: bool,
     random_user_uuid: String,
-}
-
-// in the public interface due to `FESettings` also being in the public interface.
-#[derive(Debug, Type, Serialize, Deserialize)]
-#[repr(i32)]
-pub enum ModChannel {
-    Alpha = 0,
-    Beta,
-    Stable,
-}
-
-impl TryFrom<i32> for ModChannel {
-    type Error = anyhow::Error;
-
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(Self::Alpha),
-            1 => Ok(Self::Beta),
-            2 => Ok(Self::Stable),
-            _ => Err(anyhow::anyhow!(
-                "Invalid mod channel id {value} not in range 0..=2"
-            )),
-        }
-    }
-}
-
-impl From<ModChannel> for crate::domain::modplatforms::ModChannel {
-    fn from(value: ModChannel) -> Self {
-        use crate::domain::modplatforms::ModChannel as Domain;
-
-        match value {
-            ModChannel::Alpha => Domain::Alpha,
-            ModChannel::Beta => Domain::Beta,
-            ModChannel::Stable => Domain::Stable,
-        }
-    }
-}
-
-impl Default for ModChannel {
-    fn default() -> Self {
-        Self::Stable
-    }
 }
 
 impl TryFrom<crate::db::app_configuration::Data> for FESettings {
@@ -153,14 +164,74 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             xmx: data.xmx,
             xms: data.xms,
             is_first_launch: data.is_first_launch,
-            startup_resolution: data.startup_resolution,
+            launcher_action_on_game_launch: data.launcher_action_on_game_launch.try_into()?,
+            game_resolution: data
+                .game_resolution
+                .and_then(|r| GameResolution::from_str(&r).ok()),
             java_custom_args: data.java_custom_args,
             auto_manage_java: data.auto_manage_java,
-            preferred_mod_channel: data.preferred_mod_channel.try_into()?,
+            mod_sources: ModSources {
+                channels: {
+                    use crate::domain::modplatforms::ModChannelWithUsage as DModChannelWithUsage;
+
+                    let mut channels = DModChannelWithUsage::str_to_vec(&data.mod_channels)?;
+                    DModChannelWithUsage::fixup_list(&mut channels);
+
+                    channels
+                        .into_iter()
+                        .map(ModChannelWithUsage::from)
+                        .collect()
+                },
+                platform_blacklist: data
+                    .mod_platform_blacklist
+                    .split(",")
+                    .filter(|p| !p.is_empty())
+                    .map(crate::domain::modplatforms::ModPlatform::from_str)
+                    .map(|r| r.map(ModPlatform::from))
+                    .collect::<Result<_, _>>()?,
+            },
             terms_and_privacy_accepted: data.terms_and_privacy_accepted,
             metrics_enabled: data.metrics_enabled,
             random_user_uuid: data.random_user_uuid,
         })
+    }
+}
+
+#[derive(Type, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub enum FELauncherActionOnGameLaunch {
+    QuitApp,
+    CloseWindow,
+    MinimizeWindow,
+    HideWindow,
+    None,
+}
+
+impl From<FELauncherActionOnGameLaunch> for String {
+    fn from(value: FELauncherActionOnGameLaunch) -> Self {
+        match value {
+            FELauncherActionOnGameLaunch::QuitApp => "quitApp",
+            FELauncherActionOnGameLaunch::CloseWindow => "closeWindow",
+            FELauncherActionOnGameLaunch::MinimizeWindow => "minimizeWindow",
+            FELauncherActionOnGameLaunch::HideWindow => "hideWindow",
+            FELauncherActionOnGameLaunch::None => "none",
+        }
+        .to_string()
+    }
+}
+
+impl TryFrom<String> for FELauncherActionOnGameLaunch {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match &*value {
+            "quitApp" => Ok(Self::QuitApp),
+            "closeWindow" => Ok(Self::CloseWindow),
+            "minimizeWindow" => Ok(Self::MinimizeWindow),
+            "hideWindow" => Ok(Self::HideWindow),
+            "none" => Ok(Self::None),
+            _ => Err(anyhow::anyhow!("Invalid action on game launch")),
+        }
     }
 }
 
@@ -169,35 +240,37 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
 #[serde(rename_all = "camelCase")]
 pub struct FESettingsUpdate {
     #[specta(optional)]
-    pub theme: Option<String>,
+    pub theme: Option<Set<String>>,
     #[specta(optional)]
-    pub language: Option<String>,
+    pub language: Option<Set<String>>,
     #[specta(optional)]
-    pub reduced_motion: Option<bool>,
+    pub reduced_motion: Option<Set<bool>>,
     #[specta(optional)]
-    pub discord_integration: Option<bool>,
+    pub discord_integration: Option<Set<bool>>,
     #[specta(optional)]
-    pub release_channel: Option<FEReleaseChannel>,
+    pub release_channel: Option<Set<FEReleaseChannel>>,
     #[specta(optional)]
-    pub concurrent_downloads: Option<i32>,
+    pub concurrent_downloads: Option<Set<i32>>,
     #[specta(optional)]
-    pub show_news: Option<bool>,
+    pub show_news: Option<Set<bool>>,
     #[specta(optional)]
-    pub xmx: Option<i32>,
+    pub xmx: Option<Set<i32>>,
     #[specta(optional)]
-    pub xms: Option<i32>,
+    pub xms: Option<Set<i32>>,
     #[specta(optional)]
-    pub is_first_launch: Option<bool>,
+    pub is_first_launch: Option<Set<bool>>,
     #[specta(optional)]
-    pub startup_resolution: Option<String>,
+    pub launcher_action_on_game_launch: Option<Set<FELauncherActionOnGameLaunch>>,
     #[specta(optional)]
-    pub java_custom_args: Option<String>,
+    pub game_resolution: Option<Set<Option<GameResolution>>>,
     #[specta(optional)]
-    pub auto_manage_java: Option<bool>,
+    pub java_custom_args: Option<Set<String>>,
     #[specta(optional)]
-    pub preferred_mod_channel: Option<ModChannel>,
+    pub auto_manage_java: Option<Set<bool>>,
     #[specta(optional)]
-    pub terms_and_privacy_accepted: Option<bool>,
+    pub mod_sources: Option<Set<ModSources>>,
     #[specta(optional)]
-    pub metrics_enabled: Option<bool>,
+    pub terms_and_privacy_accepted: Option<Set<bool>>,
+    #[specta(optional)]
+    pub metrics_enabled: Option<Set<bool>>,
 }

@@ -33,7 +33,7 @@ const Screenshots = () => {
                           ? (screenshot as CFFEModAsset).thumbnailUrl
                           : screenshot.url
                       }
-                      class="rounded-xl w-72 h-44"
+                      class="rounded-xl h-44 w-72"
                       alt={screenshot.description || ""}
                     />
                   )}

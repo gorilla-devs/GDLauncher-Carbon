@@ -30,7 +30,11 @@ const App = (props: Props) => {
     if (isFirstRun.data?.isFirstLaunch && currentRoute.pathname !== "/") {
       untrack(() => {
         modalsContext?.openModal({ name: "onBoarding" });
-        setIsFirstRun.mutate({ isFirstLaunch: false });
+        setIsFirstRun.mutate({
+          isFirstLaunch: {
+            Set: false
+          }
+        });
       });
     }
   });

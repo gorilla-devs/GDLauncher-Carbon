@@ -1,8 +1,8 @@
 import { useLocation, useMatch, useRouteData } from "@solidjs/router";
-import { For, Show, createEffect } from "solid-js";
+import { For, Match, Show, Switch, createEffect } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
-import { Tab, TabList, Tabs, Spacing, Button } from "@gd/ui";
+import { Tab, TabList, Tabs, Spacing, Button, Tooltip } from "@gd/ui";
 import getRouteIndex from "@/route/getRouteIndex";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "@/pages/app.data";
@@ -10,7 +10,10 @@ import { AccountsDropdown } from "./AccountsDropdown";
 import { AccountStatus, AccountType } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
 import { port } from "@/utils/rspcClient";
-import updateAvailable from "@/utils/updater";
+import updateAvailable, {
+  updateDownloaded,
+  updateProgress
+} from "@/utils/updater";
 import { Trans } from "@gd/i18n";
 import { useModal } from "@/managers/ModalsManager";
 
@@ -73,7 +76,7 @@ const AppNavbar = () => {
             onClick={() => navigate("/library")}
           />
         </div>
-        <div class="flex text-white w-full items-center list-none gap-6 h-full">
+        <div class="flex text-white w-full items-center h-full list-none gap-6">
           <Tabs index={selectedIndex()}>
             <TabList aligment="between">
               <div class="flex gap-6 h-full">
@@ -110,7 +113,7 @@ const AppNavbar = () => {
                     });
                   }}
                 >
-                  <i class="i-ri:add-fill" />
+                  <i class="flex i-ri:add-fill" />
                   <Trans key="sidebar.add_instance" />
                 </Button>
               </Tab>
@@ -133,21 +136,56 @@ const AppNavbar = () => {
                     />
                   </Tab>
                 </div>
-                <Show when={updateAvailable()}>
+                <Show
+                  when={
+                    updateAvailable() ||
+                    updateDownloaded() ||
+                    updateProgress() > 0
+                  }
+                >
                   <Tab ignored>
-                    <div
-                      class="text-2xl text-green-600 i-ri:download-2-fill"
-                      onClick={() =>
-                        modalsContext?.openModal({ name: "appUpdate" })
+                    <Tooltip
+                      placement="bottom"
+                      content={
+                        <Switch>
+                          <Match when={updateDownloaded()}>
+                            <Trans key="app_update.apply_and_restart" />
+                          </Match>
+                          <Match when={updateProgress() > 0}>
+                            <Trans
+                              key="app_update.downloading"
+                              options={{
+                                progress: updateProgress()
+                              }}
+                            />
+                          </Match>
+                          <Match when={updateAvailable()}>
+                            <Trans key="app_update.new_update_available_text" />
+                          </Match>
+                        </Switch>
                       }
-                    />
+                    >
+                      <div
+                        class="text-2xl text-green-500 i-ri:download-2-fill"
+                        classList={{
+                          "hover:text-green-100": !updateDownloaded()
+                        }}
+                        onClick={() => {
+                          if (updateDownloaded()) {
+                            window.installUpdate();
+                          } else {
+                            modalsContext?.openModal({ name: "appUpdate" });
+                          }
+                        }}
+                      />
+                    </Tooltip>
                   </Tab>
                 </Show>
               </div>
             </TabList>
           </Tabs>
         </div>
-        <div class="flex justify-end lg:min-w-52 lg:ml-4 ml-2">
+        <div class="flex ml-2 justify-end lg:min-w-52 lg:ml-4">
           <Show when={routeData?.accounts.data}>
             <AccountsDropdown
               accounts={accounts}

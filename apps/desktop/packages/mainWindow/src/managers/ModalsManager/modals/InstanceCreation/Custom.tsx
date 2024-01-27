@@ -386,7 +386,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
 
       updateInstanceMutation.mutate({
         instance: parseInt((instanceData() as Instancetype).id, 10),
-        use_loaded_icon: { Set: !!bgPreview() },
+        useLoadedIcon: { Set: !!bgPreview() },
         name: { Set: title()! },
         version: {
           Set: mcVersion() || (mappedMcVersions()?.[0]?.id as string)

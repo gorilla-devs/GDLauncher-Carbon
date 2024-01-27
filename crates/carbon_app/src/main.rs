@@ -30,6 +30,7 @@ mod platform;
 mod logger;
 mod once_send;
 mod runtime_path_override;
+mod util;
 
 #[tokio::main]
 pub async fn main() {
@@ -242,6 +243,27 @@ macro_rules! assert_eq_display {
                 a_val = $a,
                 b_val = $b,
             );
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! mirror_into {
+    ($a:path, $b:path, |$value:ident| $expr:expr) => {
+        impl From<$a> for $b {
+            fn from($value: $a) -> Self {
+                use $a as Other;
+
+                $expr
+            }
+        }
+
+        impl From<$b> for $a {
+            fn from($value: $b) -> Self {
+                use $b as Other;
+
+                $expr
+            }
         }
     };
 }

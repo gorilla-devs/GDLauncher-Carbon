@@ -11,6 +11,7 @@ use crate::managers::App;
 use crate::domain::modplatforms::modrinth::version::{
     ModpackIndex, ModrinthEnvironmentSupport, VersionFile,
 };
+use crate::managers::instance::modpack::packinfo::PackInfo;
 
 use thiserror::Error;
 
@@ -105,7 +106,8 @@ pub enum ProgressState {
 #[derive(Debug)]
 pub struct ModpackInfo {
     pub index: ModpackIndex,
-    pub downloadables: Vec<Downloadable>,
+    // (downloadable, existing path)
+    pub downloadables: Vec<(Downloadable, Option<String>)>,
 }
 
 pub async fn download_mrpack(
@@ -148,7 +150,7 @@ pub async fn download_mrpack(
 
     carbon_net::download_file(&file_downloadable, Some(download_progress_sender)).await?;
 
-    file.rename(target_path).await?;
+    file.try_rename_or_move(target_path).await?;
     Ok(())
 }
 
@@ -157,10 +159,9 @@ pub async fn prepare_modpack_from_mrpack(
     mrpack_path: &Path,
     instance_path: &InstancePath,
     skip_overlays: bool,
+    packinfo: Option<&PackInfo>,
     progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
 ) -> anyhow::Result<ModpackInfo> {
-    let progress_percentage_sender = Arc::new(progress_percentage_sender);
-
     let file_path_clone = mrpack_path.to_path_buf();
     let (mut archive, index) = spawn_blocking(move || {
         let file = std::fs::File::open(file_path_clone)?;
@@ -199,26 +200,35 @@ pub async fn prepare_modpack_from_mrpack(
         .collect();
 
     let downloadables = {
-        let mut handles = Vec::new();
-
-        let semaphore = Arc::new(tokio::sync::Semaphore::new(20));
-        let atomic_counter_download_metadata = Arc::new(std::sync::atomic::AtomicU64::new(0));
-
         let files_len = required_files.len() as u64;
 
         let data_path = instance_path.get_data_path();
         tokio::fs::create_dir_all(&data_path).await?;
 
-        for file in required_files {
-            let semaphore = semaphore.clone();
-            let _app = app.clone();
-            let instance_path = instance_path.clone();
-            let progress_percentage_sender_clone = progress_percentage_sender.clone();
-            let atomic_counter = atomic_counter_download_metadata.clone();
+        let instance_path = instance_path.clone();
 
-            let data_path = instance_path.get_data_path();
-            let handle = tokio::spawn(async move {
-                let _ = semaphore.acquire().await?;
+        required_files
+            .into_iter()
+            .enumerate()
+            .map(|(i, file)| {
+                let _app = app.clone();
+
+                let data_path = instance_path.get_data_path();
+
+                let existing_path = packinfo
+                    .map(|packinfo| {
+                        let mut sha512 = [0u8; 64];
+                        hex::decode_to_slice(file.hashes.sha512, &mut sha512).ok()?;
+
+                        let packinfo_path = format!("/{}", file.path);
+
+                        match packinfo.files.get(&packinfo_path) {
+                            Some(hashes) if sha512 == hashes.sha512 => Some(packinfo_path),
+                            _ => None,
+                        }
+                    })
+                    .flatten();
+
                 let target_path = secure_path_join(&data_path, &file.path)?;
 
                 let downloadable = Downloadable::new(
@@ -229,21 +239,12 @@ pub async fn prepare_modpack_from_mrpack(
                     target_path,
                 )
                 .with_size(file.file_size as u64);
-                progress_percentage_sender_clone.send(ProgressState::AcquiringPackMetadata(
-                    atomic_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-                    files_len,
-                ))?;
 
-                Ok::<Downloadable, anyhow::Error>(downloadable)
-            });
+                progress_percentage_sender
+                    .send(ProgressState::AcquiringPackMetadata(i as u64, files_len))?;
 
-            handles.push(handle);
-        }
-
-        futures::future::join_all(handles)
-            .await
-            .into_iter()
-            .flatten()
+                Ok::<_, anyhow::Error>((downloadable, existing_path))
+            })
             .collect::<Result<Vec<_>, _>>()?
     };
 
