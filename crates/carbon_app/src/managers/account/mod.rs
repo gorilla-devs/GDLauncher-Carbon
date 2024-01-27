@@ -519,6 +519,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
     /// # Parameters
     /// lock_refresh - stop any new background account refreshes and wait 30 seconds
     ///                before performing more.
+    #[tracing::instrument(skip(self, lock_refresh))]
     pub async fn refresh_account_status(
         self,
         uuid: String,
@@ -526,7 +527,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
     ) -> anyhow::Result<()> {
         use db::account::{SetParam, UniqueWhereParam};
 
-        info!("Checking account status for {uuid}");
+        info!("Checking account status");
 
         let mut refresh_lock = match lock_refresh {
             true => Some(self.refreshloop_sleep.lock().await),
@@ -538,12 +539,17 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .await?
             .ok_or_else(|| ValidateAccountError::AccountMissing(uuid.clone()))?;
 
-        let AccountStatus::Ok {
-            access_token: Some(access_token),
-        } = account.status
-        else {
-            return Ok(());
+        let access_token = match account.status {
+            AccountStatus::Ok {
+                access_token: Some(access_token),
+                ..
+            } => access_token,
+            _ => {
+                info!(?account.status, "Account is not ok, ignoring");
+                return Ok(());
+            }
         };
+
         let profile = api::get_profile(&self.app.reqwest_client, &access_token).await;
 
         if let Some(refresh_lock) = &mut refresh_lock {
@@ -555,6 +561,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         let profile = match profile {
             Ok(Ok(x)) => x,
             Ok(Err(GetProfileError::AuthTokenInvalid)) => {
+                info!("Auth token was invalid");
                 // the account was expired prematurely
                 self.app
                     .prisma_client
@@ -566,13 +573,12 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     .exec()
                     .await?;
 
-                info!("Auth token was invalid for {uuid}");
-
-                self.app.invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
+                self.app
+                    .invalidate(GET_ACCOUNT_STATUS, Some(uuid.clone().into()));
                 return Ok(());
             }
             Ok(Err(GetProfileError::GameProfileMissing)) => {
-                info!("Game profile is missing for {uuid}");
+                info!("Game profile is missing");
                 bail!(GetProfileError::GameProfileMissing)
             }
             Err(e) => bail!(e),
@@ -598,7 +604,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             self.app.invalidate(GET_HEAD, Some(uuid.clone().into()));
         }
 
-        debug!("Account {uuid} is valid");
+        debug!("Account is valid");
 
         Ok(())
     }
@@ -695,8 +701,10 @@ impl AccountRefreshService {
                 // TODO: there's not really a way to handle an error in here
                 if let Ok(accounts) = account_manager.get_account_entries().await {
                     for account in accounts {
+                        let uuid = account.uuid.clone();
                         // ignore badly formed account entries since we can't handle them
                         let Ok(account) = FullAccount::try_from(account) else {
+                            tracing::error!("Badly formed account entry for uuid {uuid}. Cannot check refresh status.");
                             continue;
                         };
                         let FullAccountType::Microsoft { token_expires, .. } = account.type_ else {
