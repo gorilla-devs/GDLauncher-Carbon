@@ -333,7 +333,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                         drop(status);
                         refreshing.remove(&self.account.uuid);
                     }
-                    EnrollmentStatus::Failed(_) => {
+                    EnrollmentStatus::Failed(e) => {
                         let FullAccountType::Microsoft {
                             access_token,
                             token_expires,
@@ -348,18 +348,30 @@ impl<'s> ManagerRef<'s, AccountManager> {
                             return;
                         };
 
-                        account_manager.add_account(FullAccount {
-                            username: self.account.username.clone(),
-                            uuid: self.account.uuid.clone(),
-                            type_: FullAccountType::Microsoft {
-                                access_token: access_token.clone(),
-                                refresh_token: None,
-                                id_token: None,
-                                token_expires: token_expires.clone(),
-                                skin_id: skin_id.clone(),
-                            },
-                            last_used: self.account.last_used.clone(),
-                        }).await.expect("db error, this can't be handled in the account invalidator right now");
+                        if let Ok(e) = e {
+                            warn!(
+                                "Failed to refresh account {} due to an account validity issue, marking the account as requiring relogin (Invalid)",
+                                self.account.uuid,
+                            );
+
+                            account_manager.add_account(FullAccount {
+                                username: self.account.username.clone(),
+                                uuid: self.account.uuid.clone(),
+                                type_: FullAccountType::Microsoft {
+                                    access_token: access_token.clone(),
+                                    refresh_token: None,
+                                    id_token: None,
+                                    token_expires: token_expires.clone(),
+                                    skin_id: skin_id.clone(),
+                                },
+                                last_used: self.account.last_used.clone(),
+                            }).await.expect("db error, this can't be handled in the account invalidator right now");
+                        } else {
+                            warn!("Failed to refresh account {}: {e:?}", self.account.uuid);
+                        }
+
+                        drop(status);
+                        refreshing.remove(&self.account.uuid);
                     }
                     _ => {}
                 }
