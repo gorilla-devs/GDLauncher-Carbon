@@ -128,7 +128,7 @@ model InstanceGroup {
   id         Int        @id @default(autoincrement())
   name       String
   groupIndex Int
-  Instances  Instance[]
+  instances  Instance[]
 }
 
 model ModFileCache {
