@@ -93,7 +93,7 @@ hr {
   display: none;
 }
 ul {
-  list-style: circle;
+  list-style: initial;
   list-style-position: inside;
 }
 /*

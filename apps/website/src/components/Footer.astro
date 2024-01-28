@@ -21,7 +21,7 @@ const downloadLinks = yamlfiles
 ---
 
 <footer class="flex flex-col">
-  <div class="flex justify-between p-20 gap-10">
+  <div class="flex justify-between p-16 gap-16">
     <div class="flex flex-col items-start basis-[50%]">
       <Image src={Logo} alt="BH Logo" class="pb-4" />
       <p class="text-graygd w-1/2">
@@ -78,6 +78,19 @@ const downloadLinks = yamlfiles
       </ul>
     </div>
     <div>
+      <span class="text-white font-medium pb-4">Legal</span>
+      <ul>
+        <li>
+          <HeaderLink href="/terms-of-service" class="pt-4">
+            Terms of service
+          </HeaderLink>
+        </li>
+        <li>
+          <HeaderLink href="/privacy-statement">Privacy statement</HeaderLink>
+        </li>
+      </ul>
+    </div>
+    <div>
       <span class="text-white font-medium pb-4">Get in Touch!</span>
       <ul class="flex gap-2">
         <li>
@@ -95,10 +108,6 @@ const downloadLinks = yamlfiles
         <span class="text-graygd"
           >(C) 2023 by GorillaDevs Inc. | All Right Reserved</span
         >
-        <HeaderLink href="/terms-of-service" class="pt-4">
-          Terms of service
-        </HeaderLink>
-        <HeaderLink href="/privacy-statement">Privacy statement</HeaderLink>
       </div>
     </div>
   </div>
