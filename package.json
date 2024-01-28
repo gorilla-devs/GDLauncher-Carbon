@@ -1,5 +1,5 @@
 {
-  "name": "corbium",
+  "name": "gdlauncher",
   "productName": "GDLauncher",
   "private": true,
   "description": "GDLauncher Carbon.",
@@ -7,7 +7,7 @@
   "license": "ARR",
   "scripts": {
     "init": "npm i -g pnpm@8.15.0 && npm i -g cross-env && cross-env-shell PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true pnpm i",
-    "sudo-init": "sudo npm i -g pnpm@8.6.6 && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true pnpm i",
+    "sudo-init": "sudo npm i -g pnpm@8.15.0 && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true pnpm i",
     "codegen": "node iridium_patchfix.js && pnpm prisma:generate && pnpm rspc-bindings:generate",
     "watch:app": "turbo run dev ",
     "watch:core": "cargo run -p carbon_app",
