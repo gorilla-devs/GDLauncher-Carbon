@@ -1,7 +1,7 @@
 {
-  "name": "website",
+  "name": "@gd/website",
   "type": "module",
-  "version": "0.0.1",
+  "version": "0.0.0",
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
@@ -27,6 +27,7 @@
   },
   "devDependencies": {
     "@astrojs/tailwind": "^5.0.3",
+    "@astrojs/check": "^0.4.1",
     "@types/js-yaml": "^4.0.9",
     "sharp": "^0.33.1",
     "tailwindcss": "^3.3.6"

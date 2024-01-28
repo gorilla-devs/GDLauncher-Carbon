@@ -6,7 +6,7 @@
   "author": "killpowa <davide@gdlauncher.com>",
   "license": "ARR",
   "scripts": {
-    "init": "npm i -g pnpm@8.6.6 && npm i -g cross-env && cross-env-shell PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true pnpm i",
+    "init": "npm i -g pnpm@8.15.0 && npm i -g cross-env && cross-env-shell PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true pnpm i",
     "sudo-init": "sudo npm i -g pnpm@8.6.6 && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true pnpm i",
     "codegen": "node iridium_patchfix.js && pnpm prisma:generate && pnpm rspc-bindings:generate",
     "watch:app": "turbo run dev ",
@@ -26,6 +26,9 @@
     "build:linux-x64-prod": "cargo build -p carbon_app --profile=production --features production --target x86_64-unknown-linux-gnu && pnpm prepare-release:linux-x64-prod && turbo run build -- --x64 --linux -- --production",
     "build:win-x64-prod": "cargo build -p carbon_app --profile=production --features production --target x86_64-pc-windows-msvc && turbo run build -- --x64 --win -- --production",
     "build:mac-universal-prod": "cargo build -p carbon_app --profile=production --features production --target x86_64-apple-darwin && pnpm prepare-release:mac-x64-prod && cargo build -p carbon_app --profile=production --features production --target aarch64-apple-darwin && pnpm prepare-release:mac-arm64-prod && turbo run build -- --universal --mac -- --production",
+    "------divider-website----": "------divider------",
+    "dev:website": "turbo run dev --filter @gd/website",
+    "build:website": "turbo run build --filter @gd/website",
     "------divider-utils------": "------divider------",
     "lint": "turbo run lint --filter @gd/desktop --filter @gd/ui",
     "test": "turbo run test && cargo test",
@@ -58,8 +61,8 @@
     "turbo": "^1.10.6"
   },
   "engines": {
-    "pnpm": ">=8.6.6",
-    "node": ">=18"
+    "pnpm": ">=8.15.0",
+    "node": ">=18.17.0"
   },
-  "packageManager": "pnpm@8.6.6"
+  "packageManager": "pnpm@8.15.0"
 }

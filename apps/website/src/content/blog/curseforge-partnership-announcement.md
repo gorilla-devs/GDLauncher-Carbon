@@ -3,7 +3,7 @@ title: "GDLauncher: A new journey - App rewrite, new partnership and more"
 description: Hello everyone! As some of you might know, we have been thinking about doing a rewrite of GDLauncher for a while, and we're here today to finally give you some updates! [...]
 author: Davide Ceschia
 pubDate: 01 November 2022
-heroImage: https://edge.gdlauncher.com/articles/curseforge-partnership-announcement/thumbnail.jpg
+heroImage: https://cdn.gdl.gg/articles/curseforge-partnership-announcement/thumbnail.jpg
 ---
 
 <details>
@@ -28,9 +28,7 @@ GorillaDevs is now officially a company. As such, we will be able to get access 
 By the way, let me present to you our new incredible team!
 
 - Davide (Founder of GDLauncher) - President / CEO / Software Engineer
-- Gianmarco (Co-Founder of GDLauncher) - Co-founder / Frontend Engineer
 - Valentin (ex Co-founder of Modrinth) - Co-Founder & General Advisor
-- There might or might not be another member that we will disclose in the upcoming weeks
 
 We also have a couple of software engineers and designers working with us full time, as well as other partners and collaborators.
 
@@ -43,7 +41,7 @@ Since the project's primary goal was to get better at programming and have fun, 
 Below, you can see GDLauncher's design evolution over the years.
 
 <img
-  src="https://edge.gdlauncher.com/articles/curseforge-partnership-announcement/launcher_evolution.png"
+  src="https://cdn.gdl.gg/articles/curseforge-partnership-announcement/launcher_evolution.png"
   alt="GDLauncher's Evolution"
 />
 
@@ -61,7 +59,7 @@ Playing modded Minecraft became very stressful and cumbersome, especially for Li
 We also got invited into Overwolf's funding program, allowing us to take the next big step and create a fantastic product!
 
 <img
-  src="https://edge.gdlauncher.com/articles/curseforge-partnership-announcement/GDl_Dev_meme.jpg"
+  src="https://cdn.gdl.gg/articles/curseforge-partnership-announcement/GDl_Dev_meme.jpg"
   alt="GDLauncher's Slow Development"
 />
 
@@ -125,14 +123,14 @@ on MacOS:
 C++ / QT
 
 <img
-  src="https://edge.gdlauncher.com/articles/curseforge-partnership-announcement/multimc-mac.png"
+  src="https://cdn.gdl.gg/articles/curseforge-partnership-announcement/multimc-mac.png"
   alt="MultiMC - Mac"
 />
 
 Electron
 
 <img
-  src="https://edge.gdlauncher.com/articles/curseforge-partnership-announcement/gdlauncher-mac.png"
+  src="https://cdn.gdl.gg/articles/curseforge-partnership-announcement/gdlauncher-mac.png"
   alt="GDLauncher Carbon - Mac"
 />
 
@@ -141,21 +139,21 @@ On Windows:
 Java
 
 <img
-  src="https://edge.gdlauncher.com/articles/curseforge-partnership-announcement/atlauncher-win.png"
+  src="https://cdn.gdl.gg/articles/curseforge-partnership-announcement/atlauncher-win.png"
   alt="ATLauncher - Windows"
 />
 
 Electron
 
 <img
-  src="https://edge.gdlauncher.com/articles/curseforge-partnership-announcement/curseforge-win.png"
+  src="https://cdn.gdl.gg/articles/curseforge-partnership-announcement/curseforge-win.png"
   alt="CurseForge - Windows"
 />
 
 Electron
 
 <img
-  src="https://edge.gdlauncher.com/articles/curseforge-partnership-announcement/gdlauncher-win.png"
+  src="https://cdn.gdl.gg/articles/curseforge-partnership-announcement/gdlauncher-win.png"
   alt="GDLauncher Carbon - Windows"
 />
 
@@ -209,7 +207,7 @@ Moreover, even though open source software can technically be community driven, 
 Below you can find insights into all contributors' added/removed lines of code.
 
 <img
-  src="https://edge.gdlauncher.com/articles/curseforge-partnership-announcement/gdl_contributions.jpg"
+  src="https://cdn.gdl.gg/articles/curseforge-partnership-announcement/gdl_contributions.jpg"
   alt="GDLauncher's contributions"
 />
 
