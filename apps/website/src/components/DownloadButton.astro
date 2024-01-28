@@ -1,16 +1,15 @@
 ---
 import Button from "./button/Button";
 import yaml from "js-yaml";
-import os from "os";
 import Windows from "../assets/Windows";
 import Apple from "../assets/Apple";
 import Linux from "../assets/Linux";
 const getOs = () => {
-  if (os.type() === "Windows_NT") {
+  if (window.navigator.userAgent.toLowerCase().includes("windows")) {
     return "Windows";
-  } else if (os.type() === "Darwin") {
+  } else if (window.navigator.userAgent.toLowerCase().includes("darwin")) {
     return "MacOS";
-  } else if (os.type() === "Linux") {
+  } else if (window.navigator.userAgent.toLowerCase().includes("linux")) {
     return "Linux";
   } else {
     return "Unknown";

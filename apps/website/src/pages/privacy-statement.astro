@@ -3,29 +3,23 @@ import Layout from "../layouts/Layout.astro";
 import { marked } from "marked";
 
 const response = await fetch(
-    "https://raw.githubusercontent.com/gorilla-devs/ToS-Privacy/master/privacy-statement.md"
-  );
-  const data = await response.text();
-  const md = marked(data);
+  "https://raw.githubusercontent.com/gorilla-devs/ToS-Privacy/master/privacy-statement.md"
+);
+const data = await response.text();
+const md = marked(data);
 ---
 
 <Layout
-  title="About Me"
-  description="Lorem ipsum dolor sit amet"
+  title="Privacy Statement"
+  description="gdlauncher privacy statement"
   pubDate={new Date("August 08 2021")}
-  heroImage="/blog-placeholder-about.jpg"
 >
-
-  <div set:html={md}></div>
+  <div set:html={md} />
 </Layout>
 <!-- fetching data from markdown file that is hosted on github could be done in 2 ways -->
 <!-- if we want to fetch data and style it i should be doing that in a script tag using a shadowRoot -->
 <!-- but sometimes the javascript inside the script tag does not run for some times !!! -->
 <!-- so i will be fetching the data in the astro file and then passing it to a div using the set:html directive -->
-
-
-
-
 
 <!-- <script>
   import { marked } from "marked";

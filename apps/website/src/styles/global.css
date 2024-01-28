@@ -89,6 +89,9 @@ h3 {
 p {
   font-size: 16px;
 }
+hr {
+  display: none;
+}
 li {
   color: rgba(147, 153, 170, 1);
   margin-bottom: 10px;
