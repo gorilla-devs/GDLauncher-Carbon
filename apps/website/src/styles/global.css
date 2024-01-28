@@ -92,10 +92,9 @@ p {
 hr {
   display: none;
 }
-li {
-  color: rgba(147, 153, 170, 1);
-  margin-bottom: 10px;
-  font-weight: bold;
+ul {
+  list-style: circle;
+  list-style-position: inside;
 }
 /*
   8. Create a root stacking context
