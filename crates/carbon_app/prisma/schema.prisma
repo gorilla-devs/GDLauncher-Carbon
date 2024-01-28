@@ -32,7 +32,7 @@ model AppConfiguration {
   randomUserUuid                  String    @default(uuid())
   secret                          Bytes
   termsAndPrivacyAccepted         Boolean   @default(false)
-  termsAndPrivacyAcceptedChecksum String?   // Should ask again if this changes
+  termsAndPrivacyAcceptedChecksum String? // Should ask again if this changes
   metricsEnabled                  Boolean   @default(false)
   metricsEnabledLastUpdate        DateTime? // should ask again after 12 months
 }
@@ -104,11 +104,31 @@ model Instance {
   mods          ModFileCache[]
 }
 
+model VersionInfoCache {
+  id          String @id // mcVersion
+  versionInfo Bytes
+}
+
+model PartialVersionInfoCache {
+  id                 String @id // modloaderName-modloaderVersion
+  partialVersionInfo Bytes
+}
+
+model LwjglMetaCache {
+  id    String @id
+  lwjgl Bytes
+}
+
+model AssetsMetaCache {
+  id          String @id
+  assetsIndex Bytes
+}
+
 model InstanceGroup {
   id         Int        @id @default(autoincrement())
   name       String
   groupIndex Int
-  instances  Instance[]
+  Instances  Instance[]
 }
 
 model ModFileCache {

@@ -1,11 +1,11 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::{collections::HashSet, os::unix::fs::MetadataExt, path::PathBuf, sync::Arc};
 
 use anyhow::Context;
 use daedalus::minecraft::{AssetIndex, AssetsIndex};
 use prisma_client_rust::QueryError;
 use thiserror::Error;
 
-use crate::domain::runtime_path::AssetsPath;
+use crate::{db::PrismaClient, domain::runtime_path::AssetsPath};
 
 #[derive(Error, Debug)]
 pub enum AssetsError {
@@ -16,41 +16,39 @@ pub enum AssetsError {
 }
 
 pub async fn get_meta(
+    db_client: Arc<PrismaClient>,
     reqwest_client: reqwest_middleware::ClientWithMiddleware,
-    version_asset_index: AssetIndex,
+    version_asset_index: &AssetIndex,
     asset_indexes_path: PathBuf,
-) -> anyhow::Result<AssetsIndex> {
-    let asset_index_bytes = reqwest_client
-        .get(version_asset_index.url)
+) -> anyhow::Result<(AssetsIndex, Vec<u8>)> {
+    let db_cache = db_client
+        .assets_meta_cache()
+        .find_unique(crate::db::assets_meta_cache::id::equals(
+            version_asset_index.id.clone(),
+        ))
+        .exec()
+        .await?;
+
+    if let Some(db_cache) = db_cache {
+        let asset_index = serde_json::from_slice(&db_cache.assets_index)?;
+
+        return Ok((asset_index, db_cache.assets_index));
+    }
+
+    let asset_index = reqwest_client
+        .get(version_asset_index.url.clone())
         .send()
         .await?
         .bytes()
         .await?;
 
-    tokio::fs::create_dir_all(&asset_indexes_path).await?;
-    tokio::fs::write(
-        asset_indexes_path.join(format!("{}.json", version_asset_index.id)),
-        asset_index_bytes.clone(),
-    )
-    .await?;
+    db_client
+        .assets_meta_cache()
+        .create(version_asset_index.id.clone(), asset_index.to_vec(), vec![])
+        .exec()
+        .await?;
 
-    Ok(serde_json::from_slice(&asset_index_bytes)?)
-}
-
-pub async fn load_index(
-    index_id: &str,
-    asset_indexes_path: PathBuf,
-) -> anyhow::Result<AssetsIndex> {
-    let asset_index_bytes = tokio::fs::read(asset_indexes_path.join(format!("{}.json", index_id)))
-        .await
-        .with_context(|| {
-            format!(
-                "Failed to read asset index `{}` from `{}`",
-                index_id,
-                asset_indexes_path.to_string_lossy()
-            )
-        })?;
-    Ok(serde_json::from_slice(&asset_index_bytes)?)
+    Ok(serde_json::from_slice(&asset_index)?)
 }
 
 pub enum AssetsDir {
@@ -70,14 +68,25 @@ impl AssetsDir {
 }
 
 pub async fn get_assets_dir(
-    index_id: &str,
+    db_client: Arc<PrismaClient>,
+    reqwest_client: reqwest_middleware::ClientWithMiddleware,
+    version_assets_index: &AssetIndex,
     assets_path: AssetsPath,
     resources_dir: PathBuf,
 ) -> anyhow::Result<AssetsDir> {
-    let assets_index = load_index(index_id, assets_path.get_indexes_path()).await?;
+    let (assets_index, _) = get_meta(
+        db_client,
+        reqwest_client,
+        version_assets_index,
+        assets_path.get_indexes_path(),
+    )
+    .await?;
+
     if assets_index.map_virtual {
         Ok(AssetsDir::Virtual(
-            assets_path.get_virtual_path().join(index_id),
+            assets_path
+                .get_virtual_path()
+                .join(version_assets_index.id.clone()),
         ))
     } else if assets_index.map_to_resources {
         Ok(AssetsDir::InstanceMapped(resources_dir))
@@ -87,13 +96,44 @@ pub async fn get_assets_dir(
 }
 
 pub async fn reconstruct_assets(
-    index_id: &str,
+    db_client: Arc<PrismaClient>,
+    reqwest_client: reqwest_middleware::ClientWithMiddleware,
+    version_asset_index: &AssetIndex,
     assets_path: AssetsPath,
     resources_dir: PathBuf,
 ) -> anyhow::Result<()> {
-    let assets_index = load_index(index_id, assets_path.get_indexes_path()).await?;
+    let (assets_index, assets_index_bytes) = get_meta(
+        db_client,
+        reqwest_client,
+        version_asset_index,
+        assets_path.get_indexes_path(),
+    )
+    .await?;
+
+    let asset_index_full_path = assets_path
+        .get_indexes_path()
+        .join(format!("{}.json", version_asset_index.id));
+
+    let existing_file_size = asset_index_full_path
+        .metadata()
+        .map(|m| m.size())
+        .unwrap_or_default();
+
+    let expected_file_size = version_asset_index.size as u64;
+
+    let file_ok = asset_index_full_path.exists() && existing_file_size == expected_file_size;
+
+    if !file_ok {
+        tokio::fs::create_dir_all(&assets_path.get_indexes_path()).await?;
+        tokio::fs::write(asset_index_full_path, assets_index_bytes).await?;
+    }
+
     let target_path = if assets_index.map_virtual {
-        Some(assets_path.get_virtual_path().join(index_id))
+        Some(
+            assets_path
+                .get_virtual_path()
+                .join(version_asset_index.id.clone()),
+        )
     } else if assets_index.map_to_resources {
         Some(resources_dir)
     } else {

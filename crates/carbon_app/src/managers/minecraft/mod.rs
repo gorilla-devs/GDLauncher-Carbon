@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use carbon_net::Downloadable;
 use daedalus::{
     minecraft::{DownloadType, Version, VersionInfo, VersionManifest},
@@ -26,6 +28,8 @@ pub mod modrinth;
 pub mod neoforge;
 pub mod quilt;
 
+const META_VERSION: &str = "v0";
+
 pub(crate) struct MinecraftManager {
     pub meta_base_url: Url,
 }
@@ -43,11 +47,14 @@ impl ManagerRef<'_, MinecraftManager> {
         minecraft::get_manifest(&self.app.reqwest_client, &self.meta_base_url).await
     }
 
-    pub async fn get_minecraft_version(
-        self,
-        manifest_version_meta: Version,
-    ) -> anyhow::Result<VersionInfo> {
-        minecraft::get_version(&self.app.reqwest_client, manifest_version_meta).await
+    pub async fn get_minecraft_version(self, mc_version: &str) -> anyhow::Result<VersionInfo> {
+        minecraft::get_version(
+            self.app.prisma_client.clone(),
+            &self.app.reqwest_client,
+            mc_version,
+            &self.meta_base_url,
+        )
+        .await
     }
 
     pub async fn get_forge_manifest(&self) -> anyhow::Result<Manifest> {
@@ -81,8 +88,13 @@ impl ManagerRef<'_, MinecraftManager> {
 
         let mut all_files = vec![];
 
-        let lwjgl =
-            get_lwjgl_meta(&self.app.reqwest_client, &version_info, &self.meta_base_url).await?;
+        let lwjgl = get_lwjgl_meta(
+            Arc::clone(&self.app.prisma_client),
+            &self.app.reqwest_client,
+            &version_info,
+            &self.meta_base_url,
+        )
+        .await?;
 
         let tmp: Vec<_> = version_info
             .libraries
@@ -106,15 +118,15 @@ impl ManagerRef<'_, MinecraftManager> {
             runtime_path,
         );
 
-        let assets = assets_index_into_vec_downloadable(
-            assets::get_meta(
-                self.app.reqwest_client.clone(),
-                version_info.asset_index,
-                runtime_path.get_assets().get_indexes_path(),
-            )
-            .await?,
-            &runtime_path.get_assets(),
-        );
+        let (assets_meta, _) = assets::get_meta(
+            Arc::clone(&self.app.prisma_client),
+            self.app.reqwest_client.clone(),
+            &version_info.asset_index,
+            runtime_path.get_assets().get_indexes_path(),
+        )
+        .await?;
+
+        let assets = assets_index_into_vec_downloadable(assets_meta, &runtime_path.get_assets());
 
         if let Some(logging_xml) = version_info.logging {
             if let Some(client) = logging_xml.get(&daedalus::minecraft::LoggingConfigName::Client) {
@@ -215,13 +227,16 @@ mod tests {
             .clone();
 
         let version_info = crate::managers::minecraft::minecraft::get_version(
+            app.prisma_client.clone(),
             &app.reqwest_client,
-            manifest_version,
+            &manifest_version.id,
+            &app.minecraft_manager.meta_base_url,
         )
         .await
         .unwrap();
 
         let lwjgl_group = get_lwjgl_meta(
+            app.prisma_client.clone(),
             &reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
             &version_info,
             &app.minecraft_manager().meta_base_url,
@@ -270,7 +285,7 @@ mod tests {
             .await
             .unwrap();
 
-        carbon_net::download_multiple(vanilla_files, progress.0, 10)
+        carbon_net::download_multiple(vanilla_files, progress.0, 10, true)
             .await
             .unwrap();
 
@@ -318,6 +333,16 @@ mod tests {
             last_used: Utc::now().into(),
         };
 
+        let assets_dir = crate::managers::minecraft::assets::get_assets_dir(
+            app.prisma_client.clone(),
+            reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
+            &version_info.asset_index,
+            runtime_path.get_assets(),
+            instance_path.get_resources_path(),
+        )
+        .await
+        .unwrap();
+
         let mut child = launch_minecraft(
             java_component,
             full_account,
@@ -329,6 +354,7 @@ mod tests {
             version_info,
             &lwjgl_group,
             instance_path,
+            assets_dir,
         )
         .await
         .unwrap();

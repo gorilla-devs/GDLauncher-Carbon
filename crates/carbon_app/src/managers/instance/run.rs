@@ -7,6 +7,7 @@ use crate::domain::runtime_path::InstancePath;
 use crate::domain::vtask::VisualTaskId;
 use crate::managers::instance::modpack::packinfo;
 use crate::managers::java::managed::Step;
+use crate::managers::minecraft::assets::get_assets_dir;
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
 use crate::managers::minecraft::modrinth;
 use crate::managers::minecraft::{curseforge, UpdateValue};
@@ -68,6 +69,7 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         launch_account: Option<FullAccount>,
         callback_task: Option<InstanceCallback>,
+        deep_check: bool,
     ) -> anyhow::Result<(JoinHandle<()>, VisualTaskId)> {
         let initial_time = Utc::now();
 
@@ -400,7 +402,7 @@ impl ManagerRef<'_, InstanceManager> {
                        }
                     };
 
-                    tokio::fs::create_dir_all(&staging_dir).await?;
+                    tokio::fs::create_dir_all(&staging_dir.join("instance")).await?;
 
                     let instance_prep_path = InstancePath::new(staging_dir.clone());
 
@@ -527,7 +529,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let concurrency = app.settings_manager().get_settings().await?.concurrent_downloads;
 
-                    carbon_net::download_multiple(downloads, progress_watch_tx, concurrency as usize).await?;
+                    carbon_net::download_multiple(downloads, progress_watch_tx, concurrency as usize, deep_check).await?;
 
                     if let Some(v) = v {
                         tracing::info!("Modpack version: {v:?}");
@@ -663,25 +665,16 @@ impl ManagerRef<'_, InstanceManager> {
                     None => bail!("Instance has no associated game version and cannot be launched"),
                 };
 
-                t_request_version_info.update_items(0, 3);
-                let manifest = app.minecraft_manager().get_minecraft_manifest().await.map_err(
-                    |e| anyhow::anyhow!("Error getting minecraft manifest: {:?}", e)
-                )?;
-                t_request_version_info.update_items(1, 3);
-
-                let manifest_version = manifest
-                    .versions
-                    .into_iter()
-                    .find(|v| v.id == version.release)
-                    .ok_or_else(|| anyhow!("Could not find game version {}", version.release))?;
+                t_request_version_info.update_items(0, 2);
 
                 let mut version_info = app
                     .minecraft_manager()
-                    .get_minecraft_version(manifest_version.clone())
+                    .get_minecraft_version(&version.release)
                     .await
                     .map_err(|e| anyhow::anyhow!("Error getting minecraft version: {:?}", e))?;
 
                 let lwjgl_group = get_lwjgl_meta(
+                    Arc::clone(&app.prisma_client),
                     &app.reqwest_client,
                     &version_info,
                     &app.minecraft_manager().meta_base_url,
@@ -689,7 +682,7 @@ impl ManagerRef<'_, InstanceManager> {
                     .await
                     .map_err(|e| anyhow::anyhow!("Error getting lwjgl meta: {:?}", e))?;
 
-                t_request_version_info.update_items(2, 3);
+                t_request_version_info.update_items(1, 2);
 
                 let java = {
                     // If instance has profile override, short circuit and use that
@@ -1014,7 +1007,7 @@ impl ManagerRef<'_, InstanceManager> {
                     }
                 }
 
-                t_request_version_info.update_items(3, 3);
+                t_request_version_info.update_items(2, 2);
 
                 downloads.extend(
                     app.minecraft_manager()
@@ -1045,7 +1038,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                 let concurrency = app.settings_manager().get_settings().await?.concurrent_downloads;
 
-                carbon_net::download_multiple(downloads, progress_watch_tx, concurrency as usize).await?;
+                carbon_net::download_multiple(downloads, progress_watch_tx, concurrency as usize, deep_check).await?;
 
                 // update mod metadata and add modpack complete flag after mods are downloaded
                 if is_first_run {
@@ -1091,7 +1084,9 @@ impl ManagerRef<'_, InstanceManager> {
 
                 t_reconstruct_assets.start_opaque();
                 managers::minecraft::assets::reconstruct_assets(
-                    &version_info.assets,
+                    Arc::clone(&app.prisma_client),
+                    app.reqwest_client.clone(),
+                    &version_info.asset_index,
                     runtime_path.get_assets(),
                     instance_path.get_resources_path(),
                 ).await?;
@@ -1105,6 +1100,15 @@ impl ManagerRef<'_, InstanceManager> {
                         .as_ref()
                         .unwrap_or(&version_info.id),
                 );
+                let assets_dir  = get_assets_dir(
+                    app.prisma_client.clone(),
+                    app.reqwest_client.clone(),
+                    &version_info.asset_index,
+                    runtime_path.get_assets(),
+                    instance_path.get_resources_path(),
+                )
+                .await
+                .unwrap();
 
                 for modloader in version.modloaders.iter() {
                     let instance_path = instance_path.clone();
@@ -1192,6 +1196,7 @@ impl ManagerRef<'_, InstanceManager> {
                             version_info,
                             &lwjgl_group,
                             instance_path,
+                            assets_dir,
                         )
                         .await?,
                     )),
@@ -1545,7 +1550,7 @@ mod test {
         };
 
         app.instance_manager()
-            .prepare_game(instance_id, Some(account), None)
+            .prepare_game(instance_id, Some(account), None, true)
             .await?;
 
         let task = match app.instance_manager().get_launch_state(instance_id).await? {
