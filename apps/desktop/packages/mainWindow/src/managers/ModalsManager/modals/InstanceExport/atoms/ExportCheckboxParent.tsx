@@ -5,7 +5,6 @@ import ExportCheckbox from "./ExportCheckbox";
 import { Checkbox } from "@gd/ui";
 import { useTransContext } from "@gd/i18n";
 import _ from "lodash";
-import { set } from "date-fns";
 
 const [checkedFiles, setCheckedFiles] = createSignal<Array<Array<string>>>([]);
 export { checkedFiles, setCheckedFiles };
