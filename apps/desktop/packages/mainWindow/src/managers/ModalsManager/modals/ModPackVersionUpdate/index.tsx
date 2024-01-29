@@ -1,3 +1,4 @@
+import { Select } from "@gd/ui";
 import { ModalProps } from "../..";
 import ModalLayout from "../../ModalLayout";
 
