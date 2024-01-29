@@ -48,7 +48,7 @@ pub async fn get_meta(
         .exec()
         .await?;
 
-    Ok(serde_json::from_slice(&asset_index)?)
+    Ok((serde_json::from_slice(&asset_index)?, asset_index.to_vec()))
 }
 
 pub enum AssetsDir {
