@@ -43,10 +43,18 @@ async function getDownloadLink() {
   return downloadLink;
 }
 
-export const DownloadLink = () => {
-  const [data] = createResource(getDownloadLink);
+export const DownloadLink = ({ urls }: { urls: Array<string> }) => {
+  const getCurrentUrl = () => {
+    if (getOs() === "Windows") {
+      return urls[0];
+    } else if (getOs() === "MacOS") {
+      return urls[1];
+    } else {
+      return urls[2];
+    }
+  };
   return (
-    <a href={data()} class="flex items-center gap-2">
+    <a href={getCurrentUrl()} class="flex items-center gap-2">
       <span>DOWNLOAD FOR</span>
       {getOs() === "Windows" ? (
         <Windows />

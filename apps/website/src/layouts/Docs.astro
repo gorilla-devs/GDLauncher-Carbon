@@ -6,6 +6,7 @@ import Footer from "../components/Footer.astro";
 import FormattedDate from "../components/FormattedDate.astro";
 import "@fontsource/ubuntu";
 import DocsSideNav from "../components/DocsSideNav.astro";
+import "../styles/DocsStyle.css";
 
 type Props = CollectionEntry<"docs">["data"];
 
@@ -28,7 +29,6 @@ const { title, category } = Astro.props;
         /* background-position: center; */
         background-repeat: no-repeat;
         background-color: rgba(29, 32, 40, 1);
-        
       }
       main {
         width: calc(100% - 2em);
