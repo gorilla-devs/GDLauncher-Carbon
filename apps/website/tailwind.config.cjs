@@ -25,8 +25,8 @@ module.exports = {
         smgd: "34px",
       },
       fontSize: {
-        smgd: "20px",
-        mdgd: "50px",
+        smgd: "1.25rem",
+        mdgd: "3.125rem",
       },
       keyframes: {
         fadeIn: {

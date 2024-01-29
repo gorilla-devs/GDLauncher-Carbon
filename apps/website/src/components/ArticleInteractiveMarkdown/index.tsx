@@ -27,7 +27,7 @@ const ArticleInteractiveMarkdown = () => {
     const container = document.querySelector("#articleContainer");
     const tableListTitle = document.querySelector("#tableListSummary");
     const tableList = document.getElementById("tableList");
-
+    tableList!.style.marginLeft = "10px";
     if (tableListTitle) (tableListTitle as any).style.cursor = "pointer";
 
     container?.querySelectorAll("h1").forEach((item) => {
@@ -115,6 +115,8 @@ const ArticleInteractiveMarkdown = () => {
 
         subLi.style.cursor = "pointer";
         subLi.style.maxWidth = "fit-content";
+        subLi.style.marginLeft = "10px";
+        subLi.style.listStyleType = "circle";
         subItem.style.position = "relative";
         anchorTag.style.color = "#60a5fa";
         li.appendChild(ul);
