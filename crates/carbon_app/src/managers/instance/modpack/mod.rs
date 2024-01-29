@@ -224,7 +224,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         self.app
             .instance_manager()
-            .prepare_game(instance_id, None, None)
+            .prepare_game(instance_id, None, None, true)
             .await
             .map(|r| r.1)
     }

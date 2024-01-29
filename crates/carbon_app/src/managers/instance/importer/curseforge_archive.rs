@@ -280,7 +280,7 @@ impl InstanceImporter for CurseforgeArchiveImporter {
             .await?;
 
         app.instance_manager()
-            .prepare_game(id, None, None)
+            .prepare_game(id, None, None, true)
             .await
             .map(|r| r.1)
     }

@@ -1206,7 +1206,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             let app = self.app.clone();
             tokio::spawn(async move {
                 app.instance_manager()
-                    .prepare_game(InstanceId(*update.instance_id), None, None)
+                    .prepare_game(InstanceId(*update.instance_id), None, None, true)
                     .await?;
 
                 Ok(()) as anyhow::Result<()>

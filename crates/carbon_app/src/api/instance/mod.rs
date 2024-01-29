@@ -215,7 +215,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
         mutation PREPARE_INSTANCE[app, id: FEInstanceId] {
             let (_, vtask_id) = app.instance_manager()
-                .prepare_game(id.into(), None, None)
+                .prepare_game(id.into(), None, None, true)
                 .await?;
 
             Ok(FETaskId::from(vtask_id))
@@ -231,7 +231,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             };
 
             app.instance_manager()
-                .prepare_game(id.into(), Some(account), None)
+                .prepare_game(id.into(), Some(account), None, false)
                 .await?;
 
             Ok(())
