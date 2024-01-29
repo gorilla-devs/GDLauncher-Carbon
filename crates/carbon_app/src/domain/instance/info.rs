@@ -54,6 +54,11 @@ pub struct CurseforgeModpack {
     pub file_id: u32,
 }
 
+pub struct CurseforgeCModpack {
+    pub project_id: Option<u32>,
+    pub file_id: u32,
+}
+
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct ModrinthModpack {
     pub project_id: String,
