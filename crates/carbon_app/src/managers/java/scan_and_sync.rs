@@ -56,7 +56,7 @@ pub async fn upsert_java_component_to_db(
             db.java()
                 .update(
                     crate::db::java::id::equals(id.clone()),
-                    vec![crate::db::java::is_valid::set(is_valid)],
+                    vec![crate::db::java::is_valid::set(true)],
                 )
                 .exec()
                 .await?;
@@ -71,7 +71,7 @@ pub async fn upsert_java_component_to_db(
                         crate::db::java::arch::set(java_component.arch.to_string()),
                         crate::db::java::os::set(java_component.os.to_string()),
                         crate::db::java::vendor::set(java_component.vendor),
-                        crate::db::java::is_valid::set(is_valid),
+                        crate::db::java::is_valid::set(true),
                     ],
                 )
                 .exec()
