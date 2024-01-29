@@ -18,7 +18,7 @@ use crate::{
         java::{JavaArch, JavaOs, JavaVersion},
         runtime_path::{ManagedJavasPath, TempPath},
     },
-    managers::java::{java_checker::JavaChecker, scan_and_sync::add_java_component_to_db},
+    managers::java::{java_checker::JavaChecker, scan_and_sync::upsert_java_component_to_db},
 };
 
 use super::{Managed, ManagedJavaArchMap, ManagedJavaOsMap, ManagedJavaVersion, Step};
@@ -210,7 +210,7 @@ impl Managed for AzulZulu {
             )
             .await?;
 
-        let java_id = add_java_component_to_db(db_client, java_component).await?;
+        let java_id = upsert_java_component_to_db(db_client, java_component).await?;
 
         Ok(java_id)
     }
