@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use anyhow::bail;
@@ -13,11 +14,15 @@ use prisma_client_rust::QueryError;
 use thiserror::Error;
 use tokio::process::Command;
 use tracing::info;
+use url::Url;
 
 use crate::{
+    db::PrismaClient,
     domain::runtime_path::{InstancePath, LibrariesPath},
     managers::java::utils::PATH_SEPARATOR,
 };
+
+use super::META_VERSION;
 
 #[derive(Error, Debug)]
 pub enum ForgeManifestError {
@@ -31,7 +36,7 @@ pub async fn get_manifest(
     reqwest_client: &reqwest_middleware::ClientWithMiddleware,
     meta_base_url: &reqwest::Url,
 ) -> anyhow::Result<Manifest> {
-    let server_url = meta_base_url.join("forge/v0/manifest.json")?;
+    let server_url = meta_base_url.join(&format!("forge/{}/manifest.json", META_VERSION))?;
     let new_manifest = reqwest_client
         .get(server_url)
         .send()
@@ -44,18 +49,47 @@ pub async fn get_manifest(
 }
 
 pub async fn get_version(
+    db_client: Arc<PrismaClient>,
     reqwest_client: &reqwest_middleware::ClientWithMiddleware,
-    manifest_version_meta: LoaderVersion,
+    forge_version: &str,
+    meta_base_url: &Url,
 ) -> anyhow::Result<PartialVersionInfo> {
-    let server_url = reqwest::Url::parse(&manifest_version_meta.url)?;
-    let new_manifest = reqwest_client
-        .get(server_url)
+    let db_entry_name = format!("forge-{}", forge_version);
+
+    let db_cache = db_client
+        .partial_version_info_cache()
+        .find_unique(crate::db::partial_version_info_cache::id::equals(
+            db_entry_name.clone(),
+        ))
+        .exec()
+        .await
+        .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
+
+    if let Some(db_cache) = db_cache {
+        let db_cache = serde_json::from_slice(&db_cache.partial_version_info)
+            .map_err(|err| anyhow::anyhow!("Failed to deserialize db cache: {}", err))?;
+
+        return Ok(db_cache);
+    }
+
+    let version_url = meta_base_url.join(&format!(
+        "forge/{}/versions/{}.json",
+        META_VERSION, forge_version
+    ))?;
+    let version_bytes = reqwest_client
+        .get(version_url)
         .send()
         .await?
-        .json::<PartialVersionInfo>()
+        .bytes()
         .await?;
 
-    Ok(new_manifest)
+    db_client
+        .partial_version_info_cache()
+        .create(db_entry_name, version_bytes.to_vec(), vec![])
+        .exec()
+        .await?;
+
+    Ok(serde_json::from_slice(&version_bytes)?)
 }
 
 fn get_class_paths_jar(libraries_path: &Path, libraries: &[String]) -> anyhow::Result<String> {

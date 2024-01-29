@@ -91,7 +91,8 @@ module.exports = {
     entitlements: "./entitlements.mac.plist",
     extendInfo: "./entitlements.mac.plist",
     hardenedRuntime: true,
-    gatekeeperAssess: false
+    gatekeeperAssess: false,
+    notarize: false
   },
   dmg: {
     sign: false
@@ -120,7 +121,7 @@ module.exports = {
     if (
       electronPlatformName !== "darwin" ||
       !process.env.APPLE_ID ||
-      !process.env.APPLE_ID_PASSWORD
+      !process.env.APPLE_APP_SPECIFIC_PASSWORD
     ) {
       console.log("Skipping notarization");
       return;
@@ -133,7 +134,8 @@ module.exports = {
       appBundleId: appId,
       appPath: `${appOutDir}/${appName}.app`,
       appleId: process.env.APPLE_ID,
-      appleIdPassword: process.env.APPLE_ID_PASSWORD
+      appleIdPassword: process.env.APPLE_APP_SPECIFIC_PASSWORD,
+      teamId: process.env.APPLE_TEAM_ID
     });
   }
 };

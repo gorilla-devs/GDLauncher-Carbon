@@ -87,6 +87,16 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .map(FEInstanceId::from)
         }
 
+        mutation CHANGE_MODPACK[app, details: ChangeModpack] {
+            app.instance_manager()
+                .change_modpack(
+                    details.instance.into(),
+                    details.modpack.into(),
+                )
+                .await
+                .map(FETaskId::from)
+        }
+
         mutation LOAD_ICON_URL[app, url: String] {
             let icon = app.instance_manager()
                 .download_icon(url)
@@ -205,7 +215,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
         mutation PREPARE_INSTANCE[app, id: FEInstanceId] {
             let (_, vtask_id) = app.instance_manager()
-                .prepare_game(id.into(), None, None)
+                .prepare_game(id.into(), None, None, true)
                 .await?;
 
             Ok(FETaskId::from(vtask_id))
@@ -221,7 +231,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             };
 
             app.instance_manager()
-                .prepare_game(id.into(), Some(account), None)
+                .prepare_game(id.into(), Some(account), None, false)
                 .await?;
 
             Ok(())
@@ -645,6 +655,12 @@ struct CreateInstance {
     use_loaded_icon: bool,
     version: CreateInstanceVersion,
     notes: String,
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct ChangeModpack {
+    instance: FEInstanceId,
+    modpack: Modpack,
 }
 
 #[derive(Type, Debug, Deserialize)]

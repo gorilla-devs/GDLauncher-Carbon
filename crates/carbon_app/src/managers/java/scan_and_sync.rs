@@ -27,7 +27,7 @@ async fn get_java_component_from_db(
 }
 
 #[tracing::instrument(level = "trace", skip(db))]
-pub async fn add_java_component_to_db(
+pub async fn upsert_java_component_to_db(
     db: &Arc<PrismaClient>,
     java_component: JavaComponent,
 ) -> anyhow::Result<String> {
@@ -53,23 +53,36 @@ pub async fn add_java_component_to_db(
 
     if let Some((component, is_valid, id)) = already_existing_component {
         if component == java_component {
-            if !is_valid {
-                db.java()
-                    .update(
-                        crate::db::java::id::equals(id.clone()),
-                        vec![crate::db::java::is_valid::set(true)],
-                    )
-                    .exec()
-                    .await?;
-            }
+            db.java()
+                .update(
+                    crate::db::java::id::equals(id.clone()),
+                    vec![crate::db::java::is_valid::set(true)],
+                )
+                .exec()
+                .await?;
 
             return Ok(id);
-        }
+        } else if component.version.major == java_component.version.major {
+            db.java()
+                .update(
+                    crate::db::java::id::equals(id.clone()),
+                    vec![
+                        crate::db::java::full_version::set(java_component.version.to_string()),
+                        crate::db::java::arch::set(java_component.arch.to_string()),
+                        crate::db::java::os::set(java_component.os.to_string()),
+                        crate::db::java::vendor::set(java_component.vendor),
+                        crate::db::java::is_valid::set(true),
+                    ],
+                )
+                .exec()
+                .await?;
 
-        anyhow::bail!(
-            "Component with path {} already exists in db but with different configuration",
-            java_component.path
-        );
+            return Ok(id);
+        } else {
+            anyhow::bail!(
+                "Java component with same path but different major version already exists"
+            );
+        }
     } else {
         let res = db
             .java()
@@ -148,25 +161,30 @@ where
             }
         }
 
-        match java_bin_info {
+        let is_java_used_in_profile = java_profiles.iter().any(|profile| {
+            let Some(java) = profile.java.as_ref() else {
+                return false;
+            };
+            let Some(java) = java.as_ref() else {
+                return false;
+            };
+            let java_path = java.path.clone();
+            java_path == resolved_java_path.display().to_string()
+        });
+
+        match (java_bin_info, db_entry) {
             // If it is valid, check whether it's in the DB
-            Ok(java_component) => {
+            (Ok(java_component), Some(db_entry)) => {
                 trace!("Java is valid: {:?}", java_component);
-                add_java_component_to_db(db, java_component).await?;
+                upsert_java_component_to_db(db, java_component).await?;
+            }
+            (Ok(java_component), None) => {
+                trace!("Java is valid: {:?}", java_component);
+                upsert_java_component_to_db(db, java_component).await?;
             }
             // If it isn't valid, check whether it's in the DB
-            Err(err) => {
+            (Err(err), db_entry) => {
                 trace!("Java is invalid due to: {:?}", err);
-                let is_java_used_in_profile = java_profiles.iter().any(|profile| {
-                    let Some(java) = profile.java.as_ref() else {
-                        return false;
-                    };
-                    let Some(java) = java.as_ref() else {
-                        return false;
-                    };
-                    let java_path = java.path.clone();
-                    java_path == resolved_java_path.display().to_string()
-                });
 
                 // If it is in the db, update it to invalid
                 if db_entry.is_some() {
@@ -307,7 +325,7 @@ where
             .await;
 
         if let Ok(java_component) = java_bin_info {
-            add_java_component_to_db(db, java_component).await?;
+            upsert_java_component_to_db(db, java_component).await?;
         }
     }
 
@@ -394,8 +412,8 @@ mod test {
             discovery::MockDiscovery,
             java_checker::{MockJavaChecker, MockJavaCheckerInvalid},
             scan_and_sync::{
-                add_java_component_to_db, scan_and_sync_custom, scan_and_sync_local,
-                scan_and_sync_managed, sync_system_java_profiles,
+                scan_and_sync_custom, scan_and_sync_local, scan_and_sync_managed,
+                sync_system_java_profiles, upsert_java_component_to_db,
             },
             JavaManager,
         },
@@ -420,7 +438,7 @@ mod test {
         let java_components = db.java().find_many(vec![]).exec().await.unwrap();
         assert_eq!(java_components.len(), 0);
 
-        add_java_component_to_db(db, java_component.clone())
+        upsert_java_component_to_db(db, java_component.clone())
             .await
             .unwrap();
 
@@ -442,7 +460,9 @@ mod test {
         assert_eq!(java_components.len(), 1);
         assert!(!java_components[0].is_valid);
 
-        add_java_component_to_db(db, java_component).await.unwrap();
+        upsert_java_component_to_db(db, java_component)
+            .await
+            .unwrap();
 
         let java_components = db.java().find_many(vec![]).exec().await.unwrap();
         assert_eq!(java_components.len(), 1);
@@ -457,7 +477,7 @@ mod test {
             vendor: "Azul Systems, Inc.".to_string(),
         };
 
-        let result = add_java_component_to_db(db, almost_equal_java_component).await;
+        let result = upsert_java_component_to_db(db, almost_equal_java_component).await;
 
         assert!(result.is_err());
     }
@@ -479,7 +499,7 @@ mod test {
             os: JavaOs::Linux,
             vendor: "Azul Systems, Inc.".to_string(),
         };
-        add_java_component_to_db(db, component_to_remove)
+        upsert_java_component_to_db(db, component_to_remove)
             .await
             .unwrap();
 
@@ -492,7 +512,7 @@ mod test {
             vendor: "Azul Systems, Inc.".to_string(),
         };
 
-        add_java_component_to_db(db, component_to_keep)
+        upsert_java_component_to_db(db, component_to_keep)
             .await
             .unwrap();
 
@@ -523,7 +543,7 @@ mod test {
             vendor: "Azul Systems, Inc.".to_string(),
         };
 
-        add_java_component_to_db(db, component_to_add)
+        upsert_java_component_to_db(db, component_to_add)
             .await
             .unwrap();
 
@@ -555,7 +575,7 @@ mod test {
             vendor: "Azul Systems, Inc.".to_string(),
         };
 
-        add_java_component_to_db(db, component_to_add)
+        upsert_java_component_to_db(db, component_to_add)
             .await
             .unwrap();
 
@@ -716,5 +736,52 @@ mod test {
             .unwrap();
 
         assert!(minecraft_exe_profile.java.flatten().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_upsert_java_component_to_db_different_java_configuration() {
+        let app = setup_managers_for_test().await;
+        let db = &app.prisma_client;
+
+        let discovery = &MockDiscovery;
+        let java_checker = &MockJavaChecker;
+
+        let old_component = JavaComponent {
+            path: "/java1".to_string(),
+            version: JavaVersion::from_major(19),
+            _type: JavaComponentType::Local,
+            arch: JavaArch::X86_32,
+            os: JavaOs::Linux,
+            vendor: "Azul Systems, Inc.".to_string(),
+        };
+
+        upsert_java_component_to_db(db, old_component)
+            .await
+            .unwrap();
+
+        let new_component = JavaComponent {
+            path: "/java1".to_string(),
+            version: JavaVersion::from_major(19),
+            _type: JavaComponentType::Local,
+            arch: JavaArch::Arm64,
+            os: JavaOs::Windows,
+            vendor: "Azul Systems, Inc. New".to_string(),
+        };
+
+        scan_and_sync_local(true, db, discovery, java_checker)
+            .await
+            .unwrap();
+
+        upsert_java_component_to_db(db, new_component.clone())
+            .await
+            .unwrap();
+
+        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+
+        assert_eq!(java_components.len(), 3);
+
+        let java_component = JavaComponent::try_from(java_components[0].clone()).unwrap();
+
+        assert_eq!(java_component, new_component);
     }
 }

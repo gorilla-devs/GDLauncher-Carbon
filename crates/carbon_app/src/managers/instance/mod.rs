@@ -47,6 +47,7 @@ pub mod export;
 pub mod importer;
 pub mod installer;
 pub mod log;
+pub mod modpack;
 mod mods;
 mod run;
 mod schema;
@@ -220,6 +221,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     favorite: cached.map(|cached| cached.favorite).unwrap_or(false),
                     config,
                     state: run::LaunchState::Inactive { failed_task: None },
+                    modpack_update_curseforge: None,
+                    modpack_update_modrinth: None,
                     icon_revision,
                 };
 
@@ -1013,6 +1016,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     favorite: false,
                     config: info,
                     state: run::LaunchState::Inactive { failed_task: None },
+                    modpack_update_curseforge: None,
+                    modpack_update_modrinth: None,
                     icon_revision,
                 }),
             },
@@ -1201,7 +1206,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             let app = self.app.clone();
             tokio::spawn(async move {
                 app.instance_manager()
-                    .prepare_game(InstanceId(*update.instance_id), None, None)
+                    .prepare_game(InstanceId(*update.instance_id), None, None, true)
                     .await?;
 
                 Ok(()) as anyhow::Result<()>
@@ -1360,6 +1365,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     favorite: false,
                     config: new_info,
                     state: run::LaunchState::Inactive { failed_task: None },
+                    modpack_update_curseforge: None,
+                    modpack_update_modrinth: None,
                     icon_revision,
                 }),
             },
@@ -1828,6 +1835,8 @@ pub struct InstanceData {
     favorite: bool,
     config: info::Instance,
     state: run::LaunchState,
+    modpack_update_curseforge: Option<bool>,
+    modpack_update_modrinth: Option<bool>,
     icon_revision: Option<u32>,
 }
 
