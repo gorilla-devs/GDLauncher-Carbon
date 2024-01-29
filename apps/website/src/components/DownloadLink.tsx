@@ -1,9 +1,8 @@
-import { createSignal } from "solid-js/types/server/reactive.js";
+import { createResource } from "solid-js";
 import Apple from "../assets/Apple";
 import Linux from "../assets/Linux";
 import Windows from "../assets/Windows";
 import yaml from "js-yaml";
-import { createResource } from "solid-js/types/server/rendering.js";
 
 const getOs = () => {
   if (window.navigator.userAgent.toLowerCase().includes("windows")) {
