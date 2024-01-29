@@ -1,4 +1,4 @@
-use std::{collections::HashSet, os::unix::fs::MetadataExt, path::PathBuf, sync::Arc};
+use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 use anyhow::Context;
 use daedalus::minecraft::{AssetIndex, AssetsIndex};
@@ -116,7 +116,7 @@ pub async fn reconstruct_assets(
 
     let existing_file_size = asset_index_full_path
         .metadata()
-        .map(|m| m.size())
+        .map(|m| m.len())
         .unwrap_or_default();
 
     let expected_file_size = version_asset_index.size as u64;
