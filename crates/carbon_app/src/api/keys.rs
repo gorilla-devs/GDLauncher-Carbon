@@ -75,6 +75,7 @@ keys! {
         GET_INSTANCES_UNGROUPED                     = "getInstancesUngrouped";
         CREATE_GROUP                                = "createGroup";
         CREATE_INSTANCE                             = "createInstance";
+        CHANGE_MODPACK                              = "changeModpack";
         LOAD_ICON_URL                               = "loadIconUrl";
         DELETE_GROUP                                = "deleteGroup";
         DELETE_INSTANCE                             = "deleteInstance";
