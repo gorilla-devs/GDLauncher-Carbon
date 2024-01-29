@@ -1,8 +1,9 @@
 use std::sync::Arc;
 
 use carbon_net::Downloadable;
+use const_format::formatcp;
 use daedalus::{
-    minecraft::{DownloadType, Version, VersionInfo, VersionManifest},
+    minecraft::{DownloadType, Version, VersionInfo, VersionManifest, CURRENT_FORMAT_VERSION},
     modded::Manifest,
 };
 use reqwest::Url;
@@ -28,7 +29,7 @@ pub mod modrinth;
 pub mod neoforge;
 pub mod quilt;
 
-const META_VERSION: &str = "v0";
+const META_VERSION: &str = formatcp!("v{}", CURRENT_FORMAT_VERSION);
 
 pub(crate) struct MinecraftManager {
     pub meta_base_url: Url,
@@ -247,7 +248,7 @@ mod tests {
         // Uncomment for FORGE
         // -----FORGE
 
-        let forge_manifest = crate::managers::minecraft::forge::get_manifest(
+        let forge_version = crate::managers::minecraft::forge::get_manifest(
             &app.reqwest_client.clone(),
             &app.minecraft_manager.meta_base_url,
         )
@@ -258,12 +259,17 @@ mod tests {
         .find(|v| v.id == version)
         .unwrap()
         .loaders[0]
+            .id
             .clone();
 
-        let forge_version_info =
-            crate::managers::minecraft::forge::get_version(&app.reqwest_client, forge_manifest)
-                .await
-                .unwrap();
+        let forge_version_info = crate::managers::minecraft::forge::get_version(
+            app.prisma_client.clone(),
+            &app.reqwest_client,
+            &forge_version,
+            &app.minecraft_manager.meta_base_url,
+        )
+        .await
+        .unwrap();
 
         let version_info =
             daedalus::modded::merge_partial_version(forge_version_info, version_info);

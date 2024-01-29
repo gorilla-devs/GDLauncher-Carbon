@@ -55,7 +55,7 @@ pub async fn get_manifest(
     reqwest_client: &reqwest_middleware::ClientWithMiddleware,
     meta_base_url: &Url,
 ) -> anyhow::Result<VersionManifest> {
-    let server_url = meta_base_url.join("minecraft/v0/manifest.json")?;
+    let server_url = meta_base_url.join(&format!("minecraft/{}/manifest.json", META_VERSION))?;
     let new_manifest = reqwest_client
         .get(server_url)
         .send()
@@ -147,8 +147,8 @@ pub async fn get_lwjgl_meta(
     }
 
     let lwjgl_json_url = meta_base_url.join(&format!(
-        "minecraft/v0/libraries/{}/{}.json",
-        version_info_lwjgl_requirement.uid, lwjgl_suggest
+        "minecraft/{}/libraries/{}/{}.json",
+        META_VERSION, version_info_lwjgl_requirement.uid, lwjgl_suggest
     ))?;
 
     tracing::trace!("LWJGL JSON URL: {}", lwjgl_json_url);

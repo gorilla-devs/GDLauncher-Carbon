@@ -436,6 +436,7 @@ dependencies = [
  "carbon_net",
  "carbon_parsing",
  "chrono",
+ "const_format",
  "daedalus",
  "derive_more",
  "directories",
@@ -619,6 +620,26 @@ checksum = "8c4ecb0dc8c35d2c626e45ae70bbfcb1050b302f42bcdf025d913cc0c5a0b443"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "const_format"
+version = "0.2.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3a214c7af3d04997541b18d432afaff4c455e79e2029079647e72fc2bd27673"
+dependencies = [
+ "const_format_proc_macros",
+]
+
+[[package]]
+name = "const_format_proc_macros"
+version = "0.2.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7f6ff08fd20f4f299298a28e2dfa8a8ba1036e6cd2460ac1de7b425d76f2500"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "unicode-xid",
 ]
 
 [[package]]
@@ -822,7 +843,7 @@ dependencies = [
 [[package]]
 name = "daedalus"
 version = "0.1.21"
-source = "git+https://github.com/gorilla-devs/daedalus?rev=dc73cbdcf06df0c5f5d2da33037234ad672b9cdd#dc73cbdcf06df0c5f5d2da33037234ad672b9cdd"
+source = "git+https://github.com/gorilla-devs/daedalus?rev=9655309b896629c18fb09c90402bc2cefee59075#9655309b896629c18fb09c90402bc2cefee59075"
 dependencies = [
  "bytes",
  "chrono",

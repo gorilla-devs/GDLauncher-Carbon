@@ -20,6 +20,7 @@ rspc = { workspace = true, features = ["axum", "chrono"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-appender = { workspace = true }
+const_format = { workspace = true }
 # tracing-forest = { workspace = true }
 reqwest = { workspace = true }
 reqwest-middleware = { workspace = true }
