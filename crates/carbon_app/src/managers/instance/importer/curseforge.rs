@@ -126,8 +126,6 @@ impl InstanceImporter for CurseforgeImporter {
                 return Ok(());
             };
 
-            info!("PORCODDIO");
-
             while let Some(path) = dir.next_entry().await? {
                 if path.metadata().await?.is_dir() {
                     if let Ok(Some(entry)) = self.scan_instance(path.path()).await {
@@ -177,8 +175,6 @@ impl InstanceImporter for CurseforgeImporter {
             _ => None,
         };
 
-        info!("PORCODDIO");
-
         let initializer = |instance_path: PathBuf| {
             let instance = &instance;
 
@@ -191,11 +187,7 @@ impl InstanceImporter for CurseforgeImporter {
             }
         };
 
-        info!("PORCODDIO1");
-
         let version = GameVersion::Standard(instance.manifest.minecraft.clone().try_into()?);
-
-        info!("PORCODDIO2");
 
         let instance_version_source = match &instance.meta {
             Some(meta) => InstanceVersionSource::ModpackWithKnownVersion(
