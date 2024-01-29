@@ -253,6 +253,7 @@
   "instance_settings.unlock": "Unlock",
   "instance_settings.unlocked": "Unlocked",
   "instance_settings.unpair": "Unpair",
+  "instance_settings.update_version": "Update version",
   "onboarding.welcome_gdlauncher_title": "Welcome to GDLauncher! 🎉",
   "onboarding.welcome_gdlauncher_text": "Hey {{user}}!\n\nWe're thrilled to have you onboard! GDLauncher is your personal Minecraft command center, designed to supercharge your gaming experience. \n\nFrom custom instances and integrated mod search to performance tweaking and design customization - everything you need is at your fingertips.\n\nReady to craft your perfect Minecraft adventure? Let's get started!\n\nThe GDLauncher Team",
   "onboarding.import_instance_text": "To start enjoying your favorite game you will need to create an instance. You can do this by selecting one of the modpacks available or by importing a zip or an instance from another launcher on your computer",
