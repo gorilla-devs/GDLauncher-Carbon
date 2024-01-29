@@ -7,9 +7,11 @@ import Ellipse from "../assets/ellipse.svg";
 ---
 
 <div class="flex flex-col items-center justify-center relative gap-2">
-  <div class="bg-bluegd-500 w-[80%] flex p-8 gap-8 mb-10 rounded-md">
+  <div
+    class="bg-bluegd-500 w-[80%] flex p-8 gap-8 mb-10 rounded-md flex-col md:flex-row"
+  >
     <Image src={GdLauncherXCurseForge} alt="gdlauncher x curseforge" />
-    <div class="flex flex-col justify-between basis-[50%]">
+    <div class="flex flex-col justify-between basis-[50%] gap-4">
       <Image src={CurseForge} alt="curseforge" />
       <div class="flex flex-col">
         <span class="text-white font-bold text-[24px]"
@@ -22,7 +24,7 @@ import Ellipse from "../assets/ellipse.svg";
 
       <Button
         intent="transparent"
-        class="text-white border-white font-bold w-1/2"
+        class="text-white border-white font-bold w-full lg:w-1/2 px-5 py-2"
       >
         <a href="/blog/curseforge-partnership-announcement/">LEARN MORE</a>
       </Button>
