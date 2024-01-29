@@ -1,58 +1,15 @@
 ---
 import Button from "./button/Button";
-import yaml from "js-yaml";
 import Windows from "../assets/Windows";
 import Apple from "../assets/Apple";
 import Linux from "../assets/Linux";
-const getOs = () => {
-  if (window.navigator.userAgent.toLowerCase().includes("windows")) {
-    return "Windows";
-  } else if (window.navigator.userAgent.toLowerCase().includes("darwin")) {
-    return "MacOS";
-  } else if (window.navigator.userAgent.toLowerCase().includes("linux")) {
-    return "Linux";
-  } else {
-    return "Unknown";
-  }
-};
+import { DownloadLink } from "./DownloadLink";
 
-const getPath = () => {
-  if (getOs() === "Windows") {
-    return "https://cdn-raw.gdl.gg/launcher/alpha.yml";
-  } else if (getOs() === "MacOS") {
-    return "https://cdn-raw.gdl.gg/launcher/alpha-mac.yml";
-  } else {
-    return "https://cdn-raw.gdl.gg/launcher/alpha-linux.yml";
-  }
-};
 
-const response = await fetch(getPath());
-const data = await response.text();
-const doc = yaml.load(data) as {
-  version: string;
-  files: Array<{
-    url: string;
-    sha512: string;
-    size: number;
-  }>;
-  path: string;
-  sha512: string;
-  releaseDate: string;
-};
-const downloadLink = `https://cdn-raw.gdl.gg/launcher/${doc.path}`;
+
+
 ---
 
 <Button intent="primary" class="uppercase items-center">
-  <a href={downloadLink} class="flex items-center gap-2">
-    <span>DOWNLOAD FOR</span>
-    {
-      getOs() === "Windows" ? (
-        <Windows />
-      ) : getOs() === "MacOS" ? (
-        <Apple />
-      ) : (
-        <Linux />
-      )
-    }
-  </a>
+  <DownloadLink client:only/>
 </Button>
