@@ -16,6 +16,7 @@ use crate::{
     },
     managers::{
         instance::{InstanceType, InvalidInstanceIdError},
+        modplatforms::modrinth::convert_standard_version_to_mr_version,
         vtask::VisualTask,
         AppInner,
     },
@@ -154,29 +155,7 @@ pub async fn export_modrinth(
                         },
                     )
                     .collect(),
-                dependencies: ModrinthPackDependencies {
-                    minecraft: Some(version.release),
-                    forge: version
-                        .modloaders
-                        .iter()
-                        .find(|loader| loader.type_ == ModLoaderType::Forge)
-                        .map(|loader| loader.version.clone()),
-                    neoforge: version
-                        .modloaders
-                        .iter()
-                        .find(|loader| loader.type_ == ModLoaderType::Neoforge)
-                        .map(|loader| loader.version.clone()),
-                    fabric_loader: version
-                        .modloaders
-                        .iter()
-                        .find(|loader| loader.type_ == ModLoaderType::Fabric)
-                        .map(|loader| loader.version.clone()),
-                    quilt_loader: version
-                        .modloaders
-                        .iter()
-                        .find(|loader| loader.type_ == ModLoaderType::Quilt)
-                        .map(|loader| loader.version.clone()),
-                },
+                dependencies: convert_standard_version_to_mr_version(version),
             };
 
             let tmpfile = app

@@ -11,6 +11,8 @@ use crate::managers::minecraft::assets::get_assets_dir;
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
 use crate::managers::minecraft::modrinth;
 use crate::managers::minecraft::{curseforge, UpdateValue};
+use crate::managers::modplatforms::curseforge::convert_cf_version_to_standard_version;
+use crate::managers::modplatforms::modrinth::convert_mr_version_to_standard_version;
 use crate::managers::vtask::Subtask;
 use crate::util::NormalizedWalkdir;
 
@@ -35,6 +37,7 @@ use chrono::{DateTime, Local, Utc};
 use futures::Future;
 use itertools::Itertools;
 use md5::{Digest, Md5};
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -276,6 +279,11 @@ impl ManagerRef<'_, InstanceManager> {
 
                 wait_task.complete_opaque();
 
+                let dummy_string = daedalus::BRANDING
+                    .get_or_init(daedalus::Branding::default)
+                    .dummy_replace_string
+                    .clone();
+
                 let mut downloads = Vec::new();
 
                 let change_version_path = setup_path.join("change-pack-version.json");
@@ -475,7 +483,16 @@ impl ManagerRef<'_, InstanceManager> {
                                 }
                             }
 
-                            Some(modpack_info.manifest.minecraft.try_into()?)
+                            let curseforge_version = modpack_info.manifest.minecraft;
+
+                            let gdl_version = convert_cf_version_to_standard_version(
+                                app.clone(),
+                                curseforge_version,
+                                dummy_string.clone(),
+                            )
+                            .await?;
+
+                            Some(gdl_version)
                         }
                         Some(Modplatform::Modrinth) => {
                             let (modpack_progress_tx, mut modpack_progress_rx) =
@@ -523,7 +540,15 @@ impl ManagerRef<'_, InstanceManager> {
                                 }
                             }
 
-                            Some(modpack_info.index.dependencies.try_into()?)
+                            let modrinth_version = modpack_info.index.dependencies;
+
+                            let gdl_version = convert_mr_version_to_standard_version(
+                                app.clone(),
+                                modrinth_version,
+                            )
+                            .await?;
+
+                            Some(gdl_version)
                         }
                         None => None,
                     };
@@ -892,11 +917,6 @@ impl ManagerRef<'_, InstanceManager> {
                                 anyhow::bail!("Fabric version is empty");
                             }
 
-                            let dummy_string = daedalus::BRANDING
-                                .get_or_init(daedalus::Branding::default)
-                                .dummy_replace_string
-                                .clone();
-
                             let fabric_version =
                                 crate::managers::minecraft::fabric::replace_template(
                                     &crate::managers::minecraft::fabric::get_version(
@@ -922,11 +942,6 @@ impl ManagerRef<'_, InstanceManager> {
                             if quilt_version.is_empty() {
                                 anyhow::bail!("Quilt version is empty");
                             }
-
-                            let dummy_string = daedalus::BRANDING
-                                .get_or_init(daedalus::Branding::default)
-                                .dummy_replace_string
-                                .clone();
 
                             let quilt_version = crate::managers::minecraft::quilt::replace_template(
                                 &crate::managers::minecraft::quilt::get_version(

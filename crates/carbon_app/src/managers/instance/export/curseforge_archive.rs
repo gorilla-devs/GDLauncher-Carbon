@@ -14,6 +14,7 @@ use crate::{
     },
     managers::{
         instance::{InstanceType, InvalidInstanceIdError},
+        modplatforms::curseforge::convert_standard_version_to_cf_version,
         vtask::VisualTask,
         AppInner,
     },
@@ -128,18 +129,7 @@ pub async fn export_curseforge(
             t_create_bundle.start_opaque(); // TODO: track the total number of overrides and use update_items
 
             let manifest = Manifest {
-                minecraft: Minecraft {
-                    version: version.release,
-                    mod_loaders: version
-                        .modloaders
-                        .into_iter()
-                        .enumerate()
-                        .map(|(i, loader)| ModLoaders {
-                            id: format!("{}-{}", loader.type_.to_string(), loader.version),
-                            primary: i == 0,
-                        })
-                        .collect(),
-                },
+                minecraft: convert_standard_version_to_cf_version(version.clone())?,
                 manifest_type: String::from("minecraftModpack"),
                 manifest_version: 1,
                 name: config.name,
