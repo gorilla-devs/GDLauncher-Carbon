@@ -237,7 +237,7 @@ mod test {
                             release: String::from("1.16.5"),
                             modloaders: HashSet::from([info::ModLoader {
                                 type_: info::ModLoaderType::Forge,
-                                version: String::from("36.2.34"),
+                                version: String::from("1.16.5-36.2.34"),
                             }]),
                         },
                     )),
