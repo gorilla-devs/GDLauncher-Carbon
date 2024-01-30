@@ -26,10 +26,10 @@ import Feat7 from "../assets/feat7.svg";
   </div>
 
   <div
-    class="grid grid-cols-1 gap-4 w-full md:w-[80%] justify-items-center p-4 md:grid-cols-2 lg:grid-cols-4"
+    class="grid grid-cols-1 gap-4 w-full md:w-[80%] justify-items-center p-4 md:grid-cols-2 lg:grid-cols-4 grid-container"
   >
     <div
-      class="flex flex-col items-center text-center w-full md:flex-1 md:w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-full md:flex-1 md:w-[275px] grid-item h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat1} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Modpack Integration</span>
@@ -40,7 +40,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-full md:w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-full md:w-[275px] grid-item h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat2} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Mods Manager</span>
@@ -51,7 +51,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-full md:w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-full md:w-[275px] grid-item h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat3} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Java Manager</span>
@@ -62,7 +62,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-full md:w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-full md:w-[275px] grid-item h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat4} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold"
@@ -75,7 +75,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-full md:w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-full md:w-[275px] grid-item h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat5} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Advanced Logs Manager</span>
@@ -86,7 +86,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-full md:w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-full md:w-[275px] grid-item h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat6} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Modload Support</span>
@@ -97,7 +97,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-full md:w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-full md:w-[275px] grid-item h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat7} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Modpack Autoupdater</span>
@@ -108,7 +108,7 @@ import Feat7 from "../assets/feat7.svg";
       </p>
     </div>
     <div
-      class="flex flex-col items-center text-center w-full md:w-[275px] h-[315px] background__card p-mdgd rounded-[16px] gap-3"
+      class="flex flex-col items-center text-center w-full md:w-[275px] grid-item h-[315px] background__card p-mdgd rounded-[16px] gap-3"
     >
       <Image src={Feat1} alt="feature placeholder" />
       <span class="text-smgd text-white font-bold">Custom Themes</span>
@@ -210,6 +210,16 @@ import Feat7 from "../assets/feat7.svg";
     }
     100% {
       transform: translate(-50%, -50%) scale(1.4) rotate(1turn);
+    }
+  }
+  @media screen and (max-width: 1485px) {
+    .grid-container {
+      width: 100%;
+    }
+  }
+  @media (min-width: 1031px) and (max-width: 1197px) {
+    .grid-item {
+      width: 228px;
     }
   }
 </style>
