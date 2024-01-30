@@ -16,7 +16,7 @@ model AppConfiguration {
   discordIntegration              Boolean   @default(true)
   releaseChannel                  String
   activeAccountUuid               String?
-  concurrentDownloads             Int       @default(8)
+  concurrentDownloads             Int       @default(10)
   showNews                        Boolean   @default(true)
   gameResolution                  String?
   launcherActionOnGameLaunch      String    @default("none")

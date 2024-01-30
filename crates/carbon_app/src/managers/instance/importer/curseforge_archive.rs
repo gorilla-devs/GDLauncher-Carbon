@@ -16,7 +16,10 @@ use crate::{
         modplatforms::curseforge::manifest::Manifest,
         vtask::VisualTaskId,
     },
-    managers::{instance::InstanceVersionSource, AppInner},
+    managers::{
+        instance::InstanceVersionSource,
+        modplatforms::curseforge::convert_cf_version_to_standard_version, AppInner,
+    },
 };
 
 use super::{
@@ -230,7 +233,19 @@ impl InstanceImporter for CurseforgeArchiveImporter {
 
         info!("Importing target {index} - '{}'", instance.manifest.name);
 
-        let version = GameVersion::Standard(instance.manifest.minecraft.clone().try_into()?);
+        let dummy_string = daedalus::BRANDING
+            .get_or_init(daedalus::Branding::default)
+            .dummy_replace_string
+            .clone();
+
+        let standard_version = convert_cf_version_to_standard_version(
+            app.clone(),
+            instance.manifest.minecraft.clone(),
+            dummy_string,
+        )
+        .await?;
+
+        let version = GameVersion::Standard(standard_version);
 
         let instance_version_source = match &instance.meta {
             Some(meta) => InstanceVersionSource::ModpackWithKnownVersion(

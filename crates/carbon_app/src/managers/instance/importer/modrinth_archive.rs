@@ -18,7 +18,10 @@ use crate::{
         },
         vtask::VisualTaskId,
     },
-    managers::{instance::InstanceVersionSource, AppInner},
+    managers::{
+        instance::InstanceVersionSource,
+        modplatforms::modrinth::convert_mr_version_to_standard_version, AppInner,
+    },
 };
 
 use super::{
@@ -200,7 +203,13 @@ impl InstanceImporter for ModrinthArchiveImporter {
             .cloned()
             .ok_or_else(|| anyhow!("invalid importable instance index"))?;
 
-        let version = GameVersion::Standard(instance.index.dependencies.clone().try_into()?);
+        let gdl_version = convert_mr_version_to_standard_version(
+            app.clone(),
+            instance.index.dependencies.clone(),
+        )
+        .await?;
+
+        let version = GameVersion::Standard(gdl_version);
 
         let instance_version_source = match &instance.meta {
             Some(meta) => InstanceVersionSource::ModpackWithKnownVersion(

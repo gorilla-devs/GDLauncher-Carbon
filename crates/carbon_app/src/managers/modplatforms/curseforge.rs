@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::bail;
 use reqwest_middleware::ClientWithMiddleware;
 use serde_json::json;
@@ -5,17 +7,21 @@ use tracing::{info, trace};
 use url::Url;
 
 use crate::{
-    domain::modplatforms::curseforge::{
-        filters::{
-            FilesParameters, ModDescriptionParameters, ModFileChangelogParameters,
-            ModFileParameters, ModFilesParameters, ModParameters, ModSearchParameters,
-            ModsParameters,
+    domain::{
+        self,
+        instance::info::{ModLoader, ModLoaderType, StandardVersion},
+        modplatforms::curseforge::{
+            filters::{
+                FilesParameters, ModDescriptionParameters, ModFileChangelogParameters,
+                ModFileParameters, ModFilesParameters, ModParameters, ModSearchParameters,
+                ModsParameters,
+            },
+            Category, CurseForgeResponse, File, FingerprintsMatchesResult, MinecraftModLoaderIndex,
+            Mod,
         },
-        Category, CurseForgeResponse, File, FingerprintsMatchesResult, MinecraftModLoaderIndex,
-        Mod,
     },
     error::request::GoodJsonRequestError,
-    managers::GDL_API_BASE,
+    managers::{AppInner, GDL_API_BASE},
 };
 
 pub struct CurseForge {
@@ -302,6 +308,201 @@ impl CurseForge {
             .await?;
         Ok(resp)
     }
+}
+
+// Converts a CurseForge version (manifest.json version for example) to a standard version
+pub async fn convert_cf_version_to_standard_version(
+    app: Arc<AppInner>,
+    curseforge_version: domain::modplatforms::curseforge::manifest::Minecraft,
+    dummy_string: String,
+) -> anyhow::Result<StandardVersion> {
+    let modloaders = curseforge_version
+        .mod_loaders
+        .into_iter()
+        .map(|mod_loader| {
+            let app = Arc::clone(&app);
+            let mc_version = curseforge_version.version.clone();
+            let dummy_string = dummy_string.clone();
+            async move {
+                let (loader, version) = mod_loader.id.split_once('-').ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "modloader id '{}' could not be split into a name-version pair",
+                        mod_loader.id
+                    )
+                })?;
+
+                match loader {
+                    "forge" => {
+                        let forge_manifest = app.minecraft_manager().get_forge_manifest().await?;
+
+                        let forge_version = forge_manifest
+                            .game_versions
+                            .into_iter()
+                            .find(|v| v.id == mc_version)
+                            .ok_or_else(|| {
+                                anyhow::anyhow!(
+                                    "forge manifest does not contain version '{}'",
+                                    mc_version
+                                )
+                            })?
+                            .loaders
+                            .into_iter()
+                            .find(|l| l.id.contains(version))
+                            .ok_or_else(|| {
+                                anyhow::anyhow!(
+                                    "forge manifest does not contain loader '{}'",
+                                    version
+                                )
+                            })?;
+
+                        Ok(ModLoader {
+                            type_: ModLoaderType::Forge,
+                            version: forge_version.id.to_string(),
+                        })
+                    }
+                    "neoforge" => {
+                        let neoforge_manifest =
+                            app.minecraft_manager().get_neoforge_manifest().await?;
+
+                        let neoforge_version = neoforge_manifest
+                            .game_versions
+                            .into_iter()
+                            .find(|v| v.id == mc_version)
+                            .ok_or_else(|| {
+                                anyhow::anyhow!(
+                                    "neoforge manifest does not contain version '{}'",
+                                    mc_version
+                                )
+                            })?
+                            .loaders
+                            .into_iter()
+                            .find(|l| l.id.contains(version))
+                            .ok_or_else(|| {
+                                anyhow::anyhow!(
+                                    "neoforge manifest does not contain loader '{}'",
+                                    version
+                                )
+                            })?;
+
+                        Ok(ModLoader {
+                            type_: ModLoaderType::Neoforge,
+                            version: neoforge_version.id.to_string(),
+                        })
+                    }
+                    "fabric" => {
+                        let fabric_manifest = app.minecraft_manager().get_fabric_manifest().await?;
+
+                        let fabric_version = fabric_manifest
+                            .game_versions
+                            .into_iter()
+                            .find(|v| v.id == dummy_string)
+                            .ok_or_else(|| {
+                                anyhow::anyhow!(
+                                    "fabric manifest does not contain version '{}'",
+                                    mc_version
+                                )
+                            })?
+                            .loaders
+                            .into_iter()
+                            .find(|l| l.id.contains(version))
+                            .ok_or_else(|| {
+                                anyhow::anyhow!(
+                                    "fabric manifest does not contain loader '{}'",
+                                    version
+                                )
+                            })?;
+
+                        Ok(ModLoader {
+                            type_: ModLoaderType::Fabric,
+                            version: fabric_version.id.to_string(),
+                        })
+                    }
+                    "quilt" => {
+                        let quilt_manifest = app.minecraft_manager().get_quilt_manifest().await?;
+
+                        let quilt_version = quilt_manifest
+                            .game_versions
+                            .into_iter()
+                            .find(|v| v.id == mc_version)
+                            .ok_or_else(|| {
+                                anyhow::anyhow!(
+                                    "quilt manifest does not contain version '{}'",
+                                    mc_version
+                                )
+                            })?
+                            .loaders
+                            .into_iter()
+                            .find(|l| l.id.contains(version))
+                            .ok_or_else(|| {
+                                anyhow::anyhow!(
+                                    "quilt manifest does not contain loader '{}'",
+                                    version
+                                )
+                            })?;
+
+                        Ok(ModLoader {
+                            type_: ModLoaderType::Quilt,
+                            version: quilt_version.id.to_string(),
+                        })
+                    }
+                    _ => bail!("unsupported modloader '{loader}'"),
+                }
+            }
+        });
+
+    let modloaders = futures::future::try_join_all(modloaders)
+        .await?
+        .into_iter()
+        .collect();
+
+    let gdl_version = StandardVersion {
+        release: curseforge_version.version.clone(),
+        modloaders,
+    };
+
+    Ok(gdl_version)
+}
+
+pub fn convert_standard_version_to_cf_version(
+    standard_version: StandardVersion,
+) -> anyhow::Result<domain::modplatforms::curseforge::manifest::Minecraft> {
+    let mod_loaders: Result<
+        Vec<domain::modplatforms::curseforge::manifest::ModLoaders>,
+        anyhow::Error,
+    > = standard_version
+        .modloaders
+        .into_iter()
+        .enumerate()
+        .map(|(i, loader)| {
+            let id = match loader.type_ {
+                ModLoaderType::Forge => {
+                    let split = loader.version.split('-').nth(1).ok_or(anyhow::anyhow!(
+                        "forge version '{}' could not be split into a name-version pair",
+                        loader.version
+                    ))?;
+
+                    Ok::<_, anyhow::Error>(format!("forge-{}", split))
+                }
+                ModLoaderType::Neoforge => Ok(format!("neoforge-{}", loader.version)),
+                ModLoaderType::Fabric => Ok(format!("fabric-{}", loader.version)),
+                ModLoaderType::Quilt => Ok(format!("quilt-{}", loader.version)),
+            }?;
+
+            Ok(domain::modplatforms::curseforge::manifest::ModLoaders {
+                id,
+                primary: i == 0,
+            })
+        })
+        .collect();
+
+    let mod_loaders = mod_loaders?;
+
+    let cf_version = domain::modplatforms::curseforge::manifest::Minecraft {
+        version: standard_version.release,
+        mod_loaders,
+    };
+
+    Ok(cf_version)
 }
 
 #[cfg(test)]
