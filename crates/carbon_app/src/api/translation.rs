@@ -26,6 +26,8 @@ pub enum Translation {
     InstanceTaskLaunchDownloadJava,
     InstanceTaskLaunchExtractJava,
     InstanceTaskLaunchDownloadFiles,
+    InstanceTaskGeneratingPackInfo,
+    InstanceTaskFillCache,
     InstanceTaskLaunchExtractNatives,
     InstanceTaskReconstructAssets,
     InstanceTaskLaunchRunForgeProcessors,

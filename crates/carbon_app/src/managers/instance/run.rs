@@ -252,6 +252,12 @@ impl ManagerRef<'_, InstanceManager> {
 
                 let t_download_files = task.subtask(Translation::InstanceTaskLaunchDownloadFiles);
                 t_download_files.set_weight(20.0);
+
+                let t_generating_packinfo =
+                    task.subtask(Translation::InstanceTaskGeneratingPackInfo);
+
+                let t_fill_cache = task.subtask(Translation::InstanceTaskFillCache);
+
                 let t_extract_natives = task.subtask(Translation::InstanceTaskLaunchExtractNatives);
 
                 let t_reconstruct_assets = task.subtask(Translation::InstanceTaskReconstructAssets);
@@ -345,8 +351,6 @@ impl ManagerRef<'_, InstanceManager> {
 
                             let (modpack_progress_tx, mut modpack_progress_rx) =
                                 tokio::sync::watch::channel(UpdateValue::<(u64, u64)>::new((0, 0)));
-
-                            t_download_files.start_opaque();
 
                             tokio::spawn(async move {
                                 while modpack_progress_rx.changed().await.is_ok() {
@@ -555,6 +559,8 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let (progress_watch_tx, mut progress_watch_rx) =
                         tokio::sync::watch::channel(carbon_net::Progress::new());
+
+                    t_download_files.start_opaque();
 
                     // dropped when the sender is dropped
                     tokio::spawn(async move {
@@ -1011,6 +1017,8 @@ impl ManagerRef<'_, InstanceManager> {
                     trace!("marking modpack initialization as complete");
 
                     if do_modpack_install {
+                        t_generating_packinfo.start_opaque();
+
                         let staging_path = setup_path.join("staging.json");
 
                         let staged_text;
@@ -1033,15 +1041,21 @@ impl ManagerRef<'_, InstanceManager> {
                             packinfo_str,
                         )
                         .await?;
+
+                        t_generating_packinfo.complete_opaque();
                     }
 
                     tokio::fs::create_dir_all(setup_path.join("modpack-complete")).await?;
 
                     tracing::info!("queueing metadata caching for running instance");
 
+                    t_fill_cache.start_opaque();
+
                     app.meta_cache_manager()
                         .queue_caching(instance_id, true)
                         .await;
+
+                    t_fill_cache.complete_opaque();
 
                     trace!("queued metadata caching");
                 }
