@@ -7,6 +7,8 @@ import Footer from "../components/Footer.astro";
 import FormattedDate from "../components/FormattedDate.astro";
 import ArticleInteractiveMarkdown from "../components/ArticleInteractiveMarkdown";
 import "../styles/blogPostStyle.css";
+import Ellipse from "../assets/ellipse10.svg";
+import { Image } from "astro:assets";
 
 type Props = CollectionEntry<"blog">["data"];
 
@@ -28,6 +30,7 @@ const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
 
         background-color: rgba(29, 32, 40, 1);
         color: white;
+        position: relative;
       }
       /* main {
         width: calc(100% - 2em);

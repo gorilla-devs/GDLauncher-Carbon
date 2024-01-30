@@ -2,13 +2,13 @@
 import HeaderLink from "./HeaderLink.astro";
 import { Image } from "astro:assets";
 import Logo from "../assets/logo.svg";
-import Button from "./button/Button";
-import Separator from "./button/Separator.astro";
 import DownloadButton from "./DownloadButton.astro";
+import Ellipse from "../assets/ellipse10.svg";
 ---
 
 <header>
   <nav>
+    <Image src={Ellipse} alt="lightning" class="absolute top-0" />
     <a href="/">
       <Image src={Logo} alt="gdlauncher logo" width="173" height="40" />
     </a>
