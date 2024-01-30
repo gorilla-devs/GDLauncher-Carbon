@@ -6,6 +6,7 @@ import { instanceId } from "@/utils/browser";
 import { Show, createSignal } from "solid-js";
 import {
   CurseforgeModpack,
+  FEInstanceId,
   Modpack,
   ModrinthModpack
 } from "@gd/core_module/bindings";
@@ -18,6 +19,14 @@ const ModPackVersionUpdate = (props: ModalProps) => {
     "instance.getInstanceDetails",
     instanceId() as number
   ]);
+  const changeModpackMutation = rspc.createMutation(
+    ["instance.changeModpack"],
+    {
+      onSuccess(taskId) {
+        modalContext?.closeModal();
+      }
+    }
+  );
   const getProjectId = () => {
     const modpack = instance.data?.modpack?.modpack;
     if (modpack) {
@@ -48,6 +57,17 @@ const ModPackVersionUpdate = (props: ModalProps) => {
       }
     }
   ]);
+  const handleUpdate = () => {
+    const obj = {
+      instance: instanceId() as FEInstanceId,
+      modpack:
+        currentPlatform() === "curseforge"
+          ? { Curseforge: JSON.parse(selectedVersion()) }
+          : { Modrinth: JSON.parse(selectedVersion()) }
+    };
+    console.log(obj);
+    changeModpackMutation.mutate(obj);
+  };
   console.log(response.data);
   console.log(instance.data);
   return (
@@ -76,13 +96,17 @@ const ModPackVersionUpdate = (props: ModalProps) => {
                 key:
                   currentPlatform() === "curseforge"
                     ? JSON.stringify({
-                        file_id: file.id
+                        file_id: file.id,
+                        project_id: file.modId
                       })
-                    : JSON.stringify({})
+                    : JSON.stringify({
+                        version_id: file.id,
+                        project_id: file.modId
+                      })
               })) || []
             }
-            onChange={(value) => {
-              console.log(value);
+            onChange={(option) => {
+              setSelectedVersion(option.key as string);
             }}
           />
 
@@ -95,7 +119,9 @@ const ModPackVersionUpdate = (props: ModalProps) => {
             >
               Cancel
             </Button>
-            <Button type="primary">Update</Button>
+            <Button type="primary" onClick={handleUpdate}>
+              Update
+            </Button>
           </div>
         </Show>
       </div>
