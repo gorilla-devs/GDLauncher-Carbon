@@ -1,4 +1,4 @@
-import { setTaskId } from "@/utils/import";
+import { setTaskId, setTaskIds } from "@/utils/import";
 import { taskIds } from "@/utils/import";
 import { rspc } from "@/utils/rspcClient";
 import { Progressbar } from "@gd/ui";
@@ -30,7 +30,9 @@ const SingleImport = (props: {
             const isFailed = task && task.progress.type === "Failed";
             const isDownloaded = task === null && progress() !== 0;
             if (isDownloaded || isFailed) {
-              setTaskId(undefined);
+              const taskIdsArray = taskIds();
+              taskIdsArray[props.instanceIndex] = undefined;
+              setTaskIds(taskIdsArray);
             }
             if (isFailed) {
               setState("failed");
