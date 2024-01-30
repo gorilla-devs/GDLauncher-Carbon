@@ -872,6 +872,7 @@ struct InstanceDetails {
     notes: String,
     state: LaunchState,
     icon_revision: Option<u32>,
+    has_pack_update: bool,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -1128,6 +1129,7 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             notes: value.notes,
             state: value.state.into(),
             icon_revision: value.icon_revision,
+            has_pack_update: value.has_pack_update,
         }
     }
 }

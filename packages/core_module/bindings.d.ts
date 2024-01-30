@@ -133,15 +133,13 @@ export type MoveInstance = { instance: FEInstanceId; target: MoveInstanceTarget 
 
 export type CFFEFileHash = { value: string; algo: CFFEHashAlgo }
 
-export type InstanceDetails = { name: string; favorite: boolean; version: string | null; modpack: ModpackInfo | null; globalJavaArgs: boolean; extraJavaArgs: string | null; memory: MemoryRange | null; gameResolution: GameResolution | null; lastPlayed: string | null; secondsPlayed: number; modloaders: ModLoader[]; notes: string; state: LaunchState; iconRevision: number | null }
+export type InstanceDetails = { name: string; favorite: boolean; version: string | null; modpack: ModpackInfo | null; globalJavaArgs: boolean; extraJavaArgs: string | null; memory: MemoryRange | null; gameResolution: GameResolution | null; lastPlayed: string | null; secondsPlayed: number; modloaders: ModLoader[]; notes: string; state: LaunchState; iconRevision: number | null; hasPackUpdate: boolean }
 
 export type InstallLatestMod = { instance_id: FEInstanceId; mod_source: LatestModSource }
 
 export type FESystemJavaProfileName = "legacy" | "legacyPatchedV1" | "alpha" | "beta" | "gamma" | "gammaSnapshot" | "minecraftJavaExe"
 
 export type FEManagedJavaOsMap = { [key: FEManagedJavaOs]: FEManagedJavaArchMap }
-
-export type ExportArgs = { instance_id: FEInstanceId; target: ExportTarget; save_path: string; link_mods: boolean; filter: ExportEntry }
 
 export type ModPlatform = "Curseforge" | "Modrinth"
 
@@ -155,37 +153,27 @@ export type ManifestVersion = { id: string; type: McType }
 
 export type CFFEFilesParameters = { body: CFFEFilesParametersBody }
 
-export type Mod = { id: string; filename: string; enabled: boolean; metadata: ModFileMetadata | null; curseforge: CurseForgeModMetadata | null; modrinth: ModrinthModMetadata | null; has_update: boolean }
+export type ImportEntityStatus = { entity: ImportEntity; supported: boolean; selection_type: ImportEntitySelectionType }
 
 export type MRFEUserRole = "developer" | "moderator" | "admin"
 
-export type InstanceFolder = "Root" | "Data" | "Mods" | "Configs" | "Screenshots" | "Saves" | "Logs" | "CrashReports" | "ResourcePacks" | "TexturePacks" | "ShaderPacks"
-
-export type ImportScanStatus = "NoResults" | { SingleResult: ImportEntry } | { MultiResult: ImportEntry[] }
-
 export type FEJavaProfile = { name: string; javaId: string | null }
-
-export type ExploreQuery = { instance_id: FEInstanceId; path: string[] }
 
 export type MRFEDependencyType = "required" | "optional" | "incompatible" | "embedded"
 
 export type FEModdedManifestLoaderVersion = { id: string }
 
-export type ModrinthModMetadata = { project_id: string; version_id: string; title: string; version: string; urlslug: string; description: string; authors: string; has_image: boolean }
-
 export type MRFESearchFacet = { Category: string } | { Version: string } | { License: string } | { ProjectType: string }
 
-export type MRFEProjectID = string
+export type ModrinthModMetadata = { project_id: string; version_id: string; title: string; version: string; urlslug: string; description: string; authors: string; has_image: boolean }
 
-export type ExploreEntry = { name: string; type: ExploreEntryType }
+export type MRFEProjectID = string
 
 export type MRFEProjectSearchParameters = { query: string | null; facets: MRFESearchFacetAnd | null; index: MRFESearchIndex | null; offset: number | null; limit: number | null; filters: string | null }
 
 export type InvalidationEvent = { key: string; args: any | null }
 
 export type FEManagedJavaVersion = { id: string; name: string; downloadUrl: string; javaVersion: string }
-
-export type ModFileMetadata = { id: string; modid: string | null; name: string | null; version: string | null; description: string | null; authors: string | null; modloaders: FEInstanceModloaderType[]; sha_1: string; sha_512: string; murmur_2: string; has_image: boolean }
 
 export type FEModDescriptionResponse = { data: string; pagination: CFFEPagination | null }
 
@@ -201,11 +189,15 @@ export type MRFETeamID = string
 
 export type FEModResponse = { data: CFFEMod; pagination: CFFEPagination | null }
 
+export type InvalidImportEntry = { name: string; reason: Translation }
+
 export type CauseSegment = { display: string; debug: string }
 
 export type ModSources = { channels: ModChannelWithUsage[]; platform_blacklist: ModPlatform[] }
 
 export type FEManagedJavaOs = "windows" | "linux" | "macOs"
+
+export type OpenInstanceFolder = { instance_id: FEInstanceId; folder: InstanceFolder }
 
 export type MRFEUser = { username: string; name: string | null; email: string | null; bio: string | null; id: string; github_id: number | null; avatar_url: string | null; created: string; role: MRFEUserRole; badges: number }
 
@@ -247,11 +239,13 @@ export type MRFEAdditionalFileType = "requiredResourcePack" | "optionalResourceP
 
 export type FESearchAPI = "curseforge" | "modrinth"
 
-export type ImportEntry = { Valid: ImportableInstance } | { Invalid: InvalidImportEntry }
-
 export type ModpackPlatform = "Curseforge" | "Modrinth"
 
+export type ExportArgs = { instance_id: FEInstanceId; target: ExportTarget; save_path: string; link_mods: boolean; filter: ExportEntry }
+
 export type FEJavaComponentType = "local" | "managed" | "custom"
+
+export type ExportEntry = { entries: { [key: string]: ExportEntry | null } }
 
 export type CFFEModSearchSortField = "featured" | "popularity" | "lastUpdated" | "name" | "author" | "totalDownloads" | "category" | "gameVersion"
 
@@ -281,9 +275,9 @@ export type FETaskId = number
 
 export type CFFECategory = { id: number; name: string; slug: string; url: string; iconUrl: string | null; dateModified: string; isClass: boolean | null; classId: number | null; parentCategoryId: number | null; displayIndex: number | null }
 
-export type MemoryRange = { min_mb: number; max_mb: number }
-
 export type GameResolution = { type: "Standard"; value: [number, number] } | { type: "Custom"; value: [number, number] }
+
+export type ExploreEntryType = { File: { size: number } } | "Directory"
 
 export type FEGroupId = number
 
@@ -303,42 +297,32 @@ export type CurseforgeMod = { project_id: number; file_id: number }
 
 export type FEUnifiedSearchParameters = { searchQuery: string | null; categories: And<FEUnifiedSearchCategoryID> | null; gameVersions: Or<string> | null; modloaders: Or<FEUnifiedModLoaderType> | null; projectType: FEUnifiedSearchType | null; sortIndex: FEUnifiedModSortIndex | null; sortOrder: CFFEModSearchSortOrder | null; index: number | null; pageSize: number | null; searchApi: FESearchAPI }
 
-export type ModLoader = { type_: FEInstanceModloaderType; version: string }
-
-export type ExportEntry = { entries: { [key: string]: ExportEntry | null } }
-
 export type MRFEDependency = { version_id: string | null; project_id: string | null; file_name: string | null; dependency_type: MRFEDependencyType }
 
 export type CFFEFileModule = { name: string; fingerprint: string }
 
 export type MRFELicense = { id: string; name: string; url: string | null }
 
-export type OpenInstanceFolder = { instance_id: FEInstanceId; folder: InstanceFolder }
-
-export type CurseForgeModMetadata = { project_id: number; file_id: number; name: string; version: string; urlslug: string; summary: string; authors: string; has_image: boolean }
-
 export type MRFERequestedVersionStatus = "listed" | "archived" | "draft" | "unlisted"
 
 export type ChangeModpack = { instance: FEInstanceId; modpack: Modpack }
 
-export type ImportEntitySelectionType = "file" | "directory"
+export type FEInstanceModloaderType = "neoforge" | "forge" | "fabric" | "quilt"
 
 export type ListInstanceStatus = { Valid: ValidListInstance } | { Invalid: InvalidListInstance }
-
-export type FEInstanceModpackInfo = { name: string; version_name: string; url_slug: string; has_image: boolean }
-
-export type ImportRequest = { index: number; name: string | null }
 
 /**
  * An image that have been uploaded to a project's gallery
  */
 export type MRFEGalleryItem = { url: string; featured: boolean; title: string | null; description: string | null; created: string; ordering: number | null }
 
-export type LaunchState = { Inactive: { failed_task: FETaskId | null } } | { Preparing: FETaskId } | { Running: { start_time: string; log_id: number } }
+export type ImportScanStatus = "NoResults" | { SingleResult: ImportEntry } | { MultiResult: ImportEntry[] }
 
 export type FEModdedManifest = { gameVersions: FEModdedManifestVersion[] }
 
 export type UpdateMod = { instance_id: FEInstanceId; mod_id: string }
+
+export type ImportRequest = { index: number; name: string | null }
 
 export type Progress = { type: "Indeterminate" } | { type: "Known"; value: number } | { type: "Failed"; value: FeError }
 
@@ -354,6 +338,8 @@ export type RemoteVersion = ({ platform: "Curseforge" } & CFFEFile) | ({ platfor
 
 export type FEModdedManifestVersion = { id: string; stable: boolean; loaders: FEModdedManifestLoaderVersion[] }
 
+export type MemoryRange = { min_mb: number; max_mb: number }
+
 export type FEModFileChangelogResponse = { data: string; pagination: CFFEPagination | null }
 
 export type ModrinthModpack = { project_id: string; version_id: string }
@@ -366,9 +352,9 @@ export type CFFEModParameters = { modId: number }
 
 export type InvalidListInstance = "JsonMissing" | { JsonError: ConfigurationParseError } | { Other: string }
 
-export type ImportEntity = "LegacyGDLauncher" | "MRPack" | "Modrinth" | "CurseForgeZip" | "CurseForge" | "ATLauncher" | "Technic" | "FTB" | "MultiMC" | "PrismLauncher"
-
 export type FEUnifiedPagination = { index: number; pageSize: number; resultCount: number; totalCount: number }
+
+export type ExportTarget = "Curseforge" | "Modrinth"
 
 export type MRFEProjectSearchResult = { slug: string; title: string; description: string; categories: string[] | null; client_side: MRFEProjectSupportRange; server_side: MRFEProjectSupportRange; project_type: MRFEProjectType; downloads: number; icon_url: string | null; color: number | null; project_id: string; author: string; display_categories: string[] | null; versions: string[]; follows: number; date_created: string; date_modified: string; latest_version: string | null; license: string; gallery: string[] | null; featured_gallery: string | null }
 
@@ -380,17 +366,15 @@ export type MRFEVersionID = string
 
 export type FEUpdateInstance = { instance: FEInstanceId; name?: Set<string> | null; useLoadedIcon?: Set<boolean> | null; notes?: Set<string> | null; version?: Set<string> | null; modloader?: Set<ModLoader | null> | null; globalJavaArgs?: Set<boolean> | null; extraJavaArgs?: Set<string | null> | null; memory?: Set<MemoryRange | null> | null; gameResolution?: Set<GameResolution | null> | null; modSources?: Set<ModSources | null> | null; modpackLocked?: Set<boolean | null> | null }
 
-export type ExportTarget = "Curseforge" | "Modrinth"
-
 export type MRFECategory = { icon: string; name: string; project_type: MRFEProjectType; header: string }
 
 export type CFFEHashAlgo = "sha1" | "md5"
 
+export type ExploreEntry = { name: string; type: ExploreEntryType }
+
 export type UngroupedInstance = ({ id: FEInstanceId; name: string; favorite: boolean; status: ListInstanceStatus; icon_revision: number | null; last_played: string | null; date_created: string; date_updated: string }) & { favorite: boolean }
 
 export type FEModSearchResponse = { data: CFFEMod[]; pagination: CFFEPagination | null }
-
-export type ImportEntityStatus = { entity: ImportEntity; supported: boolean; selection_type: ImportEntitySelectionType }
 
 export type ModpackInfo = { modpack: Modpack; locked: boolean }
 
@@ -410,15 +394,17 @@ export type CFFEClassId = "mods" | "resourcePacks" | "modpacks" | "customization
 
 export type CurseforgeModpack = { project_id: number; file_id: number }
 
-export type MRFEStatus = "listed" | "archived" | "draft" | "unlisted" | "scheduled" | "unknown"
+export type ImportableInstance = { filename: string; instance_name: string }
 
-export type ExploreEntryType = { File: { size: number } } | "Directory"
+export type MRFEStatus = "listed" | "archived" | "draft" | "unlisted" | "scheduled" | "unknown"
 
 export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: FEReleaseChannel; concurrentDownloads: number; launcherActionOnGameLaunch: FELauncherActionOnGameLaunch; showNews: boolean; xmx: number; xms: number; isFirstLaunch: boolean; gameResolution: GameResolution | null; javaCustomArgs: string; autoManageJava: boolean; modSources: ModSources; termsAndPrivacyAccepted: boolean; metricsEnabled: boolean; randomUserUuid: string }
 
 export type CFFEModAuthor = { id: number; name: string; url: string }
 
 export type InstanceMod = { instance_id: FEInstanceId; mod_id: string }
+
+export type Mod = { id: string; filename: string; enabled: boolean; metadata: ModFileMetadata | null; curseforge: CurseForgeModMetadata | null; modrinth: ModrinthModMetadata | null; has_update: boolean }
 
 export type FELauncherActionOnGameLaunch = "quitApp" | "closeWindow" | "minimizeWindow" | "hideWindow" | "none"
 
@@ -436,7 +422,7 @@ export type MRFESearchIndex = "relevance" | "downloads" | "follows" | "newest" |
 
 export type StandardVersion = { release: string; modloaders: ModLoader[] }
 
-export type FEInstanceModloaderType = "neoforge" | "forge" | "fabric" | "quilt"
+export type InstanceFolder = "Root" | "Data" | "Mods" | "Configs" | "Screenshots" | "Saves" | "Logs" | "CrashReports" | "ResourcePacks" | "TexturePacks" | "ShaderPacks"
 
 export type Set<T> = { Set: T }
 
@@ -452,29 +438,35 @@ export type MRFELoadersResponse = MRFELoader[]
 
 export type ModrinthMod = { project_id: string; version_id: string }
 
-export type FECategoriesResponse = { data: CFFECategory[]; pagination: CFFEPagination | null }
+export type ImportEntry = { Valid: ImportableInstance } | { Invalid: InvalidImportEntry }
 
-export type FullImportScanStatus = { scanning: boolean; status: ImportScanStatus }
+export type FECategoriesResponse = { data: CFFECategory[]; pagination: CFFEPagination | null }
 
 export type InstallMod = { instance_id: FEInstanceId; mod_source: ModSource; install_deps: boolean; replaces_mod: string | null }
 
 export type FEInstanceId = number
 
+export type LaunchState = { Inactive: { failed_task: FETaskId | null } } | { Preparing: FETaskId } | { Running: { start_time: string; log_id: number } }
+
 export type MRFESearchFacetAnd = MRFESearchFacetOr[]
 
 export type CFFEModStatus = "new" | "changesRequired" | "underSoftReview" | "approved" | "rejected" | "changesMade" | "inactive" | "abandoned" | "deleted" | "underReview"
+
+export type ModLoader = { type_: FEInstanceModloaderType; version: string }
 
 export type CFFEFileRelationType = "embeddedLibrary" | "optionalDependency" | "requiredDependency" | "tool" | "incompatible" | "include"
 
 export type MRFELoader = { icon: string; name: MRFELoaderType; supported_project_types: MRFEProjectType[] }
 
+export type FullImportScanStatus = { scanning: boolean; status: ImportScanStatus }
+
 export type CFFEModsParametersBody = { modIds: number[] }
 
 export type GameLogEntry = { id: GameLogId; instance_id: FEInstanceId; active: boolean }
 
-export type LatestModSource = { Curseforge: number } | { Modrinth: string }
+export type ImportEntity = "LegacyGDLauncher" | "MRPack" | "Modrinth" | "CurseForgeZip" | "CurseForge" | "ATLauncher" | "Technic" | "FTB" | "MultiMC" | "PrismLauncher"
 
-export type ImportableInstance = { filename: string; instance_name: string }
+export type LatestModSource = { Curseforge: number } | { Modrinth: string }
 
 export type FEModFilesResponse = { data: CFFEFile[]; pagination: CFFEPagination | null }
 
@@ -488,13 +480,19 @@ export type CFFEModFilesParameters = { modId: number; query: CFFEModFilesParamet
 
 export type GameVersion = { Standard: StandardVersion }
 
+export type ModFileMetadata = { id: string; modid: string | null; name: string | null; version: string | null; description: string | null; authors: string | null; modloaders: FEInstanceModloaderType[]; sha_1: string; sha_512: string; murmur_2: string; has_image: boolean }
+
 export type MRFEProjectSupportRange = "required" | "optional" | "unsupported" | "unknown"
 
 export type FEUpdateSystemJavaProfileArgs = { profileName: FESystemJavaProfileName; javaId: string }
 
+export type FEInstanceModpackInfo = { name: string; version_name: string; url_slug: string; has_image: boolean }
+
 export type CFFEModSearchParametersQuery = { gameId: number; searchFilter: string | null; gameVersion: string | null; categoryIds: number[] | null; sortOrder: CFFEModSearchSortOrder | null; sortField: CFFEModSearchSortField | null; classId: CFFEClassId | null; modLoaderTypes: CFFEModLoaderType[] | null; gameVersionTypeId: number | null; authorId: number | null; slug: string | null; index: number | null; pageSize: number | null }
 
-export type InvalidImportEntry = { name: string; reason: Translation }
+export type ImportEntitySelectionType = "file" | "directory"
+
+export type CurseForgeModMetadata = { project_id: number; file_id: number; name: string; version: string; urlslug: string; summary: string; authors: string; has_image: boolean }
 
 export type FEUnifiedSearchResult = { curseforge: CFFEMod } | { modrinth: MRFEProjectSearchResult }
 
@@ -513,5 +511,7 @@ export type ListGroup = { id: FEGroupId; name: string; instances: ListInstance[]
 export type MRFEProjectsResponse = MRFEProject[]
 
 export type McType = "old_alpha" | "old_beta" | "release" | "snapshot"
+
+export type ExploreQuery = { instance_id: FEInstanceId; path: string[] }
 
 export type MRFELoaderType = "bukkit" | "bungeecord" | "canvas" | "datapack" | "fabric" | "folia" | "forge" | "neoforge" | "iris" | "liteloader" | "minecraft" | "modloader" | "optifine" | "paper" | "purpur" | "quilt" | "rift" | "spigot" | "sponge" | "vanilla" | "velocity" | "waterfall" | "other"
