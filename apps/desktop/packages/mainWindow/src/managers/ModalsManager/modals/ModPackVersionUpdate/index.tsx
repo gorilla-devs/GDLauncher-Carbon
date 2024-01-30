@@ -62,8 +62,18 @@ const ModPackVersionUpdate = (props: ModalProps) => {
       instance: instanceId() as FEInstanceId,
       modpack:
         currentPlatform() === "curseforge"
-          ? { Curseforge: JSON.parse(selectedVersion()) }
-          : { Modrinth: JSON.parse(selectedVersion()) }
+          ? {
+              Curseforge: {
+                project_id: getProjectId()?.projectId as number,
+                file_id: parseInt(selectedVersion())
+              }
+            }
+          : {
+              Modrinth: {
+                project_id: getProjectId()?.projectId.toString() as string,
+                version_id: selectedVersion()
+              }
+            }
     };
     console.log(obj);
     changeModpackMutation.mutate(obj);
@@ -93,20 +103,11 @@ const ModPackVersionUpdate = (props: ModalProps) => {
                     </Show>
                   </div>
                 ),
-                key:
-                  currentPlatform() === "curseforge"
-                    ? JSON.stringify({
-                        file_id: file.id,
-                        project_id: file.modId
-                      })
-                    : JSON.stringify({
-                        version_id: file.id,
-                        project_id: file.modId
-                      })
+                key: file.id
               })) || []
             }
             onChange={(option) => {
-              setSelectedVersion(option.key as string);
+              setSelectedVersion(option.key.toString());
             }}
           />
 
