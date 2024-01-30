@@ -1,8 +1,55 @@
-import { Select } from "@gd/ui";
-import { ModalProps } from "../..";
+import { Button, Dropdown, Select } from "@gd/ui";
+import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
+import { rspc } from "@/utils/rspcClient";
+import { instanceId } from "@/utils/browser";
+import { Show, createSignal } from "solid-js";
+import {
+  CurseforgeModpack,
+  Modpack,
+  ModrinthModpack
+} from "@gd/core_module/bindings";
 
 const ModPackVersionUpdate = (props: ModalProps) => {
+  const [currentPlatform, setCurrentPlatform] = createSignal<string>("");
+  const [selectedVersion, setSelectedVersion] = createSignal<string>("");
+  const modalContext = useModal();
+  const instance = rspc.createQuery(() => [
+    "instance.getInstanceDetails",
+    instanceId() as number
+  ]);
+  const getProjectId = () => {
+    const modpack = instance.data?.modpack?.modpack;
+    if (modpack) {
+      if ("Curseforge" in modpack) {
+        const curseforgeModpack: CurseforgeModpack = modpack.Curseforge;
+        setCurrentPlatform("curseforge");
+        return {
+          projectId: curseforgeModpack.project_id,
+          fileId: curseforgeModpack.file_id
+        };
+      } else {
+        const modrinthModpack: ModrinthModpack = modpack.Modrinth;
+        setCurrentPlatform("modrinth");
+        return {
+          projectId: modrinthModpack.project_id,
+          fileId: modrinthModpack.version_id
+        };
+      }
+    }
+    return undefined;
+  };
+  const response = rspc.createQuery(() => [
+    "modplatforms.curseforge.getModFiles",
+    {
+      modId: getProjectId()?.projectId as number,
+      query: {
+        pageSize: 300
+      }
+    }
+  ]);
+  console.log(response.data);
+  console.log(instance.data);
   return (
     <ModalLayout
       noHeader={props.noHeader}
@@ -10,9 +57,48 @@ const ModPackVersionUpdate = (props: ModalProps) => {
       overflowHiddenDisabled={true}
       noPadding={true}
       scrollable="overflow-y-scroll scrollbar-hide"
-      // height="h-96"
     >
-      <div class="flex flex-col p-4 w-120"></div>
+      <div class="flex flex-col p-4 w-120 gap-4">
+        <Show when={response.isLoading || instance.isLoading}>loading ...</Show>
+        <Show when={!response.isLoading && !instance.isLoading}>
+          <Dropdown
+            class="bg-darkSlate-800 w-full"
+            options={
+              response.data?.data.map((file) => ({
+                label: (
+                  <div class="flex justify-between w-full">
+                    <span>{file.displayName}</span>
+                    <Show when={file.id === getProjectId()?.fileId}>
+                      <span class="text-green-500">[ Current ]</span>
+                    </Show>
+                  </div>
+                ),
+                key:
+                  currentPlatform() === "curseforge"
+                    ? JSON.stringify({
+                        file_id: file.id
+                      })
+                    : JSON.stringify({})
+              })) || []
+            }
+            onChange={(value) => {
+              console.log(value);
+            }}
+          />
+
+          <div class="flex justify-between">
+            <Button
+              type="outline"
+              onClick={() => {
+                modalContext?.closeModal();
+              }}
+            >
+              Cancel
+            </Button>
+            <Button type="primary">Update</Button>
+          </div>
+        </Show>
+      </div>
     </ModalLayout>
   );
 };
