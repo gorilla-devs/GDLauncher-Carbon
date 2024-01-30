@@ -466,7 +466,7 @@ const Tile = (props: Props) => {
                 }}
                 classList={{
                   "group-hover:opacity-50 group-hover:blur-[1.5px]  transition ease-in-out duration-150":
-                    !props.isLoading && !props.isRunning,
+                    !props.isLoading && !props.isRunning && !isInQueue(),
                   "opacity-50 blur-[1.5px]": props.isRunning,
                   grayscale: props.isLoading || isInQueue()
                 }}
