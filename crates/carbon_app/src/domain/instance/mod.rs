@@ -44,6 +44,7 @@ pub struct InstanceDetails {
     pub state: LaunchState,
     pub notes: String,
     pub icon_revision: Option<u32>,
+    pub has_pack_update: bool,
 }
 
 #[derive(Debug)]

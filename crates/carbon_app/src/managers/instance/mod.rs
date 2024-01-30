@@ -15,7 +15,7 @@ use anyhow::{anyhow, Context};
 use chrono::{DateTime, Utc};
 use fs_extra::dir::CopyOptions;
 use futures::future::BoxFuture;
-use futures::Future;
+use futures::{join, Future};
 
 use prisma_client_rust::Direction;
 use rspc::Type;
@@ -168,6 +168,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .meta_cache_manager()
                 .queue_caching(instance_id, false)
                 .await;
+
+            let app = self.app.clone();
+            tokio::task::spawn(async move {
+                // ignore errors
+                let (_, _) = join!(
+                    app.instance_manager()
+                        .check_curseforge_modpack_updates(instance_id),
+                    app.instance_manager()
+                        .check_modrinth_modpack_updates(instance_id),
+                );
+            });
         }
 
         self.app.invalidate(GET_GROUPS, None);
@@ -1536,6 +1547,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             state: (&instance.state).into(),
             notes: instance.config.notes.clone(),
             icon_revision,
+            has_pack_update: instance.modpack_update_curseforge.unwrap_or(false)
+                || instance.modpack_update_modrinth.unwrap_or(false),
         })
     }
 

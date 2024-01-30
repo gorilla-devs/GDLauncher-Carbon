@@ -426,7 +426,10 @@ async fn cache_modrinth_meta_unchecked(
 
     let mut file_update_paths = HashSet::<(&str, ModLoaderType, ModChannel)>::new();
 
-    for other_version in versions {
+    let mut versions_sorted = versions.iter().collect::<Vec<_>>();
+    versions_sorted.sort_by(|f1, f2| Ord::cmp(&f2.date_published, &f1.date_published));
+
+    for other_version in versions_sorted {
         if other_version.project_id != project.id
             || other_version.id == version.id
             || !version
