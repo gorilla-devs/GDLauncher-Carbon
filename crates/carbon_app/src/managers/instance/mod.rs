@@ -1050,8 +1050,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .settings_manager()
             .runtime_path
             .get_instances()
-            .to_path()
-            .join(shortpath as &str);
+            .get_instance_path(shortpath as &str)
+            .get_root();
 
         let mut info = data.config.clone();
 
@@ -1199,7 +1199,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .invalidate(INSTANCE_DETAILS, Some(update.instance_id.0.into()));
 
         if need_reinstall {
-            tokio::fs::write(path.join(".first_run_incomplete"), "")
+            tokio::fs::create_dir_all(path.join(".setup"))
                 .await
                 .context("writing incomplete instance marker")?;
 

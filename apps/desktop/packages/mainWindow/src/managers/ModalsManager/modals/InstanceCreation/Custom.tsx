@@ -656,7 +656,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                     bgColorClass="bg-darkSlate-800"
                     containerClass="w-full"
                     class="w-full"
-                    value={loaderVersions()[0].id}
+                    value={chosenLoaderVersion() || loaderVersions()[0].id}
                     placement="bottom"
                     onChange={(l) => {
                       const key = l.key as string;

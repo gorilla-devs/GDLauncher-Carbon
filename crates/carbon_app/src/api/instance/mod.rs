@@ -542,8 +542,10 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                         .await
                         .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
 
-                    app.instance_manager().set_loaded_icon(icon).await;
-                    Ok::<_, AxumError>(())
+                    app.instance_manager().set_loaded_icon(icon.clone()).await;
+
+                    let icon_bytes = icon.1;
+                    Ok::<_, AxumError>(icon_bytes)
                 }
             )
         )

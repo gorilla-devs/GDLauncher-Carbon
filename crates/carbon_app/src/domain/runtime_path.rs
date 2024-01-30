@@ -96,8 +96,8 @@ impl InstancesPath {
         self.0.clone()
     }
 
-    pub fn get_instance_path(&self, instance_id: &str) -> InstancePath {
-        InstancePath(self.0.join(instance_id))
+    pub fn get_instance_path(&self, instance_shortpath: &str) -> InstancePath {
+        InstancePath(self.0.join(instance_shortpath))
     }
 }
 
