@@ -25,8 +25,12 @@ export const DownloadLink = ({ urls }: { urls: Array<string> }) => {
       return urls[2];
     }
   };
+  const url = getCurrentUrl();
   return (
-    <a href={getCurrentUrl()} class="flex items-center gap-2">
+    <a
+      href={url.includes("zip") ? url.replace("zip", "dmg") : url}
+      class="flex items-center gap-2"
+    >
       <span>DOWNLOAD FOR</span>
 
       <Show when={getOs() === "Windows"}>

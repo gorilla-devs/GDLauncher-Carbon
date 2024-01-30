@@ -13,7 +13,10 @@ const response = await Promise.all([
 const yamlfiles = await Promise.all(response.map((val) => val.text()));
 const downloadLinks = yamlfiles
   .map((val) => yaml.load(val))
-  .map((val: any) => `https://cdn-raw.gdl.gg/launcher/${val.path}`);
+  .map(
+    (val: any) =>
+      `https://cdn-raw.gdl.gg/launcher/${val.path.includes("zip") ? val.path.replace("zip", "dmg") : val.path}`
+  );
 ---
 
 <Button
