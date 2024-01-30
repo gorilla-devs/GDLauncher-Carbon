@@ -1,13 +1,12 @@
-import { createResource } from "solid-js";
+import { Show, createResource } from "solid-js";
 import Apple from "../assets/Apple";
 import Linux from "../assets/Linux";
 import Windows from "../assets/Windows";
-import yaml from "js-yaml";
 
 const getOs = () => {
   if (window.navigator.userAgent.toLowerCase().includes("windows")) {
     return "Windows";
-  } else if (window.navigator.userAgent.toLowerCase().includes("darwin")) {
+  } else if (window.navigator.userAgent.toLowerCase().includes("mac")) {
     return "MacOS";
   } else if (window.navigator.userAgent.toLowerCase().includes("linux")) {
     return "Linux";
@@ -15,33 +14,6 @@ const getOs = () => {
     return "Unknown";
   }
 };
-
-async function getDownloadLink() {
-  const getPath = () => {
-    if (getOs() === "Windows") {
-      return "https://cdn-raw.gdl.gg/launcher/alpha.yml";
-    } else if (getOs() === "MacOS") {
-      return "https://cdn-raw.gdl.gg/launcher/alpha-mac.yml";
-    } else {
-      return "https://cdn-raw.gdl.gg/launcher/alpha-linux.yml";
-    }
-  };
-  const response = await fetch(getPath());
-  const data = await response.text();
-  const doc = yaml.load(data) as {
-    version: string;
-    files: Array<{
-      url: string;
-      sha512: string;
-      size: number;
-    }>;
-    path: string;
-    sha512: string;
-    releaseDate: string;
-  };
-  const downloadLink = `https://cdn-raw.gdl.gg/launcher/${doc.path}`;
-  return downloadLink;
-}
 
 export const DownloadLink = ({ urls }: { urls: Array<string> }) => {
   const getCurrentUrl = () => {
@@ -56,13 +28,16 @@ export const DownloadLink = ({ urls }: { urls: Array<string> }) => {
   return (
     <a href={getCurrentUrl()} class="flex items-center gap-2">
       <span>DOWNLOAD FOR</span>
-      {getOs() === "Windows" ? (
+
+      <Show when={getOs() === "Windows"}>
         <Windows />
-      ) : getOs() === "MacOS" ? (
+      </Show>
+      <Show when={getOs() === "MacOS"}>
         <Apple />
-      ) : (
+      </Show>
+      <Show when={getOs() === "Linux"}>
         <Linux />
-      )}
+      </Show>
     </a>
   );
 };
