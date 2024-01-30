@@ -220,6 +220,7 @@ const Tile = (props: Props) => {
         <ContextMenu menuItems={menuItems()}>
           <div
             class="flex justify-center flex-col relative select-none group items-start"
+            style={{ "pointer-events": "auto" }}
             onClick={(e) => {
               e.stopPropagation();
               if (
