@@ -77,7 +77,7 @@ const posts = (await getCollection("blog")).sort(
         margin: 0;
         color: rgba(147, 153, 170, 1);
       }
-      
+
       ul a:hover img {
         box-shadow: var(--box-shadow);
         transform: scale(1.05);
@@ -120,7 +120,7 @@ const posts = (await getCollection("blog")).sort(
               //     </p>
               //   </a>
               // </li>
-              <ArticleCard post={post}/>
+              <ArticleCard post={post} />
             ))
           }
         </ul>

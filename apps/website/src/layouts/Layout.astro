@@ -15,7 +15,7 @@ const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
   <head>
     <BaseHead title={title} description={description} />
     <style>
-     body {
+      body {
         font-family: "Ubuntu", cursive;
         /* background-color: rgba(29, 32, 40, 1); */
         background-image: linear-gradient(
@@ -23,9 +23,8 @@ const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
             /* Your specified semi-transparent color */ rgba(23, 29, 39, 0.3)
           ),
           url("../assets/bg.svg");
-        background-size: cover;
-        /* background-position: center; */
-        background-repeat: no-repeat;
+
+        background-repeat: repeat-x;
         background-color: rgba(29, 32, 40, 1);
       }
       main {
@@ -37,7 +36,6 @@ const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
         margin: 0 auto;
         border-radius: 12px;
       }
-       
     </style>
   </head>
   <body>
@@ -51,7 +49,7 @@ const { title, description, pubDate, updatedDate, heroImage } = Astro.props;
             )
           }
         </div>
-        
+
         <slot />
       </article>
     </main>

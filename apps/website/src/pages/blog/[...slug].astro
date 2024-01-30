@@ -1,20 +1,36 @@
 ---
-import { type CollectionEntry, getCollection } from 'astro:content';
-import BlogPost from '../../layouts/BlogPost.astro';
+import { type CollectionEntry, getCollection } from "astro:content";
+import BlogPost from "../../layouts/BlogPost.astro";
 
 export async function getStaticPaths() {
-	const posts = await getCollection('blog');
-	return posts.map((post) => ({
-		params: { slug: post.slug },
-		props: post,
-	}));
+  const posts = await getCollection("blog");
+  return posts.map((post) => ({
+    params: { slug: post.slug },
+    props: post,
+  }));
 }
-type Props = CollectionEntry<'blog'>;
+type Props = CollectionEntry<"blog">;
 
 const post = Astro.props;
 const { Content } = await post.render();
 ---
 
+<style>
+  body {
+    font-family: "Ubuntu", cursive;
+    /* background-color: rgba(29, 32, 40, 1); */
+    background-image: linear-gradient(
+        rgba(23, 29, 39, 0.3),
+        /* Your specified semi-transparent color */ rgba(23, 29, 39, 0.3)
+      ),
+      url("../../assets/bg.svg");
+
+    background-color: rgba(29, 32, 40, 1);
+    background-repeat: repeat-x;
+    color: white;
+  }
+</style>
+
 <BlogPost {...post.data}>
-	<Content />
+  <Content />
 </BlogPost>
