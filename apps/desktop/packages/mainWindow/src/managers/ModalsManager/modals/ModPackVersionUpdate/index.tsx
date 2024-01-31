@@ -1,4 +1,4 @@
-import { Button, Dropdown, Select } from "@gd/ui";
+import { Button, Dropdown } from "@gd/ui";
 import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
 import { rspc } from "@/utils/rspcClient";
@@ -7,12 +7,13 @@ import { Show, createSignal } from "solid-js";
 import {
   CurseforgeModpack,
   FEInstanceId,
-  Modpack,
   ModrinthModpack
 } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
+import { useTransContext } from "@gd/i18n";
 
 const ModPackVersionUpdate = (props: ModalProps) => {
+  const [t] = useTransContext();
   const [currentPlatform, setCurrentPlatform] = createSignal<string>("");
   const [selectedVersion, setSelectedVersion] = createSignal<string>("");
   const navigate = useGDNavigate();
@@ -24,7 +25,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
   const changeModpackMutation = rspc.createMutation(
     ["instance.changeModpack"],
     {
-      onSuccess(taskId) {
+      onSuccess() {
         modalContext?.closeModal();
         navigate("/library");
       }
@@ -101,7 +102,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
                   <div class="flex justify-between w-full">
                     <span>{file.displayName}</span>
                     <Show when={file.id === getProjectId()?.fileId}>
-                      <span class="text-green-500">[ Current ]</span>
+                      <span class="text-green-500">{`[ Current ]`}</span>
                     </Show>
                   </div>
                 ),
@@ -121,10 +122,10 @@ const ModPackVersionUpdate = (props: ModalProps) => {
                 modalContext?.closeModal();
               }}
             >
-              Cancel
+              {t("instance.cancel_export")}
             </Button>
             <Button type="primary" onClick={handleUpdate}>
-              Update
+              {t("instance.instance_modal_instance_update")}
             </Button>
           </div>
         </Show>

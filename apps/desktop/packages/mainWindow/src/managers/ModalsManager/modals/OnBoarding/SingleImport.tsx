@@ -1,4 +1,4 @@
-import { setTaskId, setTaskIds } from "@/utils/import";
+import { setTaskIds } from "@/utils/import";
 import { taskIds } from "@/utils/import";
 import { rspc } from "@/utils/rspcClient";
 import { Progressbar } from "@gd/ui";
