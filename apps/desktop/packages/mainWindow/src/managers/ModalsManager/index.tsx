@@ -57,6 +57,10 @@ const defaultModals = {
     component: lazy(() => import("./modals/InstanceExport")),
     title: "Export Instance"
   },
+  modpack_version_update: {
+    component: lazy(() => import("./modals/ModPackVersionUpdate")),
+    title: "Update Version"
+  },
   notification: {
     component: lazy(() => import("./modals/Notification")),
     title: "Notification"

@@ -112,23 +112,26 @@ const Dropdown = (props: Props) => {
         (option) => option.key === selectedValue().key
       );
 
-      const isElementFullyViewable = (element: HTMLElement) => {
-        const elementRect = element.getBoundingClientRect();
-        const parentRect = (menuRef() as HTMLElement).getBoundingClientRect();
-
-        return (
-          elementRect.top >= parentRect.top &&
-          elementRect.bottom <= parentRect.bottom
-        );
-      };
-
       if (selectedOptionIndex !== -1) {
         const selectedOption = (menuRef() as HTMLUListElement).children[
           selectedOptionIndex
         ] as HTMLElement;
 
-        if (!isElementFullyViewable(selectedOption)) {
-          selectedOption.scrollIntoView();
+        const menuElement = menuRef() as HTMLElement;
+        const menuRect = menuElement.getBoundingClientRect();
+        const optionRect = selectedOption.getBoundingClientRect();
+
+        const isOptionInView =
+          optionRect.top >= menuRect.top &&
+          optionRect.bottom <= menuRect.bottom;
+
+        if (!isOptionInView) {
+          const scrollMiddle =
+            optionRect.top -
+            menuRect.top +
+            menuElement.scrollTop -
+            (menuRect.height / 2 - optionRect.height / 2);
+          menuElement.scrollTop = scrollMiddle;
         }
       }
     }
@@ -208,7 +211,7 @@ const Dropdown = (props: Props) => {
           <Portal>
             <ul
               ref={setMenuRef}
-              class="absolute max-h-60 overflow-y-auto overflow-x-hidden text-darkSlate-50 shadow-md shadow-darkSlate-900 list-none m-0 p-0 z-100 min-w-32"
+              class="absolute  max-h-60 bottom-0 overflow-y-auto overflow-x-hidden text-darkSlate-50 shadow-md shadow-darkSlate-900 list-none m-0 p-0 z-100 min-w-32"
               onMouseOut={() => {
                 setFocusIn(false);
               }}

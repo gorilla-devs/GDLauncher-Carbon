@@ -125,7 +125,7 @@ export type ImportRequest = { index: number; name: string | null }
 
 export type FEManagedJavaArchMap = { [key: FEManagedJavaArch]: FEManagedJavaVersion[] }
 
-export type MRFETeamMember = { team_id: string; user: MRFEUser; role: string; ordering: number | null }
+export type MRFETeamMember = { team_id: string; user: MRFEUser; role: string; ordering: string | null }
 
 export type ImportEntity = "LegacyGDLauncher" | "MRPack" | "Modrinth" | "CurseForgeZip" | "CurseForge" | "ATLauncher" | "Technic" | "FTB" | "MultiMC" | "PrismLauncher"
 
@@ -312,7 +312,7 @@ export type MoveInstanceTarget = { BeforeInstance: FEInstanceId } | { BeginningO
 /**
  * An image that have been uploaded to a project's gallery
  */
-export type MRFEGalleryItem = { url: string; featured: boolean; title: string | null; description: string | null; created: string; ordering: number | null }
+export type MRFEGalleryItem = { url: string; featured: boolean; title: string | null; description: string | null; created: string; ordering: string | null }
 
 export type FEModdedManifest = { gameVersions: FEModdedManifestVersion[] }
 

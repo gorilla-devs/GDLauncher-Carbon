@@ -10,9 +10,12 @@ import Title from "@/pages/Settings/components/Title";
 import Row from "@/pages/Settings/components/Row";
 import RowsContainer from "@/pages/Settings/components/RowsContainer";
 import RightHandSide from "@/pages/Settings/components/RightHandSide";
+import { setInstanceId } from "@/utils/browser";
+import { useModal } from "@/managers/ModalsManager";
 
 const Settings = () => {
   const [t] = useTransContext();
+  const modalsContext = useModal();
   const params = useParams();
   const updateInstanceMutation = rspc.createMutation(
     ["instance.updateInstance"],
@@ -110,6 +113,18 @@ const Settings = () => {
               >
                 <i class="w-5 h-5 i-ri:git-branch-fill" />
                 <Trans key="instance_settings.unpair" />
+              </Button>
+              <Button
+                type="outline"
+                onClick={() => {
+                  setInstanceId(parseInt(params.id, 10));
+                  modalsContext?.openModal({
+                    name: "modpack_version_update"
+                  });
+                }}
+              >
+                <i class="w-5 h-5 i-ri:arrow-left-right-fill" />
+                <Trans key="instance_settings.update_version" />
               </Button>
             </div>
           </div>

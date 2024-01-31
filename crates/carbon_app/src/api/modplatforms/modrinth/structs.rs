@@ -961,7 +961,7 @@ pub struct MRFEGalleryItem {
     pub created: String,
     /// The order of the gallery image.
     /// Gallery images are sorted by this field and then alphabetically by title.
-    pub ordering: Option<i32>,
+    pub ordering: Option<String>,
 }
 
 impl From<GalleryItem> for MRFEGalleryItem {
@@ -972,7 +972,7 @@ impl From<GalleryItem> for MRFEGalleryItem {
             title: value.title,
             description: value.description,
             created: value.created.to_rfc3339(),
-            ordering: value.ordering,
+            ordering: value.ordering.map(|v| v.to_string()),
         }
     }
 }
@@ -986,7 +986,7 @@ impl TryFrom<MRFEGalleryItem> for GalleryItem {
             title: value.title,
             description: value.description,
             created: value.created.parse()?,
-            ordering: value.ordering,
+            ordering: value.ordering.map(|v| v.parse()).transpose()?,
         })
     }
 }
@@ -1112,7 +1112,7 @@ pub struct MRFETeamMember {
     pub team_id: String,
     pub user: MRFEUser,
     pub role: String,
-    pub ordering: Option<u32>,
+    pub ordering: Option<String>,
 }
 
 impl From<TeamMember> for MRFETeamMember {
@@ -1121,7 +1121,7 @@ impl From<TeamMember> for MRFETeamMember {
             team_id: value.team_id,
             user: value.user.into(),
             role: value.role,
-            ordering: value.ordering,
+            ordering: value.ordering.map(|v| v.to_string()),
         }
     }
 }
