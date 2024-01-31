@@ -220,6 +220,7 @@ const Tile = (props: Props) => {
         <ContextMenu menuItems={menuItems()}>
           <div
             class="flex justify-center flex-col relative select-none group items-start"
+            style={{ "pointer-events": "auto" }}
             onClick={(e) => {
               e.stopPropagation();
               if (
@@ -304,7 +305,7 @@ const Tile = (props: Props) => {
                     props.percentage !== null
                   }
                 >
-                  <div class="flex flex-col justify-center items-center z-20 w-full h-full gap-2">
+                  <div class="flex flex-col justify-center items-center z-20 w-full h-full gap-2 p-4">
                     <h3 class="text-center opacity-50 m-0 text-3xl">
                       {Math.round(props.percentage as number)}%
                     </h3>

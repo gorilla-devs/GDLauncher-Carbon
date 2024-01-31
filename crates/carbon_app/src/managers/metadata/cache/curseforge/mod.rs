@@ -13,6 +13,9 @@ use crate::db::read_filters::DateTimeFilter;
 use crate::db::read_filters::IntFilter;
 use crate::domain::instance::info::ModLoaderType;
 use crate::domain::instance::InstanceId;
+use crate::domain::modplatforms::curseforge::filters::ModFilesParameters;
+use crate::domain::modplatforms::curseforge::filters::ModFilesParametersQuery;
+use crate::domain::modplatforms::curseforge::filters::ModParameters;
 use crate::domain::modplatforms::curseforge::filters::ModsParameters;
 use crate::domain::modplatforms::curseforge::filters::ModsParametersBody;
 use crate::domain::modplatforms::curseforge::File;
@@ -42,7 +45,7 @@ impl ModplatformCacher for CurseforgeModCacher {
         Vec<u32>,
         Vec<(String, u32)>,
         FingerprintsMatchesResult,
-        Vec<Mod>,
+        Vec<(Mod, Vec<File>)>,
     );
 
     async fn query_platform(
@@ -116,22 +119,38 @@ impl ModplatformCacher for CurseforgeModCacher {
                     .await?
                     .data;
 
-                let mods_response = app
-                    .modplatforms_manager()
-                    .curseforge
-                    .get_mods(ModsParameters {
-                        body: ModsParametersBody {
-                            mod_ids: fp_response
-                                .exact_matches
-                                .iter()
-                                .map(|m| m.file.mod_id)
-                                .collect::<Vec<_>>(),
-                        },
-                    })
-                    .await?
-                    .data;
+                let mpm = app.modplatforms_manager();
+                let mod_responses = fp_response.exact_matches.iter().map(|m| async {
+                    let cfmod = mpm
+                        .curseforge
+                        .get_mod(ModParameters {
+                            mod_id: m.file.mod_id,
+                        })
+                        .await?;
 
-                sender.send((fingerprints, metadata, fp_response, mods_response));
+                    let files = mpm
+                        .curseforge
+                        .get_mod_files(ModFilesParameters {
+                            mod_id: m.file.mod_id,
+                            query: ModFilesParametersQuery {
+                                game_version: None,
+                                mod_loader_type: None,
+                                game_version_type_id: None,
+                                index: None,
+                                page_size: None,
+                            },
+                        })
+                        .await?;
+
+                    Ok::<_, anyhow::Error>((cfmod.data, files.data))
+                });
+
+                let mod_responses = futures::future::join_all(mod_responses)
+                    .await
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                sender.send((fingerprints, metadata, fp_response, mod_responses));
             }
 
             Ok::<_, anyhow::Error>(())
@@ -157,7 +176,7 @@ impl ModplatformCacher for CurseforgeModCacher {
     async fn save_batch(
         app: &App,
         instance_id: InstanceId,
-        (fingerprints, batch, fp_response, mods_response): Self::SaveBundle,
+        (fingerprints, batch, fp_response, mod_responses): Self::SaveBundle,
     ) {
         trace!("processing curseforge mod batch for instance {instance_id}");
 
@@ -165,9 +184,9 @@ impl ModplatformCacher for CurseforgeModCacher {
             .exact_matches
             .into_iter()
             .map(|fp_match| {
-                mods_response
+                mod_responses
                     .iter()
-                    .find(|m| m.id == fp_match.file.mod_id)
+                    .find(|m| m.0.id == fp_match.file.mod_id)
                     .map(|m| (fp_match.file.file_fingerprint, (fp_match, m)))
             })
             .flatten()
@@ -186,7 +205,8 @@ impl ModplatformCacher for CurseforgeModCacher {
                     metadata_id.clone(),
                     &fp_match.file,
                     murmur2,
-                    &modinfo,
+                    &modinfo.0,
+                    &modinfo.1[..],
                 )
                 .await;
 
@@ -340,6 +360,7 @@ async fn cache_curseforge_meta_unchecked(
     fileinfo: &File,
     murmur2: u32,
     modinfo: &Mod,
+    mod_files: &[File],
 ) -> anyhow::Result<()> {
     let prev = app
         .prisma_client
@@ -383,7 +404,7 @@ async fn cache_curseforge_meta_unchecked(
     let file_update_paths = parse_update_paths(&fileinfo);
     let mut update_paths = Vec::<(String, ModLoaderType, ModChannel)>::new();
 
-    let mut latest_files_sorted = modinfo.latest_files.iter().collect::<Vec<_>>();
+    let mut latest_files_sorted = mod_files.iter().collect::<Vec<_>>();
     latest_files_sorted.sort_by(|f1, f2| Ord::cmp(&f2.file_date, &f1.file_date));
 
     for file in latest_files_sorted {

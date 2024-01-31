@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use anyhow::bail;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -11,7 +12,10 @@ use crate::{
         modplatforms::{
             curseforge::{
                 self,
-                filters::{ModParameters, ModsParameters, ModsParametersBody},
+                filters::{
+                    ModFilesParameters, ModFilesParametersQuery, ModParameters, ModsParameters,
+                    ModsParametersBody,
+                },
             },
             modrinth::{project::ProjectVersionsFilters, search::ProjectID},
         },
@@ -25,161 +29,107 @@ use super::{InstanceData, InstanceManager, InstanceType};
 pub mod packinfo;
 
 impl ManagerRef<'_, InstanceManager> {
-    pub async fn check_curseforge_modpack_updates(self) -> anyhow::Result<()> {
+    pub async fn check_curseforge_modpack_updates(
+        self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<()> {
         let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        let project_ids = instances
-            .iter()
-            .filter_map(|instance| match &instance.1.type_ {
-                InstanceType::Valid(InstanceData {
-                    config:
-                        info::Instance {
-                            modpack:
-                                Some(ModpackInfo {
-                                    modpack: Modpack::Curseforge(modpack),
-                                    ..
-                                }),
-                            ..
-                        },
-                    ..
-                }) => Some(modpack.project_id as i32),
-                _ => None,
-            })
-            .collect();
+        let data = instance.data()?;
+
+        let Some(ModpackInfo {
+            modpack: Modpack::Curseforge(modpack),
+            ..
+        }) = data.config.modpack.clone()
+        else {
+            bail!("Instance is not a curseforge modpack");
+        };
 
         drop(instances);
 
-        let mut response = self
+        let response = self
             .app
             .modplatforms_manager()
             .curseforge
-            .get_mods(ModsParameters {
-                body: ModsParametersBody {
-                    mod_ids: project_ids,
+            .get_mod_files(ModFilesParameters {
+                mod_id: modpack.project_id as i32,
+                query: ModFilesParametersQuery {
+                    game_version: None,
+                    mod_loader_type: None,
+                    game_version_type_id: None,
+                    index: None,
+                    page_size: None,
                 },
             })
-            .await?
+            .await?;
+
+        let has_update = !response
             .data
-            .into_iter()
-            .map(|m| (m.id as u32, m))
-            .collect::<HashMap<_, _>>();
+            .first()
+            .map(|file| file.id as u32 == modpack.file_id)
+            .unwrap_or(false);
 
         let mut instances = self.instances.write().await;
+        let instance = instances
+            .get_mut(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        for (_, instance) in &mut *instances {
-            let InstanceType::Valid(InstanceData {
-                config:
-                    info::Instance {
-                        modpack:
-                            Some(ModpackInfo {
-                                modpack: Modpack::Curseforge(modpack),
-                                ..
-                            }),
-                        ..
-                    },
-                modpack_update_curseforge,
-                ..
-            }) = &mut instance.type_
-            else {
-                continue;
-            };
-
-            let Some(m) = response.get(&modpack.project_id) else {
-                continue;
-            };
-
-            // Figuring out which version follows the current version is actually somewhat difficult,
-            // so we check if this version is the latest by seeing if it's in the latest file list.
-            *modpack_update_curseforge = Some(
-                !m.latest_files
-                    .iter()
-                    .any(|file| file.id as u32 == modpack.file_id),
-            );
-        }
+        let data = instance.data_mut()?;
+        data.modpack_update_curseforge = Some(has_update);
 
         Ok(())
     }
 
-    pub async fn check_modrinth_modpack_updates(self) -> anyhow::Result<()> {
+    pub async fn check_modrinth_modpack_updates(
+        self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<()> {
         let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        let project_ids = instances
-            .iter()
-            .filter_map(|instance| match &instance.1.type_ {
-                InstanceType::Valid(InstanceData {
-                    config:
-                        info::Instance {
-                            modpack:
-                                Some(ModpackInfo {
-                                    modpack: Modpack::Modrinth(modpack),
-                                    ..
-                                }),
-                            ..
-                        },
-                    ..
-                }) => Some(modpack.project_id.clone()),
-                _ => None,
-            });
+        let data = instance.data()?;
 
-        let mut responses_future = futures::future::join_all(
-            project_ids
-                .map(|project_id| async move {
-                    (
-                        project_id.clone(),
-                        self.app
-                            .modplatforms_manager()
-                            .modrinth
-                            .get_project_versions(ProjectVersionsFilters {
-                                project_id: ProjectID(project_id),
-                                game_versions: Some(Vec::new()),
-                                loaders: Some(Vec::new()),
-                                offset: None,
-                                limit: None,
-                            })
-                            .await,
-                    )
-                })
-                .collect::<Vec<_>>(),
-        );
+        let Some(ModpackInfo {
+            modpack: Modpack::Modrinth(modpack),
+            ..
+        }) = data.config.modpack.clone()
+        else {
+            bail!("Instance is not a modrinth modpack");
+        };
 
         drop(instances);
 
-        let responses = responses_future
-            .await
-            .into_iter()
-            .map(|(pid, response)| response.map(|r| (pid, r)))
-            .collect::<Result<HashMap<_, _>, _>>()?;
+        let response = self
+            .app
+            .modplatforms_manager()
+            .modrinth
+            .get_project_versions(ProjectVersionsFilters {
+                project_id: ProjectID(modpack.project_id),
+                game_versions: Some(Vec::new()),
+                loaders: Some(Vec::new()),
+                offset: None,
+                limit: None,
+            })
+            .await?;
+
+        let has_update = response
+            .0
+            .first()
+            .map(|v| v.id != modpack.version_id)
+            .unwrap_or(false);
 
         let mut instances = self.instances.write().await;
+        let instance = instances
+            .get_mut(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
 
-        for (_, instance) in &mut *instances {
-            let InstanceType::Valid(InstanceData {
-                config:
-                    info::Instance {
-                        modpack:
-                            Some(ModpackInfo {
-                                modpack: Modpack::Modrinth(modpack),
-                                ..
-                            }),
-                        ..
-                    },
-                modpack_update_modrinth,
-                ..
-            }) = &mut instance.type_
-            else {
-                continue;
-            };
-
-            let Some(m) = responses.get(&modpack.project_id) else {
-                continue;
-            };
-
-            *modpack_update_modrinth = Some(
-                m.0.first()
-                    .map(|v| v.id != modpack.version_id)
-                    .unwrap_or(false),
-            );
-        }
+        let data = instance.data_mut()?;
+        data.modpack_update_modrinth = Some(has_update);
 
         Ok(())
     }
@@ -224,7 +174,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         self.app
             .instance_manager()
-            .prepare_game(instance_id, None, None)
+            .prepare_game(instance_id, None, None, true)
             .await
             .map(|r| r.1)
     }

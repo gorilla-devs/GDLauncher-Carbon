@@ -192,7 +192,7 @@ export const getInstanceImageUrl = (
   instanceId: string | number,
   rev: string | number
 ) => {
-  return `http://localhost:${port}/instance/instanceIcon?id=${instanceId}&rev=${rev}`;
+  return `http://127.0.0.1:${port}/instance/instanceIcon?id=${instanceId}&rev=${rev}`;
 };
 
 export const getModImageUrl = (
@@ -200,7 +200,7 @@ export const getModImageUrl = (
   modId: string,
   platform: string | null
 ) => {
-  return `http://localhost:${port}/instance/modIcon?instance_id=${instanceId}&mod_id=${modId}&platform=${platform}`;
+  return `http://127.0.0.1:${port}/instance/modIcon?instance_id=${instanceId}&mod_id=${modId}&platform=${platform}`;
 };
 
 export const getUrlType = (url: string) => {

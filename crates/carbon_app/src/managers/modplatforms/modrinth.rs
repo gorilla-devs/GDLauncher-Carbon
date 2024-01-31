@@ -1,22 +1,28 @@
+use std::{collections::HashSet, sync::Arc};
+
 use anyhow::Ok;
 use reqwest_middleware::ClientWithMiddleware;
 use tracing::trace;
 use url::Url;
 
 use crate::{
-    domain::modplatforms::modrinth::{
-        project::{Project, ProjectVersionsFilters},
-        responses::{
-            CategoriesResponse, LoadersResponse, ProjectsResponse, TeamResponse,
-            VersionHashesResponse, VersionsResponse,
+    domain::{
+        instance::info::{ModLoader, ModLoaderType, StandardVersion},
+        modplatforms::modrinth::{
+            project::{Project, ProjectVersionsFilters},
+            responses::{
+                CategoriesResponse, LoadersResponse, ProjectsResponse, TeamResponse,
+                VersionHashesResponse, VersionsResponse,
+            },
+            search::{
+                ProjectID, ProjectIDs, ProjectSearchParameters, ProjectSearchResponse, TeamID,
+                TeamIDs, VersionHashesQuery, VersionID, VersionIDs,
+            },
+            version::{ModrinthPackDependencies, Version},
         },
-        search::{
-            ProjectID, ProjectIDs, ProjectSearchParameters, ProjectSearchResponse, TeamID, TeamIDs,
-            VersionHashesQuery, VersionID, VersionIDs,
-        },
-        version::Version,
     },
     error::request::GoodJsonRequestError,
+    managers::AppInner,
 };
 
 pub struct Modrinth {
@@ -263,6 +269,98 @@ impl Modrinth {
             .collect::<TeamResponse>();
         Ok(team)
     }
+}
+
+pub async fn convert_mr_version_to_standard_version(
+    app: Arc<AppInner>,
+    modrinth_version: ModrinthPackDependencies,
+) -> anyhow::Result<StandardVersion> {
+    let minecraft_version = modrinth_version
+        .minecraft
+        .ok_or_else(|| anyhow::anyhow!("Modpack does not have a Minecraft version listed"))?;
+
+    let mut modloaders = HashSet::new();
+    if let Some(forge_version) = modrinth_version.forge {
+        let forge_manifest = app.minecraft_manager().get_forge_manifest().await?;
+
+        let forge_version = forge_manifest
+            .game_versions
+            .into_iter()
+            .find(|v| v.id == minecraft_version)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "forge manifest does not contain version '{}'",
+                    minecraft_version
+                )
+            })?
+            .loaders
+            .into_iter()
+            .find(|l| l.id.contains(&forge_version))
+            .ok_or_else(|| {
+                anyhow::anyhow!("forge manifest does not contain loader '{}'", forge_version)
+            })?;
+
+        modloaders.insert(ModLoader {
+            type_: ModLoaderType::Forge,
+            version: forge_version.id,
+        });
+    }
+    if let Some(fabric_version) = modrinth_version.fabric_loader {
+        modloaders.insert(ModLoader {
+            type_: ModLoaderType::Fabric,
+            version: fabric_version,
+        });
+    }
+    if let Some(quilt_version) = modrinth_version.quilt_loader {
+        modloaders.insert(ModLoader {
+            type_: ModLoaderType::Quilt,
+            version: quilt_version,
+        });
+    }
+    if let Some(neoforge_version) = modrinth_version.neoforge {
+        modloaders.insert(ModLoader {
+            type_: ModLoaderType::Neoforge,
+            version: neoforge_version,
+        });
+    }
+
+    let gdl_version = StandardVersion {
+        release: minecraft_version,
+        modloaders,
+    };
+
+    Ok(gdl_version)
+}
+
+pub fn convert_standard_version_to_mr_version(
+    standard_version: StandardVersion,
+) -> ModrinthPackDependencies {
+    let mut modrinth_version = ModrinthPackDependencies {
+        minecraft: Some(standard_version.release),
+        forge: None,
+        fabric_loader: None,
+        quilt_loader: None,
+        neoforge: None,
+    };
+
+    for modloader in standard_version.modloaders {
+        match modloader.type_ {
+            ModLoaderType::Forge => {
+                modrinth_version.forge = Some(modloader.version);
+            }
+            ModLoaderType::Fabric => {
+                modrinth_version.fabric_loader = Some(modloader.version);
+            }
+            ModLoaderType::Quilt => {
+                modrinth_version.quilt_loader = Some(modloader.version);
+            }
+            ModLoaderType::Neoforge => {
+                modrinth_version.neoforge = Some(modloader.version);
+            }
+        }
+    }
+
+    modrinth_version
 }
 
 #[cfg(test)]

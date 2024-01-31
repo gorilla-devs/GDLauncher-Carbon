@@ -147,13 +147,13 @@ const Overview = () => {
         >
           <div class="relative flex p-5 rounded-xl box-border bg-darkSlate-700 w-full overflow-hidden min-h-23 h-max">
             <FadedBanner
-              imageUrl={`http://localhost:${port}/instance/modpackIcon?instance_id=${params.id}`}
+              imageUrl={`http://127.0.0.1:${port}/instance/modpackIcon?instance_id=${params.id}`}
             >
               <div class="flex flex-col justify-between items-start w-full z-10 gap-6 2xl:flex-row 2xl:items-center 2xl:gap-14">
                 <div class="flex items-center gap-2 flex-1">
                   <img
                     class="h-13 w-13 rounded-lg"
-                    src={`http://localhost:${port}/instance/modpackIcon?instance_id=${params.id}`}
+                    src={`http://127.0.0.1:${port}/instance/modpackIcon?instance_id=${params.id}`}
                   />
                   <div class="text-white whitespace-nowrap">
                     <div class="text-lg font-bold">

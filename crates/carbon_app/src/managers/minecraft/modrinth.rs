@@ -154,6 +154,7 @@ pub async fn download_mrpack(
     Ok(())
 }
 
+#[tracing::instrument(skip(app, packinfo, progress_percentage_sender))]
 pub async fn prepare_modpack_from_mrpack(
     app: &App,
     mrpack_path: &Path,
