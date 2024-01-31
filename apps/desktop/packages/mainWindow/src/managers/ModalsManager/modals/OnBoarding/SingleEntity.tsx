@@ -217,7 +217,10 @@ const SingleEntity = (props: {
                           defaultPath: path() || "",
                           properties: ["openFile"],
                           filters: [
-                            { name: "ZIP Files", extensions: ["zip"] },
+                            {
+                              name: "ZIP Files",
+                              extensions: ["zip", "mrpack"]
+                            },
                             { name: "All Files", extensions: ["*"] }
                           ]
                         });
