@@ -10,10 +10,12 @@ import {
   Modpack,
   ModrinthModpack
 } from "@gd/core_module/bindings";
+import { useGDNavigate } from "@/managers/NavigationManager";
 
 const ModPackVersionUpdate = (props: ModalProps) => {
   const [currentPlatform, setCurrentPlatform] = createSignal<string>("");
   const [selectedVersion, setSelectedVersion] = createSignal<string>("");
+  const navigate = useGDNavigate();
   const modalContext = useModal();
   const instance = rspc.createQuery(() => [
     "instance.getInstanceDetails",
@@ -24,6 +26,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
     {
       onSuccess(taskId) {
         modalContext?.closeModal();
+        navigate("/library");
       }
     }
   );
@@ -78,8 +81,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
     console.log(obj);
     changeModpackMutation.mutate(obj);
   };
-  console.log(response.data);
-  console.log(instance.data);
+
   return (
     <ModalLayout
       noHeader={props.noHeader}
@@ -107,6 +109,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
               })) || []
             }
             onChange={(option) => {
+              console.log(option.key);
               setSelectedVersion(option.key.toString());
             }}
           />
