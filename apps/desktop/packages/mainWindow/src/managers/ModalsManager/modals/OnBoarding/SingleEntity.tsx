@@ -4,7 +4,7 @@ import {
   ImportableInstance,
   InvalidImportEntry
 } from "@gd/core_module/bindings";
-import { Button, Checkbox, Input, Tooltip } from "@gd/ui";
+import { Button, Checkbox, Input, Spinner, Tooltip } from "@gd/ui";
 import {
   For,
   Match,
@@ -247,12 +247,28 @@ const SingleEntity = (props: {
             <Match when={step() === "selectionStep"}>
               <Switch
                 fallback={
+                  // importScanStatus.isLoading ? (
+
+                  //   <Spinner />
+                  // ) : (
+                  //   <div class="w-full h-full flex items-center justify-center">
+                  //     <p class="text-xl text-gray-500">
+                  //       {path()
+                  //         ? t("instance.no_instance_found")
+                  //         : t("instance.select_path")}
+                  //     </p>
+                  //   </div>
+                  // )
                   <div class="w-full h-full flex items-center justify-center">
-                    <p class="text-xl text-gray-500">
-                      {path()
-                        ? t("instance.no_instance_found")
-                        : t("instance.select_path")}
-                    </p>
+                    {importScanStatus.isLoading ? (
+                      <Spinner />
+                    ) : (
+                      <p class="text-xl text-gray-500">
+                        {path()
+                          ? t("instance.no_instance_found")
+                          : t("instance.select_path")}
+                      </p>
+                    )}
                   </div>
                 }
               >
