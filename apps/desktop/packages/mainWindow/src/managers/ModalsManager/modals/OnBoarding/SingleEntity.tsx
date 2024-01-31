@@ -141,7 +141,7 @@ const SingleEntity = (props: {
     }
   });
   createEffect(() => {
-    console.log(instances());
+    console.log(importScanStatus.data);
   });
   return (
     <>
@@ -247,29 +247,27 @@ const SingleEntity = (props: {
             <Match when={step() === "selectionStep"}>
               <Switch
                 fallback={
-                  // importScanStatus.isLoading ? (
-
-                  //   <Spinner />
-                  // ) : (
-                  //   <div class="w-full h-full flex items-center justify-center">
-                  //     <p class="text-xl text-gray-500">
-                  //       {path()
-                  //         ? t("instance.no_instance_found")
-                  //         : t("instance.select_path")}
-                  //     </p>
-                  //   </div>
-                  // )
-                  <div class="w-full h-full flex items-center justify-center">
-                    {importScanStatus.isLoading ? (
-                      <Spinner />
-                    ) : (
-                      <p class="text-xl text-gray-500">
-                        {path()
-                          ? t("instance.no_instance_found")
-                          : t("instance.select_path")}
-                      </p>
-                    )}
-                  </div>
+                  <>
+                    <Show when={importScanStatus.data?.scanning}>
+                      <div class="w-full h-full flex items-center justify-center">
+                        <Spinner />
+                      </div>
+                    </Show>
+                    <Show
+                      when={
+                        importScanStatus.data?.status === "NoResults" &&
+                        !importScanStatus.data?.scanning
+                      }
+                    >
+                      <div class="w-full h-full flex items-center justify-center">
+                        <p class="text-xl text-gray-500">
+                          {path()
+                            ? t("instance.no_instance_found")
+                            : t("instance.select_path")}
+                        </p>
+                      </div>
+                    </Show>
+                  </>
                 }
               >
                 <Match when={typeof instance.multiResult !== "undefined"}>
