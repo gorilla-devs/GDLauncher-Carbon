@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fs::File, io::Write, path::PathBuf, sync::Arc};
 
 use anyhow::anyhow;
+use tokio::sync::mpsc;
 
 use crate::{
     api::translation::Translation,
@@ -17,12 +18,14 @@ use crate::{
     managers::{
         instance::{InstanceType, InvalidInstanceIdError},
         modplatforms::modrinth::convert_standard_version_to_mr_version,
-        vtask::VisualTask,
+        vtask::{TaskState, VisualTask},
         AppInner,
     },
 };
 
 use crate::db::{mod_file_cache as fcdb, mod_metadata as metadb};
+
+use super::ZipMode;
 
 pub async fn export_modrinth(
     app: Arc<AppInner>,
@@ -71,10 +74,19 @@ pub async fn export_modrinth(
         let try_result: anyhow::Result<_> = async {
             let mut mods = Vec::new();
 
+            let t_calc_size = vtask.subtask(Translation::InstanceExportCalculateSize);
+            t_calc_size.set_weight(0.0);
+            let t_create_bundle = vtask.subtask(Translation::InstanceExportCreatingBundle);
+
+            vtask
+                .edit(|data| data.state = TaskState::KnownProgress)
+                .await;
+
             if link_mods {
                 let mods_filter = filter.0.get_mut("mods");
                 if let Some(mods_filter) = mods_filter {
                     let t_scan = vtask.subtask(Translation::InstanceExportScanningMods);
+                    t_calc_size.set_weight(0.5);
                     t_scan.start_opaque();
 
                     if mods_filter.is_none() {
@@ -130,8 +142,18 @@ pub async fn export_modrinth(
                 }
             }
 
-            let t_create_bundle = vtask.subtask(Translation::InstanceExportCreatingBundle);
-            t_create_bundle.start_opaque(); // TODO: track the total number of overrides and use update_items
+            t_calc_size.start_opaque();
+
+            let mut file_count = 0;
+            super::zip_excluding(
+                ZipMode::<File>::Count(&mut file_count),
+                &basepath,
+                "overrides",
+                &filter,
+            )?;
+
+            t_calc_size.complete_opaque();
+            t_create_bundle.update_items(0, file_count);
 
             let manifest = ModpackIndex {
                 format_version: 1,
@@ -166,22 +188,44 @@ pub async fn export_modrinth(
                 .await?;
 
             let send_path = tmpfile.to_path_buf();
-            tokio::task::spawn_blocking(move || {
+            let (notify_tx, mut notify_rx) = mpsc::channel::<()>(1);
+
+            let ziptask = tokio::task::spawn_blocking(move || {
                 let mut zip = zip::ZipWriter::new(File::create(send_path)?);
                 let options = zip::write::FileOptions::default();
                 zip.start_file("modrinth.index.json", options)?;
                 zip.write_all(&serde_json::to_vec_pretty(&manifest)?)?;
 
-                super::zip_excluding(&mut zip, options, &basepath, "overrides", &filter)?;
+                super::zip_excluding(
+                    ZipMode::Create(&mut zip, options, notify_tx),
+                    &basepath,
+                    "overrides",
+                    &filter,
+                )?;
 
                 zip.finish()?;
                 Ok::<_, anyhow::Error>(())
-            })
-            .await??;
+            });
+
+            tokio::select! {
+                r = ziptask => r??,
+                _ = async {
+                    let mut counter = 0;
+
+                    loop {
+                        if notify_rx.recv().await.is_some() {
+                            counter += 1;
+                            t_create_bundle.update_items(counter, file_count);
+                        } else {
+                            futures::future::pending().await
+                        }
+                    }
+                } => {},
+            }
 
             tmpfile.try_rename_or_move(save_path).await?;
 
-            t_create_bundle.complete_opaque();
+            t_create_bundle.complete_items();
 
             Ok(())
         }

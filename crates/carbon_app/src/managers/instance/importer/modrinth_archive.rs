@@ -124,9 +124,13 @@ impl ModrinthArchiveImporter {
                 hashes: vec![sha512.clone()],
                 algorithm: HashAlgorithm::SHA512,
             })
-            .await?;
+            .await;
 
         let meta = 'remote: {
+            let Ok(version_response) = version_response else {
+                break 'remote None;
+            };
+
             let Some(version) = version_response.get(&sha512) else {
                 break 'remote None;
             };
@@ -135,9 +139,10 @@ impl ModrinthArchiveImporter {
                 .modplatforms_manager()
                 .modrinth
                 .get_project(ProjectID(version.project_id.clone()))
-                .await?;
+                .await
+                .ok();
 
-            Some(MrMetadata {
+            project.map(|project| MrMetadata {
                 name: project.title,
                 project_id: project.id,
                 version_id: version.id.clone(),
