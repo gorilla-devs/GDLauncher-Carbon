@@ -219,7 +219,10 @@ const SingleEntity = (props: {
                           filters: [
                             {
                               name: "ZIP Files",
-                              extensions: ["zip", "mrpack"]
+                              extensions:
+                                props.entity.entity === "CurseForgeZip"
+                                  ? ["zip"]
+                                  : ["mrpack"]
                             },
                             { name: "All Files", extensions: ["*"] }
                           ]
