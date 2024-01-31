@@ -5,6 +5,7 @@ use std::{
 };
 
 use itertools::Itertools;
+use tokio::sync::mpsc;
 use zip::{write::FileOptions, ZipWriter};
 
 use crate::{
@@ -12,7 +13,7 @@ use crate::{
         instance::{ExportEntry, ExportTarget, InstanceId},
         vtask::VisualTaskId,
     },
-    managers::ManagerRef,
+    managers::{vtask::Subtask, ManagerRef},
 };
 
 mod curseforge_archive;
@@ -61,16 +62,19 @@ impl ManagerRef<'_, InstanceExportManager> {
     }
 }
 
+enum ZipMode<'a, W: io::Write + io::Seek> {
+    Count(&'a mut u32),
+    Create(&'a mut ZipWriter<W>, FileOptions, mpsc::Sender<()>),
+}
+
 fn zip_excluding<W: io::Write + io::Seek>(
-    zip: &mut ZipWriter<W>,
-    options: FileOptions,
+    mut mode: ZipMode<W>,
     base_path: &Path,
     prefix: &str,
     filter: &ExportEntry,
 ) -> anyhow::Result<()> {
     fn walk_recursive<W: io::Write + io::Seek>(
-        zip: &mut ZipWriter<W>,
-        options: FileOptions,
+        mode: &mut ZipMode<W>,
         path: &Path,
         prefix: &str,
         relpath: &[&str],
@@ -94,22 +98,23 @@ fn zip_excluding<W: io::Write + io::Seek>(
 
             if entry.metadata()?.is_dir() {
                 let relpath = &[relpath, &[&*name][..]].concat()[..];
-                walk_recursive(
-                    zip,
-                    options,
-                    &entry.path(),
-                    prefix,
-                    relpath,
-                    subfilter.as_ref(),
-                )?;
+                walk_recursive(mode, &entry.path(), prefix, relpath, subfilter.as_ref())?;
             } else {
-                zip.start_file(pathstr, options)?;
-                io::copy(&mut File::open(entry.path())?, zip)?;
+                match mode {
+                    ZipMode::Count(counter) => {
+                        **counter += 1;
+                    }
+                    ZipMode::Create(zip, options, notify) => {
+                        zip.start_file(pathstr, *options)?;
+                        io::copy(&mut File::open(entry.path())?, zip)?;
+                        let _ = notify.blocking_send(());
+                    }
+                }
             }
         }
 
         Ok(())
     }
 
-    walk_recursive(zip, options, base_path, prefix, &[], Some(filter))
+    walk_recursive(&mut mode, base_path, prefix, &[], Some(filter))
 }
