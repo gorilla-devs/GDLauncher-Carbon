@@ -1,6 +1,6 @@
 ---
 import composeCDNAssetLink from "../utils/composeCDNAssetLink";
-import "../styles/global.css"
+import "../styles/global.css";
 import { ViewTransitions } from "astro:transitions";
 export interface Props {
   title: string;
@@ -16,6 +16,7 @@ const { title, description, image } = Astro.props as Props;
 <meta name="og:title" property="og:title" content={title} />
 <meta property="og:type" content="website" />
 <meta property="og:description" content={description} />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta
   property="og:image"
   content={image || composeCDNAssetLink("gdlauncher_logo_og.png")}
