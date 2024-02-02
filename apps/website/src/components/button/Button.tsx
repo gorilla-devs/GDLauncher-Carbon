@@ -56,8 +56,9 @@ export interface ButtonProps
   extends JSX.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof button> {}
 
+const [items, showItems] = createSignal(false);
+export { showItems };
 const Button = (props: ButtonProps & Props) => {
-  const [items, showItems] = createSignal(false);
   const intent = props.intent;
   const size = props.size;
   const className = props.class;
