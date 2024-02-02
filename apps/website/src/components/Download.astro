@@ -10,7 +10,7 @@ import Logo7 from "../assets/7.svg";
 import DownloadDropdown from "./DownloadDropdown.astro";
 ---
 
-<div class="w-[80%] flex justify-between h-[170px] mb-24">
+<div class="w-full md:w-[80%] flex justify-between h-[170px] mb-24">
   <Image
     src={Logo1}
     alt="item1"
@@ -32,7 +32,7 @@ import DownloadDropdown from "./DownloadDropdown.astro";
     height={62}
     class="animated-logo opacity-0"
   />
-  <div class="flex flex-col justify-between items-center">
+  <div class="hidden md:flex flex-col justify-between items-center">
     <DownloadDropdown />
     <Image
       src={Logo4}
@@ -42,6 +42,13 @@ import DownloadDropdown from "./DownloadDropdown.astro";
       class="animated-logo opacity-0"
     />
   </div>
+  <Image
+      src={Logo4}
+      alt="item4"
+      width={62}
+      height={62}
+      class="flex md:hidden animated-logo opacity-0"
+    />
   <Image
     src={Logo7}
     alt="item7"
@@ -64,7 +71,15 @@ import DownloadDropdown from "./DownloadDropdown.astro";
     class="self-start animated-logo opacity-0"
   />
 </div>
-<style></style>
+<style>
+   @media (min-width: 390px) and (max-width: 480px) {
+   .animated-logo {
+      width: 55px;
+      height: 55px;
+    
+   }
+  }
+</style>
 
 <script>
   const logos = document.querySelectorAll(".animated-logo");
