@@ -214,7 +214,7 @@ const Overview = () => {
                     }}
                   >
                     <Trans key="instance.modpack_view" />
-                    <i class="i-ri:arrow-right-line" />
+                    <i class="w-4 h-4 i-ri:arrow-right-line" />
                   </Button>
                 </div>
               </div>
