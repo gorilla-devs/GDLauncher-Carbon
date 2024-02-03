@@ -847,7 +847,7 @@ mod tests {
         }
         let progress = tokio::sync::watch::channel(Progress::new());
 
-        carbon_net::download_multiple(downloadables, progress.0, 10, true)
+        carbon_net::download_multiple(&downloadables[..], Some(progress.0), 10, true, false)
             .await
             .unwrap();
 
