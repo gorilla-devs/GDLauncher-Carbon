@@ -15,7 +15,6 @@ pub enum Translation {
     InstanceTaskPrepare {
         name: String,
     },
-    InstanceTaskLaunchWaiting,
     InstanceTaskLaunchRequestVersions,
     InstanceTaskLaunchRequestModpack,
     InstanceTaskLaunchDownloadModpack,
@@ -25,6 +24,7 @@ pub enum Translation {
     InstanceTaskLaunchApplyStagedPatches,
     InstanceTaskLaunchDownloadJava,
     InstanceTaskLaunchExtractJava,
+    InstanceTaskLaunchWaitDownloadFiles,
     InstanceTaskLaunchDownloadFiles,
     InstanceTaskGeneratingPackInfo,
     InstanceTaskFillCache,
