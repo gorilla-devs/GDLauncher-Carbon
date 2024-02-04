@@ -9,12 +9,7 @@ import {
   getInactiveState,
   getInstanceImageUrl
 } from "@/utils/instances";
-import {
-  ListInstance,
-  UngroupedInstance,
-  FESubtask,
-  FETask
-} from "@gd/core_module/bindings";
+import { ListInstance, FESubtask, FETask } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { rspc } from "@/utils/rspcClient";
 import { createStore } from "solid-js/store";
@@ -30,9 +25,10 @@ type InstanceDownloadProgress = {
 };
 
 const InstanceTile = (props: {
-  instance: UngroupedInstance | ListInstance;
+  instance: ListInstance;
   isSidebarOpened?: boolean;
   selected?: boolean;
+  size: 1 | 2 | 3 | 4 | 5;
 }) => {
   const [isLoading, setIsLoading] = createSignal(false);
   const [failError, setFailError] = createSignal("");
@@ -127,6 +123,7 @@ const InstanceTile = (props: {
       isRunning={!!isRunning()}
       isPreparing={isPreparingState() !== undefined}
       variant={type()}
+      size={props.size}
       img={
         props.instance.icon_revision
           ? getInstanceImageUrl(props.instance.id, props.instance.icon_revision)

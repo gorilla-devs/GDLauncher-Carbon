@@ -16,8 +16,15 @@ model AppConfiguration {
   discordIntegration              Boolean   @default(true)
   releaseChannel                  String
   activeAccountUuid               String?
+  // Instances settings
   concurrentDownloads             Int       @default(10)
+  instancesTileSize               Int       @default(2) // 1-5
+  instancesGroupBy                String    @default("group")
+  instancesGroupByAsc             Boolean   @default(true)
+  instancesSortBy                 String    @default("name")
+  instancesSortByAsc              Boolean   @default(true)
   showNews                        Boolean   @default(true)
+  // Minecraft settings
   gameResolution                  String?
   launcherActionOnGameLaunch      String    @default("none")
   javaCustomArgs                  String    @default("")

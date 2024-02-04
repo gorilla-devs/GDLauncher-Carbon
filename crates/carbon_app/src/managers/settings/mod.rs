@@ -121,6 +121,51 @@ impl ManagerRef<'_, SettingsManager> {
             ));
         }
 
+        if let Some(sort_by) = incoming_settings.instances_sort_by {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![app_configuration::instances_sort_by::set(
+                    sort_by.inner().into(),
+                )],
+            ));
+        }
+
+        if let Some(instances_sort_by_asc) = incoming_settings.instances_sort_by_asc {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![app_configuration::instances_sort_by_asc::set(
+                    instances_sort_by_asc.inner(),
+                )],
+            ));
+        }
+
+        if let Some(instances_group_by) = incoming_settings.instances_group_by {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![app_configuration::instances_group_by::set(
+                    instances_group_by.inner().into(),
+                )],
+            ));
+        }
+
+        if let Some(instances_group_by_asc) = incoming_settings.instances_group_by_asc {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![app_configuration::instances_group_by_asc::set(
+                    instances_group_by_asc.inner(),
+                )],
+            ));
+        }
+
+        if let Some(instances_tile_size) = incoming_settings.instances_tile_size {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![app_configuration::instances_tile_size::set(
+                    instances_tile_size.inner().into(),
+                )],
+            ));
+        }
+
         if let Some(xmx) = incoming_settings.xmx {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),

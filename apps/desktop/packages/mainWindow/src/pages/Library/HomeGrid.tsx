@@ -1,28 +1,37 @@
-import { Collapsable, Input, News, Skeleton } from "@gd/ui";
+import {
+  Button,
+  Collapsable,
+  Dropdown,
+  Input,
+  News,
+  Popover,
+  Skeleton,
+  Slider
+} from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import {
   For,
   Match,
   Show,
-  Suspense,
   Switch,
-  createEffect,
   createMemo,
   createResource,
   createSignal
 } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
-import { createStore, reconcile } from "solid-js/store";
 import fetchData from "./library.data";
 import InstanceTile from "@/components/InstanceTile";
 import skull from "/assets/images/icons/skull.png";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import UnstableCard from "@/components/UnstableCard";
 import FeaturedModpackTile from "./FeaturedModpackTile";
-import { InstancesStore, isListInstanceValid } from "@/utils/instances";
-import { getCFModloaderIcon } from "@/utils/sidebar";
-import { CFFEModLoaderType } from "@gd/core_module/bindings";
+import {
+  InstancesGroupBy,
+  InstancesSortBy,
+  ListInstance
+} from "@gd/core_module/bindings";
 import { initNews } from "@/utils/news";
+import { rspc } from "@/utils/rspcClient";
 
 const NewsWrapper = () => {
   const newsInitializer = initNews();
@@ -56,42 +65,223 @@ const NewsWrapper = () => {
 const HomeGrid = () => {
   const [t] = useTransContext();
 
-  const [instances, setInstances] = createStore<InstancesStore>({});
+  const rspcContext = rspc.useContext();
+
   const [filter, setFilter] = createSignal("");
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
+  const settingsMutation = rspc.createMutation(["settings.setSettings"], {
+    onMutate: (data) => {
+      rspcContext.queryClient.setQueryData(
+        ["settings.getSettings"],
+        (old: any) => {
+          const newSettings: any = {};
+
+          for (const key in data) {
+            newSettings[key] = (data as any)[key].Set;
+          }
+
+          return {
+            ...old,
+            ...newSettings
+          };
+        }
+      );
+    }
+  });
+
   let inputRef: HTMLInputElement | undefined;
 
-  const filteredData = createMemo(() =>
-    filter()
-      ? routeData.instancesUngrouped.data?.filter((item) =>
-          item.name.toLowerCase().includes(filter().toLowerCase())
-        )
-      : routeData.instancesUngrouped.data
-  );
+  type Groups = {
+    [key: string | number]: {
+      id: string | number | null;
+      name: string;
+      instances: ListInstance[];
+    };
+  };
 
-  createEffect(() => {
-    setInstances(reconcile({}));
+  const filteredGroups = createMemo(() => {
+    let timeStart = performance.now();
 
-    if (filteredData()) {
-      filteredData()?.forEach((instance) => {
-        const validInstance = isListInstanceValid(instance.status)
-          ? instance.status.Valid
-          : null;
+    const _groups: Groups = {};
 
-        const modloader = validInstance?.modloader || "vanilla";
-        if (modloader) {
-          setInstances(modloader, (prev) => {
-            const filteredPrev = (prev || []).filter(
-              (prev) => prev.id !== instance.id
-            );
-            if (!instance.favorite) return [...filteredPrev, instance];
-            else return [...filteredPrev];
+    if (routeData.settings.data?.instancesGroupBy === "group") {
+      _groups["favorites"] = {
+        id: -1,
+        name: t("favorites"),
+        instances: []
+      };
+    }
+
+    for (const instance of routeData.instances.data || []) {
+      let groupId = null;
+      let groupName = null;
+
+      if (routeData.settings.data?.instancesGroupBy === "group") {
+        const _groupName = routeData.groups.data?.find(
+          (group) => group.id === instance.group_id
+        )?.name;
+
+        groupName =
+          _groupName === "localize➽default" ? t("default") : _groupName;
+        groupId = instance.group_id;
+      } else if (routeData.settings.data?.instancesGroupBy === "gameVersion") {
+        if ("Valid" in instance.status) {
+          groupName = instance.status.Valid.mc_version;
+        }
+      } else if (routeData.settings.data?.instancesGroupBy === "modloader") {
+        if ("Valid" in instance.status) {
+          groupName = instance.status.Valid.modloader;
+        }
+      }
+
+      if (!groupName) {
+        continue;
+      }
+
+      if (!_groups[groupName]) {
+        _groups[groupName] = {
+          id: groupId,
+          name: groupName,
+          instances: []
+        };
+      }
+
+      if (instance.name.toLowerCase().includes(filter().toLowerCase())) {
+        if (
+          routeData.settings.data?.instancesGroupBy === "group" &&
+          instance.favorite
+        ) {
+          _groups["favorites"].instances.push(instance);
+        }
+        _groups[groupName].instances.push(instance);
+      }
+    }
+
+    // sort groups
+    for (const key in _groups) {
+      _groups[key].instances.sort((a, b) => {
+        if (routeData.settings.data?.instancesSortBy === "name") {
+          return a.name.localeCompare(b.name);
+        } else if (routeData.settings.data?.instancesSortBy === "lastPlayed") {
+          return (
+            Date.parse(b.last_played || "") - Date.parse(a.last_played || "") ||
+            a.name.localeCompare(b.name)
+          );
+        } else if (routeData.settings.data?.instancesSortBy === "lastUpdated") {
+          return (
+            Date.parse(b.date_updated || "") -
+              Date.parse(a.date_updated || "") || a.name.localeCompare(b.name)
+          );
+        } else if (routeData.settings.data?.instancesSortBy === "gameVersion") {
+          return (
+            (a.status as any).Valid.mc_version?.localeCompare(
+              (b.status as any).Valid.mc_version,
+              undefined,
+              { numeric: true, sensitivity: "base" }
+            ) || a.name.localeCompare(b.name)
+          );
+        } else if (routeData.settings.data?.instancesSortBy === "created") {
+          return (
+            Date.parse(b.date_created || "") -
+              Date.parse(a.date_created || "") || a.name.localeCompare(b.name)
+          );
+        }
+      });
+    }
+
+    console.log("Recomputing filtered groups", performance.now() - timeStart);
+
+    return _groups;
+  });
+
+  const iterableFilteredGroups = createMemo(() => {
+    const iterable = Object.values(filteredGroups());
+
+    if (
+      routeData.settings.data?.instancesGroupBy === "group" ||
+      routeData.settings.data?.instancesGroupBy === "modloader"
+    ) {
+      iterable.sort((a, b) => {
+        if (a.name === t("favorites")) {
+          return -1;
+        }
+
+        if (b.name === t("favorites")) {
+          return 1;
+        }
+
+        if (routeData.settings.data?.instancesGroupByAsc) {
+          return a.name.localeCompare(b.name);
+        } else {
+          return b.name.localeCompare(a.name);
+        }
+      });
+    } else if (routeData.settings.data?.instancesGroupBy === "gameVersion") {
+      iterable.sort((a, b) => {
+        if (routeData.settings.data?.instancesGroupByAsc) {
+          return a.name.localeCompare(b.name, undefined, {
+            numeric: true,
+            sensitivity: "base"
+          });
+        } else {
+          return b.name.localeCompare(a.name, undefined, {
+            numeric: true,
+            sensitivity: "base"
           });
         }
       });
     }
+
+    return iterable;
   });
+
+  const instancesTileSize = () =>
+    routeData.settings.data?.instancesTileSize || 0;
+
+  const sortByOptions: {
+    key: InstancesSortBy;
+    label: string;
+  }[] = [
+    {
+      key: "name",
+      label: t("general.name")
+    },
+    {
+      key: "lastPlayed",
+      label: t("general.last_played")
+    },
+    {
+      key: "lastUpdated",
+      label: t("general.last_updated")
+    },
+    {
+      key: "gameVersion",
+      label: t("general.game_version")
+    },
+    {
+      key: "created",
+      label: t("general.created")
+    }
+  ];
+
+  const groupByOptions: {
+    key: InstancesGroupBy;
+    label: string;
+  }[] = [
+    {
+      key: "group",
+      label: t("general.group")
+    },
+    {
+      key: "gameVersion",
+      label: t("general.game_version")
+    },
+    {
+      key: "modloader",
+      label: t("general.modloader")
+    }
+  ];
 
   return (
     <div>
@@ -100,9 +290,16 @@ const HomeGrid = () => {
         <Switch>
           <Match
             when={
-              routeData.instancesUngrouped.data &&
-              routeData.instancesUngrouped.data.length === 0 &&
-              !routeData.instancesUngrouped.isLoading
+              routeData.instances.isLoading &&
+              routeData.instances.isInitialLoading
+            }
+          >
+            <Skeleton.instances />
+          </Match>
+          <Match
+            when={
+              routeData.instances?.data?.length === 0 &&
+              !routeData.instances.isLoading
             }
           >
             <div class="w-full h-full flex flex-col justify-center items-center mt-12">
@@ -120,69 +317,156 @@ const HomeGrid = () => {
           </Match>
           <Match
             when={
-              (routeData.instancesUngrouped.data &&
-                routeData.instancesUngrouped.data.length > 0 &&
-                !routeData.instancesUngrouped.isLoading) ||
-              routeData.instancesUngrouped.isLoading ||
-              routeData.instancesUngrouped.isInitialLoading
+              (routeData.instances?.data?.length || 0) > 1 &&
+              !routeData.instances.isLoading
             }
           >
-            <div class="mt-8">
-              <div class="flex items-center gap-4">
-                <Input
-                  ref={inputRef}
-                  placeholder={t("general.search")}
-                  icon={<div class="i-ri:search-line" />}
-                  class="w-full rounded-full"
-                  onInput={(e) => setFilter(e.target.value)}
-                  disabled={
-                    (routeData.instancesUngrouped?.data || []).length === 0
-                  }
-                />
-              </div>
+            <div>
               <Show when={routeData.settings.data?.showNews}>
                 <NewsWrapper />
               </Show>
-              <div class="mt-4">
-                <For
-                  each={Object.entries(instances).filter(
-                    (group) => group[1].length > 0
-                  )}
+              <div class="flex items-center gap-4 mt-8">
+                <Input
+                  ref={inputRef}
+                  placeholder={t("general.search")}
+                  value={filter()}
+                  class="w-full rounded-full"
+                  onInput={(e) => setFilter(e.target.value)}
+                  disabled={iterableFilteredGroups().length === 0}
+                  icon={
+                    <Switch>
+                      <Match when={filter()}>
+                        <div
+                          onClick={() => {
+                            setFilter("");
+                          }}
+                          class="i-ri:close-line hover:bg-white"
+                        />
+                      </Match>
+                      <Match when={!filter()}>
+                        <div class="i-ri:search-line" />
+                      </Match>
+                    </Switch>
+                  }
+                />
+                <Popover
+                  trigger="click"
+                  noTip
+                  noPadding
+                  content={
+                    <div class="flex flex-col gap-y-6 w-80 h-auto p-4">
+                      <div class="text-2xl mb-4">
+                        <Trans key="general.instances_options" />
+                      </div>
+                      <div class="w-full flex items-center justify-between">
+                        <div>
+                          <Trans key="general.instance_tile_size" />
+                        </div>
+                        <div class="w-30 flex items-center">
+                          <Slider
+                            min={1}
+                            max={5}
+                            marks={[]}
+                            steps={1}
+                            value={instancesTileSize()}
+                            onChange={(value) => {
+                              if (!value) return;
+
+                              settingsMutation.mutate({
+                                instancesTileSize: {
+                                  Set: value
+                                }
+                              });
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div class="w-full flex items-center justify-between">
+                        <div>
+                          <Trans key="general.sort_by" />
+                        </div>
+                        <div class="w-30 flex items-center">
+                          <Dropdown
+                            class="w-30"
+                            options={sortByOptions}
+                            icon={<div class="i-ri:price-tag-3-fill" />}
+                            value={routeData.settings.data?.instancesSortBy}
+                            onChange={(val) => {
+                              settingsMutation.mutate({
+                                instancesSortBy: {
+                                  Set: val.key as InstancesSortBy
+                                }
+                              });
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div class="w-full flex items-center justify-between">
+                        <div>
+                          <Trans key="general.group_by" />
+                        </div>
+                        <div class="w-30 flex items-center">
+                          <Dropdown
+                            class="w-30"
+                            options={groupByOptions}
+                            icon={<div class="i-ri:price-tag-3-fill" />}
+                            value={routeData.settings.data?.instancesGroupBy}
+                            onChange={(val) => {
+                              settingsMutation.mutate({
+                                instancesGroupBy: {
+                                  Set: val.key as InstancesGroupBy
+                                }
+                              });
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  }
                 >
-                  {([key, values]) => (
-                    <Collapsable
-                      noPadding
-                      title={
-                        <>
-                          <img
+                  <Button type="secondary" size="small">
+                    <i class="w-4 h-4 i-ri:filter-fill" />
+                  </Button>
+                </Popover>
+              </div>
+              <div class="mt-4">
+                <For each={iterableFilteredGroups() || []}>
+                  {(group) => (
+                    <Show when={group.instances.length > 0}>
+                      <Collapsable
+                        noPadding
+                        title={
+                          <>
+                            {/* <img
                             class="w-6 h-6"
                             src={getCFModloaderIcon(key as CFFEModLoaderType)}
-                          />
-                          <span>{t(key)}</span>
-                        </>
-                      }
-                      size="standard"
-                    >
-                      <div class="mt-4 flex flex-wrap gap-4">
-                        <For each={values}>
-                          {(instance) => (
-                            <Suspense
-                              fallback={
-                                <Show
-                                  when={routeData.instancesUngrouped.isLoading}
-                                >
-                                  <Skeleton.sidebarInstanceSmall />
-                                </Show>
-                              }
-                            >
-                              <Suspense fallback={<Skeleton.instance />}>
-                                <InstanceTile instance={instance} />
-                              </Suspense>
-                            </Suspense>
-                          )}
-                        </For>
-                      </div>
-                    </Collapsable>
+                          /> */}
+                            <span>{group.name}</span>
+                          </>
+                        }
+                        size="standard"
+                      >
+                        <div
+                          class="mt-4 flex flex-wrap gap-x-4"
+                          classList={{
+                            "gap-y-4": instancesTileSize() === 1,
+                            "gap-y-6": instancesTileSize() === 2,
+                            "gap-y-8": instancesTileSize() === 3,
+                            "gap-y-10": instancesTileSize() === 4,
+                            "gap-y-12": instancesTileSize() === 5
+                          }}
+                        >
+                          <For each={group.instances}>
+                            {(instance) => (
+                              <InstanceTile
+                                instance={instance}
+                                size={instancesTileSize() as any}
+                              />
+                            )}
+                          </For>
+                        </div>
+                      </Collapsable>
+                    </Show>
                   )}
                 </For>
               </div>

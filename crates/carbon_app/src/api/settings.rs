@@ -126,6 +126,76 @@ impl FromStr for GameResolution {
     }
 }
 
+#[derive(Type, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum InstancesSortBy {
+    Name,
+    LastPlayed,
+    LastUpdated,
+    Created,
+    GameVersion,
+}
+
+impl From<InstancesSortBy> for String {
+    fn from(value: InstancesSortBy) -> Self {
+        match value {
+            InstancesSortBy::Name => "name",
+            InstancesSortBy::LastPlayed => "last_played",
+            InstancesSortBy::LastUpdated => "last_updated",
+            InstancesSortBy::GameVersion => "game_version",
+            InstancesSortBy::Created => "created",
+        }
+        .to_string()
+    }
+}
+
+impl TryFrom<String> for InstancesSortBy {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match &*value.to_lowercase() {
+            "name" => Ok(Self::Name),
+            "last_played" => Ok(Self::LastPlayed),
+            "last_updated" => Ok(Self::LastUpdated),
+            "game_version" => Ok(Self::GameVersion),
+            "created" => Ok(Self::Created),
+            _ => Err(anyhow::anyhow!("Invalid sort by")),
+        }
+    }
+}
+
+#[derive(Type, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum InstancesGroupBy {
+    Group,
+    Modloader,
+    GameVersion,
+}
+
+impl From<InstancesGroupBy> for String {
+    fn from(value: InstancesGroupBy) -> Self {
+        match value {
+            InstancesGroupBy::Group => "group",
+            InstancesGroupBy::Modloader => "modloader",
+            InstancesGroupBy::GameVersion => "game_version",
+        }
+        .to_string()
+    }
+}
+
+impl TryFrom<String> for InstancesGroupBy {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match &*value.to_lowercase() {
+            "group" => Ok(Self::Group),
+            "modloader" => Ok(Self::Modloader),
+            "game_version" => Ok(Self::GameVersion),
+            _ => Err(anyhow::anyhow!("Invalid group by")),
+        }
+    }
+}
+
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct FESettings {
@@ -137,6 +207,11 @@ struct FESettings {
     concurrent_downloads: i32,
     launcher_action_on_game_launch: FELauncherActionOnGameLaunch,
     show_news: bool,
+    instances_sort_by: InstancesSortBy,
+    instances_sort_by_asc: bool,
+    instances_group_by: InstancesGroupBy,
+    instances_group_by_asc: bool,
+    instances_tile_size: i32,
     xmx: i32,
     xms: i32,
     is_first_launch: bool,
@@ -161,6 +236,11 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             release_channel: data.release_channel.try_into()?,
             concurrent_downloads: data.concurrent_downloads,
             show_news: data.show_news,
+            instances_sort_by: data.instances_sort_by.try_into()?,
+            instances_sort_by_asc: data.instances_sort_by_asc,
+            instances_group_by: data.instances_group_by.try_into()?,
+            instances_group_by_asc: data.instances_group_by_asc,
+            instances_tile_size: data.instances_tile_size,
             xmx: data.xmx,
             xms: data.xms,
             is_first_launch: data.is_first_launch,
@@ -251,6 +331,16 @@ pub struct FESettingsUpdate {
     pub release_channel: Option<Set<FEReleaseChannel>>,
     #[specta(optional)]
     pub concurrent_downloads: Option<Set<i32>>,
+    #[specta(optional)]
+    pub instances_sort_by: Option<Set<InstancesSortBy>>,
+    #[specta(optional)]
+    pub instances_sort_by_asc: Option<Set<bool>>,
+    #[specta(optional)]
+    pub instances_group_by: Option<Set<InstancesGroupBy>>,
+    #[specta(optional)]
+    pub instances_group_by_asc: Option<Set<bool>>,
+    #[specta(optional)]
+    pub instances_tile_size: Option<Set<i32>>,
     #[specta(optional)]
     pub show_news: Option<Set<bool>>,
     #[specta(optional)]

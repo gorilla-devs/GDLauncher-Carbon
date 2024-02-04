@@ -72,7 +72,7 @@ keys! {
     instance {
         DEFAULT_GROUP                               = "getDefaultGroup";
         GET_GROUPS                                  = "getGroups";
-        GET_INSTANCES_UNGROUPED                     = "getInstancesUngrouped";
+        GET_ALL_INSTANCES                           = "getAllInstances";
         CREATE_GROUP                                = "createGroup";
         CREATE_INSTANCE                             = "createInstance";
         CHANGE_MODPACK                              = "changeModpack";

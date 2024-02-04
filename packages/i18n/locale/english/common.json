@@ -7,6 +7,17 @@
   "general.game_versions": "Game Versions",
   "general.modloaders": "Modloader",
   "general.categories": "Categories",
+  "general.name": "Name",
+  "general.last_played": "Last Played",
+  "general.last_updated": "Last Updated",
+  "general.created": "Created",
+  "general.game_version": "Game Version",
+  "general.modloader": "Modloader",
+  "general.group": "Group",
+  "general.instance_tile_size": "Instance Tile Size",
+  "general.sort_by": "Sort by",
+  "general.group_by": "Group by",
+  "general.instances_options": "Instances Options",
   "languages.italian": "Italiano",
   "languages.english": "English",
   "languages.german": "german",
@@ -380,5 +391,7 @@
   "ads.paragraph-7": "Thank you for being part of our journey. Your support is instrumental in shaping the future of GDLauncher and enhancing the Minecraft experience for everyone in our community.",
   "ads.paragraph-8": "Sincerely, The GDLauncher Team",
   "mods_updater.updating_mods_count": "Updating {{mods}} / {{total}} mods",
-  "mods_updater.updating_mod_text": "Updating mod {{mod_name}}"
+  "mods_updater.updating_mod_text": "Updating mod {{mod_name}}",
+  "default": "Default",
+  "favorites": "Favorites"
 }

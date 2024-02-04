@@ -46,20 +46,12 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .collect::<Vec<_>>())
         }
 
-        query GET_INSTANCES_UNGROUPED[app, args: ()] {
+        query GET_ALL_INSTANCES[app, args: ()] {
             Ok(app.instance_manager()
                 .list_groups()
                 .await?
                 .into_iter()
-                .flat_map(|group| {
-                    group.instances
-                        .into_iter()
-                        .map(|instance| UngroupedInstance {
-                            favorite: instance.favorite,
-                            instance: instance.into(),
-                        })
-                        .collect::<Vec<_>>()
-                })
+                .flat_map(|group| group.instances.into_iter().map(ListInstance::from))
                 .collect::<Vec<_>>())
         }
 
@@ -585,12 +577,12 @@ impl From<FEInstanceId> for domain::InstanceId {
 struct ListGroup {
     id: FEGroupId,
     name: String,
-    instances: Vec<ListInstance>,
 }
 
 #[derive(Type, Debug, Serialize)]
 struct ListInstance {
     id: FEInstanceId,
+    group_id: FEGroupId,
     name: String,
     favorite: bool,
     status: ListInstanceStatus,
@@ -598,13 +590,6 @@ struct ListInstance {
     last_played: Option<DateTime<Utc>>,
     date_created: DateTime<Utc>,
     date_updated: DateTime<Utc>,
-}
-
-#[derive(Type, Debug, Serialize)]
-struct UngroupedInstance {
-    favorite: bool,
-    #[serde(flatten)]
-    instance: ListInstance,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -1308,7 +1293,6 @@ impl From<manager::ListGroup> for ListGroup {
         Self {
             id: value.id.into(),
             name: value.name,
-            instances: value.instances.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -1317,6 +1301,7 @@ impl From<manager::ListInstance> for ListInstance {
     fn from(value: manager::ListInstance) -> Self {
         Self {
             id: value.id.into(),
+            group_id: value.group_id.into(),
             name: value.name,
             favorite: value.favorite,
             status: value.status.into(),

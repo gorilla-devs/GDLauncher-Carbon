@@ -182,7 +182,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         }
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
 
         Ok(())
     }
@@ -302,6 +302,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     )
                     .map(|(instance, status)| ListInstance {
                         id: InstanceId(instance.id),
+                        group_id: GroupId(instance.group_id),
                         name: instance.name,
                         favorite: instance.favorite,
                         icon_revision: match &status {
@@ -452,7 +453,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         Ok(())
     }
 
@@ -566,7 +567,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         Ok(())
     }
 
@@ -669,7 +670,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
 
         Ok(GroupId(group.id))
     }
@@ -751,7 +752,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
 
@@ -1035,7 +1036,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         );
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
 
         info!({ shortpath = ?shortpath }, "Created new instance '{name}' (id {})", *id);
 
@@ -1205,7 +1206,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         }
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some(update.instance_id.0.into()));
 
@@ -1286,7 +1287,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self.remove_instance(instance_id).await?;
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
 
@@ -1384,7 +1385,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         );
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app.meta_cache_manager().queue_caching(id, false).await;
 
         Ok(id)
@@ -1493,7 +1494,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         }
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         Ok(())
     }
 
@@ -1705,6 +1706,7 @@ pub struct ListGroup {
 #[derive(Debug, PartialEq, Eq)]
 pub struct ListInstance {
     pub id: InstanceId,
+    pub group_id: GroupId,
     pub name: String,
     pub favorite: bool,
     pub status: ListInstanceStatus,
@@ -2296,6 +2298,7 @@ mod test {
             name: default_group.name.clone(),
             instances: vec![ListInstance {
                 id: instance_id,
+                group_id: default_group.id,
                 name: String::from("test"),
                 favorite: false,
                 icon_revision: None,

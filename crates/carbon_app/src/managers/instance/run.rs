@@ -190,7 +190,7 @@ impl ManagerRef<'_, InstanceManager> {
         data.state = LaunchState::Preparing(id);
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some((*instance_id).into()));
 
@@ -1423,7 +1423,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         debug!("changing state of instance {instance_id} to {state:?}");
         instance.data_mut()?.state = state;
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some((*instance_id).into()));
 

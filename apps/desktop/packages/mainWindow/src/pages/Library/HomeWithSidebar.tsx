@@ -47,9 +47,9 @@ const HomeWithSidebar = () => {
         <Switch>
           <Match
             when={
-              routeData.instancesUngrouped.data &&
-              routeData.instancesUngrouped.data.length === 0 &&
-              !routeData.instancesUngrouped.isLoading
+              routeData.instances.data &&
+              routeData.instances.data.length === 0 &&
+              !routeData.instances.isLoading
             }
           >
             <div class="w-full h-full flex flex-col justify-center items-center mt-12">
@@ -67,25 +67,25 @@ const HomeWithSidebar = () => {
           </Match>
           <Match
             when={
-              (routeData.instancesUngrouped.data &&
-                routeData.instancesUngrouped.data.length > 0 &&
-                !routeData.instancesUngrouped.isLoading) ||
-              routeData.instancesUngrouped.isLoading ||
-              routeData.instancesUngrouped.isInitialLoading
+              (routeData.instances.data &&
+                routeData.instances.data.length > 0 &&
+                !routeData.instances.isLoading) ||
+              routeData.instances.isLoading ||
+              routeData.instances.isInitialLoading
             }
           >
             <div class="mt-4">
               <Switch>
                 <Match
                   when={
-                    routeData.instancesUngrouped.data &&
-                    routeData.instancesUngrouped.data.length > 0 &&
-                    !routeData.instancesUngrouped.isLoading
+                    routeData.instances.data &&
+                    routeData.instances.data.length > 0 &&
+                    !routeData.instances.isLoading
                   }
                 >
                   <Carousel title={t("jump_back_in")}>
                     <For
-                      each={routeData.instancesUngrouped.data
+                      each={routeData.instances.data
                         ?.slice()
                         .sort((a, b) => {
                           return (
@@ -97,7 +97,7 @@ const HomeWithSidebar = () => {
                     >
                       {(instance) => (
                         <Suspense fallback={<Skeleton.instance />}>
-                          <InstanceTile instance={instance} />
+                          <InstanceTile size={2} instance={instance} />
                         </Suspense>
                       )}
                     </For>
@@ -105,8 +105,8 @@ const HomeWithSidebar = () => {
                 </Match>
                 <Match
                   when={
-                    routeData.instancesUngrouped.isLoading &&
-                    routeData.instancesUngrouped.isInitialLoading
+                    routeData.instances.isLoading &&
+                    routeData.instances.isInitialLoading
                   }
                 >
                   <Skeleton.instances />
@@ -117,14 +117,14 @@ const HomeWithSidebar = () => {
               <Switch>
                 <Match
                   when={
-                    routeData.instancesUngrouped.data &&
-                    routeData.instancesUngrouped.data.length > 0 &&
-                    !routeData.instancesUngrouped.isLoading
+                    routeData.instances.data &&
+                    routeData.instances.data.length > 0 &&
+                    !routeData.instances.isLoading
                   }
                 >
                   <Carousel title={t("have_not_played_in_a_while")}>
                     <For
-                      each={routeData.instancesUngrouped.data
+                      each={routeData.instances.data
                         ?.slice()
                         .sort((a, b) => {
                           return (
@@ -136,7 +136,7 @@ const HomeWithSidebar = () => {
                     >
                       {(instance) => (
                         <Suspense fallback={<Skeleton.instance />}>
-                          <InstanceTile instance={instance} />
+                          <InstanceTile size={2} instance={instance} />
                         </Suspense>
                       )}
                     </For>
@@ -144,8 +144,8 @@ const HomeWithSidebar = () => {
                 </Match>
                 <Match
                   when={
-                    routeData.instancesUngrouped.isLoading &&
-                    routeData.instancesUngrouped.isInitialLoading
+                    routeData.instances.isLoading &&
+                    routeData.instances.isInitialLoading
                   }
                 >
                   <Skeleton.instances />

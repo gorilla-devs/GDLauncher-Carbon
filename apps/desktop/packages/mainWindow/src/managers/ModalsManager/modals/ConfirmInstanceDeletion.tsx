@@ -19,11 +19,11 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
         { previusInstancesUngrouped: UngroupedInstance[] } | undefined
       > => {
         await queryClient.cancelQueries({
-          queryKey: ["instance.getInstancesUngrouped"]
+          queryKey: ["instance.getAllInstances"]
         });
 
         const previusInstancesUngrouped: UngroupedInstance[] | undefined =
-          queryClient.getQueryData(["instance.getInstancesUngrouped"]);
+          queryClient.getQueryData(["instance.getAllInstances"]);
 
         queryClient.setQueryData(
           ["account.getActiveUuid", null],
@@ -47,14 +47,14 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
 
         if (context?.previusInstancesUngrouped) {
           queryClient.setQueryData(
-            ["instance.getInstancesUngrouped"],
+            ["instance.getAllInstances"],
             context.previusInstancesUngrouped
           );
         }
       },
       onSettled: () => {
         queryClient.invalidateQueries({
-          queryKey: ["instance.getInstancesUngrouped"]
+          queryKey: ["instance.getAllInstances"]
         });
       }
     }

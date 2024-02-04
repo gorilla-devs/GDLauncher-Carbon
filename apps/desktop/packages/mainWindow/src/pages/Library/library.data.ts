@@ -1,13 +1,11 @@
 import { rspc } from "@/utils/rspcClient";
 
 const fetchData = () => {
+  const instances = rspc.createQuery(() => ["instance.getAllInstances"]);
   const groups = rspc.createQuery(() => ["instance.getGroups"]);
-  const instancesUngrouped = rspc.createQuery(() => [
-    "instance.getInstancesUngrouped"
-  ]);
   const settings = rspc.createQuery(() => ["settings.getSettings"]);
 
-  return { groups, settings, instancesUngrouped };
+  return { settings, instances, groups };
 };
 
 export default fetchData;
