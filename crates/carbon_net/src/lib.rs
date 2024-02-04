@@ -207,11 +207,12 @@ pub async fn download_file(
 
 // TODO: improve checksum/size verification
 pub async fn download_multiple(
-    files: Vec<Downloadable>,
-    progress: watch::Sender<Progress>,
+    files: &[Downloadable],
+    progress: Option<watch::Sender<Progress>>,
     concurrency: usize,
     deep_check: bool,
-) -> Result<(), DownloadError> {
+    skip_download: bool,
+) -> Result<bool, DownloadError> {
     let retry_policy = ExponentialBackoff::builder().build_with_max_retries(3);
     let reqwest_client = Client::builder().build().unwrap();
     let client = ClientBuilder::new(reqwest_client)
@@ -241,6 +242,7 @@ pub async fn download_multiple(
         let path = file.path.clone();
         let client = client.clone();
 
+        let file = file.clone();
         let task = tokio::spawn(async move {
             let _permit = semaphore
                 .acquire()
@@ -289,14 +291,16 @@ pub async fn download_multiple(
                                 let downloaded = progress_counter
                                     .fetch_add(file.size.unwrap(), Ordering::SeqCst);
 
-                                progress.send(Progress {
-                                    current_count: file_counter.load(Ordering::SeqCst),
-                                    total_count,
-                                    current_size: downloaded,
-                                    total_size: size.load(Ordering::SeqCst),
-                                })?;
+                                if let Some(progress) = &*progress {
+                                    progress.send(Progress {
+                                        current_count: file_counter.load(Ordering::SeqCst),
+                                        total_count,
+                                        current_size: downloaded,
+                                        total_size: size.load(Ordering::SeqCst),
+                                    })?;
+                                }
 
-                                return Ok(());
+                                return Ok(false);
                             } else {
                                 trace!(
                                     "Hash mismatch sha1 for file: {} - expected: {hash} - got: {}",
@@ -312,14 +316,16 @@ pub async fn download_multiple(
                                 let downloaded = progress_counter
                                     .fetch_add(file.size.unwrap(), Ordering::SeqCst);
 
-                                progress.send(Progress {
-                                    current_count: file_counter.load(Ordering::SeqCst),
-                                    total_count,
-                                    current_size: downloaded,
-                                    total_size: size.load(Ordering::SeqCst),
-                                })?;
+                                if let Some(progress) = &*progress {
+                                    progress.send(Progress {
+                                        current_count: file_counter.load(Ordering::SeqCst),
+                                        total_count,
+                                        current_size: downloaded,
+                                        total_size: size.load(Ordering::SeqCst),
+                                    })?;
+                                }
 
-                                return Ok(());
+                                return Ok(false);
                             } else {
                                 trace!(
                                         "Hash mismatch sha256 for file: {} - expected: {hash} - got: {}",
@@ -335,14 +341,16 @@ pub async fn download_multiple(
                                 let downloaded = progress_counter
                                     .fetch_add(file.size.unwrap(), Ordering::SeqCst);
 
-                                progress.send(Progress {
-                                    current_count: file_counter.load(Ordering::SeqCst),
-                                    total_count,
-                                    current_size: downloaded,
-                                    total_size: size.load(Ordering::SeqCst),
-                                })?;
+                                if let Some(progress) = &*progress {
+                                    progress.send(Progress {
+                                        current_count: file_counter.load(Ordering::SeqCst),
+                                        total_count,
+                                        current_size: downloaded,
+                                        total_size: size.load(Ordering::SeqCst),
+                                    })?;
+                                }
 
-                                return Ok(());
+                                return Ok(false);
                             } else {
                                 trace!(
                                     "Hash mismatch md5 for file: {} - expected: {hash} - got: {}",
@@ -354,8 +362,10 @@ pub async fn download_multiple(
                         None => {}
                     }
                 } else {
-                    return Ok(());
+                    return Ok(false);
                 }
+            } else if skip_download {
+                return Ok(true);
             }
 
             let mut file_downloaded = 0u64;
@@ -407,23 +417,27 @@ pub async fn download_multiple(
                     size.fetch_add(diff, Ordering::SeqCst);
                 }
 
-                progress.send(Progress {
-                    current_count: file_counter.load(Ordering::SeqCst),
-                    total_count,
-                    current_size: downloaded,
-                    total_size: size.load(Ordering::SeqCst),
-                })?;
+                if let Some(progress) = &*progress {
+                    progress.send(Progress {
+                        current_count: file_counter.load(Ordering::SeqCst),
+                        total_count,
+                        current_size: downloaded,
+                        total_size: size.load(Ordering::SeqCst),
+                    })?;
+                }
             }
 
             let diff = file_size_reported - file_downloaded;
             let total = progress_counter.fetch_sub(diff, Ordering::SeqCst) - diff;
 
-            progress.send(Progress {
-                current_count: file_counter.fetch_add(1, Ordering::SeqCst),
-                total_count,
-                current_size: total,
-                total_size: size.load(Ordering::SeqCst),
-            })?;
+            if let Some(progress) = &*progress {
+                progress.send(Progress {
+                    current_count: file_counter.fetch_add(1, Ordering::SeqCst),
+                    total_count,
+                    current_size: total,
+                    total_size: size.load(Ordering::SeqCst),
+                })?;
+            }
 
             match file.checksum {
                 Some(Checksum::Sha1(hash)) => {
@@ -450,19 +464,24 @@ pub async fn download_multiple(
                 None => {}
             }
 
-            Ok(())
+            Ok(true)
         });
 
         tasks.push((task, url_clone));
     }
 
+    let mut download_required = false;
     for (task, url) in tasks {
-        let res = task.await?;
-        if let Err(e) = res {
-            tracing::error!({ error = ?e }, "Download failed for {}", url);
-            return Err(e);
+        match task.await? {
+            Ok(download_req) => {
+                download_required |= download_req;
+            }
+            Err(e) => {
+                tracing::error!({ error = ?e }, "Download failed for {}", url);
+                return Err(e);
+            }
         }
     }
 
-    Ok(())
+    Ok(download_required)
 }

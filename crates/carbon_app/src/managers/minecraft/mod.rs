@@ -291,7 +291,7 @@ mod tests {
             .await
             .unwrap();
 
-        carbon_net::download_multiple(vanilla_files, progress.0, 10, true)
+        carbon_net::download_multiple(&vanilla_files[..], Some(progress.0), 10, true, false)
             .await
             .unwrap();
 
