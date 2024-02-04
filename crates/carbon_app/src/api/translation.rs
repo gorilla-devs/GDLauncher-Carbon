@@ -49,5 +49,6 @@ pub enum Translation {
     InstanceExport,
     InstanceExportScanningMods,
     InstanceExportCacheMods,
+    InstanceExportCalculateSize,
     InstanceExportCreatingBundle,
 }

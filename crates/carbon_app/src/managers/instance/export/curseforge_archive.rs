@@ -1,6 +1,7 @@
 use std::{collections::HashMap, fs::File, io::Write, path::PathBuf, sync::Arc};
 
 use anyhow::anyhow;
+use tokio::sync::mpsc;
 use tracing::trace;
 
 use crate::{
@@ -13,9 +14,9 @@ use crate::{
         vtask::VisualTaskId,
     },
     managers::{
-        instance::{InstanceType, InvalidInstanceIdError},
+        instance::{export::ZipMode, InstanceType, InvalidInstanceIdError},
         modplatforms::curseforge::convert_standard_version_to_cf_version,
-        vtask::VisualTask,
+        vtask::{TaskState, VisualTask},
         AppInner,
     },
 };
@@ -69,11 +70,18 @@ pub async fn export_curseforge(
         let try_result: anyhow::Result<_> = async {
             let mut mods = Vec::new();
 
+            let t_calc_size = vtask.subtask(Translation::InstanceExportCalculateSize);
+            t_calc_size.set_weight(0.0);
+            let t_create_bundle = vtask.subtask(Translation::InstanceExportCreatingBundle);
+
+            vtask
+                .edit(|data| data.state = TaskState::KnownProgress)
+                .await;
+
             if link_mods {
                 let mods_filter = filter.0.get_mut("mods");
                 if let Some(mods_filter) = mods_filter {
                     let t_scan = vtask.subtask(Translation::InstanceExportScanningMods);
-                    let t_cache_mods = vtask.subtask(Translation::InstanceExportCacheMods);
                     t_scan.start_opaque();
 
                     if mods_filter.is_none() {
@@ -91,11 +99,9 @@ pub async fn export_curseforge(
 
                     let mods_filter = mods_filter.as_mut().map(|v| &mut v.0).unwrap();
 
-                    t_cache_mods.start_opaque();
                     app.meta_cache_manager()
                         .override_caching_and_wait(instance_id, true, false)
                         .await?;
-                    t_cache_mods.complete_opaque();
 
                     let mods2 = app
                         .prisma_client
@@ -125,8 +131,18 @@ pub async fn export_curseforge(
                 }
             }
 
-            let t_create_bundle = vtask.subtask(Translation::InstanceExportCreatingBundle);
-            t_create_bundle.start_opaque(); // TODO: track the total number of overrides and use update_items
+            t_calc_size.start_opaque();
+
+            let mut file_count = 0;
+            super::zip_excluding(
+                ZipMode::<File>::Count(&mut file_count),
+                &basepath,
+                "overrides",
+                &filter,
+            )?;
+
+            t_calc_size.complete_opaque();
+            t_create_bundle.update_items(0, file_count);
 
             let manifest = Manifest {
                 minecraft: convert_standard_version_to_cf_version(version.clone())?,
@@ -154,28 +170,45 @@ pub async fn export_curseforge(
                 .await?;
 
             let send_path = tmpfile.to_path_buf();
-            tokio::task::spawn_blocking(move || {
+            let (notify_tx, mut notify_rx) = mpsc::channel::<()>(1);
+
+            let ziptask = tokio::task::spawn_blocking(move || {
                 let mut zip = zip::ZipWriter::new(File::create(&send_path)?);
                 let options = zip::write::FileOptions::default();
                 zip.start_file("manifest.json", options)?;
                 zip.write_all(&serde_json::to_vec_pretty(&manifest)?)?;
 
-                super::zip_excluding(&mut zip, options, &basepath, "overrides", &filter)?;
+                super::zip_excluding(
+                    ZipMode::Create(&mut zip, options, notify_tx),
+                    &basepath,
+                    "overrides",
+                    &filter,
+                )?;
 
                 zip.finish()?;
                 trace!("finished writing `{}`", send_path.to_string_lossy());
                 Ok::<_, anyhow::Error>(())
-            })
-            .await??;
+            });
 
-            trace!(
-                "renaming export from `{}` to `{}`",
-                tmpfile.to_string_lossy(),
-                save_path.to_string_lossy()
-            );
+            tokio::select! {
+                r = ziptask => r??,
+                _ = async {
+                    let mut counter = 0;
+
+                    loop {
+                        if notify_rx.recv().await.is_some() {
+                            counter += 1;
+                            t_create_bundle.update_items(counter, file_count);
+                        } else {
+                            futures::future::pending().await
+                        }
+                    }
+                } => {},
+            }
+
             tmpfile.try_rename_or_move(save_path).await?;
 
-            t_create_bundle.complete_opaque();
+            t_create_bundle.complete_items();
 
             Ok(())
         }

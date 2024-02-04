@@ -622,6 +622,8 @@ impl ManagerRef<'_, InstanceManager> {
                             .ok_or_else(|| anyhow!("Instance was deleted while loading"))?
                             .data_mut()?
                             .config = config;
+
+                        app.invalidate(GET_MODPACK_INFO, Some(instance_id.0.into()));
                     }
 
                     // normally there would be a problem here because we would be skipping any mods removed by users
@@ -654,7 +656,6 @@ impl ManagerRef<'_, InstanceManager> {
                     let r: anyhow::Result<_> = async {
                         if let Some(packinfo) = packinfo {
                             for (oldfile, oldfilehash) in &packinfo.files {
-                                // TODO: diff in a way that stays sane across a crash
                                 let mut original_file =
                                     instance_root.join("instance").join(&oldfile[1..]);
 

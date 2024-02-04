@@ -145,9 +145,9 @@ impl ManagerRef<'_, InstanceManager> {
             .ok_or(InvalidInstanceIdError(instance_id))?;
 
         let data = instance.data()?;
-        let Some(modpack) = data.config.modpack.clone() else {
+        if data.config.modpack.is_none() {
             anyhow::bail!("Instance does not have an associated modpack");
-        };
+        }
 
         let runtime_path = self.app.settings_manager().runtime_path.clone();
         let instance_path = runtime_path
@@ -156,7 +156,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         drop(instances);
 
-        let pack_version_text = serde_json::to_string(&PackVersionFile::from(modpack.modpack))?;
+        let pack_version_text = serde_json::to_string(&PackVersionFile::from(modpack))?;
 
         let setup_path = instance_path.get_root().join(".setup");
 
@@ -164,13 +164,14 @@ impl ManagerRef<'_, InstanceManager> {
             anyhow::bail!("Instance has not completed the setup phase, attempting to change the modpack may irreparably damage it.");
         }
 
+        tokio::fs::create_dir_all(&setup_path).await?;
+
         let update_file_path = setup_path.join("change-pack-version.json");
 
-        let update_file = runtime_path.get_temp().maketmpfile().await?;
-
-        tokio::fs::create_dir_all(setup_path).await?;
-        tokio::fs::write(&*update_file, pack_version_text).await?;
-        drop(update_file);
+        runtime_path
+            .get_temp()
+            .write_file_atomic(update_file_path, pack_version_text)
+            .await?;
 
         self.app
             .instance_manager()
