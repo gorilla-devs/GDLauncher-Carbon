@@ -51,13 +51,15 @@ use tracing::{debug, info, trace};
 
 #[derive(Debug)]
 pub struct PersistenceManager {
-    ensure_lock: Semaphore,
+    instance_download_lock: Semaphore,
+    loader_install_lock: Semaphore,
 }
 
 impl PersistenceManager {
     pub fn new() -> Self {
         Self {
-            ensure_lock: Semaphore::new(1),
+            instance_download_lock: Semaphore::new(1),
+            loader_install_lock: Semaphore::new(1),
         }
     }
 }
@@ -182,9 +184,6 @@ impl ManagerRef<'_, InstanceManager> {
             },
         });
 
-        let wait_task = task.subtask(Translation::InstanceTaskLaunchWaiting);
-        wait_task.set_weight(0.0);
-
         let id = self.app.task_manager().spawn_task(&task).await;
 
         data.state = LaunchState::Preparing(id);
@@ -204,13 +203,6 @@ impl ManagerRef<'_, InstanceManager> {
         let installation_task = tokio::spawn(async move {
             let instance_manager = app.instance_manager();
             let task = task;
-            let _lock = instance_manager
-                .persistence_manager
-                .ensure_lock
-                .acquire()
-                .await
-                .expect("the ensure lock semaphore should never be closed");
-
             let instance_root = instance_path.get_root();
             let setup_path = instance_root.join(".setup");
             let is_first_run = setup_path.is_dir();
@@ -282,8 +274,6 @@ impl ManagerRef<'_, InstanceManager> {
 
                 task.edit(|data| data.state = TaskState::KnownProgress)
                     .await;
-
-                wait_task.complete_opaque();
 
                 let dummy_string = daedalus::BRANDING
                     .get_or_init(daedalus::Branding::default)
@@ -587,10 +577,11 @@ impl ManagerRef<'_, InstanceManager> {
                         .concurrent_downloads;
 
                     carbon_net::download_multiple(
-                        downloads,
-                        progress_watch_tx,
+                        &downloads[..],
+                        Some(progress_watch_tx),
                         concurrency as usize,
                         deep_check,
+                        false,
                     )
                     .await?;
 
@@ -978,40 +969,62 @@ impl ManagerRef<'_, InstanceManager> {
                         .await?,
                 );
 
-                let (progress_watch_tx, mut progress_watch_rx) =
-                    tokio::sync::watch::channel(carbon_net::Progress::new());
-
-                // dropped when the sender is dropped
-                tokio::spawn(async move {
-                    while progress_watch_rx.changed().await.is_ok() {
-                        {
-                            let progress = progress_watch_rx.borrow();
-                            t_download_files.update_download(
-                                progress.current_size as u32,
-                                progress.total_size as u32,
-                                false,
-                            );
-                        }
-
-                        tokio::time::sleep(Duration::from_millis(200)).await;
-                    }
-
-                    t_download_files.complete_download();
-                });
-
                 let concurrency = app
                     .settings_manager()
                     .get_settings()
                     .await?
                     .concurrent_downloads;
 
-                carbon_net::download_multiple(
-                    downloads,
-                    progress_watch_tx,
+                let download_requied = carbon_net::download_multiple(
+                    &downloads[..],
+                    None,
                     concurrency as usize,
                     deep_check,
+                    true,
                 )
                 .await?;
+
+                if download_requied {
+                    let wait_task = task.subtask(Translation::InstanceTaskLaunchWaitDownloadFiles);
+                    wait_task.set_weight(0.0);
+
+                    let _lock = instance_manager
+                        .persistence_manager
+                        .instance_download_lock
+                        .acquire()
+                        .await
+                        .unwrap();
+
+                    let (progress_watch_tx, mut progress_watch_rx) =
+                        tokio::sync::watch::channel(carbon_net::Progress::new());
+
+                    // dropped when the sender is dropped
+                    tokio::spawn(async move {
+                        while progress_watch_rx.changed().await.is_ok() {
+                            {
+                                let progress = progress_watch_rx.borrow();
+                                t_download_files.update_download(
+                                    progress.current_size as u32,
+                                    progress.total_size as u32,
+                                    false,
+                                );
+                            }
+
+                            tokio::time::sleep(Duration::from_millis(200)).await;
+                        }
+
+                        t_download_files.complete_download();
+                    });
+
+                    carbon_net::download_multiple(
+                        &downloads[..],
+                        Some(progress_watch_tx),
+                        concurrency as usize,
+                        deep_check,
+                        false,
+                    )
+                    .await?;
+                }
 
                 // update mod metadata and add modpack complete flag after mods are downloaded
                 if is_first_run {
@@ -1114,6 +1127,13 @@ impl ManagerRef<'_, InstanceManager> {
                             if let Some(t_forge_processors) = &t_forge_processors {
                                 t_forge_processors.start_opaque();
 
+                                let _lock = instance_manager
+                                    .persistence_manager
+                                    .loader_install_lock
+                                    .acquire()
+                                    .await
+                                    .unwrap();
+
                                 if let Some(processors) = &version_info.processors {
                                     managers::minecraft::forge::execute_processors(
                                         processors,
@@ -1141,6 +1161,13 @@ impl ManagerRef<'_, InstanceManager> {
                         } => {
                             if let Some(t_neoforge_processors) = &t_neoforge_processors {
                                 t_neoforge_processors.start_opaque();
+
+                                let _lock = instance_manager
+                                    .persistence_manager
+                                    .loader_install_lock
+                                    .acquire()
+                                    .await
+                                    .unwrap();
 
                                 if let Some(processors) = &version_info.processors {
                                     managers::minecraft::neoforge::execute_processors(
