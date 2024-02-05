@@ -40,6 +40,7 @@ import {
 import { rspcFetch } from "@/utils/rspcClient";
 import { createStore } from "solid-js/store";
 import { mappedMcVersions, mcVersions } from "@/utils/mcVersion";
+import { instanceId, setInstanceId } from "@/utils/browser";
 
 const mapTypeToColor = (type: McType) => {
   return (
@@ -122,8 +123,6 @@ const Sidebar = () => {
     }
   }
 
-  const instanceId = () => infiniteQuery.instanceId();
-
   const [t] = useTransContext();
 
   const isCurseforge = () => infiniteQuery?.query?.searchApi === "curseforge";
@@ -172,7 +171,7 @@ const Sidebar = () => {
                   setSearchParams({
                     instanceId: val as number
                   });
-                  infiniteQuery.setInstanceId(val as number);
+                  setInstanceId(val as number);
 
                   const modloaders = details.data.modloaders.map(
                     (v: any) => v.type_
@@ -191,6 +190,8 @@ const Sidebar = () => {
                       newModloaders = [...modloaders!] as any;
                     }
                   }
+
+                  console.log(newModloaders, [gameVersion]);
 
                   infiniteQuery.setQuery({
                     modloaders: newModloaders,
