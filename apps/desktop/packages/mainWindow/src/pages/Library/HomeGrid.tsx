@@ -125,6 +125,10 @@ const HomeGrid = () => {
         if ("Valid" in instance.status) {
           groupName = instance.status.Valid.modloader;
         }
+      } else if (routeData.settings.data?.instancesGroupBy === "modplatform") {
+        if ("Valid" in instance.status) {
+          groupName = instance.status.Valid.modpack_platform;
+        }
       }
 
       if (!groupName) {
@@ -241,10 +245,21 @@ const HomeGrid = () => {
   const iterableFilteredGroups = createMemo(() => {
     const iterable = Object.values(filteredGroups());
 
-    if (
-      routeData.settings.data?.instancesGroupBy === "group" ||
-      routeData.settings.data?.instancesGroupBy === "modloader"
-    ) {
+    if (routeData.settings.data?.instancesGroupBy === "gameVersion") {
+      iterable.sort((a, b) => {
+        if (routeData.settings.data?.instancesGroupByAsc) {
+          return a.name.localeCompare(b.name, undefined, {
+            numeric: true,
+            sensitivity: "base"
+          });
+        } else {
+          return b.name.localeCompare(a.name, undefined, {
+            numeric: true,
+            sensitivity: "base"
+          });
+        }
+      });
+    } else {
       iterable.sort((a, b) => {
         if (a.name === t("favorites")) {
           return -1;
@@ -258,20 +273,6 @@ const HomeGrid = () => {
           return a.name.localeCompare(b.name);
         } else {
           return b.name.localeCompare(a.name);
-        }
-      });
-    } else if (routeData.settings.data?.instancesGroupBy === "gameVersion") {
-      iterable.sort((a, b) => {
-        if (routeData.settings.data?.instancesGroupByAsc) {
-          return a.name.localeCompare(b.name, undefined, {
-            numeric: true,
-            sensitivity: "base"
-          });
-        } else {
-          return b.name.localeCompare(a.name, undefined, {
-            numeric: true,
-            sensitivity: "base"
-          });
         }
       });
     }
@@ -324,6 +325,10 @@ const HomeGrid = () => {
     {
       key: "modloader",
       label: t("general.modloader")
+    },
+    {
+      key: "modplatform",
+      label: t("general.modplatform")
     }
   ];
 

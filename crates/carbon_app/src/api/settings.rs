@@ -173,6 +173,7 @@ pub enum InstancesGroupBy {
     Group,
     Modloader,
     GameVersion,
+    Modplatform,
 }
 
 impl From<InstancesGroupBy> for String {
@@ -181,6 +182,7 @@ impl From<InstancesGroupBy> for String {
             InstancesGroupBy::Group => "group",
             InstancesGroupBy::Modloader => "modloader",
             InstancesGroupBy::GameVersion => "game_version",
+            InstancesGroupBy::Modplatform => "modplatform",
         }
         .to_string()
     }
@@ -194,6 +196,7 @@ impl TryFrom<String> for InstancesGroupBy {
             "group" => Ok(Self::Group),
             "modloader" => Ok(Self::Modloader),
             "game_version" => Ok(Self::GameVersion),
+            "modplatform" => Ok(Self::Modplatform),
             _ => Err(anyhow::anyhow!("Invalid group by")),
         }
     }

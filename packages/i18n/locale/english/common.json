@@ -14,6 +14,7 @@
   "general.created": "Created",
   "general.game_version": "Game Version",
   "general.modloader": "Modloader",
+  "general.modplatform": "Modpack Platform",
   "general.group": "Group",
   "general.instance_tile_size": "Instance Tile Size",
   "general.sort_by": "Sort by",

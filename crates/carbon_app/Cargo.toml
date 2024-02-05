@@ -94,3 +94,6 @@ tracing-test = { workspace = true }
 
 [features]
 production = ["iridium"]
+
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-Ctarget-feature=+crt-static", "-Zunstable-options"]
