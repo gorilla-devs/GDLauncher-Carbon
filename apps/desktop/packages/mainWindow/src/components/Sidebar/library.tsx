@@ -40,10 +40,10 @@ const Sidebar = () => {
 
   const filteredData = createMemo(() =>
     filter()
-      ? routeData.instancesUngrouped.data?.filter((item) =>
+      ? instances.data?.filter((item) =>
           item.name.toLowerCase().includes(filter().toLowerCase())
         )
-      : routeData.instancesUngrouped.data
+      : instances.data
   );
 
   createEffect(() => {
@@ -71,7 +71,7 @@ const Sidebar = () => {
 
   let inputRef: HTMLInputElement | undefined;
   const favoriteInstances = () =>
-    routeData.instancesUngrouped.data?.filter((inst) => inst.favorite) || [];
+    instances.data?.filter((inst) => inst.favorite) || [];
 
   const mapIconToKey = (key: string) => {
     return (
@@ -110,11 +110,11 @@ const Sidebar = () => {
               icon={<div class="i-ri:search-line" />}
               class="w-full rounded-full"
               onInput={(e) => setFilter(e.target.value)}
-              disabled={(routeData.instancesUngrouped?.data || []).length === 0}
+              disabled={(instances?.data || []).length === 0}
             />
           </Show>
         </div>
-        <Show when={routeData.instancesUngrouped.isInitialLoading}>
+        <Show when={instances.isInitialLoading}>
           <Skeleton.sidebarInstances />
         </Show>
         <div
@@ -139,17 +139,18 @@ const Sidebar = () => {
                   <Suspense
                     fallback={
                       isSidebarOpened() ? (
-                        <Show when={routeData.instancesUngrouped.isLoading}>
+                        <Show when={routeData.instances.isLoading}>
                           <Skeleton.sidebarInstance />
                         </Show>
                       ) : (
-                        <Show when={routeData.instancesUngrouped.isLoading}>
+                        <Show when={instances.isLoading}>
                           <Skeleton.sidebarInstanceSmall />
                         </Show>
                       )
                     }
                   >
                     <InstanceTile
+                      size={2}
                       instance={instance}
                       isSidebarOpened={isSidebarOpened()}
                       selected={instanceId() === instance.id.toString()}
@@ -174,17 +175,18 @@ const Sidebar = () => {
                     <Suspense
                       fallback={
                         isSidebarOpened() ? (
-                          <Show when={routeData.instancesUngrouped.isLoading}>
+                          <Show when={instances.isLoading}>
                             <Skeleton.sidebarInstance />
                           </Show>
                         ) : (
-                          <Show when={routeData.instancesUngrouped.isLoading}>
+                          <Show when={instances.isLoading}>
                             <Skeleton.sidebarInstanceSmall />
                           </Show>
                         )
                       }
                     >
                       <InstanceTile
+                        size={2}
                         instance={instance}
                         isSidebarOpened={isSidebarOpened()}
                         selected={instanceId() === instance.id.toString()}
@@ -196,10 +198,7 @@ const Sidebar = () => {
             )}
           </For>
           <Show
-            when={
-              (routeData.instancesUngrouped?.data || []).length === 0 &&
-              !routeData.instancesUngrouped.isLoading
-            }
+            when={(instances?.data || []).length === 0 && !instances.isLoading}
           >
             <div class="w-full h-full flex flex-col justify-center items-center">
               <img

@@ -70,8 +70,7 @@ const HomeWithSidebar = () => {
               (routeData.instances.data &&
                 routeData.instances.data.length > 0 &&
                 !routeData.instances.isLoading) ||
-              routeData.instances.isLoading ||
-              routeData.instances.isInitialLoading
+              routeData.instances.isLoading
             }
           >
             <div class="mt-4">
@@ -103,12 +102,7 @@ const HomeWithSidebar = () => {
                     </For>
                   </Carousel>
                 </Match>
-                <Match
-                  when={
-                    routeData.instances.isLoading &&
-                    routeData.instances.isInitialLoading
-                  }
-                >
+                <Match when={routeData.instances.isLoading}>
                   <Skeleton.instances />
                 </Match>
               </Switch>
@@ -142,12 +136,7 @@ const HomeWithSidebar = () => {
                     </For>
                   </Carousel>
                 </Match>
-                <Match
-                  when={
-                    routeData.instances.isLoading &&
-                    routeData.instances.isInitialLoading
-                  }
-                >
+                <Match when={routeData.instances.isLoading}>
                   <Skeleton.instances />
                 </Match>
               </Switch>

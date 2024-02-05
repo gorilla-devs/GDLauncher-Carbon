@@ -5,7 +5,6 @@ import {
   CFFEModLoaderType,
   FESubtask,
   Translation,
-  UngroupedInstance,
   ModpackPlatform
 } from "@gd/core_module/bindings";
 import { For, Match, Show, Switch, mergeProps } from "solid-js";
@@ -27,7 +26,7 @@ type Variant = "default" | "sidebar" | "sidebar-small";
 
 type Props = {
   modloader: CFFEModLoaderType | null | undefined;
-  instance: UngroupedInstance | ListInstance;
+  instance: ListInstance;
   selected?: boolean;
   isLoading?: boolean;
   percentage?: number;

@@ -372,6 +372,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                             InstanceType::Valid(status) => status.config.date_updated,
                             InstanceType::Invalid(status) => DateTime::default(),
                         },
+                        seconds_played: match status {
+                            InstanceType::Valid(status) => status.config.seconds_played,
+                            InstanceType::Invalid(status) => 0,
+                        },
                     })
                     .collect::<Vec<_>>(),
             })
@@ -1231,7 +1235,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     pub async fn update_playtime(
         self,
         instance_id: InstanceId,
-        added_seconds: u64,
+        added_seconds: u32,
     ) -> anyhow::Result<()> {
         let mut instances = self.instances.write().await;
         let instance = instances
@@ -1715,6 +1719,7 @@ pub struct ListInstance {
     pub locked: bool,
     pub date_created: DateTime<Utc>,
     pub date_updated: DateTime<Utc>,
+    pub seconds_played: u32,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -2312,6 +2317,7 @@ mod test {
                 last_played: None,
                 date_created: list[0].instances[0].date_created,
                 date_updated: list[0].instances[0].date_updated,
+                seconds_played: 0,
             }],
         }];
 

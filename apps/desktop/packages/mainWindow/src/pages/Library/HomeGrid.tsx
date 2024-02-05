@@ -14,6 +14,7 @@ import {
   Match,
   Show,
   Switch,
+  createEffect,
   createMemo,
   createResource,
   createSignal
@@ -65,30 +66,19 @@ const NewsWrapper = () => {
 const HomeGrid = () => {
   const [t] = useTransContext();
 
-  const rspcContext = rspc.useContext();
+  // const rspcContext = rspc.useContext();
 
   const [filter, setFilter] = createSignal("");
+
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
-  const settingsMutation = rspc.createMutation(["settings.setSettings"], {
-    onMutate: (data) => {
-      rspcContext.queryClient.setQueryData(
-        ["settings.getSettings"],
-        (old: any) => {
-          const newSettings: any = {};
+  const [instancesTileSize, setInstancesTileSize] = createSignal(2);
 
-          for (const key in data) {
-            newSettings[key] = (data as any)[key].Set;
-          }
-
-          return {
-            ...old,
-            ...newSettings
-          };
-        }
-      );
-    }
+  createEffect(() => {
+    setInstancesTileSize(routeData.settings.data?.instancesTileSize!);
   });
+
+  const settingsMutation = rspc.createMutation(["settings.setSettings"]);
 
   let inputRef: HTMLInputElement | undefined;
 
@@ -162,30 +152,77 @@ const HomeGrid = () => {
     for (const key in _groups) {
       _groups[key].instances.sort((a, b) => {
         if (routeData.settings.data?.instancesSortBy === "name") {
-          return a.name.localeCompare(b.name);
+          if (routeData.settings.data?.instancesSortByAsc) {
+            return a.name.localeCompare(b.name);
+          } else {
+            return b.name.localeCompare(a.name);
+          }
+        } else if (routeData.settings.data?.instancesSortBy === "mostPlayed") {
+          if (routeData.settings.data?.instancesSortByAsc) {
+            return (
+              (a.seconds_played || 0) - (b.seconds_played || 0) ||
+              a.name.localeCompare(b.name)
+            );
+          } else {
+            return (
+              (b.seconds_played || 0) - (a.seconds_played || 0) ||
+              b.name.localeCompare(a.name)
+            );
+          }
         } else if (routeData.settings.data?.instancesSortBy === "lastPlayed") {
-          return (
-            Date.parse(b.last_played || "") - Date.parse(a.last_played || "") ||
-            a.name.localeCompare(b.name)
-          );
+          if (routeData.settings.data?.instancesSortByAsc) {
+            return (
+              Date.parse(a.last_played || "") -
+                Date.parse(b.last_played || "") || a.name.localeCompare(b.name)
+            );
+          } else {
+            return (
+              Date.parse(b.last_played || "") -
+                Date.parse(a.last_played || "") || b.name.localeCompare(a.name)
+            );
+          }
         } else if (routeData.settings.data?.instancesSortBy === "lastUpdated") {
-          return (
-            Date.parse(b.date_updated || "") -
-              Date.parse(a.date_updated || "") || a.name.localeCompare(b.name)
-          );
+          if (routeData.settings.data?.instancesSortByAsc) {
+            return (
+              Date.parse(a.date_updated || "") -
+                Date.parse(b.date_updated || "") || a.name.localeCompare(b.name)
+            );
+          } else {
+            return (
+              Date.parse(b.date_updated || "") -
+                Date.parse(a.date_updated || "") || b.name.localeCompare(a.name)
+            );
+          }
         } else if (routeData.settings.data?.instancesSortBy === "gameVersion") {
-          return (
-            (a.status as any).Valid.mc_version?.localeCompare(
-              (b.status as any).Valid.mc_version,
-              undefined,
-              { numeric: true, sensitivity: "base" }
-            ) || a.name.localeCompare(b.name)
-          );
+          if (routeData.settings.data?.instancesSortByAsc) {
+            return (
+              (a.status as any).Valid.mc_version?.localeCompare(
+                (b.status as any).Valid.mc_version,
+                undefined,
+                { numeric: true, sensitivity: "base" }
+              ) || a.name.localeCompare(b.name)
+            );
+          } else {
+            return (
+              (b.status as any).Valid.mc_version?.localeCompare(
+                (a.status as any).Valid.mc_version,
+                undefined,
+                { numeric: true, sensitivity: "base" }
+              ) || b.name.localeCompare(a.name)
+            );
+          }
         } else if (routeData.settings.data?.instancesSortBy === "created") {
-          return (
-            Date.parse(b.date_created || "") -
-              Date.parse(a.date_created || "") || a.name.localeCompare(b.name)
-          );
+          if (routeData.settings.data?.instancesSortByAsc) {
+            return (
+              Date.parse(a.date_created || "") -
+                Date.parse(b.date_created || "") || a.name.localeCompare(b.name)
+            );
+          } else {
+            return (
+              Date.parse(b.date_created || "") -
+                Date.parse(a.date_created || "") || b.name.localeCompare(a.name)
+            );
+          }
         }
       });
     }
@@ -236,9 +273,6 @@ const HomeGrid = () => {
     return iterable;
   });
 
-  const instancesTileSize = () =>
-    routeData.settings.data?.instancesTileSize || 0;
-
   const sortByOptions: {
     key: InstancesSortBy;
     label: string;
@@ -246,6 +280,10 @@ const HomeGrid = () => {
     {
       key: "name",
       label: t("general.name")
+    },
+    {
+      key: "mostPlayed",
+      label: t("general.most_played")
     },
     {
       key: "lastPlayed",
@@ -288,12 +326,7 @@ const HomeGrid = () => {
       <div class="overflow-hidden">
         <UnstableCard />
         <Switch>
-          <Match
-            when={
-              routeData.instances.isLoading &&
-              routeData.instances.isInitialLoading
-            }
-          >
+          <Match when={routeData.instances.isLoading}>
             <Skeleton.instances />
           </Match>
           <Match
@@ -354,15 +387,15 @@ const HomeGrid = () => {
                   noTip
                   noPadding
                   content={
-                    <div class="flex flex-col gap-y-6 w-80 h-auto p-4">
+                    <div class="w-100 flex flex-col gap-y-6 h-auto p-4">
                       <div class="text-2xl mb-4">
-                        <Trans key="general.instances_options" />
+                        <Trans key="general.instances_filters" />
                       </div>
                       <div class="w-full flex items-center justify-between">
                         <div>
                           <Trans key="general.instance_tile_size" />
                         </div>
-                        <div class="w-30 flex items-center">
+                        <div class="w-50 flex items-center">
                           <Slider
                             min={1}
                             max={5}
@@ -371,6 +404,16 @@ const HomeGrid = () => {
                             value={instancesTileSize()}
                             onChange={(value) => {
                               if (!value) return;
+
+                              setInstancesTileSize(value);
+                            }}
+                            OnRelease={(value) => {
+                              if (
+                                value ===
+                                routeData.settings.data?.instancesTileSize
+                              ) {
+                                return;
+                              }
 
                               settingsMutation.mutate({
                                 instancesTileSize: {
@@ -385,9 +428,9 @@ const HomeGrid = () => {
                         <div>
                           <Trans key="general.sort_by" />
                         </div>
-                        <div class="w-30 flex items-center">
+                        <div class="flex items-center gap-4">
                           <Dropdown
-                            class="w-30"
+                            class="w-40"
                             options={sortByOptions}
                             icon={<div class="i-ri:price-tag-3-fill" />}
                             value={routeData.settings.data?.instancesSortBy}
@@ -399,15 +442,32 @@ const HomeGrid = () => {
                               });
                             }}
                           />
+                          <div
+                            class="w-6 h-6 text-darkSlate-50 hover:text-white"
+                            classList={{
+                              "i-ri:sort-alphabet-asc":
+                                routeData.settings.data?.instancesSortByAsc,
+                              "i-ri:sort-alphabet-desc":
+                                !routeData.settings.data?.instancesSortByAsc
+                            }}
+                            onClick={() => {
+                              settingsMutation.mutate({
+                                instancesSortByAsc: {
+                                  Set: !routeData.settings.data
+                                    ?.instancesSortByAsc
+                                }
+                              });
+                            }}
+                          />
                         </div>
                       </div>
                       <div class="w-full flex items-center justify-between">
                         <div>
                           <Trans key="general.group_by" />
                         </div>
-                        <div class="w-30 flex items-center">
+                        <div class="flex items-center gap-4">
                           <Dropdown
-                            class="w-30"
+                            class="w-40"
                             options={groupByOptions}
                             icon={<div class="i-ri:price-tag-3-fill" />}
                             value={routeData.settings.data?.instancesGroupBy}
@@ -419,7 +479,50 @@ const HomeGrid = () => {
                               });
                             }}
                           />
+                          <div
+                            class="w-6 h-6 text-darkSlate-50 hover:text-white"
+                            classList={{
+                              "i-ri:sort-alphabet-asc":
+                                routeData.settings.data?.instancesGroupByAsc,
+                              "i-ri:sort-alphabet-desc":
+                                !routeData.settings.data?.instancesGroupByAsc
+                            }}
+                            onClick={() => {
+                              settingsMutation.mutate({
+                                instancesGroupByAsc: {
+                                  Set: !routeData.settings.data
+                                    ?.instancesGroupByAsc
+                                }
+                              });
+                            }}
+                          />
                         </div>
+                      </div>
+                      <div class="flex justify-end">
+                        <span
+                          class="text-darkSlate-50 hover:text-white mt-4"
+                          onClick={() => {
+                            settingsMutation.mutate({
+                              instancesSortBy: {
+                                Set: "name"
+                              },
+                              instancesSortByAsc: {
+                                Set: true
+                              },
+                              instancesGroupBy: {
+                                Set: "group"
+                              },
+                              instancesGroupByAsc: {
+                                Set: true
+                              },
+                              instancesTileSize: {
+                                Set: 2
+                              }
+                            });
+                          }}
+                        >
+                          <Trans key="general.reset_filters" />
+                        </span>
                       </div>
                     </div>
                   }

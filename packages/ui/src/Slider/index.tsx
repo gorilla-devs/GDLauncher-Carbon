@@ -346,7 +346,7 @@ function Slider(props: Props) {
             }}
           />
           <div
-            class="bg-darkSlate-900 rounded-full"
+            class="bg-darkSlate-600 rounded-full"
             classList={{
               "w-full h-2": !props.vertical,
               "h-full w-2": props.vertical,

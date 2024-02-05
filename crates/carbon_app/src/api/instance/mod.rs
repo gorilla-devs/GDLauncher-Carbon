@@ -590,6 +590,7 @@ struct ListInstance {
     last_played: Option<DateTime<Utc>>,
     date_created: DateTime<Utc>,
     date_updated: DateTime<Utc>,
+    seconds_played: u32,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -1309,6 +1310,7 @@ impl From<manager::ListInstance> for ListInstance {
             last_played: value.last_played,
             date_created: value.date_created,
             date_updated: value.date_updated,
+            seconds_played: value.seconds_played,
         }
     }
 }

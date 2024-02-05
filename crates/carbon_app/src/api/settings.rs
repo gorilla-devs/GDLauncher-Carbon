@@ -134,6 +134,7 @@ pub enum InstancesSortBy {
     LastUpdated,
     Created,
     GameVersion,
+    MostPlayed,
 }
 
 impl From<InstancesSortBy> for String {
@@ -144,6 +145,7 @@ impl From<InstancesSortBy> for String {
             InstancesSortBy::LastUpdated => "last_updated",
             InstancesSortBy::GameVersion => "game_version",
             InstancesSortBy::Created => "created",
+            InstancesSortBy::MostPlayed => "most_played",
         }
         .to_string()
     }
@@ -159,6 +161,7 @@ impl TryFrom<String> for InstancesSortBy {
             "last_updated" => Ok(Self::LastUpdated),
             "game_version" => Ok(Self::GameVersion),
             "created" => Ok(Self::Created),
+            "most_played" => Ok(Self::MostPlayed),
             _ => Err(anyhow::anyhow!("Invalid sort by")),
         }
     }

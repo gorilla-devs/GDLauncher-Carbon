@@ -1266,7 +1266,7 @@ impl ManagerRef<'_, InstanceManager> {
                             last_stored_time = now;
                             let r = app
                                 .instance_manager()
-                                .update_playtime(instance_id, diff.num_seconds() as u64)
+                                .update_playtime(instance_id, diff.num_seconds() as u32)
                                 .await;
                             if let Err(e) = r {
                                 tracing::error!({ error = ?e }, "error updating instance playtime");
@@ -1288,7 +1288,7 @@ impl ManagerRef<'_, InstanceManager> {
                         .instance_manager()
                         .update_playtime(
                             instance_id,
-                            (Utc::now() - last_stored_time).num_seconds() as u64,
+                            (Utc::now() - last_stored_time).num_seconds() as u32,
                         )
                         .await;
                     if let Err(e) = r {

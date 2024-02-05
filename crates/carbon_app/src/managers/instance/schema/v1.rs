@@ -20,7 +20,7 @@ pub struct Instance {
     #[serde(default)]
     pub last_played: Option<DateTime<Utc>>,
     #[serde(default)]
-    pub seconds_played: u64,
+    pub seconds_played: u32,
     #[serde(default)]
     pub modpack: Option<ModpackInfo>,
     pub game_configuration: GameConfig,
