@@ -5,7 +5,7 @@ import {
   ListInstanceStatus,
   FESubtask,
   FETaskId,
-  UngroupedInstance,
+  ListInstance,
   ValidListInstance,
   Modpack,
   CurseforgeModpack,
@@ -213,13 +213,11 @@ export const getUrlType = (url: string) => {
     : null;
 };
 
-export interface InvalidInstanceType extends Omit<UngroupedInstance, "status"> {
+export interface InvalidInstanceType extends Omit<ListInstance, "status"> {
   error?: InvalidListInstance;
 }
 
-export interface ValidInstanceType
-  extends ValidListInstance,
-    UngroupedInstance {
+export interface ValidInstanceType extends ValidListInstance, ListInstance {
   error?: undefined;
   img: string;
 }
@@ -227,7 +225,7 @@ export interface ValidInstanceType
 export type Instance = InvalidInstanceType | ValidInstanceType;
 
 export interface InstancesStore {
-  [modloader: string]: UngroupedInstance[];
+  [modloader: string]: ListInstance[];
 }
 
 export const getModpackPlatformIcon = (platform: ModpackPlatform) => {

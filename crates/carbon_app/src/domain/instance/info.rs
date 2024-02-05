@@ -14,7 +14,7 @@ pub struct Instance {
     pub date_created: DateTime<Utc>,
     pub date_updated: DateTime<Utc>,
     pub last_played: Option<DateTime<Utc>>,
-    pub seconds_played: u64,
+    pub seconds_played: u32,
     pub modpack: Option<ModpackInfo>,
     pub game_configuration: GameConfig,
     pub mod_sources: Option<ModSources>,

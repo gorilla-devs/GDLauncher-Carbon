@@ -211,7 +211,7 @@ const Dropdown = (props: Props) => {
           <Portal>
             <ul
               ref={setMenuRef}
-              class="absolute  max-h-60 bottom-0 overflow-y-auto overflow-x-hidden text-darkSlate-50 shadow-md shadow-darkSlate-900 list-none m-0 p-0 z-100 min-w-32"
+              class="absolute h-max max-h-60 bottom-0 overflow-y-auto overflow-x-hidden text-darkSlate-50 shadow-md shadow-darkSlate-900 list-none m-0 p-0 z-100 min-w-32"
               onMouseOut={() => {
                 setFocusIn(false);
               }}
@@ -235,7 +235,10 @@ const Dropdown = (props: Props) => {
                       "bg-darkSlate-700": selectedValue().key !== option.key,
                       "bg-darkSlate-800": selectedValue().key === option.key,
                     }}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopImmediatePropagation();
+                      e.stopPropagation();
                       setSelectedValue(option);
                       props.onChange?.(option);
                       toggleMenu();

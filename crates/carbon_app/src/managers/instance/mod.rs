@@ -182,7 +182,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         }
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
 
         Ok(())
     }
@@ -302,6 +302,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     )
                     .map(|(instance, status)| ListInstance {
                         id: InstanceId(instance.id),
+                        group_id: GroupId(instance.group_id),
                         name: instance.name,
                         favorite: instance.favorite,
                         icon_revision: match &status {
@@ -370,6 +371,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         date_updated: match status {
                             InstanceType::Valid(status) => status.config.date_updated,
                             InstanceType::Invalid(status) => DateTime::default(),
+                        },
+                        seconds_played: match status {
+                            InstanceType::Valid(status) => status.config.seconds_played,
+                            InstanceType::Invalid(status) => 0,
                         },
                     })
                     .collect::<Vec<_>>(),
@@ -452,7 +457,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         Ok(())
     }
 
@@ -566,7 +571,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         Ok(())
     }
 
@@ -669,7 +674,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
 
         Ok(GroupId(group.id))
     }
@@ -751,7 +756,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
 
@@ -1035,7 +1040,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         );
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
 
         info!({ shortpath = ?shortpath }, "Created new instance '{name}' (id {})", *id);
 
@@ -1205,7 +1210,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         }
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some(update.instance_id.0.into()));
 
@@ -1230,7 +1235,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     pub async fn update_playtime(
         self,
         instance_id: InstanceId,
-        added_seconds: u64,
+        added_seconds: u32,
     ) -> anyhow::Result<()> {
         let mut instances = self.instances.write().await;
         let instance = instances
@@ -1286,7 +1291,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self.remove_instance(instance_id).await?;
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
 
@@ -1384,7 +1389,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         );
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app.meta_cache_manager().queue_caching(id, false).await;
 
         Ok(id)
@@ -1493,7 +1498,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         }
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         Ok(())
     }
 
@@ -1705,6 +1710,7 @@ pub struct ListGroup {
 #[derive(Debug, PartialEq, Eq)]
 pub struct ListInstance {
     pub id: InstanceId,
+    pub group_id: GroupId,
     pub name: String,
     pub favorite: bool,
     pub status: ListInstanceStatus,
@@ -1713,6 +1719,7 @@ pub struct ListInstance {
     pub locked: bool,
     pub date_created: DateTime<Utc>,
     pub date_updated: DateTime<Utc>,
+    pub seconds_played: u32,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -2296,6 +2303,7 @@ mod test {
             name: default_group.name.clone(),
             instances: vec![ListInstance {
                 id: instance_id,
+                group_id: default_group.id,
                 name: String::from("test"),
                 favorite: false,
                 icon_revision: None,
@@ -2309,6 +2317,7 @@ mod test {
                 last_played: None,
                 date_created: list[0].instances[0].date_created,
                 date_updated: list[0].instances[0].date_updated,
+                seconds_played: 0,
             }],
         }];
 

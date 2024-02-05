@@ -1,5 +1,5 @@
 import { rspc, queryClient } from "@/utils/rspcClient";
-import { UngroupedInstance } from "@gd/core_module/bindings";
+import { ListInstance } from "@gd/core_module/bindings";
 import { ModalProps, useModal } from "..";
 import ModalLayout from "../ModalLayout";
 import { Button, createNotification } from "@gd/ui";
@@ -15,19 +15,17 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
     {
       onMutate: async (
         instanceId
-      ): Promise<
-        { previusInstancesUngrouped: UngroupedInstance[] } | undefined
-      > => {
+      ): Promise<{ previusInstancesUngrouped: ListInstance[] } | undefined> => {
         await queryClient.cancelQueries({
-          queryKey: ["instance.getInstancesUngrouped"]
+          queryKey: ["instance.getAllInstances"]
         });
 
-        const previusInstancesUngrouped: UngroupedInstance[] | undefined =
-          queryClient.getQueryData(["instance.getInstancesUngrouped"]);
+        const previusInstancesUngrouped: ListInstance[] | undefined =
+          queryClient.getQueryData(["instance.getAllInstances"]);
 
         queryClient.setQueryData(
           ["account.getActiveUuid", null],
-          (old: UngroupedInstance[] | undefined) => {
+          (old: ListInstance[] | undefined) => {
             const filteredAccounts = old?.filter(
               (account) => account.id !== instanceId
             );
@@ -41,20 +39,20 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
       onError: (
         error,
         _variables,
-        context: { previusInstancesUngrouped: UngroupedInstance[] } | undefined
+        context: { previusInstancesUngrouped: ListInstance[] } | undefined
       ) => {
         addNotification(error.message, "error");
 
         if (context?.previusInstancesUngrouped) {
           queryClient.setQueryData(
-            ["instance.getInstancesUngrouped"],
+            ["instance.getAllInstances"],
             context.previusInstancesUngrouped
           );
         }
       },
       onSettled: () => {
         queryClient.invalidateQueries({
-          queryKey: ["instance.getInstancesUngrouped"]
+          queryKey: ["instance.getAllInstances"]
         });
       }
     }

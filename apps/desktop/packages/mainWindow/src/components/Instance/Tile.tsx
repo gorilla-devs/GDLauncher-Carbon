@@ -5,7 +5,6 @@ import {
   CFFEModLoaderType,
   FESubtask,
   Translation,
-  UngroupedInstance,
   ModpackPlatform
 } from "@gd/core_module/bindings";
 import { For, Match, Show, Switch, mergeProps } from "solid-js";
@@ -27,7 +26,7 @@ type Variant = "default" | "sidebar" | "sidebar-small";
 
 type Props = {
   modloader: CFFEModLoaderType | null | undefined;
-  instance: UngroupedInstance | ListInstance;
+  instance: ListInstance;
   selected?: boolean;
   isLoading?: boolean;
   percentage?: number;
@@ -42,6 +41,7 @@ type Props = {
   subTasks?: FESubtask[] | undefined;
   failError?: string;
   onClick?: (_e: MouseEvent) => void;
+  size: 1 | 2 | 3 | 4 | 5;
 };
 
 const Tile = (props: Props) => {
@@ -233,23 +233,25 @@ const Tile = (props: Props) => {
               }
             }}
           >
-            <div class="relative rounded-2xl overflow-hidden border-1 border-solid h-38 w-38 border-darkSlate-600">
+            <div
+              class="relative rounded-2xl overflow-hidden border-1 border-solid border-darkSlate-600"
+              classList={{
+                "h-100 w-100": props.size === 5,
+                "h-70 w-70": props.size === 4,
+                "h-50 w-50": props.size === 3,
+                "h-38 w-38": props.size === 2,
+                "h-20 w-20": props.size === 1
+              }}
+            >
               <div
-                class="flex justify-center relative items-center rounded-2xl overflow-hidden h-38 w-38 bg-cover bg-center max-w-38"
+                class="flex justify-center relative items-center rounded-2xl overflow-hidden h-full w-full bg-cover bg-center"
                 classList={{
-                  grayscale: props.isLoading || isInQueue(),
-                  "cursor-pointer":
-                    !props.isLoading &&
-                    !isInQueue() &&
-                    !props.isInvalid &&
-                    !props.failError &&
-                    !props.isRunning
+                  grayscale: props.isLoading || isInQueue()
                 }}
                 style={{
                   "background-image": props.img
                     ? `url("${props.img}")`
-                    : `url("${DefaultImg}")`,
-                  "background-size": props.img ? "cover" : "120%"
+                    : `url("${DefaultImg}")`
                 }}
               >
                 <Show when={props.isInvalid}>
@@ -364,10 +366,15 @@ const Tile = (props: Props) => {
               </Show>
             </div>
             <h4
-              class="max-w-38 text-ellipsis whitespace-nowrap mt-2 mb-1"
+              class="text-ellipsis whitespace-nowrap mt-2 mb-1"
               classList={{
                 "text-white": !props.isLoading && !isInQueue(),
-                "text-lightGray-900": props.isLoading || isInQueue()
+                "text-lightGray-900": props.isLoading || isInQueue(),
+                "max-w-100": props.size === 5,
+                "max-w-70": props.size === 4,
+                "max-w-50": props.size === 3,
+                "max-w-38": props.size === 2,
+                "max-w-20": props.size === 1
               }}
             >
               <Tooltip
@@ -375,7 +382,7 @@ const Tile = (props: Props) => {
                   props.instance.name.length > 20 ? props.instance.name : ""
                 }
                 placement="top"
-                class="max-w-38 w-full text-ellipsis overflow-hidden"
+                class="w-full text-ellipsis overflow-hidden"
               >
                 {props.instance.name}
               </Tooltip>
@@ -392,7 +399,9 @@ const Tile = (props: Props) => {
                         )}
                       />
                     </Show>
-                    <p class="m-0">{props.modloader?.toString()}</p>
+                    <Show when={props.size !== 1}>
+                      <p class="m-0">{props.modloader?.toString()}</p>
+                    </Show>
                   </span>
                   <p class="m-0">{props.version}</p>
                 </div>
