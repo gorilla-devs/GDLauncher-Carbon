@@ -140,9 +140,7 @@ const SingleEntity = (props: {
       }
     }
   });
-  createEffect(() => {
-    console.log(importScanStatus.data);
-  });
+
   return (
     <>
       <div class="flex-1 w-full flex flex-col items-center justify-center p-4">

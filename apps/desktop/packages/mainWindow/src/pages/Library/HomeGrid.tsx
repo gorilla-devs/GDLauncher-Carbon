@@ -95,6 +95,8 @@ const HomeGrid = () => {
 
     const _groups: Groups = {};
 
+    const nameFilter = filter().replaceAll(" ", "").toLowerCase();
+
     if (routeData.settings.data?.instancesGroupBy === "group") {
       _groups["favorites"] = {
         id: -1,
@@ -104,8 +106,6 @@ const HomeGrid = () => {
     }
 
     for (const instance of routeData.instances.data || []) {
-      console.log("INSTANCES", instance.status);
-
       let groupId = null;
       let groupName = null;
 
@@ -139,7 +139,9 @@ const HomeGrid = () => {
         };
       }
 
-      if (instance.name.toLowerCase().includes(filter().toLowerCase())) {
+      if (
+        instance.name.toLowerCase().replaceAll(" ", "").includes(nameFilter)
+      ) {
         if (
           routeData.settings.data?.instancesGroupBy === "group" &&
           instance.favorite
@@ -229,7 +231,9 @@ const HomeGrid = () => {
       });
     }
 
-    console.log("Recomputing filtered groups", performance.now() - timeStart);
+    console.log(
+      `Recomputing filtered groups ${performance.now() - timeStart} ms`
+    );
 
     return _groups;
   });

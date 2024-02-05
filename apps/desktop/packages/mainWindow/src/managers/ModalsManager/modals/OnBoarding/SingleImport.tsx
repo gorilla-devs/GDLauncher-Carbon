@@ -42,27 +42,6 @@ const SingleImport = (props: {
             }
           }
         });
-        // const task = await rspcContext.client.query([
-        //   "vtask.getTask",
-        //   props.taskId || null
-        // ]);
-        // console.log(task);
-        // if (task && task.progress) {
-        //   if (task.progress.type == "Known") {
-        //     setProgress(Math.floor(task.progress.value * 100));
-        //   }
-        // }
-        // const isFailed = task && task.progress.type === "Failed";
-        // const isDownloaded = task === null && progress() !== 0;
-        // if (isDownloaded || isFailed) {
-        //   setTaskId(undefined);
-        // }
-        // if (isFailed) {
-        //   setState("failed");
-        // } else if (isDownloaded) {
-        //   setState("completed");
-        //   setIsDownloaded(true);
-        // }
       }
     }
     try {
