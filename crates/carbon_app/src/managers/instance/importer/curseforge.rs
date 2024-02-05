@@ -67,13 +67,13 @@ impl CurseforgeImporter {
     pub async fn get_default_scan_path() -> anyhow::Result<PathBuf> {
         let basedirs = directories::BaseDirs::new().ok_or(anyhow!("Cannot build basedirs"))?;
 
-        // old gdl did not respect the xdg basedirs spec on linux
         #[cfg(target_os = "linux")]
-        let p = basedirs.config_dir();
+        let p = basedirs.home_dir().join("Documents");
         #[cfg(not(target_os = "linux"))]
         let p = basedirs.data_dir();
-
         let mut p = p.join("curseforge");
+        #[cfg(target_os = "linux")]
+        let mut p = p.join("minecraft/Instances");
         Ok(p)
     }
 
