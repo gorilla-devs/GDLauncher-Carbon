@@ -1,3 +1,7 @@
+import RightHandSide from "@/pages/Settings/components/RightHandSide";
+import Row from "@/pages/Settings/components/Row";
+import RowsContainer from "@/pages/Settings/components/RowsContainer";
+import Title from "@/pages/Settings/components/Title";
 import { rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import { Button, Switch } from "@gd/ui";
@@ -8,33 +12,51 @@ type Props = {
 };
 
 const SecondStep = (props: Props) => {
-  let setSettingsMutation = rspc.createMutation(["settings.setSettings"]);
-  let settingsQuery = rspc.createQuery(() => ["settings.getSettings"]);
+  let settingsMutation = rspc.createMutation(["settings.setSettings"]);
+  let settings = rspc.createQuery(() => ["settings.getSettings"]);
   return (
     <div class="flex flex-col justify-between h-full lg:w-160 box-border">
-      <div class="flex flex-col justify-center min-h-60">
-        <div class="flex items-center gap-4 w-100 lg:w-[35rem]">
-          <p class="text-left text-darkSlate-100 m-0 font-normal w-fit leading-7">
-            <Trans
-              key="onboarding.java_title"
-              options={{
-                defaultValue:
-                  "Do you want the launcher to automatically handle java for you? It will also download a managed java version if you don't have a correct one"
+      <RowsContainer>
+        <Row>
+          <Title
+            description={<Trans key="java.auto_handle_java_description" />}
+          >
+            <Trans key="java.auto_handle_java" />
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={settings.data?.autoManageJava}
+              onChange={(e) => {
+                settingsMutation.mutate({
+                  autoManageJava: {
+                    Set: e.target.checked
+                  }
+                });
               }}
             />
-          </p>
-          <Switch
-            checked={settingsQuery.data?.autoManageJava}
-            onChange={(e) => {
-              setSettingsMutation.mutate({
-                autoManageJava: {
-                  Set: e.target.checked
-                }
-              });
-            }}
-          />
-        </div>
-      </div>
+          </RightHandSide>
+        </Row>
+        <Row>
+          <Title description={<Trans key="settings:show_news_text" />}>
+            <Trans key="settings:show_news_title" />
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={settings.data?.showNews}
+              onChange={(e) => {
+                settingsMutation.mutate({
+                  showNews: {
+                    Set: e.currentTarget.checked
+                  }
+                });
+              }}
+            />
+          </RightHandSide>
+        </Row>
+        <Row>
+          <Trans key="onboarding.manage_more_options_from_settings" />
+        </Row>
+      </RowsContainer>
       <div class="flex justify-between w-full">
         <Button
           type="secondary"

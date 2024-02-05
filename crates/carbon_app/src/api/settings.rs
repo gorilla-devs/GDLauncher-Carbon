@@ -215,6 +215,7 @@ struct FESettings {
     instances_group_by: InstancesGroupBy,
     instances_group_by_asc: bool,
     instances_tile_size: i32,
+    deletion_through_recycle_bin: bool,
     xmx: i32,
     xms: i32,
     is_first_launch: bool,
@@ -244,6 +245,7 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             instances_group_by: data.instances_group_by.try_into()?,
             instances_group_by_asc: data.instances_group_by_asc,
             instances_tile_size: data.instances_tile_size,
+            deletion_through_recycle_bin: data.deletion_through_recycle_bin,
             xmx: data.xmx,
             xms: data.xms,
             is_first_launch: data.is_first_launch,
@@ -344,6 +346,8 @@ pub struct FESettingsUpdate {
     pub instances_group_by_asc: Option<Set<bool>>,
     #[specta(optional)]
     pub instances_tile_size: Option<Set<i32>>,
+    #[specta(optional)]
+    pub deletion_through_recycle_bin: Option<Set<bool>>,
     #[specta(optional)]
     pub show_news: Option<Set<bool>>,
     #[specta(optional)]

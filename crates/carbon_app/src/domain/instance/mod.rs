@@ -81,6 +81,7 @@ pub enum LaunchState {
         start_time: DateTime<Utc>,
         log_id: GameLogId,
     },
+    Deleting,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

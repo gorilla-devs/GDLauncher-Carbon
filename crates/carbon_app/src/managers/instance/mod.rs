@@ -5,11 +5,13 @@ use std::fmt::Display;
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
 use crate::api::keys::instance::*;
+use crate::api::translation::Translation;
 use crate::db::read_filters::StringFilter;
 use crate::domain::instance::info::{GameVersion, InstanceIcon, Modpack};
 use crate::domain::modplatforms::curseforge::filters::{ModFileParameters, ModParameters};
 use crate::domain::modplatforms::modrinth::search::{ProjectID, VersionID};
 use crate::domain::modplatforms::ModPlatform;
+use crate::domain::vtask::VisualTaskId;
 use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::{DateTime, Utc};
@@ -31,10 +33,11 @@ use db::instance::Data as CachedInstance;
 use self::export::InstanceExportManager;
 use self::importer::InstanceImportManager;
 use self::log::GameLog;
-use self::run::PersistenceManager;
+use self::run::{LaunchState, PersistenceManager};
 
 use super::metadata::cache;
 use super::modplatforms::curseforge::CurseForge;
+use super::vtask::{TaskState, VisualTask};
 use super::ManagerRef;
 
 use crate::domain::instance::{
@@ -1271,11 +1274,37 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
-    pub async fn delete_instance(self, instance_id: InstanceId) -> anyhow::Result<()> {
+    pub async fn delete_instance(&self, instance_id: InstanceId) -> anyhow::Result<()> {
+        let app = self.app.clone();
+
+        tokio::spawn(async move {
+            app.instance_manager()._delete_instance(instance_id).await?;
+
+            Ok::<_, anyhow::Error>(())
+        });
+
+        Ok(())
+    }
+
+    async fn _delete_instance(self, instance_id: InstanceId) -> anyhow::Result<()> {
         let mut instances = self.instances.write().await;
         let instance = instances
-            .get(&instance_id)
+            .get_mut(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let InstanceType::Valid(data) = &mut instance.type_ else {
+            return Err(anyhow!("Instance {instance_id} is not in a valid state"));
+        };
+
+        data.state = LaunchState::Deleting;
+
+        let instance_shortpath = instance.shortpath.clone();
+        drop(instances);
+
+        self.app.invalidate(GET_GROUPS, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
+        self.app
+            .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
 
         let path = self
             .app
@@ -1283,11 +1312,29 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .runtime_path
             .get_instances()
             .to_path()
-            .join(&instance.shortpath as &str);
+            .join(&instance_shortpath as &str);
 
-        tokio::task::spawn_blocking(|| trash::delete(path)).await??;
+        let should_go_to_trash = self
+            .app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .deletion_through_recycle_bin;
+
+        tokio::task::spawn_blocking(move || {
+            if should_go_to_trash {
+                trash::delete(&path)?;
+            } else {
+                std::fs::remove_dir_all(&path)?;
+            }
+
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
+
+        let mut instances = self.instances.write().await;
+
         instances.remove(&instance_id);
-        drop(instances);
         self.remove_instance(instance_id).await?;
 
         self.app.invalidate(GET_GROUPS, None);

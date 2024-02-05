@@ -70,6 +70,10 @@ export const isLaunchState = (input: any): input is LaunchState => {
       return typeof input.Preparing === "number";
     }
 
+    if ("Deleting" in input) {
+      return true;
+    }
+
     if ("Inactive" in input) {
       return input.Inactive.failed_task === null;
     }
@@ -109,6 +113,21 @@ export const getPreparingState = (status: ListInstanceStatus | LaunchState) => {
   }
 };
 
+export const getDeletingState = (status: ListInstanceStatus | LaunchState) => {
+  const launchState = isLaunchState(status);
+
+  if (launchState) {
+    if (typeof status === "object" && "Deleting" in status) {
+      return status.Deleting;
+    }
+  } else {
+    const isValidState = getValideInstance(status);
+    if (isValidState && isValidState.state === "Deleting") {
+      return true;
+    }
+  }
+};
+
 export const getInactiveState = (status: ListInstanceStatus | LaunchState) => {
   const launchState = isLaunchState(status);
 
@@ -121,6 +140,7 @@ export const getInactiveState = (status: ListInstanceStatus | LaunchState) => {
     if (
       isValidState &&
       isValidState.state &&
+      typeof isValidState.state === "object" &&
       "Inactive" in isValidState.state
     ) {
       return isValidState.state.Inactive.failed_task;

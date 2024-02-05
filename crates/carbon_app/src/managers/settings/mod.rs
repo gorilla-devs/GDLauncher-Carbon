@@ -166,6 +166,15 @@ impl ManagerRef<'_, SettingsManager> {
             ));
         }
 
+        if let Some(deletion_through_recycle_bin) = incoming_settings.deletion_through_recycle_bin {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![app_configuration::deletion_through_recycle_bin::set(
+                    deletion_through_recycle_bin.inner(),
+                )],
+            ));
+        }
+
         if let Some(xmx) = incoming_settings.xmx {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),

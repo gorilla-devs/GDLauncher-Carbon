@@ -934,6 +934,7 @@ enum LaunchState {
         start_time: DateTime<Utc>,
         log_id: i32,
     },
+    Deleting,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -1384,6 +1385,7 @@ impl From<domain::LaunchState> for LaunchState {
                 start_time,
                 log_id: log_id.0,
             },
+            domain::Deleting => Self::Deleting,
         }
     }
 }

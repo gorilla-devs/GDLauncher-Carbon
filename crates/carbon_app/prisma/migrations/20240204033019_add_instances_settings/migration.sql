@@ -15,6 +15,7 @@ CREATE TABLE "new_AppConfiguration" (
     "instancesSortBy" TEXT NOT NULL DEFAULT 'name',
     "instancesSortByAsc" BOOLEAN NOT NULL DEFAULT true,
     "showNews" BOOLEAN NOT NULL DEFAULT true,
+    "deletionThroughRecycleBin" BOOLEAN NOT NULL DEFAULT true,
     "gameResolution" TEXT,
     "launcherActionOnGameLaunch" TEXT NOT NULL DEFAULT 'none',
     "javaCustomArgs" TEXT NOT NULL DEFAULT '',

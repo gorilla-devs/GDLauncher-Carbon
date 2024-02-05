@@ -173,7 +173,9 @@ const Java = () => {
           </div>
         </Row>
         <Row>
-          <Title>
+          <Title
+            description={<Trans key="java.auto_handle_java_description" />}
+          >
             <Trans key="java.auto_handle_java" />
           </Title>
           <RightHandSide>

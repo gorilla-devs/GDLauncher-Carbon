@@ -89,6 +89,9 @@ impl ManagerRef<'_, InstanceManager> {
 
         match &data.state {
             LaunchState::Inactive { .. } => {}
+            LaunchState::Deleting => {
+                bail!("cannot prepare an instance that is being deleted");
+            }
             LaunchState::Preparing(task_id) => {
                 // dismiss the existing task if its a failure, return if its still in progress.
                 let r = self.app.task_manager().dismiss_task(*task_id).await;
@@ -975,7 +978,7 @@ impl ManagerRef<'_, InstanceManager> {
                     .await?
                     .concurrent_downloads;
 
-                let download_requied = carbon_net::download_multiple(
+                let download_required = carbon_net::download_multiple(
                     &downloads[..],
                     None,
                     concurrency as usize,
@@ -984,7 +987,7 @@ impl ManagerRef<'_, InstanceManager> {
                 )
                 .await?;
 
-                if download_requied {
+                if download_required {
                     let wait_task = task.subtask(Translation::InstanceTaskLaunchWaitDownloadFiles);
                     wait_task.set_weight(0.0);
 
@@ -1441,11 +1444,11 @@ impl ManagerRef<'_, InstanceManager> {
                 // println to stdout is used by the launcher to detect when the game is closed
                 println!("_INSTANCE_STATE_:GAME_CLOSED|{action_to_take}");
             }
-            LaunchState::Preparing(_) => (),
             LaunchState::Running(_) => {
                 // println to stdout is used by the launcher to detect when the game is closed
                 println!("_INSTANCE_STATE_:GAME_LAUNCHED|{action_to_take}");
             }
+            LaunchState::Preparing(_) | LaunchState::Deleting => (),
         };
 
         debug!("changing state of instance {instance_id} to {state:?}");
@@ -1490,6 +1493,7 @@ pub enum LaunchState {
     Inactive { failed_task: Option<VisualTaskId> },
     Preparing(VisualTaskId),
     Running(RunningInstance),
+    Deleting,
 }
 
 impl Debug for LaunchState {
@@ -1501,6 +1505,7 @@ impl Debug for LaunchState {
                 Self::Inactive { .. } => "Inactive",
                 Self::Preparing(_) => "Preparing",
                 Self::Running(_) => "Running",
+                Self::Deleting => "Deleting",
             }
         )
     }
@@ -1526,6 +1531,7 @@ impl From<&LaunchState> for domain::LaunchState {
                 start_time: *start_time,
                 log_id: *log,
             },
+            LaunchState::Deleting => Self::Deleting,
         }
     }
 }

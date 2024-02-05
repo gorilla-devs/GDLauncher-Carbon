@@ -24,7 +24,8 @@ model AppConfiguration {
   instancesSortBy                 String    @default("name")
   instancesSortByAsc              Boolean   @default(true)
   showNews                        Boolean   @default(true)
-  // Minecraft settings
+  // Other settings
+  deletionThroughRecycleBin       Boolean   @default(true)
   gameResolution                  String?
   launcherActionOnGameLaunch      String    @default("none")
   javaCustomArgs                  String    @default("")

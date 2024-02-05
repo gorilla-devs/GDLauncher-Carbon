@@ -104,6 +104,8 @@ const HomeGrid = () => {
     }
 
     for (const instance of routeData.instances.data || []) {
+      console.log("INSTANCES", instance.status);
+
       let groupId = null;
       let groupName = null;
 
@@ -350,7 +352,7 @@ const HomeGrid = () => {
           </Match>
           <Match
             when={
-              (routeData.instances?.data?.length || 0) > 1 &&
+              (routeData.instances?.data?.length || 0) > 0 &&
               !routeData.instances.isLoading
             }
           >
