@@ -114,6 +114,15 @@ impl ManagerRef<'_, SettingsManager> {
             ));
         }
 
+        if let Some(download_dependencies) = incoming_settings.download_dependencies {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![app_configuration::download_dependencies::set(
+                    download_dependencies.inner(),
+                )],
+            ));
+        }
+
         if let Some(show_news) = incoming_settings.show_news {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),

@@ -211,6 +211,7 @@ struct FESettings {
     discord_integration: bool,
     release_channel: FEReleaseChannel,
     concurrent_downloads: i32,
+    download_dependencies: bool,
     launcher_action_on_game_launch: FELauncherActionOnGameLaunch,
     show_news: bool,
     instances_sort_by: InstancesSortBy,
@@ -242,6 +243,7 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             discord_integration: data.discord_integration,
             release_channel: data.release_channel.try_into()?,
             concurrent_downloads: data.concurrent_downloads,
+            download_dependencies: data.download_dependencies,
             show_news: data.show_news,
             instances_sort_by: data.instances_sort_by.try_into()?,
             instances_sort_by_asc: data.instances_sort_by_asc,
@@ -339,6 +341,8 @@ pub struct FESettingsUpdate {
     pub release_channel: Option<Set<FEReleaseChannel>>,
     #[specta(optional)]
     pub concurrent_downloads: Option<Set<i32>>,
+    #[specta(optional)]
+    pub download_dependencies: Option<Set<bool>>,
     #[specta(optional)]
     pub instances_sort_by: Option<Set<InstancesSortBy>>,
     #[specta(optional)]

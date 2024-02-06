@@ -18,6 +18,7 @@ model AppConfiguration {
   activeAccountUuid               String?
   // Instances settings
   concurrentDownloads             Int       @default(10)
+  downloadDependencies            Boolean      @default(true)
   instancesTileSize               Int       @default(2) // 1-5
   instancesGroupBy                String    @default("group")
   instancesGroupByAsc             Boolean   @default(true)
