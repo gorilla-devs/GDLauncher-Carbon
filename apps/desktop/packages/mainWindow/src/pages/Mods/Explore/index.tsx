@@ -238,7 +238,7 @@ const Modpack = () => {
                         projectId={projectId()}
                         isCurseforge={routeData.isCurseforge}
                         instanceId={instanceId()}
-                        instanceDetails={instanceDetails.data || undefined}
+                        instanceLocked={instanceDetails.data?.modpack?.locked}
                         instanceMods={instanceMods.data || undefined}
                       />
                     </div>
@@ -297,7 +297,7 @@ const Modpack = () => {
                       projectId={projectId()}
                       isCurseforge={routeData.isCurseforge}
                       instanceId={instanceId()}
-                      instanceDetails={instanceDetails.data || undefined}
+                      instanceLocked={instanceDetails.data?.modpack?.locked}
                       instanceMods={instanceMods.data || undefined}
                     />
                   </Show>
