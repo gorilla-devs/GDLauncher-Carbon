@@ -79,21 +79,30 @@ const Button = (props: ButtonProps & Props) => {
           items={[
             {
               item: (
-                <a class="flex items-center gap-2 p-1" href={props.items![1]}>
+                <a
+                  class="flex items-center gap-2 p-1 hover:bg-bluegd-400 hover:text-white"
+                  href={props.items![1]}
+                >
                   <Apple /> MacOS
                 </a>
               ) as Element,
             },
             {
               item: (
-                <a class="flex items-center gap-2 p-1" href={props.items![0]}>
+                <a
+                  class="flex items-center gap-2 p-1 hover:bg-bluegd-400 hover:text-white"
+                  href={props.items![0]}
+                >
                   <Windows /> Windows
                 </a>
               ) as Element,
             },
             {
               item: (
-                <a class="flex items-center gap-2 p-1" href={props.items![2]}>
+                <a
+                  class="flex items-center gap-2 p-1 hover:bg-bluegd-400 hover:text-white"
+                  href={props.items![2]}
+                >
                   <Linux /> Linux
                 </a>
               ) as Element,
