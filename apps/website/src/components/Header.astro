@@ -3,17 +3,24 @@ import HeaderLink from "./HeaderLink.astro";
 import { Image } from "astro:assets";
 import Logo from "../assets/logo.svg";
 import DownloadButton from "./DownloadButton.astro";
-import Ellipse from "../assets/ellipse10.svg";
+import { AiOutlineMenu } from 'solid-icons/ai'
+import { AiOutlineClose } from 'solid-icons/ai'
 ---
 
 <header>
-  <nav>
-    <a href="/">
+  <div class="closebtn" onclick="openNav()">
+    <AiOutlineMenu class="text-graygd"/>
+  </div>
+  <nav id="sidebar" class="relative">
+    <div  class="closebtn" onclick="closeNav()">
+      <AiOutlineClose class="text-graygd" />
+    </div>
+    <a href="/" class="gdlogo">
       <Image src={Logo} alt="gdlauncher logo" width="173" height="40" />
     </a>
     <div class="internal-links">
       <HeaderLink class="text-graygd" href="/">Home</HeaderLink>
-
+      
       <HeaderLink class="text-graygd" href="/blog">Blog</HeaderLink>
       <HeaderLink class="text-graygd" href="/docs">Docs</HeaderLink>
     </div>
@@ -32,20 +39,94 @@ import Ellipse from "../assets/ellipse10.svg";
     margin: 0;
     font-size: 1em;
   }
+  .closebtn {
+    display: none;
+    position: absolute;
+    top: 0;
+    right: 0;
+    padding: 1em;
+    cursor: pointer;
+  }
 
+
+
+  @media screen and (max-width: 480px) {
+    .gdlogo {
+      padding-top: 1rem;
+    }
+    .closebtn {
+      display: block;
+    }
+  }
+@media screen and (min-width: 790px) {
+  nav {
+    display: flex;
+  }
+}
   nav {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8rem;
   }
+  @media screen and (max-width: 480px) {
+    
+    nav {
+      position: fixed;
+      top: 0px;
+      bottom: 0px;
+      left: 0px;
+      width: 100%;
+      flex-direction: column;
+      justify-content: start;
+      background-color: rgba(29, 32, 40, 1);
+      z-index: 20;
+      align-items: center;
+      min-width: 0;
+      
+    }
+    nav > * {
+      margin: 1rem;
+    }
+    .internal-links {
+      min-width: 0;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    
+  }
   nav a {
     padding: 1em 0.5em;
     cursor: pointer;
   }
-  @media (min-width: 390px) and (max-width: 480px) {
+  @media screen and (max-width: 480px) {
     nav {
       gap: 0rem;
     }
   }
 </style>
+
+
+
+<script defer>
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 480) {
+      document.getElementById("sidebar").style.display = "flex";
+    }
+  })
+  function openNav() {
+    if (window.innerWidth <= 480) {
+      document.getElementById("sidebar").style.width = "100%";
+    document.getElementById("sidebar").style.display = "flex";
+    }
+    
+    
+}
+
+function closeNav() {
+  if (window.innerWidth <= 480)
+     document.getElementById("sidebar").style.display = "none";
+}
+</script>
