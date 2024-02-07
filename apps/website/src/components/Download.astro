@@ -81,15 +81,22 @@ import DownloadDropdown from "./DownloadDropdown.astro";
 </style>
 
 <script>
-  const logos = document.querySelectorAll(".animated-logo");
+  document.addEventListener(
+    "astro:page-load",
+    () => {
+      // This only runs once.
+      const logos = document.querySelectorAll(".animated-logo");
 
-  let delay = 0;
+      let delay = 0;
 
-  logos.forEach((logo) => {
-    setTimeout(() => {
-      logo.classList.remove("opacity-0");
-      logo.classList.add("animate-fadeIn");
-    }, delay);
-    delay += 200;
-  });
+      logos.forEach((logo) => {
+        setTimeout(() => {
+          logo.classList.remove("opacity-0");
+          logo.classList.add("animate-fadeIn");
+        }, delay);
+        delay += 200;
+      });
+    },
+    { once: false }
+  );
 </script>

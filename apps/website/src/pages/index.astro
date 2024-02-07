@@ -52,13 +52,12 @@ Astro.locals.cache(60);
         height: 780px;
         width: 100%;
       }
-       @media (min-width: 390px) and (max-width: 480px) {
-    .parallax > img {
-      height: 500px;
-      width: 100%;
-      
-    }
-  }
+      @media (min-width: 390px) and (max-width: 480px) {
+        .parallax > img {
+          height: 500px;
+          width: 100%;
+        }
+      }
     </style></head
   >
 
@@ -122,11 +121,18 @@ Astro.locals.cache(60);
     <Footer />
     <script>
       import vanilla from "vanilla-tilt";
+      document.addEventListener(
+        "astro:page-load",
+        () => {
+          // This only runs once.
 
-      vanilla.init(document.querySelector(".parallax") as HTMLElement, {
-        max: 15,
-        speed: 200,
-      });
+          vanilla.init(document.querySelector(".parallax") as HTMLElement, {
+            max: 15,
+            speed: 200,
+          });
+        },
+        { once: false }
+      );
     </script>
   </body>
 </html>
