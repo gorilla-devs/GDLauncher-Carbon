@@ -1227,7 +1227,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                 match launch_account {
                     Some(account) => {
-                        if let Some(pre_launch_hook) = pre_launch_hook {
+                        if let Some(pre_launch_hook) = pre_launch_hook.filter(|v| !v.is_empty()) {
                             let mut split = shlex::split(&pre_launch_hook)
                                 .ok_or_else(|| anyhow::anyhow!("Failed to parse pre-launch hook"))?
                                 .into_iter();
@@ -1394,7 +1394,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let _ = app.rich_presence_manager().stop_activity().await;
 
-                    if let Some(post_exit_hook) = post_exit_hook {
+                    if let Some(post_exit_hook) = post_exit_hook.filter(|v| !v.is_empty()) {
                         match shlex::split(&post_exit_hook)
                             .ok_or_else(|| anyhow::anyhow!("Failed to parse post-exit hook"))
                             .map(|v| v.into_iter())

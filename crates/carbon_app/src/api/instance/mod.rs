@@ -672,6 +672,12 @@ struct FEUpdateInstance {
     #[specta(optional)]
     memory: Option<Set<Option<MemoryRange>>>,
     #[specta(optional)]
+    pre_launch_hook: Option<Set<Option<String>>>,
+    #[specta(optional)]
+    post_exit_hook: Option<Set<Option<String>>>,
+    #[specta(optional)]
+    wrapper_command: Option<Set<Option<String>>>,
+    #[specta(optional)]
     game_resolution: Option<Set<Option<GameResolution>>>,
     #[specta(optional)]
     mod_sources: Option<Set<Option<super::modplatforms::ModSources>>>,
@@ -1529,6 +1535,9 @@ impl TryFrom<FEUpdateInstance> for domain::InstanceSettingsUpdate {
             global_java_args: value.global_java_args.map(|x| x.inner()),
             extra_java_args: value.extra_java_args.map(|x| x.inner()),
             memory: value.memory.map(|x| x.inner().map(Into::into)),
+            pre_launch_hook: value.pre_launch_hook.map(|x| x.inner()),
+            post_exit_hook: value.post_exit_hook.map(|x| x.inner()),
+            wrapper_command: value.wrapper_command.map(|x| x.inner()),
             game_resolution: value.game_resolution.map(|x| x.inner().map(Into::into)),
             mod_sources: value.mod_sources.map(|x| x.inner().map(Into::into)),
             modpack_locked: value.modpack_locked.map(|x| x.inner()),

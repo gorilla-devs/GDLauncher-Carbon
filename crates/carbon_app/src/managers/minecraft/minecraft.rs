@@ -603,10 +603,13 @@ pub async fn launch_minecraft(
 
     let main_command = wrapper_command
         .as_ref()
+        .filter(|v| !v.is_empty())
         .map(|s| s.as_str())
         .unwrap_or_else(|| java_component.path.as_str());
 
-    startup_command.insert(0, java_component.path.clone());
+    if wrapper_command.is_some() {
+        startup_command.insert(0, java_component.path.clone());
+    }
 
     info!(
         "Starting Minecraft with command: {} {}",

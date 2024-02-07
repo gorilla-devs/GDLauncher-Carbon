@@ -24,8 +24,11 @@ pub struct Instance {
     #[serde(default)]
     pub modpack: Option<ModpackInfo>,
     pub game_configuration: GameConfig,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub pre_launch_hook: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub post_exit_hook: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub wrapper_command: Option<String>,
     #[serde(default)]
     pub mod_sources: Option<ModSources>,

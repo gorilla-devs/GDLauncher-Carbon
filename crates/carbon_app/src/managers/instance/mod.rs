@@ -1112,6 +1112,18 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             info.notes = notes;
         }
 
+        if let Some(pre_launch_hook) = update.pre_launch_hook {
+            info.pre_launch_hook = pre_launch_hook;
+        }
+
+        if let Some(post_exit_hook) = update.post_exit_hook {
+            info.post_exit_hook = post_exit_hook;
+        }
+
+        if let Some(wrapper_command) = update.wrapper_command {
+            info.wrapper_command = wrapper_command;
+        }
+
         let mut need_reinstall = false;
 
         if let Some(version) = update.version {
@@ -2397,6 +2409,9 @@ mod test {
                 global_java_args: None,
                 extra_java_args: None,
                 memory: None,
+                pre_launch_hook: None,
+                post_exit_hook: None,
+                wrapper_command: None,
                 game_resolution: None,
                 modpack_locked: None,
                 mod_sources: None,
