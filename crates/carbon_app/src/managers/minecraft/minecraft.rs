@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     app_version::APP_VERSION,
-    db::PrismaClient,
+    db::{app_configuration::pre_launch_hook, PrismaClient},
     domain::{
         java::{JavaArch, JavaComponent},
         minecraft::minecraft::{
@@ -584,8 +584,9 @@ pub async fn launch_minecraft(
     lwjgl_group: &LibraryGroup,
     instance_path: InstancePath,
     assets_dir: super::assets::AssetsDir,
+    wrapper_command: Option<String>,
 ) -> anyhow::Result<Child> {
-    let startup_command = generate_startup_command(
+    let mut startup_command = generate_startup_command(
         java_component.clone(),
         full_account,
         xmx_memory,
@@ -600,13 +601,20 @@ pub async fn launch_minecraft(
     )
     .await?;
 
+    let main_command = wrapper_command
+        .as_ref()
+        .map(|s| s.as_str())
+        .unwrap_or_else(|| java_component.path.as_str());
+
+    startup_command.insert(0, java_component.path.clone());
+
     info!(
         "Starting Minecraft with command: {} {}",
-        java_component.path,
+        main_command,
         startup_command.join(" ")
     );
 
-    let mut command_exec = tokio::process::Command::new(java_component.path);
+    let mut command_exec = tokio::process::Command::new(main_command);
     command_exec.current_dir(instance_path.get_data_path());
 
     command_exec.stdout(std::process::Stdio::piped());

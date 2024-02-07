@@ -361,6 +361,7 @@ mod tests {
             &lwjgl_group,
             instance_path,
             assets_dir,
+            None,
         )
         .await
         .unwrap();

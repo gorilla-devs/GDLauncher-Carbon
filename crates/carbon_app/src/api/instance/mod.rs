@@ -857,6 +857,9 @@ struct InstanceDetails {
     last_played: Option<DateTime<Utc>>,
     seconds_played: u32,
     modloaders: Vec<ModLoader>,
+    pre_launch_hook: Option<String>,
+    post_exit_hook: Option<String>,
+    wrapper_command: Option<String>,
     notes: String,
     state: LaunchState,
     icon_revision: Option<u32>,
@@ -1119,6 +1122,9 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             state: value.state.into(),
             icon_revision: value.icon_revision,
             has_pack_update: value.has_pack_update,
+            pre_launch_hook: value.pre_launch_hook,
+            post_exit_hook: value.post_exit_hook,
+            wrapper_command: value.wrapper_command,
         }
     }
 }

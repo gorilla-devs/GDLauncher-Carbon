@@ -222,6 +222,9 @@ struct FESettings {
     deletion_through_recycle_bin: bool,
     xmx: i32,
     xms: i32,
+    pre_launch_hook: Option<String>,
+    wrapper_command: Option<String>,
+    post_exit_hook: Option<String>,
     is_first_launch: bool,
     game_resolution: Option<GameResolution>,
     java_custom_args: String,
@@ -253,6 +256,9 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             deletion_through_recycle_bin: data.deletion_through_recycle_bin,
             xmx: data.xmx,
             xms: data.xms,
+            pre_launch_hook: data.pre_launch_hook,
+            wrapper_command: data.wrapper_command,
+            post_exit_hook: data.post_exit_hook,
             is_first_launch: data.is_first_launch,
             launcher_action_on_game_launch: data.launcher_action_on_game_launch.try_into()?,
             game_resolution: data
@@ -361,6 +367,12 @@ pub struct FESettingsUpdate {
     pub xmx: Option<Set<i32>>,
     #[specta(optional)]
     pub xms: Option<Set<i32>>,
+    #[specta(optional)]
+    pub pre_launch_hook: Option<Set<Option<String>>>,
+    #[specta(optional)]
+    pub wrapper_command: Option<Set<Option<String>>>,
+    #[specta(optional)]
+    pub post_exit_hook: Option<Set<Option<String>>>,
     #[specta(optional)]
     pub is_first_launch: Option<Set<bool>>,
     #[specta(optional)]
