@@ -3,16 +3,16 @@ import HeaderLink from "./HeaderLink.astro";
 import { Image } from "astro:assets";
 import Logo from "../assets/logo.svg";
 import DownloadButton from "./DownloadButton.astro";
-import { AiOutlineMenu } from 'solid-icons/ai'
-import { AiOutlineClose } from 'solid-icons/ai'
+import { AiOutlineMenu } from "solid-icons/ai";
+import { AiOutlineClose } from "solid-icons/ai";
 ---
 
 <header>
   <div class="closebtn" onclick="openNav()">
-    <AiOutlineMenu class="text-graygd"/>
+    <AiOutlineMenu class="text-graygd" />
   </div>
   <nav id="sidebar" class="relative">
-    <div  class="closebtn" onclick="closeNav()">
+    <div class="closebtn" onclick="closeNav()">
       <AiOutlineClose class="text-graygd" />
     </div>
     <a href="/" class="gdlogo">
@@ -20,7 +20,7 @@ import { AiOutlineClose } from 'solid-icons/ai'
     </a>
     <div class="internal-links">
       <HeaderLink class="text-graygd" href="/">Home</HeaderLink>
-      
+
       <HeaderLink class="text-graygd" href="/blog">Blog</HeaderLink>
       <HeaderLink class="text-graygd" href="/docs">Docs</HeaderLink>
     </div>
@@ -48,8 +48,6 @@ import { AiOutlineClose } from 'solid-icons/ai'
     cursor: pointer;
   }
 
-
-
   @media screen and (max-width: 480px) {
     .gdlogo {
       padding-top: 1rem;
@@ -58,11 +56,11 @@ import { AiOutlineClose } from 'solid-icons/ai'
       display: block;
     }
   }
-@media screen and (min-width: 790px) {
-  nav {
-    display: flex;
+  @media screen and (min-width: 790px) {
+    nav {
+      display: flex;
+    }
   }
-}
   nav {
     display: flex;
     align-items: center;
@@ -70,7 +68,6 @@ import { AiOutlineClose } from 'solid-icons/ai'
     gap: 8rem;
   }
   @media screen and (max-width: 480px) {
-    
     nav {
       position: fixed;
       top: 0px;
@@ -83,7 +80,6 @@ import { AiOutlineClose } from 'solid-icons/ai'
       z-index: 20;
       align-items: center;
       min-width: 0;
-      
     }
     nav > * {
       margin: 1rem;
@@ -95,7 +91,6 @@ import { AiOutlineClose } from 'solid-icons/ai'
       flex-direction: column;
       align-items: center;
     }
-    
   }
   nav a {
     padding: 1em 0.5em;
@@ -104,29 +99,26 @@ import { AiOutlineClose } from 'solid-icons/ai'
   @media screen and (max-width: 480px) {
     nav {
       gap: 0rem;
+      display: none;
     }
   }
 </style>
 
-
-
 <script defer>
-  window.addEventListener('resize', () => {
+  window.addEventListener("resize", () => {
     if (window.innerWidth > 480) {
       document.getElementById("sidebar").style.display = "flex";
     }
-  })
+  });
   function openNav() {
     if (window.innerWidth <= 480) {
       document.getElementById("sidebar").style.width = "100%";
-    document.getElementById("sidebar").style.display = "flex";
+      document.getElementById("sidebar").style.display = "flex";
     }
-    
-    
-}
+  }
 
-function closeNav() {
-  if (window.innerWidth <= 480)
-     document.getElementById("sidebar").style.display = "none";
-}
+  function closeNav() {
+    if (window.innerWidth <= 480)
+      document.getElementById("sidebar").style.display = "none";
+  }
 </script>
