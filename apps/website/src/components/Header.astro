@@ -70,8 +70,11 @@ import { AiOutlineClose } from 'solid-icons/ai'
     gap: 8rem;
   }
   @media screen and (max-width: 480px) {
-    
     nav {
+      display: none;
+    }
+    
+    nav.visible {
       position: fixed;
       top: 0px;
       bottom: 0px;
@@ -114,12 +117,20 @@ import { AiOutlineClose } from 'solid-icons/ai'
   window.addEventListener('resize', () => {
     if (window.innerWidth > 480) {
       document.getElementById("sidebar").style.display = "flex";
+    } else {
+      if (!document.getElementById("sidebar").classList.contains("visible")) {
+        document.getElementById("sidebar").style.display = "none";
+      } else {
+        document.getElementById("sidebar").style.display = "flex";
+      }
     }
   })
   function openNav() {
     if (window.innerWidth <= 480) {
-      document.getElementById("sidebar").style.width = "100%";
+    //   document.getElementById("sidebar").style.width = "100%";
+    // document.getElementById("sidebar").style.display = "flex";
     document.getElementById("sidebar").style.display = "flex";
+    document.getElementById("sidebar").classList.add("visible");
     }
     
     
@@ -127,6 +138,7 @@ import { AiOutlineClose } from 'solid-icons/ai'
 
 function closeNav() {
   if (window.innerWidth <= 480)
-     document.getElementById("sidebar").style.display = "none";
+    document.getElementById("sidebar").style.display = "none";
+    document.getElementById("sidebar").classList.remove("visible");
 }
 </script>
