@@ -19,82 +19,66 @@ const posts = (await getCollection("blog")).sort(
     <BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
     <style>
       body {
-        font-family: "Ubuntu", cursive;
-        /* background-color: rgba(29, 32, 40, 1); */
+        font-family: "Ubuntu", sans-serif;
         background-image: linear-gradient(
             rgba(23, 29, 39, 0.3),
-            /* Your specified semi-transparent color */ rgba(23, 29, 39, 0.3)
+            rgba(23, 29, 39, 0.3)
           ),
           url("../../assets/bg.svg");
         background-size: cover;
-        /* background-position: center; */
         background-repeat: no-repeat;
         background-color: rgba(29, 32, 40, 1);
       }
       main {
-        width: 960px;
+        max-width: 960px;
         margin: 0 auto;
+        padding: 20px;
       }
       ul {
         display: flex;
         flex-wrap: wrap;
         gap: 2rem;
         list-style-type: none;
-        margin: 0;
         padding: 0;
       }
       ul li {
-        width: calc(50% - 1rem);
-      }
-      ul li * {
-        text-decoration: none;
-        transition: 0.2s ease;
-      }
-      ul li:first-child {
-        width: 100%;
-        margin-bottom: 1rem;
-        text-align: center;
-      }
-      ul li:first-child img {
-        width: 100%;
-      }
-      ul li:first-child .title {
-        font-size: 2.369rem;
-      }
-      ul li img {
-        margin-bottom: 0.5rem;
-        border-radius: 12px;
+        flex: 1 1 calc(50% - 2rem);
+        max-width: calc(50% - 2rem);
       }
       ul li a {
-        display: block;
+        text-decoration: none;
+        color: inherit;
+      }
+      ul li img {
+        width: 100%;
+        height: auto;
+        border-radius: 12px;
+        transition: transform 0.3s ease;
+      }
+      .title,
+      .date {
+        display: block; /* Ensure these are block-level for proper spacing */
+        color: white;
+        text-align: center;
       }
       .title {
-        margin: 0;
-        color: white;
-        line-height: 1;
+        margin-top: 0.5rem;
+        font-size: 1.2rem;
       }
       .date {
-        margin: 0;
+        font-size: 0.9rem;
         color: rgba(147, 153, 170, 1);
-      }
-
-      ul a:hover img {
-        box-shadow: var(--box-shadow);
-        transform: scale(1.05);
       }
       @media (max-width: 720px) {
         ul {
-          gap: 0.5em;
+          gap: 1rem;
         }
         ul li {
-          width: 100%;
-          text-align: center;
+          flex-basis: 100%;
+          max-width: 100%;
         }
-        ul li:first-child {
-          margin-bottom: 0;
-        }
-        ul li:first-child .title {
-          font-size: 1.563em;
+        .title {
+          font-size: 1rem;
         }
       }
     </style>
@@ -104,25 +88,7 @@ const posts = (await getCollection("blog")).sort(
     <main>
       <section>
         <ul>
-          {
-            posts.map((post) => (
-              // <li>
-              //   <a href={`/blog/${post.slug}/`}>
-              //     <img
-              //       width={720}
-              //       height={360}
-              //       src={post.data.heroImage}
-              //       alt=""
-              //     />
-              //     <h4 class="title">{post.data.title}</h4>
-              //     <p class="date">
-              //       <FormattedDate date={post.data.pubDate} />
-              //     </p>
-              //   </a>
-              // </li>
-              <ArticleCard post={post} />
-            ))
-          }
+          {posts.map((post) => <ArticleCard post={post} />)}
         </ul>
       </section>
     </main>
