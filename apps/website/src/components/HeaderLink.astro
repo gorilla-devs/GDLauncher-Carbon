@@ -10,15 +10,13 @@ const isActive =
   (pathname.includes(href as string) && href !== "/") ||
   href === pathname.replace(/\/$/, "") ||
   (href === "/" && pathname === "/");
-console.log(href);
-console.log(pathname);
 ---
 
 <a
   href={href}
   class:list={[
     className,
-    { "border-b-2 border-b-solid border-b-red-500": isActive },
+    { "border-b-2 border-b-solid border-b-[rgba(147, 153, 170, 1)]": isActive },
   ]}
   {...props}
 >
