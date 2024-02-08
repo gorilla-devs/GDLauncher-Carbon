@@ -16,7 +16,10 @@ console.log(pathname);
 
 <a
   href={href}
-  class:list={[className, { "underline underline-offset-4": isActive }]}
+  class:list={[
+    className,
+    { "border-b-2 border-b-solid border-b-red-500": isActive },
+  ]}
   {...props}
 >
   <slot />
