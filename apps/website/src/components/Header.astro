@@ -5,6 +5,7 @@ import Logo from "../assets/logo.svg";
 import DownloadButton from "./DownloadButton.astro";
 import { AiOutlineMenu } from "solid-icons/ai";
 import { AiOutlineClose } from "solid-icons/ai";
+import { APP_URLS } from "../consts";
 ---
 
 <header>
@@ -23,6 +24,9 @@ import { AiOutlineClose } from "solid-icons/ai";
 
       <HeaderLink class="text-graygd" href="/blog">Blog</HeaderLink>
       <HeaderLink class="text-graygd" href="/docs">Docs</HeaderLink>
+      <HeaderLink class="text-graygd" href={APP_URLS.socials.github}>
+        Github
+      </HeaderLink>
     </div>
 
     <div class="social-links">
