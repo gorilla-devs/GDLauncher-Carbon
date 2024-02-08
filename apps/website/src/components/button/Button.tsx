@@ -23,7 +23,7 @@ const button = cva("button", {
         "bg-bluegd-500",
         "shadow-mdgd",
         "text-white",
-        "hover:bg-bluegd-400",
+        "hover:bg-bluegd-400 transition-all duration-300 ease-in-out",
         "rounded-smgd",
         "flex",
         "gap-2",
