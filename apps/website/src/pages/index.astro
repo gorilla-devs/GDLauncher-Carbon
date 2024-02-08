@@ -48,15 +48,20 @@ Astro.locals.cache(60);
         overflow: hidden;
         /* z-index: -1; */
       }
-      .parallax > img {
+      /* .parallax > img {
         height: 780px;
         width: 100%;
-      }
-      @media (min-width: 390px) and (max-width: 480px) {
+      } */
+      /* @media (min-width: 390px) and (max-width: 480px) {
         .parallax > img {
           height: 500px;
           width: 100%;
         }
+      } */
+      .responsive-image {
+        width: 100%;
+        height: auto;
+        object-fit: cover;
       }
     </style></head
   >
@@ -101,7 +106,7 @@ Astro.locals.cache(60);
             id="firstImg"
             src="https://cdn.gdl.gg/github-readme/home.png"
             alt="gd launcher"
-            class="mx-auto"
+            class="mx-auto responsive-image"
             height="1240"
             width="718"
           />
