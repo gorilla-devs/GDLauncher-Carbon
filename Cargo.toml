@@ -40,6 +40,7 @@ murmurhash32 = { git = "https://github.com/gorilla-devs/murmurhash32" }
 nom = "7"
 num_cpus = "1.16.0"
 opener = "0.6.1"
+parking_lot = "0.12.1"
 prisma-client-rust = { git = "https://github.com/Brendonovich/prisma-client-rust", rev = "f71ad9122537c4ed29bf496a4a643947a5fe9aef", features = [
   "sqlite-create-many",
   "sqlite",
@@ -50,6 +51,7 @@ prisma-client-rust-cli = { git = "https://github.com/Brendonovich/prisma-client-
   "sqlite",
   "migrations",
 ], default_features = false }
+rayon = "1.8.1"
 regex = "1.7.0"
 const_format = "0.2.32"
 reqwest = { version = "0.11.13", default-features = false, features = [

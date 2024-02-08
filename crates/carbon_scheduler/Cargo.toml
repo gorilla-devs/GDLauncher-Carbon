@@ -1,0 +1,11 @@
+[package]
+name = "carbon_scheduler"
+version = "0.0.0"
+edition = "2021"
+author = "GorillaDevs Inc."
+
+[dependencies]
+futures = { workspace = true }
+parking_lot = { workspace = true }
+rayon = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
