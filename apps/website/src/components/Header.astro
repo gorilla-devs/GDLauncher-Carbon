@@ -6,6 +6,10 @@ import DownloadButton from "./DownloadButton.astro";
 import { AiOutlineMenu } from "solid-icons/ai";
 import { AiOutlineClose } from "solid-icons/ai";
 import { APP_URLS } from "../consts";
+import DocsSideNav from "./DocsSideNav.astro";
+
+const { pathname } = Astro.url;
+const isDocs = pathname.startsWith("/docs");
 ---
 
 <header>
@@ -28,7 +32,9 @@ import { APP_URLS } from "../consts";
         Github
       </HeaderLink>
     </div>
-
+    <div class="sidenav">
+      {isDocs && <DocsSideNav />}
+    </div>
     <div class="social-links">
       <DownloadButton />
     </div>
@@ -52,6 +58,14 @@ import { APP_URLS } from "../consts";
     cursor: pointer;
   }
 
+  .sidenav {
+    display: none;
+  }
+  @media screen and (max-width: 480px) {
+    .sidenav {
+      display: block;
+    }
+  }
   @media screen and (max-width: 480px) {
     .gdlogo {
       padding-top: 1rem;
