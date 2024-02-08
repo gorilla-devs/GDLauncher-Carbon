@@ -408,6 +408,120 @@ const Settings = () => {
             </Show>
           </div>
         </Show>
+        <Row>
+          <Title description={<Trans key="settings:pre_launch_hook_text" />}>
+            <Trans key="settings:pre_launch_hook_title" />
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={
+                typeof routeData?.instanceDetails?.data?.preLaunchHook ===
+                "string"
+              }
+              onChange={(e) => {
+                updateInstanceMutation.mutate({
+                  preLaunchHook: {
+                    Set: e.target.checked ? "" : null
+                  },
+                  instance: parseInt(params.id, 10)
+                });
+              }}
+            />
+          </RightHandSide>
+        </Row>
+        <Show
+          when={
+            typeof routeData?.instanceDetails?.data?.preLaunchHook === "string"
+          }
+        >
+          <Input
+            value={routeData?.instanceDetails?.data?.preLaunchHook || ""}
+            onChange={(e) => {
+              updateInstanceMutation.mutate({
+                preLaunchHook: {
+                  Set: e.currentTarget.value.trim()
+                },
+                instance: parseInt(params.id, 10)
+              });
+            }}
+          />
+        </Show>
+        <Row>
+          <Title description={<Trans key="settings:post_exit_hook_text" />}>
+            <Trans key="settings:post_exit_hook_title" />
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={
+                typeof routeData?.instanceDetails?.data?.postExitHook ===
+                "string"
+              }
+              onChange={(e) => {
+                updateInstanceMutation.mutate({
+                  postExitHook: {
+                    Set: e.target.checked ? "" : null
+                  },
+                  instance: parseInt(params.id, 10)
+                });
+              }}
+            />
+          </RightHandSide>
+        </Row>
+        <Show
+          when={
+            typeof routeData?.instanceDetails?.data?.postExitHook === "string"
+          }
+        >
+          <Input
+            value={routeData?.instanceDetails?.data?.postExitHook || ""}
+            onChange={(e) => {
+              updateInstanceMutation.mutate({
+                postExitHook: {
+                  Set: e.currentTarget.value.trim()
+                },
+                instance: parseInt(params.id, 10)
+              });
+            }}
+          />
+        </Show>
+        <Row>
+          <Title description={<Trans key="settings:wrapper_command_text" />}>
+            <Trans key="settings:wrapper_command_title" />
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={
+                typeof routeData?.instanceDetails?.data?.wrapperCommand ===
+                "string"
+              }
+              onChange={(e) => {
+                updateInstanceMutation.mutate({
+                  wrapperCommand: {
+                    Set: e.target.checked ? "" : null
+                  },
+                  instance: parseInt(params.id, 10)
+                });
+              }}
+            />
+          </RightHandSide>
+        </Row>
+        <Show
+          when={
+            typeof routeData?.instanceDetails?.data?.wrapperCommand === "string"
+          }
+        >
+          <Input
+            value={routeData?.instanceDetails?.data?.wrapperCommand || ""}
+            onChange={(e) => {
+              updateInstanceMutation.mutate({
+                wrapperCommand: {
+                  Set: e.currentTarget.value.trim()
+                },
+                instance: parseInt(params.id, 10)
+              });
+            }}
+          />
+        </Show>
       </RowsContainer>
     </Suspense>
   );

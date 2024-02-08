@@ -31,6 +31,11 @@ const settings: Array<settingsItem> = [
     path: "/settings/java"
   },
   {
+    name: "Custom Commands",
+    icon: "i-ri:terminal-fill",
+    path: "/settings/custom-commands"
+  },
+  {
     name: "Privacy",
     icon: "i-ri:shield-keyhole-line",
     path: "/settings/privacy"

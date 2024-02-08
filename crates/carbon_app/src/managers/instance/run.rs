@@ -164,6 +164,30 @@ impl ManagerRef<'_, InstanceManager> {
             }
         };
 
+        let pre_launch_hook = match config.pre_launch_hook.as_ref() {
+            Some(hook) => Some(hook.clone()),
+            None => {
+                let settings = self.app.settings_manager().get_settings().await?;
+                settings.pre_launch_hook.clone()
+            }
+        };
+
+        let post_exit_hook = match config.post_exit_hook.as_ref() {
+            Some(hook) => Some(hook.clone()),
+            None => {
+                let settings = self.app.settings_manager().get_settings().await?;
+                settings.post_exit_hook.clone()
+            }
+        };
+
+        let wrapper_command = match config.wrapper_command.as_ref() {
+            Some(cmd) => Some(cmd.clone()),
+            None => {
+                let settings = self.app.settings_manager().get_settings().await?;
+                settings.wrapper_command.clone()
+            }
+        };
+
         let runtime_path = self.app.settings_manager().runtime_path.clone();
         let instance_path = runtime_path
             .get_instances()
@@ -1202,22 +1226,58 @@ impl ManagerRef<'_, InstanceManager> {
                 }
 
                 match launch_account {
-                    Some(account) => Ok(Some(
-                        managers::minecraft::minecraft::launch_minecraft(
-                            java,
-                            account,
-                            xmx_memory,
-                            xms_memory,
-                            game_resolution,
-                            &extra_java_args,
-                            &runtime_path,
-                            version_info,
-                            &lwjgl_group,
-                            instance_path,
-                            assets_dir,
-                        )
-                        .await?,
-                    )),
+                    Some(account) => {
+                        if let Some(pre_launch_hook) = pre_launch_hook.filter(|v| !v.is_empty()) {
+                            let mut split = shlex::split(&pre_launch_hook)
+                                .ok_or_else(|| anyhow::anyhow!("Failed to parse pre-launch hook"))?
+                                .into_iter();
+
+                            let main_command = split
+                                .next()
+                                .ok_or_else(|| anyhow::anyhow!("Pre-launch hook is empty"))?;
+
+                            let pre_launch_command = tokio::process::Command::new(main_command)
+                                .args(split)
+                                .current_dir(instance_path.get_data_path())
+                                .output()
+                                .await
+                                .map_err(|e| {
+                                    anyhow::anyhow!("Pre-launch hook failed to start: {:?}", e)
+                                })?;
+
+                            if !pre_launch_command.status.success() {
+                                return Err(anyhow::anyhow!(
+                                    "Pre-launch hook failed with status: {:?} \n{}",
+                                    pre_launch_command.status,
+                                    String::from_utf8(pre_launch_command.stderr)
+                                        .unwrap_or_default()
+                                ));
+                            }
+
+                            tracing::info!(
+                                "Pre-launch hook completed successfully {}",
+                                String::from_utf8(pre_launch_command.stdout).unwrap_or_default()
+                            );
+                        }
+
+                        Ok(Some(
+                            managers::minecraft::minecraft::launch_minecraft(
+                                java,
+                                account,
+                                xmx_memory,
+                                xms_memory,
+                                game_resolution,
+                                &extra_java_args,
+                                &runtime_path,
+                                version_info,
+                                &lwjgl_group,
+                                instance_path.clone(),
+                                assets_dir,
+                                wrapper_command,
+                            )
+                            .await?,
+                        ))
+                    }
                     None => {
                         if let Some(callback_task) = callback_task {
                             callback_task(
@@ -1321,6 +1381,7 @@ impl ManagerRef<'_, InstanceManager> {
                             (Utc::now() - last_stored_time).num_seconds() as u32,
                         )
                         .await;
+
                     if let Err(e) = r {
                         tracing::error!({ error = ?e }, "error updating instance playtime");
                     }
@@ -1332,6 +1393,55 @@ impl ManagerRef<'_, InstanceManager> {
                     }
 
                     let _ = app.rich_presence_manager().stop_activity().await;
+
+                    if let Some(post_exit_hook) = post_exit_hook.filter(|v| !v.is_empty()) {
+                        match shlex::split(&post_exit_hook)
+                            .ok_or_else(|| anyhow::anyhow!("Failed to parse post-exit hook"))
+                            .map(|v| v.into_iter())
+                        {
+                            Ok(mut split) => match split.next() {
+                                Some(main_command) => {
+                                    let post_exit_command =
+                                        tokio::process::Command::new(main_command)
+                                            .args(split)
+                                            .current_dir(instance_path.get_data_path())
+                                            .output()
+                                            .await;
+
+                                    match post_exit_command {
+                                        Ok(post_exit_command) => {
+                                            if !post_exit_command.status.success() {
+                                                tracing::error!(
+                                                    "Post-exit hook failed with status: {:?} \n{}",
+                                                    post_exit_command.status,
+                                                    String::from_utf8(post_exit_command.stderr)
+                                                        .unwrap_or_default()
+                                                );
+                                            } else {
+                                                tracing::info!(
+                                                    "Post-exit hook completed successfully {}",
+                                                    String::from_utf8(post_exit_command.stdout)
+                                                        .unwrap_or_default()
+                                                );
+                                            }
+                                        }
+                                        Err(e) => {
+                                            tracing::error!(
+                                                "Post-exit hook failed to start: {:?}",
+                                                e
+                                            );
+                                        }
+                                    }
+                                }
+                                None => {
+                                    tracing::error!("Post-exit hook is empty");
+                                }
+                            },
+                            Err(e) => {
+                                tracing::error!("Post-exit hook failed to parse: {:?}", e);
+                            }
+                        }
+                    }
 
                     let _ = app
                         .instance_manager()

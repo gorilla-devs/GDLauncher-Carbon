@@ -18,7 +18,7 @@ model AppConfiguration {
   activeAccountUuid               String?
   // Instances settings
   concurrentDownloads             Int       @default(10)
-  downloadDependencies            Boolean      @default(true)
+  downloadDependencies            Boolean   @default(true)
   instancesTileSize               Int       @default(2) // 1-5
   instancesGroupBy                String    @default("group")
   instancesGroupByAsc             Boolean   @default(true)
@@ -33,6 +33,9 @@ model AppConfiguration {
   xmx                             Int
   xms                             Int       @default(1024)
   defaultInstanceGroup            Int?
+  preLaunchHook                   String?
+  wrapperCommand                  String?
+  postExitHook                    String?
   isFirstLaunch                   Boolean   @default(true)
   autoManageJava                  Boolean   @default(true)
   modPlatformBlacklist            String    @default("")

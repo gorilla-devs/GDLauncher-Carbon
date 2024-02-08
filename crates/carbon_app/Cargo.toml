@@ -66,6 +66,7 @@ indexmap = { version = "1.9.3", features = ["serde"] }
 tracing-test = "0.2.4"
 walkdir = { workspace = true }
 async-recursion = "1.0.4"
+shlex = "1.3.0"
 serde-enum-str = "0.3.2"
 markdown = { workspace = true }
 ring = { workspace = true }

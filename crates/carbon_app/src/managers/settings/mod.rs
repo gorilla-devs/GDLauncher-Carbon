@@ -3,7 +3,7 @@ use self::terms_and_privacy::TermsAndPrivacy;
 use super::ManagerRef;
 use crate::{
     api::{keys::settings::*, settings::FESettingsUpdate},
-    db::app_configuration,
+    db::app_configuration::{self, post_exit_hook, wrapper_command},
     domain::{self as domain, modplatforms::ModChannelWithUsage, runtime_path},
 };
 use anyhow::anyhow;
@@ -221,6 +221,33 @@ impl ManagerRef<'_, SettingsManager> {
                 app_configuration::id::equals(0),
                 vec![app_configuration::java_custom_args::set(
                     java_custom_args.inner(),
+                )],
+            ));
+        }
+
+        if let Some(pre_launch_hook) = incoming_settings.pre_launch_hook {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![app_configuration::pre_launch_hook::set(
+                    pre_launch_hook.inner(),
+                )],
+            ));
+        }
+
+        if let Some(post_exit_hook) = incoming_settings.post_exit_hook {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![app_configuration::post_exit_hook::set(
+                    post_exit_hook.inner(),
+                )],
+            ));
+        }
+
+        if let Some(wrapper_command) = incoming_settings.wrapper_command {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![app_configuration::wrapper_command::set(
+                    wrapper_command.inner(),
                 )],
             ));
         }
