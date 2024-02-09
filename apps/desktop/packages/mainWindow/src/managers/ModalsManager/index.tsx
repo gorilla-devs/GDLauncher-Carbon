@@ -10,6 +10,7 @@ import {
 import { Dynamic, Portal } from "solid-js/web";
 import { useGDNavigate } from "../NavigationManager";
 import adSize from "@/utils/adhelper";
+import { instanceState } from "./modals/Confirmation";
 
 export type ModalProps = {
   title: string;
@@ -60,6 +61,9 @@ const defaultModals = {
   modpack_version_update: {
     component: lazy(() => import("./modals/ModPackVersionUpdate")),
     title: "Update Version"
+  },
+  confirmation: {
+    component: lazy(() => import("./modals/Confirmation"))
   },
   notification: {
     component: lazy(() => import("./modals/Notification")),

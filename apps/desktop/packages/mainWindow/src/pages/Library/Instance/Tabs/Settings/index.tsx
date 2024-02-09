@@ -12,6 +12,7 @@ import RowsContainer from "@/pages/Settings/components/RowsContainer";
 import RightHandSide from "@/pages/Settings/components/RightHandSide";
 import { setInstanceId } from "@/utils/browser";
 import { useModal } from "@/managers/ModalsManager";
+import { setInstanceState } from "@/managers/ModalsManager/modals/Confirmation";
 
 const Settings = () => {
   const [t] = useTransContext();
@@ -82,11 +83,10 @@ const Settings = () => {
                 <Button
                   type="outline"
                   onClick={() => {
-                    updateInstanceMutation.mutate({
-                      modpackLocked: {
-                        Set: false
-                      },
-                      instance: parseInt(params.id, 10)
+                    setInstanceId(parseInt(params.id, 10));
+                    setInstanceState("unlock");
+                    modalsContext?.openModal({
+                      name: "confirmation"
                     });
                   }}
                 >
@@ -103,11 +103,10 @@ const Settings = () => {
               <Button
                 type="outline"
                 onClick={() => {
-                  updateInstanceMutation.mutate({
-                    modpackLocked: {
-                      Set: null
-                    },
-                    instance: parseInt(params.id, 10)
+                  setInstanceId(parseInt(params.id, 10));
+                  setInstanceState("unpair");
+                  modalsContext?.openModal({
+                    name: "confirmation"
                   });
                 }}
               >
