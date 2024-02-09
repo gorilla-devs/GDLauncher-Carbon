@@ -11,7 +11,7 @@ const [instanceState, setInstanceState] = createSignal<"unlock" | "unpair">(
 );
 export { instanceState, setInstanceState };
 
-const InstanceExport = (props: ModalProps) => {
+const Confirmation = (props: ModalProps) => {
   const modalContext = useModal();
   const [t] = useTransContext();
   const updateInstanceMutation = rspc.createMutation(
@@ -79,4 +79,4 @@ const InstanceExport = (props: ModalProps) => {
   );
 };
 
-export default InstanceExport;
+export default Confirmation;
