@@ -10,7 +10,6 @@ import {
 import { Dynamic, Portal } from "solid-js/web";
 import { useGDNavigate } from "../NavigationManager";
 import adSize from "@/utils/adhelper";
-import { instanceState } from "./modals/Confirmation";
 
 export type ModalProps = {
   title: string;

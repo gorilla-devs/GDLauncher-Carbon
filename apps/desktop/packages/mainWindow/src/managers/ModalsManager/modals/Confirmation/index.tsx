@@ -1,7 +1,7 @@
 import { Button } from "@gd/ui";
 import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
-import { Match, Show, Switch, createSignal } from "solid-js";
+import { Show, createSignal } from "solid-js";
 import { useTransContext } from "@gd/i18n";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { instanceId } from "@/utils/browser";
@@ -48,7 +48,7 @@ const InstanceExport = (props: ModalProps) => {
               modalContext?.closeModal();
             }}
           >
-            Cancel
+            {t("instance_cancel")}
           </Button>
           <Button
             type="secondary"
@@ -71,7 +71,7 @@ const InstanceExport = (props: ModalProps) => {
               modalContext?.closeModal();
             }}
           >
-            Confirm
+            {t("instance_confirm")}
           </Button>
         </div>
       </div>

@@ -49,6 +49,8 @@
   "login.prev": "Prev",
   "login.manage": "Manage",
   "login.we_value_privacy_title": "We Value Your Privacy",
+  "instance_cancel": "Cancel",
+  "instance_confirm": "Confirm",
   "login.renew": "Renew Confirmation",
   "login.we_value_privacy_text_renew": "In order to be compliant with GDPR, CCPA and other data privacy laws, we are required to ask for the renewal of your confirmation, either periodically or whenever they are updated.",
   "login.we_value_privacy_text1": "GDLauncher supports the display of in-app ads. This allows support for us, the developers of GDLauncher, and all mods and modpacks developers from the CurseForge platform.",
