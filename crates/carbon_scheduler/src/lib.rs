@@ -10,6 +10,7 @@ use parking_lot::Mutex;
 
 /// Execute a CPU intensive task on the rayon threadpool, capturing the environment.
 ///
+/// Warning: dropping this future will cause it to block on the dropping thread until completion.
 /// SAFETY: The future must not be deleted without dropping.
 pub async fn cpu_block<F: (FnOnce() -> R) + Send, R: Send>(f: F) -> R {
     enum WaitFutureWakerStage {
@@ -63,12 +64,16 @@ pub async fn cpu_block<F: (FnOnce() -> R) + Send, R: Send>(f: F) -> R {
             // so we block until it finishes.
             let mut waker = self.waker.lock();
             if !waker.complete {
-                let (tx, rx) = mpsc::sync_channel::<()>(1);
-                waker.stage = WaitFutureWakerStage::Dropping { complete: tx };
+                tracing::warn!({ future_address = ?(self as *const Self) }, "CPU blocking future was dropped while running! To maintain soundness this will block an executor thread!");
+                // attempt to reduce the hit on the executor
+                tokio::task::block_in_place(|| {
+                    let (tx, rx) = mpsc::sync_channel::<()>(1);
+                    waker.stage = WaitFutureWakerStage::Dropping { complete: tx };
 
-                drop(waker);
-
-                let _ = rx.recv();
+                    drop(waker);
+                    let _ = rx.recv();
+                });
+                tracing::warn!({ future_address = ?(self as *const Self) }, "CPU blocking future finished running in drop. No longer blocking executor.");
             }
         }
     }
@@ -203,6 +208,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[tracing_test::traced_test]
     async fn cpu_block_normal() {
         let mut value = 5;
         let future = super::cpu_block(|| {
@@ -222,6 +228,7 @@ mod test {
     // ensure dropping the future runs it to completion.
     // not doing that is undefined behavior.
     #[test]
+    #[tracing_test::traced_test]
     fn cpu_block_drop() {
         let check = AtomicBool::new(false);
 

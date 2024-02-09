@@ -553,6 +553,8 @@ dependencies = [
  "parking_lot 0.12.1",
  "rayon",
  "tokio",
+ "tracing",
+ "tracing-test",
 ]
 
 [[package]]

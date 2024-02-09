@@ -33,15 +33,12 @@ pub async fn scan_dir(path: &Path, filter: Option<&Vec<&str>>) -> anyhow::Result
                 relpath.truncate(relpath.len() - ".disabled".len());
             }
 
-            let hashes = tokio::task::spawn_blocking(move || {
-                let sha512: [u8; 64] = Sha512::digest(&content).into();
+            carbon_scheduler::cpu_join! {
+                let sha512 = Sha512::digest(&content).into();
                 let md5 = Md5::digest(&content).into();
+            }
 
-                super::FileHashes { sha512, md5 }
-            })
-            .await?;
-
-            Ok::<_, anyhow::Error>((relpath, hashes))
+            Ok::<_, anyhow::Error>((relpath, super::FileHashes { sha512, md5 }))
         });
     }
 

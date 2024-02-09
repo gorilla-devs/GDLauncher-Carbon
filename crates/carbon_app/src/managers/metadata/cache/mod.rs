@@ -867,19 +867,18 @@ impl ManagerRef<'_, MetaCacheManager> {
 
         let content = tokio::fs::read(path).await?;
         let content_len = content.len();
-        let (content, sha512, sha1, meta, murmur2) = tokio::task::spawn_blocking(move || {
+
+        carbon_scheduler::cpu_join! {
             let sha512: [u8; 64] = Sha512::new_with_prefix(&content).finalize().into();
             let sha1: [u8; 20] = Sha1::new_with_prefix(&content).finalize().into();
             let meta = super::mods::parse_metadata(Cursor::new(&content));
-
-            // curseforge's api removes whitespace in murmur2 hashes
-            let mut murmur_content = content.clone();
-            murmur_content.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
-            let murmur2 = murmurhash32::murmurhash2(&murmur_content);
-
-            (content, sha512, sha1, meta, murmur2)
-        })
-        .await?;
+            let murmur2 = {
+                // curseforge's api removes whitespace in murmur2 hashes
+                let mut murmur_content = content.clone();
+                murmur_content.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
+                murmurhash32::murmurhash2(&murmur_content)
+            };
+        }
 
         let meta = match meta {
             Ok(meta) => meta,
@@ -920,7 +919,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                         .await
                         .expect("the image scale semaphore is never closed");
 
-                    let logo = tokio::task::spawn_blocking(move || {
+                    let logo = carbon_scheduler::cpu_block(|| {
                         let mut zip = zip::ZipArchive::new(Cursor::new(&content)).unwrap();
                         let Ok(mut file) = zip.by_name(&logo_file) else {
                             return Ok(None);
@@ -935,18 +934,14 @@ impl ManagerRef<'_, MetaCacheManager> {
                     drop(guard);
 
                     match logo {
-                        Ok(Ok(Some(data))) => {
+                        Ok(Some(data)) => {
                             Some(self.app.prisma_client.local_mod_image_cache().create(
                                 data,
                                 metadb::UniqueWhereParam::IdEquals(meta_id.clone()),
                                 Vec::new(),
                             ))
                         }
-                        Ok(Ok(None)) => None,
-                        Ok(Err(e)) => {
-                            error!({ error = ?e }, "could not scale mod icon for {}", mod_filename);
-                            None
-                        }
+                        Ok(None) => None,
                         Err(e) => {
                             error!({ error = ?e }, "could not scale mod icon for {}", mod_filename);
                             None

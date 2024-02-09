@@ -9,3 +9,5 @@ futures = { workspace = true }
 parking_lot = { workspace = true }
 rayon = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true }
+tracing-test = "0.2.4"
