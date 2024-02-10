@@ -11,7 +11,7 @@ use self::{
 
 use super::ManagerRef;
 use crate::{
-    api::keys::java::GET_JAVA_PROFILES,
+    api::keys::java::{GET_AVAILABLE_JAVAS, GET_JAVA_PROFILES},
     db::PrismaClient,
     domain::{
         instance::info::StandardVersion,
@@ -163,7 +163,7 @@ impl ManagerRef<'_, JavaManager> {
 
     pub async fn update_java_profile(
         &self,
-        profile_name: SystemJavaProfileName,
+        profile_name: String,
         java_id: String,
     ) -> anyhow::Result<()> {
         let auto_manage_java = self
@@ -258,6 +258,9 @@ impl ManagerRef<'_, JavaManager> {
                 anyhow::bail!("Java with id {} is local. Cannot delete.", java_id.clone());
             }
         }
+
+        self.app.invalidate(GET_JAVA_PROFILES, None);
+        self.app.invalidate(GET_AVAILABLE_JAVAS, None);
 
         Ok(())
     }

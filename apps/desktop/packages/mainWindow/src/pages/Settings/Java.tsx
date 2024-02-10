@@ -8,7 +8,8 @@ import {
   TabList,
   TabPanel,
   Tabs,
-  Tooltip
+  Tooltip,
+  Dropdown
 } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import { For, Match, Show, Switch, createMemo } from "solid-js";
@@ -23,6 +24,7 @@ import RowsContainer from "./components/RowsContainer";
 import RightHandSide from "./components/RightHandSide";
 import { generateSequence } from "@/utils/helpers";
 import Center from "./components/Center";
+import TruncatedPath from "@/components/TruncatePath";
 
 const Java = () => {
   const routeData: ReturnType<typeof SettingsJavaData> = useRouteData();
@@ -33,6 +35,8 @@ const Java = () => {
   const settings = rspc.createQuery(() => ["settings.getSettings"]);
 
   const settingsMutation = rspc.createMutation(["settings.setSettings"]);
+
+  const updateProfile = rspc.createMutation(["java.updateJavaProfilePath"]);
 
   let deleteJavaMutation = rspc.createMutation(["java.deleteJavaVersion"]);
 
@@ -50,12 +54,6 @@ const Java = () => {
       (acc, curr) => acc.concat(curr),
       []
     );
-
-  const javaInProfile = (id: string) => {
-    return (routeData.javaProfiles.data || []).some(
-      (item) => item.javaId === id
-    );
-  };
 
   const DeleteIcon = (props: { id: string }) => (
     <div
@@ -82,6 +80,33 @@ const Java = () => {
         </Show>
       </>
     );
+  };
+
+  const availableJavasDropdown = () => {
+    const results = flattenedAvailableJavas()?.map((java) => {
+      return {
+        label: (
+          <div class="w-full flex flex-col gap-2">
+            <div class="flex justify-between">
+              <div>{java.version}</div>
+              <div>{java.type}</div>
+            </div>
+            <Tooltip content={java.path}>
+              <TruncatedPath originalPath={java.path} />
+            </Tooltip>
+          </div>
+        ),
+        key: java.id
+      };
+    });
+
+    return [
+      {
+        label: "Unassigned",
+        key: "unassigned"
+      },
+      ...results
+    ];
   };
 
   return (
@@ -210,14 +235,13 @@ const Java = () => {
                         <Trans key="java.found_java_text" />
                       </h2>
                       <Button
-                        rounded={false}
                         type="secondary"
                         size="small"
                         onClick={() => {
                           modalsContext?.openModal({ name: "addJava" });
                         }}
                       >
-                        <div class="text-xl text-darkSlate-500 i-ri:add-fill" />
+                        <div class="text-xl i-ri:add-fill" />
                       </Button>
                     </div>
                     <div class="flex flex-col gap-4">
@@ -238,24 +262,40 @@ const Java = () => {
                                   {(java) => (
                                     <div class="bg-darkSlate-700 rounded-md px-4 py-2">
                                       <div class="flex justify-between text-xl text-lightSlate-400">
-                                        <div>{java.version}</div>
+                                        <div class="flex gap-2">
+                                          <div>{java.version}</div>
+                                          <div>[{java.type.toUpperCase()}]</div>
+                                          <div>
+                                            Used in{" "}
+                                            {
+                                              (
+                                                routeData.javaProfiles.data ||
+                                                []
+                                              ).filter(
+                                                (item) =>
+                                                  item.javaId === java.id
+                                              ).length
+                                            }{" "}
+                                            profiles
+                                          </div>
+                                        </div>
                                         <Show when={java.isValid}>
                                           <div class="i-ri:check-fill text-green-400" />
                                         </Show>
                                       </div>
                                       <div class="flex justify-between">
-                                        <div class="block text-xs text-lightSlate-700 overflow-hidden w-30 whitespace-nowrap overflow-ellipsis">
-                                          {java.path}
+                                        <div class="block text-xs text-lightSlate-700 overflow-hidden whitespace-nowrap w-full">
+                                          <Tooltip content={java.path}>
+                                            <TruncatedPath
+                                              originalPath={java.path}
+                                            />
+                                          </Tooltip>
                                         </div>
                                         <div class="flex gap-2 justify-center items-center">
-                                          <span>{java.type}</span>
                                           {mapJavaTypeToAction(
                                             java.type,
                                             java.id
                                           )}
-                                          <Show when={javaInProfile(java.id)}>
-                                            <div class="text-green-500 i-ri:checkbox-circle-fill" />
-                                          </Show>
                                         </div>
                                       </div>
                                     </div>
@@ -278,17 +318,28 @@ const Java = () => {
                   <div class="bg-darkSlate-900 h-full p-4 flex flex-col gap-4 min-h-96">
                     <For each={routeData.javaProfiles.data}>
                       {(profile) => {
-                        const path = flattenedAvailableJavas()?.find(
+                        const id = flattenedAvailableJavas()?.find(
                           (java) => java.id === profile.javaId
-                        )?.path;
+                        )?.id;
                         return (
                           <div class="rounded-xl border-1 border-solid border-darkSlate-600 p-4 flex justify-between items-center">
                             <h3 class="m-0">{profile.name}</h3>
                             <span class="m-0">
-                              <Switch>
-                                <Match when={path}>{path}</Match>
-                                <Match when={!path}>-</Match>
-                              </Switch>
+                              <Dropdown
+                                class="w-70"
+                                value={id || "unassigned"}
+                                options={availableJavasDropdown()}
+                                onChange={(option) => {
+                                  console.log({
+                                    profileName: profile.name,
+                                    javaId: option.key.toString()
+                                  });
+                                  updateProfile.mutate({
+                                    profileName: profile.name,
+                                    javaId: option.key.toString()
+                                  });
+                                }}
+                              />
                             </span>
                           </div>
                         );

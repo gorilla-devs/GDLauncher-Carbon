@@ -45,7 +45,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             get_java_profiles(app, args).await
         }
 
-        mutation UPDATE_JAVA_PROFILE_PATH[app, args: FEUpdateSystemJavaProfileArgs] {
+        mutation UPDATE_JAVA_PROFILE_PATH[app, args: FEUpdateJavaProfileArgs] {
             update_java_profile_path(app, args).await
         }
 
@@ -140,17 +140,14 @@ async fn get_java_profiles(app: App, _args: ()) -> anyhow::Result<Vec<FEJavaProf
 
 #[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FEUpdateSystemJavaProfileArgs {
-    pub profile_name: FESystemJavaProfileName,
+struct FEUpdateJavaProfileArgs {
+    pub profile_name: String,
     pub java_id: String,
 }
 
-async fn update_java_profile_path(
-    app: App,
-    args: FEUpdateSystemJavaProfileArgs,
-) -> anyhow::Result<()> {
+async fn update_java_profile_path(app: App, args: FEUpdateJavaProfileArgs) -> anyhow::Result<()> {
     app.java_manager()
-        .update_java_profile(args.profile_name.into(), args.java_id)
+        .update_java_profile(args.profile_name, args.java_id)
         .await
 }
 
@@ -253,6 +250,13 @@ impl From<FESystemJavaProfileName> for crate::domain::java::SystemJavaProfileNam
 
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]
+enum FEJavaProfileName {
+    System(FESystemJavaProfileName),
+    Custom(String),
+}
+
+#[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct FEJavaProfile {
     name: String,
     java_id: Option<String>,
@@ -261,11 +265,7 @@ struct FEJavaProfile {
 impl From<crate::domain::java::JavaProfile> for FEJavaProfile {
     fn from(profile: crate::domain::java::JavaProfile) -> Self {
         Self {
-            name: profile
-                .name
-                .strip_prefix(SYSTEM_JAVA_PROFILE_NAME_PREFIX)
-                .unwrap_or(&profile.name)
-                .to_string(),
+            name: profile.name.to_string(),
             java_id: profile.java_id,
         }
     }

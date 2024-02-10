@@ -20,7 +20,7 @@ import {
 } from "@floating-ui/dom";
 
 type Option = {
-  label: string | JSX.Element;
+  label: string | JSX.Element | Element;
   key: string | number;
 };
 
@@ -230,7 +230,7 @@ const Dropdown = (props: Props) => {
               <For each={props.options}>
                 {(option) => (
                   <li
-                    class="first:rounded-t last:rounded-b hover:bg-darkSlate-800 py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline cursor-pointer w-full box-border"
+                    class="first:rounded-t last:rounded-b hover:bg-darkSlate-800 py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline w-full box-border max-w-100"
                     classList={{
                       "bg-darkSlate-700": selectedValue().key !== option.key,
                       "bg-darkSlate-800": selectedValue().key === option.key,
