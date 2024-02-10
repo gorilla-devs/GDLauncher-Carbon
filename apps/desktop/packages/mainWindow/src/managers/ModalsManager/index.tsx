@@ -15,6 +15,7 @@ export type ModalProps = {
   title: string;
   noHeader?: boolean;
   data?: any;
+  instanceState?: string;
 };
 
 type Hash = {
@@ -25,6 +26,7 @@ type Hash = {
     preventClose?: boolean;
     title?: string;
     noHeader?: boolean;
+    instanceState?: string;
   };
 };
 
@@ -61,8 +63,15 @@ const defaultModals = {
     component: lazy(() => import("./modals/ModPackVersionUpdate")),
     title: "Update Version"
   },
-  confirmation: {
-    component: lazy(() => import("./modals/Confirmation"))
+  unlock_confirmation: {
+    component: lazy(() => import("./modals/Confirmation")),
+    title: "Unlock Instance",
+    instanceState: "unlock"
+  },
+  unpair_confirmation: {
+    component: lazy(() => import("./modals/Confirmation")),
+    title: "Unpair Instance",
+    instanceState: "unpair"
   },
   notification: {
     component: lazy(() => import("./modals/Notification")),
@@ -213,6 +222,9 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                         data={modal.data}
                         noHeader={noHeader}
                         title={title}
+                        instanceState={
+                          (defaultModals as Hash)[modal.name].instanceState
+                        }
                       />
                     </div>
                     <div class="absolute inset-0 bg-darkSlate-900 backdrop-blur-sm opacity-80" />
