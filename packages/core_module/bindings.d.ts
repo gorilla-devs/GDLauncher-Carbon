@@ -97,7 +97,7 @@ export type Procedures = {
         { key: "instance.updateMod", input: UpdateMod, result: FETaskId } | 
         { key: "java.deleteJavaVersion", input: string, result: null } | 
         { key: "java.setupManagedJava", input: FEManagedJavaSetupArgs, result: string } | 
-        { key: "java.updateJavaProfilePath", input: FEUpdateSystemJavaProfileArgs, result: null } | 
+        { key: "java.updateJavaProfile", input: FEUpdateJavaProfileArgs, result: null } | 
         { key: "metrics.sendEvent", input: FEMetricsEvent, result: null } | 
         { key: "settings.setSettings", input: FESettingsUpdate, result: null } | 
         { key: "vtask.dismissTask", input: FETaskId, result: null },
@@ -139,8 +139,6 @@ export type MoveGroup = { group: FEGroupId; before: FEGroupId | null }
 
 export type ValidListInstance = { mc_version: string | null; modloader: FEInstanceModloaderType | null; modpack_platform: ModpackPlatform | null; state: LaunchState }
 
-export type FESystemJavaProfileName = "legacy" | "legacyPatchedV1" | "alpha" | "beta" | "gamma" | "gammaSnapshot" | "minecraftJavaExe"
-
 export type FEManagedJavaOsMap = { [key: FEManagedJavaOs]: FEManagedJavaArchMap }
 
 export type ModPlatform = "Curseforge" | "Modrinth"
@@ -163,8 +161,6 @@ export type MRFEUserRole = "developer" | "moderator" | "admin"
 
 export type GameResolution = { type: "Standard"; value: [number, number] } | { type: "Custom"; value: [number, number] }
 
-export type FEJavaProfile = { name: string; javaId: string | null }
-
 export type FEGroupId = number
 
 export type MRFEDependencyType = "required" | "optional" | "incompatible" | "embedded"
@@ -182,6 +178,8 @@ export type MRFEProjectSearchParameters = { query: string | null; facets: MRFESe
 export type InvalidationEvent = { key: string; args: any | null }
 
 export type FEManagedJavaVersion = { id: string; name: string; downloadUrl: string; javaVersion: string }
+
+export type FEJavaProfile = { name: string; javaId: string | null }
 
 export type FEModDescriptionResponse = { data: string; pagination: CFFEPagination | null }
 
@@ -216,8 +214,6 @@ export type MRFEDonationLink = { id: string; platform: string; url: string }
 export type MRFESearchFacetOr = MRFESearchFacet[]
 
 export type MRFEProjectVersionsFilters = { project_id: MRFEProjectID; game_versions?: string[] | null; loaders?: string[] | null; limit?: number | null; offset?: number | null }
-
-export type FEJavaComponent = { id: string; path: string; version: string; type: FEJavaComponentType; isValid: boolean }
 
 export type CurseforgeMod = { project_id: number; file_id: number }
 
@@ -322,6 +318,8 @@ export type MRFERequestedVersionStatus = "listed" | "archived" | "draft" | "unli
 export type FEInstanceModloaderType = "neoforge" | "forge" | "fabric" | "quilt"
 
 export type FEInstanceModpackInfo = { name: string; version_name: string; url_slug: string; has_image: boolean }
+
+export type FEJavaComponent = { id: string; path: string; version: string; type: FEJavaComponentType; isValid: boolean }
 
 export type MemoryRange = { min_mb: number; max_mb: number }
 
@@ -488,7 +486,7 @@ export type ListGroup = { id: FEGroupId; name: string }
 
 export type MRFEProjectSupportRange = "required" | "optional" | "unsupported" | "unknown"
 
-export type FEUpdateSystemJavaProfileArgs = { profileName: FESystemJavaProfileName; javaId: string }
+export type FEUpdateJavaProfileArgs = { profileName: string; javaId: string }
 
 export type CFFEModSearchParametersQuery = { gameId: number; searchFilter: string | null; gameVersion: string | null; categoryIds: number[] | null; sortOrder: CFFEModSearchSortOrder | null; sortField: CFFEModSearchSortField | null; classId: CFFEClassId | null; modLoaderTypes: CFFEModLoaderType[] | null; gameVersionTypeId: number | null; authorId: number | null; slug: string | null; index: number | null; pageSize: number | null }
 

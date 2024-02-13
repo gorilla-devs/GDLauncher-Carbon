@@ -45,12 +45,22 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             get_java_profiles(app, args).await
         }
 
-        mutation UPDATE_JAVA_PROFILE_PATH[app, args: FEUpdateJavaProfileArgs] {
-            update_java_profile_path(app, args).await
+        mutation UPDATE_JAVA_PROFILE[app, args: FEUpdateJavaProfileArgs] {
+            app.java_manager()
+            .update_java_profile(args.profile_name, args.java_id)
+            .await
+        }
+
+        mutation CREATE_JAVA_PROFILE[app, args: FECreateJavaProfileArgs] {
+            app.java_manager().create_java_profile(args.profile_name, args.java_id).await
+        }
+
+        mutation DELETE_JAVA_PROFILE[app, args: String] {
+            app.java_manager().delete_java_profile(args).await
         }
 
         mutation DELETE_JAVA_VERSION[app, args: String] {
-            delete_java_version(app, args).await
+            app.java_manager().delete_java_version(args).await
         }
     }
 }
@@ -145,14 +155,11 @@ struct FEUpdateJavaProfileArgs {
     pub java_id: String,
 }
 
-async fn update_java_profile_path(app: App, args: FEUpdateJavaProfileArgs) -> anyhow::Result<()> {
-    app.java_manager()
-        .update_java_profile(args.profile_name, args.java_id)
-        .await
-}
-
-async fn delete_java_version(app: App, args: String) -> anyhow::Result<()> {
-    app.java_manager().delete_java_version(args).await
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FECreateJavaProfileArgs {
+    pub profile_name: String,
+    pub java_id: Option<String>,
 }
 
 #[derive(Type, Serialize)]

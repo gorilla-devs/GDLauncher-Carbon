@@ -57,7 +57,9 @@ keys! {
         SETUP_MANAGED_JAVA                          = "setupManagedJava";
         GET_SETUP_MANAGED_JAVA_PROGRESS             = "getSetupManagedJavaProgress";
         GET_JAVA_PROFILES                           = "getJavaProfiles";
-        UPDATE_JAVA_PROFILE_PATH                    = "updateJavaProfilePath";
+        UPDATE_JAVA_PROFILE                         = "updateJavaProfile";
+        CREATE_JAVA_PROFILE                         = "createJavaProfile";
+        DELETE_JAVA_PROFILE                         = "deleteJavaProfile";
         DELETE_JAVA_VERSION                         = "deleteJavaVersion";
     }
 

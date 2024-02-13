@@ -17,7 +17,7 @@ use crate::{
         instance::info::StandardVersion,
         java::{
             Java, JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaProfile, JavaVendor,
-            SystemJavaProfileName,
+            SystemJavaProfileName, SYSTEM_JAVA_PROFILE_NAME_PREFIX,
         },
     },
     managers::java::java_checker::RealJavaChecker,
@@ -103,7 +103,7 @@ impl JavaManager {
         T: Discovery,
         G: JavaChecker,
     {
-        scan_and_sync::scan_and_sync_local(auto_manage_java, db, discovery, java_checker).await?;
+        scan_and_sync::scan_and_sync_local(db, discovery, java_checker).await?;
         scan_and_sync::scan_and_sync_custom(db, java_checker).await?;
         scan_and_sync::scan_and_sync_managed(db, discovery, java_checker).await?;
 
@@ -186,6 +186,85 @@ impl ManagerRef<'_, JavaManager> {
                     crate::db::java::id::equals(java_id),
                 )],
             )
+            .exec()
+            .await?;
+
+        self.app.invalidate(GET_JAVA_PROFILES, None);
+
+        Ok(())
+    }
+
+    pub async fn create_java_profile(
+        &self,
+        profile_name: String,
+        java_id: Option<String>,
+    ) -> anyhow::Result<()> {
+        let auto_manage_java = self
+            .app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .auto_manage_java;
+
+        if auto_manage_java {
+            anyhow::bail!("Auto manage java is enabled");
+        }
+
+        // make sure profile doesn't start with system profile prefix
+        if profile_name.starts_with(SYSTEM_JAVA_PROFILE_NAME_PREFIX) {
+            anyhow::bail!(
+                "Profile name cannot start with {}",
+                SYSTEM_JAVA_PROFILE_NAME_PREFIX
+            );
+        }
+
+        let java_id = java_id.ok_or_else(|| anyhow::anyhow!("java_id is required"))?;
+
+        let exists = self
+            .app
+            .prisma_client
+            .java_profile()
+            .find_unique(crate::db::java_profile::name::equals(profile_name.clone()))
+            .exec()
+            .await?;
+
+        if exists.is_some() {
+            anyhow::bail!("Profile with name {} already exists", profile_name);
+        }
+
+        self.app
+            .prisma_client
+            .java_profile()
+            .create(
+                profile_name,
+                vec![crate::db::java_profile::java::connect(
+                    crate::db::java::id::equals(java_id),
+                )],
+            )
+            .exec()
+            .await?;
+
+        self.app.invalidate(GET_JAVA_PROFILES, None);
+
+        Ok(())
+    }
+
+    pub async fn delete_java_profile(&self, profile_name: String) -> anyhow::Result<()> {
+        let auto_manage_java = self
+            .app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .auto_manage_java;
+
+        if auto_manage_java {
+            anyhow::bail!("Auto manage java is enabled");
+        }
+
+        self.app
+            .prisma_client
+            .java_profile()
+            .delete(crate::db::java_profile::name::equals(profile_name))
             .exec()
             .await?;
 
@@ -311,18 +390,34 @@ impl ManagerRef<'_, JavaManager> {
                             err
                         );
 
-                        self.app
+                        let all_profiles_using_this_java = self
+                            .app
                             .prisma_client
-                            ._batch((
-                                self.app.prisma_client.java_profile().update(
+                            .java_profile()
+                            .find_many(vec![java_profile::java_id::equals(Some(java.id.clone()))])
+                            .exec()
+                            .await?;
+
+                        for profile in all_profiles_using_this_java {
+                            self.app
+                                .prisma_client
+                                .java_profile()
+                                .update(
                                     java_profile::name::equals(profile.name.to_string()),
                                     vec![java_profile::java::disconnect()],
-                                ),
-                                self.app
-                                    .prisma_client
-                                    .java()
-                                    .delete(java::id::equals(java.id)),
-                            ))
+                                )
+                                .exec()
+                                .await?;
+                        }
+
+                        self.app
+                            .prisma_client
+                            .java()
+                            .update(
+                                java::id::equals(java.id.clone()),
+                                vec![java::is_valid::set(false)],
+                            )
+                            .exec()
                             .await?;
 
                         None
