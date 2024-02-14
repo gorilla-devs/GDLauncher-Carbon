@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 use std::ffi::OsStr;
 use std::io::Cursor;
 use std::io::Read;
+use std::io::SeekFrom;
 use std::path::PathBuf;
 use std::sync::atomic;
 use std::sync::atomic::AtomicI32;
@@ -16,8 +17,10 @@ use futures::Future;
 use image::ImageOutputFormat;
 use itertools::Itertools;
 use md5::Digest;
+use murmurhash32::Murmur2Digest;
 use sha1::Sha1;
 use sha2::Sha512;
+use tokio::io::AsyncSeekExt;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::sync::watch;
@@ -865,20 +868,65 @@ impl ManagerRef<'_, MetaCacheManager> {
             path.set_extension(format!("{prev_ext}.disabled"));
         }
 
-        let content = tokio::fs::read(path).await?;
-        let content_len = content.len();
+        let mut file = tokio::fs::File::open(path).await?;
 
-        carbon_scheduler::cpu_join! {
-            let sha512: [u8; 64] = Sha512::new_with_prefix(&content).finalize().into();
-            let sha1: [u8; 20] = Sha1::new_with_prefix(&content).finalize().into();
-            let meta = super::mods::parse_metadata(Cursor::new(&content));
-            let murmur2 = {
-                // curseforge's api removes whitespace in murmur2 hashes
-                let mut murmur_content = content.clone();
-                murmur_content.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
-                murmurhash32::murmurhash2(&murmur_content)
+        let mut sha512 = Sha512::new();
+        let mut sha1 = Sha1::new();
+        let mut murmur_len = 0;
+        let mut content_len = 0;
+
+        carbon_scheduler::buffered_digest(&mut file, |chunk| {
+            sha512.update(&chunk);
+            sha1.update(&chunk);
+            murmur_len += chunk.iter().filter(|&&x| x != 9 && x != 10 && x != 13 && x != 32).count();
+            content_len += chunk.len();
+        }).await?;
+
+        let sha512: [u8; 64] = sha512.finalize().into();
+        let sha1: [u8; 20] = sha1.finalize().into();
+
+        file.seek(SeekFrom::Start(0)).await?;
+        let mut file = file.into_std().await;
+
+        let (file, meta, image_data) = tokio::task::spawn_blocking(|| {
+            let meta = super::mods::parse_metadata(&mut file);
+
+            let image_data = match &meta.as_ref().map(|m| m.as_ref().map(|m| m.logo_file.as_ref())) {
+                Ok(Some(Some(logo_file))) => {
+                    // TODO: use the same zip in parse_metadata
+                    let mut zip = zip::ZipArchive::new(&mut file).unwrap();
+                    let r = match zip.by_name(&logo_file) {
+                        Ok(mut file) => {
+                            let mut image = Vec::with_capacity(file.size() as usize);
+                            file.read_to_end(&mut image)?;
+                            Some(image)
+                        }
+                        _ => None,
+                    };
+
+                    r
+                },
+                _ => None,
             };
-        }
+
+            Ok::<_, anyhow::Error>((file, meta, image_data))
+        }).await??;
+
+        let mut file = tokio::fs::File::from_std(file);
+        file.seek(SeekFrom::Start(0)).await?;
+        let mut murmur2 = Murmur2Digest::new(murmur_len as u32);
+
+        let mut workbuf = Vec::<u8>::with_capacity(carbon_scheduler::BUFSIZE);
+
+        carbon_scheduler::buffered_digest(&mut file, |chunk| {
+            workbuf.splice(.., chunk.iter().map(|&b| b));
+            workbuf.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
+            murmur2.update(&workbuf[..]);
+        }).await?;
+
+        let murmur2 = murmur2.finalize();
+
+        drop(file);
 
         let meta = match meta {
             Ok(meta) => meta,
@@ -905,48 +953,34 @@ impl ManagerRef<'_, MetaCacheManager> {
             None => {
                 let meta_id = Uuid::new_v4().to_string();
 
-                let logo_insert = 'logo: {
-                    let Some(meta) = &meta else { break 'logo None };
-                    let Some(logo_file) = &meta.logo_file else {
-                        break 'logo None;
-                    };
-                    let logo_file = logo_file.to_string();
+                let logo_insert = match image_data {
+                    Some(image_data) => {
+                        let permit = self.image_scale_semaphore.acquire().await
+                            .expect("the image scale semaphore is never closed");
 
-                    let mcm = self.app.meta_cache_manager();
-                    let guard = mcm
-                        .image_scale_semaphore
-                        .acquire()
-                        .await
-                        .expect("the image scale semaphore is never closed");
+                        let logo = carbon_scheduler::cpu_block(|| {
+                            let scaled = scale_mod_image(&image_data[..])?;
+                            Ok::<_, anyhow::Error>(Some(scaled))
+                        }).await;
 
-                    let logo = carbon_scheduler::cpu_block(|| {
-                        let mut zip = zip::ZipArchive::new(Cursor::new(&content)).unwrap();
-                        let Ok(mut file) = zip.by_name(&logo_file) else {
-                            return Ok(None);
-                        };
-                        let mut image = Vec::with_capacity(file.size() as usize);
-                        file.read_to_end(&mut image)?;
-                        let scaled = scale_mod_image(&image[..])?;
-                        Ok::<_, anyhow::Error>(Some(scaled))
-                    })
-                    .await;
+                        drop(permit);
 
-                    drop(guard);
-
-                    match logo {
-                        Ok(Some(data)) => {
-                            Some(self.app.prisma_client.local_mod_image_cache().create(
-                                data,
-                                metadb::UniqueWhereParam::IdEquals(meta_id.clone()),
-                                Vec::new(),
-                            ))
-                        }
-                        Ok(None) => None,
-                        Err(e) => {
-                            error!({ error = ?e }, "could not scale mod icon for {}", mod_filename);
-                            None
+                        match logo {
+                            Ok(Some(data)) => {
+                                Some(self.app.prisma_client.local_mod_image_cache().create(
+                                    data,
+                                    metadb::UniqueWhereParam::IdEquals(meta_id.clone()),
+                                    Vec::new(),
+                                ))
+                            }
+                            Ok(None) => None,
+                            Err(e) => {
+                                error!({ error = ?e }, "could not scale mod icon for {}", mod_filename);
+                                None
+                            }
                         }
                     }
+                    None => None,
                 };
 
                 let meta_insert = self.app.prisma_client.mod_metadata().create(

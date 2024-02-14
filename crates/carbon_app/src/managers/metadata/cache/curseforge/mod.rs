@@ -300,13 +300,13 @@ impl ModplatformCacher for CurseforgeModCacher {
 
                     drop(dl_guard);
 
+                    let image = icon.to_vec();
+
                     let scale_guard = mcm
                         .image_scale_semaphore
                         .acquire()
                         .await
                         .expect("the image scale semaphore is never closed");
-
-                    let image = icon.to_vec();
 
                     let image = carbon_scheduler::cpu_block(|| {
                         let scaled = super::scale_mod_image(&image[..])?;

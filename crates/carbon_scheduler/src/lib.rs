@@ -1,12 +1,10 @@
 use std::{
-    mem::{self, ManuallyDrop, MaybeUninit},
-    pin::Pin,
-    sync::mpsc,
-    task::{Context, Poll, Waker},
+    io, mem::{self, ManuallyDrop, MaybeUninit}, pin::Pin, sync::mpsc, task::{Context, Poll, Waker}
 };
 
 use futures::Future;
 use parking_lot::Mutex;
+use tokio::io::{AsyncRead, AsyncReadExt};
 
 /// Execute a CPU intensive task on the rayon threadpool, capturing the environment.
 ///
@@ -129,6 +127,25 @@ pub async fn cpu_block<F: (FnOnce() -> R) + Send, R: Send>(f: F) -> R {
     // On the normal path the invoker will be called by rayon before the future is woken.
     // On the drop path the future will break above here.
     unsafe { result.assume_init() }
+}
+
+pub const BUFSIZE: usize = 1024 * 8;
+
+pub async fn buffered_digest<F: FnMut(&mut [u8]) + Send>(
+    source: &mut (impl AsyncRead + Unpin),
+    mut f: F,
+) -> io::Result<()> {
+    let mut buffer = [0u8; BUFSIZE];
+
+    loop {
+        let n = source.read(&mut buffer).await?;
+
+        if n == 0 {
+            break Ok(())
+        }
+
+        cpu_block(|| f(&mut buffer[..n])).await;
+    }
 }
 
 #[macro_export]
