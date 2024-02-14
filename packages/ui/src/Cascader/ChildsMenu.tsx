@@ -1,0 +1,52 @@
+import { For, Portal, Show } from "solid-js/web";
+import { Checkbox } from "../Checkbox";
+import { Input } from "../Input";
+
+interface ChildsMenuProps {
+  items: { label: string; img: any; children?: ChildsMenuProps }[];
+  isCheckbox: boolean;
+  hasSearch: boolean;
+}
+
+const ChildsMenu = (props: ChildsMenuProps) => {
+  return (
+    //   <Portal mount={document.body}>
+    <div class="max-h-72 max-w-52 bg-[#272b35] rounded-md p-2 flex flex-col gap-2 overflow-x-auto scrollbar-hide">
+      <Show when={props.hasSearch}>
+        <Input
+          type="text"
+          inputClass="rounded-md bg-[#1D2028] p-2 text-[#8A8B8F] placeholder-[#8A8B8F]"
+          placeholder="Search"
+          //   icon={
+          //     <span class="text-darkSlate-300">
+          //       <div class="i-ri:search-line"></div>
+          //     </span>
+          //   }
+        />
+      </Show>
+      <For each={props.items}>
+        {(item) => (
+          <div class="w-full flex justify-between">
+            <Checkbox
+              children={
+                <div class="flex items-center gap-2">
+                  <img
+                    src="https://yt3.googleusercontent.com/B8OVfruPK5Zls5beHf_7a-kQ0Lo57DcoHxb-tp0skMeAGVZMM1EqMsFA0wyEl91N10z2Bc19X1w=s900-c-k-c0x00ffffff-no-rj"
+                    class="h-4 w-4"
+                    alt="solidjsimg"
+                  />
+                  <span class="text-[#8A8B8F]">{item.label}</span>
+                </div>
+              }
+            />
+            <Show when={item.children}>
+              <div class="text-[#8A8B8F] i-ri-arrow-right-s-line"></div>
+            </Show>
+          </div>
+        )}
+      </For>
+    </div>
+    //   </Portal>
+  );
+};
+export default ChildsMenu;
