@@ -1,18 +1,19 @@
 import type { Meta, StoryObj } from "storybook-solidjs";
 import ChildsMenu from "./ChildsMenu";
+import Parent from "./Parent";
 
-const meta: Meta<typeof ChildsMenu> = {
+const meta: Meta<typeof Parent> = {
   /* 👇 The title prop is optional.
    * See https://storybook.js.org/docs/solid/configure/overview#configure-story-loading
    * to learn how to generate automatic titles
    */
   title: "ChildsMenu",
-  component: ChildsMenu,
+  component: Parent,
 };
 
 export default meta;
 
-type Story = StoryObj<typeof ChildsMenu>;
+type Story = StoryObj<typeof Parent>;
 
 export const WithoutParents: Story = {
   args: {
@@ -92,6 +93,16 @@ export const WithParents: Story = {
             {
               label: "Item 3",
               img: "",
+              children: {
+                items: [
+                  {
+                    label: "Item 3",
+                    img: "",
+                  },
+                ],
+                isCheckbox: false,
+                hasSearch: false,
+              },
             },
             {
               label: "Item 3",
