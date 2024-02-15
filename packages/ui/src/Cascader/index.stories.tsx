@@ -26,6 +26,63 @@ export const WithoutParents: Story = {
       {
         label: "Item 2",
         img: "",
+      },
+      {
+        label: "Item 3",
+        img: "",
+      },
+      {
+        label: "Item 4",
+        img: "",
+      },
+      {
+        label: "Item 5",
+        img: "",
+      },
+      {
+        label: "Item 3",
+        img: "",
+      },
+      {
+        label: "Item 6",
+        img: "",
+      },
+      {
+        label: "Item 3",
+        img: "",
+      },
+      {
+        label: "Item 3",
+        img: "",
+      },
+      {
+        label: "Item 3",
+        img: "",
+      },
+      {
+        label: "Item 3",
+        img: "",
+      },
+      {
+        label: "Item 3",
+        img: "",
+      },
+    ],
+  },
+};
+
+export const WithParents: Story = {
+  args: {
+    hasSearch: false,
+    isCheckbox: true,
+    items: [
+      {
+        label: "Item 1",
+        img: "",
+      },
+      {
+        label: "Item 2",
+        img: "",
         children: {
           items: [
             {

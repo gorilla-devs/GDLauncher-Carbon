@@ -1,6 +1,7 @@
 import { For, Portal, Show } from "solid-js/web";
 import { Checkbox } from "../Checkbox";
 import { Input } from "../Input";
+import { createSignal } from "solid-js";
 
 interface ChildsMenuProps {
   items: { label: string; img: any; children?: ChildsMenuProps }[];
@@ -9,24 +10,21 @@ interface ChildsMenuProps {
 }
 
 const ChildsMenu = (props: ChildsMenuProps) => {
+  const [search, setSearch] = createSignal("");
   return (
     //   <Portal mount={document.body}>
-    <div class="max-h-72 max-w-52 bg-[#272b35] rounded-md p-2 flex flex-col gap-2 overflow-x-auto scrollbar-hide">
+    <div class="max-h-72 max-w-52 bg-[#272b35] rounded-md p-3 flex flex-col gap-2 overflow-x-auto scrollbar-hide">
       <Show when={props.hasSearch}>
         <Input
           type="text"
           inputClass="rounded-md bg-[#1D2028] p-2 text-[#8A8B8F] placeholder-[#8A8B8F]"
           placeholder="Search"
-          //   icon={
-          //     <span class="text-darkSlate-300">
-          //       <div class="i-ri:search-line"></div>
-          //     </span>
-          //   }
+          onInput={(e) => setSearch(e.target.value)}
         />
       </Show>
-      <For each={props.items}>
+      <For each={props.items.filter((item) => item.label.includes(search()))}>
         {(item) => (
-          <div class="w-full flex justify-between">
+          <div class="w-full flex justify-between p-1 items-center">
             <Checkbox
               children={
                 <div class="flex items-center gap-2">
@@ -39,8 +37,24 @@ const ChildsMenu = (props: ChildsMenuProps) => {
                 </div>
               }
             />
+            <Portal mount={document.body}>
+              <Show when={item.children}>
+                <div>
+                  <ChildsMenu
+                    items={item.children!.items}
+                    hasSearch={item.children!.hasSearch}
+                    isCheckbox={item.children!.isCheckbox}
+                  />
+                </div>
+              </Show>
+            </Portal>
             <Show when={item.children}>
-              <div class="text-[#8A8B8F] i-ri-arrow-right-s-line"></div>
+              <div class="flex items-center">
+                <span class="text-[#8A8B8F]">
+                  0/{item.children?.items.length}
+                </span>
+                <div class="text-[#8A8B8F] i-ri-arrow-right-s-line"></div>
+              </div>
             </Show>
           </div>
         )}
