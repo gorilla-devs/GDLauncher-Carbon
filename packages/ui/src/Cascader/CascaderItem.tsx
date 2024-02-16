@@ -50,12 +50,14 @@ const CascaderItem = (props: {
         />
       </Show>
 
-      <Show when={props.children}>
-        <div class="flex items-center">
+      <div class="flex items-center">
+        <Show when={props.children && props.children.isCheckbox}>
           <span class="text-[#8A8B8F]">0/{props.children?.items.length}</span>
+        </Show>
+        <Show when={props.children}>
           <div class="text-[#8A8B8F] i-ri-arrow-right-s-line"></div>
-        </div>
-      </Show>
+        </Show>
+      </div>
     </div>
   );
 };
