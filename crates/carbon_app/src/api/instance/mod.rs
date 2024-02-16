@@ -1705,33 +1705,30 @@ mod log {
                 let new_lines = {
                     let log = log_rx.borrow();
 
-                    let new_lines
-                        = log
-                            .get_span(last_idx..)
-                            .into_iter()
-                            .inspect(|entry| tracing::trace!(?entry, "received log entry"))
-                            .map(|entry| {
-                                serde_json::to_vec(&entry)
-                                    .expect(
-                                        "serialization of a log entry should be infallible"
-                                    )
-                            })
-                            .collect::<Vec<_>>();
+                    let log_span = log.get_span(last_idx..);
+                    let mut new_data = Vec::<u8>::with_capacity(log_span.len() * 150); // estimate
+
+                    for entry in log_span {
+                        // write space in for the size, determine the size from the amount written, then insert the size
+                        let size_offset = new_data.len();
+                        new_data.extend([0; 4]);
+                        serde_json::to_writer(&mut new_data, &entry)
+                            .expect("serialization of a log entry should be infallible");
+                        let json_len = new_data.len() - (size_offset + 4);
+
+                        new_data[size_offset..size_offset + 4].copy_from_slice(&json_len.to_le_bytes()[..]);
+                    }
 
                     last_idx = log.len();
 
-                    new_lines
+                    new_data
                 };
-
-
 
                 for line in new_lines {
                     tracing::trace!("yielding log entry");
 
                     yield Ok::<_, Infallible>(line)
                 }
-
-
 
                 if let Err(_) = log_rx.changed().await {
                     tracing::error!("`log_rx` was closed, killing log stream");
