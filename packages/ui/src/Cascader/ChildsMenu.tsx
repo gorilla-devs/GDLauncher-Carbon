@@ -4,6 +4,7 @@ import { Input } from "../Input";
 import { createSignal } from "solid-js";
 import { useFloating } from "solid-floating-ui";
 import CascaderItem from "./CascaderItem";
+import { Radio } from "../Radio";
 
 export interface ChildsMenuProps {
   items: { label: string; img: any; children?: ChildsMenuProps }[];
@@ -30,9 +31,30 @@ const ChildsMenu = (props: ChildsMenuProps) => {
             each={props.items.filter((item) => item.label.includes(search()))}
           >
             {(item) => (
-              <CascaderItem label={item.label} children={item.children} />
+              <CascaderItem
+                label={item.label}
+                children={item.children}
+                isCheckbox={true}
+              />
             )}
           </For>
+        </Show>
+        <Show when={!props.isCheckbox}>
+          <Radio.group value={props.items.map((item) => item.label)}>
+            <For
+              each={props.items.filter((item) => item.label.includes(search()))}
+            >
+              {(item) => (
+                <CascaderItem
+                  name={item.label}
+                  value={item.label}
+                  children={item.children}
+                  isCheckbox={false}
+                  label={item.label}
+                />
+              )}
+            </For>
+          </Radio.group>
         </Show>
       </div>
     </Portal>
