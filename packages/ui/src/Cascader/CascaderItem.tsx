@@ -1,4 +1,4 @@
-import { Show } from "solid-js";
+import { Show, createSignal } from "solid-js";
 import { Checkbox } from "../Checkbox";
 import ChildsMenu, { ChildsMenuProps } from "./ChildsMenu";
 import { Radio } from "../Radio";
@@ -10,6 +10,8 @@ const CascaderItem = (props: {
   value?: string;
   isCheckbox?: boolean;
 }) => {
+  const [isMenuOpen, setIsMenuOpen] = createSignal(false);
+  const toggleMenu = () => setIsMenuOpen(!isMenuOpen());
   return (
     <div class="w-full flex justify-between p-2 items-center hover:bg-[#1D2028]">
       <Show when={props.isCheckbox}>
@@ -42,7 +44,7 @@ const CascaderItem = (props: {
           }
         />
       </Show>
-      <Show when={props.children}>
+      <Show when={props.children && isMenuOpen()}>
         <ChildsMenu
           items={props.children!.items}
           hasSearch={props.children!.hasSearch}
@@ -50,7 +52,7 @@ const CascaderItem = (props: {
         />
       </Show>
 
-      <div class="flex items-center">
+      <div class="flex items-center" onClick={toggleMenu}>
         <Show when={props.children && props.children.isCheckbox}>
           <span class="text-[#8A8B8F]">0/{props.children?.items.length}</span>
         </Show>

@@ -116,10 +116,30 @@ export const WithParents: Story = {
       {
         label: "Item 3",
         img: "",
+        children: {
+          items: [
+            {
+              label: "Item 3",
+              img: "",
+            },
+          ],
+          isCheckbox: false,
+          hasSearch: false,
+        },
       },
       {
         label: "Item 3",
         img: "",
+        children: {
+          items: [
+            {
+              label: "Item 3",
+              img: "",
+            },
+          ],
+          isCheckbox: false,
+          hasSearch: false,
+        },
       },
       {
         label: "Item 3",
