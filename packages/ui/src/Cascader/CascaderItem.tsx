@@ -15,7 +15,7 @@ const CascaderItem = (props: {
   return (
     <div
       class="w-full flex justify-between p-2 items-center hover:bg-[#1D2028]"
-      onMouseEnter={toggleMenu}
+      onMouseEnter={props.children ? toggleMenu : undefined}
       //   onMouseLeave={toggleMenu}
     >
       <Show when={props.isCheckbox}>
