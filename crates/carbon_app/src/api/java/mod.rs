@@ -51,6 +51,14 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             .await
         }
 
+        mutation VALIDATE_CUSTOM_JAVA_PATH[app, args: String] {
+            app.java_manager().validate_custom_java_path(args).await
+        }
+
+        mutation CREATE_CUSTOM_JAVA_VERSION[app, args: String] {
+            app.java_manager().create_custom_java_version(args).await
+        }
+
         mutation CREATE_JAVA_PROFILE[app, args: FECreateJavaProfileArgs] {
             app.java_manager().create_java_profile(args.profile_name, args.java_id).await
         }
@@ -143,7 +151,7 @@ async fn get_setup_managed_java_progress(
 }
 
 async fn get_java_profiles(app: App, _args: ()) -> anyhow::Result<Vec<FEJavaProfile>> {
-    let profiles = app.java_manager().get_system_java_profiles().await?;
+    let profiles = app.java_manager().get_java_profiles().await?;
 
     Ok(profiles.into_iter().map(FEJavaProfile::from).collect())
 }
@@ -152,7 +160,8 @@ async fn get_java_profiles(app: App, _args: ()) -> anyhow::Result<Vec<FEJavaProf
 #[serde(rename_all = "camelCase")]
 struct FEUpdateJavaProfileArgs {
     pub profile_name: String,
-    pub java_id: String,
+    #[specta(optional)]
+    pub java_id: Option<String>,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -267,6 +276,7 @@ enum FEJavaProfileName {
 struct FEJavaProfile {
     name: String,
     java_id: Option<String>,
+    is_system: bool,
 }
 
 impl From<crate::domain::java::JavaProfile> for FEJavaProfile {
@@ -274,6 +284,7 @@ impl From<crate::domain::java::JavaProfile> for FEJavaProfile {
         Self {
             name: profile.name.to_string(),
             java_id: profile.java_id,
+            is_system: profile.is_system,
         }
     }
 }

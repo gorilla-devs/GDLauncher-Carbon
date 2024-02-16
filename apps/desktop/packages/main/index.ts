@@ -7,7 +7,6 @@ import {
   BrowserWindow,
   dialog,
   ipcMain,
-  Menu,
   OpenDialogOptions,
   SaveDialogOptions,
   screen,
@@ -335,9 +334,6 @@ if (process.defaultApp) {
 } else {
   app.setAsDefaultProtocolClient("gdlauncher");
 }
-
-const menu = Menu.buildFromTemplate([]);
-Menu.setApplicationMenu(menu);
 
 async function createWindow(
   skipIntroAnimation = false

@@ -60,6 +60,8 @@ keys! {
         UPDATE_JAVA_PROFILE                         = "updateJavaProfile";
         CREATE_JAVA_PROFILE                         = "createJavaProfile";
         DELETE_JAVA_PROFILE                         = "deleteJavaProfile";
+        VALIDATE_CUSTOM_JAVA_PATH                   = "validateCustomJavaPath";
+        CREATE_CUSTOM_JAVA_VERSION                  = "createCustomJavaVersion";
         DELETE_JAVA_VERSION                         = "deleteJavaVersion";
     }
 

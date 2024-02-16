@@ -46,13 +46,16 @@ function Input(props: Props) {
   const [focusIn, setFocusIn] = createSignal(false);
   const [inputRef, setInputRef] = createSignal<HTMLInputElement | undefined>();
   const [menuRef, setMenuRef] = createSignal<HTMLUListElement | undefined>();
+  const [inputContainerRef, setInputContainerRef] = createSignal<
+    HTMLDivElement | undefined
+  >();
 
   const toggleMenu = () => {
     if (props.disabled) return;
     setMenuOpened(!menuOpened());
   };
 
-  const position = useFloating(inputRef, menuRef, {
+  const position = useFloating(inputContainerRef, menuRef, {
     placement: "bottom-start",
     middleware: [offset(5), flip(), shift(), hide(), size()],
     whileElementsMounted: (reference, floating, update) =>
@@ -128,7 +131,7 @@ function Input(props: Props) {
 
   return (
     <>
-      <div class={containerClasses}>
+      <div class={containerClasses} ref={setInputContainerRef}>
         <input
           ref={setInputRef}
           class={`${inputBaseClasses} ${disabledClasses} ${errorClasses} ${inputColorClasses}`}
@@ -142,35 +145,35 @@ function Input(props: Props) {
               props.onSearch((e.target as HTMLInputElement).value);
             }
 
-            if (props.onInput) {
-              props.onInput(_);
+            if (props.onInput && typeof props.onInput === "function") {
+              props.onInput(e);
             }
           }}
-          onFocus={() => {
+          onFocus={(e) => {
             if (props.autoCompleteOptions && !menuOpened()) {
               toggleMenu();
             }
 
-            if (props.onFocus) {
-              props.onFocus();
+            if (props.onFocus && typeof props.onFocus === "function") {
+              props.onFocus(e);
             }
           }}
-          onMouseDown={() => {
+          onMouseDown={(e) => {
             if (props.autoCompleteOptions && !menuOpened()) {
               toggleMenu();
             }
 
-            if (props.onMouseDown) {
-              props.onMouseDown();
+            if (props.onMouseDown && typeof props.onMouseDown === "function") {
+              props.onMouseDown(e);
             }
           }}
-          onBlur={() => {
+          onBlur={(e) => {
             if (!focusIn()) {
               setMenuOpened(false);
             }
 
-            if (props.onBlur) {
-              props.onBlur();
+            if (props.onBlur && typeof props.onBlur === "function") {
+              props.onBlur(e);
             }
           }}
           {...otherProps}
@@ -188,7 +191,7 @@ function Input(props: Props) {
         <Portal>
           <ul
             ref={setMenuRef}
-            class="absolute h-max max-h-60 bottom-0 overflow-y-auto overflow-x-hidden text-darkSlate-50 shadow-md shadow-darkSlate-900 list-none m-0 p-0 z-100 min-w-32"
+            class="absolute h-max max-h-60 bottom-0 overflow-y-auto overflow-x-hidden text-darkSlate-50 shadow-md shadow-darkSlate-900 list-none m-0 p-0 z-100 min-w-32 max-w-200"
             onMouseOut={() => {
               setFocusIn(false);
             }}
@@ -196,7 +199,8 @@ function Input(props: Props) {
               setFocusIn(true);
             }}
             style={{
-              "min-width": inputRef()?.offsetWidth + "px" || "auto",
+              width: inputContainerRef()?.offsetWidth + "px" || "auto",
+              "max-width": inputContainerRef()?.offsetWidth + "px" || "auto",
               top: `${position.y ?? 0}px`,
               left: `${position.x ?? 0}px`,
             }}
@@ -204,7 +208,7 @@ function Input(props: Props) {
             <For each={props.autoCompleteOptions}>
               {(option) => (
                 <li
-                  class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-darkSlate-800 py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline w-full box-border"
+                  class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-darkSlate-800 py-2 px-4 block break-all text-darkSlate-50 no-underline w-full box-border"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopImmediatePropagation();

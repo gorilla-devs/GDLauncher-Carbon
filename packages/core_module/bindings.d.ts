@@ -95,9 +95,13 @@ export type Procedures = {
         { key: "instance.setImportScanTarget", input: [ImportEntity, string], result: null } | 
         { key: "instance.updateInstance", input: FEUpdateInstance, result: null } | 
         { key: "instance.updateMod", input: UpdateMod, result: FETaskId } | 
+        { key: "java.createCustomJavaVersion", input: string, result: null } | 
+        { key: "java.createJavaProfile", input: FECreateJavaProfileArgs, result: null } | 
+        { key: "java.deleteJavaProfile", input: string, result: null } | 
         { key: "java.deleteJavaVersion", input: string, result: null } | 
         { key: "java.setupManagedJava", input: FEManagedJavaSetupArgs, result: string } | 
         { key: "java.updateJavaProfile", input: FEUpdateJavaProfileArgs, result: null } | 
+        { key: "java.validateCustomJavaPath", input: string, result: boolean } | 
         { key: "metrics.sendEvent", input: FEMetricsEvent, result: null } | 
         { key: "settings.setSettings", input: FESettingsUpdate, result: null } | 
         { key: "vtask.dismissTask", input: FETaskId, result: null },
@@ -120,6 +124,8 @@ export type CFFEModSearchParameters = { query: CFFEModSearchParametersQuery }
 export type FELauncherActionOnGameLaunch = "quitApp" | "closeWindow" | "minimizeWindow" | "hideWindow" | "none"
 
 export type MRFEVersion = { name: string; version_number: string; changelog: string | null; dependencies: MRFEDependency[]; game_versions: string[]; version_type: MRFEVersionType; loaders: string[]; featured: boolean; status: MRFEStatus | null; requested_status: MRFERequestedVersionStatus | null; id: string; project_id: string; author_id: string; date_published: string; downloads: number; files: MRFEVersionFile[] }
+
+export type FECreateJavaProfileArgs = { profileName: string; javaId: string | null }
 
 export type CFFESortableGameVersion = { gameVersionName: string; gameVersionPadded: string; gameVersion: string; gameVersionReleaseDate: string; gameVersionTypeId: number | null }
 
@@ -179,8 +185,6 @@ export type InvalidationEvent = { key: string; args: any | null }
 
 export type FEManagedJavaVersion = { id: string; name: string; downloadUrl: string; javaVersion: string }
 
-export type FEJavaProfile = { name: string; javaId: string | null }
-
 export type FEModDescriptionResponse = { data: string; pagination: CFFEPagination | null }
 
 export type DuplicateInstance = { instance: FEInstanceId; new_name: string }
@@ -202,6 +206,8 @@ export type Mod = { id: string; filename: string; enabled: boolean; metadata: Mo
 export type ModSources = { channels: ModChannelWithUsage[]; platform_blacklist: ModPlatform[] }
 
 export type FEManagedJavaOs = "windows" | "linux" | "macOs"
+
+export type FEJavaComponentType = "local" | "managed" | "custom"
 
 export type MRFEUser = { username: string; name: string | null; email: string | null; bio: string | null; id: string; github_id: number | null; avatar_url: string | null; created: string; role: MRFEUserRole; badges: number }
 
@@ -240,8 +246,6 @@ export type ModpackInfo = { modpack: Modpack; locked: boolean }
 export type MRFEAdditionalFileType = "requiredResourcePack" | "optionalResourcePack"
 
 export type FESearchAPI = "curseforge" | "modrinth"
-
-export type FEJavaComponentType = "local" | "managed" | "custom"
 
 export type CFFEModSearchSortField = "featured" | "popularity" | "lastUpdated" | "name" | "author" | "totalDownloads" | "category" | "gameVersion"
 
@@ -318,8 +322,6 @@ export type MRFERequestedVersionStatus = "listed" | "archived" | "draft" | "unli
 export type FEInstanceModloaderType = "neoforge" | "forge" | "fabric" | "quilt"
 
 export type FEInstanceModpackInfo = { name: string; version_name: string; url_slug: string; has_image: boolean }
-
-export type FEJavaComponent = { id: string; path: string; version: string; type: FEJavaComponentType; isValid: boolean }
 
 export type MemoryRange = { min_mb: number; max_mb: number }
 
@@ -444,6 +446,8 @@ export type MRFELoadersResponse = MRFELoader[]
 
 export type LaunchState = { Inactive: { failed_task: FETaskId | null } } | { Preparing: FETaskId } | { Running: { start_time: string; log_id: number } } | "Deleting"
 
+export type FEJavaProfile = { name: string; javaId: string | null; isSystem: boolean }
+
 export type FECategoriesResponse = { data: CFFECategory[]; pagination: CFFEPagination | null }
 
 export type ModFileMetadata = { id: string; modid: string | null; name: string | null; version: string | null; description: string | null; authors: string | null; modloaders: FEInstanceModloaderType[]; sha_1: string; sha_512: string; murmur_2: string; has_image: boolean }
@@ -486,9 +490,11 @@ export type ListGroup = { id: FEGroupId; name: string }
 
 export type MRFEProjectSupportRange = "required" | "optional" | "unsupported" | "unknown"
 
-export type FEUpdateJavaProfileArgs = { profileName: string; javaId: string }
+export type FEJavaComponent = { id: string; path: string; version: string; type: FEJavaComponentType; isValid: boolean }
 
 export type CFFEModSearchParametersQuery = { gameId: number; searchFilter: string | null; gameVersion: string | null; categoryIds: number[] | null; sortOrder: CFFEModSearchSortOrder | null; sortField: CFFEModSearchSortField | null; classId: CFFEClassId | null; modLoaderTypes: CFFEModLoaderType[] | null; gameVersionTypeId: number | null; authorId: number | null; slug: string | null; index: number | null; pageSize: number | null }
+
+export type FEUpdateJavaProfileArgs = { profileName: string; javaId?: string | null }
 
 export type FEUnifiedSearchResult = { curseforge: CFFEMod } | { modrinth: MRFEProjectSearchResult }
 

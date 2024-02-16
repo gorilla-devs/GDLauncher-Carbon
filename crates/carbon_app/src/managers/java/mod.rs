@@ -24,6 +24,7 @@ use crate::{
 };
 use std::{
     collections::HashMap,
+    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -161,10 +162,25 @@ impl ManagerRef<'_, JavaManager> {
         Ok(all_profiles)
     }
 
+    pub async fn validate_custom_java_path(&self, path: String) -> anyhow::Result<bool> {
+        let p = Path::new(&path);
+
+        // check if file is executable
+        if !p.is_file() {
+            return Ok(false);
+        }
+
+        let java = RealJavaChecker::get_bin_info(&RealJavaChecker, p, JavaComponentType::Custom)
+            .await
+            .is_ok();
+
+        Ok(java)
+    }
+
     pub async fn update_java_profile(
         &self,
         profile_name: String,
-        java_id: String,
+        java_id: Option<String>,
     ) -> anyhow::Result<()> {
         let auto_manage_java = self
             .app
@@ -177,17 +193,29 @@ impl ManagerRef<'_, JavaManager> {
             anyhow::bail!("Auto manage java is enabled");
         }
 
-        self.app
-            .prisma_client
-            .java_profile()
-            .update(
-                crate::db::java_profile::name::equals(profile_name.to_string()),
-                vec![crate::db::java_profile::java::connect(
-                    crate::db::java::id::equals(java_id),
-                )],
-            )
-            .exec()
-            .await?;
+        if let Some(java_id) = java_id {
+            self.app
+                .prisma_client
+                .java_profile()
+                .update(
+                    crate::db::java_profile::name::equals(profile_name.to_string()),
+                    vec![crate::db::java_profile::java::connect(
+                        crate::db::java::id::equals(java_id),
+                    )],
+                )
+                .exec()
+                .await?;
+        } else {
+            self.app
+                .prisma_client
+                .java_profile()
+                .update(
+                    crate::db::java_profile::name::equals(profile_name.to_string()),
+                    vec![crate::db::java_profile::java::disconnect()],
+                )
+                .exec()
+                .await?;
+        }
 
         self.app.invalidate(GET_JAVA_PROFILES, None);
 
@@ -269,6 +297,58 @@ impl ManagerRef<'_, JavaManager> {
             .await?;
 
         self.app.invalidate(GET_JAVA_PROFILES, None);
+
+        Ok(())
+    }
+
+    pub async fn create_custom_java_version(&self, path: String) -> anyhow::Result<()> {
+        let auto_manage_java = self
+            .app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .auto_manage_java;
+
+        if auto_manage_java {
+            anyhow::bail!("Auto manage java is enabled");
+        }
+
+        let java = RealJavaChecker::get_bin_info(
+            &RealJavaChecker,
+            Path::new(&path),
+            JavaComponentType::Custom,
+        )
+        .await?;
+
+        let exists = self
+            .app
+            .prisma_client
+            .java()
+            .find_unique(crate::db::java::path::equals(path.clone()))
+            .exec()
+            .await?;
+
+        if exists.is_some() {
+            anyhow::bail!("Java with path {} already exists", path);
+        }
+
+        self.app
+            .prisma_client
+            .java()
+            .create(
+                java.path,
+                java.version.major as i32,
+                java.version.to_string(),
+                java._type.to_string(),
+                java.os.to_string(),
+                java.arch.to_string(),
+                java.vendor,
+                vec![],
+            )
+            .exec()
+            .await?;
+
+        self.app.invalidate(GET_AVAILABLE_JAVAS, None);
 
         Ok(())
     }
@@ -508,7 +588,7 @@ impl ManagerRef<'_, JavaManager> {
 
             let system_profiles_in_db = self.get_system_java_profiles().await?;
 
-            for JavaProfile { name, java_id } in system_profiles_in_db {
+            for JavaProfile { name, java_id, .. } in system_profiles_in_db {
                 let system_profile_name = SystemJavaProfileName::try_from(&*name)?;
                 if system_profile_name == target_profile
                     || !system_profile_name.is_java_version_compatible(&java.version)
