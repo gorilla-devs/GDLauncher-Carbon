@@ -1705,23 +1705,24 @@ mod log {
                 let new_lines = {
                     let log = log_rx.borrow();
 
-                    let log_span = log.get_span(last_idx..);
-                    let mut new_data = Vec::<u8>::with_capacity(log_span.len() * 150); // estimate
+                    let new_lines = log
+                        .get_span(last_idx..)
+                        .into_iter()
+                        .map(|entry| {
+                            let mut data = Vec::from([0u8; 4]);
 
-                    for entry in log_span {
-                        // write space in for the size, determine the size from the amount written, then insert the size
-                        let size_offset = new_data.len();
-                        new_data.extend([0; 4]);
-                        serde_json::to_writer(&mut new_data, &entry)
-                            .expect("serialization of a log entry should be infallible");
-                        let json_len = new_data.len() - (size_offset + 4);
+                            serde_json::to_writer(&mut data, &entry)
+                                .expect("serialization of a log entry should be infallible");
+                            let json_len = data.len() - 4;
 
-                        new_data[size_offset..size_offset + 4].copy_from_slice(&json_len.to_le_bytes()[..]);
-                    }
+                            data[..4].copy_from_slice(&json_len.to_le_bytes()[..]);
+                            data
+                        })
+                        .collect::<Vec<_>>();
 
                     last_idx = log.len();
 
-                    new_data
+                    new_lines
                 };
 
                 for line in new_lines {
