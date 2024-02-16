@@ -66,6 +66,7 @@ pub struct MetaCacheManager {
     image_scale_semaphore: Semaphore,
     image_download_semaphore: Semaphore,
     watched_instance: watch::Sender<Option<InstanceId>>,
+    pause_caching: watch::Sender<bool>,
 }
 
 impl MetaCacheManager {
@@ -82,9 +83,10 @@ impl MetaCacheManager {
             local_targets: LockNotify::new(CacheTargets::new()),
             curseforge_targets: LockNotify::new(CacheTargets::new()),
             modrinth_targets: LockNotify::new(CacheTargets::new()),
-            image_scale_semaphore: Semaphore::new(num_cpus::get()),
+            image_scale_semaphore: Semaphore::new(1),
             image_download_semaphore: Semaphore::new(10),
             watched_instance: watch::channel(None).0,
+            pause_caching: watch::channel(false).0,
         }
     }
 }
@@ -555,17 +557,54 @@ fn cache_modplatform<C: ModplatformCacher>(
                 is_priority,
                 is_override,
             }| async move {
-                debug!({ is_priority, is_override }, "Beginning {} mod caching for instance {instance_id}", C::NAME);
+                let mut pause = app.meta_cache_manager().pause_caching.subscribe();
+                let r = loop {
+                    let wait_for_pause = async {
+                        loop {
+                            if *pause.borrow() {
+                                break;
+                            }
 
-                // true could be optimized to "if there is a callback" if this is a bottleneck
-                let mut sender = BundleSender::new(instance_id, true, is_priority, batch_tx);
-                let r = C::query_platform(&app, instance_id, &mut sender).await;
+                            if pause.changed().await.is_err() {
+                                futures::future::pending().await
+                            }
+                        }
+                    };
 
-                if let Err(e) = &r {
-                    tracing::error!({ error = ?e }, "Could not query {} mod metadata for instance {instance_id}", C::NAME);
-                }
+                    let do_caching = async {
+                        debug!({ is_priority, is_override }, "Beginning {} mod caching for instance {instance_id}", C::NAME);
 
-                sender.wait().await;
+                        // true could be optimized to "if there is a callback" if this is a bottleneck
+                        let mut sender = BundleSender::new(instance_id, true, is_priority, batch_tx);
+                        let r = C::query_platform(&app, instance_id, &mut sender).await;
+
+                        if let Err(e) = &r {
+                            tracing::error!({ error = ?e }, "Could not query {} mod metadata for instance {instance_id}", C::NAME);
+                        }
+
+                        sender.wait().await;
+
+                        r
+                    };
+
+                    tokio::select! {
+                        _ = wait_for_pause => {
+                            tracing::info!("Remote mod caching paused");
+
+                            // wait for unpause
+                            loop {
+                                if !*pause.borrow() {
+                                    break;
+                                }
+
+                                if pause.changed().await.is_err() {
+                                    futures::future::pending().await
+                                }
+                            }
+                        },
+                        r = do_caching => break r,
+                    };
+                };
 
                 move |targets: &mut CacheTargets| targets.release_target(instance_id, r)
             },
@@ -785,6 +824,27 @@ impl ManagerRef<'_, MetaCacheManager> {
     }
 
     pub async fn launch_background_tasks(self) {
+        let app_pause = self.app.clone();
+        tokio::spawn(async move {
+            let mut any_instance_changed_watcher = app_pause
+                .instance_manager()
+                .any_instance_running
+                .subscribe();
+
+            loop {
+                let any_instance_running = *any_instance_changed_watcher.borrow();
+
+                app_pause
+                    .meta_cache_manager()
+                    .pause_caching
+                    .send_replace(any_instance_running);
+
+                if any_instance_changed_watcher.changed().await.is_err() {
+                    break;
+                }
+            }
+        });
+
         let (list_debounce_tx, mut list_debounce_rx) = watch::channel(());
 
         let debounce_target = Arc::new(AtomicI32::new(-1));
@@ -878,9 +938,13 @@ impl ManagerRef<'_, MetaCacheManager> {
         carbon_scheduler::buffered_digest(&mut file, |chunk| {
             sha512.update(&chunk);
             sha1.update(&chunk);
-            murmur_len += chunk.iter().filter(|&&x| x != 9 && x != 10 && x != 13 && x != 32).count();
+            murmur_len += chunk
+                .iter()
+                .filter(|&&x| x != 9 && x != 10 && x != 13 && x != 32)
+                .count();
             content_len += chunk.len();
-        }).await?;
+        })
+        .await?;
 
         let sha512: [u8; 64] = sha512.finalize().into();
         let sha1: [u8; 20] = sha1.finalize().into();
@@ -891,7 +955,10 @@ impl ManagerRef<'_, MetaCacheManager> {
         let (file, meta, image_data) = tokio::task::spawn_blocking(|| {
             let meta = super::mods::parse_metadata(&mut file);
 
-            let image_data = match &meta.as_ref().map(|m| m.as_ref().map(|m| m.logo_file.as_ref())) {
+            let image_data = match &meta
+                .as_ref()
+                .map(|m| m.as_ref().map(|m| m.logo_file.as_ref()))
+            {
                 Ok(Some(Some(logo_file))) => {
                     // TODO: use the same zip in parse_metadata
                     let mut zip = zip::ZipArchive::new(&mut file).unwrap();
@@ -905,12 +972,13 @@ impl ManagerRef<'_, MetaCacheManager> {
                     };
 
                     r
-                },
+                }
                 _ => None,
             };
 
             Ok::<_, anyhow::Error>((file, meta, image_data))
-        }).await??;
+        })
+        .await??;
 
         let mut file = tokio::fs::File::from_std(file);
         file.seek(SeekFrom::Start(0)).await?;
@@ -922,7 +990,8 @@ impl ManagerRef<'_, MetaCacheManager> {
             workbuf.splice(.., chunk.iter().map(|&b| b));
             workbuf.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
             murmur2.update(&workbuf[..]);
-        }).await?;
+        })
+        .await?;
 
         let murmur2 = murmur2.finalize();
 
@@ -955,13 +1024,17 @@ impl ManagerRef<'_, MetaCacheManager> {
 
                 let logo_insert = match image_data {
                     Some(image_data) => {
-                        let permit = self.image_scale_semaphore.acquire().await
+                        let permit = self
+                            .image_scale_semaphore
+                            .acquire()
+                            .await
                             .expect("the image scale semaphore is never closed");
 
                         let logo = carbon_scheduler::cpu_block(|| {
                             let scaled = scale_mod_image(&image_data[..])?;
                             Ok::<_, anyhow::Error>(Some(scaled))
-                        }).await;
+                        })
+                        .await;
 
                         drop(permit);
 
@@ -1096,7 +1169,7 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
         let app = &app;
         let update_notifier = &update_notifier;
 
-        let cache_instance = |CacheTargetInfo { instance_id, .. }| async move {
+        let cache_instance = |instance_id: InstanceId| async move {
             let app2 = app.clone();
             let cached_entries = tokio::spawn(async move {
                 app2.prisma_client
@@ -1248,28 +1321,65 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
         let cache_instance = &cache_instance;
 
         LoopWatcher::new(rx).await.loop_interrupt(
-            |target @ CacheTargetInfo {
+            |CacheTargetInfo {
                 instance_id,
                 is_override,
                 is_priority,
             }| async move {
-                debug!("Beginning local mod caching for instance {instance_id}");
+                let mut pause = app.meta_cache_manager().pause_caching.subscribe();
+                let r = loop {
+                    let wait_for_pause = async {
+                        loop {
+                            if *pause.borrow() {
+                                break;
+                            }
 
-                let r = cache_instance(target).await;
+                            if pause.changed().await.is_err() {
+                                futures::future::pending().await
+                            }
+                        }
+                    };
 
-                if let Err(e) = &r {
-                    tracing::error!({ error = ?e }, "Could not query local mod metadata for instance {instance_id}");
-                }
+                    let do_caching = async {
+                        debug!("Beginning local mod caching for instance {instance_id}");
 
-                // waiting list targets cascade into curseforge and modrinth caching.
-                if !is_override && !is_priority {
-                    let mcm = app.meta_cache_manager();
+                        let r = cache_instance(instance_id).await;
 
-                    join!(
-                        mcm.curseforge_targets.send_modify_always(|targets| targets.waiting.push_back(instance_id)),
-                        mcm.modrinth_targets.send_modify_always(|targets| targets.waiting.push_back(instance_id)),
-                    );
-                }
+                        if let Err(e) = &r {
+                            tracing::error!({ error = ?e }, "Could not query local mod metadata for instance {instance_id}");
+                        }
+
+                        // waiting list targets cascade into curseforge and modrinth caching.
+                        if !is_override && !is_priority {
+                            let mcm = app.meta_cache_manager();
+
+                            join!(
+                                mcm.curseforge_targets.send_modify_always(|targets| targets.waiting.push_back(instance_id)),
+                                mcm.modrinth_targets.send_modify_always(|targets| targets.waiting.push_back(instance_id)),
+                            );
+                        }
+
+                        r
+                    };
+
+                    tokio::select! {
+                        _ = wait_for_pause => {
+                            tracing::info!("Local mod caching paused");
+
+                            // wait for unpause
+                            loop {
+                                if !*pause.borrow() {
+                                    break;
+                                }
+
+                                if pause.changed().await.is_err() {
+                                    futures::future::pending().await
+                                }
+                            }
+                        },
+                        r = do_caching => break r,
+                    };
+                };
 
                 move |targets: &mut CacheTargets| targets.release_target(instance_id, r)
             }

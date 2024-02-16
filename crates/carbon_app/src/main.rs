@@ -24,6 +24,7 @@ pub(crate) mod db;
 pub mod domain;
 mod error;
 pub mod iridium_client;
+mod livenesstracker;
 pub mod managers;
 mod platform;
 // mod pprocess_keepalive;

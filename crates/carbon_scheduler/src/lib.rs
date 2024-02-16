@@ -1,5 +1,9 @@
 use std::{
-    io, mem::{self, ManuallyDrop, MaybeUninit}, pin::Pin, sync::mpsc, task::{Context, Poll, Waker}
+    io,
+    mem::{self, ManuallyDrop, MaybeUninit},
+    pin::Pin,
+    sync::mpsc,
+    task::{Context, Poll, Waker},
 };
 
 use futures::Future;
@@ -141,7 +145,7 @@ pub async fn buffered_digest<F: FnMut(&mut [u8]) + Send>(
         let n = source.read(&mut buffer).await?;
 
         if n == 0 {
-            break Ok(())
+            break Ok(());
         }
 
         cpu_block(|| f(&mut buffer[..n])).await;

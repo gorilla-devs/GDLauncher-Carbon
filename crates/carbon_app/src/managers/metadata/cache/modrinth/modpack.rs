@@ -106,7 +106,10 @@ pub async fn get_modpack_metadata(
                     .await?;
 
                 let mcm = app.meta_cache_manager();
-                let permit = mcm.image_scale_semaphore.acquire().await
+                let permit = mcm
+                    .image_scale_semaphore
+                    .acquire()
+                    .await
                     .expect("the image scale semaphore is never closed");
 
                 let scaled_image = carbon_scheduler::cpu_block(|| {
