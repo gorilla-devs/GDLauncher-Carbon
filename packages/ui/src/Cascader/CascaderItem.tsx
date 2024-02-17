@@ -9,13 +9,16 @@ const CascaderItem = (props: {
   name?: string;
   value?: string;
   isCheckbox?: boolean;
+  isOpen: boolean;
+  onToggleMenu: () => void;
 }) => {
   const [isMenuOpen, setIsMenuOpen] = createSignal(false);
-  const toggleMenu = () => setIsMenuOpen(!isMenuOpen());
+  // const toggleMenu = () => setIsMenuOpen(!isMenuOpen());
+
   return (
     <div
       class="w-full flex justify-between p-2 items-center hover:bg-[#1D2028]"
-      onMouseEnter={props.children ? toggleMenu : undefined}
+      onMouseEnter={() => props.children && props.onToggleMenu()}
       //   onMouseLeave={toggleMenu}
     >
       <Show when={props.isCheckbox}>
@@ -48,7 +51,7 @@ const CascaderItem = (props: {
           }
         />
       </Show>
-      <Show when={props.children && isMenuOpen()}>
+      <Show when={props.children && props.isOpen}>
         <ChildsMenu
           items={props.children!.items}
           hasSearch={props.children!.hasSearch}

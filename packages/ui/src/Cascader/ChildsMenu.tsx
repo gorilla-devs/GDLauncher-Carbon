@@ -14,7 +14,11 @@ export interface ChildsMenuProps {
 
 const ChildsMenu = (props: ChildsMenuProps) => {
   const [search, setSearch] = createSignal("");
+  const [openItem, setOpenItem] = createSignal<string | null>(null);
 
+  const toggleMenu = (label: string) => {
+    setOpenItem((prev) => (prev === label ? null : label));
+  };
   return (
     <Portal mount={document.getElementById("menu-id") as Node}>
       <div class="max-h-72 w-52 bg-[#272b35] rounded-md p-3 flex flex-col gap-2 overflow-x-auto scrollbar-hide">
@@ -35,6 +39,8 @@ const ChildsMenu = (props: ChildsMenuProps) => {
                 label={item.label}
                 children={item.children}
                 isCheckbox={true}
+                isOpen={openItem() === item.label}
+                onToggleMenu={() => toggleMenu(item.label)}
               />
             )}
           </For>
@@ -51,6 +57,8 @@ const ChildsMenu = (props: ChildsMenuProps) => {
                   children={item.children}
                   isCheckbox={false}
                   label={item.label}
+                  isOpen={openItem() === item.label}
+                  onToggleMenu={() => toggleMenu(item.label)}
                 />
               )}
             </For>

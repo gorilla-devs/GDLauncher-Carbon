@@ -87,16 +87,16 @@ export const WithParents: Story = {
         children: {
           items: [
             {
-              label: "Item 3",
+              label: "Subitem 2.1",
               img: "",
             },
             {
-              label: "Item 3",
+              label: "Subitem 2.2",
               img: "",
               children: {
                 items: [
                   {
-                    label: "Item 3",
+                    label: "Subsubitem 2.2.1",
                     img: "",
                   },
                 ],
@@ -105,7 +105,7 @@ export const WithParents: Story = {
               },
             },
             {
-              label: "Item 3",
+              label: "Subitem 2.3",
               img: "",
             },
           ],
@@ -119,7 +119,7 @@ export const WithParents: Story = {
         children: {
           items: [
             {
-              label: "Item 3",
+              label: "Subitem 3.1",
               img: "",
             },
           ],
@@ -128,12 +128,12 @@ export const WithParents: Story = {
         },
       },
       {
-        label: "Item 3",
+        label: "Item 4",
         img: "",
         children: {
           items: [
             {
-              label: "Item 3",
+              label: "Subitem 4.1",
               img: "",
             },
           ],
@@ -142,35 +142,39 @@ export const WithParents: Story = {
         },
       },
       {
-        label: "Item 3",
+        label: "Item 5",
         img: "",
       },
       {
-        label: "Item 3",
+        label: "Item 6",
         img: "",
       },
       {
-        label: "Item 3",
+        label: "Item 7",
         img: "",
       },
       {
-        label: "Item 3",
+        label: "Item 8",
         img: "",
       },
       {
-        label: "Item 3",
+        label: "Item 9",
         img: "",
       },
       {
-        label: "Item 3",
+        label: "Item 10",
         img: "",
       },
       {
-        label: "Item 3",
+        label: "Item 11",
         img: "",
       },
       {
-        label: "Item 3",
+        label: "Item 12",
+        img: "",
+      },
+      {
+        label: "Item 13",
         img: "",
       },
     ],
