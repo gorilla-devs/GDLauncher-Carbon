@@ -12,14 +12,10 @@ const CascaderItem = (props: {
   isOpen: boolean;
   onToggleMenu: () => void;
 }) => {
-  const [isMenuOpen, setIsMenuOpen] = createSignal(false);
-  // const toggleMenu = () => setIsMenuOpen(!isMenuOpen());
-
   return (
     <div
       class="w-full flex justify-between p-2 items-center hover:bg-[#1D2028]"
       onMouseEnter={() => props.children && props.onToggleMenu()}
-      //   onMouseLeave={toggleMenu}
     >
       <Show when={props.isCheckbox}>
         <Checkbox
