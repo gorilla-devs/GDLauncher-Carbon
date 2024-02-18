@@ -78,6 +78,7 @@ export const WithParents: Story = {
     hasSearch: false,
     isCheckbox: false,
     isParent: true,
+    parentLabel: "Parent",
     items: [
       {
         label: "Item 1",
@@ -86,7 +87,9 @@ export const WithParents: Story = {
       {
         label: "Item 2",
         img: "",
+
         children: {
+          parentLabel: "Item 2",
           isParent: false,
           items: [
             {
@@ -97,6 +100,7 @@ export const WithParents: Story = {
               label: "Subitem 2.2",
               img: "",
               children: {
+                parentLabel: "Subitem 2.2",
                 isParent: false,
                 items: [
                   {
@@ -121,6 +125,7 @@ export const WithParents: Story = {
         label: "Item 3",
         img: "",
         children: {
+          parentLabel: "Item 3",
           isParent: false,
           items: [
             {
@@ -136,6 +141,7 @@ export const WithParents: Story = {
         label: "Item 4",
         img: "",
         children: {
+          parentLabel: "Item 4",
           isParent: false,
           items: [
             {

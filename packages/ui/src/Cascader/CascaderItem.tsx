@@ -3,6 +3,8 @@ import { Checkbox } from "../Checkbox";
 import ChildsMenu, { ChildsMenuProps } from "./ChildsMenu";
 import { Radio } from "../Radio";
 
+const [cascaderItems, setCascaderItems] = createSignal<string[]>([]);
+
 const CascaderItem = (props: {
   label: string;
   children?: ChildsMenuProps;
@@ -13,7 +15,6 @@ const CascaderItem = (props: {
   isParent: boolean;
   onToggleMenu: () => void;
 }) => {
-  console.log(props.label);
   return (
     <div
       class="w-full flex justify-between p-2 items-center hover:bg-[#1D2028]"
@@ -26,6 +27,16 @@ const CascaderItem = (props: {
       </Show>
       <Show when={props.isCheckbox && !props.isParent}>
         <Checkbox
+          onChange={() => {
+            if (cascaderItems().includes(props.label)) {
+              setCascaderItems((prev) =>
+                prev.filter((item) => item !== props.label)
+              );
+            } else {
+              setCascaderItems((prev) => [...prev, props.label]);
+            }
+          }}
+          checked={cascaderItems().includes(props.label)}
           children={
             <div class="flex items-center gap-2">
               <img

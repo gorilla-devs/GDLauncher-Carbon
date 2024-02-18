@@ -11,6 +11,7 @@ export interface ChildsMenuProps {
   isCheckbox: boolean;
   hasSearch: boolean;
   isParent: boolean;
+  parentLabel?: string;
 }
 
 const ChildsMenu = (props: ChildsMenuProps) => {
@@ -20,6 +21,7 @@ const ChildsMenu = (props: ChildsMenuProps) => {
   const toggleMenu = (label: string) => {
     setOpenItem((prev) => (prev === label ? null : label));
   };
+  const [radioValue, setRadioValue] = createSignal<string>("");
   return (
     <Portal mount={document.getElementById("menu-id") as Node}>
       <div class="max-h-72 w-52 bg-[#272b35] rounded-md p-3 flex flex-col gap-2 overflow-x-auto scrollbar-hide">
@@ -31,7 +33,7 @@ const ChildsMenu = (props: ChildsMenuProps) => {
             onInput={(e) => setSearch(e.target.value)}
           />
         </Show>
-        <Show when={props.isCheckbox}>
+        <Show when={props.isCheckbox || props.isParent}>
           <For
             each={props.items.filter((item) => item.label.includes(search()))}
           >
@@ -39,7 +41,7 @@ const ChildsMenu = (props: ChildsMenuProps) => {
               <CascaderItem
                 label={item.label}
                 children={item.children}
-                isCheckbox={true}
+                isCheckbox={props.isParent ? false : true}
                 isOpen={openItem() === item.label}
                 onToggleMenu={() => toggleMenu(item.label)}
                 isParent={props?.isParent}
@@ -47,8 +49,11 @@ const ChildsMenu = (props: ChildsMenuProps) => {
             )}
           </For>
         </Show>
-        <Show when={!props.isCheckbox}>
-          <Radio.group value={props.items.map((item) => item.label)}>
+        <Show when={!props.isCheckbox && !props.isParent}>
+          <Radio.group
+            value={props.parentLabel}
+            onChange={(val) => console.log(val)}
+          >
             <For
               each={props.items.filter((item) => item.label.includes(search()))}
             >
