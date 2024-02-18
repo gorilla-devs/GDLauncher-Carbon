@@ -10,6 +10,7 @@ export interface ChildsMenuProps {
   items: { label: string; img: any; children?: ChildsMenuProps }[];
   isCheckbox: boolean;
   hasSearch: boolean;
+  isParent: boolean;
 }
 
 const ChildsMenu = (props: ChildsMenuProps) => {
@@ -41,6 +42,7 @@ const ChildsMenu = (props: ChildsMenuProps) => {
                 isCheckbox={true}
                 isOpen={openItem() === item.label}
                 onToggleMenu={() => toggleMenu(item.label)}
+                isParent={props?.isParent}
               />
             )}
           </For>
@@ -59,6 +61,7 @@ const ChildsMenu = (props: ChildsMenuProps) => {
                   label={item.label}
                   isOpen={openItem() === item.label}
                   onToggleMenu={() => toggleMenu(item.label)}
+                  isParent={props?.isParent}
                 />
               )}
             </For>

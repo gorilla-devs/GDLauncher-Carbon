@@ -19,6 +19,7 @@ export const WithoutParents: Story = {
   args: {
     hasSearch: false,
     isCheckbox: true,
+    isParent: false,
     items: [
       {
         label: "Item 1",
@@ -75,7 +76,8 @@ export const WithoutParents: Story = {
 export const WithParents: Story = {
   args: {
     hasSearch: false,
-    isCheckbox: true,
+    isCheckbox: false,
+    isParent: true,
     items: [
       {
         label: "Item 1",
@@ -85,6 +87,7 @@ export const WithParents: Story = {
         label: "Item 2",
         img: "",
         children: {
+          isParent: false,
           items: [
             {
               label: "Subitem 2.1",
@@ -94,6 +97,7 @@ export const WithParents: Story = {
               label: "Subitem 2.2",
               img: "",
               children: {
+                isParent: false,
                 items: [
                   {
                     label: "Subsubitem 2.2.1",
@@ -117,6 +121,7 @@ export const WithParents: Story = {
         label: "Item 3",
         img: "",
         children: {
+          isParent: false,
           items: [
             {
               label: "Subitem 3.1",
@@ -131,6 +136,7 @@ export const WithParents: Story = {
         label: "Item 4",
         img: "",
         children: {
+          isParent: false,
           items: [
             {
               label: "Subitem 4.1",
@@ -180,10 +186,3 @@ export const WithParents: Story = {
     ],
   },
 };
-// export const WithTitle: Story = {
-//   args: {
-//     checked: true,
-//     disabled: false,
-//     children: "Checkbox",
-//   },
-// };

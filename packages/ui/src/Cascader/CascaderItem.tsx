@@ -10,14 +10,21 @@ const CascaderItem = (props: {
   value?: string;
   isCheckbox?: boolean;
   isOpen: boolean;
+  isParent: boolean;
   onToggleMenu: () => void;
 }) => {
+  console.log(props.label);
   return (
     <div
       class="w-full flex justify-between p-2 items-center hover:bg-[#1D2028]"
       onMouseEnter={() => props.children && props.onToggleMenu()}
     >
-      <Show when={props.isCheckbox}>
+      <Show when={!props.isCheckbox && props.isParent}>
+        <div>
+          <span class="text-white">{props.label}</span>
+        </div>
+      </Show>
+      <Show when={props.isCheckbox && !props.isParent}>
         <Checkbox
           children={
             <div class="flex items-center gap-2">
@@ -31,7 +38,7 @@ const CascaderItem = (props: {
           }
         />
       </Show>
-      <Show when={!props.isCheckbox}>
+      <Show when={!props.isCheckbox && !props.isParent}>
         <Radio
           name={props.label}
           value={props.label}
@@ -52,10 +59,15 @@ const CascaderItem = (props: {
           items={props.children!.items}
           hasSearch={props.children!.hasSearch}
           isCheckbox={props.children!.isCheckbox}
+          isParent={props.children!.isParent}
         />
       </Show>
 
       <div class="flex items-center">
+        <Show when={!props.isCheckbox && props.isParent && props.children}>
+          {/* here should go some kind of label idk */}
+          <span class="text-[#8A8B8F]">placeholder</span>
+        </Show>
         <Show when={props.children && props.children.isCheckbox}>
           <span class="text-[#8A8B8F]">0/{props.children?.items.length}</span>
         </Show>
