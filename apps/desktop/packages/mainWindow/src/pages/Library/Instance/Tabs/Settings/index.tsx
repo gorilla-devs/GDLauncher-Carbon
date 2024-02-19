@@ -82,12 +82,13 @@ const Settings = () => {
                 <Button
                   type="outline"
                   onClick={() => {
-                    updateInstanceMutation.mutate({
-                      modpackLocked: {
-                        Set: false
+                    setInstanceId(parseInt(params.id, 10));
+                    modalsContext?.openModal(
+                      {
+                        name: "unlock_confirmation"
                       },
-                      instance: parseInt(params.id, 10)
-                    });
+                      { instanceState: "unlock" }
+                    );
                   }}
                 >
                   <i class="w-5 h-5 i-ri:lock-fill" />
@@ -103,12 +104,13 @@ const Settings = () => {
               <Button
                 type="outline"
                 onClick={() => {
-                  updateInstanceMutation.mutate({
-                    modpackLocked: {
-                      Set: null
+                  setInstanceId(parseInt(params.id, 10));
+                  modalsContext?.openModal(
+                    {
+                      name: "unpair_confirmation"
                     },
-                    instance: parseInt(params.id, 10)
-                  });
+                    { instanceState: "unpair" }
+                  );
                 }}
               >
                 <i class="w-5 h-5 i-ri:git-branch-fill" />
