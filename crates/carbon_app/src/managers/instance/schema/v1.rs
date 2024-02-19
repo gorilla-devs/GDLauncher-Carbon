@@ -24,6 +24,12 @@ pub struct Instance {
     #[serde(default)]
     pub modpack: Option<ModpackInfo>,
     pub game_configuration: GameConfig,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pre_launch_hook: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub post_exit_hook: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wrapper_command: Option<String>,
     #[serde(default)]
     pub mod_sources: Option<ModSources>,
     #[serde(default)]
@@ -233,6 +239,9 @@ impl From<Instance> for info::Instance {
             seconds_played: value.seconds_played,
             modpack: value.modpack.map(Into::into),
             game_configuration: value.game_configuration.into(),
+            pre_launch_hook: value.pre_launch_hook,
+            post_exit_hook: value.post_exit_hook,
+            wrapper_command: value.wrapper_command,
             mod_sources: value.mod_sources.map(Into::into),
             notes: value.notes,
         }
@@ -250,6 +259,9 @@ impl From<info::Instance> for Instance {
             seconds_played: value.seconds_played,
             modpack: value.modpack.map(Into::into),
             game_configuration: value.game_configuration.into(),
+            pre_launch_hook: value.pre_launch_hook,
+            post_exit_hook: value.post_exit_hook,
+            wrapper_command: value.wrapper_command,
             mod_sources: value.mod_sources.map(Into::into),
             notes: value.notes,
         }

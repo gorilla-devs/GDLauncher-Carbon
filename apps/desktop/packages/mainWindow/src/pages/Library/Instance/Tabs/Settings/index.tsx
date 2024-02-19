@@ -82,12 +82,13 @@ const Settings = () => {
                 <Button
                   type="outline"
                   onClick={() => {
-                    updateInstanceMutation.mutate({
-                      modpackLocked: {
-                        Set: false
+                    setInstanceId(parseInt(params.id, 10));
+                    modalsContext?.openModal(
+                      {
+                        name: "unlock_confirmation"
                       },
-                      instance: parseInt(params.id, 10)
-                    });
+                      { instanceState: "unlock" }
+                    );
                   }}
                 >
                   <i class="w-5 h-5 i-ri:lock-fill" />
@@ -103,12 +104,13 @@ const Settings = () => {
               <Button
                 type="outline"
                 onClick={() => {
-                  updateInstanceMutation.mutate({
-                    modpackLocked: {
-                      Set: null
+                  setInstanceId(parseInt(params.id, 10));
+                  modalsContext?.openModal(
+                    {
+                      name: "unpair_confirmation"
                     },
-                    instance: parseInt(params.id, 10)
-                  });
+                    { instanceState: "unpair" }
+                  );
                 }}
               >
                 <i class="w-5 h-5 i-ri:git-branch-fill" />
@@ -155,11 +157,11 @@ const Settings = () => {
         <Show when={routeData?.instanceDetails?.data?.memory !== null}>
           <div class="flex justify-center px-2">
             <Slider
-              min={0}
+              min={1024}
               max={mbTotalRAM()}
-              steps={1000}
+              steps={1024}
               value={routeData?.instanceDetails.data?.memory?.max_mb}
-              marks={generateSequence(2048, mbTotalRAM())}
+              marks={generateSequence(1024, mbTotalRAM())}
               onChange={(val) => {
                 if (
                   !val ||
@@ -407,6 +409,120 @@ const Settings = () => {
               </div>
             </Show>
           </div>
+        </Show>
+        <Row>
+          <Title description={<Trans key="settings:pre_launch_hook_text" />}>
+            <Trans key="settings:pre_launch_hook_title" />
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={
+                typeof routeData?.instanceDetails?.data?.preLaunchHook ===
+                "string"
+              }
+              onChange={(e) => {
+                updateInstanceMutation.mutate({
+                  preLaunchHook: {
+                    Set: e.target.checked ? "" : null
+                  },
+                  instance: parseInt(params.id, 10)
+                });
+              }}
+            />
+          </RightHandSide>
+        </Row>
+        <Show
+          when={
+            typeof routeData?.instanceDetails?.data?.preLaunchHook === "string"
+          }
+        >
+          <Input
+            value={routeData?.instanceDetails?.data?.preLaunchHook || ""}
+            onChange={(e) => {
+              updateInstanceMutation.mutate({
+                preLaunchHook: {
+                  Set: e.currentTarget.value.trim()
+                },
+                instance: parseInt(params.id, 10)
+              });
+            }}
+          />
+        </Show>
+        <Row>
+          <Title description={<Trans key="settings:post_exit_hook_text" />}>
+            <Trans key="settings:post_exit_hook_title" />
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={
+                typeof routeData?.instanceDetails?.data?.postExitHook ===
+                "string"
+              }
+              onChange={(e) => {
+                updateInstanceMutation.mutate({
+                  postExitHook: {
+                    Set: e.target.checked ? "" : null
+                  },
+                  instance: parseInt(params.id, 10)
+                });
+              }}
+            />
+          </RightHandSide>
+        </Row>
+        <Show
+          when={
+            typeof routeData?.instanceDetails?.data?.postExitHook === "string"
+          }
+        >
+          <Input
+            value={routeData?.instanceDetails?.data?.postExitHook || ""}
+            onChange={(e) => {
+              updateInstanceMutation.mutate({
+                postExitHook: {
+                  Set: e.currentTarget.value.trim()
+                },
+                instance: parseInt(params.id, 10)
+              });
+            }}
+          />
+        </Show>
+        <Row>
+          <Title description={<Trans key="settings:wrapper_command_text" />}>
+            <Trans key="settings:wrapper_command_title" />
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={
+                typeof routeData?.instanceDetails?.data?.wrapperCommand ===
+                "string"
+              }
+              onChange={(e) => {
+                updateInstanceMutation.mutate({
+                  wrapperCommand: {
+                    Set: e.target.checked ? "" : null
+                  },
+                  instance: parseInt(params.id, 10)
+                });
+              }}
+            />
+          </RightHandSide>
+        </Row>
+        <Show
+          when={
+            typeof routeData?.instanceDetails?.data?.wrapperCommand === "string"
+          }
+        >
+          <Input
+            value={routeData?.instanceDetails?.data?.wrapperCommand || ""}
+            onChange={(e) => {
+              updateInstanceMutation.mutate({
+                wrapperCommand: {
+                  Set: e.currentTarget.value.trim()
+                },
+                instance: parseInt(params.id, 10)
+              });
+            }}
+          />
         </Show>
       </RowsContainer>
     </Suspense>

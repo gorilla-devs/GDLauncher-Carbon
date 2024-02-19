@@ -17,6 +17,9 @@ pub struct Instance {
     pub seconds_played: u32,
     pub modpack: Option<ModpackInfo>,
     pub game_configuration: GameConfig,
+    pub pre_launch_hook: Option<String>,
+    pub post_exit_hook: Option<String>,
+    pub wrapper_command: Option<String>,
     pub mod_sources: Option<ModSources>,
     pub notes: String,
 }

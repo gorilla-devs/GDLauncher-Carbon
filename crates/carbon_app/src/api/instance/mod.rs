@@ -672,6 +672,12 @@ struct FEUpdateInstance {
     #[specta(optional)]
     memory: Option<Set<Option<MemoryRange>>>,
     #[specta(optional)]
+    pre_launch_hook: Option<Set<Option<String>>>,
+    #[specta(optional)]
+    post_exit_hook: Option<Set<Option<String>>>,
+    #[specta(optional)]
+    wrapper_command: Option<Set<Option<String>>>,
+    #[specta(optional)]
     game_resolution: Option<Set<Option<GameResolution>>>,
     #[specta(optional)]
     mod_sources: Option<Set<Option<super::modplatforms::ModSources>>>,
@@ -857,6 +863,9 @@ struct InstanceDetails {
     last_played: Option<DateTime<Utc>>,
     seconds_played: u32,
     modloaders: Vec<ModLoader>,
+    pre_launch_hook: Option<String>,
+    post_exit_hook: Option<String>,
+    wrapper_command: Option<String>,
     notes: String,
     state: LaunchState,
     icon_revision: Option<u32>,
@@ -1119,6 +1128,9 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             state: value.state.into(),
             icon_revision: value.icon_revision,
             has_pack_update: value.has_pack_update,
+            pre_launch_hook: value.pre_launch_hook,
+            post_exit_hook: value.post_exit_hook,
+            wrapper_command: value.wrapper_command,
         }
     }
 }
@@ -1523,6 +1535,9 @@ impl TryFrom<FEUpdateInstance> for domain::InstanceSettingsUpdate {
             global_java_args: value.global_java_args.map(|x| x.inner()),
             extra_java_args: value.extra_java_args.map(|x| x.inner()),
             memory: value.memory.map(|x| x.inner().map(Into::into)),
+            pre_launch_hook: value.pre_launch_hook.map(|x| x.inner()),
+            post_exit_hook: value.post_exit_hook.map(|x| x.inner()),
+            wrapper_command: value.wrapper_command.map(|x| x.inner()),
             game_resolution: value.game_resolution.map(|x| x.inner().map(Into::into)),
             mod_sources: value.mod_sources.map(|x| x.inner().map(Into::into)),
             modpack_locked: value.modpack_locked.map(|x| x.inner()),

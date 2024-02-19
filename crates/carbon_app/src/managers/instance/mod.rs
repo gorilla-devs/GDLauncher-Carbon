@@ -988,6 +988,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 memory: None,
                 game_resolution: None,
             },
+            pre_launch_hook: None,
+            post_exit_hook: None,
+            wrapper_command: None,
             mod_sources: None,
             notes,
         };
@@ -1117,6 +1120,18 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         if let Some(notes) = update.notes {
             info.notes = notes;
+        }
+
+        if let Some(pre_launch_hook) = update.pre_launch_hook {
+            info.pre_launch_hook = pre_launch_hook;
+        }
+
+        if let Some(post_exit_hook) = update.post_exit_hook {
+            info.post_exit_hook = post_exit_hook;
+        }
+
+        if let Some(wrapper_command) = update.wrapper_command {
+            info.wrapper_command = wrapper_command;
         }
 
         let mut need_reinstall = false;
@@ -1611,6 +1626,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             icon_revision,
             has_pack_update: instance.modpack_update_curseforge.unwrap_or(false)
                 || instance.modpack_update_modrinth.unwrap_or(false),
+            pre_launch_hook: instance.config.pre_launch_hook.clone(),
+            post_exit_hook: instance.config.post_exit_hook.clone(),
+            wrapper_command: instance.config.wrapper_command.clone(),
         })
     }
 
@@ -2401,6 +2419,9 @@ mod test {
                 global_java_args: None,
                 extra_java_args: None,
                 memory: None,
+                pre_launch_hook: None,
+                post_exit_hook: None,
+                wrapper_command: None,
                 game_resolution: None,
                 modpack_locked: None,
                 mod_sources: None,
