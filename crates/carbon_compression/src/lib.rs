@@ -193,22 +193,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_decompress_zip() {
-        let file_path = PathBuf::from("fixtures/compressed.zip");
-        let dest_folder = PathBuf::from("tests_decompressed/zip");
+        let file_path = Path::new("fixtures/compressed.zip");
+        let dest_folder = Path::new("tests_decompressed/zip");
         decompress(&file_path, &dest_folder).await.unwrap();
     }
 
     #[tokio::test]
     async fn test_decompress_tar() {
-        let file_path = PathBuf::from("fixtures/compressed.tar");
-        let dest_folder = PathBuf::from("tests_decompressed/tar");
+        let file_path = Path::new("fixtures/compressed.tar");
+        let dest_folder = Path::new("tests_decompressed/tar");
         decompress(&file_path, &dest_folder).await.unwrap();
     }
 
     #[tokio::test]
     async fn test_decompress_tar_gzip() {
-        let file_path = PathBuf::from("fixtures/compressed.tar.gz");
-        let dest_folder = PathBuf::from("tests_decompressed/tar_gzip");
+        let file_path = Path::new("fixtures/compressed.tar.gz");
+        let dest_folder = Path::new("tests_decompressed/tar_gzip");
         decompress(&file_path, &dest_folder).await.unwrap();
     }
 
