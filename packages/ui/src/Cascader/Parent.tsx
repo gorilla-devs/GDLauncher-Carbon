@@ -90,26 +90,26 @@ export const Parent = (props: ChildsMenuProps) => {
   });
   console.log(containerRef());
   return (
-    <div ref={setContainerRef} onClick={openContextMenu}>
-      <Show when={containerRef() == ContextMenu?.openCascader()}>
-        <Portal mount={document.body}>
-          <div
-            ref={setMenuRef}
-            id="menu-id"
-            class="flex gap-1 context-menu"
-            style={{
-              position: "absolute",
-              top: y() + "px",
-              left: x() + "px",
-              "z-index": "1000000",
-            }}
-            onClick={closeContextMenu}
-          >
-            <ChildsMenu {...props} />
-          </div>
-        </Portal>
-      </Show>
-    </div>
+    // <div ref={setContainerRef} onClick={openContextMenu}>
+    //   <Show when={containerRef() == ContextMenu?.openCascader()}>
+    <Portal mount={document.body}>
+      <div
+        ref={setMenuRef}
+        id="menu-id"
+        class="flex gap-1 context-menu"
+        style={{
+          position: "absolute",
+          top: y() + "px",
+          left: x() + "px",
+          "z-index": "1000000",
+        }}
+        onClick={closeContextMenu}
+      >
+        <ChildsMenu {...props} />
+      </div>
+    </Portal>
+    //   </Show>
+    // </div>
   );
 };
 export default Parent;
