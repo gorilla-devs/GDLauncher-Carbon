@@ -157,11 +157,11 @@ const Settings = () => {
         <Show when={routeData?.instanceDetails?.data?.memory !== null}>
           <div class="flex justify-center px-2">
             <Slider
-              min={0}
+              min={1024}
               max={mbTotalRAM()}
-              steps={1000}
+              steps={1024}
               value={routeData?.instanceDetails.data?.memory?.max_mb}
-              marks={generateSequence(2048, mbTotalRAM())}
+              marks={generateSequence(1024, mbTotalRAM())}
               onChange={(val) => {
                 if (
                   !val ||
