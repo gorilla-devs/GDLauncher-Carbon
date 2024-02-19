@@ -10,8 +10,11 @@ import { instanceId } from "@/utils/browser";
 //   "unlock"
 // );
 // export { instanceState, setInstanceState };
-
+interface Props {
+  instanceState: "unlock" | "unpair";
+}
 const Confirmation = (props: ModalProps) => {
+  const data: () => Props = () => props.data;
   const modalContext = useModal();
   const [t] = useTransContext();
   const updateInstanceMutation = rspc.createMutation(
@@ -34,10 +37,10 @@ const Confirmation = (props: ModalProps) => {
       // height="h-96"
     >
       <div class="flex flex-col p-4 w-120">
-        <Show when={props.instanceState === "unlock"}>
+        <Show when={data().instanceState === "unlock"}>
           <p>{t("instance_unlock_confirmation")}</p>
         </Show>
-        <Show when={props.instanceState === "unpair"}>
+        <Show when={data().instanceState === "unpair"}>
           <p>{t("instance_unpair_confirmation")}</p>
         </Show>
         <p>{t("instance_confirm_continue")}</p>
@@ -53,7 +56,7 @@ const Confirmation = (props: ModalProps) => {
           <Button
             type="secondary"
             onClick={() => {
-              if (props.instanceState === "unlock") {
+              if (data().instanceState === "unlock") {
                 updateInstanceMutation.mutate({
                   modpackLocked: {
                     Set: false

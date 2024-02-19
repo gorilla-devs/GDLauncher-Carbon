@@ -83,9 +83,12 @@ const Settings = () => {
                   type="outline"
                   onClick={() => {
                     setInstanceId(parseInt(params.id, 10));
-                    modalsContext?.openModal({
-                      name: "unlock_confirmation"
-                    });
+                    modalsContext?.openModal(
+                      {
+                        name: "unlock_confirmation"
+                      },
+                      { instanceState: "unlock" }
+                    );
                   }}
                 >
                   <i class="w-5 h-5 i-ri:lock-fill" />
@@ -102,9 +105,12 @@ const Settings = () => {
                 type="outline"
                 onClick={() => {
                   setInstanceId(parseInt(params.id, 10));
-                  modalsContext?.openModal({
-                    name: "unpair_confirmation"
-                  });
+                  modalsContext?.openModal(
+                    {
+                      name: "unpair_confirmation"
+                    },
+                    { instanceState: "unpair" }
+                  );
                 }}
               >
                 <i class="w-5 h-5 i-ri:git-branch-fill" />
