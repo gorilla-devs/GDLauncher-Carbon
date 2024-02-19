@@ -82,12 +82,13 @@ const Settings = () => {
                 <Button
                   type="outline"
                   onClick={() => {
-                    updateInstanceMutation.mutate({
-                      modpackLocked: {
-                        Set: false
+                    setInstanceId(parseInt(params.id, 10));
+                    modalsContext?.openModal(
+                      {
+                        name: "unlock_confirmation"
                       },
-                      instance: parseInt(params.id, 10)
-                    });
+                      { instanceState: "unlock" }
+                    );
                   }}
                 >
                   <i class="w-5 h-5 i-ri:lock-fill" />
@@ -103,12 +104,13 @@ const Settings = () => {
               <Button
                 type="outline"
                 onClick={() => {
-                  updateInstanceMutation.mutate({
-                    modpackLocked: {
-                      Set: null
+                  setInstanceId(parseInt(params.id, 10));
+                  modalsContext?.openModal(
+                    {
+                      name: "unpair_confirmation"
                     },
-                    instance: parseInt(params.id, 10)
-                  });
+                    { instanceState: "unpair" }
+                  );
                 }}
               >
                 <i class="w-5 h-5 i-ri:git-branch-fill" />
@@ -177,11 +179,11 @@ const Settings = () => {
         <Show when={routeData?.instanceDetails?.data?.memory !== null}>
           <div class="flex justify-center px-2">
             <Slider
-              min={0}
+              min={1024}
               max={mbTotalRAM()}
-              steps={1000}
+              steps={1024}
               value={routeData?.instanceDetails.data?.memory?.max_mb}
-              marks={generateSequence(2048, mbTotalRAM())}
+              marks={generateSequence(1024, mbTotalRAM())}
               onChange={(val) => {
                 if (
                   !val ||

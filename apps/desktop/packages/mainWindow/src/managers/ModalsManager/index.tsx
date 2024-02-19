@@ -65,6 +65,14 @@ const defaultModals = {
     component: lazy(() => import("./modals/ModPackVersionUpdate")),
     title: "Update Version"
   },
+  unlock_confirmation: {
+    component: lazy(() => import("./modals/Confirmation")),
+    title: "Unlock Instance"
+  },
+  unpair_confirmation: {
+    component: lazy(() => import("./modals/Confirmation")),
+    title: "Unpair Instance"
+  },
   notification: {
     component: lazy(() => import("./modals/Notification")),
     title: "Notification"
