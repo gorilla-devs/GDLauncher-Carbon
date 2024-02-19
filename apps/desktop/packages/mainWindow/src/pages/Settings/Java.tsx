@@ -294,12 +294,12 @@ const Java = () => {
                                                   </Match>
                                                 </Switch>
                                               </div>
-                                              <div class="h-2/3 w-px bg-darkSlate-400 mr-2" />
                                               <Show
                                                 when={
                                                   usedInNProfiles().length > 0
                                                 }
                                               >
+                                                <div class="h-2/3 w-px bg-darkSlate-400 mr-2" />
                                                 <Popover
                                                   content={
                                                     <div class="p-4">

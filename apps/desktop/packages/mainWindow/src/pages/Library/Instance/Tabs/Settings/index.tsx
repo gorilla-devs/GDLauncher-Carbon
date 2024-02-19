@@ -130,6 +130,28 @@ const Settings = () => {
           </div>
         </Show>
         <Row>
+          <Title>Instance Java Path / Profile</Title>
+          <RightHandSide>
+            <Switch
+              checked={!!routeData?.instanceDetails?.data?.memory}
+              onChange={(e) => {}}
+            />
+          </RightHandSide>
+        </Row>
+        <Show when={routeData?.instanceDetails?.data?.memory !== null}>
+          <div class="flex justify-center px-2">
+            <Slider
+              min={0}
+              max={mbTotalRAM()}
+              steps={1000}
+              value={routeData?.instanceDetails.data?.memory?.max_mb}
+              marks={generateSequence(2048, mbTotalRAM())}
+              onChange={(val) => {}}
+              OnRelease={(val) => {}}
+            />
+          </div>
+        </Show>
+        <Row>
           <Title>
             <Trans key="instance_settings.java_memory_title" />
           </Title>
