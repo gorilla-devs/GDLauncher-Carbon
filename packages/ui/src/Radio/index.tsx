@@ -1,4 +1,4 @@
-import { JSX, Show, Switch, Match, For } from "solid-js";
+import { JSX, Show, Switch, Match, For, splitProps } from "solid-js";
 import { Button } from "../Button";
 
 type Props = {
@@ -28,6 +28,8 @@ type GroupProps = {
 let nextId = 1;
 
 const Radio = (props: Props) => {
+  const [local, otherProps] = splitProps(props, ["buttonStyle", "onChange"]);
+
   const id = `radio-${nextId++}`;
 
   // Determine base and conditional classes based on buttonStyle
@@ -41,7 +43,7 @@ const Radio = (props: Props) => {
       <input
         type="radio"
         class="hidden"
-        {...props}
+        {...otherProps}
         checked={props.checked}
         id={id}
       />
@@ -49,15 +51,15 @@ const Radio = (props: Props) => {
         for={id}
         class={`${baseClasses}`}
         onClick={() => {
-          props?.onChange(props.value);
+          local?.onChange?.(props.value);
         }}
       >
-        <Show when={props?.buttonStyle === "button"}>
+        <Show when={local?.buttonStyle === "button"}>
           <Button type={props.checked ? "primary" : "secondary"}>
             {props.children}
           </Button>
         </Show>
-        <Show when={props?.buttonStyle !== "button"}>
+        <Show when={local?.buttonStyle !== "button"}>
           <div
             class={`flex justify-center items-center ${indicatorBaseClasses} ${
               props.checked ? indicatorCheckedClasses : ""

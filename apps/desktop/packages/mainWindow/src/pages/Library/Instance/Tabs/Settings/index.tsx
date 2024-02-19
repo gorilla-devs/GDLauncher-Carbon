@@ -1,10 +1,16 @@
 import { generateSequence } from "@/utils/helpers";
 import { port, queryClient, rspc } from "@/utils/rspcClient";
 import { Trans, useTransContext } from "@gd/i18n";
-import { Button, Dropdown, Input, Slider, Switch } from "@gd/ui";
+import { Button, Dropdown, Input, Radio, Slider, Switch } from "@gd/ui";
 import { useParams, useRouteData } from "@solidjs/router";
 import fetchData from "../../instance.data";
-import { Show, Suspense, createMemo } from "solid-js";
+import {
+  Match,
+  Show,
+  Suspense,
+  createMemo,
+  Switch as SolidSwitch
+} from "solid-js";
 import { InstanceDetails } from "@gd/core_module/bindings";
 import Title from "@/pages/Settings/components/Title";
 import Row from "@/pages/Settings/components/Row";
@@ -12,6 +18,7 @@ import RowsContainer from "@/pages/Settings/components/RowsContainer";
 import RightHandSide from "@/pages/Settings/components/RightHandSide";
 import { setInstanceId } from "@/utils/browser";
 import { useModal } from "@/managers/ModalsManager";
+import JavaPathAutoComplete from "@/components/JavaPathAutoComplete";
 
 const Settings = () => {
   const [t] = useTransContext();
@@ -25,6 +32,8 @@ const Settings = () => {
       }
     }
   );
+
+  const getAllProfiles = rspc.createQuery(() => ["java.getJavaProfiles"]);
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
@@ -53,6 +62,24 @@ const Settings = () => {
     }
 
     return "custom";
+  };
+
+  const javaOverrideType = () => {
+    if ("Profile" in (routeData?.instanceDetails?.data?.javaOverride || {})) {
+      return "Profile";
+    }
+
+    return "Path";
+  };
+
+  const javaSelectedProfile = () => {
+    const profileName = (routeData?.instanceDetails?.data?.javaOverride as any)
+      ?.Profile;
+
+    if (!profileName) return null;
+
+    return getAllProfiles.data?.find((profile) => profile.name === profileName)
+      ?.name;
   };
 
   return (
@@ -135,23 +162,114 @@ const Settings = () => {
           <Title>Instance Java Path / Profile</Title>
           <RightHandSide>
             <Switch
-              checked={!!routeData?.instanceDetails?.data?.memory}
-              onChange={(e) => {}}
+              checked={!!routeData?.instanceDetails?.data?.javaOverride}
+              onChange={(v) => {
+                console.log(v.target.value);
+                updateInstanceMutation.mutate({
+                  javaOverride: {
+                    Set: v.target.checked
+                      ? ({
+                          Profile:
+                            routeData.instanceDetails.data?.requiredJavaProfile
+                        } as any)
+                      : null
+                  },
+                  instance: parseInt(params.id, 10)
+                });
+              }}
             />
           </RightHandSide>
         </Row>
-        <Show when={routeData?.instanceDetails?.data?.memory !== null}>
-          <div class="flex justify-center px-2">
-            <Slider
-              min={0}
-              max={mbTotalRAM()}
-              steps={1000}
-              value={routeData?.instanceDetails.data?.memory?.max_mb}
-              marks={generateSequence(2048, mbTotalRAM())}
-              onChange={(val) => {}}
-              OnRelease={(val) => {}}
-            />
-          </div>
+        <Show when={routeData?.instanceDetails?.data?.javaOverride !== null}>
+          <Radio.group
+            value={javaOverrideType()}
+            buttonStyle="button"
+            onChange={(v) => {
+              const payload =
+                v?.toString() === "Path"
+                  ? {
+                      Path: null
+                    }
+                  : {
+                      Profile:
+                        routeData.instanceDetails.data?.requiredJavaProfile
+                    };
+
+              updateInstanceMutation.mutate({
+                javaOverride: {
+                  Set: payload as any
+                },
+                instance: parseInt(params.id, 10)
+              });
+            }}
+            options={[
+              {
+                value: "Path",
+                label: "Path"
+              },
+              {
+                value: "Profile",
+                label: "Profile"
+              }
+            ]}
+          />
+          <SolidSwitch>
+            <Match when={javaOverrideType() === "Path"}>
+              <div class="min-w-100 max-w-2/3">
+                <JavaPathAutoComplete
+                  defaultValue={
+                    (routeData?.instanceDetails?.data?.javaOverride as any)
+                      ?.Path
+                  }
+                  updateValue={(id, value) => {
+                    updateInstanceMutation.mutate({
+                      javaOverride: {
+                        Set: {
+                          Path: value || null
+                        }
+                      },
+                      instance: parseInt(params.id, 10)
+                    });
+                  }}
+                />
+              </div>
+            </Match>
+            <Match when={javaOverrideType() === "Profile"}>
+              <div class="flex items-center">
+                <Dropdown
+                  class="min-w-100 max-w-2/3"
+                  value={javaSelectedProfile()}
+                  placeholder={"Select a java profile"}
+                  options={
+                    getAllProfiles.data?.map((profile) => ({
+                      key: profile.name,
+                      label: profile.name
+                    })) || []
+                  }
+                  onChange={(option) => {
+                    updateInstanceMutation.mutate({
+                      javaOverride: {
+                        Set: {
+                          Profile: option.key.toString()
+                        }
+                      },
+                      instance: parseInt(params.id, 10)
+                    });
+                  }}
+                />
+                <Button
+                  type="primary"
+                  onClick={() => {
+                    modalsContext?.openModal({
+                      name: "javaProfileCreation"
+                    });
+                  }}
+                >
+                  Add new profile
+                </Button>
+              </div>
+            </Match>
+          </SolidSwitch>
         </Show>
         <Row>
           <Title>

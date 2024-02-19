@@ -1,11 +1,12 @@
 use crate::domain::instance::info::{self, Modpack, ModpackInfo, StandardVersion};
-use crate::domain::java::SystemJavaProfileName;
+use crate::domain::java::{JavaComponent, JavaComponentType, SystemJavaProfileName};
 use crate::domain::metrics::Event;
 use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::modplatforms::modrinth::search::VersionID;
 use crate::domain::runtime_path::InstancePath;
 use crate::domain::vtask::VisualTaskId;
 use crate::managers::instance::modpack::packinfo;
+use crate::managers::java::java_checker::{JavaChecker, RealJavaChecker};
 use crate::managers::java::managed::Step;
 use crate::managers::minecraft::assets::get_assets_dir;
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
@@ -187,6 +188,55 @@ impl ManagerRef<'_, InstanceManager> {
                 settings.wrapper_command.clone()
             }
         };
+
+        let all_profiles = self.app.java_manager().get_java_profiles().await?;
+        let all_javas = self.app.java_manager().get_available_javas().await?;
+
+        let java_component_override = match config.game_configuration.java_override {
+            Some(_) => {
+                RealJavaChecker::get_bin_info(
+                    &RealJavaChecker,
+                    Path::new(""),
+                    JavaComponentType::Custom,
+                )
+                .await
+                .is_ok();
+            }
+            None => {}
+        };
+
+        // config
+        //     .game_configuration
+        //     .java_override
+        //     .map(|java_override| match java_override {
+        //         info::JavaOverride::Path(value) => {
+        //             RealJavaChecker::get_bin_info(&RealJavaChecker, p, JavaComponentType::Custom)
+        //                 .await
+        //                 .is_ok();
+        //             value
+        //         }
+        //         info::JavaOverride::Profile(value) => all_profiles.iter().find_map(|profile| {
+        //             value.as_ref().and_then(|v| {
+        //                 if &profile.name == v {
+        //                     let Some(java_id) = profile.java_id else {
+        //                         return None;
+        //                     };
+        //                     // match with all javas
+        //                     all_javas.iter().find_map(|javas| {
+        //                         javas.1.iter().find_map(|java| {
+        //                             if java.id == java_id {
+        //                                 Some(java.component)
+        //                             } else {
+        //                                 None
+        //                             }
+        //                         })
+        //                     })
+        //                 } else {
+        //                     None
+        //                 }
+        //             })
+        //         }),
+        //     });
 
         let runtime_path = self.app.settings_manager().runtime_path.clone();
         let instance_path = runtime_path

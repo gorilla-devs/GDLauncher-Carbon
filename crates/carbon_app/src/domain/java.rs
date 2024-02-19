@@ -24,11 +24,6 @@ impl TryFrom<crate::db::java::Data> for Java {
     }
 }
 
-pub enum JavaMajorVer {
-    Version8,
-    Version17,
-}
-
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 pub struct JavaComponent {
     pub path: String,

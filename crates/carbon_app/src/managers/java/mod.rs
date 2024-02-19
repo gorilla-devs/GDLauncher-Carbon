@@ -1,3 +1,4 @@
+use anyhow::bail;
 use prisma_client_rust::{prisma_errors::query_engine::UniqueKeyViolation, QueryError};
 use strum::IntoEnumIterator;
 use tokio::sync::watch;

@@ -4,13 +4,23 @@ import { Match, Switch, createEffect, createSignal } from "solid-js";
 import TruncatedPath from "./TruncatePath";
 
 type Props = {
-  updateValue?: (_value: string) => void;
+  defaultValue?: string;
+  updateValue?: (_id: string, _value: string) => void;
   disabled?: boolean;
 };
 
 const JavaPathAutoComplete = (props: Props) => {
-  const [value, setValue] = createSignal("");
+  const [value, setValue] = createSignal(props.defaultValue || "");
   let availableJavas = rspc.createQuery(() => ["java.getAvailableJavas"]);
+
+  let runOnce = false;
+
+  createEffect(() => {
+    if (!runOnce && !value() && props.defaultValue) {
+      setValue(props.defaultValue);
+      runOnce = true;
+    }
+  });
 
   const createCustomJavaVersionMutation = rspc.createMutation([
     "java.createCustomJavaVersion"
@@ -89,9 +99,9 @@ const JavaPathAutoComplete = (props: Props) => {
 
   createEffect(() => {
     if (javaComponent()?.id) {
-      props.updateValue?.(javaComponent()?.id!);
+      props.updateValue?.(javaComponent()?.id!, value());
     } else {
-      props.updateValue?.("");
+      props.updateValue?.("", value());
     }
   });
 

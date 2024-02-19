@@ -651,6 +651,30 @@ struct ChangeModpack {
     modpack: Modpack,
 }
 
+#[derive(Type, Debug, Deserialize, Serialize)]
+enum FEJavaOverride {
+    Profile(Option<String>),
+    Path(Option<String>),
+}
+
+impl From<domain::info::JavaOverride> for FEJavaOverride {
+    fn from(value: domain::info::JavaOverride) -> Self {
+        match value {
+            domain::info::JavaOverride::Profile(p) => Self::Profile(p),
+            domain::info::JavaOverride::Path(p) => Self::Path(p),
+        }
+    }
+}
+
+impl From<FEJavaOverride> for domain::info::JavaOverride {
+    fn from(value: FEJavaOverride) -> Self {
+        match value {
+            FEJavaOverride::Profile(p) => Self::Profile(p),
+            FEJavaOverride::Path(p) => Self::Path(p),
+        }
+    }
+}
+
 #[derive(Type, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FEUpdateInstance {
@@ -665,6 +689,8 @@ struct FEUpdateInstance {
     version: Option<Set<String>>,
     #[specta(optional)]
     modloader: Option<Set<Option<ModLoader>>>,
+    #[specta(optional)]
+    java_override: Option<Set<Option<FEJavaOverride>>>,
     #[specta(optional)]
     global_java_args: Option<Set<bool>>,
     #[specta(optional)]
@@ -863,6 +889,8 @@ struct InstanceDetails {
     last_played: Option<DateTime<Utc>>,
     seconds_played: u32,
     modloaders: Vec<ModLoader>,
+    java_override: Option<FEJavaOverride>,
+    required_java_profile: Option<String>,
     pre_launch_hook: Option<String>,
     post_exit_hook: Option<String>,
     wrapper_command: Option<String>,
@@ -1124,6 +1152,8 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             last_played: value.last_played,
             seconds_played: value.seconds_played,
             modloaders: value.modloaders.into_iter().map(Into::into).collect(),
+            java_override: value.java_override.map(Into::into),
+            required_java_profile: value.required_java_profile,
             notes: value.notes,
             state: value.state.into(),
             icon_revision: value.icon_revision,
@@ -1532,6 +1562,7 @@ impl TryFrom<FEUpdateInstance> for domain::InstanceSettingsUpdate {
             modloader: value
                 .modloader
                 .map(|x| x.inner().and_then(|v| v.try_into().ok())),
+            java_override: value.java_override.map(|x| x.inner().map(Into::into)),
             global_java_args: value.global_java_args.map(|x| x.inner()),
             extra_java_args: value.extra_java_args.map(|x| x.inner()),
             memory: value.memory.map(|x| x.inner().map(Into::into)),
