@@ -6,6 +6,11 @@ import DownloadButton from "./DownloadButton.astro";
 import { AiOutlineMenu } from "solid-icons/ai";
 import { AiOutlineClose } from "solid-icons/ai";
 import { APP_URLS } from "../consts";
+import DocsSideNav from "./DocsSideNav.astro";
+
+
+const { pathname } = Astro.url;
+
 ---
 
 <header>
@@ -28,6 +33,8 @@ import { APP_URLS } from "../consts";
         Github
       </HeaderLink>
     </div>
+
+    {pathname.includes("docs")  && <DocsSideNav />}
 
     <div class="social-links">
       <DownloadButton />
