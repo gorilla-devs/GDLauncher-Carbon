@@ -39,6 +39,9 @@ const isDocs = pathname.startsWith("/docs");
       <DownloadButton />
     </div>
   </nav>
+  <a href="/" class="gdlogo gdlogo-mobile">
+    <Image src={Logo} alt="gdlauncher logo" width="173" height="40" />
+  </a>
 </header>
 <style>
   header {
@@ -51,13 +54,27 @@ const isDocs = pathname.startsWith("/docs");
   }
   .closebtn {
     display: none;
-    position: absolute;
+    /* position: absolute; */
     top: 0;
     right: 0;
     padding: 1em;
     cursor: pointer;
   }
-
+  .gdlogo-mobile {
+    display: none;
+  }
+  @media screen and (max-width: 480px) {
+    .gdlogo-mobile {
+      display: block;
+      padding-top: 0;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-direction: row-reverse;
+    }
+  }
   .sidenav {
     display: none;
   }
@@ -67,9 +84,9 @@ const isDocs = pathname.startsWith("/docs");
     }
   }
   @media screen and (max-width: 480px) {
-    .gdlogo {
+    /* .gdlogo {
       padding-top: 1rem;
-    }
+    } */
     .closebtn {
       display: block;
     }
