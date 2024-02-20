@@ -31,8 +31,9 @@ const { pathname } = Astro.url;
         Github
       </HeaderLink>
     </div>
-
-    {pathname.includes("docs") && <DocsSideNav />}
+    <div class="sidenav">
+      {pathname.includes("docs") && <DocsSideNav />}
+    </div>
 
     <div class="social-links">
       <DownloadButton />
