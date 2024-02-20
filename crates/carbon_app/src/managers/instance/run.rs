@@ -1,4 +1,4 @@
-use crate::domain::instance::info::{self, Modpack, ModpackInfo, StandardVersion};
+use crate::domain::instance::info::{self, JavaOverride, Modpack, ModpackInfo, StandardVersion};
 use crate::domain::java::{JavaComponent, JavaComponentType, SystemJavaProfileName};
 use crate::domain::metrics::Event;
 use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
@@ -189,54 +189,54 @@ impl ManagerRef<'_, InstanceManager> {
             }
         };
 
-        let all_profiles = self.app.java_manager().get_java_profiles().await?;
-        let all_javas = self.app.java_manager().get_available_javas().await?;
-
-        let java_component_override = match config.game_configuration.java_override {
-            Some(_) => {
-                RealJavaChecker::get_bin_info(
-                    &RealJavaChecker,
-                    Path::new(""),
-                    JavaComponentType::Custom,
-                )
-                .await
-                .is_ok();
-            }
-            None => {}
+        let java_component_override = match config.game_configuration.java_override.as_ref() {
+            Some(path) => match path {
+                JavaOverride::Path(value) => {
+                    if let Some(value) = value {
+                        RealJavaChecker::get_bin_info(
+                            &RealJavaChecker,
+                            &PathBuf::from(value),
+                            JavaComponentType::Custom,
+                        )
+                        .await
+                        .ok()
+                    } else {
+                        None
+                    }
+                }
+                JavaOverride::Profile(value) => {
+                    if let Ok(all_profiles) = self.app.java_manager().get_java_profiles().await {
+                        if let Ok(all_javas) = self.app.java_manager().get_available_javas().await {
+                            all_profiles.iter().find_map(|profile| {
+                                value.as_ref().and_then(|v| {
+                                    if &profile.name == v {
+                                        let Some(java_id) = profile.java_id.as_ref() else {
+                                            return None;
+                                        };
+                                        all_javas.iter().find_map(|javas| {
+                                            javas.1.iter().find_map(|java| {
+                                                if &java.id == java_id {
+                                                    Some(java.component.clone())
+                                                } else {
+                                                    None
+                                                }
+                                            })
+                                        })
+                                    } else {
+                                        None
+                                    }
+                                })
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }
+            },
+            None => None,
         };
-
-        // config
-        //     .game_configuration
-        //     .java_override
-        //     .map(|java_override| match java_override {
-        //         info::JavaOverride::Path(value) => {
-        //             RealJavaChecker::get_bin_info(&RealJavaChecker, p, JavaComponentType::Custom)
-        //                 .await
-        //                 .is_ok();
-        //             value
-        //         }
-        //         info::JavaOverride::Profile(value) => all_profiles.iter().find_map(|profile| {
-        //             value.as_ref().and_then(|v| {
-        //                 if &profile.name == v {
-        //                     let Some(java_id) = profile.java_id else {
-        //                         return None;
-        //                     };
-        //                     // match with all javas
-        //                     all_javas.iter().find_map(|javas| {
-        //                         javas.1.iter().find_map(|java| {
-        //                             if java.id == java_id {
-        //                                 Some(java.component)
-        //                             } else {
-        //                                 None
-        //                             }
-        //                         })
-        //                     })
-        //                 } else {
-        //                     None
-        //                 }
-        //             })
-        //         }),
-        //     });
 
         let runtime_path = self.app.settings_manager().runtime_path.clone();
         let instance_path = runtime_path
@@ -826,114 +826,123 @@ impl ManagerRef<'_, InstanceManager> {
                 t_request_version_info.update_items(1, 2);
 
                 let java = {
-                    // If instance has profile override, short circuit and use that
-                    // ....
-                    // else
+                    if let Some(java_component_override) = java_component_override {
+                        java_component_override
+                    } else {
+                        let mut required_java = SystemJavaProfileName::from(
+                            daedalus::minecraft::MinecraftJavaProfile::try_from(
+                                &version_info
+                                    .java_version
+                                    .as_ref()
+                                    .ok_or_else(|| {
+                                        anyhow::anyhow!("instance java version unsupported")
+                                    })?
+                                    .component as &str,
+                            )?,
+                        );
 
-                    let mut required_java = SystemJavaProfileName::from(
-                        daedalus::minecraft::MinecraftJavaProfile::try_from(
-                            &version_info
-                                .java_version
-                                .as_ref()
-                                .ok_or_else(|| {
-                                    anyhow::anyhow!("instance java version unsupported")
-                                })?
-                                .component as &str,
-                        )?,
-                    );
+                        // Forge 1.16.5 requires an older java 8 version so we inject the legacy fixed 1 profile
+                        if &version.release == "1.16.5"
+                            && *&version
+                                .modloaders
+                                .iter()
+                                .find(|v| v.type_ == ModLoaderType::Forge)
+                                .is_some()
+                        {
+                            required_java = SystemJavaProfileName::LegacyFixed1;
+                        }
 
-                    // Forge 1.16.5 requires an older java 8 version so we inject the legacy fixed 1 profile
-                    if &version.release == "1.16.5"
-                        && *&version
-                            .modloaders
-                            .iter()
-                            .find(|v| v.type_ == ModLoaderType::Forge)
-                            .is_some()
-                    {
-                        required_java = SystemJavaProfileName::LegacyFixed1;
-                    }
+                        tracing::debug!("Required java: {:?}", required_java);
 
-                    tracing::debug!("Required java: {:?}", required_java);
+                        let auto_manage_java = app
+                            .settings_manager()
+                            .get_settings()
+                            .await?
+                            .auto_manage_java;
 
-                    let auto_manage_java = app
-                        .settings_manager()
-                        .get_settings()
-                        .await?
-                        .auto_manage_java;
+                        let usable_java = app
+                            .java_manager()
+                            .get_usable_java_for_profile_name(required_java)
+                            .await?;
 
-                    let usable_java = app
-                        .java_manager()
-                        .get_usable_java_for_profile_name(required_java)
-                        .await?;
+                        tracing::debug!("Usable java: {:?}", usable_java);
 
-                    tracing::debug!("Usable java: {:?}", usable_java);
+                        match usable_java {
+                            Some(path) => path,
+                            None => {
+                                if !auto_manage_java {
+                                    return bail!(
+                                        "No usable java found and auto manage java is disabled"
+                                    );
+                                }
 
-                    match usable_java {
-                        Some(path) => path,
-                        None => {
-                            if !auto_manage_java {
-                                return bail!(
-                                    "No usable java found and auto manage java is disabled"
-                                );
-                            }
+                                let t_download_java =
+                                    task.subtask(Translation::InstanceTaskLaunchDownloadJava);
 
-                            let t_download_java =
-                                task.subtask(Translation::InstanceTaskLaunchDownloadJava);
+                                let t_extract_java =
+                                    task.subtask(Translation::InstanceTaskLaunchExtractJava);
+                                t_download_java.set_weight(0.0);
+                                t_extract_java.set_weight(0.0);
 
-                            let t_extract_java =
-                                task.subtask(Translation::InstanceTaskLaunchExtractJava);
-                            t_download_java.set_weight(0.0);
-                            t_extract_java.set_weight(0.0);
+                                let (progress_watch_tx, mut progress_watch_rx) =
+                                    watch::channel(Step::Idle);
 
-                            let (progress_watch_tx, mut progress_watch_rx) =
-                                watch::channel(Step::Idle);
+                                // dropped when the sender is dropped
+                                tokio::spawn(async move {
+                                    let mut started = false;
+                                    let mut dl_completed = false;
 
-                            // dropped when the sender is dropped
-                            tokio::spawn(async move {
-                                let mut started = false;
-                                let mut dl_completed = false;
+                                    while progress_watch_rx.changed().await.is_ok() {
+                                        let step = progress_watch_rx.borrow();
 
-                                while progress_watch_rx.changed().await.is_ok() {
-                                    let step = progress_watch_rx.borrow();
+                                        if !started && !matches!(*step, Step::Idle) {
+                                            t_download_java.set_weight(10.0);
+                                            t_extract_java.set_weight(3.0);
+                                            started = true;
+                                        }
 
-                                    if !started && !matches!(*step, Step::Idle) {
-                                        t_download_java.set_weight(10.0);
-                                        t_extract_java.set_weight(3.0);
-                                        started = true;
-                                    }
+                                        match *step {
+                                            Step::Downloading(downloaded, total) => t_download_java
+                                                .update_download(
+                                                    downloaded as u32,
+                                                    total as u32,
+                                                    true,
+                                                ),
+                                            Step::Extracting(count, total) => {
+                                                if !dl_completed {
+                                                    t_download_java.complete_download();
+                                                    dl_completed = true;
+                                                }
 
-                                    match *step {
-                                        Step::Downloading(downloaded, total) => t_download_java
-                                            .update_download(downloaded as u32, total as u32, true),
-                                        Step::Extracting(count, total) => {
-                                            if !dl_completed {
-                                                t_download_java.complete_download();
-                                                dl_completed = true;
+                                                t_extract_java
+                                                    .update_items(count as u32, total as u32);
                                             }
 
-                                            t_extract_java.update_items(count as u32, total as u32);
+                                            Step::Done => {
+                                                t_download_java.complete_download();
+                                                t_extract_java.complete_items();
+                                            }
+
+                                            Step::Idle => {}
                                         }
 
-                                        Step::Done => {
-                                            t_download_java.complete_download();
-                                            t_extract_java.complete_items();
-                                        }
-
-                                        Step::Idle => {}
+                                        // this is already debounced in setup_managed
                                     }
+                                });
 
-                                    // this is already debounced in setup_managed
+                                let path = app
+                                    .java_manager()
+                                    .require_java_install(
+                                        required_java,
+                                        true,
+                                        Some(progress_watch_tx),
+                                    )
+                                    .await?;
+
+                                match path {
+                                    Some(path) => path,
+                                    None => return Ok(None),
                                 }
-                            });
-
-                            let path = app
-                                .java_manager()
-                                .require_java_install(required_java, true, Some(progress_watch_tx))
-                                .await?;
-
-                            match path {
-                                Some(path) => path,
-                                None => return Ok(None),
                             }
                         }
                     }
