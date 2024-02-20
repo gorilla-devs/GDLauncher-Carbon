@@ -9,7 +9,6 @@ import { APP_URLS } from "../consts";
 import DocsSideNav from "./DocsSideNav.astro";
 
 const { pathname } = Astro.url;
-const isDocs = pathname.startsWith("/docs");
 ---
 
 <header>
@@ -32,9 +31,9 @@ const isDocs = pathname.startsWith("/docs");
         Github
       </HeaderLink>
     </div>
-    <div class="sidenav">
-      {isDocs && <DocsSideNav />}
-    </div>
+
+    {pathname.includes("docs") && <DocsSideNav />}
+
     <div class="social-links">
       <DownloadButton />
     </div>
