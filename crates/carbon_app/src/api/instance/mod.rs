@@ -1695,7 +1695,7 @@ mod log {
         };
 
         let s = async_stream::stream! {
-            tracing::trace!("starting log stream");
+            tracing::debug!("starting log stream");
 
             let mut last_idx = 0;
 
@@ -1713,7 +1713,7 @@ mod log {
 
                             serde_json::to_writer(&mut data, &entry)
                                 .expect("serialization of a log entry should be infallible");
-                            let json_len = data.len() - 4;
+                            let json_len = (data.len() - 4) as u32;
 
                             data[..4].copy_from_slice(&json_len.to_le_bytes()[..]);
                             data
@@ -1732,7 +1732,7 @@ mod log {
                 }
 
                 if let Err(_) = log_rx.changed().await {
-                    tracing::error!("`log_rx` was closed, killing log stream");
+                    tracing::debug!("`log_rx` is closed, ending log stream");
 
                     break
                 }
