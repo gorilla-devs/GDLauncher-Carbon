@@ -127,15 +127,15 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
 
     let app = AppInner::new(invalidation_sender, runtime_path).await;
 
-    let auto_manage_java = app
+    let auto_manage_java_system_profiles = app
         .settings_manager()
         .get_settings()
         .await
         .unwrap()
-        .auto_manage_java;
+        .auto_manage_java_system_profiles;
 
     crate::managers::java::JavaManager::scan_and_sync(
-        auto_manage_java,
+        auto_manage_java_system_profiles,
         &app.prisma_client,
         &RealDiscovery::new(app.settings_manager().runtime_path.clone()),
         &RealJavaChecker,

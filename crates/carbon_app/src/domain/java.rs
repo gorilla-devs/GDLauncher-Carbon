@@ -24,11 +24,6 @@ impl TryFrom<crate::db::java::Data> for Java {
     }
 }
 
-pub enum JavaMajorVer {
-    Version8,
-    Version17,
-}
-
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug, Clone)]
 pub struct JavaComponent {
     pub path: String,
@@ -398,19 +393,17 @@ impl TryFrom<&str> for SystemJavaProfileName {
 pub struct JavaProfile {
     pub name: String,
     pub java_id: Option<String>,
+    pub is_system: bool,
 }
 
 impl TryFrom<crate::db::java_profile::Data> for JavaProfile {
     type Error = anyhow::Error;
 
     fn try_from(data: crate::db::java_profile::Data) -> Result<Self, Self::Error> {
-        if !data.is_system_profile {
-            bail!("Cannot create system java profile from non-system profile");
-        }
-
         Ok(Self {
-            name: data.name.as_str().try_into()?,
+            name: data.name,
             java_id: data.java_id,
+            is_system: data.is_system_profile,
         })
     }
 }

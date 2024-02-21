@@ -1,21 +1,14 @@
-import { useLocation } from "@solidjs/router";
-
 interface Props {
   children: any;
+  zeroPadding?: boolean;
 }
 const ContentWrapper = (props: Props) => {
-  const location = useLocation();
-
-  const dynamicPathRegex = /(\/library|modpacks|mods)\/(\d+)(\/.*)?/;
-
   return (
-    <div class="flex justify-center text-white w-full flex-1 box-border p-4 flex-1 h-full bg-darkSlate-700 overflow-auto max-h-full pb-0">
+    <div class="flex justify-center text-white w-full flex-1 box-border p-4 bg-darkSlate-700 overflow-auto max-h-full pb-0 h-content">
       <div
-        class="w-full flex-1 box-border overflow-auto flex bg-darkSlate-800 relative flex-col h-auto rounded-2xl rounded-b-none"
+        class="w-full flex-1 box-border overflow-auto flex bg-darkSlate-800 relative flex-col h-auto rounded-2xl rounded-b-none scrollbar-gutter pb-10 pr-3"
         classList={{
-          "scrollbar-gutter py-6 pl-6 pr-3": !dynamicPathRegex.test(
-            location.pathname
-          )
+          "pl-6": !props.zeroPadding
         }}
       >
         {props.children}

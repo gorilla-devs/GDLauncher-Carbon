@@ -22,7 +22,7 @@ const osMappedNames: mappedOS = {
   linux: "linux"
 };
 
-const AddJava = (props: ModalProps) => {
+const AddManagedJava = (props: ModalProps) => {
   let javaVendors = rspc.createQuery(() => ["java.getManagedVendors"]);
 
   const [vendor, setVendor] = createSignal<FEVendor>("azul");
@@ -179,4 +179,4 @@ const AddJava = (props: ModalProps) => {
   );
 };
 
-export default AddJava;
+export default AddManagedJava;

@@ -5,14 +5,16 @@ import InfiniteScrollModsLayout from "@/components/InfiniteScrollModsQueryWrappe
 
 function ModpacksLayout() {
   return (
-    <InfiniteScrollModsLayout type="mod">
-      <>
-        <Sidebar />
-        <ContentWrapper>
-          <Outlet />
-        </ContentWrapper>
-      </>
-    </InfiniteScrollModsLayout>
+    <div class="flex w-full h-full">
+      <InfiniteScrollModsLayout type="mod">
+        <>
+          <Sidebar />
+          <ContentWrapper>
+            <Outlet />
+          </ContentWrapper>
+        </>
+      </InfiniteScrollModsLayout>
+    </div>
   );
 }
 
