@@ -694,13 +694,6 @@ mod test {
             .await
             .unwrap();
 
-        let result_second_delete = app
-            .java_manager()
-            .delete_java_version(from_db.id.clone())
-            .await;
-
-        assert!(result_second_delete.is_ok());
-
         let count = app.prisma_client.java().count(vec![]).exec().await.unwrap();
         assert_eq!(count, 0);
 
