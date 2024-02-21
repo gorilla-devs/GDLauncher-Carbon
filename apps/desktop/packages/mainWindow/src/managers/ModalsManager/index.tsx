@@ -37,8 +37,12 @@ const defaultModals = {
     component: lazy(() => import("./modals/TermsAndConditions")),
     title: "Terms and Conditions"
   },
-  addJava: {
-    component: lazy(() => import("./modals/Java/AddJava")),
+  addManagedJava: {
+    component: lazy(() => import("./modals/Java/AddManagedJava")),
+    title: "Add java version"
+  },
+  addCustomJava: {
+    component: lazy(() => import("./modals/Java/AddCustomJava")),
     title: "Add java version"
   },
   modDetails: {
@@ -96,6 +100,10 @@ const defaultModals = {
   modsUpdater: {
     component: lazy(() => import("./modals/ModsUpdater")),
     title: "Mods Updater"
+  },
+  javaProfileCreation: {
+    component: lazy(() => import("./modals/JavaProfileCreationModal")),
+    title: "Create Java Profile"
   }
 };
 

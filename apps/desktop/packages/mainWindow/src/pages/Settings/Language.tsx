@@ -4,7 +4,7 @@ import PageTitle from "./components/PageTitle";
 import Row from "./components/Row";
 import RowsContainer from "./components/RowsContainer";
 import { Radio } from "@gd/ui";
-import { For, getOwner, runWithOwner } from "solid-js";
+import { getOwner, runWithOwner } from "solid-js";
 import { rspc } from "@/utils/rspcClient";
 import Title from "./components/Title";
 import changeLanguage from "@/utils/language";
@@ -31,24 +31,22 @@ const Language = () => {
                 });
               }}
               value={settings.data?.language}
-            >
-              <For each={Object.entries(supportedLanguages)}>
-                {([key, value]) => (
-                  <div class="flex items-center h-12">
-                    <Radio value={key}>
-                      <div class="w-full flex justify-between">
-                        <div class="flex items-center gap-2">
-                          <div
-                            class={`h-5 w-5 i-emojione-v1:flag-for-${value}`}
-                          />
-                          <Trans key={`languages:${key}_native`} />
-                        </div>
+              options={Object.entries(supportedLanguages).map(
+                ([key, value]) => ({
+                  value: key,
+                  label: (
+                    <div class="w-full flex justify-between">
+                      <div class="flex items-center gap-2">
+                        <div
+                          class={`h-5 w-5 i-emojione-v1:flag-for-${value}`}
+                        />
+                        <Trans key={`languages:${key}_native`} />
                       </div>
-                    </Radio>
-                  </div>
-                )}
-              </For>
-            </Radio.group>
+                    </div>
+                  )
+                })
+              )}
+            />
           </div>
         </Row>
       </RowsContainer>

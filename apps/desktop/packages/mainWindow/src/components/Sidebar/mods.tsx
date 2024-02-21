@@ -199,30 +199,26 @@ const Sidebar = () => {
                   });
                 }}
                 value={instanceId()}
-              >
-                <For each={filteredInstances() || []}>
-                  {(instance) => {
-                    return (
-                      <Radio name="instance" value={instance.id}>
-                        <div class="flex items-center justify-between gap-2">
-                          <div
-                            class="w-6 h-6 bg-center bg-cover"
-                            style={{
-                              "background-image": instance.icon_revision
-                                ? `url("${getInstanceImageUrl(
-                                    instance.id,
-                                    instance.icon_revision
-                                  )}")`
-                                : `url("${DefaultImg}")`
-                            }}
-                          />
-                          <p class="m-0">{instance.name}</p>
-                        </div>
-                      </Radio>
-                    );
-                  }}
-                </For>
-              </Radio.group>
+                options={(filteredInstances() || []).map((instance) => ({
+                  value: instance.id,
+                  label: (
+                    <div class="flex items-center justify-between gap-2">
+                      <div
+                        class="w-6 h-6 bg-center bg-cover"
+                        style={{
+                          "background-image": instance.icon_revision
+                            ? `url("${getInstanceImageUrl(
+                                instance.id,
+                                instance.icon_revision
+                              )}")`
+                            : `url("${DefaultImg}")`
+                        }}
+                      />
+                      <p class="m-0">{instance.name}</p>
+                    </div>
+                  )
+                }))}
+              />
             </div>
           </Collapsable>
         </Show>
@@ -236,18 +232,16 @@ const Sidebar = () => {
                 });
               }}
               value={capitalize(infiniteQuery?.query?.searchApi)}
-            >
-              <For each={ModpackPlatforms}>
-                {(platform) => (
-                  <Radio name="platform" value={platform}>
-                    <div class="flex items-center gap-2">
-                      <PlatformIcon platform={platform} />
-                      <p class="m-0">{platform}</p>
-                    </div>
-                  </Radio>
-                )}
-              </For>
-            </Radio.group>
+              options={ModpackPlatforms.map((platform) => ({
+                value: platform,
+                label: (
+                  <div class="flex items-center gap-2">
+                    <PlatformIcon platform={platform} />
+                    <p class="m-0">{platform}</p>
+                  </div>
+                )
+              }))}
+            />
           </div>
         </Collapsable>
         <Collapsable title={t("general.game_versions")} noPadding>
@@ -320,7 +314,7 @@ const Sidebar = () => {
                             : modloader.name;
 
                         const filteredModloaders = prevModloaders.filter(
-                          (_modloader) => _modloader !== modloaderName
+                          (_modloader: any) => _modloader !== modloaderName
                         );
 
                         const newModloaders = checked
