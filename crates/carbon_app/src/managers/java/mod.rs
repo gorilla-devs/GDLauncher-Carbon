@@ -25,7 +25,6 @@ use crate::{
 };
 use std::{
     collections::HashMap,
-    os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     sync::Arc,
 };

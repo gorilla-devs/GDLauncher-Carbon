@@ -902,7 +902,7 @@ impl ManagerRef<'_, InstanceManager> {
                             Some(path) => path,
                             None => {
                                 if !auto_manage_java_system_profiles {
-                                    return bail!(
+                                    bail!(
                                         "No usable java found and auto manage java is disabled"
                                     );
                                 }
