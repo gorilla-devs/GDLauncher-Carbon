@@ -32,7 +32,7 @@ import DownloadDropdown from "./DownloadDropdown.astro";
     height={62}
     class="animated-logo opacity-0"
   />
-  <div class="flex flex-col justify-between items-center">
+  <div class="flex flex-col justify-between items-center download-mobile">
     <DownloadDropdown />
     <Image
       src={Logo4}
@@ -72,6 +72,11 @@ import DownloadDropdown from "./DownloadDropdown.astro";
   />
 </div>
 <style>
+  @media screen and (max-width: 640px) {
+    .download-mobile {
+      display: none;
+    }
+  }
   @media (min-width: 390px) and (max-width: 480px) {
     .animated-logo {
       width: 55px;

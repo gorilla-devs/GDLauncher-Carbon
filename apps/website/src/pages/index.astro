@@ -11,6 +11,7 @@ import { SITE_TITLE, SITE_DESCRIPTION, DownloadItems } from "../consts";
 import WhatMakesGDSpecial from "../components/WhatMakesGDSpecial.astro";
 import GdxCF from "../components/GdxCF.astro";
 import "../styles/HomeStyle.css";
+import DownloadDropdown from "../components/DownloadDropdown.astro";
 
 Astro.locals.cache(60);
 ---
@@ -63,6 +64,14 @@ Astro.locals.cache(60);
         height: auto;
         object-fit: cover;
       }
+      .download-dropdown-mobile {
+        display: none;
+      }
+      @media (max-width: 768px) {
+        .download-dropdown-mobile {
+          display: block;
+        }
+      }
     </style></head
   >
 
@@ -98,6 +107,9 @@ Astro.locals.cache(60);
         </div>
         <!-- <Button items={DownloadItems} isDropdown={true} intent="primary" size="medium">DOWNLOAD FOR</Button> -->
         <Download />
+        <div class="download-dropdown-mobile">
+          <DownloadDropdown />
+        </div>
         <!-- <DownloadDropdown /> -->
       </div>
       <div class="relative mx-auto z-10">
