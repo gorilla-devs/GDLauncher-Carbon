@@ -222,6 +222,7 @@ const Settings = () => {
                     (routeData?.instanceDetails?.data?.javaOverride as any)
                       ?.Path
                   }
+                  updateValueOnlyOnBlur
                   updateValue={(id, value) => {
                     updateInstanceMutation.mutate({
                       javaOverride: {
@@ -237,7 +238,9 @@ const Settings = () => {
             </Match>
             <Match when={javaOverrideType() === "Profile"}>
               <div class="flex gap-2">
-                <div class="text-lightSlate-700">This instance requires</div>
+                <div class="text-lightSlate-700">
+                  <Trans key="settings:this_instance_requires" />
+                </div>
                 <div class="text-lightSlate-100">
                   {routeData.instanceDetails.data?.requiredJavaProfile}
                 </div>
@@ -272,7 +275,7 @@ const Settings = () => {
                     });
                   }}
                 >
-                  Add new profile
+                  <Trans key="settings:add_new_profile" />
                 </Button>
               </div>
             </Match>

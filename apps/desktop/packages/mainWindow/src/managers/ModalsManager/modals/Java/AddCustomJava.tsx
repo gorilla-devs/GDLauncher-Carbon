@@ -74,7 +74,7 @@ const AddCustomJava = (props: ModalProps) => {
                 modalsContext?.closeModal();
               }}
             >
-              Add Custom Path
+              <Trans key="add_custom_java_path" />
             </Button>
           </div>
         </div>

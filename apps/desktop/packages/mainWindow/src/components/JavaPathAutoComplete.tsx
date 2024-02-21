@@ -1,17 +1,26 @@
 import { rspc } from "@/utils/rspcClient";
 import { Input, Tooltip } from "@gd/ui";
-import { Match, Switch, createEffect, createSignal } from "solid-js";
+import {
+  Match,
+  Switch,
+  createEffect,
+  createSignal,
+  getOwner,
+  runWithOwner
+} from "solid-js";
 import TruncatedPath from "./TruncatePath";
 import { Trans } from "@gd/i18n";
 
 type Props = {
   defaultValue?: string;
-  updateValue?: (_id: string, _value: string) => void;
+  updateValue?: (_id: string | null, _value: string) => void;
+  updateValueOnlyOnBlur?: boolean;
   disabled?: boolean;
   inputColor?: string;
 };
 
 const JavaPathAutoComplete = (props: Props) => {
+  const owner = getOwner();
   const [value, setValue] = createSignal(props.defaultValue || "");
   let availableJavas = rspc.createQuery(() => ["java.getAvailableJavas"]);
 
@@ -72,42 +81,44 @@ const JavaPathAutoComplete = (props: Props) => {
   };
 
   const autocompleteOptions = () => {
-    return _autocompleteOptions().concat(
-      shouldSuggestCreation()
-        ? [
-            {
-              value: value(),
-              label: (
-                <div
-                  class="w-full flex flex-col gap-2"
-                  onClick={() => {
-                    createCustomJavaVersionMutation.mutate(value());
-                  }}
-                >
-                  <div class="flex justify-between">
-                    <div>
-                      <Trans key="java_autocomplete.not_found" />
+    const x = runWithOwner(owner, () => {
+      return _autocompleteOptions().concat(
+        shouldSuggestCreation()
+          ? [
+              {
+                value: value(),
+                label: (
+                  <div
+                    class="w-full flex flex-col gap-2"
+                    onClick={() => {
+                      createCustomJavaVersionMutation.mutate(value());
+                    }}
+                  >
+                    <div class="flex justify-between">
+                      <div>
+                        <Trans key="java_autocomplete.not_found" />
+                      </div>
+                      <div>
+                        <Trans key="java_autocomplete.create_new_custom" />
+                      </div>
                     </div>
-                    <div>
-                      <Trans key="java_autocomplete.create_new_custom" />
-                    </div>
+                    <Tooltip content={value()}>
+                      <TruncatedPath originalPath={value()} />
+                    </Tooltip>
                   </div>
-                  <Tooltip content={value()}>
-                    <TruncatedPath originalPath={value()} />
-                  </Tooltip>
-                </div>
-              )
-            }
-          ]
-        : []
-    );
+                )
+              }
+            ]
+          : []
+      );
+    });
+
+    return x;
   };
 
   createEffect(() => {
-    if (javaComponent()?.id) {
-      props.updateValue?.(javaComponent()?.id!, value());
-    } else {
-      props.updateValue?.("", value());
+    if (!props.updateValueOnlyOnBlur) {
+      props.updateValue?.(javaComponent()?.id || null, value());
     }
   });
 
@@ -141,7 +152,12 @@ const JavaPathAutoComplete = (props: Props) => {
         onSearch={(value) => {
           setValue(value);
         }}
-        autoCompleteOptions={autocompleteOptions()}
+        onBlur={() => {
+          if (props.updateValueOnlyOnBlur) {
+            props.updateValue?.(javaComponent()?.id || null, value());
+          }
+        }}
+        autoCompleteOptions={autocompleteOptions() || []}
       />
     </div>
   );

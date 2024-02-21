@@ -73,6 +73,7 @@
   "used_in_counted_profiles": "Used in {{count}} profiles",
   "system_profiles": "System Profiles",
   "custom_profiles": "Custom Profiles",
-  "profile_used_in_mc_versions": "This profile is used in the following Minecraft versions"
-
+  "profile_used_in_mc_versions": "This profile is used in the following Minecraft versions",
+  "this_instance_requires": "This instance requires",
+  "add_new_profile": "Add New Profile"
 }

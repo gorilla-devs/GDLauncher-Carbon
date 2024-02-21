@@ -2,8 +2,8 @@ import { rspc } from "@/utils/rspcClient";
 import { ModalProps, useModal } from "..";
 import ModalLayout from "../ModalLayout";
 import { Button, Input, createNotification } from "@gd/ui";
-import { Trans, useTransContext } from "@gd/i18n";
-import { createEffect, createSignal } from "solid-js";
+import { Trans } from "@gd/i18n";
+import { createSignal } from "solid-js";
 import JavaPathAutoComplete from "@/components/JavaPathAutoComplete";
 
 const JavaProfileCreationModal = (props: ModalProps) => {
@@ -36,7 +36,9 @@ const JavaProfileCreationModal = (props: ModalProps) => {
     >
       <div class="flex flex-col justify-between h-full">
         <div class="flex flex-col gap-4">
-          <h4>Profile Name:</h4>
+          <h4>
+            <Trans key="profile_name" />
+          </h4>
           <Input
             disabled={createCustomJavaVersionMutation.isLoading}
             placeholder="Type a profile name"
@@ -46,12 +48,14 @@ const JavaProfileCreationModal = (props: ModalProps) => {
               profileAlreadyExists() ? "Profile name already exists" : undefined
             }
           />
-          <h4>Assigned Java Path:</h4>
+          <h4>
+            <Trans key="assigned_java_path" />
+          </h4>
           <JavaPathAutoComplete
             inputColor="bg-darkSlate-600"
             disabled={createCustomJavaVersionMutation.isLoading}
             updateValue={(value) => {
-              setJavaId(value);
+              if (value) setJavaId(value);
             }}
           />
         </div>
@@ -63,7 +67,7 @@ const JavaProfileCreationModal = (props: ModalProps) => {
               modalsContext?.closeModal();
             }}
           >
-            Cancel
+            <Trans key="instance_confirm_deletion.cancel" />
           </Button>
           <Button
             disabled={
@@ -83,7 +87,7 @@ const JavaProfileCreationModal = (props: ModalProps) => {
               modalsContext?.closeModal();
             }}
           >
-            Create
+            <Trans key="create" />
           </Button>
         </div>
       </div>
