@@ -1,80 +1,119 @@
-import {
-  JSX,
-  Show,
-  children,
-  createContext,
-  createEffect,
-  useContext,
-} from "solid-js";
+import { JSX, Show, Switch, Match, For, splitProps } from "solid-js";
+import { Button } from "../Button";
 
-interface Props extends JSX.InputHTMLAttributes<HTMLInputElement> {}
+type Props = {
+  value: string | number | string[] | undefined;
+  checked: boolean;
+  onChange?: OnChange;
+  buttonStyle?: ButtonStyle;
+  children?: JSX.Element;
+};
 
 type OnChange = (_value: string | number | string[] | undefined) => void;
 
-type RadioGroupContext = {
-  onChange: OnChange;
+type Option = {
+  value: string | number | string[] | undefined;
+  label: JSX.Element;
 };
+
+type ButtonStyle = "standard" | "button";
 
 type GroupProps = {
   onChange?: OnChange;
-  children: JSX.Element;
   value?: string | number | string[] | undefined;
+  buttonStyle?: ButtonStyle;
+  options: Option[];
 };
 
-const RadioContext = createContext<RadioGroupContext>();
-
-export const useRadioContext = () => {
-  return useContext(RadioContext);
-};
+let nextId = 1;
 
 const Radio = (props: Props) => {
-  const radioContext = useRadioContext();
+  const [local, otherProps] = splitProps(props, ["buttonStyle", "onChange"]);
+
+  const id = `radio-${nextId++}`;
+
+  // Determine base and conditional classes based on buttonStyle
+  const baseClasses = "relative flex gap-3 items-center";
+  const indicatorBaseClasses =
+    "w-4 h-4 rounded-full border border-gray-300 bg-white";
+  const indicatorCheckedClasses = "bg-blue-500 border-transparent";
 
   return (
-    <label class="relative flex gap-3 items-center">
-      <span class="cursor-pointer">
-        <input
-          type="radio"
-          class="peer absolute opacity-0 cursor-pointer"
-          {...props}
-          onChange={() => {
-            radioContext?.onChange(props.value);
-          }}
-        />
-        <div class="relative box-border bg-darkSlate-500 peer-disabled:bg-darkSlate-900 peer-disabled:border-0 border-1 border-solid border-transparent hover:border-darkSlate-300 w-5 h-5 rounded-[50%] before:content-[] before:w-4 before:h-4 before:bg-primary-300 before:opacity-0 peer-checked:before:opacity-100 before:rounded-full before:absolute before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 transition ease-in-out" />
-      </span>
-      <Show when={props.children}>
-        <span>{props.children}</span>
-      </Show>
-    </label>
+    <>
+      <input
+        type="radio"
+        class="hidden"
+        {...otherProps}
+        checked={props.checked}
+        id={id}
+      />
+      <label
+        for={id}
+        class={`${baseClasses}`}
+        onClick={() => {
+          local?.onChange?.(props.value);
+        }}
+      >
+        <Show when={local?.buttonStyle === "button"}>
+          <Button type={props.checked ? "primary" : "secondary"}>
+            {props.children}
+          </Button>
+        </Show>
+        <Show when={local?.buttonStyle !== "button"}>
+          <div
+            class={`flex justify-center items-center ${indicatorBaseClasses} ${
+              props.checked ? indicatorCheckedClasses : ""
+            }`}
+          >
+            <Show when={props.checked}>
+              <div class="w-2 h-2 bg-white rounded-full"></div>
+            </Show>
+          </div>
+          <Show when={props.children}>
+            <span class="ml-2">{props.children}</span>
+          </Show>
+        </Show>
+      </label>
+    </>
   );
 };
 
 const Group = (props: GroupProps) => {
-  const context = {
-    onChange: (value: string | number | string[] | undefined) => {
-      props?.onChange?.(value);
-    },
-  };
-
-  const Inner = () => {
-    const c = children(() => props.children);
-
-    createEffect(() => {
-      (c() as JSX.InputHTMLAttributes<HTMLInputElement>[])?.forEach((item) => {
-        // @ts-ignore
-        const input = item.querySelector(".cursor-pointer input");
-
-        return (input.checked = props.value == input.value);
-      });
-    });
-    return <>{c()}</>;
-  };
-
   return (
-    <RadioContext.Provider value={context}>
-      <Inner />
-    </RadioContext.Provider>
+    <Switch>
+      <Match when={props.buttonStyle === "button"}>
+        <div class="flex bg-darkSlate-900 w-max">
+          <For each={props.options}>
+            {(option) => (
+              <Radio
+                value={option.value}
+                checked={props.value === option.value}
+                onChange={props.onChange}
+                buttonStyle={props.buttonStyle}
+              >
+                {option.label}
+              </Radio>
+            )}
+          </For>
+        </div>
+      </Match>
+      <Match when={props.buttonStyle !== "button"}>
+        <div class="flex flex-col">
+          <For each={props.options}>
+            {(option) => (
+              <Radio
+                value={option.value}
+                checked={props.value === option.value}
+                onChange={props.onChange}
+                buttonStyle={props.buttonStyle}
+              >
+                {option.label}
+              </Radio>
+            )}
+          </For>
+        </div>
+      </Match>
+    </Switch>
   );
 };
 

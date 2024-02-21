@@ -4,6 +4,7 @@ use std::{
     sync::Arc,
 };
 
+use anyhow::Context;
 use carbon_net::{Downloadable, Progress};
 use serde::Deserialize;
 use strum::IntoEnumIterator;
@@ -11,6 +12,7 @@ use tokio::{
     sync::{watch::Sender, RwLock},
     task::spawn_blocking,
 };
+use tracing::{instrument, trace};
 
 use crate::{
     db::PrismaClient,
@@ -30,6 +32,7 @@ pub struct AzulZulu {
 
 #[async_trait::async_trait]
 impl Managed for AzulZulu {
+    #[instrument(skip(self, java_checker, db_client, progress_report))]
     async fn setup<G: JavaChecker + Send + Sync>(
         &self,
         version: &ManagedJavaVersion,
@@ -42,6 +45,9 @@ impl Managed for AzulZulu {
         let progress_report = Arc::new(progress_report);
 
         let download_temp_path = tmp_path.to_path().join(&version.name);
+
+        trace!("Download path: {:?}", download_temp_path);
+
         let download_url = &version.download_url;
 
         let content_length = reqwest::get(download_url).await?.content_length();
@@ -51,6 +57,8 @@ impl Managed for AzulZulu {
         } else {
             Downloadable::new(download_url, download_temp_path)
         };
+
+        trace!("Downloadable: {:?}", downloadable);
 
         let (p_sender, mut p_recv) = tokio::sync::watch::channel(Progress::new());
 
@@ -70,10 +78,19 @@ impl Managed for AzulZulu {
         let result = {
             carbon_net::download_file(&downloadable, Some(p_sender)).await?;
 
+            trace!("Download complete");
+
             progress_proxy.await??;
 
-            let file_handle = std::fs::File::open(&downloadable.path)?;
-            let mut archive = zip::ZipArchive::new(file_handle)?;
+            let file_handle = std::fs::File::open(&downloadable.path).with_context(|| {
+                format!("Could not open downloaded file: {:?}", &downloadable.path)
+            })?;
+            let mut archive = zip::ZipArchive::new(file_handle).with_context(|| {
+                format!(
+                    "Could not open downloaded file as zip: {:?}",
+                    &downloadable.path
+                )
+            })?;
 
             let progress_report_clone = progress_report.clone();
             let version_name = version.name.clone();
@@ -113,7 +130,9 @@ impl Managed for AzulZulu {
                     base_managed_java_path.to_path().join(removed_extension)
                 };
 
-                std::fs::create_dir_all(&java_managed_path)?;
+                std::fs::create_dir_all(&java_managed_path).with_context(|| {
+                    format!("Could not create directory: {:?}", &java_managed_path)
+                })?;
 
                 let mut main_binary_path = None;
 
@@ -208,7 +227,13 @@ impl Managed for AzulZulu {
                 &main_binary_path,
                 crate::domain::java::JavaComponentType::Managed,
             )
-            .await?;
+            .await
+            .with_context(|| {
+                format!(
+                    "Could not get bin info for main binary: {:?}",
+                    &main_binary_path
+                )
+            })?;
 
         let java_id = upsert_java_component_to_db(db_client, java_component).await?;
 

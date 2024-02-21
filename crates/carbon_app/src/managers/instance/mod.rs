@@ -8,6 +8,7 @@ use crate::api::keys::instance::*;
 use crate::api::translation::Translation;
 use crate::db::read_filters::StringFilter;
 use crate::domain::instance::info::{GameVersion, InstanceIcon, Modpack};
+use crate::domain::java::{SystemJavaProfileName, SYSTEM_JAVA_PROFILE_NAME_PREFIX};
 use crate::domain::modplatforms::curseforge::filters::{ModFileParameters, ModParameters};
 use crate::domain::modplatforms::modrinth::search::{ProjectID, VersionID};
 use crate::domain::modplatforms::ModPlatform;
@@ -15,6 +16,7 @@ use crate::domain::vtask::VisualTaskId;
 use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::{DateTime, Utc};
+use daedalus::minecraft::MinecraftJavaProfile;
 use fs_extra::dir::CopyOptions;
 use futures::future::BoxFuture;
 use futures::{join, Future};
@@ -976,6 +978,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 global_java_args: true,
                 extra_java_args: None,
                 memory: None,
+                java_override: None,
                 game_resolution: None,
             },
             pre_launch_hook: None,
@@ -1122,6 +1125,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         if let Some(wrapper_command) = update.wrapper_command {
             info.wrapper_command = wrapper_command;
+        }
+
+        if let Some(java_override) = update.java_override {
+            info!(?java_override, "Updating java override");
+            info.game_configuration.java_override = java_override;
         }
 
         let mut need_reinstall = false;
@@ -1583,14 +1591,44 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             InstanceIcon::RelativePath(_) => instance.icon_revision,
         };
 
+        let mc_version = match &instance.config.game_configuration.version {
+            Some(info::GameVersion::Standard(version)) => Some(version.release.clone()),
+            Some(info::GameVersion::Custom(custom)) => Some(custom.clone()),
+            None => None,
+        };
+
+        let mut version_info = None;
+
+        if let Some(mc_version) = &mc_version {
+            version_info = Some(
+                self.app
+                    .minecraft_manager()
+                    .get_minecraft_version(&mc_version)
+                    .await,
+            );
+        }
+
+        let required_java_profile = mc_version.clone().and_then(|version| {
+            let version_info = version_info.unwrap().ok();
+            let java = version_info
+                .map(|version| version.java_version)
+                .and_then(|version| version.map(|version| version.component));
+
+            let Some(java) = java else {
+                return None;
+            };
+
+            let Ok(required_java) = MinecraftJavaProfile::try_from(&*java) else {
+                return None;
+            };
+
+            Some(SystemJavaProfileName::from(required_java).to_string())
+        });
+
         Ok(domain::InstanceDetails {
             favorite: instance.favorite,
             name: instance.config.name.clone(),
-            version: match &instance.config.game_configuration.version {
-                Some(info::GameVersion::Standard(version)) => Some(version.release.clone()),
-                Some(info::GameVersion::Custom(custom)) => Some(custom.clone()),
-                None => None,
-            },
+            version: mc_version,
             modpack: instance.config.modpack.clone(),
             locked: instance
                 .config
@@ -1611,6 +1649,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 Some(info::GameVersion::Custom(_)) => Vec::new(), // todo
                 None => Vec::new(),
             },
+            java_override: instance.config.game_configuration.java_override.clone(),
+            required_java_profile,
             state: (&instance.state).into(),
             notes: instance.config.notes.clone(),
             icon_revision,
@@ -2409,6 +2449,7 @@ mod test {
                 global_java_args: None,
                 extra_java_args: None,
                 memory: None,
+                java_override: None,
                 pre_launch_hook: None,
                 post_exit_hook: None,
                 wrapper_command: None,

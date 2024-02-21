@@ -25,10 +25,10 @@ const SecondStep = (props: Props) => {
           </Title>
           <RightHandSide>
             <Switch
-              checked={settings.data?.autoManageJava}
+              checked={settings.data?.autoManageJavaSystemProfiles}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  autoManageJava: {
+                  autoManageJavaSystemProfiles: {
                     Set: e.target.checked
                   }
                 });

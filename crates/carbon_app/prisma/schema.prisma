@@ -37,7 +37,7 @@ model AppConfiguration {
   wrapperCommand                  String?
   postExitHook                    String?
   isFirstLaunch                   Boolean   @default(true)
-  autoManageJava                  Boolean   @default(true)
+  autoManageJavaSystemProfiles    Boolean   @default(true)
   modPlatformBlacklist            String    @default("")
   modChannels                     String    @default("stable:true,beta:true,alpha:true")
   // Legal / metrics
@@ -63,12 +63,10 @@ model Java {
 }
 
 model JavaProfile {
-  id              String     @id @default(uuid())
-  name            String     @unique
-  isSystemProfile Boolean    @default(false)
-  java            Java?      @relation(fields: [javaId], references: [id])
+  name            String  @id
+  isSystemProfile Boolean @default(false)
+  java            Java?   @relation(fields: [javaId], references: [id], onDelete: SetNull)
   javaId          String?
-  Instance        Instance[]
 }
 
 model Account {
@@ -111,8 +109,6 @@ model Instance {
   index         Int
   group         InstanceGroup  @relation(fields: [groupId], references: [id])
   groupId       Int
-  javaProfile   JavaProfile?   @relation(fields: [javaProfileId], references: [id])
-  javaProfileId String?
   mods          ModFileCache[]
 }
 

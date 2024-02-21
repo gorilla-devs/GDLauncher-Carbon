@@ -11,7 +11,7 @@ function Library() {
       <Show when={gridLayout()}>
         <Sidebar />
       </Show>
-      <ContentWrapper>
+      <ContentWrapper zeroPadding>
         <Outlet />
       </ContentWrapper>
     </>
