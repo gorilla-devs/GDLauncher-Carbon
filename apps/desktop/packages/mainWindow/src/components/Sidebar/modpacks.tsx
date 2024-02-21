@@ -142,18 +142,16 @@ const Sidebar = () => {
                 });
               }}
               value={capitalize(infiniteQuery?.query?.searchApi)}
-            >
-              <For each={ModpackPlatforms}>
-                {(platform) => (
-                  <Radio name="platform" value={platform}>
-                    <div class="flex items-center gap-2">
-                      <PlatformIcon platform={platform} />
-                      <p class="m-0">{platform}</p>
-                    </div>
-                  </Radio>
-                )}
-              </For>
-            </Radio.group>
+              options={ModpackPlatforms.map((platform) => ({
+                value: platform,
+                label: (
+                  <div class="flex items-center gap-2">
+                    <PlatformIcon platform={platform} />
+                    <p class="m-0">{platform}</p>
+                  </div>
+                )
+              }))}
+            />
           </div>
         </Collapsable>
         <Collapsable title={t("general.game_versions")} noPadding>
@@ -229,7 +227,7 @@ const Sidebar = () => {
                             : modloader.name;
 
                         const filteredModloaders = prevModloaders.filter(
-                          (_modloader) => _modloader !== modloaderName
+                          (_modloader: any) => _modloader !== modloaderName
                         );
 
                         const newModloaders = checked

@@ -98,22 +98,9 @@ const General = () => {
         </Row>
         <Row>
           <Title
-            description={
-              <Trans
-                key="settings:concurrent_downloads_text"
-                options={{
-                  defaultValue:
-                    "Select the number of concurrent downloads. If you have slow connection, select at most 3"
-                }}
-              />
-            }
+            description={<Trans key="settings:concurrent_downloads_text" />}
           >
-            <Trans
-              key="settings:concurrent_downloads_title"
-              options={{
-                defaultValue: "Concurrent Downloads"
-              }}
-            />
+            <Trans key="settings:concurrent_downloads_title" />
           </Title>
           <RightHandSide>
             <Dropdown
@@ -383,21 +370,27 @@ const General = () => {
         <Row>
           <Title
             description={
-              <Trans
-                key="settings:potato_mode_text"
-                options={{
-                  defaultValue:
-                    "You got a potato PC? Don't worry! We got you covered. Enable this and all animations and special effects will be disabled."
-                }}
-              />
+              <Trans key="settings:deletion_through_recycle_bin_text" />
             }
           >
-            <Trans
-              key="settings:potato_mode_title"
-              options={{
-                defaultValue: "Potato PC mode"
+            <Trans key="settings:deletion_through_recycle_bin_title" />
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={settings.deletionThroughRecycleBin}
+              onChange={(e) => {
+                settingsMutation.mutate({
+                  deletionThroughRecycleBin: {
+                    Set: e.currentTarget.checked
+                  }
+                });
               }}
             />
+          </RightHandSide>
+        </Row>
+        <Row>
+          <Title description={<Trans key="settings:potato_mode_text" />}>
+            <Trans key="settings:potato_mode_title" />
           </Title>
           <RightHandSide>
             <Switch

@@ -14,9 +14,12 @@ pub struct Instance {
     pub date_created: DateTime<Utc>,
     pub date_updated: DateTime<Utc>,
     pub last_played: Option<DateTime<Utc>>,
-    pub seconds_played: u64,
+    pub seconds_played: u32,
     pub modpack: Option<ModpackInfo>,
     pub game_configuration: GameConfig,
+    pub pre_launch_hook: Option<String>,
+    pub post_exit_hook: Option<String>,
+    pub wrapper_command: Option<String>,
     pub mod_sources: Option<ModSources>,
     pub notes: String,
 }
@@ -67,10 +70,17 @@ pub enum GameResolution {
 }
 
 #[derive(Debug, Clone)]
+pub enum JavaOverride {
+    Profile(Option<String>),
+    Path(Option<String>),
+}
+
+#[derive(Debug, Clone)]
 pub struct GameConfig {
     pub version: Option<GameVersion>,
     pub global_java_args: bool,
     pub extra_java_args: Option<String>,
+    pub java_override: Option<JavaOverride>,
     pub memory: Option<(u16, u16)>,
     pub game_resolution: Option<GameResolution>,
 }

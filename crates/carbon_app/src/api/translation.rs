@@ -6,6 +6,7 @@ use serde::Serialize;
 pub enum Translation {
     #[cfg(test)]
     Test,
+    InstanceTaskDeleting,
     ModCacheTaskUpdate,
     ModCacheTaskUpdateScanFiles,
     ModCacheTaskUpdateQueryApis,
@@ -15,7 +16,6 @@ pub enum Translation {
     InstanceTaskPrepare {
         name: String,
     },
-    InstanceTaskLaunchWaiting,
     InstanceTaskLaunchRequestVersions,
     InstanceTaskLaunchRequestModpack,
     InstanceTaskLaunchDownloadModpack,
@@ -25,7 +25,10 @@ pub enum Translation {
     InstanceTaskLaunchApplyStagedPatches,
     InstanceTaskLaunchDownloadJava,
     InstanceTaskLaunchExtractJava,
+    InstanceTaskLaunchWaitDownloadFiles,
     InstanceTaskLaunchDownloadFiles,
+    InstanceTaskGeneratingPackInfo,
+    InstanceTaskFillCache,
     InstanceTaskLaunchExtractNatives,
     InstanceTaskReconstructAssets,
     InstanceTaskLaunchRunForgeProcessors,
@@ -47,5 +50,6 @@ pub enum Translation {
     InstanceExport,
     InstanceExportScanningMods,
     InstanceExportCacheMods,
+    InstanceExportCalculateSize,
     InstanceExportCreatingBundle,
 }

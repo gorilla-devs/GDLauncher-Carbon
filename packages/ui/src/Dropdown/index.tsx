@@ -20,7 +20,7 @@ import {
 } from "@floating-ui/dom";
 
 type Option = {
-  label: string | JSX.Element;
+  label: string | JSX.Element | Element;
   key: string | number;
 };
 
@@ -112,23 +112,26 @@ const Dropdown = (props: Props) => {
         (option) => option.key === selectedValue().key
       );
 
-      const isElementFullyViewable = (element: HTMLElement) => {
-        const elementRect = element.getBoundingClientRect();
-        const parentRect = (menuRef() as HTMLElement).getBoundingClientRect();
-
-        return (
-          elementRect.top >= parentRect.top &&
-          elementRect.bottom <= parentRect.bottom
-        );
-      };
-
       if (selectedOptionIndex !== -1) {
         const selectedOption = (menuRef() as HTMLUListElement).children[
           selectedOptionIndex
         ] as HTMLElement;
 
-        if (!isElementFullyViewable(selectedOption)) {
-          selectedOption.scrollIntoView();
+        const menuElement = menuRef() as HTMLElement;
+        const menuRect = menuElement.getBoundingClientRect();
+        const optionRect = selectedOption.getBoundingClientRect();
+
+        const isOptionInView =
+          optionRect.top >= menuRect.top &&
+          optionRect.bottom <= menuRect.bottom;
+
+        if (!isOptionInView) {
+          const scrollMiddle =
+            optionRect.top -
+            menuRect.top +
+            menuElement.scrollTop -
+            (menuRect.height / 2 - optionRect.height / 2);
+          menuElement.scrollTop = scrollMiddle;
         }
       }
     }
@@ -136,12 +139,9 @@ const Dropdown = (props: Props) => {
 
   return (
     <>
-      <div
-        class={`inline-block relative ${props.containerClass || ""}`}
-        id={props.id}
-      >
+      <div class={`block relative ${props.containerClass || ""}`} id={props.id}>
         <button
-          class={`flex justify-between font-semibold py-2 inline-flex items-center min-h-10 box-border ${props.class} ${props.bgColorClass} ${props.textColorClass}`}
+          class={`flex justify-between font-semibold py-2 items-center min-h-10 box-border ${props.class} ${props.bgColorClass} ${props.textColorClass}`}
           onClick={() => {
             if (props.disabled) return;
             setMenuOpened(!menuOpened());
@@ -176,8 +176,8 @@ const Dropdown = (props: Props) => {
             <Show when={props.icon}>
               <span class="mr-2">{props.icon}</span>
             </Show>
-            <span
-              class="w-full flex justify-between"
+            <div
+              class="w-[calc(100%-2rem)] flex justify-between"
               classList={{
                 "text-white": !!props.error,
                 "text-darkSlate-50 hover:text-white group-hover:text-white":
@@ -187,10 +187,10 @@ const Dropdown = (props: Props) => {
               }}
             >
               {selectedValue()?.label ?? props.placeholder}
-            </span>
+            </div>
           </Show>
-          <span
-            class="i-ri:arrow-drop-down-line text-3xl ease-in-out duration-100"
+          <div
+            class="i-ri:arrow-drop-down-line w-8 h-8 ease-in-out duration-100"
             classList={{
               "text-darkSlate-50 group-hover:text-white":
                 !props.disabled &&
@@ -208,18 +208,16 @@ const Dropdown = (props: Props) => {
           <Portal>
             <ul
               ref={setMenuRef}
-              class="absolute max-h-60 overflow-y-auto overflow-x-hidden text-darkSlate-50 shadow-md shadow-darkSlate-900 list-none m-0 p-0 z-100 min-w-32"
+              class="absolute h-max max-h-60 bottom-0 overflow-y-auto overflow-x-hidden text-darkSlate-50 shadow-md shadow-darkSlate-900 list-none m-0 p-0 z-100 min-w-32 max-w-200"
               onMouseOut={() => {
                 setFocusIn(false);
               }}
               onMouseOver={() => {
                 setFocusIn(true);
               }}
-              classList={{
-                "min-w-20": props.btnDropdown,
-              }}
               style={{
-                "min-width": buttonRef()?.offsetWidth + "px" || "auto",
+                width: buttonRef()?.offsetWidth + "px" || "auto",
+                "max-width": buttonRef()?.offsetWidth + "px" || "auto",
                 top: `${position.y ?? 0}px`,
                 left: `${position.x ?? 0}px`,
               }}
@@ -227,12 +225,15 @@ const Dropdown = (props: Props) => {
               <For each={props.options}>
                 {(option) => (
                   <li
-                    class="first:rounded-t last:rounded-b hover:bg-darkSlate-800 py-2 px-4 block whitespace-no-wrap text-darkSlate-50 no-underline cursor-pointer w-full box-border"
+                    class="first:rounded-t last:rounded-b hover:bg-darkSlate-800 py-2 px-4 block break-all text-darkSlate-50 no-underline w-full box-border"
                     classList={{
                       "bg-darkSlate-700": selectedValue().key !== option.key,
                       "bg-darkSlate-800": selectedValue().key === option.key,
                     }}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopImmediatePropagation();
+                      e.stopPropagation();
                       setSelectedValue(option);
                       props.onChange?.(option);
                       toggleMenu();

@@ -6,8 +6,8 @@ import {
   app,
   BrowserWindow,
   dialog,
+  Display,
   ipcMain,
-  Menu,
   OpenDialogOptions,
   SaveDialogOptions,
   screen,
@@ -336,9 +336,6 @@ if (process.defaultApp) {
   app.setAsDefaultProtocolClient("gdlauncher");
 }
 
-const menu = Menu.buildFromTemplate([]);
-Menu.setApplicationMenu(menu);
-
 async function createWindow(
   skipIntroAnimation = false
 ): Promise<BrowserWindow> {
@@ -362,6 +359,21 @@ async function createWindow(
       webSecurity: true,
       additionalArguments: [`--skipIntroAnimation=${skipIntroAnimation}`]
     }
+  });
+
+  let lastDisplay: Display | null = null;
+
+  win.on("move", () => {
+    const currentDisplay = screen.getDisplayMatching(win?.getBounds()!);
+    if (lastDisplay?.id === currentDisplay?.id) {
+      return;
+    }
+
+    lastDisplay = currentDisplay;
+    const { minWidth, minHeight, adSize } = getAdSize(currentDisplay);
+    win?.setMinimumSize(minWidth, minHeight);
+    win?.setSize(minWidth, minHeight);
+    win?.webContents.send("adSizeChanged", adSize);
   });
 
   win.webContents.on("will-navigate", (e, url) => {

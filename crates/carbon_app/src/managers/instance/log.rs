@@ -261,6 +261,7 @@ mod test {
 
         // a..b
         test_span(&log, 1..1, []);
+        #[allow(clippy::reversed_empty_ranges)]
         test_span(&log, 1..0, []);
         test_span(&log, 1..2, ["item 2"]);
         test_span(&log, 1..=3, ["item 2", "item 3", "item 4"]);

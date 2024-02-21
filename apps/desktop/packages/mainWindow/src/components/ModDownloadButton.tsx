@@ -1,34 +1,8 @@
 import { rspc } from "@/utils/rspcClient";
-import { InstanceDetails, Mod } from "@gd/core_module/bindings";
+import { Mod } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Progressbar, Spinner, Tooltip } from "@gd/ui";
-import {
-  JSX,
-  Match,
-  Show,
-  Switch,
-  children,
-  createEffect,
-  createSignal
-} from "solid-js";
-
-const MaybeTooltip = (props: {
-  children: JSX.Element;
-  showTooltip?: boolean;
-}) => {
-  const c = children(() => props.children);
-
-  return (
-    <Switch>
-      <Match when={!props.showTooltip}>{c()}</Match>
-      <Match when={props.showTooltip}>
-        <Tooltip content={<Trans key="instance.locked_cannot_apply_changes" />}>
-          {c()}
-        </Tooltip>
-      </Match>
-    </Switch>
-  );
-};
+import { Match, Show, Switch, createEffect, createSignal } from "solid-js";
 
 type ModDownloadButtonProps = {
   projectId: number | string | undefined;
@@ -37,7 +11,7 @@ type ModDownloadButtonProps = {
   size: "small" | "medium" | "large";
   isCurseforge: boolean;
   instanceMods: Mod[] | undefined;
-  instanceDetails: InstanceDetails | undefined;
+  instanceLocked: boolean | undefined;
 };
 
 const ModDownloadButton = (props: ModDownloadButtonProps) => {
@@ -159,15 +133,18 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   });
 
   return (
-    <MaybeTooltip showTooltip={props.instanceDetails?.modpack?.locked}>
+    <Tooltip
+      content={
+        props.instanceLocked ? (
+          <Trans key="instance.locked_cannot_apply_changes" />
+        ) : null
+      }
+    >
       <Button
         uppercase
         size={props.size}
         variant={isInstalled() ? "green" : "primary"}
-        disabled={
-          !props.instanceId ||
-          (props.instanceDetails?.modpack?.locked && !isInstalled())
-        }
+        disabled={!props.instanceId || (props.instanceLocked && !isInstalled())}
         onClick={handleDownload}
       >
         <Show when={loading()}>
@@ -190,17 +167,15 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
             <Match when={isInstalled()}>
               <Trans key="mod.downloaded" />
             </Match>
-            <Match when={props.instanceDetails?.modpack?.locked}>
+            <Match when={props.instanceLocked}>
               <Trans key="instance.instance_locked" />
             </Match>
-            <Match
-              when={!props.instanceDetails?.modpack?.locked && !props.fileId}
-            >
+            <Match when={!props.instanceLocked && !props.fileId}>
               <Trans key="instance.download_latest" />
             </Match>
             <Match
               when={
-                !props.instanceDetails?.modpack?.locked &&
+                !props.instanceLocked &&
                 props.fileId &&
                 installedMod() &&
                 !isInstalled()
@@ -208,15 +183,13 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
             >
               <Trans key="instance.switch_version" />
             </Match>
-            <Match
-              when={!props.instanceDetails?.modpack?.locked && props.fileId}
-            >
+            <Match when={!props.instanceLocked && props.fileId}>
               <Trans key="instance.download_version" />
             </Match>
           </Switch>
         </Show>
       </Button>
-    </MaybeTooltip>
+    </Tooltip>
   );
 };
 

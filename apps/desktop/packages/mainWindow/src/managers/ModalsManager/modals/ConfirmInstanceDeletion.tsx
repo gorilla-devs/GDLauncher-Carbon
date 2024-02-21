@@ -1,5 +1,4 @@
-import { rspc, queryClient } from "@/utils/rspcClient";
-import { UngroupedInstance } from "@gd/core_module/bindings";
+import { rspc } from "@/utils/rspcClient";
 import { ModalProps, useModal } from "..";
 import ModalLayout from "../ModalLayout";
 import { Button, createNotification } from "@gd/ui";
@@ -13,49 +12,8 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
   const deleteInstanceMutation = rspc.createMutation(
     ["instance.deleteInstance"],
     {
-      onMutate: async (
-        instanceId
-      ): Promise<
-        { previusInstancesUngrouped: UngroupedInstance[] } | undefined
-      > => {
-        await queryClient.cancelQueries({
-          queryKey: ["instance.getInstancesUngrouped"]
-        });
-
-        const previusInstancesUngrouped: UngroupedInstance[] | undefined =
-          queryClient.getQueryData(["instance.getInstancesUngrouped"]);
-
-        queryClient.setQueryData(
-          ["account.getActiveUuid", null],
-          (old: UngroupedInstance[] | undefined) => {
-            const filteredAccounts = old?.filter(
-              (account) => account.id !== instanceId
-            );
-
-            if (filteredAccounts) return filteredAccounts;
-          }
-        );
-
-        if (previusInstancesUngrouped) return { previusInstancesUngrouped };
-      },
-      onError: (
-        error,
-        _variables,
-        context: { previusInstancesUngrouped: UngroupedInstance[] } | undefined
-      ) => {
+      onError: (error) => {
         addNotification(error.message, "error");
-
-        if (context?.previusInstancesUngrouped) {
-          queryClient.setQueryData(
-            ["instance.getInstancesUngrouped"],
-            context.previusInstancesUngrouped
-          );
-        }
-      },
-      onSettled: () => {
-        queryClient.invalidateQueries({
-          queryKey: ["instance.getInstancesUngrouped"]
-        });
       }
     }
   );

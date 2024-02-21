@@ -18,7 +18,6 @@ const PrivateRoute = (props: Props) => {
     routeData.settings.data?.termsAndPrivacyAccepted;
 
   createEffect(() => {
-    console.log(isAlreadyAuthenticated());
     if (!isAlreadyAuthenticated()) navigate("/");
   });
 

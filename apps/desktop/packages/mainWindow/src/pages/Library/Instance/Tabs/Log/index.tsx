@@ -18,7 +18,7 @@ import { getRunningState } from "@/utils/instances";
 import { Button, Tooltip } from "@gd/ui";
 
 const fetchLogs = async (logId: number) => {
-  return fetch(`http://localhost:${port}/instance/log?id=${logId}`);
+  return fetch(`http://127.0.0.1:${port}/instance/log?id=${logId}`);
 };
 
 const Logs = () => {

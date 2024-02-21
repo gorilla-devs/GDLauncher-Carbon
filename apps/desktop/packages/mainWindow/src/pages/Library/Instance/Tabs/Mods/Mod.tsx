@@ -160,7 +160,7 @@ const Mod = (props: Props) => {
       );
     },
     onError: (err, data) => {
-      console.log(err);
+      console.error(err);
 
       queryClient.setQueryData(
         ["instance.getInstanceMods", data.instance_id],
@@ -197,7 +197,7 @@ const Mod = (props: Props) => {
       );
     },
     onError: (err, data) => {
-      console.log(err);
+      console.error(err);
 
       queryClient.setQueryData(
         ["instance.getInstanceMods", data.instance_id],
@@ -227,7 +227,7 @@ const Mod = (props: Props) => {
       );
     },
     onError: (err, data) => {
-      console.log(err);
+      console.error(err);
 
       queryClient.setQueryData(
         ["instance.getInstanceMods", data.instance_id],

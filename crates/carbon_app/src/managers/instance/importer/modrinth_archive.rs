@@ -18,7 +18,10 @@ use crate::{
         },
         vtask::VisualTaskId,
     },
-    managers::{instance::InstanceVersionSource, AppInner},
+    managers::{
+        instance::InstanceVersionSource,
+        modplatforms::modrinth::convert_mr_version_to_standard_version, AppInner,
+    },
 };
 
 use super::{
@@ -121,9 +124,13 @@ impl ModrinthArchiveImporter {
                 hashes: vec![sha512.clone()],
                 algorithm: HashAlgorithm::SHA512,
             })
-            .await?;
+            .await;
 
         let meta = 'remote: {
+            let Ok(version_response) = version_response else {
+                break 'remote None;
+            };
+
             let Some(version) = version_response.get(&sha512) else {
                 break 'remote None;
             };
@@ -132,9 +139,10 @@ impl ModrinthArchiveImporter {
                 .modplatforms_manager()
                 .modrinth
                 .get_project(ProjectID(version.project_id.clone()))
-                .await?;
+                .await
+                .ok();
 
-            Some(MrMetadata {
+            project.map(|project| MrMetadata {
                 name: project.title,
                 project_id: project.id,
                 version_id: version.id.clone(),
@@ -200,7 +208,13 @@ impl InstanceImporter for ModrinthArchiveImporter {
             .cloned()
             .ok_or_else(|| anyhow!("invalid importable instance index"))?;
 
-        let version = GameVersion::Standard(instance.index.dependencies.clone().try_into()?);
+        let gdl_version = convert_mr_version_to_standard_version(
+            app.clone(),
+            instance.index.dependencies.clone(),
+        )
+        .await?;
+
+        let version = GameVersion::Standard(gdl_version);
 
         let instance_version_source = match &instance.meta {
             Some(meta) => InstanceVersionSource::ModpackWithKnownVersion(
@@ -250,7 +264,7 @@ impl InstanceImporter for ModrinthArchiveImporter {
             .await?;
 
         app.instance_manager()
-            .prepare_game(id, None, None)
+            .prepare_game(id, None, None, true)
             .await
             .map(|r| r.1)
     }

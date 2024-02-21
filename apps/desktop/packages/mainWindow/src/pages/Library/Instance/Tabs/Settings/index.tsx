@@ -1,18 +1,28 @@
 import { generateSequence } from "@/utils/helpers";
 import { port, queryClient, rspc } from "@/utils/rspcClient";
 import { Trans, useTransContext } from "@gd/i18n";
-import { Button, Dropdown, Input, Slider, Switch } from "@gd/ui";
+import { Button, Dropdown, Input, Radio, Slider, Switch } from "@gd/ui";
 import { useParams, useRouteData } from "@solidjs/router";
 import fetchData from "../../instance.data";
-import { Show, Suspense, createMemo } from "solid-js";
+import {
+  Match,
+  Show,
+  Suspense,
+  createMemo,
+  Switch as SolidSwitch
+} from "solid-js";
 import { InstanceDetails } from "@gd/core_module/bindings";
 import Title from "@/pages/Settings/components/Title";
 import Row from "@/pages/Settings/components/Row";
 import RowsContainer from "@/pages/Settings/components/RowsContainer";
 import RightHandSide from "@/pages/Settings/components/RightHandSide";
+import { setInstanceId } from "@/utils/browser";
+import { useModal } from "@/managers/ModalsManager";
+import JavaPathAutoComplete from "@/components/JavaPathAutoComplete";
 
 const Settings = () => {
   const [t] = useTransContext();
+  const modalsContext = useModal();
   const params = useParams();
   const updateInstanceMutation = rspc.createMutation(
     ["instance.updateInstance"],
@@ -22,6 +32,8 @@ const Settings = () => {
       }
     }
   );
+
+  const getAllProfiles = rspc.createQuery(() => ["java.getJavaProfiles"]);
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
@@ -52,6 +64,24 @@ const Settings = () => {
     return "custom";
   };
 
+  const javaOverrideType = () => {
+    if ("Profile" in (routeData?.instanceDetails?.data?.javaOverride || {})) {
+      return "Profile";
+    }
+
+    return "Path";
+  };
+
+  const javaSelectedProfile = () => {
+    const profileName = (routeData?.instanceDetails?.data?.javaOverride as any)
+      ?.Profile;
+
+    if (!profileName) return null;
+
+    return getAllProfiles.data?.find((profile) => profile.name === profileName)
+      ?.name;
+  };
+
   return (
     <Suspense fallback={null}>
       <RowsContainer>
@@ -65,7 +95,7 @@ const Settings = () => {
             <div class="flex items-center gap-4">
               <img
                 class="h-13 w-13 rounded-lg"
-                src={`http://localhost:${port}/instance/modpackIcon?instance_id=${params.id}`}
+                src={`http://127.0.0.1:${port}/instance/modpackIcon?instance_id=${params.id}`}
               />
               <div>
                 <div class="text-lg font-bold">
@@ -79,12 +109,13 @@ const Settings = () => {
                 <Button
                   type="outline"
                   onClick={() => {
-                    updateInstanceMutation.mutate({
-                      modpackLocked: {
-                        Set: false
+                    setInstanceId(parseInt(params.id, 10));
+                    modalsContext?.openModal(
+                      {
+                        name: "unlock_confirmation"
                       },
-                      instance: parseInt(params.id, 10)
-                    });
+                      { instanceState: "unlock" }
+                    );
                   }}
                 >
                   <i class="w-5 h-5 i-ri:lock-fill" />
@@ -100,19 +131,155 @@ const Settings = () => {
               <Button
                 type="outline"
                 onClick={() => {
-                  updateInstanceMutation.mutate({
-                    modpackLocked: {
-                      Set: null
+                  setInstanceId(parseInt(params.id, 10));
+                  modalsContext?.openModal(
+                    {
+                      name: "unpair_confirmation"
                     },
-                    instance: parseInt(params.id, 10)
-                  });
+                    { instanceState: "unpair" }
+                  );
                 }}
               >
                 <i class="w-5 h-5 i-ri:git-branch-fill" />
                 <Trans key="instance_settings.unpair" />
               </Button>
+              <Button
+                type="outline"
+                onClick={() => {
+                  setInstanceId(parseInt(params.id, 10));
+                  modalsContext?.openModal({
+                    name: "modpack_version_update"
+                  });
+                }}
+              >
+                <i class="w-5 h-5 i-ri:arrow-left-right-fill" />
+                <Trans key="instance_settings.update_version" />
+              </Button>
             </div>
           </div>
+        </Show>
+        <Row>
+          <Title>
+            <Trans key="instance_settings.java_path_profile" />
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={!!routeData?.instanceDetails?.data?.javaOverride}
+              onChange={(v) => {
+                updateInstanceMutation.mutate({
+                  javaOverride: {
+                    Set: v.target.checked
+                      ? ({
+                          Profile:
+                            routeData.instanceDetails.data?.requiredJavaProfile
+                        } as any)
+                      : null
+                  },
+                  instance: parseInt(params.id, 10)
+                });
+              }}
+            />
+          </RightHandSide>
+        </Row>
+        <Show when={routeData?.instanceDetails?.data?.javaOverride !== null}>
+          <Radio.group
+            value={javaOverrideType()}
+            buttonStyle="button"
+            onChange={(v) => {
+              const payload =
+                v?.toString() === "Path"
+                  ? {
+                      Path: null
+                    }
+                  : {
+                      Profile:
+                        routeData.instanceDetails.data?.requiredJavaProfile
+                    };
+
+              updateInstanceMutation.mutate({
+                javaOverride: {
+                  Set: payload as any
+                },
+                instance: parseInt(params.id, 10)
+              });
+            }}
+            options={[
+              {
+                value: "Path",
+                label: "Path"
+              },
+              {
+                value: "Profile",
+                label: "Profile"
+              }
+            ]}
+          />
+          <SolidSwitch>
+            <Match when={javaOverrideType() === "Path"}>
+              <div class="min-w-100 max-w-2/3">
+                <JavaPathAutoComplete
+                  defaultValue={
+                    (routeData?.instanceDetails?.data?.javaOverride as any)
+                      ?.Path
+                  }
+                  updateValueOnlyOnBlur
+                  updateValue={(id, value) => {
+                    updateInstanceMutation.mutate({
+                      javaOverride: {
+                        Set: {
+                          Path: value || null
+                        }
+                      },
+                      instance: parseInt(params.id, 10)
+                    });
+                  }}
+                />
+              </div>
+            </Match>
+            <Match when={javaOverrideType() === "Profile"}>
+              <div class="flex gap-2">
+                <div class="text-lightSlate-700">
+                  <Trans key="settings:this_instance_requires" />
+                </div>
+                <div class="text-lightSlate-100">
+                  {routeData.instanceDetails.data?.requiredJavaProfile}
+                </div>
+              </div>
+              <div class="flex items-center">
+                <Dropdown
+                  class="min-w-100 max-w-2/3"
+                  value={javaSelectedProfile()}
+                  placeholder={"Select a java profile"}
+                  options={
+                    getAllProfiles.data?.map((profile) => ({
+                      key: profile.name,
+                      label: profile.name
+                    })) || []
+                  }
+                  onChange={(option) => {
+                    updateInstanceMutation.mutate({
+                      javaOverride: {
+                        Set: {
+                          Profile: option.key.toString()
+                        }
+                      },
+                      instance: parseInt(params.id, 10)
+                    });
+                  }}
+                />
+                <Button
+                  type="primary"
+                  onClick={() => {
+                    modalsContext?.openModal({
+                      name: "javaProfileCreation"
+                    });
+                  }}
+                >
+                  <Trans key="settings:add_new_profile" />
+                </Button>
+              </div>
+            </Match>
+          </SolidSwitch>
         </Show>
         <Row>
           <Title>
@@ -140,11 +307,11 @@ const Settings = () => {
         <Show when={routeData?.instanceDetails?.data?.memory !== null}>
           <div class="flex justify-center px-2">
             <Slider
-              min={0}
+              min={1024}
               max={mbTotalRAM()}
-              steps={1000}
+              steps={1024}
               value={routeData?.instanceDetails.data?.memory?.max_mb}
-              marks={generateSequence(2048, mbTotalRAM())}
+              marks={generateSequence(1024, mbTotalRAM())}
               onChange={(val) => {
                 if (
                   !val ||
@@ -392,6 +559,120 @@ const Settings = () => {
               </div>
             </Show>
           </div>
+        </Show>
+        <Row>
+          <Title description={<Trans key="settings:pre_launch_hook_text" />}>
+            <Trans key="settings:pre_launch_hook_title" />
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={
+                typeof routeData?.instanceDetails?.data?.preLaunchHook ===
+                "string"
+              }
+              onChange={(e) => {
+                updateInstanceMutation.mutate({
+                  preLaunchHook: {
+                    Set: e.target.checked ? "" : null
+                  },
+                  instance: parseInt(params.id, 10)
+                });
+              }}
+            />
+          </RightHandSide>
+        </Row>
+        <Show
+          when={
+            typeof routeData?.instanceDetails?.data?.preLaunchHook === "string"
+          }
+        >
+          <Input
+            value={routeData?.instanceDetails?.data?.preLaunchHook || ""}
+            onChange={(e) => {
+              updateInstanceMutation.mutate({
+                preLaunchHook: {
+                  Set: e.currentTarget.value.trim()
+                },
+                instance: parseInt(params.id, 10)
+              });
+            }}
+          />
+        </Show>
+        <Row>
+          <Title description={<Trans key="settings:post_exit_hook_text" />}>
+            <Trans key="settings:post_exit_hook_title" />
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={
+                typeof routeData?.instanceDetails?.data?.postExitHook ===
+                "string"
+              }
+              onChange={(e) => {
+                updateInstanceMutation.mutate({
+                  postExitHook: {
+                    Set: e.target.checked ? "" : null
+                  },
+                  instance: parseInt(params.id, 10)
+                });
+              }}
+            />
+          </RightHandSide>
+        </Row>
+        <Show
+          when={
+            typeof routeData?.instanceDetails?.data?.postExitHook === "string"
+          }
+        >
+          <Input
+            value={routeData?.instanceDetails?.data?.postExitHook || ""}
+            onChange={(e) => {
+              updateInstanceMutation.mutate({
+                postExitHook: {
+                  Set: e.currentTarget.value.trim()
+                },
+                instance: parseInt(params.id, 10)
+              });
+            }}
+          />
+        </Show>
+        <Row>
+          <Title description={<Trans key="settings:wrapper_command_text" />}>
+            <Trans key="settings:wrapper_command_title" />
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={
+                typeof routeData?.instanceDetails?.data?.wrapperCommand ===
+                "string"
+              }
+              onChange={(e) => {
+                updateInstanceMutation.mutate({
+                  wrapperCommand: {
+                    Set: e.target.checked ? "" : null
+                  },
+                  instance: parseInt(params.id, 10)
+                });
+              }}
+            />
+          </RightHandSide>
+        </Row>
+        <Show
+          when={
+            typeof routeData?.instanceDetails?.data?.wrapperCommand === "string"
+          }
+        >
+          <Input
+            value={routeData?.instanceDetails?.data?.wrapperCommand || ""}
+            onChange={(e) => {
+              updateInstanceMutation.mutate({
+                wrapperCommand: {
+                  Set: e.currentTarget.value.trim()
+                },
+                instance: parseInt(params.id, 10)
+              });
+            }}
+          />
         </Show>
       </RowsContainer>
     </Suspense>

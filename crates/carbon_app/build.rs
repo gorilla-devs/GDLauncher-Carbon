@@ -1,5 +1,7 @@
 use std::{path::PathBuf, process::Command};
 fn main() {
+    static_vcruntime::metabuild();
+
     let parent_env_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()

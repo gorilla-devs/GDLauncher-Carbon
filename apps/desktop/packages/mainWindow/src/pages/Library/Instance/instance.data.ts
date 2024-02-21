@@ -16,7 +16,7 @@ const fetchData = ({ params }) => {
   ]);
 
   const instancesUngrouped = rspc.createQuery(() => [
-    "instance.getInstancesUngrouped"
+    "instance.getAllInstances"
   ]);
 
   const _instanceMods = rspc.createQuery(() => [

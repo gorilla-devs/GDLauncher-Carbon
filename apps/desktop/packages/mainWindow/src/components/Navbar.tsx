@@ -52,7 +52,7 @@ const AppNavbar = () => {
       return {
         label: {
           name: account?.username,
-          icon: `http://localhost:${port}/account/headImage?uuid=${account.uuid}`,
+          icon: `http://127.0.0.1:${port}/account/headImage?uuid=${account.uuid}`,
           uuid: account.uuid,
           type: account.type,
           status: accountStatusQuery.data

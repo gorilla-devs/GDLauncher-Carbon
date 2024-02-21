@@ -57,8 +57,13 @@ keys! {
         SETUP_MANAGED_JAVA                          = "setupManagedJava";
         GET_SETUP_MANAGED_JAVA_PROGRESS             = "getSetupManagedJavaProgress";
         GET_JAVA_PROFILES                           = "getJavaProfiles";
-        UPDATE_JAVA_PROFILE_PATH                    = "updateJavaProfilePath";
+        UPDATE_JAVA_PROFILE                         = "updateJavaProfile";
+        CREATE_JAVA_PROFILE                         = "createJavaProfile";
+        DELETE_JAVA_PROFILE                         = "deleteJavaProfile";
+        VALIDATE_CUSTOM_JAVA_PATH                   = "validateCustomJavaPath";
+        CREATE_CUSTOM_JAVA_VERSION                  = "createCustomJavaVersion";
         DELETE_JAVA_VERSION                         = "deleteJavaVersion";
+        SYSTEM_JAVA_PROFILE_ASSIGNMENTS             = "systemJavaProfileAssignments";
     }
 
     mc {
@@ -72,7 +77,7 @@ keys! {
     instance {
         DEFAULT_GROUP                               = "getDefaultGroup";
         GET_GROUPS                                  = "getGroups";
-        GET_INSTANCES_UNGROUPED                     = "getInstancesUngrouped";
+        GET_ALL_INSTANCES                           = "getAllInstances";
         CREATE_GROUP                                = "createGroup";
         CREATE_INSTANCE                             = "createInstance";
         CHANGE_MODPACK                              = "changeModpack";

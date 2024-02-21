@@ -37,8 +37,12 @@ const defaultModals = {
     component: lazy(() => import("./modals/TermsAndConditions")),
     title: "Terms and Conditions"
   },
-  addJava: {
-    component: lazy(() => import("./modals/Java/AddJava")),
+  addManagedJava: {
+    component: lazy(() => import("./modals/Java/AddManagedJava")),
+    title: "Add java version"
+  },
+  addCustomJava: {
+    component: lazy(() => import("./modals/Java/AddCustomJava")),
     title: "Add java version"
   },
   modDetails: {
@@ -56,6 +60,18 @@ const defaultModals = {
   exportInstance: {
     component: lazy(() => import("./modals/InstanceExport")),
     title: "Export Instance"
+  },
+  modpack_version_update: {
+    component: lazy(() => import("./modals/ModPackVersionUpdate")),
+    title: "Update Version"
+  },
+  unlock_confirmation: {
+    component: lazy(() => import("./modals/Confirmation")),
+    title: "Unlock Instance"
+  },
+  unpair_confirmation: {
+    component: lazy(() => import("./modals/Confirmation")),
+    title: "Unpair Instance"
   },
   notification: {
     component: lazy(() => import("./modals/Notification")),
@@ -84,6 +100,10 @@ const defaultModals = {
   modsUpdater: {
     component: lazy(() => import("./modals/ModsUpdater")),
     title: "Mods Updater"
+  },
+  javaProfileCreation: {
+    component: lazy(() => import("./modals/JavaProfileCreationModal")),
+    title: "Create Java Profile"
   }
 };
 

@@ -1,15 +1,19 @@
-use crate::domain::instance::info::{self, Modpack, ModpackInfo, StandardVersion};
-use crate::domain::java::SystemJavaProfileName;
+use crate::domain::instance::info::{self, JavaOverride, Modpack, ModpackInfo, StandardVersion};
+use crate::domain::java::{JavaComponent, JavaComponentType, SystemJavaProfileName};
 use crate::domain::metrics::Event;
 use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::modplatforms::modrinth::search::VersionID;
 use crate::domain::runtime_path::InstancePath;
 use crate::domain::vtask::VisualTaskId;
 use crate::managers::instance::modpack::packinfo;
+use crate::managers::java::java_checker::{JavaChecker, RealJavaChecker};
 use crate::managers::java::managed::Step;
+use crate::managers::minecraft::assets::get_assets_dir;
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
 use crate::managers::minecraft::modrinth;
 use crate::managers::minecraft::{curseforge, UpdateValue};
+use crate::managers::modplatforms::curseforge::convert_cf_version_to_standard_version;
+use crate::managers::modplatforms::modrinth::convert_mr_version_to_standard_version;
 use crate::managers::vtask::Subtask;
 use crate::util::NormalizedWalkdir;
 
@@ -34,6 +38,7 @@ use chrono::{DateTime, Local, Utc};
 use futures::Future;
 use itertools::Itertools;
 use md5::{Digest, Md5};
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::io;
 use std::path::{Path, PathBuf};
@@ -47,13 +52,15 @@ use tracing::{debug, info, trace};
 
 #[derive(Debug)]
 pub struct PersistenceManager {
-    ensure_lock: Semaphore,
+    instance_download_lock: Semaphore,
+    loader_install_lock: Semaphore,
 }
 
 impl PersistenceManager {
     pub fn new() -> Self {
         Self {
-            ensure_lock: Semaphore::new(1),
+            instance_download_lock: Semaphore::new(1),
+            loader_install_lock: Semaphore::new(1),
         }
     }
 }
@@ -68,6 +75,7 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         launch_account: Option<FullAccount>,
         callback_task: Option<InstanceCallback>,
+        deep_check: bool,
     ) -> anyhow::Result<(JoinHandle<()>, VisualTaskId)> {
         let initial_time = Utc::now();
 
@@ -82,6 +90,9 @@ impl ManagerRef<'_, InstanceManager> {
 
         match &data.state {
             LaunchState::Inactive { .. } => {}
+            LaunchState::Deleting => {
+                bail!("cannot prepare an instance that is being deleted");
+            }
             LaunchState::Preparing(task_id) => {
                 // dismiss the existing task if its a failure, return if its still in progress.
                 let r = self.app.task_manager().dismiss_task(*task_id).await;
@@ -96,6 +107,13 @@ impl ManagerRef<'_, InstanceManager> {
                 bail!("cannot prepare an instance that is already running");
             }
         }
+
+        let auto_manage_java_system_profiles = self
+            .app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .auto_manage_java_system_profiles;
 
         let mut config = data.config.clone();
 
@@ -154,6 +172,32 @@ impl ManagerRef<'_, InstanceManager> {
             }
         };
 
+        let pre_launch_hook = match config.pre_launch_hook.as_ref() {
+            Some(hook) => Some(hook.clone()),
+            None => {
+                let settings = self.app.settings_manager().get_settings().await?;
+                settings.pre_launch_hook.clone()
+            }
+        };
+
+        let post_exit_hook = match config.post_exit_hook.as_ref() {
+            Some(hook) => Some(hook.clone()),
+            None => {
+                let settings = self.app.settings_manager().get_settings().await?;
+                settings.post_exit_hook.clone()
+            }
+        };
+
+        let wrapper_command = match config.wrapper_command.as_ref() {
+            Some(cmd) => Some(cmd.clone()),
+            None => {
+                let settings = self.app.settings_manager().get_settings().await?;
+                settings.wrapper_command.clone()
+            }
+        };
+
+        let java_override = config.game_configuration.java_override.clone();
+
         let runtime_path = self.app.settings_manager().runtime_path.clone();
         let instance_path = runtime_path
             .get_instances()
@@ -177,15 +221,12 @@ impl ManagerRef<'_, InstanceManager> {
             },
         });
 
-        let wait_task = task.subtask(Translation::InstanceTaskLaunchWaiting);
-        wait_task.set_weight(0.0);
-
         let id = self.app.task_manager().spawn_task(&task).await;
 
         data.state = LaunchState::Preparing(id);
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some((*instance_id).into()));
 
@@ -199,13 +240,6 @@ impl ManagerRef<'_, InstanceManager> {
         let installation_task = tokio::spawn(async move {
             let instance_manager = app.instance_manager();
             let task = task;
-            let _lock = instance_manager
-                .persistence_manager
-                .ensure_lock
-                .acquire()
-                .await
-                .expect("the ensure lock semaphore should never be closed");
-
             let instance_root = instance_path.get_root();
             let setup_path = instance_root.join(".setup");
             let is_first_run = setup_path.is_dir();
@@ -213,18 +247,20 @@ impl ManagerRef<'_, InstanceManager> {
             let mut time_at_start = None;
 
             let try_result: anyhow::Result<_> = async {
-                let do_modpack_install = is_first_run
-                    && !setup_path.join("modpack-complete").is_dir();
+                let do_modpack_install =
+                    is_first_run && !setup_path.join("modpack-complete").is_dir();
 
                 let staging_dir = setup_path.join("staging");
-                let do_modpack_staging = do_modpack_install && !setup_path.join("staging.json").exists();
+                let do_modpack_staging =
+                    do_modpack_install && !setup_path.join("staging.json").exists();
 
                 let packinfo_path = instance_root.join("packinfo.json");
                 let packinfo = match tokio::fs::read_to_string(packinfo_path).await {
-                    Ok(text) => Some(packinfo::parse_packinfo(&text).context("while parsing packinfo json")?),
+                    Ok(text) => Some(
+                        packinfo::parse_packinfo(&text).context("while parsing packinfo json")?,
+                    ),
                     Err(_) => None,
                 };
-
 
                 let t_modpack = match do_modpack_staging {
                     true => Some((
@@ -237,31 +273,33 @@ impl ManagerRef<'_, InstanceManager> {
                     false => None,
                 };
 
-                let t_apply_staging = task.subtask(Translation::InstanceTaskLaunchApplyStagedPatches);
+                let t_apply_staging =
+                    task.subtask(Translation::InstanceTaskLaunchApplyStagedPatches);
 
-                let t_request_version_info = task
-                    .subtask(Translation::InstanceTaskLaunchRequestVersions);
+                let t_request_version_info =
+                    task.subtask(Translation::InstanceTaskLaunchRequestVersions);
 
-                let t_download_files = task
-                    .subtask(Translation::InstanceTaskLaunchDownloadFiles);
+                let t_download_files = task.subtask(Translation::InstanceTaskLaunchDownloadFiles);
                 t_download_files.set_weight(20.0);
-                let t_extract_natives = task
-                    .subtask(Translation::InstanceTaskLaunchExtractNatives);
 
-                let t_reconstruct_assets = task
-                    .subtask(Translation::InstanceTaskReconstructAssets);
+                let t_generating_packinfo =
+                    task.subtask(Translation::InstanceTaskGeneratingPackInfo);
+
+                let t_fill_cache = task.subtask(Translation::InstanceTaskFillCache);
+
+                let t_extract_natives = task.subtask(Translation::InstanceTaskLaunchExtractNatives);
+
+                let t_reconstruct_assets = task.subtask(Translation::InstanceTaskReconstructAssets);
 
                 let t_forge_processors = match is_first_run {
-                    true => Some(
-                        task.subtask(Translation::InstanceTaskLaunchRunForgeProcessors),
-                    ),
+                    true => Some(task.subtask(Translation::InstanceTaskLaunchRunForgeProcessors)),
                     false => None,
                 };
 
                 let t_neoforge_processors = match is_first_run {
-                    true => Some(
-                        task.subtask(Translation::InstanceTaskLaunchRunNeoforgeProcessors),
-                    ),
+                    true => {
+                        Some(task.subtask(Translation::InstanceTaskLaunchRunNeoforgeProcessors))
+                    }
                     false => None,
                 };
 
@@ -274,14 +312,22 @@ impl ManagerRef<'_, InstanceManager> {
                 task.edit(|data| data.state = TaskState::KnownProgress)
                     .await;
 
-                wait_task.complete_opaque();
+                let dummy_string = daedalus::BRANDING
+                    .get_or_init(daedalus::Branding::default)
+                    .dummy_replace_string
+                    .clone();
 
                 let mut downloads = Vec::new();
 
                 let change_version_path = setup_path.join("change-pack-version.json");
 
-                if let Some((t_request, t_download_packfile, t_download_files, t_extract_files, t_addon_metadata)) =
-                    t_modpack
+                if let Some((
+                    t_request,
+                    t_download_packfile,
+                    t_download_files,
+                    t_extract_files,
+                    t_addon_metadata,
+                )) = t_modpack
                 {
                     let mut downloads = Vec::new();
 
@@ -291,11 +337,10 @@ impl ManagerRef<'_, InstanceManager> {
                     let skip_overrides = skip_overrides_path.is_dir();
 
                     let modpack = match tokio::fs::read_to_string(&change_version_path).await {
-                        Ok(text) => Some(Modpack::from(serde_json::from_str::<PackVersionFile>(&text)?)),
-                        Err(_) => {
-
-                            config.modpack.as_ref().map(|m| m.modpack.clone())
-                        },
+                        Ok(text) => Some(Modpack::from(serde_json::from_str::<PackVersionFile>(
+                            &text,
+                        )?)),
+                        Err(_) => config.modpack.as_ref().map(|m| m.modpack.clone()),
                     };
 
                     enum Modplatform {
@@ -309,15 +354,15 @@ impl ManagerRef<'_, InstanceManager> {
                         (false, false, None) => {
                             t_request.complete_opaque();
                             None
-                        },
+                        }
                         (true, _, _) => {
                             t_request.complete_opaque();
                             Some(Modplatform::Curseforge)
-                        },
+                        }
                         (_, true, _) => {
                             t_request.complete_opaque();
                             Some(Modplatform::Modrinth)
-                        },
+                        }
                         (false, false, Some(Modpack::Curseforge(modpack))) => {
                             let file = app
                                 .modplatforms_manager()
@@ -332,15 +377,17 @@ impl ManagerRef<'_, InstanceManager> {
                             t_request.complete_opaque();
 
                             let (modpack_progress_tx, mut modpack_progress_rx) =
-                                tokio::sync::watch::channel(UpdateValue::<(u64,u64)>::new((0, 0)));
-
-                            t_download_files.start_opaque();
+                                tokio::sync::watch::channel(UpdateValue::<(u64, u64)>::new((0, 0)));
 
                             tokio::spawn(async move {
                                 while modpack_progress_rx.changed().await.is_ok() {
                                     {
                                         let (downloaded, total) = modpack_progress_rx.borrow().0;
-                                        t_download_packfile.update_download(downloaded as u32, total as u32, true);
+                                        t_download_packfile.update_download(
+                                            downloaded as u32,
+                                            total as u32,
+                                            true,
+                                        );
                                     }
 
                                     tokio::time::sleep(Duration::from_millis(200)).await;
@@ -355,10 +402,10 @@ impl ManagerRef<'_, InstanceManager> {
                                 &cffile_path,
                                 modpack_progress_tx,
                             )
-                                .await?;
+                            .await?;
 
                             Some(Modplatform::Curseforge)
-                        },
+                        }
                         (false, false, Some(Modpack::Modrinth(modpack))) => {
                             let file = app
                                 .modplatforms_manager()
@@ -367,14 +414,14 @@ impl ManagerRef<'_, InstanceManager> {
                                 .await?
                                 .files
                                 .into_iter()
-                                .reduce(|a, b| {
-                                    if b.primary {
-                                        b
-                                    } else {
-                                        a
-                                    }
-                                })
-                                .ok_or_else(|| anyhow!("Modrinth project '{}' version '{}' does not have a file", modpack.project_id, modpack.version_id))?;
+                                .reduce(|a, b| if b.primary { b } else { a })
+                                .ok_or_else(|| {
+                                    anyhow!(
+                                        "Modrinth project '{}' version '{}' does not have a file",
+                                        modpack.project_id,
+                                        modpack.version_id
+                                    )
+                                })?;
 
                             t_request.complete_opaque();
 
@@ -385,7 +432,11 @@ impl ManagerRef<'_, InstanceManager> {
                                 while modpack_progress_rx.changed().await.is_ok() {
                                     {
                                         let (downloaded, total) = modpack_progress_rx.borrow().0;
-                                        t_download_packfile.update_download(downloaded as u32, total as u32, true);
+                                        t_download_packfile.update_download(
+                                            downloaded as u32,
+                                            total as u32,
+                                            true,
+                                        );
                                     }
 
                                     tokio::time::sleep(Duration::from_millis(200)).await;
@@ -394,13 +445,19 @@ impl ManagerRef<'_, InstanceManager> {
                                 t_download_packfile.complete_download();
                             });
 
-                            modrinth::download_mrpack(&app, &file, &mrfile_path, modpack_progress_tx).await?;
+                            modrinth::download_mrpack(
+                                &app,
+                                &file,
+                                &mrfile_path,
+                                modpack_progress_tx,
+                            )
+                            .await?;
 
                             Some(Modplatform::Modrinth)
-                       }
+                        }
                     };
 
-                    tokio::fs::create_dir_all(&staging_dir).await?;
+                    tokio::fs::create_dir_all(&staging_dir.join("instance")).await?;
 
                     let instance_prep_path = InstancePath::new(staging_dir.clone());
 
@@ -420,9 +477,13 @@ impl ManagerRef<'_, InstanceManager> {
                                     {
                                         let progress = modpack_progress_rx.borrow();
 
-                                        tracker.extract_addon_overrides.update_from(&progress.extract_addon_overrides, |(completed, total)| {
-                                            t_extract_files.update_items(completed as u32, total as u32);
-                                        });
+                                        tracker.extract_addon_overrides.update_from(
+                                            &progress.extract_addon_overrides,
+                                            |(completed, total)| {
+                                                t_extract_files
+                                                    .update_items(completed as u32, total as u32);
+                                            },
+                                        );
                                     }
 
                                     tokio::time::sleep(Duration::from_millis(200)).await;
@@ -438,13 +499,11 @@ impl ManagerRef<'_, InstanceManager> {
                                 t_addon_metadata,
                                 modpack_progress_tx,
                             )
-                                .await
-                                .map_err(
-                                    |e| {
-                                        tracing::error!("Error preparing modpack: {:?}", e);
-                                        e
-                                    }
-                                )?;
+                            .await
+                            .map_err(|e| {
+                                tracing::error!("Error preparing modpack: {:?}", e);
+                                e
+                            })?;
 
                             tokio::fs::create_dir_all(skip_overrides_path).await?;
 
@@ -455,7 +514,16 @@ impl ManagerRef<'_, InstanceManager> {
                                 }
                             }
 
-                            Some(modpack_info.manifest.minecraft.try_into()?)
+                            let curseforge_version = modpack_info.manifest.minecraft;
+
+                            let gdl_version = convert_cf_version_to_standard_version(
+                                app.clone(),
+                                curseforge_version,
+                                dummy_string.clone(),
+                            )
+                            .await?;
+
+                            Some(gdl_version)
                         }
                         Some(Modplatform::Modrinth) => {
                             let (modpack_progress_tx, mut modpack_progress_rx) =
@@ -467,13 +535,16 @@ impl ManagerRef<'_, InstanceManager> {
                                         let progress = modpack_progress_rx.borrow();
                                         match *progress {
                                             modrinth::ProgressState::Idle => {}
-                                            modrinth::ProgressState::ExtractingPackOverrides(count, total) => {
-                                                t_extract_files.update_items(count as u32, total as u32)
-                                            }
-                                            modrinth::ProgressState::AcquiringPackMetadata(count, total) => {
-                                                t_addon_metadata
-                                                    .update_items(count as u32, total as u32)
-                                            }
+                                            modrinth::ProgressState::ExtractingPackOverrides(
+                                                count,
+                                                total,
+                                            ) => t_extract_files
+                                                .update_items(count as u32, total as u32),
+                                            modrinth::ProgressState::AcquiringPackMetadata(
+                                                count,
+                                                total,
+                                            ) => t_addon_metadata
+                                                .update_items(count as u32, total as u32),
                                         }
                                     }
 
@@ -487,8 +558,9 @@ impl ManagerRef<'_, InstanceManager> {
                                 &instance_prep_path,
                                 skip_overrides,
                                 packinfo.as_ref(),
-                                modpack_progress_tx
-                            ).await?;
+                                modpack_progress_tx,
+                            )
+                            .await?;
 
                             tokio::fs::create_dir_all(skip_overrides_path).await?;
 
@@ -499,13 +571,23 @@ impl ManagerRef<'_, InstanceManager> {
                                 }
                             }
 
-                            Some(modpack_info.index.dependencies.try_into()?)
+                            let modrinth_version = modpack_info.index.dependencies;
+
+                            let gdl_version = convert_mr_version_to_standard_version(
+                                app.clone(),
+                                modrinth_version,
+                            )
+                            .await?;
+
+                            Some(gdl_version)
                         }
                         None => None,
                     };
 
                     let (progress_watch_tx, mut progress_watch_rx) =
                         tokio::sync::watch::channel(carbon_net::Progress::new());
+
+                    t_download_files.start_opaque();
 
                     // dropped when the sender is dropped
                     tokio::spawn(async move {
@@ -525,9 +607,20 @@ impl ManagerRef<'_, InstanceManager> {
                         t_download_files.complete_download();
                     });
 
-                    let concurrency = app.settings_manager().get_settings().await?.concurrent_downloads;
+                    let concurrency = app
+                        .settings_manager()
+                        .get_settings()
+                        .await?
+                        .concurrent_downloads;
 
-                    carbon_net::download_multiple(downloads, progress_watch_tx, concurrency as usize).await?;
+                    carbon_net::download_multiple(
+                        &downloads[..],
+                        Some(progress_watch_tx),
+                        concurrency as usize,
+                        deep_check,
+                        false,
+                    )
+                    .await?;
 
                     if let Some(v) = v {
                         tracing::info!("Modpack version: {v:?}");
@@ -558,11 +651,16 @@ impl ManagerRef<'_, InstanceManager> {
                         let json = make_instance_config(config.clone())?;
                         tokio::fs::write(path.join("instance.json"), json).await?;
 
-                        instance_manager.instances.write().await
+                        instance_manager
+                            .instances
+                            .write()
+                            .await
                             .get_mut(&instance_id)
                             .ok_or_else(|| anyhow!("Instance was deleted while loading"))?
                             .data_mut()?
                             .config = config;
+
+                        app.invalidate(GET_MODPACK_INFO, Some(instance_id.0.into()));
                     }
 
                     // normally there would be a problem here because we would be skipping any mods removed by users
@@ -571,7 +669,9 @@ impl ManagerRef<'_, InstanceManager> {
                     // snapshot filetree before applying
                     let mut walker = NormalizedWalkdir::new(&staging_dir.join("instance"))?;
                     while let Some(entry) = walker.next()? {
-                        if entry.is_dir { continue }
+                        if entry.is_dir {
+                            continue;
+                        }
                         files.push(entry.relative_path.to_string());
                     }
 
@@ -584,15 +684,17 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let overwrite_changed = !change_version_path.exists(); // TODO
 
-                    let staged_text = tokio::fs::read_to_string(setup_path.join("staging.json")).await?;
+                    let staged_text =
+                        tokio::fs::read_to_string(setup_path.join("staging.json")).await?;
                     let staging_snapshot = serde_json::from_str::<Vec<&str>>(&staged_text)
                         .context("could not parse staging snapshot")?;
 
                     debug!("Applying staged instance files");
                     let r: anyhow::Result<_> = async {
                         if let Some(packinfo) = packinfo {
-                            for (oldfile, oldfilehash) in &packinfo.files { // TODO: diff in a way that stays sane across a crash
-                                let mut original_file = instance_root.join("instance").join(&oldfile[1..]);
+                            for (oldfile, oldfilehash) in &packinfo.files {
+                                let mut original_file =
+                                    instance_root.join("instance").join(&oldfile[1..]);
 
                                 if !original_file.exists() {
                                     let mut name = original_file.file_name().unwrap().to_owned();
@@ -601,7 +703,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                                     if !original_file.exists() {
                                         // either the user deleted it or we already deleted it in the next check, skip
-                                        continue
+                                        continue;
                                     }
                                 }
 
@@ -610,13 +712,13 @@ impl ManagerRef<'_, InstanceManager> {
 
                                 if original_md5 != oldfilehash.md5 {
                                     // the user has modified this file so we shouldn't touch it
-                                    continue
+                                    continue;
                                 }
 
                                 if !staging_snapshot.contains(&(&oldfile as &str)) {
                                     // file is not present in new version and old version was not changed, delete
                                     tokio::fs::remove_file(original_file).await?;
-                                    continue
+                                    continue;
                                 }
 
                                 let staged_file = staging_dir.join("instance").join(&oldfile[1..]);
@@ -645,7 +747,8 @@ impl ManagerRef<'_, InstanceManager> {
                         }
 
                         Ok(())
-                    }.await;
+                    }
+                    .await;
 
                     if let Err(e) = r {
                         return Err(e.context("Failed to apply staged instance changes"));
@@ -663,126 +766,214 @@ impl ManagerRef<'_, InstanceManager> {
                     None => bail!("Instance has no associated game version and cannot be launched"),
                 };
 
-                t_request_version_info.update_items(0, 3);
-                let manifest = app.minecraft_manager().get_minecraft_manifest().await.map_err(
-                    |e| anyhow::anyhow!("Error getting minecraft manifest: {:?}", e)
-                )?;
-                t_request_version_info.update_items(1, 3);
-
-                let manifest_version = manifest
-                    .versions
-                    .into_iter()
-                    .find(|v| v.id == version.release)
-                    .ok_or_else(|| anyhow!("Could not find game version {}", version.release))?;
+                t_request_version_info.update_items(0, 2);
 
                 let mut version_info = app
                     .minecraft_manager()
-                    .get_minecraft_version(manifest_version.clone())
+                    .get_minecraft_version(&version.release)
                     .await
                     .map_err(|e| anyhow::anyhow!("Error getting minecraft version: {:?}", e))?;
 
                 let lwjgl_group = get_lwjgl_meta(
+                    Arc::clone(&app.prisma_client),
                     &app.reqwest_client,
                     &version_info,
                     &app.minecraft_manager().meta_base_url,
                 )
-                    .await
-                    .map_err(|e| anyhow::anyhow!("Error getting lwjgl meta: {:?}", e))?;
+                .await
+                .map_err(|e| anyhow::anyhow!("Error getting lwjgl meta: {:?}", e))?;
 
-                t_request_version_info.update_items(2, 3);
+                t_request_version_info.update_items(1, 2);
+
+                let mut required_java_system_profile = SystemJavaProfileName::from(
+                    daedalus::minecraft::MinecraftJavaProfile::try_from(
+                        &version_info
+                            .java_version
+                            .as_ref()
+                            .ok_or_else(|| {
+                                anyhow::anyhow!("instance java version unsupported")
+                            })?
+                            .component as &str,
+                    )?,
+                );
+
+                tracing::debug!("This instance requires system profile: {:?}", required_java_system_profile);
+
+                let java_component_override = match java_override {
+                    Some(path) => match path {
+                        JavaOverride::Path(value) => {
+                            if let Some(value) = value {
+                                trace!("Java path override: {:?}", value);
+                                Some(
+                                    RealJavaChecker::get_bin_info(
+                                        &RealJavaChecker,
+                                        &PathBuf::from(value),
+                                        JavaComponentType::Custom,
+                                    )
+                                    .await,
+                                )
+                            } else {
+                                Some(anyhow::bail!("Java path is not set"))
+                            }
+                        }
+                        JavaOverride::Profile(value) => {
+                            if let Some(value) = value {
+                                if let Ok(all_profiles) = app.java_manager().get_java_profiles().await
+                                {
+                                    if let Ok(all_javas) =
+                                        app.java_manager().get_available_javas().await
+                                    {
+                                        let mut result = None;
+                                        for profile in all_profiles.iter() {
+                                            if profile.name == value {
+                                                if auto_manage_java_system_profiles && profile.is_system && value == required_java_system_profile.to_string() {
+                                                    // !! THIS IS USED TO EFFECTIVELY TREAT IT AS A NON-OVERRIDE, SO THAT THE LAUNCHER MANAGES THE PROFILE NORMALLY !!
+                                                    trace!("Java profile override BUT ignoring: {:?}", profile.name);
+                                                    result = None;
+                                                } else {
+                                                    if let Some(java_id) = profile.java_id.as_ref() {
+                                                        let java_component =
+                                                            all_javas.iter().find_map(|javas| {
+                                                                javas.1.iter().find_map(|java| {
+                                                                    if &java.id == java_id {
+                                                                        Some(java.component.clone())
+                                                                    } else {
+                                                                        None
+                                                                    }
+                                                                })
+                                                            });
+
+                                                        if let Some(java_component) = java_component {
+                                                            trace!("Java profile override: {:?}", java_component);
+                                                            result = Some(Ok(java_component));
+                                                        } else {
+                                                            result = Some(anyhow::bail!(
+                                                                "Java profile has associated java id that does not exist"
+                                                            ));
+                                                        }
+                                                    } else {
+                                                        result = Some(anyhow::bail!(
+                                                            "Java profile has no associated java id"
+                                                        ));
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        result
+                                    } else {
+                                        Some(anyhow::bail!("Could not get available javas"))
+                                    }
+                                } else {
+                                    Some(anyhow::bail!("Could not get java profiles"))
+                                }
+                            } else {
+                                Some(anyhow::bail!("Java profile is not set"))
+                            }
+                        }
+                    },
+                    None => None,
+                };
 
                 let java = {
-                    // If instance has profile override, short circuit and use that
-                    // ....
-                    // else
+                    if let Some(java_component_override) = java_component_override {
+                        java_component_override?
+                    } else {
+                        // Forge 1.16.5 requires an older java 8 version so we inject the legacy fixed 1 profile
+                        if &version.release == "1.16.5"
+                            && *&version
+                                .modloaders
+                                .iter()
+                                .find(|v| v.type_ == ModLoaderType::Forge)
+                                .is_some()
+                        {
+                            required_java_system_profile = SystemJavaProfileName::LegacyFixed1;
+                        }
 
-                    let mut required_java = SystemJavaProfileName::from(
-                        daedalus::minecraft::MinecraftJavaProfile::try_from(
-                            &version_info
-                                .java_version
-                                .as_ref()
-                                .ok_or_else(|| {
-                                    anyhow::anyhow!("instance java version unsupported")
-                                })?
-                                .component as &str,
-                        )?,
-                    );
 
-                    // Forge 1.16.5 requires an older java 8 version so we inject the legacy fixed 1 profile
-                    if &version.release == "1.16.5" && *&version.modloaders.iter().find(|v| v.type_ == ModLoaderType::Forge).is_some() {
-                        required_java = SystemJavaProfileName::LegacyFixed1;
-                    }
+                        let usable_java = app
+                            .java_manager()
+                            .get_usable_java_for_profile_name(required_java_system_profile)
+                            .await?;
 
-                    tracing::debug!("Required java: {:?}", required_java);
+                        tracing::debug!("Usable java: {:?}", usable_java);
 
-                    let auto_manage_java = app.settings_manager().get_settings().await?.auto_manage_java;
+                        match usable_java {
+                            Some(path) => path,
+                            None => {
+                                if !auto_manage_java_system_profiles {
+                                    bail!(
+                                        "No usable java found and auto manage java is disabled"
+                                    );
+                                }
 
-                    let usable_java = app.java_manager().get_usable_java_for_profile_name(required_java).await?;
+                                let t_download_java =
+                                    task.subtask(Translation::InstanceTaskLaunchDownloadJava);
 
-                    tracing::debug!("Usable java: {:?}", usable_java);
+                                let t_extract_java =
+                                    task.subtask(Translation::InstanceTaskLaunchExtractJava);
+                                t_download_java.set_weight(0.0);
+                                t_extract_java.set_weight(0.0);
 
-                    match usable_java {
-                        Some(path) => path,
-                        None => {
-                            if !auto_manage_java {
-                                return bail!("No usable java found and auto manage java is disabled");
-                            }
+                                let (progress_watch_tx, mut progress_watch_rx) =
+                                    watch::channel(Step::Idle);
 
-                            let t_download_java = task
-                                .subtask(Translation::InstanceTaskLaunchDownloadJava);
+                                // dropped when the sender is dropped
+                                tokio::spawn(async move {
+                                    let mut started = false;
+                                    let mut dl_completed = false;
 
-                            let t_extract_java = task
-                                .subtask(Translation::InstanceTaskLaunchExtractJava);
-                            t_download_java.set_weight(0.0);
-                            t_extract_java.set_weight(0.0);
+                                    while progress_watch_rx.changed().await.is_ok() {
+                                        let step = progress_watch_rx.borrow();
 
-                            let (progress_watch_tx, mut progress_watch_rx) = watch::channel(Step::Idle);
+                                        if !started && !matches!(*step, Step::Idle) {
+                                            t_download_java.set_weight(10.0);
+                                            t_extract_java.set_weight(3.0);
+                                            started = true;
+                                        }
 
-                            // dropped when the sender is dropped
-                            tokio::spawn(async move {
-                                let mut started = false;
-                                let mut dl_completed = false;
+                                        match *step {
+                                            Step::Downloading(downloaded, total) => t_download_java
+                                                .update_download(
+                                                    downloaded as u32,
+                                                    total as u32,
+                                                    true,
+                                                ),
+                                            Step::Extracting(count, total) => {
+                                                if !dl_completed {
+                                                    t_download_java.complete_download();
+                                                    dl_completed = true;
+                                                }
 
-                                while progress_watch_rx.changed().await.is_ok() {
-                                    let step = progress_watch_rx.borrow();
-
-                                    if !started && !matches!(*step, Step::Idle) {
-                                        t_download_java.set_weight(10.0);
-                                        t_extract_java.set_weight(3.0);
-                                        started = true;
-                                    }
-
-                                    match *step {
-                                        Step::Downloading(downloaded, total) => t_download_java.update_download(downloaded as u32, total as u32, true),
-                                        Step::Extracting(count, total) => {
-                                            if !dl_completed {
-                                                t_download_java.complete_download();
-                                                dl_completed = true;
+                                                t_extract_java
+                                                    .update_items(count as u32, total as u32);
                                             }
 
-                                            t_extract_java.update_items(count as u32, total as u32);
+                                            Step::Done => {
+                                                t_download_java.complete_download();
+                                                t_extract_java.complete_items();
+                                            }
+
+                                            Step::Idle => {}
                                         }
 
-                                        Step::Done => {
-                                            t_download_java.complete_download();
-                                            t_extract_java.complete_items();
-                                        }
-
-                                        Step::Idle => {}
+                                        // this is already debounced in setup_managed
                                     }
+                                });
 
-                                    // this is already debounced in setup_managed
+                                let path = app
+                                    .java_manager()
+                                    .require_java_install(
+                                        required_java_system_profile,
+                                        true,
+                                        Some(progress_watch_tx),
+                                    )
+                                    .await?;
+
+                                match path {
+                                    Some(path) => path,
+                                    None => return Ok(None),
                                 }
-                            });
-
-                            let path = app
-                                .java_manager()
-                                .require_java_install(required_java, true, Some(progress_watch_tx))
-                                .await?;
-
-                            match path {
-                                Some(path) => path,
-                                None => return Ok(None),
                             }
                         }
                     }
@@ -798,48 +989,18 @@ impl ManagerRef<'_, InstanceManager> {
                                 anyhow::bail!("Forge version is empty");
                             }
 
-                            let forge_manifest = app.minecraft_manager().get_forge_manifest().await.with_context(
-                                || format!("Error getting forge manifest for version {}", version.release)
-                            )?;
-
-                            let forge_version =
-                                match forge_version.strip_prefix(&format!("{}-", version.release)) {
-                                    None => forge_version.clone(),
-                                    Some(sub) => sub.to_string(),
-                                };
-
-                            let forge_manifest_version = forge_manifest
-                                .game_versions
-                                .into_iter()
-                                .find(|v| v.id == version.release)
-                                .ok_or_else(|| {
-                                    anyhow!("Could not find any forge versions for mc version {}", version.release)
-                                })?
-                                .loaders
-                                .into_iter()
-                                .find(|v| {
-                                    let exact_match = v.id == format!("{}-{}", version.release, forge_version);
-                                    let fuzzy_match = v.id.starts_with(&format!("{}-{}", version.release, forge_version));
-
-                                    exact_match || fuzzy_match
-                                })
-                                .ok_or_else(|| {
-                                    anyhow!(
-                                        "Could not find forge version {}-{} for minecraft version {}",
-                                        version.release,
-                                        forge_version,
-                                        version.release,
-                                    )
-                                })?;
-
                             let forge_version = crate::managers::minecraft::forge::get_version(
+                                app.prisma_client.clone(),
                                 &app.reqwest_client,
-                                forge_manifest_version,
+                                forge_version,
+                                &app.minecraft_manager().meta_base_url,
                             )
                             .await?;
 
-                            version_info =
-                                daedalus::modded::merge_partial_version(forge_version, version_info);
+                            version_info = daedalus::modded::merge_partial_version(
+                                forge_version,
+                                version_info,
+                            );
                         }
                         ModLoader {
                             type_: ModLoaderType::Neoforge,
@@ -849,47 +1010,19 @@ impl ManagerRef<'_, InstanceManager> {
                                 anyhow::bail!("Neoforge version is empty");
                             }
 
-                            let neoforge_manifest = app.minecraft_manager().get_neoforge_manifest().await?;
-
                             let neoforge_version =
-                                match neoforge_version.strip_prefix(&format!("{}-", version.release)) {
-                                    None => neoforge_version.clone(),
-                                    Some(sub) => sub.to_string(),
-                                };
+                                crate::managers::minecraft::neoforge::get_version(
+                                    app.prisma_client.clone(),
+                                    &app.reqwest_client,
+                                    neoforge_version,
+                                    &app.minecraft_manager().meta_base_url,
+                                )
+                                .await?;
 
-                            let neoforge_manifest_version = neoforge_manifest
-                                .game_versions
-                                .into_iter()
-                                .find(|v| v.id == version.release)
-                                .ok_or_else(|| {
-                                    anyhow!("Could not find any neoforge versions for mc version {}", version.release)
-                                })?
-                                .loaders
-                                .into_iter()
-                                .find(|v| {
-                                    let exact_match = v.id == format!("{}-{}", version.release, neoforge_version);
-                                    let fuzzy_match = v.id.starts_with(&format!("{}-{}", version.release, neoforge_version));
-                                    let only_version = v.id == neoforge_version;
-
-                                    exact_match || fuzzy_match || only_version
-                                })
-                                .ok_or_else(|| {
-                                    anyhow!(
-                                        "Could not find neoforge version {}-{} for minecraft version {}",
-                                        version.release,
-                                        neoforge_version,
-                                        version.release,
-                                    )
-                                })?;
-
-                            let neoforge_version = crate::managers::minecraft::neoforge::get_version(
-                                &app.reqwest_client,
-                                neoforge_manifest_version,
-                            )
-                            .await?;
-
-                            version_info =
-                                daedalus::modded::merge_partial_version(neoforge_version, version_info);
+                            version_info = daedalus::modded::merge_partial_version(
+                                neoforge_version,
+                                version_info,
+                            );
                         }
                         ModLoader {
                             type_: ModLoaderType::Fabric,
@@ -899,57 +1032,23 @@ impl ManagerRef<'_, InstanceManager> {
                                 anyhow::bail!("Fabric version is empty");
                             }
 
-                            let fabric_manifest = app.minecraft_manager().get_fabric_manifest().await?;
-
                             let fabric_version =
-                                match fabric_version.strip_prefix(&format!("{}-", version.release)) {
-                                    None => fabric_version.clone(),
-                                    Some(sub) => sub.to_string(),
-                                };
-
-                            let dummy_string = daedalus::BRANDING
-                                .get_or_init(daedalus::Branding::default)
-                                .dummy_replace_string
-                                .clone();
-
-                            let supported = fabric_manifest
-                                    .game_versions
-                                    .iter()
-                                    .any(|v| v.id == version.release);
-
-                            if !supported {
-                                return Err(anyhow!("Fabric does not support version {}", version.release));
-                            }
-
-                            let fabric_manifest_version = fabric_manifest
-                                .game_versions
-                                .into_iter()
-                                .find(|v| v.id == dummy_string)
-                                .ok_or_else(|| {
-                                    anyhow!(
-                                        "Could not find fabric metadata template using {}",
-                                        dummy_string
+                                crate::managers::minecraft::fabric::replace_template(
+                                    &crate::managers::minecraft::fabric::get_version(
+                                        app.prisma_client.clone(),
+                                        &app.reqwest_client,
+                                        &fabric_version,
+                                        &app.minecraft_manager().meta_base_url,
                                     )
-                                })?
-                                .loaders
-                                .into_iter()
-                                .find(|v| v.id == fabric_version)
-                                .ok_or_else(|| {
-                                    anyhow!("Could not find fabric version {}", fabric_version)
-                                })?;
+                                    .await?,
+                                    &version.release,
+                                    &dummy_string,
+                                );
 
-                            let fabric_version = crate::managers::minecraft::fabric::replace_template(
-                                &crate::managers::minecraft::fabric::get_version(
-                                    &app.reqwest_client,
-                                    fabric_manifest_version,
-                                )
-                                .await?,
-                                &version.release,
-                                &dummy_string,
+                            version_info = daedalus::modded::merge_partial_version(
+                                fabric_version,
+                                version_info,
                             );
-
-                            version_info =
-                                daedalus::modded::merge_partial_version(fabric_version, version_info);
                         }
                         ModLoader {
                             type_: ModLoaderType::Quilt,
@@ -959,62 +1058,27 @@ impl ManagerRef<'_, InstanceManager> {
                                 anyhow::bail!("Quilt version is empty");
                             }
 
-                            let quilt_manifest = app.minecraft_manager().get_quilt_manifest().await?;
-
-                            let quilt_version =
-                                match quilt_version.strip_prefix(&format!("{}-", version.release)) {
-                                    None => quilt_version.clone(),
-                                    Some(sub) => sub.to_string(),
-                                };
-
-                            let dummy_string = daedalus::BRANDING
-                                .get_or_init(daedalus::Branding::default)
-                                .dummy_replace_string
-                                .clone();
-
-                            let supported = quilt_manifest
-                                    .game_versions
-                                    .iter()
-                                    .any(|v| v.id == version.release);
-
-                            if !supported {
-                                return Err(anyhow!("Quilt does not support version {}", version.release));
-                            }
-
-                            let quilt_manifest_version = quilt_manifest
-                                .game_versions
-                                .into_iter()
-                                .find(|v| v.id == dummy_string)
-                                .ok_or_else(|| {
-                                    anyhow!(
-                                        "Could not find quilt metadata template using {}",
-                                        dummy_string
-                                    )
-                                })?
-                                .loaders
-                                .into_iter()
-                                .find(|v| v.id == quilt_version)
-                                .ok_or_else(|| {
-                                    anyhow!("Could not find quilt version {}", quilt_version)
-                                })?;
-
                             let quilt_version = crate::managers::minecraft::quilt::replace_template(
                                 &crate::managers::minecraft::quilt::get_version(
+                                    app.prisma_client.clone(),
                                     &app.reqwest_client,
-                                    quilt_manifest_version,
+                                    &quilt_version,
+                                    &app.minecraft_manager().meta_base_url,
                                 )
                                 .await?,
                                 &version.release,
                                 &dummy_string,
                             );
 
-                            version_info =
-                                daedalus::modded::merge_partial_version(quilt_version, version_info);
+                            version_info = daedalus::modded::merge_partial_version(
+                                quilt_version,
+                                version_info,
+                            );
                         }
                     }
                 }
 
-                t_request_version_info.update_items(3, 3);
+                t_request_version_info.update_items(2, 2);
 
                 downloads.extend(
                     app.minecraft_manager()
@@ -1022,36 +1086,70 @@ impl ManagerRef<'_, InstanceManager> {
                         .await?,
                 );
 
-                let (progress_watch_tx, mut progress_watch_rx) =
-                    tokio::sync::watch::channel(carbon_net::Progress::new());
+                let concurrency = app
+                    .settings_manager()
+                    .get_settings()
+                    .await?
+                    .concurrent_downloads;
 
-                // dropped when the sender is dropped
-                tokio::spawn(async move {
-                    while progress_watch_rx.changed().await.is_ok() {
-                        {
-                            let progress = progress_watch_rx.borrow();
-                            t_download_files.update_download(
-                                progress.current_size as u32,
-                                progress.total_size as u32,
-                                false,
-                            );
+                let download_required = carbon_net::download_multiple(
+                    &downloads[..],
+                    None,
+                    concurrency as usize,
+                    deep_check,
+                    true,
+                )
+                .await?;
+
+                if download_required {
+                    let wait_task = task.subtask(Translation::InstanceTaskLaunchWaitDownloadFiles);
+                    wait_task.set_weight(0.0);
+
+                    let _lock = instance_manager
+                        .persistence_manager
+                        .instance_download_lock
+                        .acquire()
+                        .await
+                        .unwrap();
+
+                    let (progress_watch_tx, mut progress_watch_rx) =
+                        tokio::sync::watch::channel(carbon_net::Progress::new());
+
+                    // dropped when the sender is dropped
+                    tokio::spawn(async move {
+                        while progress_watch_rx.changed().await.is_ok() {
+                            {
+                                let progress = progress_watch_rx.borrow();
+                                t_download_files.update_download(
+                                    progress.current_size as u32,
+                                    progress.total_size as u32,
+                                    false,
+                                );
+                            }
+
+                            tokio::time::sleep(Duration::from_millis(200)).await;
                         }
 
-                        tokio::time::sleep(Duration::from_millis(200)).await;
-                    }
+                        t_download_files.complete_download();
+                    });
 
-                    t_download_files.complete_download();
-                });
-
-                let concurrency = app.settings_manager().get_settings().await?.concurrent_downloads;
-
-                carbon_net::download_multiple(downloads, progress_watch_tx, concurrency as usize).await?;
+                    carbon_net::download_multiple(
+                        &downloads[..],
+                        Some(progress_watch_tx),
+                        concurrency as usize,
+                        deep_check,
+                        false,
+                    )
+                    .await?;
+                }
 
                 // update mod metadata and add modpack complete flag after mods are downloaded
                 if is_first_run {
                     trace!("marking modpack initialization as complete");
 
                     if do_modpack_install {
+                        t_generating_packinfo.start_opaque();
+
                         let staging_path = setup_path.join("staging.json");
 
                         let staged_text;
@@ -1059,22 +1157,36 @@ impl ManagerRef<'_, InstanceManager> {
 
                         if staging_path.exists() {
                             staged_text = tokio::fs::read_to_string(staging_path).await?;
-                            filter = Some(serde_json::from_str::<Vec<&str>>(&staged_text)
-                                .context("could not parse staging snapshot for packinfo creation")?);
+                            filter =
+                                Some(serde_json::from_str::<Vec<&str>>(&staged_text).context(
+                                    "could not parse staging snapshot for packinfo creation",
+                                )?);
                         }
 
-                        let packinfo = packinfo::scan_dir(&instance_path.get_data_path(), filter.as_ref()).await?;
+                        let packinfo =
+                            packinfo::scan_dir(&instance_path.get_data_path(), filter.as_ref())
+                                .await?;
                         let packinfo_str = packinfo::make_packinfo(packinfo)?;
-                        tokio::fs::write(instance_path.get_root().join("packinfo.json"), packinfo_str).await?;
+                        tokio::fs::write(
+                            instance_path.get_root().join("packinfo.json"),
+                            packinfo_str,
+                        )
+                        .await?;
+
+                        t_generating_packinfo.complete_opaque();
                     }
 
                     tokio::fs::create_dir_all(setup_path.join("modpack-complete")).await?;
 
                     tracing::info!("queueing metadata caching for running instance");
 
+                    t_fill_cache.start_opaque();
+
                     app.meta_cache_manager()
                         .queue_caching(instance_id, true)
                         .await;
+
+                    t_fill_cache.complete_opaque();
 
                     trace!("queued metadata caching");
                 }
@@ -1091,10 +1203,13 @@ impl ManagerRef<'_, InstanceManager> {
 
                 t_reconstruct_assets.start_opaque();
                 managers::minecraft::assets::reconstruct_assets(
-                    &version_info.assets,
+                    Arc::clone(&app.prisma_client),
+                    app.reqwest_client.clone(),
+                    &version_info.asset_index,
                     runtime_path.get_assets(),
                     instance_path.get_resources_path(),
-                ).await?;
+                )
+                .await?;
                 t_reconstruct_assets.complete_opaque();
 
                 let libraries_path = runtime_path.get_libraries();
@@ -1105,6 +1220,15 @@ impl ManagerRef<'_, InstanceManager> {
                         .as_ref()
                         .unwrap_or(&version_info.id),
                 );
+                let assets_dir = get_assets_dir(
+                    app.prisma_client.clone(),
+                    app.reqwest_client.clone(),
+                    &version_info.asset_index,
+                    runtime_path.get_assets(),
+                    instance_path.get_resources_path(),
+                )
+                .await
+                .unwrap();
 
                 for modloader in version.modloaders.iter() {
                     let instance_path = instance_path.clone();
@@ -1120,13 +1244,19 @@ impl ManagerRef<'_, InstanceManager> {
                             if let Some(t_forge_processors) = &t_forge_processors {
                                 t_forge_processors.start_opaque();
 
+                                let _lock = instance_manager
+                                    .persistence_manager
+                                    .loader_install_lock
+                                    .acquire()
+                                    .await
+                                    .unwrap();
+
                                 if let Some(processors) = &version_info.processors {
                                     managers::minecraft::forge::execute_processors(
                                         processors,
-                                        version_info
-                                            .data
-                                            .as_ref()
-                                            .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
+                                        version_info.data.as_ref().ok_or_else(|| {
+                                            anyhow::anyhow!("Data entries missing")
+                                        })?,
                                         PathBuf::from(&java.path),
                                         instance_path,
                                         client_path,
@@ -1141,7 +1271,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                                 t_forge_processors.complete_opaque();
                             }
-                        },
+                        }
                         ModLoader {
                             type_: ModLoaderType::Neoforge,
                             ..
@@ -1149,13 +1279,19 @@ impl ManagerRef<'_, InstanceManager> {
                             if let Some(t_neoforge_processors) = &t_neoforge_processors {
                                 t_neoforge_processors.start_opaque();
 
+                                let _lock = instance_manager
+                                    .persistence_manager
+                                    .loader_install_lock
+                                    .acquire()
+                                    .await
+                                    .unwrap();
+
                                 if let Some(processors) = &version_info.processors {
                                     managers::minecraft::neoforge::execute_processors(
                                         processors,
-                                        version_info
-                                            .data
-                                            .as_ref()
-                                            .ok_or_else(|| anyhow::anyhow!("Data entries missing"))?,
+                                        version_info.data.as_ref().ok_or_else(|| {
+                                            anyhow::anyhow!("Data entries missing")
+                                        })?,
                                         PathBuf::from(&java.path),
                                         instance_path.clone(),
                                         client_path,
@@ -1170,7 +1306,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                                 t_neoforge_processors.complete_opaque();
                             }
-                        },
+                        }
                         _ => {}
                     }
                 }
@@ -1180,24 +1316,65 @@ impl ManagerRef<'_, InstanceManager> {
                 }
 
                 match launch_account {
-                    Some(account) => Ok(Some(
-                        managers::minecraft::minecraft::launch_minecraft(
-                            java,
-                            account,
-                            xmx_memory,
-                            xms_memory,
-                            game_resolution,
-                            &extra_java_args,
-                            &runtime_path,
-                            version_info,
-                            &lwjgl_group,
-                            instance_path,
-                        )
-                        .await?,
-                    )),
+                    Some(account) => {
+                        if let Some(pre_launch_hook) = pre_launch_hook.filter(|v| !v.is_empty()) {
+                            let mut split = shlex::split(&pre_launch_hook)
+                                .ok_or_else(|| anyhow::anyhow!("Failed to parse pre-launch hook"))?
+                                .into_iter();
+
+                            let main_command = split
+                                .next()
+                                .ok_or_else(|| anyhow::anyhow!("Pre-launch hook is empty"))?;
+
+                            let pre_launch_command = tokio::process::Command::new(main_command)
+                                .args(split)
+                                .current_dir(instance_path.get_data_path())
+                                .output()
+                                .await
+                                .map_err(|e| {
+                                    anyhow::anyhow!("Pre-launch hook failed to start: {:?}", e)
+                                })?;
+
+                            if !pre_launch_command.status.success() {
+                                return Err(anyhow::anyhow!(
+                                    "Pre-launch hook failed with status: {:?} \n{}",
+                                    pre_launch_command.status,
+                                    String::from_utf8(pre_launch_command.stderr)
+                                        .unwrap_or_default()
+                                ));
+                            }
+
+                            tracing::info!(
+                                "Pre-launch hook completed successfully {}",
+                                String::from_utf8(pre_launch_command.stdout).unwrap_or_default()
+                            );
+                        }
+
+                        Ok(Some(
+                            managers::minecraft::minecraft::launch_minecraft(
+                                java,
+                                account,
+                                xmx_memory,
+                                xms_memory,
+                                game_resolution,
+                                &extra_java_args,
+                                &runtime_path,
+                                version_info,
+                                &lwjgl_group,
+                                instance_path.clone(),
+                                assets_dir,
+                                wrapper_command,
+                            )
+                            .await?,
+                        ))
+                    }
                     None => {
                         if let Some(callback_task) = callback_task {
-                            callback_task(t_finalize_import.expect("If callback_task is Some, subtask will also be Some")).await?;
+                            callback_task(
+                                t_finalize_import
+                                    .expect("If callback_task is Some, subtask will also be Some"),
+                            )
+                            .await?;
                         }
 
                         let _ = app
@@ -1269,7 +1446,7 @@ impl ManagerRef<'_, InstanceManager> {
                             last_stored_time = now;
                             let r = app
                                 .instance_manager()
-                                .update_playtime(instance_id, diff.num_seconds() as u64)
+                                .update_playtime(instance_id, diff.num_seconds() as u32)
                                 .await;
                             if let Err(e) = r {
                                 tracing::error!({ error = ?e }, "error updating instance playtime");
@@ -1291,9 +1468,10 @@ impl ManagerRef<'_, InstanceManager> {
                         .instance_manager()
                         .update_playtime(
                             instance_id,
-                            (Utc::now() - last_stored_time).num_seconds() as u64,
+                            (Utc::now() - last_stored_time).num_seconds() as u32,
                         )
                         .await;
+
                     if let Err(e) = r {
                         tracing::error!({ error = ?e }, "error updating instance playtime");
                     }
@@ -1305,6 +1483,55 @@ impl ManagerRef<'_, InstanceManager> {
                     }
 
                     let _ = app.rich_presence_manager().stop_activity().await;
+
+                    if let Some(post_exit_hook) = post_exit_hook.filter(|v| !v.is_empty()) {
+                        match shlex::split(&post_exit_hook)
+                            .ok_or_else(|| anyhow::anyhow!("Failed to parse post-exit hook"))
+                            .map(|v| v.into_iter())
+                        {
+                            Ok(mut split) => match split.next() {
+                                Some(main_command) => {
+                                    let post_exit_command =
+                                        tokio::process::Command::new(main_command)
+                                            .args(split)
+                                            .current_dir(instance_path.get_data_path())
+                                            .output()
+                                            .await;
+
+                                    match post_exit_command {
+                                        Ok(post_exit_command) => {
+                                            if !post_exit_command.status.success() {
+                                                tracing::error!(
+                                                    "Post-exit hook failed with status: {:?} \n{}",
+                                                    post_exit_command.status,
+                                                    String::from_utf8(post_exit_command.stderr)
+                                                        .unwrap_or_default()
+                                                );
+                                            } else {
+                                                tracing::info!(
+                                                    "Post-exit hook completed successfully {}",
+                                                    String::from_utf8(post_exit_command.stdout)
+                                                        .unwrap_or_default()
+                                                );
+                                            }
+                                        }
+                                        Err(e) => {
+                                            tracing::error!(
+                                                "Post-exit hook failed to start: {:?}",
+                                                e
+                                            );
+                                        }
+                                    }
+                                }
+                                None => {
+                                    tracing::error!("Post-exit hook is empty");
+                                }
+                            },
+                            Err(e) => {
+                                tracing::error!("Post-exit hook failed to parse: {:?}", e);
+                            }
+                        }
+                    }
 
                     let _ = app
                         .instance_manager()
@@ -1417,16 +1644,16 @@ impl ManagerRef<'_, InstanceManager> {
                 // println to stdout is used by the launcher to detect when the game is closed
                 println!("_INSTANCE_STATE_:GAME_CLOSED|{action_to_take}");
             }
-            LaunchState::Preparing(_) => (),
             LaunchState::Running(_) => {
                 // println to stdout is used by the launcher to detect when the game is closed
                 println!("_INSTANCE_STATE_:GAME_LAUNCHED|{action_to_take}");
             }
+            LaunchState::Preparing(_) | LaunchState::Deleting => (),
         };
 
         debug!("changing state of instance {instance_id} to {state:?}");
         instance.data_mut()?.state = state;
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some((*instance_id).into()));
 
@@ -1466,6 +1693,7 @@ pub enum LaunchState {
     Inactive { failed_task: Option<VisualTaskId> },
     Preparing(VisualTaskId),
     Running(RunningInstance),
+    Deleting,
 }
 
 impl Debug for LaunchState {
@@ -1477,6 +1705,7 @@ impl Debug for LaunchState {
                 Self::Inactive { .. } => "Inactive",
                 Self::Preparing(_) => "Preparing",
                 Self::Running(_) => "Running",
+                Self::Deleting => "Deleting",
             }
         )
     }
@@ -1502,6 +1731,7 @@ impl From<&LaunchState> for domain::LaunchState {
                 start_time: *start_time,
                 log_id: *log,
             },
+            LaunchState::Deleting => Self::Deleting,
         }
     }
 }
@@ -1545,7 +1775,7 @@ mod test {
         };
 
         app.instance_manager()
-            .prepare_game(instance_id, Some(account), None)
+            .prepare_game(instance_id, Some(account), None, true)
             .await?;
 
         let task = match app.instance_manager().get_launch_state(instance_id).await? {

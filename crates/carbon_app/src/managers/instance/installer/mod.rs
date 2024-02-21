@@ -33,14 +33,20 @@ use crate::{
     },
 };
 
+use crate::db::{
+    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
+    modrinth_mod_cache as mrdb,
+};
+
 use super::{Instance, InstanceData, InstanceType, InvalidInstanceIdError};
 
 use futures::future::Future;
 
 type BoxedResourceInstaller = Box<dyn ResourceInstaller + Send>;
 type ResourceInstallerGetter = Box<
-    dyn FnOnce() -> Pin<Box<dyn Future<Output = anyhow::Result<BoxedResourceInstaller>> + Send>>
-        + Send,
+    dyn FnOnce() -> Pin<
+            Box<dyn Future<Output = Option<anyhow::Result<BoxedResourceInstaller>>> + Send>,
+        > + Send,
 >;
 
 pub struct DependencyIterator<'iter> {
@@ -82,6 +88,7 @@ pub trait ResourceInstaller: Sync {
     fn dependencies(
         &self,
         app: &Arc<AppInner>,
+        instance_id: InstanceId,
         instance_data: &InstanceData,
         preferred_channel: ModChannel,
     ) -> DependencyIterator;
@@ -110,10 +117,11 @@ impl<I: ResourceInstaller + ?Sized + Send> ResourceInstaller for Box<I> {
     fn dependencies(
         &self,
         app: &Arc<AppInner>,
+        instance_id: InstanceId,
         instance_data: &InstanceData,
         preferred_channel: ModChannel,
     ) -> DependencyIterator {
-        (**self).dependencies(app, instance_data, preferred_channel)
+        (**self).dependencies(app, instance_id, instance_data, preferred_channel)
     }
 
     #[inline]
@@ -249,6 +257,12 @@ impl Installer {
         install_deps: bool,
         replaces_mod_id: Option<String>,
     ) -> anyhow::Result<VisualTaskId> {
+        let download_deps = app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .download_dependencies;
+
         let (task, task_id, instance_path) = async {
             let instance_manager = app.instance_manager();
             let instances = instance_manager.instances.write().await;
@@ -298,7 +312,7 @@ impl Installer {
             &instance_path,
             &task,
             &visited_ids,
-            install_deps,
+            install_deps && download_deps,
             replaces_mod_id,
         )
         .await?;
@@ -341,7 +355,7 @@ impl Installer {
                         .expect("instance should still be valid");
                     let instance_data = instance.data().expect("instance should still be valid");
 
-                    lock.dependencies(app, instance_data, ModChannel::Stable)
+                    lock.dependencies(app, instance_id, instance_data, ModChannel::Stable)
                 };
 
                 let mut processed_deps = Vec::new();
@@ -349,6 +363,10 @@ impl Installer {
 
                 for dep in dep_iter {
                     let dep_result = dep().await;
+                    let Some(dep_result) = dep_result else {
+                        continue;
+                    };
+
                     match dep_result {
                         Err(err) => {
                             dep_error = Some(err.context(format!(
@@ -590,6 +608,7 @@ impl ResourceInstaller for CurseforgeModInstaller {
     fn dependencies(
         &self,
         app: &Arc<AppInner>,
+        instance_id: InstanceId,
         instance_data: &InstanceData,
         preferred_channel: ModChannel,
     ) -> DependencyIterator {
@@ -614,7 +633,23 @@ impl ResourceInstaller for CurseforgeModInstaller {
             if let curseforge::FileRelationType::RequiredDependency = dep.relation_type {
                 installers.push(Box::new(move || {
                     Box::pin(async move {
-                        app_clone
+                        let existing = app_clone
+                            .prisma_client
+                            .mod_file_cache()
+                            .find_first(vec![
+                                fcdb::instance_id::equals(*instance_id),
+                                fcdb::metadata::is(vec![metadb::curseforge::is(vec![
+                                    cfdb::project_id::equals(mod_id),
+                                ])]),
+                            ])
+                            .exec()
+                            .await;
+
+                        if let Ok(Some(_)) = existing {
+                            return None;
+                        }
+
+                        let r = app_clone
                             .modplatforms_manager()
                             .curseforge
                             .get_mod_files(ModFilesParameters {
@@ -698,7 +733,9 @@ impl ResourceInstaller for CurseforgeModInstaller {
                                 // let app_clone = Arc::clone(&self.app);
                                 CurseforgeModInstaller::from_file(file)
                                     .map(|installer| Box::new(installer) as BoxedResourceInstaller)
-                            })
+                            });
+
+                        Some(r)
                     })
                 }));
             }
@@ -854,6 +891,7 @@ impl ResourceInstaller for ModrinthModInstaller {
     fn dependencies(
         &self,
         app: &Arc<AppInner>,
+        instance_id: InstanceId,
         instance_data: &InstanceData,
         preferred_channel: ModChannel,
     ) -> DependencyIterator {
@@ -877,26 +915,44 @@ impl ResourceInstaller for ModrinthModInstaller {
             let game_version = game_version.clone();
 
             if let modrinth::version::DependencyType::Required = dep.dependency_type {
-                if let Some(version_id) = version_id {
+                if let Some(project_id) = project_id {
                     installers.push(Box::new(move || {
                         Box::pin(async move {
-                            app_clone
-                                .modplatforms_manager()
-                                .modrinth
-                                .get_version(VersionID(version_id))
-                                .await
-                                .and_then(|version| {
-                                    // let app_clone = Arc::clone(&self.app);
-                                    ModrinthModInstaller::from_version(version).map(|installer| {
-                                        Box::new(installer) as BoxedResourceInstaller
-                                    })
-                                })
-                        })
-                    }));
-                } else if let Some(project_id) = project_id {
-                    installers.push(Box::new(move || {
-                        Box::pin(async move {
-                            app_clone
+                            let existing = app_clone
+                                .prisma_client
+                                .mod_file_cache()
+                                .find_first(vec![
+                                    fcdb::instance_id::equals(*instance_id),
+                                    fcdb::metadata::is(vec![metadb::modrinth::is(vec![
+                                        mrdb::project_id::equals(project_id.clone()),
+                                    ])]),
+                                ])
+                                .exec()
+                                .await;
+
+                            if let Ok(Some(_)) = existing {
+                                return None;
+                            }
+
+                            if let Some(version_id) = version_id {
+                                return Some(
+                                    app_clone
+                                        .modplatforms_manager()
+                                        .modrinth
+                                        .get_version(VersionID(version_id))
+                                        .await
+                                        .and_then(|version| {
+                                            // let app_clone = Arc::clone(&self.app);
+                                            ModrinthModInstaller::from_version(version).map(
+                                                |installer| {
+                                                    Box::new(installer) as BoxedResourceInstaller
+                                                },
+                                            )
+                                        }),
+                                );
+                            }
+
+                            let r = app_clone
                                 .modplatforms_manager()
                                 .modrinth
                                 .get_project_versions(ProjectVersionsFilters {
@@ -977,7 +1033,9 @@ impl ResourceInstaller for ModrinthModInstaller {
                                     ModrinthModInstaller::from_version(version).map(|installer| {
                                         Box::new(installer) as BoxedResourceInstaller
                                     })
-                                })
+                                });
+
+                            Some(r)
                         })
                     }));
                 }

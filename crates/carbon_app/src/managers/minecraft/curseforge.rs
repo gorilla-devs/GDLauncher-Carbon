@@ -91,7 +91,7 @@ pub async fn download_modpack_zip(
     Ok(())
 }
 
-#[tracing::instrument(skip(app, t_addon_metadata, progress_percentage_sender))]
+#[tracing::instrument(skip(app, packinfo, t_addon_metadata, progress_percentage_sender))]
 pub async fn prepare_modpack_from_zip(
     app: &App,
     zip_path: &Path,

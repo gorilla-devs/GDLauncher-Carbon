@@ -16,6 +16,7 @@ import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg";
 import LegacyGDL from "/assets/images/icons/legacy_gdlauncher.svg";
 import { Trans } from "@gd/i18n";
 import { isDownloaded } from "./SingleImport";
+import { taskIds } from "@/utils/import";
 
 export const keys = [
   "entity.legacygdlauncher",
@@ -58,6 +59,10 @@ const ThirdStep = (props: Props) => {
   const handleClickEntity = (ent: ImportEntityStatus) => {
     if (ent.supported) {
       if (currentEntity() && !(currentEntity()?.entity === ent.entity)) {
+        setStep("selectionStep");
+        setInstances([]);
+      }
+      if (taskIds().every((x) => x === undefined)) {
         setStep("selectionStep");
         setInstances([]);
       }

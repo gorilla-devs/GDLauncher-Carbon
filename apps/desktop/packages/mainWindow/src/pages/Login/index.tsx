@@ -87,12 +87,12 @@ export default function Login() {
         <Navigate href={"/library"} />
       </Match>
       <Match when={!isAlreadyAuthenticated()}>
-        <div class="flex justify-center items-center w-full p-0 h-screen bg-img-loginBG.jpg">
+        <div class="flex justify-center items-center w-full p-0 h-screen bg-img-loginBG.png">
           <div
             style={{
               "mix-blend-mode": "hard-light"
             }}
-            class="absolute left-0 right-0 bg-darkSlate-800 bottom-0 top-0 opacity-80"
+            class="absolute left-0 right-0 bg-darkSlate-800 bottom-0 top-0 opacity-60"
           />
           <div class="fixed right-6 bottom-6">
             <Dropdown

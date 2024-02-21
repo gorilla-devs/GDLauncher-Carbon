@@ -40,8 +40,7 @@ const BeginImportStep = (props: {
       await new Promise((r) => setTimeout(r, 100));
     }
   }
-  createMutations();
-  console.log(globalInstances());
+  if (taskIds().every((x) => x === undefined)) createMutations();
   return (
     <div class="w-full overflow-y-auto p-2 h-[240px]">
       <For each={props.instances}>
