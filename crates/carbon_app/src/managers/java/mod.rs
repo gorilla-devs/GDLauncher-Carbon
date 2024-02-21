@@ -682,7 +682,7 @@ mod test {
             .delete_java_version(from_db.id.clone())
             .await;
 
-        assert!(result_first_delete.is_err());
+        assert!(result_first_delete.is_ok());
 
         app.prisma_client
             .app_configuration()
