@@ -48,6 +48,7 @@ const JavaProfileCreationModal = (props: ModalProps) => {
           />
           <h4>Assigned Java Path:</h4>
           <JavaPathAutoComplete
+            inputColor="bg-darkSlate-600"
             disabled={createCustomJavaVersionMutation.isLoading}
             updateValue={(value) => {
               setJavaId(value);

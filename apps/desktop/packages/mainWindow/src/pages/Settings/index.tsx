@@ -56,7 +56,7 @@ function Settings() {
       <ContentWrapper>
         <div class="w-full box-border sticky top-0 z-50">
           <Tabs orientation="horizontal">
-            <div class="h-24">
+            <div class="h-26">
               <TabList>
                 <For each={settings}>
                   {(item) => (

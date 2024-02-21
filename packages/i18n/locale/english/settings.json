@@ -68,5 +68,11 @@
   "confirm_change_confirm_button": "Yes, change path",
   "confirm_change_cancel_button": "No, cancel",
   "applying_new_runtime_path": "Applying new runtime path...",
-  "do_not_close_app": "Do not close the app. It will restart automatically once it's done."
+  "do_not_close_app": "Do not close the app. It will restart automatically once it's done.",
+  "used_in_the_following_profiles": "Used in the following profiles",
+  "used_in_counted_profiles": "Used in {{count}} profiles",
+  "system_profiles": "System Profiles",
+  "custom_profiles": "Custom Profiles",
+  "profile_used_in_mc_versions": "This profile is used in the following Minecraft versions"
+
 }

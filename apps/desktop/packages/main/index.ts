@@ -6,6 +6,7 @@ import {
   app,
   BrowserWindow,
   dialog,
+  Display,
   ipcMain,
   OpenDialogOptions,
   SaveDialogOptions,
@@ -358,6 +359,21 @@ async function createWindow(
       webSecurity: true,
       additionalArguments: [`--skipIntroAnimation=${skipIntroAnimation}`]
     }
+  });
+
+  let lastDisplay: Display | null = null;
+
+  win.on("move", () => {
+    const currentDisplay = screen.getDisplayMatching(win?.getBounds()!);
+    if (lastDisplay?.id === currentDisplay?.id) {
+      return;
+    }
+
+    lastDisplay = currentDisplay;
+    const { minWidth, minHeight, adSize } = getAdSize(currentDisplay);
+    win?.setMinimumSize(minWidth, minHeight);
+    win?.setSize(minWidth, minHeight);
+    win?.webContents.send("adSizeChanged", adSize);
   });
 
   win.webContents.on("will-navigate", (e, url) => {

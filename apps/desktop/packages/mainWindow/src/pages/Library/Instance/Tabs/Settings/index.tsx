@@ -159,12 +159,13 @@ const Settings = () => {
           </div>
         </Show>
         <Row>
-          <Title>Instance Java Path / Profile</Title>
+          <Title>
+            <Trans key="instance_settings.java_path_profile" />
+          </Title>
           <RightHandSide>
             <Switch
               checked={!!routeData?.instanceDetails?.data?.javaOverride}
               onChange={(v) => {
-                console.log(v.target.value);
                 updateInstanceMutation.mutate({
                   javaOverride: {
                     Set: v.target.checked
@@ -235,6 +236,12 @@ const Settings = () => {
               </div>
             </Match>
             <Match when={javaOverrideType() === "Profile"}>
+              <div class="flex gap-2">
+                <div class="text-lightSlate-700">This instance requires</div>
+                <div class="text-lightSlate-100">
+                  {routeData.instanceDetails.data?.requiredJavaProfile}
+                </div>
+              </div>
               <div class="flex items-center">
                 <Dropdown
                   class="min-w-100 max-w-2/3"

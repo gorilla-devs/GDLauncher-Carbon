@@ -37,7 +37,7 @@ model AppConfiguration {
   wrapperCommand                  String?
   postExitHook                    String?
   isFirstLaunch                   Boolean   @default(true)
-  autoManageJava                  Boolean   @default(true)
+  autoManageJavaSystemProfiles    Boolean   @default(true)
   modPlatformBlacklist            String    @default("")
   modChannels                     String    @default("stable:true,beta:true,alpha:true")
   // Legal / metrics

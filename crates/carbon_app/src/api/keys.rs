@@ -63,6 +63,7 @@ keys! {
         VALIDATE_CUSTOM_JAVA_PATH                   = "validateCustomJavaPath";
         CREATE_CUSTOM_JAVA_VERSION                  = "createCustomJavaVersion";
         DELETE_JAVA_VERSION                         = "deleteJavaVersion";
+        SYSTEM_JAVA_PROFILE_ASSIGNMENTS             = "systemJavaProfileAssignments";
     }
 
     mc {

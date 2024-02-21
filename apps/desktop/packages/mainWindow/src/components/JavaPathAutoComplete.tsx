@@ -2,11 +2,13 @@ import { rspc } from "@/utils/rspcClient";
 import { Input, Tooltip } from "@gd/ui";
 import { Match, Switch, createEffect, createSignal } from "solid-js";
 import TruncatedPath from "./TruncatePath";
+import { Trans } from "@gd/i18n";
 
 type Props = {
   defaultValue?: string;
   updateValue?: (_id: string, _value: string) => void;
   disabled?: boolean;
+  inputColor?: string;
 };
 
 const JavaPathAutoComplete = (props: Props) => {
@@ -83,8 +85,12 @@ const JavaPathAutoComplete = (props: Props) => {
                   }}
                 >
                   <div class="flex justify-between">
-                    <div>Not found</div>
-                    <div>Create new [CUSTOM]</div>
+                    <div>
+                      <Trans key="java_autocomplete.not_found" />
+                    </div>
+                    <div>
+                      <Trans key="java_autocomplete.create_new_custom" />
+                    </div>
                   </div>
                   <Tooltip content={value()}>
                     <TruncatedPath originalPath={value()} />
@@ -111,7 +117,7 @@ const JavaPathAutoComplete = (props: Props) => {
         value={value()}
         disabled={props.disabled}
         placeholder="Type a java path"
-        inputColor="bg-darkSlate-600"
+        inputColor={props.inputColor || ""}
         icon={
           <Switch>
             <Match when={createCustomJavaVersionMutation.isLoading}>

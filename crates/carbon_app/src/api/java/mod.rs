@@ -1,7 +1,9 @@
 use crate::api::java::managed::{FEManagedJavaSetupArgs, FEManagedJavaSetupProgress};
 use crate::api::managers::App;
 use crate::api::router::router;
-use crate::domain::java::{JavaComponentType, JavaVendor, SYSTEM_JAVA_PROFILE_NAME_PREFIX};
+use crate::domain::java::{
+    JavaComponentType, JavaVendor, SystemJavaProfileName, SYSTEM_JAVA_PROFILE_NAME_PREFIX,
+};
 use crate::{api::keys::java::*, domain::java::Java};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
@@ -39,6 +41,25 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
         query GET_SETUP_MANAGED_JAVA_PROGRESS[app, args: ()] {
             get_setup_managed_java_progress(app, args).await
+        }
+
+        query SYSTEM_JAVA_PROFILE_ASSIGNMENTS[app, args: ()] {
+            let minecraft_manifest = app.minecraft_manager().get_minecraft_manifest().await?.versions;
+
+            let mut assignments = HashMap::new();
+
+            for version in minecraft_manifest {
+                if let Some(profile_name) = version.java_profile {
+                    let system_profile_name = SystemJavaProfileName::from(profile_name).to_string();
+
+                    assignments
+                        .entry(system_profile_name)
+                        .or_insert_with(Vec::new)
+                        .push(version.id);
+                }
+            }
+
+            Ok(assignments)
         }
 
         query GET_JAVA_PROFILES[app, args: ()] {

@@ -96,7 +96,7 @@ impl JavaManager {
     }
 
     pub async fn scan_and_sync<T, G>(
-        auto_manage_java: bool,
+        auto_manage_java_system_profiles: bool,
         db: &Arc<PrismaClient>,
         discovery: &T,
         java_checker: &G,
@@ -109,7 +109,7 @@ impl JavaManager {
         scan_and_sync::scan_and_sync_custom(db, java_checker).await?;
         scan_and_sync::scan_and_sync_managed(db, discovery, java_checker).await?;
 
-        if auto_manage_java {
+        if auto_manage_java_system_profiles {
             scan_and_sync::sync_system_java_profiles(db).await?;
         }
 
@@ -131,22 +131,6 @@ impl ManagerRef<'_, JavaManager> {
         }
 
         Ok(result)
-    }
-
-    pub async fn get_system_java_profiles(&self) -> anyhow::Result<Vec<JavaProfile>> {
-        let db = &self.app.prisma_client;
-        let all_profiles = db
-            .java_profile()
-            .find_many(vec![crate::db::java_profile::is_system_profile::equals(
-                true,
-            )])
-            .exec()
-            .await?
-            .into_iter()
-            .map(JavaProfile::try_from)
-            .collect::<anyhow::Result<Vec<_>>>()?;
-
-        Ok(all_profiles)
     }
 
     pub async fn get_java_profiles(&self) -> anyhow::Result<Vec<JavaProfile>> {
@@ -183,14 +167,16 @@ impl ManagerRef<'_, JavaManager> {
         profile_name: String,
         java_id: Option<String>,
     ) -> anyhow::Result<()> {
-        let auto_manage_java = self
+        let auto_manage_java_system_profiles = self
             .app
             .settings_manager()
             .get_settings()
             .await?
-            .auto_manage_java;
+            .auto_manage_java_system_profiles;
 
-        if auto_manage_java {
+        if auto_manage_java_system_profiles
+            && profile_name.starts_with(SYSTEM_JAVA_PROFILE_NAME_PREFIX)
+        {
             anyhow::bail!("Auto manage java is enabled");
         }
 
@@ -228,17 +214,6 @@ impl ManagerRef<'_, JavaManager> {
         profile_name: String,
         java_id: Option<String>,
     ) -> anyhow::Result<()> {
-        let auto_manage_java = self
-            .app
-            .settings_manager()
-            .get_settings()
-            .await?
-            .auto_manage_java;
-
-        if auto_manage_java {
-            anyhow::bail!("Auto manage java is enabled");
-        }
-
         // make sure profile doesn't start with system profile prefix
         if profile_name.starts_with(SYSTEM_JAVA_PROFILE_NAME_PREFIX) {
             anyhow::bail!(
@@ -279,14 +254,16 @@ impl ManagerRef<'_, JavaManager> {
     }
 
     pub async fn delete_java_profile(&self, profile_name: String) -> anyhow::Result<()> {
-        let auto_manage_java = self
+        let auto_manage_java_system_profiles = self
             .app
             .settings_manager()
             .get_settings()
             .await?
-            .auto_manage_java;
+            .auto_manage_java_system_profiles;
 
-        if auto_manage_java {
+        if auto_manage_java_system_profiles
+            && profile_name.starts_with(SYSTEM_JAVA_PROFILE_NAME_PREFIX)
+        {
             anyhow::bail!("Auto manage java is enabled");
         }
 
@@ -303,17 +280,6 @@ impl ManagerRef<'_, JavaManager> {
     }
 
     pub async fn create_custom_java_version(&self, path: String) -> anyhow::Result<()> {
-        let auto_manage_java = self
-            .app
-            .settings_manager()
-            .get_settings()
-            .await?
-            .auto_manage_java;
-
-        if auto_manage_java {
-            anyhow::bail!("Auto manage java is enabled");
-        }
-
         let java = RealJavaChecker::get_bin_info(
             &RealJavaChecker,
             Path::new(&path),
@@ -355,17 +321,6 @@ impl ManagerRef<'_, JavaManager> {
     }
 
     pub async fn delete_java_version(&self, java_id: String) -> anyhow::Result<()> {
-        let auto_manage_java = self
-            .app
-            .settings_manager()
-            .get_settings()
-            .await?
-            .auto_manage_java;
-
-        if auto_manage_java {
-            anyhow::bail!("Auto manage java is enabled");
-        }
-
         let java_from_db = self
             .app
             .prisma_client
@@ -433,13 +388,17 @@ impl ManagerRef<'_, JavaManager> {
         use crate::db::{java, java_profile};
 
         let profile = self
-            .get_system_java_profiles()
+            .app
+            .prisma_client
+            .java_profile()
+            .find_many(vec![crate::db::java_profile::is_system_profile::equals(
+                true,
+            )])
+            .exec()
             .await?
             .into_iter()
             .find(|profile| profile.name == target_profile.to_string())
-            .ok_or_else(|| {
-                anyhow::anyhow!("system java profile not found for {target_profile:?}")
-            })?;
+            .ok_or_else(|| anyhow::anyhow!("Profile not found"))?;
 
         let java = match profile.java_id {
             Some(java_id) => {
@@ -508,7 +467,13 @@ impl ManagerRef<'_, JavaManager> {
             None => None,
         };
 
-        Ok(java)
+        Ok(java.and_then(|java| {
+            if !target_profile.is_java_version_compatible(&java.version) {
+                None
+            } else {
+                Some(java)
+            }
+        }))
     }
 
     /// Will return Some(path) if configured to automatically install.
@@ -587,13 +552,21 @@ impl ManagerRef<'_, JavaManager> {
                 .exec()
                 .await?;
 
-            let system_profiles_in_db = self.get_system_java_profiles().await?;
+            let system_profiles_in_db = self
+                .app
+                .prisma_client
+                .java_profile()
+                .find_many(vec![crate::db::java_profile::is_system_profile::equals(
+                    true,
+                )])
+                .exec()
+                .await?;
 
-            for JavaProfile { name, java_id, .. } in system_profiles_in_db {
-                let system_profile_name = SystemJavaProfileName::try_from(&*name)?;
+            for system_profile in system_profiles_in_db {
+                let system_profile_name = SystemJavaProfileName::try_from(&*system_profile.name)?;
                 if system_profile_name == target_profile
                     || !system_profile_name.is_java_version_compatible(&java.version)
-                    || java_id.is_some()
+                    || system_profile.java_id.is_some()
                 {
                     continue;
                 }
@@ -602,7 +575,7 @@ impl ManagerRef<'_, JavaManager> {
                     .prisma_client
                     .java_profile()
                     .update(
-                        crate::db::java_profile::name::equals(name),
+                        crate::db::java_profile::name::equals(system_profile.name),
                         vec![crate::db::java_profile::java::connect(
                             crate::db::java::id::equals(id.clone()),
                         )],
@@ -638,7 +611,15 @@ mod test {
             .unwrap()
             .unwrap();
 
-        let profiles_in_db = java_manager.get_system_java_profiles().await.unwrap();
+        let profiles_in_db = app
+            .prisma_client
+            .java_profile()
+            .find_many(vec![crate::db::java_profile::is_system_profile::equals(
+                true,
+            )])
+            .exec()
+            .await
+            .unwrap();
 
         assert_eq!(
             profiles_in_db
@@ -707,7 +688,7 @@ mod test {
             .app_configuration()
             .update(
                 crate::db::app_configuration::id::equals(0),
-                vec![crate::db::app_configuration::auto_manage_java::set(false)],
+                vec![crate::db::app_configuration::auto_manage_java_system_profiles::set(false)],
             )
             .exec()
             .await
