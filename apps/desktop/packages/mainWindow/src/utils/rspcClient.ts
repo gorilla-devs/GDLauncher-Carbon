@@ -13,7 +13,11 @@ export const rspc = createSolidQueryHooks<Procedures>();
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false // default: true
+      refetchOnWindowFocus: false, // default: true
+      networkMode: "always"
+    },
+    mutations: {
+      networkMode: "always"
     }
   }
 });
@@ -23,7 +27,7 @@ export let port: number | null = null;
 export default function initRspc(_port: number) {
   port = _port;
   const wsClient = createWSClient({
-    url: `ws://localhost:${_port}/rspc/ws`
+    url: `ws://127.0.0.1:${_port}/rspc/ws`
   });
 
   const client = createClient<Procedures>({

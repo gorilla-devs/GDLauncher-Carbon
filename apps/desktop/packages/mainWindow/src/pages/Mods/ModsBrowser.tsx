@@ -31,6 +31,7 @@ import { rspc } from "@/utils/rspcClient";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { getInstanceImageUrl } from "@/utils/instances";
+import { setInstanceId, instanceId as _instanceId } from "@/utils/browser";
 
 const ModsBrowser = () => {
   const [t] = useTransContext();
@@ -48,16 +49,15 @@ const ModsBrowser = () => {
 
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const instanceId = () => {
-    const res =
-      infiniteQuery.instanceId() ?? parseInt(searchParams.instanceId, 10);
+  const instanceId = createMemo(() => {
+    const res = _instanceId() ?? parseInt(searchParams.instanceId, 10);
 
     if (isNaN(res)) {
       return null;
     }
 
     return res;
-  };
+  });
 
   const instanceMods = rspc.createQuery(() => [
     "instance.getInstanceMods",
@@ -117,43 +117,6 @@ const ModsBrowser = () => {
     infiniteQuery?.infiniteQuery.data
       ? infiniteQuery.infiniteQuery.data.pages.flatMap((d) => d.data)
       : [];
-
-  // const instanceModloaders = () =>
-  //   instanceDetails.data?.modloaders.map((modloader) => modloader.type_);
-
-  // const instancePlatform = () =>
-  //   Object.keys(instanceDetails.data?.modpack || {})[0]?.toLocaleLowerCase();
-
-  // createEffect(() => {
-  //   const modloaders = instanceModloaders();
-  //   const platform = instancePlatform();
-  //   const _ = instanceId();
-
-  //   const newQuery: Partial<FEUnifiedSearchParameters> = {};
-
-  //   if (platform) {
-  //     newQuery["searchApi"] = platform as FESearchAPI;
-  //   }
-
-  //   if (instanceDetails.data?.version) {
-  //     newQuery["gameVersions"] = [instanceDetails.data?.version!];
-  //   }
-
-  //   if (modloaders) {
-  //     newQuery["modloaders"] = [];
-
-  //     if (modloaders.includes("forge")) {
-  //       newQuery["modloaders"].push("forge");
-  //     } else if (modloaders.includes("quilt")) {
-  //       newQuery["modloaders"].push("fabric");
-  //       newQuery["modloaders"].push("quilt");
-  //     } else {
-  //       newQuery["modloaders"] = [...modloaders] as any;
-  //     }
-  //   }
-
-  //   infiniteQuery.setQuery(newQuery);
-  // });
 
   const hasFiltersData = createMemo(() => Boolean(sortingFields()));
 
@@ -216,7 +179,7 @@ const ModsBrowser = () => {
                       setSearchParams({
                         instanceId: undefined
                       });
-                      infiniteQuery.setInstanceId(undefined);
+                      setInstanceId(undefined);
                       infiniteQuery.setQuery({
                         modloaders: null,
                         gameVersions: null,
@@ -349,7 +312,6 @@ const ModsBrowser = () => {
                                   type="Mod"
                                   data={mod()}
                                   instanceId={instanceId()}
-                                  installedMods={instanceMods.data!}
                                   mcVersion={
                                     instanceDetails.data?.version || ""
                                   }

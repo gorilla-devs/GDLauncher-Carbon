@@ -180,7 +180,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
                 fileId={props.modVersion.fileId}
                 isCurseforge={props.isCurseforge || false}
                 instanceId={props.instanceId}
-                instanceDetails={props.instanceDetails}
+                instanceLocked={props.instanceDetails?.modpack?.locked}
                 instanceMods={props.instanceMods}
               />
             </Match>

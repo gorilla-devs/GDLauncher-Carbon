@@ -7,7 +7,7 @@ CREATE TABLE "AppConfiguration" (
     "discordIntegration" BOOLEAN NOT NULL DEFAULT true,
     "releaseChannel" TEXT NOT NULL,
     "activeAccountUuid" TEXT,
-    "concurrentDownloads" INTEGER NOT NULL DEFAULT 8,
+    "concurrentDownloads" INTEGER NOT NULL DEFAULT 10,
     "showNews" BOOLEAN NOT NULL DEFAULT true,
     "startupResolution" TEXT NOT NULL DEFAULT '854x480',
     "javaCustomArgs" TEXT NOT NULL DEFAULT '',
@@ -45,7 +45,9 @@ CREATE TABLE "JavaProfile" (
     "name" TEXT NOT NULL,
     "isSystemProfile" BOOLEAN NOT NULL DEFAULT false,
     "javaId" TEXT,
-    CONSTRAINT "JavaProfile_javaId_fkey" FOREIGN KEY ("javaId") REFERENCES "Java" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "JavaProfile_javaId_fkey" FOREIGN KEY ("javaId") REFERENCES "Java" ("id") ON DELETE
+    SET
+        NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -92,7 +94,9 @@ CREATE TABLE "Instance" (
     "groupId" INTEGER NOT NULL,
     "javaProfileId" TEXT,
     CONSTRAINT "Instance_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "InstanceGroup" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "Instance_javaProfileId_fkey" FOREIGN KEY ("javaProfileId") REFERENCES "JavaProfile" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "Instance_javaProfileId_fkey" FOREIGN KEY ("javaProfileId") REFERENCES "JavaProfile" ("id") ON DELETE
+    SET
+        NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -197,7 +201,6 @@ CREATE TABLE "CurseForgeModpackCache" (
     "versionName" TEXT NOT NULL,
     "urlSlug" TEXT NOT NULL,
     "updatedAt" DATETIME NOT NULL,
-
     PRIMARY KEY ("projectId", "fileId")
 );
 
@@ -209,7 +212,6 @@ CREATE TABLE "ModrinthModpackCache" (
     "versionName" TEXT NOT NULL,
     "urlSlug" TEXT NOT NULL,
     "updatedAt" DATETIME NOT NULL,
-
     PRIMARY KEY ("projectId", "versionId")
 );
 
@@ -219,7 +221,6 @@ CREATE TABLE "CurseForgeModpackImageCache" (
     "fileId" INTEGER NOT NULL,
     "url" TEXT NOT NULL,
     "data" BLOB,
-
     PRIMARY KEY ("projectId", "fileId"),
     CONSTRAINT "CurseForgeModpackImageCache_projectId_fileId_fkey" FOREIGN KEY ("projectId", "fileId") REFERENCES "CurseForgeModpackCache" ("projectId", "fileId") ON DELETE CASCADE ON UPDATE CASCADE
 );
@@ -230,7 +231,6 @@ CREATE TABLE "ModrinthModpackImageCache" (
     "versionId" TEXT NOT NULL,
     "url" TEXT NOT NULL,
     "data" BLOB,
-
     PRIMARY KEY ("projectId", "versionId"),
     CONSTRAINT "ModrinthModpackImageCache_projectId_versionId_fkey" FOREIGN KEY ("projectId", "versionId") REFERENCES "ModrinthModpackCache" ("projectId", "versionId") ON DELETE CASCADE ON UPDATE CASCADE
 );

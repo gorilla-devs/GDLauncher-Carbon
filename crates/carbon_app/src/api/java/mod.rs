@@ -1,7 +1,9 @@
 use crate::api::java::managed::{FEManagedJavaSetupArgs, FEManagedJavaSetupProgress};
 use crate::api::managers::App;
 use crate::api::router::router;
-use crate::domain::java::{JavaComponentType, JavaVendor, SYSTEM_JAVA_PROFILE_NAME_PREFIX};
+use crate::domain::java::{
+    JavaComponentType, JavaVendor, SystemJavaProfileName, SYSTEM_JAVA_PROFILE_NAME_PREFIX,
+};
 use crate::{api::keys::java::*, domain::java::Java};
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
@@ -41,16 +43,53 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             get_setup_managed_java_progress(app, args).await
         }
 
+        query SYSTEM_JAVA_PROFILE_ASSIGNMENTS[app, args: ()] {
+            let minecraft_manifest = app.minecraft_manager().get_minecraft_manifest().await?.versions;
+
+            let mut assignments = HashMap::new();
+
+            for version in minecraft_manifest {
+                if let Some(profile_name) = version.java_profile {
+                    let system_profile_name = SystemJavaProfileName::from(profile_name).to_string();
+
+                    assignments
+                        .entry(system_profile_name)
+                        .or_insert_with(Vec::new)
+                        .push(version.id);
+                }
+            }
+
+            Ok(assignments)
+        }
+
         query GET_JAVA_PROFILES[app, args: ()] {
             get_java_profiles(app, args).await
         }
 
-        mutation UPDATE_JAVA_PROFILE_PATH[app, args: FEUpdateSystemJavaProfileArgs] {
-            update_java_profile_path(app, args).await
+        mutation UPDATE_JAVA_PROFILE[app, args: FEUpdateJavaProfileArgs] {
+            app.java_manager()
+            .update_java_profile(args.profile_name, args.java_id)
+            .await
+        }
+
+        mutation VALIDATE_CUSTOM_JAVA_PATH[app, args: String] {
+            app.java_manager().validate_custom_java_path(args).await
+        }
+
+        mutation CREATE_CUSTOM_JAVA_VERSION[app, args: String] {
+            app.java_manager().create_custom_java_version(args).await
+        }
+
+        mutation CREATE_JAVA_PROFILE[app, args: FECreateJavaProfileArgs] {
+            app.java_manager().create_java_profile(args.profile_name, args.java_id).await
+        }
+
+        mutation DELETE_JAVA_PROFILE[app, args: String] {
+            app.java_manager().delete_java_profile(args).await
         }
 
         mutation DELETE_JAVA_VERSION[app, args: String] {
-            delete_java_version(app, args).await
+            app.java_manager().delete_java_version(args).await
         }
     }
 }
@@ -133,29 +172,24 @@ async fn get_setup_managed_java_progress(
 }
 
 async fn get_java_profiles(app: App, _args: ()) -> anyhow::Result<Vec<FEJavaProfile>> {
-    let profiles = app.java_manager().get_system_java_profiles().await?;
+    let profiles = app.java_manager().get_java_profiles().await?;
 
     Ok(profiles.into_iter().map(FEJavaProfile::from).collect())
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct FEUpdateSystemJavaProfileArgs {
-    pub profile_name: FESystemJavaProfileName,
-    pub java_id: String,
+struct FEUpdateJavaProfileArgs {
+    pub profile_name: String,
+    #[specta(optional)]
+    pub java_id: Option<String>,
 }
 
-async fn update_java_profile_path(
-    app: App,
-    args: FEUpdateSystemJavaProfileArgs,
-) -> anyhow::Result<()> {
-    app.java_manager()
-        .update_java_profile(args.profile_name.into(), args.java_id)
-        .await
-}
-
-async fn delete_java_version(app: App, args: String) -> anyhow::Result<()> {
-    app.java_manager().delete_java_version(args).await
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FECreateJavaProfileArgs {
+    pub profile_name: String,
+    pub java_id: Option<String>,
 }
 
 #[derive(Type, Serialize)]
@@ -253,20 +287,25 @@ impl From<FESystemJavaProfileName> for crate::domain::java::SystemJavaProfileNam
 
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]
+enum FEJavaProfileName {
+    System(FESystemJavaProfileName),
+    Custom(String),
+}
+
+#[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct FEJavaProfile {
     name: String,
     java_id: Option<String>,
+    is_system: bool,
 }
 
 impl From<crate::domain::java::JavaProfile> for FEJavaProfile {
     fn from(profile: crate::domain::java::JavaProfile) -> Self {
         Self {
-            name: profile
-                .name
-                .strip_prefix(SYSTEM_JAVA_PROFILE_NAME_PREFIX)
-                .unwrap_or(&profile.name)
-                .to_string(),
+            name: profile.name.to_string(),
             java_id: profile.java_id,
+            is_system: profile.is_system,
         }
     }
 }

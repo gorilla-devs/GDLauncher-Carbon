@@ -39,11 +39,17 @@ pub struct InstanceDetails {
     pub memory: Option<(u16, u16)>,
     pub game_resolution: Option<info::GameResolution>,
     pub last_played: Option<DateTime<Utc>>,
+    pub pre_launch_hook: Option<String>,
+    pub post_exit_hook: Option<String>,
+    pub wrapper_command: Option<String>,
     pub seconds_played: u32,
     pub modloaders: Vec<info::ModLoader>,
+    pub java_override: Option<info::JavaOverride>,
+    pub required_java_profile: Option<String>,
     pub state: LaunchState,
     pub notes: String,
     pub icon_revision: Option<u32>,
+    pub has_pack_update: bool,
 }
 
 #[derive(Debug)]
@@ -62,9 +68,13 @@ pub struct InstanceSettingsUpdate {
     pub notes: Option<String>,
     pub version: Option<String>,
     pub modloader: Option<Option<info::ModLoader>>,
+    pub java_override: Option<Option<info::JavaOverride>>,
     pub global_java_args: Option<bool>,
     pub extra_java_args: Option<Option<String>>,
     pub memory: Option<Option<(u16, u16)>>,
+    pub pre_launch_hook: Option<Option<String>>,
+    pub post_exit_hook: Option<Option<String>>,
+    pub wrapper_command: Option<Option<String>>,
     pub game_resolution: Option<Option<info::GameResolution>>,
     pub mod_sources: Option<Option<ModSources>>,
     pub modpack_locked: Option<Option<bool>>,
@@ -80,6 +90,7 @@ pub enum LaunchState {
         start_time: DateTime<Utc>,
         log_id: GameLogId,
     },
+    Deleting,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1,10 +1,12 @@
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use crate::{
     app_version::APP_VERSION,
+    db::{app_configuration::pre_launch_hook, PrismaClient},
     domain::{
         java::{JavaArch, JavaComponent},
         minecraft::minecraft::{
@@ -31,6 +33,8 @@ use crate::{
     managers::account::{FullAccount, FullAccountType},
 };
 
+use super::META_VERSION;
+
 #[derive(Debug, Error)]
 pub enum VersionError {
     #[error("Could not fetch version meta: {0}")]
@@ -51,7 +55,7 @@ pub async fn get_manifest(
     reqwest_client: &reqwest_middleware::ClientWithMiddleware,
     meta_base_url: &Url,
 ) -> anyhow::Result<VersionManifest> {
-    let server_url = meta_base_url.join("minecraft/v0/manifest.json")?;
+    let server_url = meta_base_url.join(&format!("minecraft/{}/manifest.json", META_VERSION))?;
     let new_manifest = reqwest_client
         .get(server_url)
         .send()
@@ -63,21 +67,51 @@ pub async fn get_manifest(
 }
 
 pub async fn get_version(
+    db_client: Arc<PrismaClient>,
     reqwest_client: &reqwest_middleware::ClientWithMiddleware,
-    manifest_version_meta: Version,
+    mc_version: &str,
+    meta_base_url: &Url,
 ) -> anyhow::Result<VersionInfo> {
-    let url = manifest_version_meta.url;
-    let version_meta = reqwest_client.get(url).send().await?.json().await?;
+    let db_cache = db_client
+        .version_info_cache()
+        .find_unique(crate::db::version_info_cache::id::equals(
+            mc_version.to_string(),
+        ))
+        .exec()
+        .await
+        .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 
-    Ok(version_meta)
+    if let Some(db_cache) = db_cache {
+        let version_info = serde_json::from_slice(&db_cache.version_info)
+            .map_err(|err| anyhow::anyhow!("Failed to deserialize version info: {}", err))?;
+
+        return Ok(version_info);
+    }
+
+    let url = meta_base_url
+        .join(&format!(
+            "minecraft/{}/versions/{}.json",
+            META_VERSION, mc_version
+        ))
+        .unwrap();
+
+    let version_meta = reqwest_client.get(url).send().await?.bytes().await?;
+
+    db_client
+        .version_info_cache()
+        .create(mc_version.to_string(), version_meta.to_vec(), vec![])
+        .exec()
+        .await?;
+
+    Ok(serde_json::from_slice(&version_meta)?)
 }
 
 pub async fn get_lwjgl_meta(
+    db_client: Arc<PrismaClient>,
     reqwest_client: &reqwest_middleware::ClientWithMiddleware,
     version_info: &VersionInfo,
     meta_base_url: &Url,
 ) -> anyhow::Result<LibraryGroup> {
-    // TODO: Hardcoded. Fix
     let version_info_lwjgl_requirement = version_info
         .requires
         .as_ref()
@@ -95,9 +129,26 @@ pub async fn get_lwjgl_meta(
         })
         .ok_or(anyhow::anyhow!("Can't find lwjgl version."))?;
 
+    let db_cache = db_client
+        .lwjgl_meta_cache()
+        .find_unique(crate::db::lwjgl_meta_cache::id::equals(format!(
+            "{}-{}",
+            version_info_lwjgl_requirement.uid, lwjgl_suggest
+        )))
+        .exec()
+        .await
+        .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
+
+    if let Some(db_cache) = db_cache {
+        let lwjgl = serde_json::from_slice(&db_cache.lwjgl)
+            .map_err(|err| anyhow::anyhow!("Failed to deserialize lwjgl meta: {}", err))?;
+
+        return Ok(lwjgl);
+    }
+
     let lwjgl_json_url = meta_base_url.join(&format!(
-        "minecraft/v0/libraries/{}/{}.json",
-        version_info_lwjgl_requirement.uid, lwjgl_suggest
+        "minecraft/{}/libraries/{}/{}.json",
+        META_VERSION, version_info_lwjgl_requirement.uid, lwjgl_suggest
     ))?;
 
     tracing::trace!("LWJGL JSON URL: {}", lwjgl_json_url);
@@ -107,6 +158,16 @@ pub async fn get_lwjgl_meta(
         .send()
         .await?
         .json()
+        .await?;
+
+    db_client
+        .lwjgl_meta_cache()
+        .create(
+            format!("{}-{}", version_info_lwjgl_requirement.uid, lwjgl_suggest),
+            serde_json::to_vec(&lwjgl).unwrap(),
+            vec![],
+        )
+        .exec()
         .await?;
 
     Ok(lwjgl)
@@ -271,6 +332,7 @@ pub async fn generate_startup_command(
     version: VersionInfo,
     lwjgl_group: &LibraryGroup,
     instance_path: InstancePath,
+    assets_dir: super::assets::AssetsDir,
 ) -> anyhow::Result<Vec<String>> {
     let mut libraries = chain_lwjgl_libs_with_base_libs(
         &version.libraries,
@@ -302,13 +364,6 @@ pub async fn generate_startup_command(
     let client_jar_path = runtime_path
         .get_libraries()
         .get_mc_client(version.inherits_from.as_ref().unwrap_or(&version.id));
-
-    let assets_dir = super::assets::get_assets_dir(
-        &version.assets,
-        runtime_path.get_assets(),
-        instance_path.get_resources_path(),
-    )
-    .await?;
 
     let instance_mapped_assets = matches!(&assets_dir, super::assets::AssetsDir::InstanceMapped(_));
 
@@ -528,8 +583,10 @@ pub async fn launch_minecraft(
     version: VersionInfo,
     lwjgl_group: &LibraryGroup,
     instance_path: InstancePath,
+    assets_dir: super::assets::AssetsDir,
+    wrapper_command: Option<String>,
 ) -> anyhow::Result<Child> {
-    let startup_command = generate_startup_command(
+    let mut startup_command = generate_startup_command(
         java_component.clone(),
         full_account,
         xmx_memory,
@@ -540,16 +597,27 @@ pub async fn launch_minecraft(
         version,
         lwjgl_group,
         instance_path.clone(),
+        assets_dir,
     )
     .await?;
 
+    let main_command = wrapper_command
+        .as_ref()
+        .filter(|v| !v.is_empty())
+        .map(|s| s.as_str())
+        .unwrap_or_else(|| java_component.path.as_str());
+
+    if wrapper_command.is_some() {
+        startup_command.insert(0, java_component.path.clone());
+    }
+
     info!(
         "Starting Minecraft with command: {} {}",
-        java_component.path,
+        main_command,
         startup_command.join(" ")
     );
 
-    let mut command_exec = tokio::process::Command::new(java_component.path);
+    let mut command_exec = tokio::process::Command::new(main_command);
     command_exec.current_dir(instance_path.get_data_path());
 
     command_exec.stdout(std::process::Stdio::piped());
@@ -670,11 +738,12 @@ mod tests {
 
         let version = app
             .minecraft_manager()
-            .get_minecraft_version(version)
+            .get_minecraft_version(&version.id)
             .await
             .unwrap();
 
         let lwjgl_group = get_lwjgl_meta(
+            app.prisma_client.clone(),
             &reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
             &version,
             &app.minecraft_manager().meta_base_url,
@@ -702,6 +771,16 @@ mod tests {
             .await
             .unwrap();
 
+        let assets_dir = crate::managers::minecraft::assets::get_assets_dir(
+            app.prisma_client.clone(),
+            reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
+            &version.asset_index,
+            runtime_path.get_assets(),
+            instance_id.get_resources_path(),
+        )
+        .await
+        .unwrap();
+
         let command = generate_startup_command(
             java_component,
             full_account,
@@ -713,6 +792,7 @@ mod tests {
             version,
             &lwjgl_group,
             instance_id,
+            assets_dir,
         )
         .await
         .unwrap();
@@ -747,11 +827,12 @@ mod tests {
 
         let version = app
             .minecraft_manager()
-            .get_minecraft_version(version)
+            .get_minecraft_version(&version.id.as_str())
             .await
             .unwrap();
 
         let lwjgl_group = get_lwjgl_meta(
+            app.prisma_client.clone(),
             &reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build(),
             &version,
             &app.minecraft_manager().meta_base_url,
@@ -777,7 +858,7 @@ mod tests {
         }
         let progress = tokio::sync::watch::channel(Progress::new());
 
-        carbon_net::download_multiple(downloadables, progress.0, 10)
+        carbon_net::download_multiple(&downloadables[..], Some(progress.0), 10, true, false)
             .await
             .unwrap();
 

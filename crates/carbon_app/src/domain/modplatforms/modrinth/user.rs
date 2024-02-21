@@ -64,7 +64,7 @@ pub struct TeamMember {
     /// The split of payouts going to this user.
     /// The proportion of payouts they get is their split divided by the sum of the splits of all members.
     pub payouts_split: Option<u32>,
-    pub ordering: Option<u32>,
+    pub ordering: Option<i64>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

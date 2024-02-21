@@ -20,10 +20,16 @@ pub struct Instance {
     #[serde(default)]
     pub last_played: Option<DateTime<Utc>>,
     #[serde(default)]
-    pub seconds_played: u64,
+    pub seconds_played: u32,
     #[serde(default)]
     pub modpack: Option<ModpackInfo>,
     pub game_configuration: GameConfig,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pre_launch_hook: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub post_exit_hook: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wrapper_command: Option<String>,
     #[serde(default)]
     pub mod_sources: Option<ModSources>,
     #[serde(default)]
@@ -157,6 +163,12 @@ where
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum JavaOverride {
+    Profile(Option<String>),
+    Path(Option<String>),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GameConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<GameVersion>,
@@ -173,6 +185,9 @@ pub struct GameConfig {
     #[serde(serialize_with = "serialize_resolution")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub game_resolution: Option<GameResolution>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub java_override: Option<JavaOverride>,
 }
 
 fn default_global_java_args() -> bool {
@@ -233,6 +248,9 @@ impl From<Instance> for info::Instance {
             seconds_played: value.seconds_played,
             modpack: value.modpack.map(Into::into),
             game_configuration: value.game_configuration.into(),
+            pre_launch_hook: value.pre_launch_hook,
+            post_exit_hook: value.post_exit_hook,
+            wrapper_command: value.wrapper_command,
             mod_sources: value.mod_sources.map(Into::into),
             notes: value.notes,
         }
@@ -250,8 +268,33 @@ impl From<info::Instance> for Instance {
             seconds_played: value.seconds_played,
             modpack: value.modpack.map(Into::into),
             game_configuration: value.game_configuration.into(),
+            pre_launch_hook: value.pre_launch_hook,
+            post_exit_hook: value.post_exit_hook,
+            wrapper_command: value.wrapper_command,
             mod_sources: value.mod_sources.map(Into::into),
             notes: value.notes,
+        }
+    }
+}
+
+impl From<JavaOverride> for info::JavaOverride {
+    fn from(value: JavaOverride) -> Self {
+        use JavaOverride as Schema;
+
+        match value {
+            Schema::Profile(value) => Self::Profile(value),
+            Schema::Path(value) => Self::Path(value),
+        }
+    }
+}
+
+impl From<info::JavaOverride> for JavaOverride {
+    fn from(value: info::JavaOverride) -> Self {
+        use info::JavaOverride as Info;
+
+        match value {
+            Info::Profile(value) => Self::Profile(value),
+            Info::Path(value) => Self::Path(value),
         }
     }
 }
@@ -358,6 +401,7 @@ impl From<GameConfig> for info::GameConfig {
             extra_java_args: value.extra_java_args,
             memory: value.memory.map(Into::into),
             game_resolution: value.game_resolution.map(Into::into),
+            java_override: value.java_override.map(Into::into),
         }
     }
 }
@@ -370,6 +414,7 @@ impl From<info::GameConfig> for GameConfig {
             extra_java_args: value.extra_java_args,
             memory: value.memory.map(Into::into),
             game_resolution: value.game_resolution.map(Into::into),
+            java_override: value.java_override.map(Into::into),
         }
     }
 }

@@ -56,7 +56,7 @@ pub async fn upsert_java_component_to_db(
             db.java()
                 .update(
                     crate::db::java::id::equals(id.clone()),
-                    vec![crate::db::java::is_valid::set(is_valid)],
+                    vec![crate::db::java::is_valid::set(true)],
                 )
                 .exec()
                 .await?;
@@ -71,7 +71,7 @@ pub async fn upsert_java_component_to_db(
                         crate::db::java::arch::set(java_component.arch.to_string()),
                         crate::db::java::os::set(java_component.os.to_string()),
                         crate::db::java::vendor::set(java_component.vendor),
-                        crate::db::java::is_valid::set(is_valid),
+                        crate::db::java::is_valid::set(true),
                     ],
                 )
                 .exec()
@@ -121,7 +121,6 @@ async fn update_java_component_in_db_to_invalid(
 
 #[tracing::instrument(level = "trace", skip_all)]
 pub async fn scan_and_sync_local<T, G>(
-    auto_manage_java: bool,
     db: &Arc<PrismaClient>,
     discovery: &T,
     java_checker: &G,
@@ -131,9 +130,12 @@ where
     G: JavaChecker,
 {
     let local_javas = discovery.find_java_paths().await;
-    let java_profiles = db.java_profile().find_many(vec![]).exec().await?;
-
-    trace!("Auto Manage Java is {}", auto_manage_java);
+    let java_profiles = db
+        .java_profile()
+        .find_many(vec![])
+        .with(crate::db::java_profile::java::fetch())
+        .exec()
+        .await?;
 
     for local_java in &local_javas {
         trace!("Analyzing local java: {:?}", local_java);
@@ -188,7 +190,7 @@ where
 
                 // If it is in the db, update it to invalid
                 if db_entry.is_some() {
-                    if is_java_used_in_profile && !auto_manage_java {
+                    if is_java_used_in_profile {
                         update_java_component_in_db_to_invalid(
                             db,
                             resolved_java_path.display().to_string(),
@@ -210,13 +212,17 @@ where
     // Cleanup unscanned local javas (if they are not default)
     let local_javas_from_db = db
         .java()
-        .find_many(vec![crate::db::java::WhereParam::Type(
-            StringFilter::Equals(JavaComponentType::Local.to_string()),
+        .find_many(vec![crate::db::java::r#type::equals(
+            JavaComponentType::Local.to_string(),
         )])
         .exec()
         .await?;
 
     for local_java_from_db in local_javas_from_db {
+        trace!(
+            "Checking if java {} has been scanned",
+            local_java_from_db.path
+        );
         let has_been_scanned = local_javas
             .iter()
             .any(|local_java| local_java_from_db.path == local_java.display().to_string());
@@ -238,7 +244,7 @@ where
             })
             .any(|java_profile_path| local_java_from_db.path == java_profile_path);
 
-        if is_used_in_profile && !auto_manage_java {
+        if is_used_in_profile {
             update_java_component_in_db_to_invalid(db, local_java_from_db.path).await?;
         } else {
             db.java()
@@ -300,6 +306,13 @@ where
         .exec()
         .await?;
 
+    let java_profiles = db
+        .java_profile()
+        .find_many(vec![])
+        .with(crate::db::java_profile::java::fetch())
+        .exec()
+        .await?;
+
     for managed_java in &managed_javas {
         let java_bin_info = java_checker
             .get_bin_info(
@@ -308,8 +321,47 @@ where
             )
             .await;
 
-        if java_bin_info.is_err() {
-            update_java_component_in_db_to_invalid(db, managed_java.path.clone()).await?;
+        let is_java_used_in_profile = java_profiles.iter().any(|profile| {
+            let Some(java) = profile.java.as_ref() else {
+                return false;
+            };
+            let Some(java) = java.as_ref() else {
+                return false;
+            };
+            let java_path = java.path.clone();
+            java_path == managed_java.path
+        });
+
+        println!(
+            "java {} is used in profile: {}",
+            managed_java.path, is_java_used_in_profile
+        );
+
+        match (java_bin_info, managed_java.is_valid) {
+            (Ok(java_component), true) => {}
+            (Ok(java_component), false) => {
+                upsert_java_component_to_db(db, java_component).await?;
+            }
+            (Err(_), true) => {
+                if is_java_used_in_profile {
+                    update_java_component_in_db_to_invalid(db, managed_java.path.clone()).await?;
+                } else {
+                    db.java()
+                        .delete(crate::db::java::path::equals(managed_java.path.clone()))
+                        .exec()
+                        .await?;
+                }
+            }
+            (Err(_), false) => {
+                if !is_java_used_in_profile {
+                    db.java()
+                        .delete(crate::db::java::UniqueWhereParam::PathEquals(
+                            managed_java.path.clone(),
+                        ))
+                        .exec()
+                        .await?;
+                }
+            }
         }
     }
 
@@ -516,7 +568,7 @@ mod test {
             .await
             .unwrap();
 
-        scan_and_sync_local(true, db, discovery, java_checker)
+        scan_and_sync_local(db, discovery, java_checker)
             .await
             .unwrap();
 
@@ -528,7 +580,9 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_scan_and_sync_local_to_invalid() {
+    /// This test is to make sure that if a java is invalid and not used in any profile, it will be removed
+    /// If it's used in a profile, it will be set as invalid
+    async fn test_scan_and_sync_local_broken_javas() {
         let app = setup_managers_for_test().await;
         let db = &app.prisma_client;
         let discovery = &MockDiscovery;
@@ -543,25 +597,99 @@ mod test {
             vendor: "Azul Systems, Inc.".to_string(),
         };
 
+        let component_to_add_still_used = JavaComponent {
+            path: "/usr/bin/java1".to_string(),
+            version: JavaVersion::from_major(8),
+            _type: JavaComponentType::Local,
+            arch: JavaArch::X86_32,
+            os: JavaOs::Linux,
+            vendor: "Azul Systems, Inc.".to_string(),
+        };
+
         upsert_java_component_to_db(db, component_to_add)
             .await
             .unwrap();
+        let java_id = upsert_java_component_to_db(db, component_to_add_still_used)
+            .await
+            .unwrap();
 
-        scan_and_sync_local(true, db, discovery, java_checker)
+        db.java_profile()
+            .update(
+                crate::db::java_profile::name::equals(SystemJavaProfileName::Legacy.to_string()),
+                vec![crate::db::java_profile::java::connect(
+                    crate::db::java::id::equals(java_id),
+                )],
+            )
+            .exec()
+            .await
+            .unwrap();
+
+        scan_and_sync_local(db, discovery, java_checker)
             .await
             .unwrap();
 
         let java_components = db.java().find_many(vec![]).exec().await.unwrap();
 
-        // Since the db only contains one component, it should be set as invalid, even tho
-        // given that it's not used in any profile, it will be silently removed.
-        // The other 2, since they don't already exist, are not added nor updated.
+        assert_eq!(java_components.len(), 1);
 
-        assert_eq!(java_components.len(), 0);
+        assert_eq!(java_components[0].path, "/usr/bin/java1");
+        assert!(!java_components[0].is_valid);
     }
-
     #[tokio::test]
-    async fn test_scan_and_sync_custom_to_invalid() {
+    async fn test_scan_and_sync_managed_broken_javas() {
+        let app = setup_managers_for_test().await;
+        let db = &app.prisma_client;
+        let java_checker = &MockJavaCheckerInvalid;
+        let discovery = &MockDiscovery;
+
+        let component_to_add = JavaComponent {
+            path: "/my/managed/path".to_string(),
+            version: JavaVersion::from_major(8),
+            _type: JavaComponentType::Managed,
+            arch: JavaArch::X86_32,
+            os: JavaOs::Linux,
+            vendor: "Azul Systems, Inc.".to_string(),
+        };
+        let component_to_add_still_used = JavaComponent {
+            path: "/my/managed/path1".to_string(),
+            version: JavaVersion::from_major(8),
+            _type: JavaComponentType::Managed,
+            arch: JavaArch::X86_32,
+            os: JavaOs::Linux,
+            vendor: "Azul Systems, Inc.".to_string(),
+        };
+
+        upsert_java_component_to_db(db, component_to_add)
+            .await
+            .unwrap();
+        let java_id = upsert_java_component_to_db(db, component_to_add_still_used)
+            .await
+            .unwrap();
+
+        db.java_profile()
+            .update(
+                crate::db::java_profile::name::equals(SystemJavaProfileName::Legacy.to_string()),
+                vec![crate::db::java_profile::java::connect(
+                    crate::db::java::id::equals(java_id),
+                )],
+            )
+            .exec()
+            .await
+            .unwrap();
+
+        scan_and_sync_managed(db, discovery, java_checker)
+            .await
+            .unwrap();
+
+        let java_components = db.java().find_many(vec![]).exec().await.unwrap();
+
+        assert_eq!(java_components.len(), 1);
+
+        assert_eq!(java_components[0].path, "/my/managed/path1");
+        assert!(!java_components[0].is_valid);
+    }
+    #[tokio::test]
+    async fn test_scan_and_sync_custom_broken_javas() {
         let app = setup_managers_for_test().await;
         let db = &app.prisma_client;
         let java_checker = &MockJavaCheckerInvalid;
@@ -574,8 +702,30 @@ mod test {
             os: JavaOs::Linux,
             vendor: "Azul Systems, Inc.".to_string(),
         };
+        let component_to_add_still_used = JavaComponent {
+            path: "/my/custom/path1".to_string(),
+            version: JavaVersion::from_major(8),
+            _type: JavaComponentType::Custom,
+            arch: JavaArch::X86_32,
+            os: JavaOs::Linux,
+            vendor: "Azul Systems, Inc.".to_string(),
+        };
 
         upsert_java_component_to_db(db, component_to_add)
+            .await
+            .unwrap();
+        let java_id = upsert_java_component_to_db(db, component_to_add_still_used)
+            .await
+            .unwrap();
+
+        db.java_profile()
+            .update(
+                crate::db::java_profile::name::equals(SystemJavaProfileName::Legacy.to_string()),
+                vec![crate::db::java_profile::java::connect(
+                    crate::db::java::id::equals(java_id),
+                )],
+            )
+            .exec()
             .await
             .unwrap();
 
@@ -583,11 +733,11 @@ mod test {
 
         let java_components = db.java().find_many(vec![]).exec().await.unwrap();
 
-        // Since the db only contains one component, it should be set as invalid.
-        // The other 2, since they don't already exist, are not added nor updated.
+        assert_eq!(java_components.len(), 2);
 
-        assert_eq!(java_components.len(), 1);
-        assert!(!java_components[0].is_valid);
+        for java_component in java_components {
+            assert!(!java_component.is_valid);
+        }
     }
 
     #[tokio::test]
@@ -768,7 +918,7 @@ mod test {
             vendor: "Azul Systems, Inc. New".to_string(),
         };
 
-        scan_and_sync_local(true, db, discovery, java_checker)
+        scan_and_sync_local(db, discovery, java_checker)
             .await
             .unwrap();
 

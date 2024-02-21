@@ -185,7 +185,7 @@ function Slider(props: Props) {
   return (
     <>
       <div
-        class="relative flex items-center box-border mb-4"
+        class="relative flex items-center box-border"
         classList={{
           "h-10 w-full max-w-full": !props.vertical,
           "h-full w-10": props.vertical,
@@ -230,7 +230,7 @@ function Slider(props: Props) {
                         }),
                   }}
                   classList={{
-                    "bg-darkSlate-900 border-darkSlate-900":
+                    "bg-darkSlate-800 border-darkSlate-600":
                       calcOffset(parseInt(value, 10)) >=
                       calcOffset(currentValue()),
                     "bg-primary-500 border-primary-500":
@@ -244,7 +244,7 @@ function Slider(props: Props) {
                   }}
                 />
                 <p
-                  class="flex flex-col mb-0 text-xs text-lightSlate-500"
+                  class="flex flex-col mb-0 text-xs text-darkGray-300 font-semibold"
                   classList={{
                     "-ml-2 mt-2 max-w-25": !props.vertical,
                     "-mt-2 mr-2": props.vertical,
@@ -346,7 +346,7 @@ function Slider(props: Props) {
             }}
           />
           <div
-            class="bg-darkSlate-900 rounded-full"
+            class="bg-darkSlate-600 rounded-full"
             classList={{
               "w-full h-2": !props.vertical,
               "h-full w-2": props.vertical,

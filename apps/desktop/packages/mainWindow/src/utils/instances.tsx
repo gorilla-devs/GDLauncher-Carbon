@@ -5,7 +5,7 @@ import {
   ListInstanceStatus,
   FESubtask,
   FETaskId,
-  UngroupedInstance,
+  ListInstance,
   ValidListInstance,
   Modpack,
   CurseforgeModpack,
@@ -70,6 +70,10 @@ export const isLaunchState = (input: any): input is LaunchState => {
       return typeof input.Preparing === "number";
     }
 
+    if ("Deleting" in input) {
+      return true;
+    }
+
     if ("Inactive" in input) {
       return input.Inactive.failed_task === null;
     }
@@ -109,6 +113,21 @@ export const getPreparingState = (status: ListInstanceStatus | LaunchState) => {
   }
 };
 
+export const getDeletingState = (status: ListInstanceStatus | LaunchState) => {
+  const launchState = isLaunchState(status);
+
+  if (launchState) {
+    if (typeof status === "object" && "Deleting" in status) {
+      return status.Deleting;
+    }
+  } else {
+    const isValidState = getValideInstance(status);
+    if (isValidState && isValidState.state === "Deleting") {
+      return true;
+    }
+  }
+};
+
 export const getInactiveState = (status: ListInstanceStatus | LaunchState) => {
   const launchState = isLaunchState(status);
 
@@ -121,6 +140,7 @@ export const getInactiveState = (status: ListInstanceStatus | LaunchState) => {
     if (
       isValidState &&
       isValidState.state &&
+      typeof isValidState.state === "object" &&
       "Inactive" in isValidState.state
     ) {
       return isValidState.state.Inactive.failed_task;
@@ -192,7 +212,7 @@ export const getInstanceImageUrl = (
   instanceId: string | number,
   rev: string | number
 ) => {
-  return `http://localhost:${port}/instance/instanceIcon?id=${instanceId}&rev=${rev}`;
+  return `http://127.0.0.1:${port}/instance/instanceIcon?id=${instanceId}&rev=${rev}`;
 };
 
 export const getModImageUrl = (
@@ -200,7 +220,7 @@ export const getModImageUrl = (
   modId: string,
   platform: string | null
 ) => {
-  return `http://localhost:${port}/instance/modIcon?instance_id=${instanceId}&mod_id=${modId}&platform=${platform}`;
+  return `http://127.0.0.1:${port}/instance/modIcon?instance_id=${instanceId}&mod_id=${modId}&platform=${platform}`;
 };
 
 export const getUrlType = (url: string) => {
@@ -213,13 +233,11 @@ export const getUrlType = (url: string) => {
     : null;
 };
 
-export interface InvalidInstanceType extends Omit<UngroupedInstance, "status"> {
+export interface InvalidInstanceType extends Omit<ListInstance, "status"> {
   error?: InvalidListInstance;
 }
 
-export interface ValidInstanceType
-  extends ValidListInstance,
-    UngroupedInstance {
+export interface ValidInstanceType extends ValidListInstance, ListInstance {
   error?: undefined;
   img: string;
 }
@@ -227,7 +245,7 @@ export interface ValidInstanceType
 export type Instance = InvalidInstanceType | ValidInstanceType;
 
 export interface InstancesStore {
-  [modloader: string]: UngroupedInstance[];
+  [modloader: string]: ListInstance[];
 }
 
 export const getModpackPlatformIcon = (platform: ModpackPlatform) => {

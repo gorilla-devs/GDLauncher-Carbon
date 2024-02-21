@@ -17,7 +17,7 @@ const fetchData = () => {
   const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
 
   const instancesUngrouped = rspc.createQuery(() => [
-    "instance.getInstancesUngrouped"
+    "instance.getAllInstances"
   ]);
 
   return {

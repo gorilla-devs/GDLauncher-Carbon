@@ -3,7 +3,6 @@ import {
   CreateInfiniteQueryResult
 } from "@tanstack/solid-query";
 import {
-  Accessor,
   createContext,
   createSignal,
   mergeProps,
@@ -18,7 +17,7 @@ import {
 } from "@gd/core_module/bindings";
 import { createVirtualizer } from "@tanstack/solid-virtual";
 import { rspc, rspcFetch } from "@/utils/rspcClient";
-import { instanceId, scrollTop, setInstanceId } from "@/utils/browser";
+import { scrollTop, setInstanceId } from "@/utils/browser";
 import {
   modpacksQuery,
   modsQuery,
@@ -37,8 +36,6 @@ type InfiniteQueryType = {
   rowVirtualizer: any;
   setParentRef: Setter<Element | null>;
   allRows: () => FEUnifiedSearchResult[];
-  setInstanceId: Setter<number | undefined>;
-  instanceId: Accessor<number | undefined>;
 };
 
 type Props = {
@@ -173,9 +170,7 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
     setQuery: setQueryWrapper,
     rowVirtualizer,
     setParentRef,
-    allRows,
-    setInstanceId,
-    instanceId
+    allRows
   };
 
   return (

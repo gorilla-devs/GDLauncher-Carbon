@@ -299,7 +299,9 @@ const ModRow = (props: ModRowProps) => {
                         projectId={getProjectId(props)}
                         isCurseforge={isCurseForgeData(props.data)}
                         instanceId={instanceId()}
-                        instanceDetails={(props as ModProps).instanceDetails}
+                        instanceLocked={
+                          (props as ModProps).instanceDetails?.modpack?.locked
+                        }
                         instanceMods={(props as ModProps).instanceMods}
                       />
                     </div>

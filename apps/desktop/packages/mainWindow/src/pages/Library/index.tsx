@@ -1,12 +1,17 @@
 import Sidebar from "@/components/Sidebar/library";
 import { Outlet } from "@solidjs/router";
 import ContentWrapper from "@/components/ContentWrapper";
+import { Show } from "solid-js";
 
 function Library() {
+  const gridLayout = () => false;
+
   return (
     <>
-      <Sidebar />
-      <ContentWrapper>
+      <Show when={gridLayout()}>
+        <Sidebar />
+      </Show>
+      <ContentWrapper zeroPadding>
         <Outlet />
       </ContentWrapper>
     </>

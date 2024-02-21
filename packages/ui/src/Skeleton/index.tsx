@@ -46,8 +46,25 @@ Skeleton.instance = Instance;
 
 Skeleton.instances = () => {
   return (
-    <div class="flex gap-4">
-      <For each={new Array(5)}>{() => <Instance />}</For>
+    <div class="flex flex-col gap-4">
+      <div class="flex gap-4">
+        <For each={new Array(10)}>{() => <Instance />}</For>
+      </div>
+      <div class="flex gap-4">
+        <For each={new Array(10)}>{() => <Instance />}</For>
+      </div>
+      <div class="flex gap-4">
+        <For each={new Array(10)}>{() => <Instance />}</For>
+      </div>
+      <div class="flex gap-4">
+        <For each={new Array(10)}>{() => <Instance />}</For>
+      </div>
+      <div class="flex gap-4">
+        <For each={new Array(10)}>{() => <Instance />}</For>
+      </div>
+      <div class="flex gap-4">
+        <For each={new Array(10)}>{() => <Instance />}</For>
+      </div>
     </div>
   );
 };

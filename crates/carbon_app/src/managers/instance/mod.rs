@@ -5,17 +5,21 @@ use std::fmt::Display;
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
 use crate::api::keys::instance::*;
+use crate::api::translation::Translation;
 use crate::db::read_filters::StringFilter;
 use crate::domain::instance::info::{GameVersion, InstanceIcon, Modpack};
+use crate::domain::java::{SystemJavaProfileName, SYSTEM_JAVA_PROFILE_NAME_PREFIX};
 use crate::domain::modplatforms::curseforge::filters::{ModFileParameters, ModParameters};
 use crate::domain::modplatforms::modrinth::search::{ProjectID, VersionID};
 use crate::domain::modplatforms::ModPlatform;
+use crate::domain::vtask::VisualTaskId;
 use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::{DateTime, Utc};
+use daedalus::minecraft::MinecraftJavaProfile;
 use fs_extra::dir::CopyOptions;
 use futures::future::BoxFuture;
-use futures::Future;
+use futures::{join, Future};
 
 use prisma_client_rust::Direction;
 use rspc::Type;
@@ -31,10 +35,11 @@ use db::instance::Data as CachedInstance;
 use self::export::InstanceExportManager;
 use self::importer::InstanceImportManager;
 use self::log::GameLog;
-use self::run::PersistenceManager;
+use self::run::{LaunchState, PersistenceManager};
 
 use super::metadata::cache;
 use super::modplatforms::curseforge::CurseForge;
+use super::vtask::{TaskState, VisualTask};
 use super::ManagerRef;
 
 use crate::domain::instance::{
@@ -168,10 +173,21 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .meta_cache_manager()
                 .queue_caching(instance_id, false)
                 .await;
+
+            let app = self.app.clone();
+            tokio::task::spawn(async move {
+                // ignore errors
+                let (_, _) = join!(
+                    app.instance_manager()
+                        .check_curseforge_modpack_updates(instance_id),
+                    app.instance_manager()
+                        .check_modrinth_modpack_updates(instance_id),
+                );
+            });
         }
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
 
         Ok(())
     }
@@ -291,6 +307,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     )
                     .map(|(instance, status)| ListInstance {
                         id: InstanceId(instance.id),
+                        group_id: GroupId(instance.group_id),
                         name: instance.name,
                         favorite: instance.favorite,
                         icon_revision: match &status {
@@ -359,6 +376,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         date_updated: match status {
                             InstanceType::Valid(status) => status.config.date_updated,
                             InstanceType::Invalid(status) => DateTime::default(),
+                        },
+                        seconds_played: match status {
+                            InstanceType::Valid(status) => status.config.seconds_played,
+                            InstanceType::Invalid(status) => 0,
                         },
                     })
                     .collect::<Vec<_>>(),
@@ -441,7 +462,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         Ok(())
     }
 
@@ -555,7 +576,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         Ok(())
     }
 
@@ -658,7 +679,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
 
         Ok(GroupId(group.id))
     }
@@ -740,7 +761,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
 
@@ -957,8 +978,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 global_java_args: true,
                 extra_java_args: None,
                 memory: None,
+                java_override: None,
                 game_resolution: None,
             },
+            pre_launch_hook: None,
+            post_exit_hook: None,
+            wrapper_command: None,
             mod_sources: None,
             notes,
         };
@@ -1024,7 +1049,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         );
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
 
         info!({ shortpath = ?shortpath }, "Created new instance '{name}' (id {})", *id);
 
@@ -1050,8 +1075,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .settings_manager()
             .runtime_path
             .get_instances()
-            .to_path()
-            .join(shortpath as &str);
+            .get_instance_path(shortpath as &str)
+            .get_root();
 
         let mut info = data.config.clone();
 
@@ -1088,6 +1113,23 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         if let Some(notes) = update.notes {
             info.notes = notes;
+        }
+
+        if let Some(pre_launch_hook) = update.pre_launch_hook {
+            info.pre_launch_hook = pre_launch_hook;
+        }
+
+        if let Some(post_exit_hook) = update.post_exit_hook {
+            info.post_exit_hook = post_exit_hook;
+        }
+
+        if let Some(wrapper_command) = update.wrapper_command {
+            info.wrapper_command = wrapper_command;
+        }
+
+        if let Some(java_override) = update.java_override {
+            info!(?java_override, "Updating java override");
+            info.game_configuration.java_override = java_override;
         }
 
         let mut need_reinstall = false;
@@ -1194,19 +1236,19 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         }
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some(update.instance_id.0.into()));
 
         if need_reinstall {
-            tokio::fs::write(path.join(".first_run_incomplete"), "")
+            tokio::fs::create_dir_all(path.join(".setup"))
                 .await
                 .context("writing incomplete instance marker")?;
 
             let app = self.app.clone();
             tokio::spawn(async move {
                 app.instance_manager()
-                    .prepare_game(InstanceId(*update.instance_id), None, None)
+                    .prepare_game(InstanceId(*update.instance_id), None, None, true)
                     .await?;
 
                 Ok(()) as anyhow::Result<()>
@@ -1219,7 +1261,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     pub async fn update_playtime(
         self,
         instance_id: InstanceId,
-        added_seconds: u64,
+        added_seconds: u32,
     ) -> anyhow::Result<()> {
         let mut instances = self.instances.write().await;
         let instance = instances
@@ -1255,11 +1297,37 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
-    pub async fn delete_instance(self, instance_id: InstanceId) -> anyhow::Result<()> {
+    pub async fn delete_instance(&self, instance_id: InstanceId) -> anyhow::Result<()> {
+        let app = self.app.clone();
+
+        tokio::spawn(async move {
+            app.instance_manager()._delete_instance(instance_id).await?;
+
+            Ok::<_, anyhow::Error>(())
+        });
+
+        Ok(())
+    }
+
+    async fn _delete_instance(self, instance_id: InstanceId) -> anyhow::Result<()> {
         let mut instances = self.instances.write().await;
         let instance = instances
-            .get(&instance_id)
+            .get_mut(&instance_id)
             .ok_or(InvalidInstanceIdError(instance_id))?;
+
+        let InstanceType::Valid(data) = &mut instance.type_ else {
+            return Err(anyhow!("Instance {instance_id} is not in a valid state"));
+        };
+
+        data.state = LaunchState::Deleting;
+
+        let instance_shortpath = instance.shortpath.clone();
+        drop(instances);
+
+        self.app.invalidate(GET_GROUPS, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
+        self.app
+            .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
 
         let path = self
             .app
@@ -1267,15 +1335,33 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .runtime_path
             .get_instances()
             .to_path()
-            .join(&instance.shortpath as &str);
+            .join(&instance_shortpath as &str);
 
-        tokio::task::spawn_blocking(|| trash::delete(path)).await??;
+        let should_go_to_trash = self
+            .app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .deletion_through_recycle_bin;
+
+        tokio::task::spawn_blocking(move || {
+            if should_go_to_trash {
+                trash::delete(&path)?;
+            } else {
+                std::fs::remove_dir_all(&path)?;
+            }
+
+            Ok::<_, anyhow::Error>(())
+        })
+        .await??;
+
+        let mut instances = self.instances.write().await;
+
         instances.remove(&instance_id);
-        drop(instances);
         self.remove_instance(instance_id).await?;
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
 
@@ -1373,7 +1459,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         );
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app.meta_cache_manager().queue_caching(id, false).await;
 
         Ok(id)
@@ -1482,7 +1568,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         }
 
         self.app.invalidate(GET_GROUPS, None);
-        self.app.invalidate(GET_INSTANCES_UNGROUPED, None);
+        self.app.invalidate(GET_ALL_INSTANCES, None);
         Ok(())
     }
 
@@ -1505,14 +1591,44 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             InstanceIcon::RelativePath(_) => instance.icon_revision,
         };
 
+        let mc_version = match &instance.config.game_configuration.version {
+            Some(info::GameVersion::Standard(version)) => Some(version.release.clone()),
+            Some(info::GameVersion::Custom(custom)) => Some(custom.clone()),
+            None => None,
+        };
+
+        let mut version_info = None;
+
+        if let Some(mc_version) = &mc_version {
+            version_info = Some(
+                self.app
+                    .minecraft_manager()
+                    .get_minecraft_version(&mc_version)
+                    .await,
+            );
+        }
+
+        let required_java_profile = mc_version.clone().and_then(|version| {
+            let version_info = version_info.unwrap().ok();
+            let java = version_info
+                .map(|version| version.java_version)
+                .and_then(|version| version.map(|version| version.component));
+
+            let Some(java) = java else {
+                return None;
+            };
+
+            let Ok(required_java) = MinecraftJavaProfile::try_from(&*java) else {
+                return None;
+            };
+
+            Some(SystemJavaProfileName::from(required_java).to_string())
+        });
+
         Ok(domain::InstanceDetails {
             favorite: instance.favorite,
             name: instance.config.name.clone(),
-            version: match &instance.config.game_configuration.version {
-                Some(info::GameVersion::Standard(version)) => Some(version.release.clone()),
-                Some(info::GameVersion::Custom(custom)) => Some(custom.clone()),
-                None => None,
-            },
+            version: mc_version,
             modpack: instance.config.modpack.clone(),
             locked: instance
                 .config
@@ -1533,9 +1649,16 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 Some(info::GameVersion::Custom(_)) => Vec::new(), // todo
                 None => Vec::new(),
             },
+            java_override: instance.config.game_configuration.java_override.clone(),
+            required_java_profile,
             state: (&instance.state).into(),
             notes: instance.config.notes.clone(),
             icon_revision,
+            has_pack_update: instance.modpack_update_curseforge.unwrap_or(false)
+                || instance.modpack_update_modrinth.unwrap_or(false),
+            pre_launch_hook: instance.config.pre_launch_hook.clone(),
+            post_exit_hook: instance.config.post_exit_hook.clone(),
+            wrapper_command: instance.config.wrapper_command.clone(),
         })
     }
 
@@ -1692,6 +1815,7 @@ pub struct ListGroup {
 #[derive(Debug, PartialEq, Eq)]
 pub struct ListInstance {
     pub id: InstanceId,
+    pub group_id: GroupId,
     pub name: String,
     pub favorite: bool,
     pub status: ListInstanceStatus,
@@ -1700,6 +1824,7 @@ pub struct ListInstance {
     pub locked: bool,
     pub date_created: DateTime<Utc>,
     pub date_updated: DateTime<Utc>,
+    pub seconds_played: u32,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -2283,6 +2408,7 @@ mod test {
             name: default_group.name.clone(),
             instances: vec![ListInstance {
                 id: instance_id,
+                group_id: default_group.id,
                 name: String::from("test"),
                 favorite: false,
                 icon_revision: None,
@@ -2296,6 +2422,7 @@ mod test {
                 last_played: None,
                 date_created: list[0].instances[0].date_created,
                 date_updated: list[0].instances[0].date_updated,
+                seconds_played: 0,
             }],
         }];
 
@@ -2322,6 +2449,10 @@ mod test {
                 global_java_args: None,
                 extra_java_args: None,
                 memory: None,
+                java_override: None,
+                pre_launch_hook: None,
+                post_exit_hook: None,
+                wrapper_command: None,
                 game_resolution: None,
                 modpack_locked: None,
                 mod_sources: None,

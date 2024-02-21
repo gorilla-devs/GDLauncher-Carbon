@@ -5,7 +5,6 @@ import {
   CFFEModLoaderType,
   FESubtask,
   Translation,
-  UngroupedInstance,
   ModpackPlatform
 } from "@gd/core_module/bindings";
 import { For, Match, Show, Switch, mergeProps } from "solid-js";
@@ -27,7 +26,7 @@ type Variant = "default" | "sidebar" | "sidebar-small";
 
 type Props = {
   modloader: CFFEModLoaderType | null | undefined;
-  instance: UngroupedInstance | ListInstance;
+  instance: ListInstance;
   selected?: boolean;
   isLoading?: boolean;
   percentage?: number;
@@ -39,9 +38,11 @@ type Props = {
   totalDownload?: number;
   isRunning?: boolean;
   isPreparing?: boolean;
+  isDeleting?: boolean;
   subTasks?: FESubtask[] | undefined;
   failError?: string;
   onClick?: (_e: MouseEvent) => void;
+  size: 1 | 2 | 3 | 4 | 5;
 };
 
 const Tile = (props: Props) => {
@@ -134,19 +135,19 @@ const Tile = (props: Props) => {
       icon: props.isRunning ? "i-ri:stop-fill" : "i-ri:play-fill",
       label: props.isRunning ? t("instance.stop") : t("instance.action_play"),
       action: handlePlay,
-      disabled: props.isLoading || isInQueue()
+      disabled: props.isLoading || isInQueue() || props.isDeleting
     },
     {
       icon: "i-ri:pencil-fill",
       label: t("instance.action_edit"),
       action: handleEdit,
-      disabled: props.isLoading || isInQueue()
+      disabled: props.isLoading || isInQueue() || props.isDeleting
     },
     {
       icon: "i-ri:settings-3-fill",
       label: t("instance.action_settings"),
       action: handleSettings,
-      disabled: props.isLoading || isInQueue()
+      disabled: props.isLoading || isInQueue() || props.isDeleting
     },
     ...(!props.isInvalid
       ? [
@@ -154,7 +155,7 @@ const Tile = (props: Props) => {
             icon: "i-ri:file-copy-fill",
             label: t("instance.action_duplicate"),
             action: handleDuplicate,
-            disabled: props.isLoading || isInQueue()
+            disabled: props.isLoading || isInQueue() || props.isDeleting
           }
         ]
       : []),
@@ -183,14 +184,14 @@ const Tile = (props: Props) => {
           name: "exportInstance"
         });
       },
-      disabled: props.isLoading || isInQueue()
+      disabled: props.isLoading || isInQueue() || props.isDeleting
     },
     {
       id: "delete",
       icon: "i-ri:delete-bin-2-fill",
       label: t("instance.action_delete"),
       action: handleDelete,
-      disabled: props.isLoading || isInQueue()
+      disabled: props.isLoading || isInQueue() || props.isDeleting
     }
   ];
 
@@ -220,35 +221,39 @@ const Tile = (props: Props) => {
         <ContextMenu menuItems={menuItems()}>
           <div
             class="flex justify-center flex-col relative select-none group items-start"
+            style={{ "pointer-events": "auto" }}
             onClick={(e) => {
               e.stopPropagation();
               if (
                 !props.isLoading &&
                 !isInQueue() &&
                 !props.isInvalid &&
-                !props.failError
+                !props.failError &&
+                !props.isDeleting
               ) {
                 props?.onClick?.(e);
               }
             }}
           >
-            <div class="relative rounded-2xl overflow-hidden border-1 border-solid h-38 w-38 border-darkSlate-600">
+            <div
+              class="relative rounded-2xl overflow-hidden border-1 border-solid border-darkSlate-600"
+              classList={{
+                "h-100 w-100": props.size === 5,
+                "h-70 w-70": props.size === 4,
+                "h-50 w-50": props.size === 3,
+                "h-38 w-38": props.size === 2,
+                "h-20 w-20": props.size === 1
+              }}
+            >
               <div
-                class="flex justify-center relative items-center rounded-2xl overflow-hidden h-38 w-38 bg-cover bg-center max-w-38"
+                class="flex justify-center relative items-center rounded-2xl overflow-hidden h-full w-full bg-cover bg-center"
                 classList={{
-                  grayscale: props.isLoading || isInQueue(),
-                  "cursor-pointer":
-                    !props.isLoading &&
-                    !isInQueue() &&
-                    !props.isInvalid &&
-                    !props.failError &&
-                    !props.isRunning
+                  grayscale: props.isLoading || isInQueue()
                 }}
                 style={{
                   "background-image": props.img
                     ? `url("${props.img}")`
-                    : `url("${DefaultImg}")`,
-                  "background-size": props.img ? "cover" : "120%"
+                    : `url("${DefaultImg}")`
                 }}
               >
                 <Show when={props.isInvalid}>
@@ -280,7 +285,8 @@ const Tile = (props: Props) => {
                       !isInQueue() &&
                       !props.isInvalid &&
                       !props.failError &&
-                      !props.isRunning
+                      !props.isRunning &&
+                      !props.isDeleting
                   }}
                   style={{ "pointer-events": "auto" }}
                   onClick={(e) => {
@@ -304,7 +310,7 @@ const Tile = (props: Props) => {
                     props.percentage !== null
                   }
                 >
-                  <div class="flex flex-col justify-center items-center z-20 w-full h-full gap-2">
+                  <div class="flex flex-col justify-center items-center z-20 w-full h-full gap-2 p-4">
                     <h3 class="text-center opacity-50 m-0 text-3xl">
                       {Math.round(props.percentage as number)}%
                     </h3>
@@ -329,11 +335,16 @@ const Tile = (props: Props) => {
                     </div>
                   </div>
                 </Show>
-                <Show when={isInQueue()}>
+                <Show when={isInQueue() || props.isDeleting}>
                   <div class="flex flex-col gap-2 items-center z-12">
                     <Spinner />
                     <span class="font-bold">
-                      <Trans key="instance.isInQueue" />
+                      <Show when={props.isDeleting}>
+                        <Trans key="instance.isDeleting" />
+                      </Show>
+                      <Show when={isInQueue()}>
+                        <Trans key="instance.isInQueue" />
+                      </Show>
                     </span>
                   </div>
                 </Show>
@@ -347,7 +358,7 @@ const Tile = (props: Props) => {
                     />
                   </div>
                 </Show>
-                <Show when={props.isLoading || isInQueue()}>
+                <Show when={props.isLoading || isInQueue() || props.isDeleting}>
                   <div class="absolute top-0 bottom-0 left-0 right-0 backdrop-blur-sm z-11" />
                   <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
                   <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
@@ -363,10 +374,17 @@ const Tile = (props: Props) => {
               </Show>
             </div>
             <h4
-              class="max-w-38 text-ellipsis whitespace-nowrap mt-2 mb-1"
+              class="text-ellipsis whitespace-nowrap mt-2 mb-1"
               classList={{
-                "text-white": !props.isLoading && !isInQueue(),
-                "text-lightGray-900": props.isLoading || isInQueue()
+                "text-white":
+                  !props.isLoading && !isInQueue() && !props.isDeleting,
+                "text-lightGray-900":
+                  props.isLoading || isInQueue() || props.isDeleting,
+                "max-w-100": props.size === 5,
+                "max-w-70": props.size === 4,
+                "max-w-50": props.size === 3,
+                "max-w-38": props.size === 2,
+                "max-w-20": props.size === 1
               }}
             >
               <Tooltip
@@ -374,7 +392,7 @@ const Tile = (props: Props) => {
                   props.instance.name.length > 20 ? props.instance.name : ""
                 }
                 placement="top"
-                class="max-w-38 w-full text-ellipsis overflow-hidden"
+                class="w-full text-ellipsis overflow-hidden"
               >
                 {props.instance.name}
               </Tooltip>
@@ -391,7 +409,9 @@ const Tile = (props: Props) => {
                         )}
                       />
                     </Show>
-                    <p class="m-0">{props.modloader?.toString()}</p>
+                    <Show when={props.size !== 1}>
+                      <p class="m-0">{props.modloader?.toString()}</p>
+                    </Show>
                   </span>
                   <p class="m-0">{props.version}</p>
                 </div>
@@ -466,9 +486,9 @@ const Tile = (props: Props) => {
                 }}
                 classList={{
                   "group-hover:opacity-50 group-hover:blur-[1.5px]  transition ease-in-out duration-150":
-                    !props.isLoading && !props.isRunning,
+                    !props.isLoading && !props.isRunning && !isInQueue(),
                   "opacity-50 blur-[1.5px]": props.isRunning,
-                  grayscale: props.isLoading || isInQueue()
+                  grayscale: props.isLoading || isInQueue() || props.isDeleting
                 }}
               />
               <div

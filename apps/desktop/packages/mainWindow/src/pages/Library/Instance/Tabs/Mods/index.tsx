@@ -45,13 +45,31 @@ const Mods = () => {
     "instance.openInstanceFolder"
   ]);
 
-  const filteredMods = createMemo(() =>
-    filter()
-      ? routeData.instanceMods?.filter((item) =>
-          item.filename.toLowerCase().includes(filter().toLowerCase())
+  const filteredMods = createMemo(() => {
+    const filterName = filter().replaceAll(" ", "").toLowerCase();
+
+    return filter()
+      ? routeData.instanceMods?.filter(
+          (item) =>
+            item.filename
+              .toLowerCase()
+              .replaceAll(" ", "")
+              .includes(filterName) ||
+            item.metadata?.name
+              ?.toLowerCase()
+              .replaceAll(" ", "")
+              .includes(filterName) ||
+            item.curseforge?.name
+              ?.toLowerCase()
+              .replaceAll(" ", "")
+              .includes(filterName) ||
+            item.modrinth?.title
+              ?.toLowerCase()
+              .replaceAll(" ", "")
+              .includes(filterName)
         )
-      : routeData.instanceMods
-  );
+      : routeData.instanceMods;
+  });
 
   const selectedMods = createMemo(() => {
     return routeData.instanceMods?.filter((mod) => selectedModsMap[mod.id]);

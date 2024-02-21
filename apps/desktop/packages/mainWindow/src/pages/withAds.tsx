@@ -1,7 +1,7 @@
 import { AdsBanner } from "@/components/AdBanner";
 import AppNavbar from "@/components/Navbar";
-import { Outlet, useLocation, useRouteData } from "@solidjs/router";
-import { createEffect } from "solid-js";
+import { Outlet, useRouteData } from "@solidjs/router";
+import { Show, createEffect } from "solid-js";
 import fetchData from "./app.data";
 import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 import {
@@ -16,11 +16,6 @@ import { useModal } from "@/managers/ModalsManager";
 function withAdsLayout() {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const modalContext = useModal();
-
-  const location = useLocation();
-
-  const modpackPathRegex = /(modpacks|mods)\/(\w+)(\/.*)?/;
-  const isDetailPage = () => modpackPathRegex.test(location.pathname);
 
   createEffect(() => {
     if (routeData.minecraftVersions.data) {
@@ -64,23 +59,25 @@ function withAdsLayout() {
       <AppNavbar />
       <div class="flex w-screen z-10 h-auto">
         <main class="relative flex-grow">
-          <div
-            class="grid justify-end h-[calc(100vh-60px)]"
-            classList={{
-              "grid-cols-[auto_2fr_auto]": !isDetailPage(),
-              "grid-cols-[2fr_auto]": isDetailPage()
-            }}
-          >
-            <Outlet />
-            <div>
+          <div class="flex justify-end h-[calc(100vh-60px)]">
+            <div
+              style={{
+                width: `calc(100vw - ${adSize.width}px)`
+              }}
+            >
+              <Outlet />
+            </div>
+            <div class="flex flex-col justify-between h-[calc(100vh-100px)]">
               <div
-                class="flex flex-col gap-4 p-5 bg-darkSlate-800 justify-start flex-initial"
+                class="bg-darkSlate-800 py-4"
                 style={{
                   width: `${adSize.width}px`,
                   height: `${adSize.height}px`
                 }}
               >
-                <AdsBanner />
+                <Show when={adSize.shouldShow}>
+                  <AdsBanner />
+                </Show>
               </div>
               <div class="flex justify-center">
                 <div

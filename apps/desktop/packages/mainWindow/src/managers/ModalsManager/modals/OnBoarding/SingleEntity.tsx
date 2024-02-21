@@ -4,7 +4,7 @@ import {
   ImportableInstance,
   InvalidImportEntry
 } from "@gd/core_module/bindings";
-import { Button, Checkbox, Input, Tooltip } from "@gd/ui";
+import { Button, Checkbox, Input, Spinner, Tooltip } from "@gd/ui";
 import {
   For,
   Match,
@@ -138,9 +138,7 @@ const SingleEntity = (props: {
       }
     }
   });
-  createEffect(() => {
-    console.log(instances());
-  });
+
   return (
     <>
       <div class="flex-1 w-full flex flex-col items-center justify-center p-4">
@@ -215,7 +213,13 @@ const SingleEntity = (props: {
                           defaultPath: path() || "",
                           properties: ["openFile"],
                           filters: [
-                            { name: "ZIP Files", extensions: ["zip"] },
+                            {
+                              name: "ZIP Files",
+                              extensions:
+                                props.entity.entity === "CurseForgeZip"
+                                  ? ["zip"]
+                                  : ["mrpack"]
+                            },
                             { name: "All Files", extensions: ["*"] }
                           ]
                         });
@@ -239,13 +243,27 @@ const SingleEntity = (props: {
             <Match when={step() === "selectionStep"}>
               <Switch
                 fallback={
-                  <div class="w-full h-full flex items-center justify-center">
-                    <p class="text-xl text-gray-500">
-                      {path()
-                        ? t("instance.no_instance_found")
-                        : t("instance.select_path")}
-                    </p>
-                  </div>
+                  <>
+                    <Show when={importScanStatus.data?.scanning}>
+                      <div class="w-full h-full flex items-center justify-center">
+                        <Spinner />
+                      </div>
+                    </Show>
+                    <Show
+                      when={
+                        importScanStatus.data?.status === "NoResults" &&
+                        !importScanStatus.data?.scanning
+                      }
+                    >
+                      <div class="w-full h-full flex items-center justify-center">
+                        <p class="text-xl text-gray-500">
+                          {path()
+                            ? t("instance.no_instance_found")
+                            : t("instance.select_path")}
+                        </p>
+                      </div>
+                    </Show>
+                  </>
                 }
               >
                 <Match when={typeof instance.multiResult !== "undefined"}>

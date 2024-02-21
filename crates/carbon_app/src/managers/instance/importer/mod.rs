@@ -87,6 +87,7 @@ impl ManagerRef<'_, InstanceImportManager> {
 
                             if let Some((scanning, _)) = &mut *scanner {
                                 *scanning = false;
+                                app.invalidate(GET_IMPORT_SCAN_STATUS, None);
                             }
                         }
 

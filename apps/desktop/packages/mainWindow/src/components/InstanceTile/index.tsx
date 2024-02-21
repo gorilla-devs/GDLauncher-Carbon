@@ -7,14 +7,10 @@ import {
   getRunningState,
   getInValideInstance,
   getInactiveState,
-  getInstanceImageUrl
+  getInstanceImageUrl,
+  getDeletingState
 } from "@/utils/instances";
-import {
-  ListInstance,
-  UngroupedInstance,
-  FESubtask,
-  FETask
-} from "@gd/core_module/bindings";
+import { ListInstance, FESubtask, FETask } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { rspc } from "@/utils/rspcClient";
 import { createStore } from "solid-js/store";
@@ -30,9 +26,10 @@ type InstanceDownloadProgress = {
 };
 
 const InstanceTile = (props: {
-  instance: UngroupedInstance | ListInstance;
+  instance: ListInstance;
   isSidebarOpened?: boolean;
   selected?: boolean;
+  size: 1 | 2 | 3 | 4 | 5;
 }) => {
   const [isLoading, setIsLoading] = createSignal(false);
   const [failError, setFailError] = createSignal("");
@@ -48,8 +45,8 @@ const InstanceTile = (props: {
   const validInstance = () => getValideInstance(props.instance.status);
   const invalidInstance = () => getInValideInstance(props.instance.status);
   const inactiveState = () => getInactiveState(props.instance.status);
-  const failedTaskId = () => inactiveState();
   const isPreparingState = () => getPreparingState(props.instance.status);
+  const isDeleting = () => getDeletingState(props.instance.status) as boolean;
 
   const modloader = () => validInstance()?.modloader;
 
@@ -95,12 +92,12 @@ const InstanceTile = (props: {
   });
 
   const failedTask = rspc.createQuery(
-    () => ["vtask.getTask", failedTaskId() as number],
+    () => ["vtask.getTask", inactiveState() as number],
     { enabled: false }
   );
 
   createEffect(() => {
-    if (failedTaskId() !== null && failedTaskId() !== undefined) {
+    if (inactiveState() !== null && inactiveState() !== undefined) {
       failedTask.refetch();
     }
   });
@@ -126,7 +123,9 @@ const InstanceTile = (props: {
       failError={failError()}
       isRunning={!!isRunning()}
       isPreparing={isPreparingState() !== undefined}
+      isDeleting={isDeleting()}
       variant={type()}
+      size={props.size}
       img={
         props.instance.icon_revision
           ? getInstanceImageUrl(props.instance.id, props.instance.icon_revision)

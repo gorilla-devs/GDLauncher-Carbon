@@ -22,7 +22,6 @@ type BaseProps = {
 export type ModProps = BaseProps & {
   type: "Mod";
   mcVersion?: string;
-  installedMods: Mod[];
   instanceId: number | null;
   instanceMods?: Mod[];
   instanceDetails?: InstanceDetails;

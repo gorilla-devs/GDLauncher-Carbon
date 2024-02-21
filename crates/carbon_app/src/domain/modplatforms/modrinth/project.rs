@@ -125,7 +125,7 @@ pub struct GalleryItem {
     pub created: UtcDateTime,
     /// The order of the gallery image.
     /// Gallery images are sorted by this field and then alphabetically by title.
-    pub ordering: Option<i32>,
+    pub ordering: Option<i64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

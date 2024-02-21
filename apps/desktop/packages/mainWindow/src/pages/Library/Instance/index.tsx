@@ -20,7 +20,7 @@ import {
   FEModResponse,
   MRFEProject,
   InstanceDetails,
-  UngroupedInstance
+  ListInstance
 } from "@gd/core_module/bindings";
 import {
   getCurseForgeData,
@@ -76,7 +76,7 @@ const Instance = () => {
       obj
     ): Promise<
       | {
-          instancesUngrouped: UngroupedInstance[];
+          instancesUngrouped: ListInstance[];
           instanceDetails: InstanceDetails;
         }
       | undefined
@@ -85,11 +85,11 @@ const Instance = () => {
         queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)]
       });
       await queryClient.cancelQueries({
-        queryKey: ["instance.getInstancesUngrouped"]
+        queryKey: ["instance.getAllInstances"]
       });
 
-      const instancesUngrouped: UngroupedInstance[] | undefined =
-        queryClient.getQueryData(["instance.getInstancesUngrouped"]);
+      const instancesUngrouped: ListInstance[] | undefined =
+        queryClient.getQueryData(["instance.getAllInstances"]);
 
       const instanceDetails: InstanceDetails | undefined =
         queryClient.getQueryData([
@@ -115,7 +115,7 @@ const Instance = () => {
         queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)]
       });
       queryClient.invalidateQueries({
-        queryKey: ["instance.getInstancesUngrouped"]
+        queryKey: ["instance.getAllInstances"]
       });
       setIsFavorite((prev) => !prev);
     },
@@ -124,7 +124,7 @@ const Instance = () => {
       _variables,
       context:
         | {
-            instancesUngrouped: UngroupedInstance[];
+            instancesUngrouped: ListInstance[];
             instanceDetails: InstanceDetails;
           }
         | undefined

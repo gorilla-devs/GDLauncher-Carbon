@@ -333,7 +333,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
   };
 
   const loadIcon = (filePaths: string) => {
-    fetch(`http://localhost:${port}/instance/loadIcon?path=${filePaths}`).then(
+    fetch(`http://127.0.0.1:${port}/instance/loadIcon?path=${filePaths}`).then(
       async (img) => {
         const blob = await img.blob();
         const b64 = (await blobToBase64(blob)) as string;
@@ -656,7 +656,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                     bgColorClass="bg-darkSlate-800"
                     containerClass="w-full"
                     class="w-full"
-                    value={loaderVersions()[0].id}
+                    value={chosenLoaderVersion() || loaderVersions()[0].id}
                     placement="bottom"
                     onChange={(l) => {
                       const key = l.key as string;

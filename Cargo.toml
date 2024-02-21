@@ -51,6 +51,7 @@ prisma-client-rust-cli = { git = "https://github.com/Brendonovich/prisma-client-
   "migrations",
 ], default_features = false }
 regex = "1.7.0"
+const_format = "0.2.32"
 reqwest = { version = "0.11.13", default-features = false, features = [
   "json",
   "blocking",
@@ -61,7 +62,7 @@ reqwest-retry = "0.2.1"
 rspc = { git = "https://github.com/oscartbeaumont/rspc", rev = "60a4fa93187c20bc5cb565cc6ee30b2f0903840e" }
 serde = "1.0.147"
 serde_json = "1.0.89"
-daedalus = { git = "https://github.com/gorilla-devs/daedalus", rev = "dc73cbdcf06df0c5f5d2da33037234ad672b9cdd" }
+daedalus = { git = "https://github.com/gorilla-devs/daedalus", rev = "9655309b896629c18fb09c90402bc2cefee59075" }
 sha1 = "0.10.5"
 sha2 = "0.10.6"
 tar = "0.4.38"

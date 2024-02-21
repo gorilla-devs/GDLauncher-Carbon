@@ -64,7 +64,7 @@ const Popover = (_props: Props) => {
 
   const open = () => {
     if (props.trigger === "click") {
-      window.addEventListener("click", onClickWindow, true);
+      document.addEventListener("click", onClickWindow);
     }
     setPopoverOpened(true);
     props.onOpen?.();
@@ -72,7 +72,7 @@ const Popover = (_props: Props) => {
 
   const close = () => {
     if (props.trigger === "click") {
-      window.removeEventListener("click", onClickWindow, true);
+      document.removeEventListener("click", onClickWindow);
     }
     setPopoverOpened(false);
     props.onClose?.();
@@ -119,12 +119,8 @@ const Popover = (_props: Props) => {
     }, 50);
   };
 
-  const onClickWindow = (event: MouseEvent) => {
-    if (PopoverRef() && !PopoverRef()!.contains(event.target as any)) {
-      event.stopPropagation();
-      event.preventDefault();
-      close();
-    }
+  const onClickWindow = () => {
+    close();
   };
 
   onMount(() => {
@@ -169,9 +165,6 @@ const Popover = (_props: Props) => {
     <>
       <Show when={props.opened || PopoverOpened()}>
         <Portal>
-          <Show when={props.trigger === "click"}>
-            <div class="w-screen h-screen absolute top-0 left-0 backdrop-blur-[2px] z-50" />
-          </Show>
           <div
             onMouseEnter={() => {
               setSsHoveringCard(true);
@@ -180,7 +173,9 @@ const Popover = (_props: Props) => {
               setSsHoveringCard(false);
             }}
             ref={setPopoverRef}
-            class={`rounded-lg will-change z-100 ${props.color || ""}`}
+            class={`rounded-lg will-change z-100 ${
+              props.color || ""
+            } shadow-lg shadow-darkSlate-900`}
             style={{
               position: "absolute",
               top: `${position.y ?? 0}px`,
@@ -189,6 +184,11 @@ const Popover = (_props: Props) => {
             classList={{
               "bg-darkSlate-900": !props.color,
               "px-2 py-1": !props.noPadding,
+            }}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopImmediatePropagation();
+              e.stopPropagation();
             }}
           >
             <div class="relative z-20">{props.content}</div>

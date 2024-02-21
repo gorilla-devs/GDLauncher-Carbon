@@ -46,20 +46,12 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .collect::<Vec<_>>())
         }
 
-        query GET_INSTANCES_UNGROUPED[app, args: ()] {
+        query GET_ALL_INSTANCES[app, args: ()] {
             Ok(app.instance_manager()
                 .list_groups()
                 .await?
                 .into_iter()
-                .flat_map(|group| {
-                    group.instances
-                        .into_iter()
-                        .map(|instance| UngroupedInstance {
-                            favorite: instance.favorite,
-                            instance: instance.into(),
-                        })
-                        .collect::<Vec<_>>()
-                })
+                .flat_map(|group| group.instances.into_iter().map(ListInstance::from))
                 .collect::<Vec<_>>())
         }
 
@@ -215,7 +207,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
 
         mutation PREPARE_INSTANCE[app, id: FEInstanceId] {
             let (_, vtask_id) = app.instance_manager()
-                .prepare_game(id.into(), None, None)
+                .prepare_game(id.into(), None, None, true)
                 .await?;
 
             Ok(FETaskId::from(vtask_id))
@@ -231,7 +223,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
             };
 
             app.instance_manager()
-                .prepare_game(id.into(), Some(account), None)
+                .prepare_game(id.into(), Some(account), None, false)
                 .await?;
 
             Ok(())
@@ -542,8 +534,10 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                         .await
                         .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
 
-                    app.instance_manager().set_loaded_icon(icon).await;
-                    Ok::<_, AxumError>(())
+                    app.instance_manager().set_loaded_icon(icon.clone()).await;
+
+                    let icon_bytes = icon.1;
+                    Ok::<_, AxumError>(icon_bytes)
                 }
             )
         )
@@ -583,12 +577,12 @@ impl From<FEInstanceId> for domain::InstanceId {
 struct ListGroup {
     id: FEGroupId,
     name: String,
-    instances: Vec<ListInstance>,
 }
 
 #[derive(Type, Debug, Serialize)]
 struct ListInstance {
     id: FEInstanceId,
+    group_id: FEGroupId,
     name: String,
     favorite: bool,
     status: ListInstanceStatus,
@@ -596,13 +590,7 @@ struct ListInstance {
     last_played: Option<DateTime<Utc>>,
     date_created: DateTime<Utc>,
     date_updated: DateTime<Utc>,
-}
-
-#[derive(Type, Debug, Serialize)]
-struct UngroupedInstance {
-    favorite: bool,
-    #[serde(flatten)]
-    instance: ListInstance,
+    seconds_played: u32,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -663,6 +651,30 @@ struct ChangeModpack {
     modpack: Modpack,
 }
 
+#[derive(Type, Debug, Deserialize, Serialize)]
+enum FEJavaOverride {
+    Profile(Option<String>),
+    Path(Option<String>),
+}
+
+impl From<domain::info::JavaOverride> for FEJavaOverride {
+    fn from(value: domain::info::JavaOverride) -> Self {
+        match value {
+            domain::info::JavaOverride::Profile(p) => Self::Profile(p),
+            domain::info::JavaOverride::Path(p) => Self::Path(p),
+        }
+    }
+}
+
+impl From<FEJavaOverride> for domain::info::JavaOverride {
+    fn from(value: FEJavaOverride) -> Self {
+        match value {
+            FEJavaOverride::Profile(p) => Self::Profile(p),
+            FEJavaOverride::Path(p) => Self::Path(p),
+        }
+    }
+}
+
 #[derive(Type, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FEUpdateInstance {
@@ -678,11 +690,19 @@ struct FEUpdateInstance {
     #[specta(optional)]
     modloader: Option<Set<Option<ModLoader>>>,
     #[specta(optional)]
+    java_override: Option<Set<Option<FEJavaOverride>>>,
+    #[specta(optional)]
     global_java_args: Option<Set<bool>>,
     #[specta(optional)]
     extra_java_args: Option<Set<Option<String>>>,
     #[specta(optional)]
     memory: Option<Set<Option<MemoryRange>>>,
+    #[specta(optional)]
+    pre_launch_hook: Option<Set<Option<String>>>,
+    #[specta(optional)]
+    post_exit_hook: Option<Set<Option<String>>>,
+    #[specta(optional)]
+    wrapper_command: Option<Set<Option<String>>>,
     #[specta(optional)]
     game_resolution: Option<Set<Option<GameResolution>>>,
     #[specta(optional)]
@@ -869,9 +889,15 @@ struct InstanceDetails {
     last_played: Option<DateTime<Utc>>,
     seconds_played: u32,
     modloaders: Vec<ModLoader>,
+    java_override: Option<FEJavaOverride>,
+    required_java_profile: Option<String>,
+    pre_launch_hook: Option<String>,
+    post_exit_hook: Option<String>,
+    wrapper_command: Option<String>,
     notes: String,
     state: LaunchState,
     icon_revision: Option<u32>,
+    has_pack_update: bool,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -945,6 +971,7 @@ enum LaunchState {
         start_time: DateTime<Utc>,
         log_id: i32,
     },
+    Deleting,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -1125,9 +1152,15 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             last_played: value.last_played,
             seconds_played: value.seconds_played,
             modloaders: value.modloaders.into_iter().map(Into::into).collect(),
+            java_override: value.java_override.map(Into::into),
+            required_java_profile: value.required_java_profile,
             notes: value.notes,
             state: value.state.into(),
             icon_revision: value.icon_revision,
+            has_pack_update: value.has_pack_update,
+            pre_launch_hook: value.pre_launch_hook,
+            post_exit_hook: value.post_exit_hook,
+            wrapper_command: value.wrapper_command,
         }
     }
 }
@@ -1304,7 +1337,6 @@ impl From<manager::ListGroup> for ListGroup {
         Self {
             id: value.id.into(),
             name: value.name,
-            instances: value.instances.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -1313,6 +1345,7 @@ impl From<manager::ListInstance> for ListInstance {
     fn from(value: manager::ListInstance) -> Self {
         Self {
             id: value.id.into(),
+            group_id: value.group_id.into(),
             name: value.name,
             favorite: value.favorite,
             status: value.status.into(),
@@ -1320,6 +1353,7 @@ impl From<manager::ListInstance> for ListInstance {
             last_played: value.last_played,
             date_created: value.date_created,
             date_updated: value.date_updated,
+            seconds_played: value.seconds_played,
         }
     }
 }
@@ -1393,6 +1427,7 @@ impl From<domain::LaunchState> for LaunchState {
                 start_time,
                 log_id: log_id.0,
             },
+            domain::Deleting => Self::Deleting,
         }
     }
 }
@@ -1527,9 +1562,13 @@ impl TryFrom<FEUpdateInstance> for domain::InstanceSettingsUpdate {
             modloader: value
                 .modloader
                 .map(|x| x.inner().and_then(|v| v.try_into().ok())),
+            java_override: value.java_override.map(|x| x.inner().map(Into::into)),
             global_java_args: value.global_java_args.map(|x| x.inner()),
             extra_java_args: value.extra_java_args.map(|x| x.inner()),
             memory: value.memory.map(|x| x.inner().map(Into::into)),
+            pre_launch_hook: value.pre_launch_hook.map(|x| x.inner()),
+            post_exit_hook: value.post_exit_hook.map(|x| x.inner()),
+            wrapper_command: value.wrapper_command.map(|x| x.inner()),
             game_resolution: value.game_resolution.map(|x| x.inner().map(Into::into)),
             mod_sources: value.mod_sources.map(|x| x.inner().map(Into::into)),
             modpack_locked: value.modpack_locked.map(|x| x.inner()),
