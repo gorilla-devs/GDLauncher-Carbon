@@ -199,6 +199,7 @@
   "instance_confirm_continue": "Are you sure you want to continue ?",
   "instance_confirm_deletion.cancel": "Cancel",
   "instance_confirm_deletion.delete": "Delete",
+  "create": "Create",
   "instance.isInQueue": "In queue",
   "instance.isDeleting": "Deleting...",
   "instance.mods.search": "Search mod",
@@ -410,6 +411,9 @@
   "mods_updater.updating_mod_text": "Updating mod {{mod_name}}",
   "default": "Default",
   "favorites": "Favorites",
+  "profile_name": "Profile Name:",
+  "assigned_java_path": "Assigned Java Path:",
+  "add_custom_java_path": "Add Custom Path",
   "java_autocomplete.not_found": "Not found",
   "java_autocomplete.create_new_custom": "Create New [CUSTOM]"
 }
