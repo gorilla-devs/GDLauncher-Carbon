@@ -1,7 +1,7 @@
 use anyhow::bail;
 use prisma_client_rust::{prisma_errors::query_engine::UniqueKeyViolation, QueryError};
 use strum::IntoEnumIterator;
-use tokio::sync::watch;
+use tokio::sync::{watch, Mutex};
 use tracing::{debug, error, trace};
 
 use self::{
@@ -484,6 +484,9 @@ impl ManagerRef<'_, JavaManager> {
         progress: Option<watch::Sender<Step>>,
     ) -> anyhow::Result<Option<JavaComponent>> {
         use crate::db::java::UniqueWhereParam;
+
+        static LOCK: Mutex<()> = Mutex::const_new(());
+        let _guard = LOCK.lock().await;
 
         let versions = self
             .app

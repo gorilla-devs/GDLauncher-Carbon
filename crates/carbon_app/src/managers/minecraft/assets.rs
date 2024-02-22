@@ -4,6 +4,7 @@ use anyhow::Context;
 use daedalus::minecraft::{AssetIndex, AssetsIndex};
 use prisma_client_rust::QueryError;
 use thiserror::Error;
+use tokio::sync::Mutex;
 
 use crate::{db::PrismaClient, domain::runtime_path::AssetsPath};
 
@@ -21,6 +22,9 @@ pub async fn get_meta(
     version_asset_index: &AssetIndex,
     asset_indexes_path: PathBuf,
 ) -> anyhow::Result<(AssetsIndex, Vec<u8>)> {
+    static LOCK: Mutex<()> = Mutex::const_new(());
+    let _guard = LOCK.lock().await;
+
     let db_cache = db_client
         .assets_meta_cache()
         .find_unique(crate::db::assets_meta_cache::id::equals(

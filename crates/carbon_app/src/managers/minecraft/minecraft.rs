@@ -25,7 +25,7 @@ use regex::{Captures, Regex};
 use reqwest::Url;
 use strum_macros::EnumIter;
 use thiserror::Error;
-use tokio::process::Child;
+use tokio::{process::Child, sync::Mutex};
 use tracing::{info, warn};
 
 use crate::{
@@ -128,6 +128,9 @@ pub async fn get_lwjgl_meta(
             daedalus::minecraft::DependencyRule::Suggests(version) => version,
         })
         .ok_or(anyhow::anyhow!("Can't find lwjgl version."))?;
+
+    static LOCK: Mutex<()> = Mutex::const_new(());
+    let _guard = LOCK.lock().await;
 
     let db_cache = db_client
         .lwjgl_meta_cache()

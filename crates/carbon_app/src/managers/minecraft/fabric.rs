@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use daedalus::modded::{LoaderVersion, Manifest, PartialVersionInfo};
 use thiserror::Error;
+use tokio::sync::Mutex;
 use url::Url;
 
 use crate::db::PrismaClient;
@@ -37,6 +38,9 @@ pub async fn get_version(
     meta_base_url: &Url,
 ) -> anyhow::Result<PartialVersionInfo> {
     let db_entry_name = format!("fabric-{}", fabric_version);
+
+    static LOCK: Mutex<()> = Mutex::const_new(());
+    let _guard = LOCK.lock().await;
 
     let db_cache = db_client
         .partial_version_info_cache()

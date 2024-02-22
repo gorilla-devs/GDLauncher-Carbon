@@ -12,7 +12,7 @@ use daedalus::{
 };
 use prisma_client_rust::QueryError;
 use thiserror::Error;
-use tokio::process::Command;
+use tokio::{process::Command, sync::Mutex};
 use tracing::info;
 use url::Url;
 
@@ -55,6 +55,9 @@ pub async fn get_version(
     meta_base_url: &Url,
 ) -> anyhow::Result<PartialVersionInfo> {
     let db_entry_name = format!("neoforge-{}", neoforge_version);
+
+    static LOCK: Mutex<()> = Mutex::const_new(());
+    let _guard = LOCK.lock().await;
 
     let db_cache = db_client
         .partial_version_info_cache()
