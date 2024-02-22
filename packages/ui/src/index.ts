@@ -25,4 +25,9 @@ export { Tooltip } from "./Tooltip";
 export { Popover } from "./Popover";
 export { ContextMenu } from "./Menu";
 export { ContextMenuProvider, useContextMenu } from "./Menu/ContextMenuContext";
+export { Cascader } from "./Cascader";
+export {
+  ContextCascaderProvider,
+  useContextCascader,
+} from "./Cascader/CascaderContext";
 export * from "./themes";

@@ -26,7 +26,6 @@ const ContextCascaderProvider = (props: ContextCascaderProviderProps) => {
   const closeCascader = () => {
     setOpenCascader(null);
   };
-
   const value = { openCascader, setOpenCascader, closeCascader };
 
   return (
@@ -41,3 +40,5 @@ const useContextCascader = () => {
 };
 
 export { ContextCascaderProvider, useContextCascader };
+
+export const Exported = 5;

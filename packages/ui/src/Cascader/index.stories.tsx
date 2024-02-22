@@ -1,19 +1,19 @@
 import type { Meta, StoryObj } from "storybook-solidjs";
 import ChildsMenu from "./ChildsMenu";
-import Parent from "./Parent";
+import { Cascader } from "./";
 
-const meta: Meta<typeof Parent> = {
+const meta: Meta<typeof Cascader> = {
   /* 👇 The title prop is optional.
    * See https://storybook.js.org/docs/solid/configure/overview#configure-story-loading
    * to learn how to generate automatic titles
    */
   title: "ChildsMenu",
-  component: Parent,
+  component: Cascader,
 };
 
 export default meta;
 
-type Story = StoryObj<typeof Parent>;
+type Story = StoryObj<typeof Cascader>;
 
 export const WithoutParents: Story = {
   args: {
@@ -78,6 +78,7 @@ export const WithParents: Story = {
     hasSearch: false,
     isCheckbox: false,
     isParent: true,
+    children: <button>testing</button>,
     parentLabel: "Parent",
     items: [
       {
