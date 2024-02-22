@@ -1409,6 +1409,8 @@ impl ManagerRef<'_, InstanceManager> {
                 Ok(Some(mut child)) => {
                     drop(task);
 
+                    let _liveness_watch = app.instance_manager().instance_running_tracker.marker();
+
                     let _ = app
                         .rich_presence_manager()
                         .update_activity("Playing Minecraft".to_string())

@@ -636,7 +636,7 @@ fn merge_mod_metadata(
     }
 }
 
-pub fn parse_metadata(reader: impl Read + Seek) -> anyhow::Result<Option<ModFileMetadata>> {
+pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<ModFileMetadata>> {
     let mut zip = zip::ZipArchive::new(reader)?;
 
     let mut mod_metadata: Option<ModFileMetadata> = None;
@@ -758,7 +758,7 @@ mod test {
         drop(zip);
 
         // read meta zip
-        let meta = parse_metadata(Cursor::new(&vec));
+        let meta = parse_metadata(&mut Cursor::new(&vec));
 
         meta
     }

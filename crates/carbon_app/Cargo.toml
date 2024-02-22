@@ -33,6 +33,7 @@ chrono = { workspace = true }
 carbon_macro = { path = "../carbon_macro" }
 carbon_compression = { path = "../carbon_compression" }
 carbon_net = { path = "../carbon_net" }
+carbon_scheduler = { path = "../carbon_scheduler" }
 uuid = { workspace = true }
 prisma-client-rust = { workspace = true, features = [
   "sqlite-create-many",
@@ -74,6 +75,8 @@ num_cpus = { workspace = true }
 display-info = "0.4.3"
 # libc = { workspace = true }
 nom = { workspace = true }
+rayon = { workspace = true }
+parking_lot = { workspace = true }
 carbon_parsing = { path = "../carbon_parsing" }
 
 [target.'cfg(windows)'.dependencies]

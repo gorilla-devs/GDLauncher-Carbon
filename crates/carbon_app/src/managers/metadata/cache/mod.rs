@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 use std::ffi::OsStr;
 use std::io::Cursor;
 use std::io::Read;
+use std::io::SeekFrom;
 use std::path::PathBuf;
 use std::sync::atomic;
 use std::sync::atomic::AtomicI32;
@@ -16,8 +17,10 @@ use futures::Future;
 use image::ImageOutputFormat;
 use itertools::Itertools;
 use md5::Digest;
+use murmurhash32::Murmur2Digest;
 use sha1::Sha1;
 use sha2::Sha512;
+use tokio::io::AsyncSeekExt;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::sync::watch;
@@ -63,6 +66,7 @@ pub struct MetaCacheManager {
     image_scale_semaphore: Semaphore,
     image_download_semaphore: Semaphore,
     watched_instance: watch::Sender<Option<InstanceId>>,
+    pause_caching: watch::Sender<bool>,
 }
 
 impl MetaCacheManager {
@@ -79,9 +83,10 @@ impl MetaCacheManager {
             local_targets: LockNotify::new(CacheTargets::new()),
             curseforge_targets: LockNotify::new(CacheTargets::new()),
             modrinth_targets: LockNotify::new(CacheTargets::new()),
-            image_scale_semaphore: Semaphore::new(num_cpus::get()),
+            image_scale_semaphore: Semaphore::new(1),
             image_download_semaphore: Semaphore::new(10),
             watched_instance: watch::channel(None).0,
+            pause_caching: watch::channel(false).0,
         }
     }
 }
@@ -552,17 +557,54 @@ fn cache_modplatform<C: ModplatformCacher>(
                 is_priority,
                 is_override,
             }| async move {
-                debug!({ is_priority, is_override }, "Beginning {} mod caching for instance {instance_id}", C::NAME);
+                let mut pause = app.meta_cache_manager().pause_caching.subscribe();
+                let r = loop {
+                    let wait_for_pause = async {
+                        loop {
+                            if *pause.borrow() {
+                                break;
+                            }
 
-                // true could be optimized to "if there is a callback" if this is a bottleneck
-                let mut sender = BundleSender::new(instance_id, true, is_priority, batch_tx);
-                let r = C::query_platform(&app, instance_id, &mut sender).await;
+                            if pause.changed().await.is_err() {
+                                futures::future::pending().await
+                            }
+                        }
+                    };
 
-                if let Err(e) = &r {
-                    tracing::error!({ error = ?e }, "Could not query {} mod metadata for instance {instance_id}", C::NAME);
-                }
+                    let do_caching = async {
+                        debug!({ is_priority, is_override }, "Beginning {} mod caching for instance {instance_id}", C::NAME);
 
-                sender.wait().await;
+                        // true could be optimized to "if there is a callback" if this is a bottleneck
+                        let mut sender = BundleSender::new(instance_id, true, is_priority, batch_tx);
+                        let r = C::query_platform(&app, instance_id, &mut sender).await;
+
+                        if let Err(e) = &r {
+                            tracing::error!({ error = ?e }, "Could not query {} mod metadata for instance {instance_id}", C::NAME);
+                        }
+
+                        sender.wait().await;
+
+                        r
+                    };
+
+                    tokio::select! {
+                        _ = wait_for_pause => {
+                            tracing::info!("Remote mod caching paused");
+
+                            // wait for unpause
+                            loop {
+                                if !*pause.borrow() {
+                                    break;
+                                }
+
+                                if pause.changed().await.is_err() {
+                                    futures::future::pending().await
+                                }
+                            }
+                        },
+                        r = do_caching => break r,
+                    };
+                };
 
                 move |targets: &mut CacheTargets| targets.release_target(instance_id, r)
             },
@@ -782,6 +824,27 @@ impl ManagerRef<'_, MetaCacheManager> {
     }
 
     pub async fn launch_background_tasks(self) {
+        let app_pause = self.app.clone();
+        tokio::spawn(async move {
+            let mut any_instance_changed_watcher = app_pause
+                .instance_manager()
+                .any_instance_running
+                .subscribe();
+
+            loop {
+                let any_instance_running = *any_instance_changed_watcher.borrow();
+
+                app_pause
+                    .meta_cache_manager()
+                    .pause_caching
+                    .send_replace(any_instance_running);
+
+                if any_instance_changed_watcher.changed().await.is_err() {
+                    break;
+                }
+            }
+        });
+
         let (list_debounce_tx, mut list_debounce_rx) = watch::channel(());
 
         let debounce_target = Arc::new(AtomicI32::new(-1));
@@ -865,21 +928,74 @@ impl ManagerRef<'_, MetaCacheManager> {
             path.set_extension(format!("{prev_ext}.disabled"));
         }
 
-        let content = tokio::fs::read(path).await?;
-        let content_len = content.len();
-        let (content, sha512, sha1, meta, murmur2) = tokio::task::spawn_blocking(move || {
-            let sha512: [u8; 64] = Sha512::new_with_prefix(&content).finalize().into();
-            let sha1: [u8; 20] = Sha1::new_with_prefix(&content).finalize().into();
-            let meta = super::mods::parse_metadata(Cursor::new(&content));
+        let mut file = tokio::fs::File::open(path).await?;
 
-            // curseforge's api removes whitespace in murmur2 hashes
-            let mut murmur_content = content.clone();
-            murmur_content.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
-            let murmur2 = murmurhash32::murmurhash2(&murmur_content);
+        let mut sha512 = Sha512::new();
+        let mut sha1 = Sha1::new();
+        let mut murmur_len = 0;
+        let mut content_len = 0;
 
-            (content, sha512, sha1, meta, murmur2)
+        carbon_scheduler::buffered_digest(&mut file, |chunk| {
+            sha512.update(&chunk);
+            sha1.update(&chunk);
+            murmur_len += chunk
+                .iter()
+                .filter(|&&x| x != 9 && x != 10 && x != 13 && x != 32)
+                .count();
+            content_len += chunk.len();
         })
         .await?;
+
+        let sha512: [u8; 64] = sha512.finalize().into();
+        let sha1: [u8; 20] = sha1.finalize().into();
+
+        file.seek(SeekFrom::Start(0)).await?;
+        let mut file = file.into_std().await;
+
+        let (file, meta, image_data) = tokio::task::spawn_blocking(|| {
+            let meta = super::mods::parse_metadata(&mut file);
+
+            let image_data = match &meta
+                .as_ref()
+                .map(|m| m.as_ref().map(|m| m.logo_file.as_ref()))
+            {
+                Ok(Some(Some(logo_file))) => {
+                    // TODO: use the same zip in parse_metadata
+                    let mut zip = zip::ZipArchive::new(&mut file).unwrap();
+                    let r = match zip.by_name(&logo_file) {
+                        Ok(mut file) => {
+                            let mut image = Vec::with_capacity(file.size() as usize);
+                            file.read_to_end(&mut image)?;
+                            Some(image)
+                        }
+                        _ => None,
+                    };
+
+                    r
+                }
+                _ => None,
+            };
+
+            Ok::<_, anyhow::Error>((file, meta, image_data))
+        })
+        .await??;
+
+        let mut file = tokio::fs::File::from_std(file);
+        file.seek(SeekFrom::Start(0)).await?;
+        let mut murmur2 = Murmur2Digest::new(murmur_len as u32);
+
+        let mut workbuf = Vec::<u8>::with_capacity(carbon_scheduler::BUFSIZE);
+
+        carbon_scheduler::buffered_digest(&mut file, |chunk| {
+            workbuf.splice(.., chunk.iter().map(|&b| b));
+            workbuf.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
+            murmur2.update(&workbuf[..]);
+        })
+        .await?;
+
+        let murmur2 = murmur2.finalize();
+
+        drop(file);
 
         let meta = match meta {
             Ok(meta) => meta,
@@ -906,52 +1022,38 @@ impl ManagerRef<'_, MetaCacheManager> {
             None => {
                 let meta_id = Uuid::new_v4().to_string();
 
-                let logo_insert = 'logo: {
-                    let Some(meta) = &meta else { break 'logo None };
-                    let Some(logo_file) = &meta.logo_file else {
-                        break 'logo None;
-                    };
-                    let logo_file = logo_file.to_string();
+                let logo_insert = match image_data {
+                    Some(image_data) => {
+                        let permit = self
+                            .image_scale_semaphore
+                            .acquire()
+                            .await
+                            .expect("the image scale semaphore is never closed");
 
-                    let mcm = self.app.meta_cache_manager();
-                    let guard = mcm
-                        .image_scale_semaphore
-                        .acquire()
-                        .await
-                        .expect("the image scale semaphore is never closed");
+                        let logo = carbon_scheduler::cpu_block(|| {
+                            let scaled = scale_mod_image(&image_data[..])?;
+                            Ok::<_, anyhow::Error>(Some(scaled))
+                        })
+                        .await;
 
-                    let logo = tokio::task::spawn_blocking(move || {
-                        let mut zip = zip::ZipArchive::new(Cursor::new(&content)).unwrap();
-                        let Ok(mut file) = zip.by_name(&logo_file) else {
-                            return Ok(None);
-                        };
-                        let mut image = Vec::with_capacity(file.size() as usize);
-                        file.read_to_end(&mut image)?;
-                        let scaled = scale_mod_image(&image[..])?;
-                        Ok::<_, anyhow::Error>(Some(scaled))
-                    })
-                    .await;
+                        drop(permit);
 
-                    drop(guard);
-
-                    match logo {
-                        Ok(Ok(Some(data))) => {
-                            Some(self.app.prisma_client.local_mod_image_cache().create(
-                                data,
-                                metadb::UniqueWhereParam::IdEquals(meta_id.clone()),
-                                Vec::new(),
-                            ))
-                        }
-                        Ok(Ok(None)) => None,
-                        Ok(Err(e)) => {
-                            error!({ error = ?e }, "could not scale mod icon for {}", mod_filename);
-                            None
-                        }
-                        Err(e) => {
-                            error!({ error = ?e }, "could not scale mod icon for {}", mod_filename);
-                            None
+                        match logo {
+                            Ok(Some(data)) => {
+                                Some(self.app.prisma_client.local_mod_image_cache().create(
+                                    data,
+                                    metadb::UniqueWhereParam::IdEquals(meta_id.clone()),
+                                    Vec::new(),
+                                ))
+                            }
+                            Ok(None) => None,
+                            Err(e) => {
+                                error!({ error = ?e }, "could not scale mod icon for {}", mod_filename);
+                                None
+                            }
                         }
                     }
+                    None => None,
                 };
 
                 let meta_insert = self.app.prisma_client.mod_metadata().create(
@@ -1067,7 +1169,7 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
         let app = &app;
         let update_notifier = &update_notifier;
 
-        let cache_instance = |CacheTargetInfo { instance_id, .. }| async move {
+        let cache_instance = |instance_id: InstanceId| async move {
             let app2 = app.clone();
             let cached_entries = tokio::spawn(async move {
                 app2.prisma_client
@@ -1219,28 +1321,65 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
         let cache_instance = &cache_instance;
 
         LoopWatcher::new(rx).await.loop_interrupt(
-            |target @ CacheTargetInfo {
+            |CacheTargetInfo {
                 instance_id,
                 is_override,
                 is_priority,
             }| async move {
-                debug!("Beginning local mod caching for instance {instance_id}");
+                let mut pause = app.meta_cache_manager().pause_caching.subscribe();
+                let r = loop {
+                    let wait_for_pause = async {
+                        loop {
+                            if *pause.borrow() {
+                                break;
+                            }
 
-                let r = cache_instance(target).await;
+                            if pause.changed().await.is_err() {
+                                futures::future::pending().await
+                            }
+                        }
+                    };
 
-                if let Err(e) = &r {
-                    tracing::error!({ error = ?e }, "Could not query local mod metadata for instance {instance_id}");
-                }
+                    let do_caching = async {
+                        debug!("Beginning local mod caching for instance {instance_id}");
 
-                // waiting list targets cascade into curseforge and modrinth caching.
-                if !is_override && !is_priority {
-                    let mcm = app.meta_cache_manager();
+                        let r = cache_instance(instance_id).await;
 
-                    join!(
-                        mcm.curseforge_targets.send_modify_always(|targets| targets.waiting.push_back(instance_id)),
-                        mcm.modrinth_targets.send_modify_always(|targets| targets.waiting.push_back(instance_id)),
-                    );
-                }
+                        if let Err(e) = &r {
+                            tracing::error!({ error = ?e }, "Could not query local mod metadata for instance {instance_id}");
+                        }
+
+                        // waiting list targets cascade into curseforge and modrinth caching.
+                        if !is_override && !is_priority {
+                            let mcm = app.meta_cache_manager();
+
+                            join!(
+                                mcm.curseforge_targets.send_modify_always(|targets| targets.waiting.push_back(instance_id)),
+                                mcm.modrinth_targets.send_modify_always(|targets| targets.waiting.push_back(instance_id)),
+                            );
+                        }
+
+                        r
+                    };
+
+                    tokio::select! {
+                        _ = wait_for_pause => {
+                            tracing::info!("Local mod caching paused");
+
+                            // wait for unpause
+                            loop {
+                                if !*pause.borrow() {
+                                    break;
+                                }
+
+                                if pause.changed().await.is_err() {
+                                    futures::future::pending().await
+                                }
+                            }
+                        },
+                        r = do_caching => break r,
+                    };
+                };
 
                 move |targets: &mut CacheTargets| targets.release_target(instance_id, r)
             }
