@@ -36,6 +36,7 @@ const ChildsMenu = (props: ChildsMenuProps) => {
 
       return prev;
     });
+    console.log(props.selectedItems());
     setRadio(val as string);
   };
   return (

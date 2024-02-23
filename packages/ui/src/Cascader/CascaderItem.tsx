@@ -24,7 +24,9 @@ const CascaderItem = (props: {
       setNumberOfCheckedItems(
         props
           .selectedItems()
-          .filter((item) => item?.includes(props.parentLabel as string)).length
+          .filter((item) =>
+            item?.includes(props.children?.parentLabel as string)
+          ).length
       );
     }
   });
