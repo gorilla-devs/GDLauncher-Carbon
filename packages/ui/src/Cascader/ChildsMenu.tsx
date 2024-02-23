@@ -26,16 +26,22 @@ const ChildsMenu = (props: ChildsMenuProps) => {
   };
   const handleRadio = (val: string | number | string[] | undefined) => {
     props.setSelectedItems((prev) => {
-      const index = prev.findIndex((item) =>
+      const newItems = [...prev];
+      const index = newItems.findIndex((item) =>
         item.includes(props.parentLabel as string)
       );
-      if (index === -1) {
-        return [...prev, `${props.parentLabel}//${val}`];
-      }
-      prev[index] = `${props.parentLabel}//${val}`;
 
-      return prev;
+      const newValue = `${props.parentLabel}//${val}`;
+
+      if (index === -1) {
+        newItems.push(newValue);
+      } else {
+        newItems[index] = newValue;
+      }
+
+      return newItems;
     });
+
     console.log(props.selectedItems());
     setRadio(val as string);
   };
