@@ -239,7 +239,14 @@ const Sidebar = () => {
     })
   });
   createEffect(() => {
-    console.log(selectedItems());
+    const currentPlatform = selectedItems()
+      .find((item) => item.includes("Platform"))
+      ?.split("//")[1];
+    infiniteQuery.setQuery({
+      searchApi: (currentPlatform as string).toLowerCase() as FESearchAPI,
+      categories: [],
+      modloaders: null
+    });
   });
   return (
     // <SiderbarWrapper collapsable={false} noPadding>
