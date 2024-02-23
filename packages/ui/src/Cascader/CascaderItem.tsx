@@ -52,7 +52,7 @@ const CascaderItem = (props: {
             } else {
               props.setSelectedItems((prev) => [
                 ...prev,
-                props.parentLabel + "/" + props.label,
+                props.parentLabel + "//" + props.label,
               ]);
             }
           }}

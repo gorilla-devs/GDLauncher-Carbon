@@ -65,7 +65,9 @@ const [gameVersionFilters, setGameVersionFilters] = createStore({
 });
 
 const Sidebar = () => {
-  const [selectedItems, setSelectedItems] = createSignal<string[]>([]);
+  const [selectedItems, setSelectedItems] = createSignal<string[]>([
+    "Platform//Curseforge"
+  ]);
   const [menuData, setMenuData] = createSignal({
     hasSearch: true,
     isCheckbox: false,

@@ -19,9 +19,24 @@ export interface ChildsMenuProps {
 const ChildsMenu = (props: ChildsMenuProps) => {
   const [search, setSearch] = createSignal("");
   const [openItem, setOpenItem] = createSignal<string | null>(null);
+  const [radioValue, setRadio] = createSignal("");
 
   const toggleMenu = (label: string) => {
     setOpenItem((prev) => (prev === label ? null : label));
+  };
+  const handleRadio = (val: string | number | string[] | undefined) => {
+    props.setSelectedItems((prev) => {
+      const index = prev.findIndex((item) =>
+        item.includes(props.parentLabel as string)
+      );
+      if (index === -1) {
+        return [...prev, `${props.parentLabel}//${val}`];
+      }
+      prev[index] = `${props.parentLabel}//${val}`;
+
+      return prev;
+    });
+    setRadio(val as string);
   };
   return (
     <Portal mount={document.getElementById("menu-id") as Node}>
@@ -55,23 +70,7 @@ const ChildsMenu = (props: ChildsMenuProps) => {
           </For>
         </Show>
         <Show when={!props.isCheckbox && !props.isParent}>
-          <Radio.group
-            value={
-              props
-                .selectedItems()
-                .filter((item) => item.includes(props.parentLabel as string))[0]
-                .split("/")[1]
-            }
-            onChange={(val) =>
-              props.setSelectedItems((prev) => {
-                const index = prev.findIndex((item) =>
-                  item.includes(props.parentLabel as string)
-                );
-                prev[index] = `${props.parentLabel}/${val}`;
-                return prev;
-              })
-            }
-          >
+          <Radio.group value={radioValue()} onChange={handleRadio}>
             <For
               each={props.items.filter((item) => item.label.includes(search()))}
             >
