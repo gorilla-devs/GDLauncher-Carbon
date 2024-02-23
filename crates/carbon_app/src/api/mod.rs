@@ -3,6 +3,9 @@ use std::sync::Arc;
 use crate::managers::{App, AppInner};
 use crate::{app_version, managers};
 use async_stream::stream;
+use axum::extract::ws::Message;
+use axum::extract::{State, WebSocketUpgrade};
+use axum::response::IntoResponse;
 use rspc::{RouterBuilderLike, Type};
 use serde::{Deserialize, Serialize};
 use tracing::{error, info};
@@ -73,9 +76,27 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
 pub fn build_axum_vanilla_router() -> axum::Router<Arc<AppInner>> {
     axum::Router::new()
         .route("/", axum::routing::get(|| async { "Hello 'rspc'!" }))
+        .route(
+            "/invalidations",
+            axum::routing::get(invalidation_ws_handler),
+        )
         .route("/health", axum::routing::get(|| async { "OK" }))
         .nest("/account", account::mount_axum_router())
         .nest("/instance", instance::mount_axum_router())
+}
+
+async fn invalidation_ws_handler(
+    req: WebSocketUpgrade,
+    State(app): State<Arc<AppInner>>,
+) -> impl IntoResponse {
+    req.on_upgrade(|mut socket| async move {
+        let mut channel = app.invalidation_channel.subscribe();
+        info!("Invalidation channel connected");
+        while let Ok(event) = channel.recv().await {
+            let message = serde_json::to_string(&event).unwrap();
+            socket.send(Message::Text(message)).await.unwrap();
+        }
+    })
 }
 
 #[derive(Type, Debug, Deserialize, Clone)]

@@ -264,7 +264,7 @@ pub async fn execute_processors<'callback>(
                 anyhow::anyhow!("Could not execute processor {}: {}", processor.jar, err)
             })?;
 
-        info!("{}", String::from_utf8_lossy(&child.stdout));
+        // info!("{}", String::from_utf8_lossy(&child.stdout));
 
         if !child.status.success() {
             bail!(
