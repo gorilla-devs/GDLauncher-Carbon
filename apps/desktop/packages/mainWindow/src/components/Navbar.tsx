@@ -68,7 +68,12 @@ const AppNavbar = () => {
 
   return (
     <Show when={!isLogin()}>
-      <nav class="flex items-center bg-darkSlate-800 text-white px-5 h-20">
+      <nav
+        class="flex items-center bg-darkSlate-800 text-white px-5"
+        style={{
+          height: "60px"
+        }}
+      >
         <div class="flex items-center" style={{ width: "19rem" }}>
           <img
             src={GDLauncherWideLogo}
