@@ -24,7 +24,7 @@ const ChildsMenu = (props: ChildsMenuProps) => {
   const [radioValue, setRadioValue] = createSignal<string>("");
   return (
     <Portal mount={document.getElementById("menu-id") as Node}>
-      <div class="max-h-72 w-52 bg-[#272b35] rounded-md p-3 flex flex-col gap-2 overflow-x-auto scrollbar-hide">
+      <div class="max-h-72 w-52 bg-[#272b35] rounded-md p-3 flex flex-col gap-2 overflow-x-auto scrollbar-hide shadow-md shadow-darkSlate-900">
         <Show when={props.hasSearch}>
           <Input
             type="text"
