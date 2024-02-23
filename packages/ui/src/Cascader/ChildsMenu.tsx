@@ -19,7 +19,12 @@ export interface ChildsMenuProps {
 const ChildsMenu = (props: ChildsMenuProps) => {
   const [search, setSearch] = createSignal("");
   const [openItem, setOpenItem] = createSignal<string | null>(null);
-  const [radioValue, setRadio] = createSignal("");
+  const [radioValue, setRadio] = createSignal(
+    props
+      .selectedItems()
+      .find((item) => item.includes(props.parentLabel as string))
+      ?.split("//")[1] || ""
+  );
 
   const toggleMenu = (label: string) => {
     setOpenItem((prev) => (prev === label ? null : label));
