@@ -224,6 +224,7 @@ const Sidebar = () => {
       return item;
     })
   });
+
   return (
     // <SiderbarWrapper collapsable={false} noPadding>
     //   <div class="h-full w-full box-border px-4 overflow-y-auto py-5">
@@ -418,7 +419,10 @@ const Sidebar = () => {
     //     </Switch>
     //   </div>
     // </SiderbarWrapper>
-    <Cascader children={<button>test</button>} {...menuData()} />
+    <Cascader
+      children={<div class="cursor-pointer text-2xl i-ri-filter-line" />}
+      {...menuData()}
+    />
   );
 };
 

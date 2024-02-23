@@ -108,8 +108,8 @@ const Cascader = (props: ParentProps) => {
             class="flex gap-1 context-menu"
             style={{
               position: "absolute",
-              top: y() + "px",
-              left: x() + "px",
+              top: y() + 100 + "px",
+              left: x() + 20 + "px",
               "z-index": "1000000",
             }}
             // onClick={closeContextMenu}

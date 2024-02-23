@@ -7,7 +7,7 @@ function ModpacksLayout() {
   return (
     <InfiniteScrollModsLayout type="modPack">
       <>
-        <Sidebar />
+        {/* <Sidebar /> */}
         <ContentWrapper>
           <Outlet />
         </ContentWrapper>
