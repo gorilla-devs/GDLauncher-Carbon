@@ -1,5 +1,10 @@
 import { QueryClient } from "@tanstack/solid-query";
-import { createClient, createWSClient, wsLink } from "@rspc/client";
+import {
+  createClient,
+  createWSClient,
+  Unsubscribable,
+  wsLink
+} from "@rspc/client";
 import { createSolidQueryHooks } from "@rspc/solid";
 import type { Procedures } from "@gd/core_module";
 import { createEffect } from "solid-js";
@@ -35,17 +40,35 @@ export default function initRspc(_port: number) {
 
   const createInvalidateQuery = () => {
     const context = rspc.useContext();
+    let subscription: Unsubscribable | null = null;
 
-    client.subscription(["invalidateQuery"], {
-      onData: (invalidateOperation) => {
-        const key = [invalidateOperation!.key];
-        if (invalidateOperation.args !== null) {
-          key.push(invalidateOperation.args);
-        }
-        console.log("invalidateQuery", key);
-        context.queryClient.invalidateQueries(key);
+    function init() {
+      if (!subscription) {
+        subscription = client.subscription(["invalidateQuery"], {
+          onData: (invalidateOperation) => {
+            const key = [invalidateOperation!.key];
+            if (invalidateOperation.args !== null) {
+              key.push(invalidateOperation.args);
+            }
+            console.log("invalidateQuery", key);
+            context.queryClient.invalidateQueries(key);
+          }
+        });
       }
+    }
+
+    wsClient.getConnection()?.addEventListener("open", (_event) => {
+      init();
     });
+
+    wsClient.getConnection()?.addEventListener("close", (_event) => {
+      subscription?.unsubscribe();
+      subscription = null;
+    });
+
+    if (!subscription) {
+      init();
+    }
   };
 
   return {
