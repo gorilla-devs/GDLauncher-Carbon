@@ -39,8 +39,6 @@ const Cascader = (props: ParentProps) => {
 
     if (containerRef()) {
       cascaderContext?.setOpenCascader(containerRef() as HTMLDivElement);
-      console.log("openCascader", cascaderContext?.openCascader());
-      console.log(containerRef());
     }
 
     // Initially set the position to cursor location
@@ -74,6 +72,9 @@ const Cascader = (props: ParentProps) => {
     if (
       containerRef() &&
       !containerRef()?.contains(e.target as Node) &&
+      menuRef() &&
+      !menuRef()?.contains(e.target as Node) &&
+      (e.target as Element).classList[0] !== "i-ri:check-line" &&
       containerRef() == cascaderContext?.openCascader()
     ) {
       closeContextMenu();
@@ -96,7 +97,6 @@ const Cascader = (props: ParentProps) => {
     containerRef()?.removeEventListener("contextmenu", openContextMenu);
     containerRef()?.removeEventListener("click", openContextMenu);
   });
-  console.log(containerRef());
   return (
     <div ref={setContainerRef}>
       {local.children}
@@ -112,7 +112,7 @@ const Cascader = (props: ParentProps) => {
               left: x() + "px",
               "z-index": "1000000",
             }}
-            onClick={closeContextMenu}
+            // onClick={closeContextMenu}
           >
             <ChildsMenu {...others} />
           </div>

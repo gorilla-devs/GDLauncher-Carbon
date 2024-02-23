@@ -45,21 +45,22 @@ const ChildsMenu = (props: ChildsMenuProps) => {
                 isOpen={openItem() === item.label}
                 onToggleMenu={() => toggleMenu(item.label)}
                 isParent={props?.isParent}
+                img={item.img}
               />
             )}
           </For>
         </Show>
         <Show when={!props.isCheckbox && !props.isParent}>
           <Radio.group
-            value={props.parentLabel}
-            onChange={(val) => console.log(val)}
+            value={radioValue()}
+            onChange={(val) => setRadioValue(val as string)}
           >
             <For
               each={props.items.filter((item) => item.label.includes(search()))}
             >
               {(item) => (
                 <CascaderItem
-                  name={item.label}
+                  name={props.parentLabel}
                   value={item.label}
                   children={item.children}
                   isCheckbox={false}
@@ -67,6 +68,7 @@ const ChildsMenu = (props: ChildsMenuProps) => {
                   isOpen={openItem() === item.label}
                   onToggleMenu={() => toggleMenu(item.label)}
                   isParent={props?.isParent}
+                  img={item.img}
                 />
               )}
             </For>

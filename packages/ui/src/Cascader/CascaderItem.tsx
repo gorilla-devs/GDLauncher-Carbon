@@ -14,6 +14,7 @@ const CascaderItem = (props: {
   isOpen: boolean;
   isParent: boolean;
   onToggleMenu: () => void;
+  img?: any;
 }) => {
   const [numberOfCheckedItems, setNumberOfCheckedItems] = createSignal(0);
   const childrenItems = props.children?.items.map((item) => item.label);
@@ -50,11 +51,7 @@ const CascaderItem = (props: {
           checked={cascaderItems().includes(props.label)}
           children={
             <div class="flex items-center gap-2">
-              <img
-                src="https://yt3.googleusercontent.com/B8OVfruPK5Zls5beHf_7a-kQ0Lo57DcoHxb-tp0skMeAGVZMM1EqMsFA0wyEl91N10z2Bc19X1w=s900-c-k-c0x00ffffff-no-rj"
-                class="h-4 w-4"
-                alt="solidjsimg"
-              />
+              {props.img && props.img}
               <span class="text-[#8A8B8F]">{props.label}</span>
             </div>
           }
@@ -66,11 +63,7 @@ const CascaderItem = (props: {
           value={props.label}
           children={
             <div class="flex items-center gap-2">
-              <img
-                src="https://yt3.googleusercontent.com/B8OVfruPK5Zls5beHf_7a-kQ0Lo57DcoHxb-tp0skMeAGVZMM1EqMsFA0wyEl91N10z2Bc19X1w=s900-c-k-c0x00ffffff-no-rj"
-                class="h-4 w-4"
-                alt="solidjsimg"
-              />
+              {props.img && props.img}
               <span class="text-[#8A8B8F]">{props.label}</span>
             </div>
           }
