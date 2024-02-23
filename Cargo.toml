@@ -43,7 +43,7 @@ image = { version = "0.24.5" }
 jsonwebtoken = "8.2.0"
 # libc = "0.2"
 md-5 = "0.10.5"
-murmurhash32 = { git = "https://github.com/gorilla-devs/murmurhash32", rev = "7595cb33123baba328be9353a0750733a71c1b53" }
+murmurhash32 = { git = "https://github.com/gorilla-devs/murmurhash32", rev = "4dfdc49b727581bbdcad4a2315452a2c28db6093" }
 nom = "7"
 num_cpus = "1.16.0"
 opener = "0.6.1"
