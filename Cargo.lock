@@ -2308,7 +2308,7 @@ dependencies = [
 [[package]]
 name = "murmurhash32"
 version = "0.2.0"
-source = "git+https://github.com/gorilla-devs/murmurhash32?rev=7595cb33123baba328be9353a0750733a71c1b53#7595cb33123baba328be9353a0750733a71c1b53"
+source = "git+https://github.com/gorilla-devs/murmurhash32?rev=4dfdc49b727581bbdcad4a2315452a2c28db6093#4dfdc49b727581bbdcad4a2315452a2c28db6093"
 dependencies = [
  "byteorder",
 ]
