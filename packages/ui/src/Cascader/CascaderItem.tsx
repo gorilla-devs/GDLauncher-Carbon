@@ -18,6 +18,7 @@ const CascaderItem = (props: {
   parentLabel?: string;
 }) => {
   const [numberOfCheckedItems, setNumberOfCheckedItems] = createSignal(0);
+  const [currentSelectedItem, setCurrentSelectedItem] = createSignal("None");
 
   createEffect(() => {
     if (props.children?.isCheckbox) {
@@ -28,6 +29,23 @@ const CascaderItem = (props: {
             item?.includes(props.children?.parentLabel as string)
           ).length
       );
+    }
+  });
+
+  createEffect(() => {
+    if (props.children) {
+      const index = props
+        .selectedItems()
+        .findIndex((item) =>
+          item.includes(props.children?.parentLabel as string)
+        );
+      if (index === -1) {
+        setCurrentSelectedItem("None");
+      } else {
+        setCurrentSelectedItem(
+          props.selectedItems()[index].split("//")[1] || "None"
+        );
+      }
     }
   });
 
@@ -95,9 +113,10 @@ const CascaderItem = (props: {
       </Show>
 
       <div class="flex items-center">
-        <Show when={!props.isCheckbox && props.isParent && props.children}>
-          {/* here should go some kind of label idk */}
-          <span class="text-[#8A8B8F]">placeholder</span>
+        <Show
+          when={props.isParent && props.children && !props.children.isCheckbox}
+        >
+          <span class="text-[#8A8B8F]">{currentSelectedItem()}</span>
         </Show>
         <Show when={props.children && props.children.isCheckbox}>
           <span class="text-[#8A8B8F]">
