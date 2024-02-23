@@ -1,9 +1,7 @@
-import { Show, createEffect, createSignal } from "solid-js";
+import { Accessor, Setter, Show, createEffect, createSignal } from "solid-js";
 import { Checkbox } from "../Checkbox";
 import ChildsMenu, { ChildsMenuProps } from "./ChildsMenu";
 import { Radio } from "../Radio";
-
-const [cascaderItems, setCascaderItems] = createSignal<string[]>([]);
 
 const CascaderItem = (props: {
   label: string;
@@ -15,14 +13,18 @@ const CascaderItem = (props: {
   isParent: boolean;
   onToggleMenu: () => void;
   img?: any;
+  selectedItems: Accessor<string[]>;
+  setSelectedItems: Setter<string[]>;
+  parentLabel?: string;
 }) => {
   const [numberOfCheckedItems, setNumberOfCheckedItems] = createSignal(0);
-  const childrenItems = props.children?.items.map((item) => item.label);
 
   createEffect(() => {
     if (props.children?.isCheckbox) {
       setNumberOfCheckedItems(
-        cascaderItems().filter((item) => childrenItems?.includes(item)).length
+        props
+          .selectedItems()
+          .filter((item) => item?.includes(props.parentLabel as string)).length
       );
     }
   });
@@ -40,15 +42,24 @@ const CascaderItem = (props: {
       <Show when={props.isCheckbox && !props.isParent}>
         <Checkbox
           onChange={() => {
-            if (cascaderItems().includes(props.label)) {
-              setCascaderItems((prev) =>
-                prev.filter((item) => item !== props.label)
+            if (
+              props.selectedItems().filter((item) => item.includes(props.label))
+                .length > 0
+            ) {
+              props.setSelectedItems((prev) =>
+                prev.filter((item) => !item.includes(props.label))
               );
             } else {
-              setCascaderItems((prev) => [...prev, props.label]);
+              props.setSelectedItems((prev) => [
+                ...prev,
+                props.parentLabel + "/" + props.label,
+              ]);
             }
           }}
-          checked={cascaderItems().includes(props.label)}
+          checked={
+            props.selectedItems().filter((item) => item.includes(props.label))
+              .length > 0
+          }
           children={
             <div class="flex items-center gap-2">
               {props.img && props.img}
@@ -75,6 +86,9 @@ const CascaderItem = (props: {
           hasSearch={props.children!.hasSearch}
           isCheckbox={props.children!.isCheckbox}
           isParent={props.children!.isParent}
+          parentLabel={props.children!.parentLabel}
+          selectedItems={props.selectedItems}
+          setSelectedItems={props.setSelectedItems}
         />
       </Show>
 

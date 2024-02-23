@@ -1,7 +1,7 @@
 import { For, Portal, Show } from "solid-js/web";
 import { Checkbox } from "../Checkbox";
 import { Input } from "../Input";
-import { createSignal } from "solid-js";
+import { Accessor, Setter, createSignal } from "solid-js";
 import { useFloating } from "solid-floating-ui";
 import CascaderItem from "./CascaderItem";
 import { Radio } from "../Radio";
@@ -12,6 +12,8 @@ export interface ChildsMenuProps {
   hasSearch: boolean;
   isParent: boolean;
   parentLabel?: string;
+  selectedItems: Accessor<string[]>;
+  setSelectedItems: Setter<string[]>;
 }
 
 const ChildsMenu = (props: ChildsMenuProps) => {
@@ -21,7 +23,6 @@ const ChildsMenu = (props: ChildsMenuProps) => {
   const toggleMenu = (label: string) => {
     setOpenItem((prev) => (prev === label ? null : label));
   };
-  const [radioValue, setRadioValue] = createSignal<string>("");
   return (
     <Portal mount={document.getElementById("menu-id") as Node}>
       <div class="max-h-72 w-52 bg-[#272b35] rounded-md p-3 flex flex-col gap-2 overflow-x-auto scrollbar-hide shadow-md shadow-darkSlate-900">
@@ -46,14 +47,30 @@ const ChildsMenu = (props: ChildsMenuProps) => {
                 onToggleMenu={() => toggleMenu(item.label)}
                 isParent={props?.isParent}
                 img={item.img}
+                selectedItems={props.selectedItems}
+                setSelectedItems={props.setSelectedItems}
+                parentLabel={props.parentLabel}
               />
             )}
           </For>
         </Show>
         <Show when={!props.isCheckbox && !props.isParent}>
           <Radio.group
-            value={radioValue()}
-            onChange={(val) => setRadioValue(val as string)}
+            value={
+              props
+                .selectedItems()
+                .filter((item) => item.includes(props.parentLabel as string))[0]
+                .split("/")[1]
+            }
+            onChange={(val) =>
+              props.setSelectedItems((prev) => {
+                const index = prev.findIndex((item) =>
+                  item.includes(props.parentLabel as string)
+                );
+                prev[index] = `${props.parentLabel}/${val}`;
+                return prev;
+              })
+            }
           >
             <For
               each={props.items.filter((item) => item.label.includes(search()))}
@@ -69,6 +86,9 @@ const ChildsMenu = (props: ChildsMenuProps) => {
                   onToggleMenu={() => toggleMenu(item.label)}
                   isParent={props?.isParent}
                   img={item.img}
+                  selectedItems={props.selectedItems}
+                  setSelectedItems={props.setSelectedItems}
+                  parentLabel={props.parentLabel}
                 />
               )}
             </For>

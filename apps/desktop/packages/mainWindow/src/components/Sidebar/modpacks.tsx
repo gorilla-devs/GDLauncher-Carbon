@@ -8,7 +8,15 @@ import {
   Radio,
   Skeleton
 } from "@gd/ui";
-import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  Match,
+  Show,
+  Switch
+} from "solid-js";
 import {
   CFFECategory,
   FESearchAPI,
@@ -57,6 +65,7 @@ const [gameVersionFilters, setGameVersionFilters] = createStore({
 });
 
 const Sidebar = () => {
+  const [selectedItems, setSelectedItems] = createSignal<string[]>([]);
   const [menuData, setMenuData] = createSignal({
     hasSearch: true,
     isCheckbox: false,
@@ -170,6 +179,7 @@ const Sidebar = () => {
             hasSearch: false,
             isCheckbox: false,
             isParent: false,
+            parentLabel: t("general.platform"),
             items: ModpackPlatforms.map((platform) => {
               return {
                 label: platform,
@@ -193,6 +203,7 @@ const Sidebar = () => {
             hasSearch: true,
             isCheckbox: true,
             isParent: false,
+            parentLabel: t("general.modloaders"),
             items: modloaders()!.map((modloader) => {
               return {
                 label: capitalize(
@@ -212,6 +223,7 @@ const Sidebar = () => {
             hasSearch: true,
             isCheckbox: true,
             isParent: false,
+            parentLabel: t("general.categories"),
             items: categories().map((category) => {
               return {
                 label: capitalize(category.name),
@@ -224,7 +236,9 @@ const Sidebar = () => {
       return item;
     })
   });
-
+  createEffect(() => {
+    console.log(selectedItems());
+  });
   return (
     // <SiderbarWrapper collapsable={false} noPadding>
     //   <div class="h-full w-full box-border px-4 overflow-y-auto py-5">
@@ -422,6 +436,8 @@ const Sidebar = () => {
     <Cascader
       children={<div class="cursor-pointer text-2xl i-ri-filter-line" />}
       {...menuData()}
+      selectedItems={selectedItems}
+      setSelectedItems={setSelectedItems}
     />
   );
 };
