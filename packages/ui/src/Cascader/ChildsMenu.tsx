@@ -46,8 +46,6 @@ const ChildsMenu = (props: ChildsMenuProps) => {
 
       return newItems;
     });
-
-    console.log(props.selectedItems());
     setRadio(val as string);
   };
   return (

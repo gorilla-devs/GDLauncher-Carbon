@@ -74,19 +74,19 @@ const Sidebar = () => {
     isParent: true,
     items: [
       {
-        label: "PLATFORM",
+        label: "Platform",
         img: ""
       },
       {
-        label: "GAME VERSIONS",
+        label: "Game Versions",
         img: ""
       },
       {
-        label: "MODLOADER",
+        label: "Modloader",
         img: ""
       },
       {
-        label: "CATEGORIES",
+        label: "Categories",
         img: ""
       }
     ]
@@ -169,74 +169,84 @@ const Sidebar = () => {
       });
     }
   }
-  setMenuData({
-    ...menuData(),
-    items: menuData().items.map((item) => {
-      if (item.label === "PLATFORM") {
-        return {
-          label: t("general.platform"),
 
-          img: "",
-          children: {
-            hasSearch: false,
-            isCheckbox: false,
-            isParent: false,
-            parentLabel: t("general.platform"),
-            items: ModpackPlatforms.map((platform) => {
-              return {
-                label: platform,
-                img: <PlatformIcon platform={platform} />
-              };
-            })
-          }
-        };
-      }
-      if (item.label === "GAME VERSIONS") {
-        return {
-          label: t("general.game_versions"),
-          img: ""
-        };
-      }
-      if (item.label === "MODLOADER") {
-        return {
-          label: t("general.modloaders"),
-          img: "",
-          children: {
-            hasSearch: true,
-            isCheckbox: true,
-            isParent: false,
-            parentLabel: t("general.modloaders"),
-            items: modloaders()!.map((modloader) => {
-              return {
-                label: capitalize(
-                  typeof modloader === "string" ? modloader : modloader.name
-                ),
-                img: <ModloaderIcon modloader={modloader} />
-              };
-            })
-          }
-        };
-      }
-      if (item.label === "CATEGORIES") {
-        return {
-          label: t("general.categories"),
-          img: "",
-          children: {
-            hasSearch: true,
-            isCheckbox: true,
-            isParent: false,
-            parentLabel: t("general.categories"),
-            items: categories().map((category) => {
-              return {
-                label: capitalize(category.name),
-                img: <CategoryIcon category={category} />
-              };
-            })
-          }
-        };
-      }
-      return item;
-    })
+  createEffect(() => {
+    console.log("here");
+    console.log(categories());
+    setMenuData((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => {
+        console.log("item", item.label);
+        if (item.label === "Platform") {
+          console.log("platforms", ModpackPlatforms);
+          return {
+            label: t("general.platform"),
+
+            img: "",
+            children: {
+              hasSearch: false,
+              isCheckbox: false,
+              isParent: false,
+              parentLabel: t("general.platform"),
+              items: ModpackPlatforms.map((platform) => {
+                return {
+                  label: platform,
+                  img: <PlatformIcon platform={platform} />
+                };
+              })
+            }
+          };
+        }
+        if (item.label === "Game Versions") {
+          console.log("game versions", filteredMappedGameVersions());
+          return {
+            label: t("general.game_versions"),
+            img: ""
+          };
+        }
+        if (item.label === "Modloader") {
+          console.log("modloaders", modloaders());
+          return {
+            label: t("general.modloaders"),
+            img: "",
+            children: {
+              hasSearch: true,
+              isCheckbox: true,
+              isParent: false,
+              parentLabel: t("general.modloaders"),
+              items: modloaders()!.map((modloader) => {
+                return {
+                  label: capitalize(
+                    typeof modloader === "string" ? modloader : modloader.name
+                  ),
+                  img: <ModloaderIcon modloader={modloader} />
+                };
+              })
+            }
+          };
+        }
+        if (item.label === "Categories") {
+          console.log("categories", categories());
+          return {
+            label: t("general.categories"),
+            img: "",
+            children: {
+              hasSearch: true,
+              isCheckbox: true,
+              isParent: false,
+              parentLabel: t("general.categories"),
+              items: categories().map((category) => {
+                return {
+                  label: capitalize(category.name),
+                  img: <CategoryIcon category={category} />
+                };
+              })
+            }
+          };
+        }
+        return item;
+      })
+    }));
   });
   createEffect(() => {
     const currentPlatform = selectedItems()
