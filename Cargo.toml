@@ -115,3 +115,6 @@ ring = "0.16.20"
 assert2 = "0.3.11"
 flowtest = "0.1.0"
 tracing-test = "0.2.4"
+
+[patch.crates-io]
+native-tls = { git = "https://github.com/gorilla-devs/rust-native-tls", rev = "306030011129dbd973ef7cdb6ebe47f7bec801c1" }

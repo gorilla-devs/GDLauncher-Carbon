@@ -2316,10 +2316,8 @@ dependencies = [
 [[package]]
 name = "native-tls"
 version = "0.2.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07226173c32f2926027b63cce4bcd8076c3552846cbe7925f3aaffeac0a3b92e"
+source = "git+https://github.com/gorilla-devs/rust-native-tls?rev=306030011129dbd973ef7cdb6ebe47f7bec801c1#306030011129dbd973ef7cdb6ebe47f7bec801c1"
 dependencies = [
- "lazy_static",
  "libc",
  "log",
  "openssl",
