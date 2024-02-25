@@ -1628,7 +1628,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 return None;
             };
 
-            let Ok(required_java) = MinecraftJavaProfile::try_from(&*java) else {
+            let Ok(required_java) = MinecraftJavaProfile::try_from(java.as_str()) else {
                 return None;
             };
 

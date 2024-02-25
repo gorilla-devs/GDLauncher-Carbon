@@ -789,13 +789,14 @@ impl ManagerRef<'_, InstanceManager> {
 
                 let mut required_java_system_profile = SystemJavaProfileName::from(
                     daedalus::minecraft::MinecraftJavaProfile::try_from(
-                        &version_info
+                        version_info
                             .java_version
                             .as_ref()
                             .ok_or_else(|| {
                                 anyhow::anyhow!("instance java version unsupported")
                             })?
-                            .component as &str,
+                            .component
+                            .as_str(),
                     )?,
                 );
 
