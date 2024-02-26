@@ -290,13 +290,23 @@ const Sidebar = () => {
   });
 
   createEffect(() => {
+    //                 const categoryObj = () =>
+    //                   isCurseforge()
+    //                     ? { curseforge: (category as CFFECategory).id }
+    //                     : { modrinth: (category as MRFECategory).name };
     console.log(selectedItems());
     const selectedCategories = selectedItems()
       .filter((item) => item.includes("Categories"))
       .map((item) => item.split("//")[1]);
     const objectCategories = selectedCategories.map((category) => {
-      return categories().find((item) => item.name === category);
+      const categ = categories().find((item) => item.name === category);
+      if (isCurseforge()) {
+        return [{ curseforge: (categ as CFFECategory).id }];
+      } else {
+        return [{ modrinth: (categ as MRFECategory).name }];
+      }
     });
+    console.log(objectCategories);
     infiniteQuery.setQuery({
       categories: objectCategories as any
     });
@@ -329,7 +339,6 @@ const Sidebar = () => {
       (isCurseforge() && currentPlatform !== "Curseforge") ||
       (!isCurseforge() && currentPlatform !== "Modrinth")
     ) {
-      console.log("calls this");
       infiniteQuery.setQuery({
         searchApi: (currentPlatform as string).toLowerCase() as FESearchAPI,
         categories: [],
