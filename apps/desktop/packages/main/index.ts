@@ -94,7 +94,7 @@ function validateArgument(arg: string): Argument | null {
 export function getPatchedUserData() {
   let appData = null;
 
-  if (os.platform() !== "linux") {
+  if (os.platform() === "darwin" || os.platform() === "win32") {
     appData = app.getPath("appData");
   } else {
     // monkey patch linux since it defaults to .config instead of .local/share

@@ -1,9 +1,9 @@
-import { Button, Dropdown } from "@gd/ui";
+import { Button, Dropdown, Spinner } from "@gd/ui";
 import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
 import { rspc } from "@/utils/rspcClient";
 import { instanceId } from "@/utils/browser";
-import { Show, createSignal } from "solid-js";
+import { Show, createEffect, createSignal } from "solid-js";
 import { FEInstanceId, Modpack } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { useTransContext } from "@gd/i18n";
@@ -20,6 +20,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
     "instance.getInstanceDetails",
     instanceId() as number
   ]);
+
   const changeModpackMutation = rspc.createMutation(
     ["instance.changeModpack"],
     {
@@ -29,6 +30,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
       }
     }
   );
+
   const getProjectId = () => {
     const modpack = instance.data?.modpack?.modpack;
     if (modpack) {
@@ -61,7 +63,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
       }
     ],
     {
-      enabled: currentPlatform() === "curseforge"
+      enabled: false
     }
   );
 
@@ -73,28 +75,40 @@ const ModPackVersionUpdate = (props: ModalProps) => {
       }
     ],
     {
-      enabled: currentPlatform() === "modrinth"
+      enabled: false
     }
   );
+
+  createEffect(() => {
+    if (currentPlatform() === "curseforge") {
+      responseCF.refetch();
+    } else if (currentPlatform() === "modrinth") {
+      responseModrinth.refetch();
+    }
+  });
 
   const response = () =>
     currentPlatform() === "curseforge" ? responseCF : responseModrinth;
 
   const options = () => {
     if (currentPlatform() === "curseforge") {
-      return responseCF.data?.data.map((file) => ({
-        label: (
-          <div class="flex justify-between w-full">
-            <span>{file.displayName}</span>
-            <Show when={file.id === getProjectId()?.fileId}>
-              <span class="text-green-500">{`[ Current ]`}</span>
-            </Show>
-          </div>
-        ),
-        key: file.id.toString()
-      }));
-    } else {
-      return responseModrinth.data?.map((file) => ({
+      return (
+        responseCF.data?.data.map((file) => ({
+          label: (
+            <div class="flex justify-between w-full">
+              <span>{file.displayName}</span>
+              <Show when={file.id === getProjectId()?.fileId}>
+                <span class="text-green-500">{`[ Current ]`}</span>
+              </Show>
+            </div>
+          ),
+          key: file.id.toString()
+        })) || []
+      );
+    }
+
+    return (
+      responseModrinth.data?.map((file) => ({
         label: (
           <div class="flex justify-between w-full">
             <span>{file.name}</span>
@@ -104,8 +118,8 @@ const ModPackVersionUpdate = (props: ModalProps) => {
           </div>
         ),
         key: file.id.toString()
-      }));
-    }
+      })) || []
+    );
   };
 
   const handleUpdate = () => {
@@ -137,14 +151,13 @@ const ModPackVersionUpdate = (props: ModalProps) => {
     >
       <div class="flex flex-col p-4 w-120 gap-4">
         <Show when={response().isLoading || instance.isLoading}>
-          loading ...
+          <Spinner />
         </Show>
         <Show when={!response().isLoading && !instance.isLoading}>
           <Dropdown
             class="bg-darkSlate-800 w-full"
             options={options()}
             onChange={(option) => {
-              console.log(option.key);
               setSelectedVersion(option.key.toString());
             }}
           />

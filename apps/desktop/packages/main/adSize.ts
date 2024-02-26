@@ -5,7 +5,8 @@ export default function getAdSize(display?: Display) {
   const { width, height } = primaryDisplay.size;
 
   // only show fallback on macos
-  const useFallbackAd = process.platform === "darwin";
+  const useFallbackAd =
+    process.platform !== "darwin" && process.platform !== "win32";
 
   if (width < 1920 || height < 1080) {
     return {
