@@ -290,6 +290,25 @@ const Sidebar = () => {
   });
 
   createEffect(() => {
+    const modLoaders = selectedItems().filter((item) =>
+      item.includes("Modloader")
+    );
+    if (modLoaders.length === 0) {
+      infiniteQuery.setQuery({
+        modloaders: null
+      });
+    } else {
+      const modloader = modLoaders.map((item) =>
+        item.split("//")[1].toLowerCase()
+      );
+      console.log(modloader);
+      infiniteQuery.setQuery({
+        modloaders: modloader as FEUnifiedModLoaderType[]
+      });
+    }
+  });
+
+  createEffect(() => {
     console.log(selectedItems());
     const currentPlatform = selectedItems()
       .find((item) => item.includes("Platform"))
