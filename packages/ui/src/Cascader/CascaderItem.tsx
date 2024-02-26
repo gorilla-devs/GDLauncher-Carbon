@@ -109,6 +109,7 @@ const CascaderItem = (props: {
           parentLabel={props.children!.parentLabel}
           selectedItems={props.selectedItems}
           setSelectedItems={props.setSelectedItems}
+          hasChildren={props.children!.hasChildren}
         />
       </Show>
 

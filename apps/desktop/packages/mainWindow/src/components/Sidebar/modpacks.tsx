@@ -58,6 +58,12 @@ const mapTypeToColor = (type: McType) => {
   );
 };
 
+const gameVersions = [
+  { type: "snapshot", label: "include snapshot versions" },
+  { type: "old_alpha", label: "include old alpha versions" },
+  { type: "old_beta", label: "include old beta versions" }
+];
+
 const [gameVersionFilters, setGameVersionFilters] = createStore({
   snapshot: false,
   oldAlpha: false,
@@ -171,14 +177,10 @@ const Sidebar = () => {
   }
 
   createEffect(() => {
-    console.log("here");
-    console.log(categories());
     setMenuData((prev) => ({
       ...prev,
       items: prev.items.map((item) => {
-        console.log("item", item.label);
         if (item.label === "Platform") {
-          console.log("platforms", ModpackPlatforms);
           return {
             label: t("general.platform"),
 
@@ -198,14 +200,39 @@ const Sidebar = () => {
           };
         }
         if (item.label === "Game Versions") {
-          console.log("game versions", filteredMappedGameVersions());
           return {
             label: t("general.game_versions"),
-            img: ""
+            img: "",
+            children: {
+              hasSearch: false,
+              isCheckbox: true,
+              isParent: false,
+              parentLabel: t("general.game_versions"),
+
+              items: gameVersions.map((version) => {
+                return {
+                  label: version.label,
+                  img: ""
+                };
+              }),
+              hasChildren: (
+                <Dropdown
+                  class="w-full"
+                  containerClass="w-full mt-4"
+                  options={filteredMappedGameVersions()}
+                  icon={<div class="i-ri:price-tag-3-fill" />}
+                  value={infiniteQuery.query.gameVersions?.[0] || null}
+                  onChange={(val) => {
+                    infiniteQuery?.setQuery({
+                      gameVersions: val.key ? [val.key as string] : null
+                    });
+                  }}
+                />
+              )
+            }
           };
         }
         if (item.label === "Modloader") {
-          console.log("modloaders", modloaders());
           return {
             label: t("general.modloaders"),
             img: "",
@@ -226,7 +253,6 @@ const Sidebar = () => {
           };
         }
         if (item.label === "Categories") {
-          console.log("categories", categories());
           return {
             label: t("general.categories"),
             img: "",
@@ -235,6 +261,7 @@ const Sidebar = () => {
               isCheckbox: true,
               isParent: false,
               parentLabel: t("general.categories"),
+
               items: categories().map((category) => {
                 return {
                   label: capitalize(category.name),
@@ -248,7 +275,22 @@ const Sidebar = () => {
       })
     }));
   });
+
   createEffect(() => {
+    const versionTypes = selectedItems().filter((item) =>
+      item.includes("Game Versions")
+    );
+
+    const versions = versionTypes.map((item) => item.split("//")[1]);
+    updateGameVersionsFilter({
+      snapshot: versions.includes("include snapshot versions"),
+      oldAlpha: versions.includes("include old alpha versions"),
+      oldBeta: versions.includes("include old beta versions")
+    });
+  });
+
+  createEffect(() => {
+    console.log(selectedItems());
     const currentPlatform = selectedItems()
       .find((item) => item.includes("Platform"))
       ?.split("//")[1];

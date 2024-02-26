@@ -1,8 +1,6 @@
 import { For, Portal, Show } from "solid-js/web";
-import { Checkbox } from "../Checkbox";
 import { Input } from "../Input";
 import { Accessor, Setter, createSignal } from "solid-js";
-import { useFloating } from "solid-floating-ui";
 import CascaderItem from "./CascaderItem";
 import { Radio } from "../Radio";
 
@@ -14,6 +12,7 @@ export interface ChildsMenuProps {
   parentLabel?: string;
   selectedItems: Accessor<string[]>;
   setSelectedItems: Setter<string[]>;
+  hasChildren?: any;
 }
 
 const ChildsMenu = (props: ChildsMenuProps) => {
@@ -103,6 +102,7 @@ const ChildsMenu = (props: ChildsMenuProps) => {
             </For>
           </Radio.group>
         </Show>
+        <Show when={props.hasChildren}>{props.hasChildren}</Show>
       </div>
     </Portal>
   );
