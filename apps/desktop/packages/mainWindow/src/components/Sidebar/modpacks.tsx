@@ -264,7 +264,7 @@ const Sidebar = () => {
 
               items: categories().map((category) => {
                 return {
-                  label: capitalize(category.name),
+                  label: category.name,
                   img: <CategoryIcon category={category} />
                 };
               })
@@ -290,6 +290,19 @@ const Sidebar = () => {
   });
 
   createEffect(() => {
+    console.log(selectedItems());
+    const selectedCategories = selectedItems()
+      .filter((item) => item.includes("Categories"))
+      .map((item) => item.split("//")[1]);
+    const objectCategories = selectedCategories.map((category) => {
+      return categories().find((item) => item.name === category);
+    });
+    infiniteQuery.setQuery({
+      categories: objectCategories as any
+    });
+  });
+
+  createEffect(() => {
     const modLoaders = selectedItems().filter((item) =>
       item.includes("Modloader")
     );
@@ -309,15 +322,20 @@ const Sidebar = () => {
   });
 
   createEffect(() => {
-    console.log(selectedItems());
     const currentPlatform = selectedItems()
       .find((item) => item.includes("Platform"))
       ?.split("//")[1];
-    infiniteQuery.setQuery({
-      searchApi: (currentPlatform as string).toLowerCase() as FESearchAPI,
-      categories: [],
-      modloaders: null
-    });
+    if (
+      (isCurseforge() && currentPlatform !== "Curseforge") ||
+      (!isCurseforge() && currentPlatform !== "Modrinth")
+    ) {
+      console.log("calls this");
+      infiniteQuery.setQuery({
+        searchApi: (currentPlatform as string).toLowerCase() as FESearchAPI,
+        categories: [],
+        modloaders: null
+      });
+    }
   });
   return (
     // <SiderbarWrapper collapsable={false} noPadding>
