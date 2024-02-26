@@ -4,8 +4,7 @@ import {
   ListInstance,
   CFFEModLoaderType,
   FESubtask,
-  Translation,
-  ModpackPlatform
+  Translation
 } from "@gd/core_module/bindings";
 import { For, Match, Show, Switch, mergeProps } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
@@ -351,12 +350,12 @@ const Tile = (props: Props) => {
                     </span>
                   </div>
                 </Show>
-                <Show when={validInstance()?.modpack_platform}>
+                <Show when={validInstance()?.modpack}>
                   <div class="absolute flex justify-center items-center border-1 border-solid border-darkSlate-600 bg-darkSlate-900 rounded-lg p-2 top-2 right-2">
                     <img
                       class="w-4 h-4"
                       src={getModpackPlatformIcon(
-                        validInstance()?.modpack_platform as ModpackPlatform
+                        validInstance()?.modpack?.type
                       )}
                     />
                   </div>

@@ -3,6 +3,7 @@ import { useGDNavigate } from "@/managers/NavigationManager";
 import { createNotification } from "@gd/ui";
 import { createSignal } from "solid-js";
 import RowContainer, { Props } from "@/components/Browser/RowContainer";
+import { Modpack } from "@gd/core_module/bindings";
 
 const VersionRow = (props: Props) => {
   const navigate = useGDNavigate();
@@ -45,20 +46,6 @@ const VersionRow = (props: Props) => {
   );
 
   const onPrimaryAction = () => {
-    const modpack = props.isCurseforge
-      ? {
-          Curseforge: {
-            project_id: parseInt(props.modVersion.id, 10),
-            file_id: parseInt(props.modVersion.fileId, 10)
-          }
-        }
-      : {
-          Modrinth: {
-            project_id: props.modVersion.id,
-            version_id: props.modVersion.fileId
-          }
-        };
-
     if (props.modVersion.mainThumbnail) {
       loadIconMutation.mutate(props.modVersion.mainThumbnail);
     }
@@ -70,7 +57,18 @@ const VersionRow = (props: Props) => {
       notes: "",
       name: props.modVersion.name,
       version: {
-        Modpack: modpack
+        Modpack: {
+          type: props.isCurseforge ? "curseforge" : "modrinth",
+          value: props.isCurseforge
+            ? {
+                project_id: parseInt(props.modVersion.id, 10),
+                file_id: parseInt(props.modVersion.fileId, 10)
+              }
+            : {
+                project_id: props.modVersion.id,
+                version_id: props.modVersion.fileId
+              }
+        } as Modpack
       }
     });
   };

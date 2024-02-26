@@ -7,9 +7,6 @@ import {
   ListInstance,
   ValidListInstance,
   Modpack,
-  CurseforgeModpack,
-  ModrinthModpack,
-  ModpackPlatform,
   CFFECategory,
   MRFECategory
 } from "@gd/core_module/bindings";
@@ -77,26 +74,6 @@ export const isInstanceRunning = (launchState: LaunchState) => {
   return launchState.state === "running";
 };
 
-export const isModpackCurseforge = (
-  modpack: Modpack
-): modpack is { Curseforge: CurseforgeModpack } => {
-  return "Curseforge" in modpack;
-};
-
-export const getCurseForgeData = (modpack: Modpack) => {
-  if ("Curseforge" in modpack) return modpack.Curseforge;
-};
-
-export const isModpackModrinth = (
-  modpack: Modpack
-): modpack is { Modrinth: ModrinthModpack } => {
-  return "Modrinth" in modpack;
-};
-
-export const getModrinthData = (modpack: Modpack) => {
-  if ("Modrinth" in modpack) return modpack.Modrinth;
-};
-
 export const getInstanceImageUrl = (
   instanceId: string | number,
   rev: string | number
@@ -137,11 +114,13 @@ export interface InstancesStore {
   [modloader: string]: ListInstance[];
 }
 
-export const getModpackPlatformIcon = (platform: ModpackPlatform) => {
-  switch (platform) {
-    case "Curseforge":
+export const getModpackPlatformIcon = (
+  modpackType: "curseforge" | "modrinth" | null | undefined
+) => {
+  switch (modpackType) {
+    case "curseforge":
       return CurseforgeLogo;
-    case "Modrinth":
+    case "modrinth":
       return ModrinthLogo;
     default:
       return CurseforgeLogo;
@@ -180,16 +159,14 @@ export const CategoryIcon = (props: {
   );
 };
 
-export const PlatformIcon = (props: { platform: ModpackPlatform }) => {
-  return <img class="h-4 w-4" src={getModpackPlatformIcon(props.platform)} />;
+export const PlatformIcon = (props: { modpack: "curseforge" | "modrinth" }) => {
+  return <img class="h-4 w-4" src={getModpackPlatformIcon(props.modpack)} />;
 };
 
 export const getModpackPlatform = (modpack: Modpack) => {
-  if ((modpack as { Curseforge: CurseforgeModpack }).Curseforge !== undefined) {
+  if (modpack.type === "curseforge") {
     return "Curseforge";
-  } else if (
-    (modpack as { Modrinth: ModrinthModpack }).Modrinth !== undefined
-  ) {
+  } else if (modpack.type === "modrinth") {
     return "Modrinth";
   } else {
     return "Unknown";

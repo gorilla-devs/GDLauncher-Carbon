@@ -344,11 +344,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                         Some(GameVersion::Custom(_)) => None,
                                         None => None,
                                     },
-                                    modpack_platform: status
+                                    modpack: status
                                         .config
                                         .modpack
                                         .as_ref()
-                                        .map(|modpack| modpack.modpack.as_platform()),
+                                        .map(|modpack| modpack.modpack.clone()),
                                     state: (&status.state).into(),
                                 })
                             }
@@ -1847,7 +1847,7 @@ pub enum ListInstanceStatus {
 pub struct ValidListInstance {
     pub mc_version: Option<String>,
     pub modloader: Option<info::ModLoaderType>,
-    pub modpack_platform: Option<ModPlatform>,
+    pub modpack: Option<Modpack>,
     pub state: domain::LaunchState,
 }
 
@@ -2425,7 +2425,7 @@ mod test {
                 status: ListInstanceStatus::Valid(ValidListInstance {
                     mc_version: Some(String::from("1.7.10")),
                     modloader: None,
-                    modpack_platform: None,
+                    modpack: None,
                     state: domain::LaunchState::Inactive { failed_task: None },
                 }),
                 locked: false,

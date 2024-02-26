@@ -605,14 +605,8 @@ enum ListInstanceStatus {
 struct ValidListInstance {
     mc_version: Option<String>,
     modloader: Option<FEInstanceModloaderType>,
-    modpack_platform: Option<ModpackPlatform>,
+    modpack: Option<Modpack>,
     state: LaunchState,
-}
-
-#[derive(Type, Debug, Serialize)]
-enum ModpackPlatform {
-    Curseforge,
-    Modrinth,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -810,6 +804,8 @@ struct ModpackInfo {
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "type", content = "value")]
 enum Modpack {
     Curseforge(CurseforgeModpack),
     Modrinth(ModrinthModpack),
@@ -1169,15 +1165,6 @@ impl From<domain::InstanceDetails> for InstanceDetails {
     }
 }
 
-impl From<mpdomain::ModPlatform> for ModpackPlatform {
-    fn from(value: mpdomain::ModPlatform) -> Self {
-        match value {
-            mpdomain::ModPlatform::Curseforge => Self::Curseforge,
-            mpdomain::ModPlatform::Modrinth => Self::Modrinth,
-        }
-    }
-}
-
 impl From<domain::info::ModLoader> for ModLoader {
     fn from(value: domain::info::ModLoader) -> Self {
         Self {
@@ -1376,7 +1363,7 @@ impl From<manager::ValidListInstance> for ValidListInstance {
         Self {
             mc_version: value.mc_version,
             modloader: value.modloader.map(Into::into),
-            modpack_platform: value.modpack_platform.map(Into::into),
+            modpack: value.modpack.map(Into::into),
             state: value.state.into(),
         }
     }

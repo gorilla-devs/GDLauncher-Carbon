@@ -57,7 +57,6 @@ const NewsWrapper = () => {
           </Match>
         </Switch>
       </div>
-      <div class="h-auto w-[1px] bg-darkSlate-400" />
       <FeaturedModpackTile />
     </div>
   );
@@ -130,7 +129,7 @@ const HomeGrid = () => {
         }
       } else if (routeData.settings.data?.instancesGroupBy === "modplatform") {
         if ("Valid" in instance.status) {
-          groupName = validInstance?.modpack_platform;
+          groupName = validInstance?.modpack?.type;
         }
       }
 
@@ -351,13 +350,7 @@ const HomeGrid = () => {
           <div class="w-full h-full flex flex-col justify-center items-center mt-12">
             <img src={skull} class="w-16 h-16" />
             <p class="text-darkSlate-50 text-center max-w-100">
-              <Trans
-                key="instance.no_instances_text"
-                options={{
-                  defaultValue:
-                    "At the moment there are not instances. Add one to start playing!"
-                }}
-              />
+              <Trans key="instance.no_instances_text" />
             </p>
           </div>
         </Match>

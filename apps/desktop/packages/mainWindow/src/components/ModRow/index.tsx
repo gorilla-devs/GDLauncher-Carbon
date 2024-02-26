@@ -30,6 +30,7 @@ import {
 import Categories from "./Categories";
 import Authors from "./Authors";
 import ModDownloadButton from "../ModDownloadButton";
+import { Modpack } from "@gd/core_module/bindings";
 
 const ModRow = (props: ModRowProps) => {
   const owner = getOwner();
@@ -93,19 +94,18 @@ const ModRow = (props: ModRowProps) => {
     fileId?: number | string,
     projectId?: number | string
   ) => {
-    return isCurseForgeData(props.data)
-      ? {
-          Curseforge: {
+    return {
+      type: isCurseForgeData(props.data) ? "curseforge" : "modrinth",
+      value: isCurseForgeData(props.data)
+        ? {
             file_id: (fileId as number) || props.data.curseforge.mainFileId,
             project_id: (projectId as number) || props.data.curseforge.id
           }
-        }
-      : {
-          Modrinth: {
+        : {
             project_id: projectId?.toString() || props.data.modrinth.project_id,
             version_id: fileId?.toString() as string
           }
-        };
+    } as Modpack;
   };
 
   let containerRef: HTMLDivElement;

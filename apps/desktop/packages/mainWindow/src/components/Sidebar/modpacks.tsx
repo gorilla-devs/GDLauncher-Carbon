@@ -146,7 +146,7 @@ const Sidebar = () => {
                 value: platform,
                 label: (
                   <div class="flex items-center gap-2">
-                    <PlatformIcon platform={platform} />
+                    <PlatformIcon modpack={platform} />
                     <p class="m-0">{platform}</p>
                   </div>
                 )

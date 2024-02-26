@@ -23,9 +23,7 @@ import {
   ListInstance
 } from "@gd/core_module/bindings";
 import {
-  getCurseForgeData,
   getInstanceImageUrl,
-  getModrinthData,
   getPreparingState,
   getRunningState
 } from "@/utils/instances";
@@ -203,8 +201,8 @@ const Instance = () => {
     getPreparingState(routeData.instanceDetails.data?.state);
 
   const curseforgeData = () =>
-    routeData.instanceDetails.data?.modpack &&
-    getCurseForgeData(routeData.instanceDetails.data.modpack.modpack);
+    routeData.instanceDetails.data?.modpack?.modpack.type === "curseforge" &&
+    routeData.instanceDetails.data?.modpack?.modpack.value;
 
   createEffect(() => {
     const isCurseforge = curseforgeData();
@@ -221,8 +219,8 @@ const Instance = () => {
   });
 
   const modrinthData = () =>
-    routeData.instanceDetails.data?.modpack &&
-    getModrinthData(routeData.instanceDetails.data.modpack.modpack);
+    routeData.instanceDetails.data?.modpack?.modpack.type === "modrinth" &&
+    routeData.instanceDetails.data?.modpack?.modpack.value;
 
   createEffect(() => {
     const isModrinth = modrinthData();

@@ -1,7 +1,12 @@
 /* eslint-disable i18next/no-literal-string */
 import ContentWrapper from "@/components/ContentWrapper";
 import { useGDNavigate } from "@/managers/NavigationManager";
-import { FEModResponse, MRFEProject, Mod } from "@gd/core_module/bindings";
+import {
+  FEModResponse,
+  MRFEProject,
+  Mod,
+  Modpack as ModpackType
+} from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import {
   Button,
@@ -149,11 +154,12 @@ const Modpack = () => {
         return addNotification("Error while downloading the modpack.", "error");
       }
       return {
-        Curseforge: {
+        type: "curseforge",
+        value: {
           file_id: routeData.modpackDetails.data.data.mainFileId,
           project_id: routeData.modpackDetails.data.data.id
         }
-      };
+      } as ModpackType;
     } else {
       const versions = routeData.modrinthProjectVersions.data;
 
@@ -165,11 +171,12 @@ const Modpack = () => {
       const versionId = versions[versions.length - 1];
 
       const modrinth = {
-        Modrinth: {
+        type: "modrinth",
+        value: {
           project_id: routeData.modpackDetails.data.id,
           version_id: versionId.id
         }
-      };
+      } as ModpackType;
 
       return modrinth;
     }

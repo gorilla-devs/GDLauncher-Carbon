@@ -1,7 +1,6 @@
 import {
   CFFEModSearchSortField,
-  MRFESearchIndex,
-  ModpackPlatform
+  MRFESearchIndex
 } from "@gd/core_module/bindings";
 
 export const NEWS_URL =
@@ -29,4 +28,7 @@ export const ModrinthSortFields: MRFESearchIndex[] = [
   "updated"
 ];
 
-export const ModpackPlatforms: ModpackPlatform[] = ["Curseforge", "Modrinth"];
+export const ModpackPlatforms: ("curseforge" | "modrinth")[] = [
+  "curseforge",
+  "modrinth"
+];
