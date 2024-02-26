@@ -5,6 +5,7 @@ use daedalus::minecraft::{AssetIndex, AssetsIndex};
 use prisma_client_rust::QueryError;
 use thiserror::Error;
 use tokio::sync::Mutex;
+use tracing::trace;
 
 use crate::{db::PrismaClient, domain::runtime_path::AssetsPath};
 
@@ -34,9 +35,18 @@ pub async fn get_meta(
         .await?;
 
     if let Some(db_cache) = db_cache {
-        let asset_index = serde_json::from_slice(&db_cache.assets_index)?;
+        let asset_index = serde_json::from_slice(&db_cache.assets_index);
 
-        return Ok((asset_index, db_cache.assets_index));
+        if let Ok(asset_index) = asset_index {
+            trace!("Asset index {} found in cache", version_asset_index.id);
+            return Ok((asset_index, db_cache.assets_index));
+        } else {
+            tracing::warn!(
+                "Failed to deserialize asset index for {} from cache, re-fetching: {}",
+                version_asset_index.id,
+                db_cache.id
+            );
+        }
     }
 
     let asset_index = reqwest_client
@@ -48,7 +58,17 @@ pub async fn get_meta(
 
     db_client
         .assets_meta_cache()
-        .create(version_asset_index.id.clone(), asset_index.to_vec(), vec![])
+        .upsert(
+            crate::db::assets_meta_cache::id::equals(version_asset_index.id.clone()),
+            crate::db::assets_meta_cache::create(
+                version_asset_index.id.clone(),
+                asset_index.to_vec(),
+                vec![],
+            ),
+            vec![crate::db::assets_meta_cache::assets_index::set(
+                asset_index.to_vec(),
+            )],
+        )
         .exec()
         .await?;
 

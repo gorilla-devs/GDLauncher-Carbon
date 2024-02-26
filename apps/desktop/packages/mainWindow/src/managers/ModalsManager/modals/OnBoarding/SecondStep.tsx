@@ -19,9 +19,11 @@ const SecondStep = (props: Props) => {
       <RowsContainer>
         <Row>
           <Title
-            description={<Trans key="java.auto_handle_java_description" />}
+            description={
+              <Trans key="java.auto_manage_java_system_profiles_text" />
+            }
           >
-            <Trans key="java.auto_handle_java" />
+            <Trans key="java.auto_manage_java_system_profiles" />
           </Title>
           <RightHandSide>
             <Switch

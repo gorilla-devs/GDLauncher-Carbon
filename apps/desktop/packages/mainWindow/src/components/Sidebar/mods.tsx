@@ -24,7 +24,6 @@ import { capitalize } from "@/utils/helpers";
 import {
   CategoryIcon,
   getInstanceImageUrl,
-  getValideInstance,
   PlatformIcon
 } from "@/utils/instances";
 import { Trans, useTransContext } from "@gd/i18n";
@@ -149,9 +148,11 @@ const Sidebar = () => {
   };
 
   const filteredInstances = () =>
-    routeData.instancesUngrouped.data?.filter(
-      (instance) => getValideInstance(instance.status)?.modloader
-    );
+    routeData.instancesUngrouped.data?.filter((instance) => {
+      const validInstance =
+        instance.status.status === "valid" ? instance.status.value : undefined;
+      return validInstance?.modloader;
+    });
 
   return (
     <SiderbarWrapper collapsable={false} noPadding>

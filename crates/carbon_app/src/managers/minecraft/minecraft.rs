@@ -26,7 +26,7 @@ use reqwest::Url;
 use strum_macros::EnumIter;
 use thiserror::Error;
 use tokio::{process::Child, sync::Mutex};
-use tracing::{info, warn};
+use tracing::{info, trace, warn};
 
 use crate::{
     domain::runtime_path::{InstancePath, RuntimePath},
@@ -143,10 +143,17 @@ pub async fn get_lwjgl_meta(
         .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 
     if let Some(db_cache) = db_cache {
-        let lwjgl = serde_json::from_slice(&db_cache.lwjgl)
-            .map_err(|err| anyhow::anyhow!("Failed to deserialize lwjgl meta: {}", err))?;
+        let lwjgl = serde_json::from_slice(&db_cache.lwjgl);
 
-        return Ok(lwjgl);
+        if let Ok(lwjgl) = lwjgl {
+            trace!("LWJGL version {} found in cache", lwjgl_suggest);
+            return Ok(lwjgl);
+        } else {
+            tracing::warn!(
+                "Failed to deserialize lwjgl version for {} from cache, re-fetching",
+                lwjgl_suggest
+            );
+        }
     }
 
     let lwjgl_json_url = meta_base_url.join(&format!(
@@ -163,11 +170,19 @@ pub async fn get_lwjgl_meta(
         .json()
         .await?;
 
+    let db_entry_name = format!("{}-{}", version_info_lwjgl_requirement.uid, lwjgl_suggest);
+
     db_client
         .lwjgl_meta_cache()
-        .create(
-            format!("{}-{}", version_info_lwjgl_requirement.uid, lwjgl_suggest),
-            serde_json::to_vec(&lwjgl).unwrap(),
+        .upsert(
+            crate::db::lwjgl_meta_cache::id::equals(db_entry_name.clone()),
+            crate::db::lwjgl_meta_cache::create(
+                db_entry_name.clone(),
+                serde_json::to_vec(&lwjgl).unwrap(),
+                vec![crate::db::lwjgl_meta_cache::lwjgl::set(
+                    serde_json::to_vec(&lwjgl).unwrap(),
+                )],
+            ),
             vec![],
         )
         .exec()

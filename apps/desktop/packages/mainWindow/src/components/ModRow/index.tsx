@@ -154,7 +154,7 @@ const ModRow = (props: ModRowProps) => {
             color="bg-darkSlate-900"
           >
             <h2
-              class="mt-0 text-ellipsis overflow-hidden whitespace-nowrap mb-1 cursor-pointer hover:underline"
+              class="text-ellipsis overflow-hidden whitespace-nowrap cursor-pointer mt-0 mb-1 hover:underline"
               onClick={() => handleExplore()}
               classList={{
                 "max-w-140": !isRowSmall(),

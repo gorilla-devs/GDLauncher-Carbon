@@ -27,7 +27,7 @@ import { For, Match, Show, Switch } from "solid-js";
 
 const Authors = (props: { data: ModRowProps }) => {
   return (
-    <div class="flex gap-2 scrollbar-hide max-w-full flex-wrap">
+    <div class="flex gap-2 max-w-full flex-wrap scrollbar-hide">
       <Switch>
         <Match when={isCurseForgeData(props.data.data)}>
           <For each={getAuthors(props.data)}>
@@ -59,7 +59,7 @@ const OverviewPopover = (props: {
   modrinthCategories: MRFECategoriesResponse | undefined;
 }) => {
   return (
-    <div class="relative flex flex-col overflow-hidden w-70 pb-4">
+    <div class="relative flex flex-col overflow-hidden pb-4 w-70">
       <Show when={getWebsiteUrl(props.data)}>
         <div
           class="rounded-lg bg-darkSlate-900 cursor-pointer w-6 h-6"
@@ -68,14 +68,14 @@ const OverviewPopover = (props: {
             if (url) window.openExternalLink(url);
           }}
         >
-          <div class="w-4 h-4 text-lightSlate-100 absolute i-ri:external-link-line z-30 top-4 right-4" />
+          <div class="w-4 h-4 text-lightSlate-500 hover:text-lightSlate-50 transition-color ease-in-out transition-100 absolute i-ri:external-link-line top-4 right-4 z-30" />
         </div>
       </Show>
       <h4 class="text-xl z-30 text-lightSlate-100 px-4 mb-2">
         {getName(props.data)}
       </h4>
       <div class="absolute top-0 bottom-0 right-0 left-0 z-20 bg-gradient-to-t from-darkSlate-900 from-70%" />
-      <div class="absolute top-0 bottom-0 right-0 bottom-0 left-0 bg-gradient-to-l from-darkSlate-900 z-20" />
+      <div class="absolute top-0 bottom-0 right-0 bottom-0 left-0 from-darkSlate-900 z-20 bg-gradient-to-l" />
       <Show when={getLogoUrl(props.data)}>
         <img
           class="absolute right-0 top-0 bottom-0 select-none h-full w-full z-10 blur-sm"

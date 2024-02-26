@@ -594,6 +594,8 @@ struct ListInstance {
 }
 
 #[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "status", content = "value")]
 enum ListInstanceStatus {
     Valid(ValidListInstance),
     Invalid(InvalidListInstance),
@@ -962,6 +964,8 @@ enum FEInstanceModloaderType {
 }
 
 #[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "state", content = "value")]
 enum LaunchState {
     Inactive {
         failed_task: Option<FETaskId>,

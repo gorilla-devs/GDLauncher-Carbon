@@ -109,6 +109,9 @@ const HomeGrid = () => {
       let groupId = null;
       let groupName = null;
 
+      const validInstance =
+        instance.status.status === "valid" ? instance.status.value : undefined;
+
       if (routeData.settings.data?.instancesGroupBy === "group") {
         const _groupName = routeData.groups.data?.find(
           (group) => group.id === instance.group_id
@@ -119,15 +122,15 @@ const HomeGrid = () => {
         groupId = instance.group_id;
       } else if (routeData.settings.data?.instancesGroupBy === "gameVersion") {
         if ("Valid" in instance.status) {
-          groupName = instance.status.Valid.mc_version;
+          groupName = validInstance?.mc_version;
         }
       } else if (routeData.settings.data?.instancesGroupBy === "modloader") {
         if ("Valid" in instance.status) {
-          groupName = instance.status.Valid.modloader;
+          groupName = validInstance?.modloader;
         }
       } else if (routeData.settings.data?.instancesGroupBy === "modplatform") {
         if ("Valid" in instance.status) {
-          groupName = instance.status.Valid.modpack_platform;
+          groupName = validInstance?.modpack_platform;
         }
       }
 

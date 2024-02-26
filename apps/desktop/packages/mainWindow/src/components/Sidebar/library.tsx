@@ -20,7 +20,7 @@ import { getInstanceIdFromPath, setLastInstanceOpened } from "@/utils/routes";
 import { Trans, useTransContext } from "@gd/i18n";
 import fetchData from "@/pages/Library/library.data";
 import { createStore, reconcile } from "solid-js/store";
-import { InstancesStore, isListInstanceValid } from "@/utils/instances";
+import { InstancesStore } from "@/utils/instances";
 import InstanceTile from "../InstanceTile";
 import skull from "/assets/images/icons/skull.png";
 import { CFFEModLoaderType } from "@gd/core_module/bindings";
@@ -51,9 +51,10 @@ const Sidebar = () => {
 
     if (filteredData()) {
       filteredData()?.forEach((instance) => {
-        const validInstance = isListInstanceValid(instance.status)
-          ? instance.status.Valid
-          : null;
+        const validInstance =
+          instance.status.status === "valid"
+            ? instance.status.value
+            : undefined;
 
         const modloader = validInstance?.modloader || "vanilla";
         if (modloader) {

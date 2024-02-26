@@ -12,7 +12,7 @@ import Auth from "./Auth";
 import CodeStep from "./CodeStep";
 import fetchData from "./auth.login.data";
 import { Navigate, useRouteData } from "@solidjs/router";
-import { supportedLanguages, useTransContext } from "@gd/i18n";
+import { Trans, supportedLanguages, useTransContext } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
 import TermsAndConditions from "./TermsAndConditions";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
@@ -87,12 +87,12 @@ export default function Login() {
         <Navigate href={"/library"} />
       </Match>
       <Match when={!isAlreadyAuthenticated()}>
-        <div class="flex justify-center items-center w-full p-0 h-screen bg-img-loginBG.png">
+        <div class="flex justify-center items-center w-full p-0 h-screen bg-img-loginBG.webp">
           <div
             style={{
               "mix-blend-mode": "hard-light"
             }}
-            class="absolute left-0 right-0 bg-darkSlate-800 bottom-0 top-0 opacity-60"
+            class="absolute left-0 right-0 bg-darkSlate-800 bottom-0 top-0 opacity-10"
           />
           <div class="fixed right-6 bottom-6">
             <Dropdown
@@ -100,7 +100,7 @@ export default function Login() {
               options={Object.keys(supportedLanguages).map((lang) => ({
                 label: (
                   <div class="whitespace-nowrap">
-                    {t(`languages:${lang}_native`)} {t(`languages:${lang}`)}
+                    {t(`languages:${lang}_native`)} ({t(`languages:${lang}`)})
                   </div>
                 ),
                 key: lang
@@ -114,7 +114,18 @@ export default function Login() {
             />
           </div>
           <div
-            class="flex flex-col items-center text-white relative justify-end rounded-2xl h-110"
+            class="flex items-center fixed bottom-6 gap-2 left-6 text-lightSlate-500 hover:text-lightSlate-50 transition-color duration-100 ease-in-out"
+            onClick={() => {
+              window.openExternalLink("https://discord.gdlauncher.com");
+            }}
+          >
+            <div class="i-ri:lifebuoy-fill w-4 h-4" />
+            <div>
+              <Trans key="get_support" />
+            </div>
+          </div>
+          <div
+            class="flex flex-col items-center text-white relative justify-end rounded-2xl h-110 transition-transform duration-300 ease-in-out"
             style={{
               background: "rgba(29, 32, 40, 0.8)",
               "justify-content": step() === 1 ? "flex-end" : "center"
@@ -122,7 +133,9 @@ export default function Login() {
             classList={{
               "overflow-hidden": step() === 2,
               "w-140": step() !== 0,
-              "max-w-160": step() === 0
+              "max-w-160": step() === 0,
+              "scale-100": !isAlreadyAuthenticated(),
+              "scale-0": !!isAlreadyAuthenticated()
             }}
           >
             <Show when={step() === 0}>

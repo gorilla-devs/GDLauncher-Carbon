@@ -32,7 +32,7 @@ const TermsAndConditions = (props: Props) => {
             </h2>
           </div>
           <div class="overflow-y-scroll max-h-38">
-            <div class="flex flex-col m-0 text-darkSlate-100 text-left gap-4 leading-5">
+            <div class="flex flex-col m-0 text-lightSlate-900 text-left gap-4 leading-5">
               <Show when={activeUuid?.data}>
                 <div>
                   <Trans key="login.we_value_privacy_text_renew" />
@@ -64,7 +64,7 @@ const TermsAndConditions = (props: Props) => {
                   setAcceptedMetrics((prev) => !prev);
                 }}
               />
-              <p class="m-0 text-darkSlate-100 leading-5 text-xs select-none text-left">
+              <p class="m-0 text-lightSlate-400 leading-5 text-xs select-none text-left">
                 <Trans key="login.cookies_tracking" />
               </p>
             </div>
@@ -75,11 +75,11 @@ const TermsAndConditions = (props: Props) => {
                   setAcceptedTOS((prev) => !prev);
                 }}
               />
-              <p class="m-0 text-darkSlate-100 leading-5 text-xs select-none">
+              <p class="m-0 text-lightSlate-400 leading-5 text-xs select-none">
                 <Trans key="login.read_and_accept">
                   I have read and accept
                   <span
-                    class="cursor-pointer underline text-lightSlate-400"
+                    class="cursor-pointer underline text-lightSlate-50"
                     onClick={() => {
                       modalsContext?.openModal({
                         name: "termsAndConditions"
@@ -90,7 +90,7 @@ const TermsAndConditions = (props: Props) => {
                   </span>
                   and
                   <span
-                    class="underline text-lightSlate-400 cursor-pointer"
+                    class="underline text-lightSlate-50 cursor-pointer"
                     onClick={() => {
                       modalsContext?.openModal({
                         name: "privacyStatement"
@@ -105,7 +105,7 @@ const TermsAndConditions = (props: Props) => {
           </div>
           <div class="flex flex-col gap-4">
             <div
-              class="text-xs underline text-lightSlate-400 cursor-pointer"
+              class="text-xs underline whitespace-nowrap text-lightSlate-50 cursor-pointer"
               onClick={() => {
                 window?.openCMPWindow();
               }}

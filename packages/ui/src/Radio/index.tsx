@@ -80,7 +80,7 @@ const Radio = (props: Props) => {
             }`}
           >
             <Show when={props.checked}>
-              <div class="w-4 h-4 rounded-full bg-blue-500"></div>
+              <div class="w-4 h-4 rounded-full bg-blue-500" />
             </Show>
           </div>
           <Show when={props.children}>

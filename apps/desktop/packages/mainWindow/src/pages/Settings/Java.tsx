@@ -125,10 +125,10 @@ const Java = () => {
           </Title>
           <Center>
             <Slider
-              min={256}
+              min={1024}
               max={mbTotalRAM()}
-              steps={1000}
-              marks={generateSequence(2048, mbTotalRAM())}
+              steps={1024}
+              marks={generateSequence(1024, mbTotalRAM())}
               value={settings.data?.xmx}
               onChange={(val) => {
                 settingsMutation.mutate({

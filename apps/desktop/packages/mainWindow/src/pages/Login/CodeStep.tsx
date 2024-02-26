@@ -143,6 +143,7 @@ const CodeStep = (props: Props) => {
             props.prevStep();
           }}
         >
+          <i class="i-ri:arrow-left-line w-4 h-4" />
           <Trans
             key="login.step_back"
             options={{

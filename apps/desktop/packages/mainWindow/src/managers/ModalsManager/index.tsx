@@ -228,15 +228,15 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                         title={title}
                       />
                     </div>
-                    <div class="absolute inset-0 bg-darkSlate-900 backdrop-blur-sm opacity-80" />
+                    <div class="absolute inset-0 bg-darkSlate-900 opacity-80" />
                   </div>
 
                   <div
-                    class="h-screen duration-100 ease-in-out text-white transition-all grid place-items-center z-99 origin-center"
+                    class="h-screen duration-100 ease-in-out text-white place-items-center z-999 origin-center bg-darkSlate-900 opacity-80"
                     style={{
-                      width: `${adSize.width + 40}px`
+                      width: `${adSize.width}px`
                     }}
-                    onClick={() => {
+                    onMouseDown={() => {
                       if (!preventClose) {
                         closeModal();
                       }

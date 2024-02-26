@@ -110,6 +110,8 @@ export function getPatchedUserData() {
   return path.join(appData, "gdlauncher_carbon");
 }
 
+const skipIntroAnimation = fss.existsSync(getPatchedUserData());
+
 app.setPath("userData", getPatchedUserData());
 
 if (app.isPackaged) {
@@ -269,7 +271,7 @@ const loadCoreModule: CoreModule = () =>
             switch (action) {
               case "closeWindow":
                 if (!win) {
-                  createWindow(true);
+                  createWindow();
                 }
                 break;
               case "hideWindow":
@@ -336,9 +338,7 @@ if (process.defaultApp) {
   app.setAsDefaultProtocolClient("gdlauncher");
 }
 
-async function createWindow(
-  skipIntroAnimation = false
-): Promise<BrowserWindow> {
+async function createWindow(): Promise<BrowserWindow> {
   const { minWidth, minHeight, width, height } = getAdSize();
 
   win = new BrowserWindow({
@@ -638,13 +638,13 @@ app.on("second-instance", (_e, _argv) => {
     if (win.isMinimized()) win.restore();
     win.focus();
   } else {
-    createWindow(true);
+    createWindow();
   }
 });
 
 app.on("activate", () => {
   if (!win) {
-    createWindow(true);
+    createWindow();
   }
 });
 

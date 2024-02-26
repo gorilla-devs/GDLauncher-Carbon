@@ -13,7 +13,7 @@ use daedalus::{
 use prisma_client_rust::QueryError;
 use thiserror::Error;
 use tokio::{process::Command, sync::Mutex};
-use tracing::info;
+use tracing::{info, trace};
 use url::Url;
 
 use crate::{
@@ -69,10 +69,17 @@ pub async fn get_version(
         .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 
     if let Some(db_cache) = db_cache {
-        let db_cache = serde_json::from_slice(&db_cache.partial_version_info)
-            .map_err(|err| anyhow::anyhow!("Failed to deserialize db cache: {}", err))?;
+        let db_cache = serde_json::from_slice(&db_cache.partial_version_info);
 
-        return Ok(db_cache);
+        if let Ok(db_cache) = db_cache {
+            trace!("NeoForge version {} found in cache", neoforge_version);
+            return Ok(db_cache);
+        } else {
+            tracing::warn!(
+                "Failed to deserialize neoforge version for {} from cache, re-fetching",
+                neoforge_version
+            );
+        }
     }
 
     let version_url = meta_base_url.join(&format!(
@@ -88,7 +95,19 @@ pub async fn get_version(
 
     db_client
         .partial_version_info_cache()
-        .create(db_entry_name, version_bytes.to_vec(), vec![])
+        .upsert(
+            crate::db::partial_version_info_cache::id::equals(db_entry_name.clone()),
+            crate::db::partial_version_info_cache::create(
+                db_entry_name.clone(),
+                version_bytes.to_vec(),
+                vec![
+                    crate::db::partial_version_info_cache::partial_version_info::set(
+                        version_bytes.to_vec(),
+                    ),
+                ],
+            ),
+            vec![],
+        )
         .exec()
         .await?;
 

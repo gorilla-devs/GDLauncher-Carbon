@@ -10,6 +10,7 @@ import {
   Tab,
   TabList,
   Tabs,
+  Tooltip,
   createNotification
 } from "@gd/ui";
 import {
@@ -261,7 +262,7 @@ const Modpack = () => {
                 "background-position": "right-5rem"
               }}
             />
-            <div class="z-20 top-5 sticky left-5 w-fit">
+            <div class="z-20 top-5 sticky w-full flex justify-between px-4 box-border">
               <Button
                 onClick={() => navigate(-1)}
                 icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
@@ -270,6 +271,26 @@ const Modpack = () => {
               >
                 <Trans key="instance.step_back" />
               </Button>
+              <Tooltip content={<Trans key="instance.open_in_browser" />}>
+                <Button
+                  rounded
+                  size="small"
+                  type="transparent"
+                  onClick={() => {
+                    if (routeData.isCurseforge) {
+                      window.openExternalLink(
+                        `https://www.curseforge.com/minecraft/modpacks/${routeData.modpackDetails.data?.data.slug}`
+                      );
+                    } else {
+                      window.openExternalLink(
+                        `https://modrinth.com/modpack/${routeData.modpackDetails.data?.slug}`
+                      );
+                    }
+                  }}
+                >
+                  <div class="text-xl i-ri:external-link-line" />
+                </Button>
+              </Tooltip>
             </div>
             <div class="flex justify-center sticky px-4 z-20 bg-gradient-to-t h-24 top-52 from-darkSlate-800 from-10% z-40">
               <div class="flex gap-4 w-full lg:flex-row">

@@ -14,7 +14,7 @@ import { ContextMenu, Spinner, Tooltip } from "@gd/ui";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { useModal } from "@/managers/ModalsManager";
-import { getModpackPlatformIcon, getValideInstance } from "@/utils/instances";
+import { getModpackPlatformIcon } from "@/utils/instances";
 import { setInstanceId } from "@/utils/browser";
 import {
   setExportStep,
@@ -98,7 +98,10 @@ const Tile = (props: Props) => {
     navigate(`/library/${props.instance.id}/settings`);
   };
 
-  const validInstance = () => getValideInstance(props.instance.status);
+  const validInstance = () =>
+    props.instance.status.status === "valid"
+      ? props.instance.status.value
+      : undefined;
 
   const handleEdit = async () => {
     const instanceDetails = await rspcContext.client.query([

@@ -1,4 +1,5 @@
 {
+  "get_support": "Get Support",
   "loading": "Loading...",
   "general.type_here": "Type Here",
   "general.search": "Search",
@@ -277,7 +278,7 @@
   "instance_settings.unlock": "Unlock",
   "instance_settings.unlocked": "Unlocked",
   "instance_settings.unpair": "Unpair",
-  "instance_settings.update_version": "Update version",
+  "instance_settings.change_modpack_version": "Change Modpack Version",
   "instance_settings.java_path_profile": "Instance Java Path / Profile",
   "instance_unpair_confirmation": "Unpairing removes the link between your instance and the modpack. This means you won’t be able to change modpack version anymore. This action cannot be undone.",
   "instance_unlock_confirmation": "Unlocking allows you to install additional content onto this instance. If not done correctly, that could potentially leading to the instance not launching anymore. This action cannot be undone.",
