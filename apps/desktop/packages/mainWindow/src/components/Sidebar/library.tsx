@@ -211,13 +211,7 @@ const Sidebar = () => {
               />
               <Show when={isSidebarOpened()}>
                 <p class="text-darkSlate-50 text-center text-xs max-w-50">
-                  <Trans
-                    key="instance.no_instances_text"
-                    options={{
-                      defaultValue:
-                        "At the moment there are not instances. Add one to start playing!"
-                    }}
-                  />
+                  <Trans key="instance.no_instances_text" />
                 </p>
               </Show>
             </div>

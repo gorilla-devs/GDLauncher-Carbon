@@ -338,8 +338,12 @@ if (process.defaultApp) {
   app.setAsDefaultProtocolClient("gdlauncher");
 }
 
+let lastDisplay: Display | null = null;
+
 async function createWindow(): Promise<BrowserWindow> {
-  const { minWidth, minHeight, width, height } = getAdSize();
+  const currentDisplay = screen.getPrimaryDisplay();
+  lastDisplay = currentDisplay;
+  const { minWidth, minHeight, height, width } = getAdSize(currentDisplay);
 
   win = new BrowserWindow({
     title: "GDLauncher Carbon",
@@ -360,8 +364,6 @@ async function createWindow(): Promise<BrowserWindow> {
       additionalArguments: [`--skipIntroAnimation=${skipIntroAnimation}`]
     }
   });
-
-  let lastDisplay: Display | null = null;
 
   win.on("move", () => {
     const currentDisplay = screen.getDisplayMatching(win?.getBounds()!);
@@ -461,7 +463,8 @@ ipcMain.handle("relaunch", () => {
 });
 
 ipcMain.handle("getAdSize", async () => {
-  return getAdSize().adSize;
+  const currentDisplay = screen.getDisplayMatching(win?.getBounds()!);
+  return getAdSize(currentDisplay).adSize;
 });
 
 ipcMain.handle("openFileDialog", async (_, opts: OpenDialogOptions) => {
@@ -596,7 +599,14 @@ app.whenReady().then(async () => {
   screen.addListener(
     "display-metrics-changed",
     (_, display, changedMetrics) => {
-      const { minWidth, minHeight } = getAdSize();
+      const currentDisplay = screen.getDisplayMatching(win?.getBounds()!);
+      if (lastDisplay?.id === currentDisplay?.id) {
+        return;
+      }
+
+      lastDisplay = currentDisplay;
+
+      const { minWidth, minHeight } = getAdSize(currentDisplay);
       if (changedMetrics.includes("workArea")) {
         win?.setMinimumSize(minWidth, minHeight);
         win?.setSize(minWidth, minHeight);

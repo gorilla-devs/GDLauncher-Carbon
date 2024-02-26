@@ -10,10 +10,10 @@ export default function getAdSize(display?: Display) {
 
   if (width < 1920 || height < 1080) {
     return {
-      minWidth: width < 1024 ? width : 1024,
-      minHeight: height < 790 ? height : 790,
-      width: width < 1024 ? width : 1024,
-      height: height < 790 ? height : 790,
+      minWidth: width < 1024 ? width - 100 : 1024,
+      minHeight: height < 790 ? height - 100 : 790,
+      width: width < 1024 ? width - 100 : 1024,
+      height: height < 790 ? height - 100 : 790,
       adSize: {
         useFallbackAd,
         useVertical: true,
