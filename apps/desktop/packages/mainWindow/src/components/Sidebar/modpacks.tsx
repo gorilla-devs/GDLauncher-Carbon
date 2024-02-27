@@ -64,7 +64,7 @@ const Sidebar = () => {
     "Platform//Curseforge"
   ]);
   const [menuData, setMenuData] = createSignal({
-    hasSearch: true,
+    hasSearch: false,
     isCheckbox: false,
     isParent: true,
     items: [
