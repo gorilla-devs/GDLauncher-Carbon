@@ -232,7 +232,7 @@ const Sidebar = () => {
                   categories: []
                 });
               }}
-              value={capitalize(infiniteQuery?.query?.searchApi)}
+              value={infiniteQuery?.query?.searchApi}
               options={ModpackPlatforms.map((platform) => ({
                 value: platform,
                 label: (

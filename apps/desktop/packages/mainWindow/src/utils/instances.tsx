@@ -6,7 +6,6 @@ import {
   FESubtask,
   ListInstance,
   ValidListInstance,
-  Modpack,
   CFFECategory,
   MRFECategory
 } from "@gd/core_module/bindings";
@@ -161,16 +160,6 @@ export const CategoryIcon = (props: {
 
 export const PlatformIcon = (props: { modpack: "curseforge" | "modrinth" }) => {
   return <img class="h-4 w-4" src={getModpackPlatformIcon(props.modpack)} />;
-};
-
-export const getModpackPlatform = (modpack: Modpack) => {
-  if (modpack.type === "curseforge") {
-    return "Curseforge";
-  } else if (modpack.type === "modrinth") {
-    return "Modrinth";
-  } else {
-    return "Unknown";
-  }
 };
 
 export const [importedInstances, setImportedInstances] = createSignal<number[]>(
