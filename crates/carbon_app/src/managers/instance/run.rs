@@ -45,7 +45,7 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{watch, Semaphore};
+use tokio::sync::{watch, Mutex, Semaphore};
 use tokio::task::JoinHandle;
 use tokio::{io::AsyncReadExt, sync::mpsc};
 use tracing::{debug, info, trace};
@@ -54,6 +54,7 @@ use tracing::{debug, info, trace};
 pub struct PersistenceManager {
     instance_download_lock: Semaphore,
     loader_install_lock: Semaphore,
+    java_check_lock: Mutex<()>,
 }
 
 impl PersistenceManager {
@@ -61,6 +62,7 @@ impl PersistenceManager {
         Self {
             instance_download_lock: Semaphore::new(1),
             loader_install_lock: Semaphore::new(1),
+            java_check_lock: Mutex::new(()),
         }
     }
 }
@@ -787,13 +789,14 @@ impl ManagerRef<'_, InstanceManager> {
 
                 let mut required_java_system_profile = SystemJavaProfileName::from(
                     daedalus::minecraft::MinecraftJavaProfile::try_from(
-                        &version_info
+                        version_info
                             .java_version
                             .as_ref()
                             .ok_or_else(|| {
                                 anyhow::anyhow!("instance java version unsupported")
                             })?
-                            .component as &str,
+                            .component
+                            .as_str(),
                     )?,
                 );
 
@@ -889,6 +892,13 @@ impl ManagerRef<'_, InstanceManager> {
                         {
                             required_java_system_profile = SystemJavaProfileName::LegacyFixed1;
                         }
+
+                        let instance_manager = app.instance_manager();
+                        let _guard = instance_manager
+                            .persistence_manager
+                            .java_check_lock
+                            .lock()
+                            .await;
 
 
                         let usable_java = app
@@ -1408,6 +1418,8 @@ impl ManagerRef<'_, InstanceManager> {
                 Ok(None) => {}
                 Ok(Some(mut child)) => {
                     drop(task);
+
+                    let _liveness_watch = app.instance_manager().instance_running_tracker.marker();
 
                     let _ = app
                         .rich_presence_manager()

@@ -1,14 +1,11 @@
 import { createEffect, createSignal } from "solid-js";
 import Tile from "../Instance/Tile";
 import {
-  isListInstanceValid,
-  getValideInstance,
   getPreparingState,
   getRunningState,
-  getInValideInstance,
   getInactiveState,
   getInstanceImageUrl,
-  getDeletingState
+  isInstanceDeleting
 } from "@/utils/instances";
 import { ListInstance, FESubtask, FETask } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
@@ -42,17 +39,25 @@ const InstanceTile = (props: {
 
   const navigate = useGDNavigate();
 
-  const validInstance = () => getValideInstance(props.instance.status);
-  const invalidInstance = () => getInValideInstance(props.instance.status);
-  const inactiveState = () => getInactiveState(props.instance.status);
-  const isPreparingState = () => getPreparingState(props.instance.status);
-  const isDeleting = () => getDeletingState(props.instance.status) as boolean;
+  const validInstance = () =>
+    props.instance.status.status === "valid"
+      ? props.instance.status.value
+      : undefined;
+
+  const invalidInstance = () =>
+    props.instance.status.status === "invalid"
+      ? props.instance.status.value
+      : undefined;
+
+  const inactiveState = () => getInactiveState(validInstance()?.state);
+  const isPreparingState = () => getPreparingState(validInstance()?.state);
+  const isDeleting = () => isInstanceDeleting(validInstance()?.state);
 
   const modloader = () => validInstance()?.modloader;
 
   const taskId = () => isPreparingState();
 
-  const isRunning = () => getRunningState(props.instance.status);
+  const isRunning = () => getRunningState(validInstance()?.state);
   const dismissTaskMutation = rspc.createMutation(["vtask.dismissTask"]);
 
   const [task, setTask] = createSignal<CreateQueryResult<
@@ -119,7 +124,7 @@ const InstanceTile = (props: {
       instance={props.instance}
       modloader={modloader()}
       version={validInstance()?.mc_version}
-      isInvalid={!isListInstanceValid(props.instance.status)}
+      isInvalid={props.instance.status.status === "invalid"}
       failError={failError()}
       isRunning={!!isRunning()}
       isPreparing={isPreparingState() !== undefined}

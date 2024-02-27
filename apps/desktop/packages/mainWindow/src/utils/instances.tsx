@@ -4,13 +4,8 @@ import {
   LaunchState,
   ListInstanceStatus,
   FESubtask,
-  FETaskId,
   ListInstance,
   ValidListInstance,
-  Modpack,
-  CurseforgeModpack,
-  ModrinthModpack,
-  ModpackPlatform,
   CFFECategory,
   MRFECategory
 } from "@gd/core_module/bindings";
@@ -19,132 +14,32 @@ import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg";
 import { Show, Switch, Match, createSignal } from "solid-js";
 import { port } from "./rspcClient";
 
-export const isListInstanceValid = (
-  status: ListInstanceStatus
-): status is { Valid: ValidListInstance } => {
-  return "Valid" in status;
-};
-
-export const isListInstanceInValid = (
-  status: ListInstanceStatus
-): status is { Invalid: InvalidListInstance } => {
+export const isListInstanceInvalid = (status: ListInstanceStatus) => {
   return "Invalid" in status;
 };
 
-export const getValideInstance = (
-  status: ListInstanceStatus
-): ValidListInstance | undefined => {
-  if (isListInstanceValid(status)) return status.Valid;
-};
+export const getLaunchState = (launchState: LaunchState | undefined) => {
+  if (!launchState) return undefined;
 
-export const getInValideInstance = (
-  status: ListInstanceStatus
-): InvalidListInstance | undefined => {
-  if (isListInstanceInValid(status)) return status.Invalid;
-};
-
-export const isListInstanceInvalid = (
-  status: ListInstanceStatus
-): status is { Invalid: InvalidListInstance } => {
-  return "Invalid" in status;
-};
-
-export const getLaunchState = (
-  launchState: LaunchState
-):
-  | { Preparing: FETaskId }
-  | { Running: { start_time: string } }
-  | undefined => {
-  if (typeof launchState === "object" && "Preparing" in launchState) {
-    return { Preparing: launchState.Preparing };
-  } else if (typeof launchState === "object" && "Running" in launchState) {
-    return { Running: launchState.Running };
+  if (launchState.state === "preparing" || launchState.state === "running") {
+    return launchState.value;
   }
   return undefined;
 };
 
-export const isLaunchState = (input: any): input is LaunchState => {
-  if (typeof input === "object") {
-    // Check for the Preparing state
-    if ("Preparing" in input) {
-      return typeof input.Preparing === "number";
-    }
+export const getPreparingState = (status: LaunchState | undefined) => {
+  if (!status) return undefined;
 
-    if ("Deleting" in input) {
-      return true;
-    }
-
-    if ("Inactive" in input) {
-      return input.Inactive.failed_task === null;
-    }
-
-    // Check for the Running state
-    if ("Running" in input) {
-      return (
-        typeof input.Running === "object" &&
-        "start_time" in input.Running &&
-        typeof input.Running.start_time === "string" &&
-        "log_id" in input.Running &&
-        typeof input.Running.log_id === "number"
-      );
-    }
-  }
-
-  return false;
-};
-
-export const getPreparingState = (status: ListInstanceStatus | LaunchState) => {
-  const launchState = isLaunchState(status);
-
-  if (launchState) {
-    if (typeof status === "object" && "Preparing" in status) {
-      return status.Preparing;
-    }
-  } else {
-    const isValidState = getValideInstance(status);
-    if (
-      isValidState &&
-      isValidState.state &&
-      typeof isValidState.state === "object" &&
-      "Preparing" in isValidState.state
-    ) {
-      return isValidState.state.Preparing;
-    }
+  if (status.state === "preparing") {
+    return status.value;
   }
 };
 
-export const getDeletingState = (status: ListInstanceStatus | LaunchState) => {
-  const launchState = isLaunchState(status);
+export const getInactiveState = (status: LaunchState | undefined) => {
+  if (!status) return undefined;
 
-  if (launchState) {
-    if (typeof status === "object" && "Deleting" in status) {
-      return status.Deleting;
-    }
-  } else {
-    const isValidState = getValideInstance(status);
-    if (isValidState && isValidState.state === "Deleting") {
-      return true;
-    }
-  }
-};
-
-export const getInactiveState = (status: ListInstanceStatus | LaunchState) => {
-  const launchState = isLaunchState(status);
-
-  if (launchState) {
-    if (typeof status === "object" && "Inactive" in status) {
-      return status.Inactive.failed_task;
-    }
-  } else {
-    const isValidState = getValideInstance(status);
-    if (
-      isValidState &&
-      isValidState.state &&
-      typeof isValidState.state === "object" &&
-      "Inactive" in isValidState.state
-    ) {
-      return isValidState.state.Inactive.failed_task;
-    }
+  if (status.state === "inactive") {
+    return status.value.failed_task;
   }
 };
 
@@ -156,56 +51,26 @@ export const isSubTaskItem = (input: FESubtask): input is FESubtask => {
   return typeof input === "object" && "item" in input;
 };
 
-export const getRunningState = (status: ListInstanceStatus | LaunchState) => {
-  const launchState = isLaunchState(status);
+export const getRunningState = (status: LaunchState | undefined) => {
+  if (!status) return undefined;
 
-  if (launchState) {
-    if (typeof status === "object" && "Running" in status) {
-      return status.Running;
-    }
-  } else {
-    const isValidState = getValideInstance(status);
-    if (
-      isValidState &&
-      isValidState.state &&
-      typeof isValidState.state === "object" &&
-      "Running" in isValidState.state
-    ) {
-      return isValidState.state.Running;
-    }
+  if (status.state === "running") {
+    return status.value;
   }
 };
 
-export const isInstancePreparing = (
-  launchState: LaunchState
-): launchState is { Preparing: FETaskId } => {
-  return typeof launchState === "object" && "Preparing" in launchState;
+export const isInstanceDeleting = (status: LaunchState | undefined) => {
+  if (!status) return false;
+
+  return status.state === "deleting";
 };
 
-export const isInstanceRunning = (
-  launchState: LaunchState
-): launchState is { Running: { start_time: string; log_id: number } } => {
-  return typeof launchState === "object" && "Running" in launchState;
+export const isInstancePreparing = (launchState: LaunchState) => {
+  return launchState.state === "preparing";
 };
 
-export const isModpackCurseforge = (
-  modpack: Modpack
-): modpack is { Curseforge: CurseforgeModpack } => {
-  return "Curseforge" in modpack;
-};
-
-export const getCurseForgeData = (modpack: Modpack) => {
-  if ("Curseforge" in modpack) return modpack.Curseforge;
-};
-
-export const isModpackModrinth = (
-  modpack: Modpack
-): modpack is { Modrinth: ModrinthModpack } => {
-  return "Modrinth" in modpack;
-};
-
-export const getModrinthData = (modpack: Modpack) => {
-  if ("Modrinth" in modpack) return modpack.Modrinth;
+export const isInstanceRunning = (launchState: LaunchState) => {
+  return launchState.state === "running";
 };
 
 export const getInstanceImageUrl = (
@@ -248,11 +113,13 @@ export interface InstancesStore {
   [modloader: string]: ListInstance[];
 }
 
-export const getModpackPlatformIcon = (platform: ModpackPlatform) => {
-  switch (platform) {
-    case "Curseforge":
+export const getModpackPlatformIcon = (
+  modpackType: "curseforge" | "modrinth" | null | undefined
+) => {
+  switch (modpackType) {
+    case "curseforge":
       return CurseforgeLogo;
-    case "Modrinth":
+    case "modrinth":
       return ModrinthLogo;
     default:
       return CurseforgeLogo;
@@ -291,20 +158,8 @@ export const CategoryIcon = (props: {
   );
 };
 
-export const PlatformIcon = (props: { platform: ModpackPlatform }) => {
-  return <img class="h-4 w-4" src={getModpackPlatformIcon(props.platform)} />;
-};
-
-export const getModpackPlatform = (modpack: Modpack) => {
-  if ((modpack as { Curseforge: CurseforgeModpack }).Curseforge !== undefined) {
-    return "Curseforge";
-  } else if (
-    (modpack as { Modrinth: ModrinthModpack }).Modrinth !== undefined
-  ) {
-    return "Modrinth";
-  } else {
-    return "Unknown";
-  }
+export const PlatformIcon = (props: { modpack: "curseforge" | "modrinth" }) => {
+  return <img class="h-4 w-4" src={getModpackPlatformIcon(props.modpack)} />;
 };
 
 export const [importedInstances, setImportedInstances] = createSignal<number[]>(

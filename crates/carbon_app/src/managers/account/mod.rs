@@ -220,7 +220,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 } => set_params.extend([
                     SetParam::SetAccessToken(Some(access_token)),
                     SetParam::SetMsRefreshToken(refresh_token),
-                    SetParam::SetTokenExpires(Some(token_expires)),
+                    SetParam::SetTokenExpires(Some(
+                        token_expires.with_timezone(&FixedOffset::east(0)),
+                    )),
                     SetParam::SetIdToken(id_token),
                     SetParam::SetSkinId(skin_id),
                 ]),
@@ -252,7 +254,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 } => vec![
                     SetParam::SetAccessToken(Some(access_token)),
                     SetParam::SetMsRefreshToken(refresh_token),
-                    SetParam::SetTokenExpires(Some(token_expires)),
+                    SetParam::SetTokenExpires(Some(
+                        token_expires.with_timezone(&FixedOffset::east(0)),
+                    )),
                     SetParam::SetIdToken(id_token),
                     SetParam::SetSkinId(skin_id),
                 ],
@@ -836,7 +840,7 @@ pub enum FullAccountType {
         access_token: String,
         refresh_token: Option<String>,
         id_token: Option<String>,
-        token_expires: DateTime<FixedOffset>,
+        token_expires: DateTime<Utc>,
         skin_id: Option<String>,
     },
 }
@@ -873,9 +877,12 @@ impl TryFrom<db::account::Data> for FullAccount {
                     access_token,
                     refresh_token: value.ms_refresh_token,
                     id_token: value.id_token,
-                    token_expires: value.token_expires.ok_or_else(|| {
-                        FullAccountLoadError::MissingExpiration(value.uuid.clone())
-                    })?,
+                    token_expires: value
+                        .token_expires
+                        .map(|time| time.with_timezone(&Utc))
+                        .ok_or_else(|| {
+                            FullAccountLoadError::MissingExpiration(value.uuid.clone())
+                        })?,
                     skin_id: value.skin_id,
                 },
                 None => FullAccountType::Offline,
@@ -936,7 +943,7 @@ impl From<api::FullAccount> for FullAccount {
                 access_token: value.mc.auth.access_token,
                 refresh_token: Some(value.ms.refresh_token),
                 id_token: Some(value.ms.id_token),
-                token_expires: DateTime::<FixedOffset>::from(value.mc.auth.expires_at),
+                token_expires: DateTime::<Utc>::from(value.mc.auth.expires_at),
                 skin_id: value.mc.profile.skin.map(|skin| skin.id),
             },
             last_used: Utc::now().into(),

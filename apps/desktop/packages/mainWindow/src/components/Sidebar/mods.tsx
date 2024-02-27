@@ -24,7 +24,6 @@ import { capitalize } from "@/utils/helpers";
 import {
   CategoryIcon,
   getInstanceImageUrl,
-  getValideInstance,
   PlatformIcon
 } from "@/utils/instances";
 import { Trans, useTransContext } from "@gd/i18n";
@@ -149,9 +148,11 @@ const Sidebar = () => {
   };
 
   const filteredInstances = () =>
-    routeData.instancesUngrouped.data?.filter(
-      (instance) => getValideInstance(instance.status)?.modloader
-    );
+    routeData.instancesUngrouped.data?.filter((instance) => {
+      const validInstance =
+        instance.status.status === "valid" ? instance.status.value : undefined;
+      return validInstance?.modloader;
+    });
 
   return (
     <SiderbarWrapper collapsable={false} noPadding>
@@ -231,13 +232,15 @@ const Sidebar = () => {
                   categories: []
                 });
               }}
-              value={capitalize(infiniteQuery?.query?.searchApi)}
+              value={infiniteQuery?.query?.searchApi}
               options={ModpackPlatforms.map((platform) => ({
                 value: platform,
                 label: (
                   <div class="flex items-center gap-2">
-                    <PlatformIcon platform={platform} />
-                    <p class="m-0">{platform}</p>
+                    <PlatformIcon modpack={platform} />
+                    <p class="m-0">
+                      <Trans key={platform} />
+                    </p>
                   </div>
                 )
               }))}
@@ -255,28 +258,31 @@ const Sidebar = () => {
                       snapshot: e
                     })
                   }
-                />
-                <div class="m-0 flex items-center">
-                  <Trans key="instance.include_snapshot_versions" />
-                </div>
+                >
+                  <div class="m-0 flex items-center">
+                    <Trans key="instance.include_snapshot_versions" />
+                  </div>
+                </Checkbox>
               </div>
               <div class="flex gap-2">
                 <Checkbox
                   checked={gameVersionFilters.oldAlpha}
                   onChange={(e) => updateGameVersionsFilter({ oldAlpha: e })}
-                />
-                <div class="m-0 flex items-center">
-                  <Trans key="instance.include_old_alpha_versions" />
-                </div>
+                >
+                  <div class="m-0 flex items-center">
+                    <Trans key="instance.include_old_alpha_versions" />
+                  </div>
+                </Checkbox>
               </div>
               <div class="flex gap-2">
                 <Checkbox
                   checked={gameVersionFilters.oldBeta}
                   onChange={(e) => updateGameVersionsFilter({ oldBeta: e })}
-                />
-                <div class="m-0 flex items-center">
-                  <Trans key="instance.include_old_beta_versions" />
-                </div>
+                >
+                  <div class="m-0 flex items-center">
+                    <Trans key="instance.include_old_beta_versions" />
+                  </div>
+                </Checkbox>
               </div>
             </div>
             <Dropdown
@@ -334,15 +340,16 @@ const Sidebar = () => {
                           modloader) as FEUnifiedModLoaderType
                       )}
                       disabled={!isNaN(instanceId()!)}
-                    />
-                    <ModloaderIcon modloader={modloader} />
-                    <p class="m-0">
-                      {capitalize(
-                        typeof modloader === "string"
-                          ? modloader
-                          : modloader.name
-                      )}
-                    </p>
+                    >
+                      <ModloaderIcon modloader={modloader} />
+                      <p class="m-0">
+                        {capitalize(
+                          typeof modloader === "string"
+                            ? modloader
+                            : modloader.name
+                        )}
+                      </p>
+                    </Checkbox>
                   </div>
                 );
               }}
@@ -394,11 +401,12 @@ const Sidebar = () => {
                               categories: newCategories
                             });
                           }}
-                        />
-                        <div class="flex items-center gap-2 max-w-32">
-                          <CategoryIcon category={category} />
-                          <p class="m-0">{capitalize(category.name)}</p>
-                        </div>
+                        >
+                          <div class="flex items-center gap-2 max-w-32">
+                            <CategoryIcon category={category} />
+                            <p class="m-0">{capitalize(category.name)}</p>
+                          </div>
+                        </Checkbox>
                       </div>
                     );
                   }}

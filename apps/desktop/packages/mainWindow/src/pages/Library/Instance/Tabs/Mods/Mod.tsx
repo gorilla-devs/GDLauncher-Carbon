@@ -309,7 +309,7 @@ const Mod = (props: Props) => {
                   <img
                     class="w-full"
                     src={getModpackPlatformIcon(
-                      isCurseForge() ? "Curseforge" : "Modrinth"
+                      isCurseForge() ? "curseforge" : "modrinth"
                     )}
                   />
                 }

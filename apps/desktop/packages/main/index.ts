@@ -94,7 +94,7 @@ function validateArgument(arg: string): Argument | null {
 export function getPatchedUserData() {
   let appData = null;
 
-  if (os.platform() !== "linux") {
+  if (os.platform() === "darwin" || os.platform() === "win32") {
     appData = app.getPath("appData");
   } else {
     // monkey patch linux since it defaults to .config instead of .local/share
@@ -109,6 +109,8 @@ export function getPatchedUserData() {
 
   return path.join(appData, "gdlauncher_carbon");
 }
+
+const skipIntroAnimation = fss.existsSync(getPatchedUserData());
 
 app.setPath("userData", getPatchedUserData());
 
@@ -269,7 +271,7 @@ const loadCoreModule: CoreModule = () =>
             switch (action) {
               case "closeWindow":
                 if (!win) {
-                  createWindow(true);
+                  createWindow();
                 }
                 break;
               case "hideWindow":
@@ -336,10 +338,12 @@ if (process.defaultApp) {
   app.setAsDefaultProtocolClient("gdlauncher");
 }
 
-async function createWindow(
-  skipIntroAnimation = false
-): Promise<BrowserWindow> {
-  const { minWidth, minHeight, width, height } = getAdSize();
+let lastDisplay: Display | null = null;
+
+async function createWindow(): Promise<BrowserWindow> {
+  const currentDisplay = screen.getPrimaryDisplay();
+  lastDisplay = currentDisplay;
+  const { minWidth, minHeight, height, width } = getAdSize(currentDisplay);
 
   win = new BrowserWindow({
     title: "GDLauncher Carbon",
@@ -360,8 +364,6 @@ async function createWindow(
       additionalArguments: [`--skipIntroAnimation=${skipIntroAnimation}`]
     }
   });
-
-  let lastDisplay: Display | null = null;
 
   win.on("move", () => {
     const currentDisplay = screen.getDisplayMatching(win?.getBounds()!);
@@ -461,7 +463,8 @@ ipcMain.handle("relaunch", () => {
 });
 
 ipcMain.handle("getAdSize", async () => {
-  return getAdSize().adSize;
+  const currentDisplay = screen.getDisplayMatching(win?.getBounds()!);
+  return getAdSize(currentDisplay).adSize;
 });
 
 ipcMain.handle("openFileDialog", async (_, opts: OpenDialogOptions) => {
@@ -596,7 +599,14 @@ app.whenReady().then(async () => {
   screen.addListener(
     "display-metrics-changed",
     (_, display, changedMetrics) => {
-      const { minWidth, minHeight } = getAdSize();
+      const currentDisplay = screen.getDisplayMatching(win?.getBounds()!);
+      if (lastDisplay?.id === currentDisplay?.id) {
+        return;
+      }
+
+      lastDisplay = currentDisplay;
+
+      const { minWidth, minHeight } = getAdSize(currentDisplay);
       if (changedMetrics.includes("workArea")) {
         win?.setMinimumSize(minWidth, minHeight);
         win?.setSize(minWidth, minHeight);
@@ -638,13 +648,13 @@ app.on("second-instance", (_e, _argv) => {
     if (win.isMinimized()) win.restore();
     win.focus();
   } else {
-    createWindow(true);
+    createWindow();
   }
 });
 
 app.on("activate", () => {
   if (!win) {
-    createWindow(true);
+    createWindow();
   }
 });
 

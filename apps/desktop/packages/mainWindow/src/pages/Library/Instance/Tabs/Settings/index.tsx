@@ -153,7 +153,7 @@ const Settings = () => {
                 }}
               >
                 <i class="w-5 h-5 i-ri:arrow-left-right-fill" />
-                <Trans key="instance_settings.update_version" />
+                <Trans key="instance_settings.change_modpack_version" />
               </Button>
             </div>
           </div>
@@ -307,11 +307,11 @@ const Settings = () => {
         <Show when={routeData?.instanceDetails?.data?.memory !== null}>
           <div class="flex justify-center px-2">
             <Slider
-              min={1024}
+              min={0}
               max={mbTotalRAM()}
-              steps={1024}
+              steps={1000}
               value={routeData?.instanceDetails.data?.memory?.max_mb}
-              marks={generateSequence(1024, mbTotalRAM())}
+              marks={generateSequence(2048, mbTotalRAM())}
               onChange={(val) => {
                 if (
                   !val ||

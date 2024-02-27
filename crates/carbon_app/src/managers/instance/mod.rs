@@ -2,6 +2,7 @@ use std::collections::HashSet;
 use std::ffi::{OsStr, OsString};
 use std::fmt::Display;
 
+use std::sync::Arc;
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
 use crate::api::keys::instance::*;
@@ -13,6 +14,7 @@ use crate::domain::modplatforms::curseforge::filters::{ModFileParameters, ModPar
 use crate::domain::modplatforms::modrinth::search::{ProjectID, VersionID};
 use crate::domain::modplatforms::ModPlatform;
 use crate::domain::vtask::VisualTaskId;
+use crate::livenesstracker::LivenessTracker;
 use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::{DateTime, Utc};
@@ -69,6 +71,8 @@ pub struct InstanceManager {
     export_manager: InstanceExportManager,
     game_logs: RwLock<HashMap<GameLogId, (InstanceId, watch::Receiver<GameLog>)>>,
     modpack_info_semaphore: Mutex<()>,
+    pub any_instance_running: Arc<watch::Sender<bool>>,
+    instance_running_tracker: Arc<LivenessTracker>,
 }
 
 impl Default for InstanceManager {
@@ -79,6 +83,8 @@ impl Default for InstanceManager {
 
 impl InstanceManager {
     pub fn new() -> Self {
+        let any_instance_running = Arc::new(watch::channel(false).0);
+
         Self {
             instances: RwLock::new(HashMap::new()),
             index_lock: Mutex::new(()),
@@ -89,6 +95,10 @@ impl InstanceManager {
             export_manager: InstanceExportManager::new(),
             game_logs: RwLock::new(HashMap::new()),
             modpack_info_semaphore: Mutex::new(()),
+            any_instance_running: any_instance_running.clone(),
+            instance_running_tracker: LivenessTracker::new(move |count| {
+                drop(any_instance_running.send_replace(count != 0))
+            }),
         }
     }
 }
@@ -334,11 +344,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                         Some(GameVersion::Custom(_)) => None,
                                         None => None,
                                     },
-                                    modpack_platform: status
+                                    modpack: status
                                         .config
                                         .modpack
                                         .as_ref()
-                                        .map(|modpack| modpack.modpack.as_platform()),
+                                        .map(|modpack| modpack.modpack.clone()),
                                     state: (&status.state).into(),
                                 })
                             }
@@ -1618,7 +1628,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 return None;
             };
 
-            let Ok(required_java) = MinecraftJavaProfile::try_from(&*java) else {
+            let Ok(required_java) = MinecraftJavaProfile::try_from(java.as_str()) else {
                 return None;
             };
 
@@ -1837,7 +1847,7 @@ pub enum ListInstanceStatus {
 pub struct ValidListInstance {
     pub mc_version: Option<String>,
     pub modloader: Option<info::ModLoaderType>,
-    pub modpack_platform: Option<ModPlatform>,
+    pub modpack: Option<Modpack>,
     pub state: domain::LaunchState,
 }
 
@@ -2415,7 +2425,7 @@ mod test {
                 status: ListInstanceStatus::Valid(ValidListInstance {
                     mc_version: Some(String::from("1.7.10")),
                     modloader: None,
-                    modpack_platform: None,
+                    modpack: None,
                     state: domain::LaunchState::Inactive { failed_task: None },
                 }),
                 locked: false,

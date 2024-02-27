@@ -3,12 +3,16 @@ import { createStore } from "solid-js/store";
 export interface BoundsSize {
   width: number;
   height: number;
+  useVertical: boolean;
+  useFallbackAd: boolean;
   shouldShow: boolean;
 }
 
 export const [adSize, _setAdSize] = createStore<BoundsSize>({
   width: 0,
   height: 0,
+  useVertical: false,
+  useFallbackAd: false,
   shouldShow: true
 });
 

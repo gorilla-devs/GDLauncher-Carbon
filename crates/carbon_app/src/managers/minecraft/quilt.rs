@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use daedalus::modded::{LoaderVersion, Manifest, PartialVersionInfo};
 use thiserror::Error;
+use tokio::sync::Mutex;
+use tracing::trace;
 use url::Url;
 
 use crate::db::PrismaClient;
@@ -38,6 +40,9 @@ pub async fn get_version(
 ) -> anyhow::Result<PartialVersionInfo> {
     let db_entry_name = format!("quilt-{}", quilt_version);
 
+    static LOCK: Mutex<()> = Mutex::const_new(());
+    let _guard = LOCK.lock().await;
+
     let db_cache = db_client
         .partial_version_info_cache()
         .find_unique(crate::db::partial_version_info_cache::id::equals(
@@ -48,10 +53,17 @@ pub async fn get_version(
         .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 
     if let Some(db_cache) = db_cache {
-        let db_cache = serde_json::from_slice(&db_cache.partial_version_info)
-            .map_err(|err| anyhow::anyhow!("Failed to deserialize db cache: {}", err))?;
+        let db_cache = serde_json::from_slice(&db_cache.partial_version_info);
 
-        return Ok(db_cache);
+        if let Ok(db_cache) = db_cache {
+            trace!("Quilt version {} found in cache", quilt_version);
+            return Ok(db_cache);
+        } else {
+            tracing::warn!(
+                "Failed to deserialize quilt version for {} from cache, re-fetching",
+                quilt_version
+            );
+        }
     }
 
     let version_url = meta_base_url.join(&format!(
@@ -67,7 +79,19 @@ pub async fn get_version(
 
     db_client
         .partial_version_info_cache()
-        .create(db_entry_name, version_bytes.to_vec(), vec![])
+        .upsert(
+            crate::db::partial_version_info_cache::id::equals(db_entry_name.clone()),
+            crate::db::partial_version_info_cache::create(
+                db_entry_name.clone(),
+                version_bytes.to_vec(),
+                vec![
+                    crate::db::partial_version_info_cache::partial_version_info::set(
+                        version_bytes.to_vec(),
+                    ),
+                ],
+            ),
+            vec![],
+        )
         .exec()
         .await?;
 

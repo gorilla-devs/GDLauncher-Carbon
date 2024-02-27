@@ -59,14 +59,10 @@ const Auth = () => {
         size="large"
         onClick={() => handleClick()}
       >
-        <Trans
-          key="login.sign_in_with_microsoft"
-          options={{
-            defaultValue: "Sign in with Microsoft"
-          }}
-        />
+        <i class="i-ri:microsoft-fill w-4 h-4" />
+        <Trans key="login.sign_in_with_microsoft" />
       </Button>
-      <p class="text-darkSlate-50 text-sm mb-10 max-w-90">
+      <p class="text-darkSlate-50 text-sm max-w-90 mb-10">
         <Trans
           key="login.sign_in_with_microsoft_text"
           options={{

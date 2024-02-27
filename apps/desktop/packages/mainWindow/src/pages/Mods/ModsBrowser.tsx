@@ -145,7 +145,7 @@ const ModsBrowser = () => {
                         : `url("${DefaultImg}")`
                   }}
                 >
-                  <div class="absolute z-0 bg-gradient-to-r from-darkSlate-700 from-50% inset-0" />
+                  <div class="absolute z-0 from-darkSlate-700 inset-0 bg-gradient-to-r from-50%" />
                   <div class="absolute inset-0 from-darkSlate-700 z-0 bg-gradient-to-t" />
                   <div class="flex gap-4 z-10 items-center">
                     <Button

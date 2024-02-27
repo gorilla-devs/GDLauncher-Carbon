@@ -1,7 +1,7 @@
 import { AdsBanner } from "@/components/AdBanner";
 import AppNavbar from "@/components/Navbar";
 import { Outlet, useRouteData } from "@solidjs/router";
-import { Show, createEffect } from "solid-js";
+import { Match, Show, Switch, createEffect } from "solid-js";
 import fetchData from "./app.data";
 import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 import {
@@ -12,6 +12,7 @@ import {
 import adSize from "@/utils/adhelper";
 import { Trans } from "@gd/i18n";
 import { useModal } from "@/managers/ModalsManager";
+import { BisectBanner } from "@/components/BisectBanner";
 
 function withAdsLayout() {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -76,7 +77,14 @@ function withAdsLayout() {
                 }}
               >
                 <Show when={adSize.shouldShow}>
-                  <AdsBanner />
+                  <Switch>
+                    <Match when={adSize.useFallbackAd}>
+                      <BisectBanner />
+                    </Match>
+                    <Match when={!adSize.useFallbackAd}>
+                      <AdsBanner />
+                    </Match>
+                  </Switch>
                 </Show>
               </div>
               <div class="flex justify-center">

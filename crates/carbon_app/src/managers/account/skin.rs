@@ -98,7 +98,7 @@ impl ManagerRef<'_, SkinManager> {
 
     pub async fn make_head(self, uuid: String) -> anyhow::Result<Vec<u8>> {
         let skin = self.get_skin(uuid).await?.data;
-        let head = tokio::task::spawn_blocking(move || stitch_head(&skin)).await??;
+        let head = carbon_scheduler::cpu_block(|| stitch_head(&skin)).await?;
         Ok(head)
     }
 }
