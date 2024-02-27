@@ -340,6 +340,55 @@ const Sidebar = () => {
     }
   });
 
+  createEffect(() => {
+    const versionTypes = selectedItems().filter((item) =>
+      item.includes("Game Versions")
+    );
+
+    const versions = versionTypes.map((item) => item.split("//")[1]);
+    updateGameVersionsFilter({
+      snapshot: versions.includes("include snapshot versions"),
+      oldAlpha: versions.includes("include old alpha versions"),
+      oldBeta: versions.includes("include old beta versions")
+    });
+  });
+
+  createEffect(() => {
+    const selectedCategories = selectedItems()
+      .filter((item) => item.includes("Categories"))
+      .map((item) => item.split("//")[1]);
+    const objectCategories = selectedCategories.map((category) => {
+      const categ = categories().find((item) => item.name === category);
+      if (isCurseforge()) {
+        return [{ curseforge: (categ as CFFECategory).id }];
+      } else {
+        return [{ modrinth: (categ as MRFECategory).name }];
+      }
+    });
+    infiniteQuery.setQuery({
+      categories: objectCategories as any
+    });
+  });
+
+  createEffect(() => {
+    const modLoaders = selectedItems().filter((item) =>
+      item.includes("Modloader")
+    );
+    if (modLoaders.length === 0) {
+      infiniteQuery.setQuery({
+        modloaders: null
+      });
+    } else {
+      const modloader = modLoaders.map((item) =>
+        item.split("//")[1].toLowerCase()
+      );
+      console.log(modloader);
+      infiniteQuery.setQuery({
+        modloaders: modloader as FEUnifiedModLoaderType[]
+      });
+    }
+  });
+
   return (
     // <SiderbarWrapper collapsable={false} noPadding>
     //   <div class="h-full w-full box-border px-4 overflow-y-auto py-5">
