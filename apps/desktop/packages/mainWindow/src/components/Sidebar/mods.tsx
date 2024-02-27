@@ -388,6 +388,51 @@ const Sidebar = () => {
       });
     }
   });
+  createEffect(() => {
+    const currentInstance = selectedItems()
+      .find((item) => item.includes("Instances"))
+      ?.split("//")[1];
+
+    if (currentInstance) {
+      const instanceId = filteredInstances()?.find(
+        (instance) => instance.name === currentInstance
+      )?.id;
+      const changeInstance = async () => {
+        const details: any = await runWithOwner(owner, async () => {
+          return rspcFetch(() => ["instance.getInstanceDetails", instanceId]);
+        });
+
+        setSearchParams({
+          instanceId: instanceId as number
+        });
+        setInstanceId(instanceId as number);
+
+        const modloaders = details.data.modloaders.map((v: any) => v.type_);
+
+        const gameVersion = details.data.version;
+
+        let newModloaders = [];
+        if (modloaders) {
+          if (modloaders?.includes("forge")) {
+            newModloaders.push("forge");
+          } else if (modloaders?.includes("quilt")) {
+            newModloaders.push("fabric");
+            newModloaders.push("quilt");
+          } else {
+            newModloaders = [...modloaders!] as any;
+          }
+        }
+
+        console.log(newModloaders, [gameVersion]);
+
+        infiniteQuery.setQuery({
+          modloaders: newModloaders,
+          gameVersions: [gameVersion]
+        });
+      };
+      changeInstance();
+    }
+  });
 
   return (
     // <SiderbarWrapper collapsable={false} noPadding>
