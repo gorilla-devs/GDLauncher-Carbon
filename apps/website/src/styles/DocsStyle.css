@@ -4,3 +4,7 @@ aside ul {
 li {
   color: white;
 }
+main a {
+  color: rgba(40, 101, 164, 1);
+  text-decoration: underline;
+}
