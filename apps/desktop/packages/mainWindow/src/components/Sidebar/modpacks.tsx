@@ -1,20 +1,10 @@
 /* eslint-disable solid/no-innerhtml */
-import SiderbarWrapper from "./wrapper";
-import {
-  Cascader,
-  Checkbox,
-  Collapsable,
-  Dropdown,
-  Radio,
-  Skeleton
-} from "@gd/ui";
+import { Cascader, Dropdown } from "@gd/ui";
 import {
   createEffect,
   createMemo,
   createSignal,
-  For,
   Match,
-  Show,
   Switch
 } from "solid-js";
 import {
@@ -31,7 +21,6 @@ import { Trans, useTransContext } from "@gd/i18n";
 import { useInfiniteModsQuery } from "../InfiniteScrollModsQueryWrapper";
 import {
   curseforgeCategories,
-  getCategoryId,
   ModloaderIcon,
   modrinthCategories,
   supportedModloaders

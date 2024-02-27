@@ -32,6 +32,7 @@ import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { getInstanceImageUrl } from "@/utils/instances";
 import { setInstanceId, instanceId as _instanceId } from "@/utils/browser";
+import Sidebar from "@/components/Sidebar/mods";
 
 const ModsBrowser = () => {
   const [t] = useTransContext();
@@ -190,6 +191,7 @@ const ModsBrowser = () => {
                 </div>
               </Show>
               <div class="flex items-center justify-between gap-3 flex-wrap pb-4">
+                <Sidebar />
                 <Input
                   placeholder={t("mods.search_mods")}
                   icon={<div class="i-ri:search-line" />}
