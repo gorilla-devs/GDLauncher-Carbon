@@ -354,6 +354,7 @@
   "modloader_forge": "Forge",
   "modloader_fabric": "Fabric",
   "explore_versions.tags": "Tags:",
+  "logs.no_logs": "No logs available",
   "logs.copy": "Copy logs",
   "logs.scroll_top": "Scroll to top",
   "introduction": "Introduction",

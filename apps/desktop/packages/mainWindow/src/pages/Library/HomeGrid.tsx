@@ -29,7 +29,8 @@ import FeaturedModpackTile from "./FeaturedModpackTile";
 import {
   InstancesGroupBy,
   InstancesSortBy,
-  ListInstance
+  ListInstance,
+  ValidListInstance
 } from "@gd/core_module/bindings";
 import { initNews } from "@/utils/news";
 import { rspc } from "@/utils/rspcClient";
@@ -120,15 +121,15 @@ const HomeGrid = () => {
           _groupName === "localize➽default" ? t("default") : _groupName;
         groupId = instance.group_id;
       } else if (routeData.settings.data?.instancesGroupBy === "gameVersion") {
-        if ("Valid" in instance.status) {
+        if (instance.status.status === "valid") {
           groupName = validInstance?.mc_version;
         }
       } else if (routeData.settings.data?.instancesGroupBy === "modloader") {
-        if ("Valid" in instance.status) {
-          groupName = validInstance?.modloader;
+        if (instance.status.status === "valid") {
+          groupName = validInstance?.modloader || "vanilla";
         }
       } else if (routeData.settings.data?.instancesGroupBy === "modplatform") {
-        if ("Valid" in instance.status) {
+        if (instance.status.status === "valid") {
           groupName = validInstance?.modpack?.type;
         }
       }
@@ -161,79 +162,41 @@ const HomeGrid = () => {
     // sort groups
     for (const key in _groups) {
       _groups[key].instances.sort((a, b) => {
+        let comparisonResult = 0; // Default comparison result
+
         if (routeData.settings.data?.instancesSortBy === "name") {
-          if (routeData.settings.data?.instancesSortByAsc) {
-            return a.name.localeCompare(b.name);
-          } else {
-            return b.name.localeCompare(a.name);
-          }
+          comparisonResult = a.name.localeCompare(b.name);
         } else if (routeData.settings.data?.instancesSortBy === "mostPlayed") {
-          if (routeData.settings.data?.instancesSortByAsc) {
-            return (
-              (a.seconds_played || 0) - (b.seconds_played || 0) ||
-              a.name.localeCompare(b.name)
-            );
-          } else {
-            return (
-              (b.seconds_played || 0) - (a.seconds_played || 0) ||
-              b.name.localeCompare(a.name)
-            );
-          }
+          comparisonResult = (a.seconds_played || 0) - (b.seconds_played || 0);
         } else if (routeData.settings.data?.instancesSortBy === "lastPlayed") {
-          if (routeData.settings.data?.instancesSortByAsc) {
-            return (
-              Date.parse(a.last_played || "") -
-                Date.parse(b.last_played || "") || a.name.localeCompare(b.name)
-            );
-          } else {
-            return (
-              Date.parse(b.last_played || "") -
-                Date.parse(a.last_played || "") || b.name.localeCompare(a.name)
-            );
-          }
+          const aLastPlayed = a.last_played ? Date.parse(a.last_played) : 0;
+          const bLastPlayed = b.last_played ? Date.parse(b.last_played) : 0;
+          comparisonResult = aLastPlayed - bLastPlayed;
         } else if (routeData.settings.data?.instancesSortBy === "lastUpdated") {
-          if (routeData.settings.data?.instancesSortByAsc) {
-            return (
-              Date.parse(a.date_updated || "") -
-                Date.parse(b.date_updated || "") || a.name.localeCompare(b.name)
-            );
-          } else {
-            return (
-              Date.parse(b.date_updated || "") -
-                Date.parse(a.date_updated || "") || b.name.localeCompare(a.name)
-            );
-          }
+          const aLastUpdated = a.date_updated ? Date.parse(a.date_updated) : 0;
+          const bLastUpdated = b.date_updated ? Date.parse(b.date_updated) : 0;
+          comparisonResult = aLastUpdated - bLastUpdated;
         } else if (routeData.settings.data?.instancesSortBy === "gameVersion") {
-          if (routeData.settings.data?.instancesSortByAsc) {
-            return (
-              (a.status as any).Valid.mc_version?.localeCompare(
-                (b.status as any).Valid.mc_version,
-                undefined,
-                { numeric: true, sensitivity: "base" }
-              ) || a.name.localeCompare(b.name)
-            );
-          } else {
-            return (
-              (b.status as any).Valid.mc_version?.localeCompare(
-                (a.status as any).Valid.mc_version,
-                undefined,
-                { numeric: true, sensitivity: "base" }
-              ) || b.name.localeCompare(a.name)
-            );
-          }
+          comparisonResult = (
+            (a.status.value as ValidListInstance).mc_version || ""
+          ).localeCompare(
+            (b.status.value as ValidListInstance).mc_version || "",
+            undefined,
+            { numeric: true, sensitivity: "base" }
+          );
         } else if (routeData.settings.data?.instancesSortBy === "created") {
-          if (routeData.settings.data?.instancesSortByAsc) {
-            return (
-              Date.parse(a.date_created || "") -
-                Date.parse(b.date_created || "") || a.name.localeCompare(b.name)
-            );
-          } else {
-            return (
-              Date.parse(b.date_created || "") -
-                Date.parse(a.date_created || "") || b.name.localeCompare(a.name)
-            );
-          }
+          const aCreated = a.date_created ? Date.parse(a.date_created) : 0;
+          const bCreated = b.date_created ? Date.parse(b.date_created) : 0;
+          comparisonResult = aCreated - bCreated;
         }
+
+        // If descending order is selected, invert the comparison result
+        if (!routeData.settings.data?.instancesSortByAsc) {
+          comparisonResult = -comparisonResult;
+        }
+
+        // Use name as a secondary sort criteria to ensure consistent order where primary criteria are equal
+        return comparisonResult || a.name.localeCompare(b.name);
       });
     }
 
