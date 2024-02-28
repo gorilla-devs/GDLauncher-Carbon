@@ -1,4 +1,5 @@
 use std::{
+    fs,
     io::{Cursor, Read},
     path::PathBuf,
     sync::Arc,
@@ -75,39 +76,39 @@ impl ModrinthArchiveImporter {
             return Ok(None);
         }
 
-        let content = tokio::fs::read(&path).await?;
-
         let name = path
             .file_name()
             .expect("filename cannot be empty")
             .to_string_lossy()
             .to_string();
 
+        let path2 = path.clone();
         let r = tokio::task::spawn_blocking(move || {
-            let mut zip = zip::ZipArchive::new(Cursor::new(&content))
-                .map_err(|_| Translation::InstanceImportMrpackMalformed)?;
+            let mut file =
+                fs::File::open(path2).map_err(|_| Translation::InstanceImportMrpackMalformed)?;
 
-            let mut manifest = zip
-                .by_name("modrinth.index.json")
-                .map_err(|_| Translation::InstanceImportMrpackMissingManifest)?;
+            let manifest = {
+                let mut zip = zip::ZipArchive::new(&mut file)
+                    .map_err(|_| Translation::InstanceImportMrpackMalformed)?;
 
-            let mut data = Vec::new();
-            manifest
-                .read_to_end(&mut data)
-                .map_err(|_| Translation::InstanceImportMrpackMalformedManifest)?;
+                let mut manifest = zip
+                    .by_name("modrinth.index.json")
+                    .map_err(|_| Translation::InstanceImportMrpackMissingManifest)?;
 
-            let manifest = serde_json::from_slice::<ModpackIndex>(&data)
-                .map_err(|_| Translation::InstanceImportMrpackMalformedManifest)?;
+                let mut data = Vec::new();
+                manifest
+                    .read_to_end(&mut data)
+                    .map_err(|_| Translation::InstanceImportMrpackMalformedManifest)?;
 
-            let sha512 = hex::encode(<[u8; 64] as From<_>>::from(
-                Sha512::new_with_prefix(&content).finalize(),
-            ));
+                serde_json::from_slice::<ModpackIndex>(&data)
+                    .map_err(|_| Translation::InstanceImportMrpackMalformedManifest)?
+            };
 
-            Ok((manifest, sha512))
+            Ok((manifest, file))
         })
         .await?;
 
-        let (index, sha512) = match r {
+        let (index, file) = match r {
             Ok(t) => t,
             Err(reason) => {
                 return Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
@@ -116,6 +117,18 @@ impl ModrinthArchiveImporter {
                 })))
             }
         };
+
+        let mut file = tokio::fs::File::from_std(file);
+        let mut sha512 = Sha512::new();
+        carbon_scheduler::buffered_digest(&mut file, |chunk| {
+            sha512.update(chunk);
+        })
+        .await?;
+
+        let sha512: [u8; 64] = sha512.finalize().into();
+        let sha512 = hex::encode(sha512);
+
+        drop(file);
 
         let version_response = app
             .modplatforms_manager()

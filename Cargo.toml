@@ -20,6 +20,7 @@ debug = 2
 codegen-units = 16
 opt-level = "s"
 incremental = true
+debug-assertions = true
 
 [workspace.dependencies]
 anyhow = { version = "1.0.51", features = ["backtrace"] }
