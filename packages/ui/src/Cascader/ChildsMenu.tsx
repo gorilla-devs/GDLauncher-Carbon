@@ -5,7 +5,12 @@ import CascaderItem from "./CascaderItem";
 import { Radio } from "../Radio";
 
 export interface ChildsMenuProps {
-  items: { label: string; img: any; children?: ChildsMenuProps }[];
+  items: {
+    label: string;
+    img: any;
+    id?: string | number;
+    children?: ChildsMenuProps;
+  }[];
   isCheckbox: boolean;
   hasSearch: boolean;
   isParent: boolean;
@@ -18,7 +23,7 @@ export interface ChildsMenuProps {
 const ChildsMenu = (props: ChildsMenuProps) => {
   const [search, setSearch] = createSignal("");
   const [openItem, setOpenItem] = createSignal<string | null>(null);
-  const [radioValue, setRadio] = createSignal(
+  const [radioValue, setRadio] = createSignal<string | number>(
     props
       .selectedItems()
       .find((item) => item.includes(props.parentLabel as string))
@@ -34,18 +39,23 @@ const ChildsMenu = (props: ChildsMenuProps) => {
       const index = newItems.findIndex((item) =>
         item.includes(props.parentLabel as string)
       );
-
-      const newValue = `${props.parentLabel}//${val}`;
+      let newValue = "";
+      const findElement = props.items.find((item) => item.id === val);
+      if (findElement) {
+        newValue = `${props.parentLabel}//${findElement.label}`;
+      } else {
+        newValue = `${props.parentLabel}//${val}`;
+      }
 
       if (index === -1) {
         newItems.push(newValue);
       } else {
         newItems[index] = newValue;
       }
+      setRadio(val as string);
 
       return newItems;
     });
-    setRadio(val as string);
   };
   return (
     <Portal mount={document.getElementById("menu-id") as Node}>
@@ -74,6 +84,7 @@ const ChildsMenu = (props: ChildsMenuProps) => {
                 selectedItems={props.selectedItems}
                 setSelectedItems={props.setSelectedItems}
                 parentLabel={props.parentLabel}
+                id={item.id}
               />
             )}
           </For>
@@ -97,6 +108,7 @@ const ChildsMenu = (props: ChildsMenuProps) => {
                   selectedItems={props.selectedItems}
                   setSelectedItems={props.setSelectedItems}
                   parentLabel={props.parentLabel}
+                  id={item.id}
                 />
               )}
             </For>

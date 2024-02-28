@@ -209,6 +209,7 @@ const Sidebar = () => {
               isParent: false,
               parentLabel: t("general.instances"),
               items: filteredInstances()?.map((instance) => {
+                console.log(instance.id);
                 return {
                   label: instance.name,
                   img: (
@@ -223,7 +224,8 @@ const Sidebar = () => {
                           : `url("${DefaultImg}")`
                       }}
                     />
-                  )
+                  ),
+                  id: instance.id
                 };
               })
             }

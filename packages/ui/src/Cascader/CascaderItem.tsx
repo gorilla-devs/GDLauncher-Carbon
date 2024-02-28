@@ -13,6 +13,7 @@ const CascaderItem = (props: {
   isParent: boolean;
   onToggleMenu: () => void;
   img?: any;
+  id?: string | number;
   selectedItems: Accessor<string[]>;
   setSelectedItems: Setter<string[]>;
   parentLabel?: string;
@@ -48,7 +49,6 @@ const CascaderItem = (props: {
       }
     }
   });
-
   return (
     <div
       class="w-full flex justify-between p-2 items-center hover:bg-[#1D2028]"
@@ -91,7 +91,7 @@ const CascaderItem = (props: {
       <Show when={!props.isCheckbox && !props.isParent}>
         <Radio
           name={props.label}
-          value={props.label}
+          value={props.id || props.label}
           children={
             <div class="flex items-center gap-2">
               {props.img && props.img}
