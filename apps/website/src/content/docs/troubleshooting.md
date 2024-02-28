@@ -25,8 +25,12 @@ It is usually located in the same path as the App Data Path, nested in the `data
 
 The app database is located in the Core Module Runtime Path, and it is a SQLite database file named `gdl_conf.db`.
 
+**DO NOT SEND THIS FILE TO ANYONE, IT CONTAINS SENSITIVE DATA.**
+
 ### App Logs
 
 The app logs are located in the Core Module Runtime Path, and they are stored in the `__logs__` folder.
 Each log file is named after the date/time it was created.
 Every time you start the app, a new log file is created.
+
+**LOGS MAY CONTAIN SENSITIVE DATA, BE CAREFUL WHEN SHARING THEM.**

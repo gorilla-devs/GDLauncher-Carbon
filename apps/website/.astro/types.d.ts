@@ -143,29 +143,43 @@ declare module 'astro:content' {
   collection: "blog";
   data: InferEntrySchema<"blog">
 } & { render(): Render[".md"] };
+"gdlauncher-carbon-official-release.md": {
+	id: "gdlauncher-carbon-official-release.md";
+  slug: "gdlauncher-carbon-official-release";
+  body: string;
+  collection: "blog";
+  data: InferEntrySchema<"blog">
+} & { render(): Render[".md"] };
 };
 "docs": {
-"gdlauncher-vs-gdlauncher_carbon.mdx": {
-	id: "gdlauncher-vs-gdlauncher_carbon.mdx";
-  slug: "gdlauncher-vs-gdlauncher_carbon";
+"gdlauncher-vs-gdlauncher-carbon.md": {
+	id: "gdlauncher-vs-gdlauncher-carbon.md";
+  slug: "gdlauncher-vs-gdlauncher-carbon";
   body: string;
   collection: "docs";
   data: any
-} & { render(): Render[".mdx"] };
-"installation.mdx": {
-	id: "installation.mdx";
+} & { render(): Render[".md"] };
+"installation.md": {
+	id: "installation.md";
   slug: "installation";
   body: string;
   collection: "docs";
   data: any
-} & { render(): Render[".mdx"] };
-"troubleshooting.mdx": {
-	id: "troubleshooting.mdx";
+} & { render(): Render[".md"] };
+"migration-from-legacy-gdlauncher.md": {
+	id: "migration-from-legacy-gdlauncher.md";
+  slug: "migration-from-legacy-gdlauncher";
+  body: string;
+  collection: "docs";
+  data: any
+} & { render(): Render[".md"] };
+"troubleshooting.md": {
+	id: "troubleshooting.md";
   slug: "troubleshooting";
   body: string;
   collection: "docs";
   data: any
-} & { render(): Render[".mdx"] };
+} & { render(): Render[".md"] };
 };
 
 	};
