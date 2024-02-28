@@ -709,8 +709,13 @@ impl ManagerRef<'_, InstanceManager> {
                                     }
                                 }
 
-                                let original_conent = tokio::fs::read(&original_file).await?;
-                                let original_md5: [u8; 16] = Md5::digest(&original_conent).into();
+                                let mut original_md5 = Md5::new();
+                                let mut file = tokio::fs::File::open(&original_file).await?;
+                                carbon_scheduler::buffered_digest(&mut file, |chunk| {
+                                    original_md5.update(chunk);
+                                }).await?;
+                                drop(file);
+                                let original_md5: [u8; 16] = original_md5.finalize().into();
 
                                 if original_md5 != oldfilehash.md5 {
                                     // the user has modified this file so we shouldn't touch it
