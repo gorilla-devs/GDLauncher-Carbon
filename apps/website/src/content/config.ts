@@ -17,10 +17,7 @@ const blog = defineCollection({
 const docs = defineCollection({
   type: "content",
   // Type-check frontmatter using a schema
-  schema: z.object({
-    title: z.string(),
-    category: z.string(),
-  }),
+  schema: null,
 });
 
 export const collections = { blog, docs };
