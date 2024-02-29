@@ -28,6 +28,7 @@ export default defineConfig({
         ...builtinModules.map((e) => `node:${e}`)
         // ...Object.keys(pkg.dependencies || {}),
       ]
-    }
+    },
+    sourcemap: "inline"
   }
 });

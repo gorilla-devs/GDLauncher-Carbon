@@ -26,10 +26,7 @@ export default defineConfig(({ mode }) => {
       sentryVitePlugin({
         org: process.env.SENTRY_ORG,
         project: process.env.SENTRY_VITE_MAIN_PROJECT_NAME,
-        authToken: process.env.SENTRY_AUTH_TOKEN,
-        sourcemaps: {
-          assets: "../../dist/main/index.cjs.map"
-        }
+        authToken: process.env.SENTRY_AUTH_TOKEN
       })
     ],
     envDir: resolve(__dirname, "../../../../"),
@@ -56,7 +53,7 @@ export default defineConfig(({ mode }) => {
           // ...Object.keys(pkg.dependencies || {}),
         ]
       },
-      sourcemap: true
+      sourcemap: "inline"
     }
   };
 });

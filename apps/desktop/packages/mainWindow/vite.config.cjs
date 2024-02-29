@@ -52,7 +52,7 @@ export default defineConfig({
     target: "esnext",
     emptyOutDir: true,
     outDir: "../../dist/mainWindow",
-    sourcemap: true
+    sourcemap: "inline"
   },
   resolve: {
     alias: {
