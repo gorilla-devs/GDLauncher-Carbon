@@ -26,7 +26,10 @@ export default defineConfig(({ mode }) => {
       sentryVitePlugin({
         org: process.env.SENTRY_ORG,
         project: process.env.SENTRY_VITE_MAIN_PROJECT_NAME,
-        authToken: process.env.SENTRY_AUTH_TOKEN
+        authToken: process.env.SENTRY_AUTH_TOKEN,
+        sourcemaps: {
+          assets: "../../dist/main/index.cjs.map"
+        }
       })
     ],
     envDir: resolve(__dirname, "../../../../"),
