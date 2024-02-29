@@ -2,9 +2,6 @@
 import yaml from "js-yaml";
 import Button from "./button/Button";
 import { AiOutlineArrowDown } from "solid-icons/ai";
-import Windows from "../assets/Windows";
-import Apple from "../assets/Apple";
-import Linux from "../assets/Linux";
 const response = await Promise.all([
   fetch("https://cdn-raw.gdl.gg/launcher/alpha.yml"),
   fetch("https://cdn-raw.gdl.gg/launcher/alpha-mac.yml"),
@@ -24,7 +21,7 @@ const downloadLinks = yamlfiles
   isDropdown={true}
   intent="primary"
   size="medium"
-  class="items-center"
+  class="items-center rounded-xsgd"
   client:only
 >
   <span>DOWNLOAD FOR</span>

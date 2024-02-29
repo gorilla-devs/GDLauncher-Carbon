@@ -17,6 +17,6 @@ const downloadLinks = yamlfiles
   .map((val: any) => `https://cdn-raw.gdl.gg/launcher/${val.path}`);
 ---
 
-<Button intent="primary" class="uppercase items-center">
+<Button intent="primary" class="uppercase items-center rounded-xsgd">
   <DownloadLink urls={downloadLinks} client:only />
 </Button>

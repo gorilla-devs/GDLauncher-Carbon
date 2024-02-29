@@ -73,7 +73,7 @@ const NewsLetter = () => {
         intent="primary"
         size="small"
         onClick={handleSubmit as any}
-        class="mt-3"
+        class="mt-3 rounded-xsgd"
       >
         SUBSCRIBE TO NEWSLETTER
       </Button>
