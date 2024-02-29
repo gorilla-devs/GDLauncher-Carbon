@@ -12,6 +12,7 @@ import WhatMakesGDSpecial from "../components/WhatMakesGDSpecial.astro";
 import GdxCF from "../components/GdxCF.astro";
 import "../styles/HomeStyle.css";
 import DownloadDropdown from "../components/DownloadDropdown.astro";
+import { AiOutlineArrowRight } from "solid-icons/ai";
 
 Astro.locals.cache(60);
 ---
@@ -87,13 +88,20 @@ Astro.locals.cache(60);
             </div>
           </a>
         </Button>
-        <Button
-          intent="transparent"
-          size="medium"
-          class="uppercase cursor-default my-4"
+        <a
+          href="/blog/gdlauncher-carbon-official-release"
+          class="bg-transparent text-bluegd-500 border-solid border-[1px] border-bluegd-500 rounded-smgd text-base py-4 px-10 cursor-pointer uppercase my-4 flex items-center"
         >
-          NEW GDLauncher 2.0 Out Now!
-        </Button>
+          NEW GDLauncher 2.0 Out Now! <div
+            role="separator"
+            class="w-[1px] bg-bluegd-400 h-6 mx-4"
+          >
+          </div>
+          <div class="flex items-center gap-4">
+            <span>read post</span>
+            <AiOutlineArrowRight />
+          </div>
+        </a>
         <div class="flex flex-col">
           <span class="text-mdgd text-center font-bold text-white">
             Elevate your Modded Minecraft
