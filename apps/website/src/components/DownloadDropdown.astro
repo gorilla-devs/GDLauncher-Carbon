@@ -1,7 +1,7 @@
 ---
 import yaml from "js-yaml";
 import Button from "./button/Button";
-import { AiOutlineArrowDown } from "solid-icons/ai";
+import { RiArrowsArrowDownSLine } from "solid-icons/ri";
 const response = await Promise.all([
   fetch("https://cdn-raw.gdl.gg/launcher/alpha.yml"),
   fetch("https://cdn-raw.gdl.gg/launcher/alpha-mac.yml"),
@@ -25,5 +25,6 @@ const downloadLinks = yamlfiles
   client:only
 >
   <span>DOWNLOAD FOR</span>
-  <AiOutlineArrowDown size={20} />
+  <div role="separator" class="w-[1px] bg-zinc-500 h-6 mx-4"></div>
+  <RiArrowsArrowDownSLine size={20} />
 </Button>
