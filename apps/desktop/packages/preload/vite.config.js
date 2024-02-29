@@ -29,6 +29,6 @@ export default defineConfig({
         // ...Object.keys(pkg.dependencies || {}),
       ]
     },
-    sourcemap: "inline"
+    sourcemap: true
   }
 });

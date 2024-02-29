@@ -1,5 +1,6 @@
 import { builtinModules } from "module";
 import { resolve } from "path";
+import os from "os";
 import { defineConfig, loadEnv } from "vite";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 
@@ -24,9 +25,16 @@ export default defineConfig(({ mode }) => {
     plugins: [
       // Put the Sentry vite plugin after all other plugins
       sentryVitePlugin({
-        org: process.env.SENTRY_ORG,
-        project: process.env.SENTRY_VITE_MAIN_PROJECT_NAME,
-        authToken: process.env.SENTRY_AUTH_TOKEN
+        org: "gorilladevs-inc",
+        project: "gdlauncher-app-vite-main",
+        authToken: process.env.SENTRY_AUTH_TOKEN,
+        release: {
+          name: appVersion,
+          dist: os.platform()
+        },
+        sourcemaps: {
+          assets: "./**"
+        }
       })
     ],
     envDir: resolve(__dirname, "../../../../"),
@@ -53,7 +61,7 @@ export default defineConfig(({ mode }) => {
           // ...Object.keys(pkg.dependencies || {}),
         ]
       },
-      sourcemap: "inline"
+      sourcemap: true
     }
   };
 });

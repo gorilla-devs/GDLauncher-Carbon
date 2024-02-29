@@ -149,7 +149,9 @@ if (!disableSentry) {
     process.removeListener("uncaughtException", handleUncaughtException);
 
     Sentry.init({
-      dsn: import.meta.env.VITE_MAIN_DSN
+      dsn: import.meta.env.VITE_MAIN_DSN,
+      release: __APP_VERSION__,
+      dist: os.platform()
     });
   }
 }
