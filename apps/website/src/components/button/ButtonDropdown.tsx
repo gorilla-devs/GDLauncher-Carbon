@@ -25,7 +25,7 @@ export const ButtonDropdown = (props: ButtonDropdownProps) => {
   });
   return (
     <div
-      class="bg-darkgd absolute   w-full rounded-xssgd top-full translate-y-1 z-[100]"
+      class="bg-darkgd absolute   w-full rounded-xssgd top-full translate-y-1 z-[100] shadow-lg"
       ref={ref}
     >
       <For each={props.items}>
