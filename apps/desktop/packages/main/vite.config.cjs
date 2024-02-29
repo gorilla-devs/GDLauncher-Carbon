@@ -1,6 +1,7 @@
 import { builtinModules } from "module";
 import { resolve } from "path";
 import { defineConfig, loadEnv } from "vite";
+import { sentryVitePlugin } from "@sentry/vite-plugin";
 
 export default defineConfig(({ mode }) => {
   const config = require("@gd/config");
@@ -20,7 +21,14 @@ export default defineConfig(({ mode }) => {
 
   return {
     root: __dirname,
-    plugins: [],
+    plugins: [
+      // Put the Sentry vite plugin after all other plugins
+      sentryVitePlugin({
+        org: process.env.SENTRY_ORG,
+        project: process.env.SENTRY_VITE_MAIN_PROJECT_NAME,
+        authToken: process.env.SENTRY_AUTH_TOKEN
+      })
+    ],
     envDir: resolve(__dirname, "../../../../"),
     resolve: {
       alias: {
@@ -44,7 +52,8 @@ export default defineConfig(({ mode }) => {
           ...builtinModules
           // ...Object.keys(pkg.dependencies || {}),
         ]
-      }
+      },
+      sourcemap: true
     }
   };
 });
