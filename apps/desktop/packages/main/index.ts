@@ -20,6 +20,7 @@ import fs from "fs/promises";
 import fss from "fs";
 import fse from "fs-extra";
 import { spawn } from "child_process";
+import { v4 as uuid } from "uuid";
 import type { ChildProcessWithoutNullStreams } from "child_process";
 import * as Sentry from "@sentry/electron/main";
 import "./preloadListeners";
@@ -130,6 +131,10 @@ if (app.isPackaged) {
 console.log("Userdata path:", app.getPath("userData"));
 console.log("Runtime path:", CURRENT_RUNTIME_PATH);
 
+const sentrySessionId = uuid();
+
+console.log("SENTRY SESSION ID", sentrySessionId);
+
 const allowMultipleInstances = validateArgument(
   "--gdl_allow_multiple_instances"
 );
@@ -152,6 +157,10 @@ if (!disableSentry) {
       dsn: import.meta.env.VITE_MAIN_DSN,
       release: __APP_VERSION__,
       dist: os.platform()
+    });
+
+    Sentry.setContext("session", {
+      gdl_session_id: sentrySessionId
     });
   }
 }
@@ -377,7 +386,7 @@ async function createWindow(): Promise<BrowserWindow> {
     const { minWidth, minHeight, adSize } = getAdSize(currentDisplay);
     win?.setMinimumSize(minWidth, minHeight);
     win?.setSize(minWidth, minHeight);
-    win?.webContents.send("adSizeChanged", adSize);
+    win?.webContents?.send("adSizeChanged", adSize);
   });
 
   win.webContents.on("will-navigate", (e, url) => {

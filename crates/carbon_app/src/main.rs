@@ -33,8 +33,7 @@ mod once_send;
 mod runtime_path_override;
 mod util;
 
-#[tokio::main]
-pub async fn main() {
+pub fn main() {
     // pprocess_keepalive::init();
     #[cfg(debug_assertions)]
     {
@@ -63,42 +62,63 @@ pub async fn main() {
 
     #[cfg(feature = "production")]
     #[cfg(not(test))]
+    let sentry_session_id = &uuid::Uuid::new_v4().to_string();
+
+    #[cfg(feature = "production")]
+    #[cfg(not(test))]
     let _guard = {
-        sentry::init((
+        let s = sentry::init((
             env!("CORE_MODULE_DSN"),
             sentry::ClientOptions {
                 release: Some(app_version::APP_VERSION.into()),
                 ..Default::default()
             },
-        ))
+        ));
+
+        sentry::configure_scope(|scope| {
+            scope.set_tag("gdl_session_id", &sentry_session_id);
+        });
+
+        s
     };
 
-    daedalus::Branding::set_branding(daedalus::Branding::new(
-        "gdlauncher".to_string(),
-        "".to_string(),
-    ))
-    .expect("Branding not to fail");
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .max_blocking_threads(50)
+        .build()
+        .unwrap()
+        .block_on(async {
+            daedalus::Branding::set_branding(daedalus::Branding::new(
+                "gdlauncher".to_string(),
+                "".to_string(),
+            ))
+            .expect("Branding not to fail");
 
-    #[cfg(feature = "production")]
-    iridium::startup_check();
+            #[cfg(feature = "production")]
+            iridium::startup_check();
 
-    info!("Initializing runtime path");
-    let runtime_path = runtime_path_override::get_runtime_path_override().await;
+            info!("Initializing runtime path");
+            let runtime_path = runtime_path_override::get_runtime_path_override().await;
 
-    let _guard = logger::setup_logger(&runtime_path).await;
+            let _guard = logger::setup_logger(&runtime_path).await;
 
-    info!("Starting Carbon App v{}", app_version::APP_VERSION);
+            info!("Starting Carbon App v{}", app_version::APP_VERSION);
 
-    info!("Runtime path: {}", runtime_path.display());
+            #[cfg(feature = "production")]
+            #[cfg(not(test))]
+            info!("Sentry Session Id: {}", sentry_session_id);
 
-    info!("Scanning ports");
-    let listener = if cfg!(debug_assertions) {
-        TcpListener::bind("127.0.0.1:4650").await.unwrap()
-    } else {
-        get_available_port().await
-    };
+            info!("Runtime path: {}", runtime_path.display());
 
-    start_router(runtime_path, listener).await;
+            info!("Scanning ports");
+            let listener = if cfg!(debug_assertions) {
+                TcpListener::bind("127.0.0.1:4650").await.unwrap()
+            } else {
+                get_available_port().await
+            };
+
+            start_router(runtime_path, listener).await;
+        });
 }
 
 async fn get_available_port() -> TcpListener {

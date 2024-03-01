@@ -72,6 +72,7 @@
     "PORT": 3344
   },
   "dependencies": {
-    "@sentry/vite-plugin": "^2.14.2"
+    "@sentry/vite-plugin": "^2.14.2",
+    "uuid": "^9.0.1"
   }
 }
