@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use anyhow::{anyhow, bail};
+use axum::routing::trace;
 use chrono::{DateTime, Utc};
 use jsonwebtoken::{errors::ErrorKind, Algorithm, DecodingKey, Validation};
 use reqwest::StatusCode;
@@ -9,7 +10,7 @@ use rspc::Type;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
-use tracing::info;
+use tracing::{info, trace};
 
 use crate::error::request::{
     censor_error, MalformedResponseDetails, RequestContext, RequestError, RequestErrorDetails,
@@ -65,12 +66,15 @@ impl DeviceCode {
         })
     }
 
+    #[tracing::instrument(skip(self, client))]
     pub async fn poll_ms_auth(
         &self,
         client: &ClientWithMiddleware,
     ) -> anyhow::Result<Result<MsAuth, DeviceCodeExpiredError>> {
         loop {
             tokio::time::sleep(self.polling_interval).await;
+
+            trace!("Polling for auth token at {:?}", Utc::now());
 
             let response = client
                 .post("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
@@ -86,8 +90,12 @@ impl DeviceCode {
                 .send()
                 .await?;
 
+            let response_at = Utc::now();
+
             match response.status() {
                 StatusCode::BAD_REQUEST => {
+                    trace!("Device code request returned 400 at {:?}", response_at);
+
                     #[derive(Deserialize)]
                     struct BadRequestError {
                         error: String,
@@ -112,6 +120,8 @@ impl DeviceCode {
                     };
                 }
                 StatusCode::OK => {
+                    trace!("Device code request returned 200 at {:?}", response_at);
+
                     #[derive(Deserialize)]
                     struct MsAuthResponse {
                         access_token: String,
@@ -132,7 +142,15 @@ impl DeviceCode {
                         expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
                     }));
                 }
-                _ => bail!(RequestError::from_status(&response,)),
+                _ => {
+                    trace!(
+                        "Device code request returned unexpected {:?} status at {:?}",
+                        response,
+                        response_at
+                    );
+
+                    bail!(RequestError::from_status(&response,))
+                }
             }
         }
     }
@@ -153,10 +171,12 @@ pub struct MsAuth {
 impl MsAuth {
     /// Refresh the auth token, returning a new token if the current one
     /// has expired.
+    #[tracing::instrument(skip(client, refresh_token))]
     pub async fn refresh(
         client: &ClientWithMiddleware,
         refresh_token: &str,
     ) -> anyhow::Result<Self> {
+        trace!("Refreshing auth token");
         #[derive(Deserialize)]
         struct RefreshResponse {
             access_token: String,
@@ -183,6 +203,8 @@ impl MsAuth {
             .json::<RefreshResponse>()
             .await?;
 
+        trace!("Refreshed auth token");
+
         Ok(Self {
             access_token: response.access_token,
             id_token: response.id_token,
@@ -199,10 +221,13 @@ pub struct XboxAuth {
 
 impl XboxAuth {
     /// Obtain an Xbox account from a MS account (without refreshing it)
+    #[tracing::instrument(skip(ms_auth, client))]
     pub async fn from_ms(
         ms_auth: &MsAuth,
         client: &ClientWithMiddleware,
     ) -> anyhow::Result<Result<Self, XboxError>> {
+        trace!("Authenticating Xbox account");
+
         let xbl_token = {
             #[derive(Deserialize)]
             struct XblToken {
@@ -233,6 +258,10 @@ impl XboxAuth {
             response.token
         };
 
+        trace!("Got XBL token");
+
+        trace!("Getting XSTS token");
+
         // get xsts token
 
         let json = json!({
@@ -253,6 +282,8 @@ impl XboxAuth {
 
         match response.status() {
             StatusCode::OK => {
+                trace!("Got XSTS token");
+
                 #[derive(Deserialize)]
                 struct XstsToken {
                     #[serde(rename = "Token")]
@@ -292,6 +323,8 @@ impl XboxAuth {
                 }))
             }
             StatusCode::UNAUTHORIZED => {
+                trace!("XSTS token request returned 401");
+
                 #[derive(Deserialize)]
                 struct XstsError {
                     #[serde(rename = "XErr")]
@@ -302,7 +335,14 @@ impl XboxAuth {
 
                 Ok(Err(XboxError::from_xerr(xsts_err.xerr)))
             }
-            _ => Err(anyhow!(RequestError::from_status(&response))),
+            _ => {
+                trace!(
+                    "XSTS token request returned unexpected status {:?}",
+                    response.status()
+                );
+
+                Err(anyhow!(RequestError::from_status(&response)))
+            }
         }
     }
 }
@@ -347,6 +387,7 @@ pub struct McAuth {
 
 impl McAuth {
     /// Authenticate with a MS account (without refreshing it)
+    #[tracing::instrument(skip(xbox_auth, client))]
     pub async fn auth_ms(
         xbox_auth: XboxAuth,
         client: &ClientWithMiddleware,
@@ -361,6 +402,8 @@ impl McAuth {
             expires_in: i64,
         }
 
+        trace!("Authenticating Minecraft account");
+
         let response = client
             .post("https://api.minecraftservices.com/authentication/login_with_xbox")
             .header("Accept", "application/json")
@@ -371,16 +414,21 @@ impl McAuth {
             .json::<McAuthResponse>()
             .await?;
 
+        trace!("Got Minecraft auth token");
+
         Ok(Self {
             access_token: response.access_token,
             expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
         })
     }
 
+    #[tracing::instrument(skip(self, client))]
     pub async fn get_entitlement(
         &self,
         client: &ClientWithMiddleware,
     ) -> anyhow::Result<Result<McEntitlement, McEntitlementMissingError>> {
+        trace!("Checking game entitlement");
+
         #[derive(Deserialize)]
         struct EntitlementResponse {
             signature: String,
@@ -394,6 +442,8 @@ impl McAuth {
             .error_for_status()?
             .json::<EntitlementResponse>()
             .await?;
+
+        trace!("Got game entitlement");
 
         #[derive(Debug, Deserialize)]
         struct SignedEntitlements {

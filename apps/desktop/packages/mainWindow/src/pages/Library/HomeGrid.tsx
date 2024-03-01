@@ -300,6 +300,9 @@ const HomeGrid = () => {
   return (
     <div class="overflow-hidden p-6">
       <UnstableCard />
+      <Show when={routeData.settings.data?.showNews}>
+        <NewsWrapper />
+      </Show>
       <Switch>
         <Match when={routeData.instances.isLoading}>
           <Skeleton.instances />
@@ -324,9 +327,6 @@ const HomeGrid = () => {
           }
         >
           <div>
-            <Show when={routeData.settings.data?.showNews}>
-              <NewsWrapper />
-            </Show>
             <div class="flex items-center gap-4 mt-8">
               <Input
                 ref={inputRef}

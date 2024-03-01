@@ -84,7 +84,7 @@ pub fn main() {
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .max_blocking_threads(50)
+        .max_blocking_threads(100)
         .build()
         .unwrap()
         .block_on(async {
