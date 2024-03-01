@@ -20,7 +20,7 @@ import fs from "fs/promises";
 import fss from "fs";
 import fse from "fs-extra";
 import { spawn } from "child_process";
-import { v4 as uuid } from "uuid";
+import crypto from "crypto";
 import type { ChildProcessWithoutNullStreams } from "child_process";
 import * as Sentry from "@sentry/electron/main";
 import "./preloadListeners";
@@ -131,7 +131,7 @@ if (app.isPackaged) {
 console.log("Userdata path:", app.getPath("userData"));
 console.log("Runtime path:", CURRENT_RUNTIME_PATH);
 
-const sentrySessionId = uuid();
+const sentrySessionId = crypto.randomUUID();
 
 console.log("SENTRY SESSION ID", sentrySessionId);
 

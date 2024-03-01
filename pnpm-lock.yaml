@@ -32,9 +32,6 @@ importers:
       '@sentry/vite-plugin':
         specifier: ^2.14.2
         version: 2.14.2
-      uuid:
-        specifier: ^9.0.1
-        version: 9.0.1
     devDependencies:
       '@gd/config':
         specifier: workspace:*
@@ -13136,6 +13133,7 @@ packages:
   /uuid@9.0.1:
     resolution: {integrity: sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==}
     hasBin: true
+    dev: true
 
   /validate-html-nesting@1.2.2:
     resolution: {integrity: sha512-hGdgQozCsQJMyfK5urgFcWEqsSSrK63Awe0t/IMR0bZ0QMtnuaiHzThW81guu3qx9abLi99NEuiaN6P9gVYsNg==}
