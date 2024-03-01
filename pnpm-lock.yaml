@@ -108,6 +108,9 @@ importers:
       electron:
         specifier: ^22.3.27
         version: 22.3.27
+      electron-log:
+        specifier: ^5.1.1
+        version: 5.1.1
       electron-notarize:
         specifier: ^1.2.2
         version: 1.2.2
@@ -7902,6 +7905,11 @@ packages:
     hasBin: true
     dependencies:
       jake: 10.8.7
+    dev: true
+
+  /electron-log@5.1.1:
+    resolution: {integrity: sha512-If7HU4Slbh2xfjOXOLxifkbgu6HmWDNJyXPLW+XNTOHMfFKisg0trA3d/7syyu25S+lHosfsd0VMfDSjGn1+Pw==}
+    engines: {node: '>= 14'}
     dev: true
 
   /electron-notarize@1.2.2:

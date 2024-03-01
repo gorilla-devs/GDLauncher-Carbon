@@ -21,6 +21,7 @@ import fss from "fs";
 import fse from "fs-extra";
 import { spawn } from "child_process";
 import crypto from "crypto";
+import log from "electron-log/main";
 import type { ChildProcessWithoutNullStreams } from "child_process";
 import * as Sentry from "@sentry/electron/main";
 import "./preloadListeners";
@@ -114,6 +115,13 @@ export function getPatchedUserData() {
 const skipIntroAnimation = fss.existsSync(getPatchedUserData());
 
 app.setPath("userData", getPatchedUserData());
+
+Object.assign(console, log.functions);
+
+log.transports.file.resolvePathFn = (variables) =>
+  path.join(getPatchedUserData(), variables.fileName!);
+log.initialize();
+log.eventLogger.startLogging();
 
 if (app.isPackaged) {
   const overrideCLIDataPath = validateArgument("--runtime_path");
