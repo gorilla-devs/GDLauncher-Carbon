@@ -54,17 +54,23 @@ export default function initAutoUpdater(win: BrowserWindow | null) {
 
   autoUpdater.on("update-available", (updateInfo) => {
     console.log("Update available", updateInfo);
-    win?.webContents.send("updateAvailable", updateInfo);
+    if (win) {
+      win?.webContents.send("updateAvailable", updateInfo);
+    }
     autoUpdater.downloadUpdate();
   });
 
   autoUpdater.on("update-not-available", () => {
-    win?.webContents.send("updateNotAvailable");
+    if (win) {
+      win.webContents.send("updateNotAvailable");
+    }
   });
 
   autoUpdater.on("download-progress", (progress) => {
     console.log("Download progress", progress);
-    win?.webContents.send("downloadProgress", progress);
+    if (win) {
+      win?.webContents.send("downloadProgress", progress);
+    }
   });
 
   ipcMain.handle("installUpdate", async () => {
@@ -73,6 +79,8 @@ export default function initAutoUpdater(win: BrowserWindow | null) {
 
   autoUpdater.on("update-downloaded", () => {
     console.log("Update downloaded, ready to install");
-    win?.webContents.send("updateDownloaded");
+    if (win) {
+      win?.webContents.send("updateDownloaded");
+    }
   });
 }

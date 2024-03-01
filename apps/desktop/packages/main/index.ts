@@ -173,6 +173,23 @@ if (!disableSentry) {
   }
 }
 
+const disableGPU = validateArgument("--disable-gpu");
+
+if (disableGPU) {
+  app.commandLine.appendSwitch("no-sandbox");
+  app.commandLine.appendSwitch("disable-gpu");
+  app.commandLine.appendSwitch("disable-software-rasterizer");
+  app.commandLine.appendSwitch("disable-gpu-compositing");
+  app.commandLine.appendSwitch("disable-gpu-rasterization");
+  app.commandLine.appendSwitch("disable-gpu-sandbox");
+  app.commandLine.appendSwitch("--no-sandbox");
+}
+
+// Disable GPU Acceleration for Windows 7
+if (disableGPU || (release().startsWith("6.1") && platform() === "win32")) {
+  app.disableHardwareAcceleration();
+}
+
 export type Log = {
   type: "info" | "error";
   message: string;
@@ -321,9 +338,7 @@ const loadCoreModule: CoreModule = () =>
       console.log(`[CORE] Exit with code: ${code}`);
 
       if (code !== 0) {
-        reject({
-          logs
-        });
+        reject(logs);
       }
 
       resolve({
@@ -337,11 +352,6 @@ const coreModule = loadCoreModule();
 
 if ((app as any).overwolf) {
   (app as any).overwolf.disableAnonymousAnalytics();
-}
-
-// Disable GPU Acceleration for Windows 7
-if (release().startsWith("6.1") && platform() === "win32") {
-  app.disableHardwareAcceleration();
 }
 
 // Set application name for Windows 10+ notifications
@@ -385,7 +395,13 @@ async function createWindow(): Promise<BrowserWindow> {
   });
 
   win.on("move", () => {
-    const currentDisplay = screen.getDisplayMatching(win?.getBounds()!);
+    const bounds = win?.getBounds();
+
+    if (!bounds) {
+      return;
+    }
+
+    const currentDisplay = screen.getDisplayMatching(bounds);
     if (lastDisplay?.id === currentDisplay?.id) {
       return;
     }
@@ -583,8 +599,11 @@ ipcMain.handle("getCoreModulePort", async () => {
 });
 
 app.whenReady().then(async () => {
-  // Expose chrome's accessibility tree by default
-  app.setAccessibilitySupportEnabled(true);
+  const accessibility = validateArgument("--enable-accessibility");
+
+  if (accessibility) {
+    app.setAccessibilitySupportEnabled(true);
+  }
 
   console.log("OVERWOLF APP ID", process.env.OVERWOLF_APP_UID);
   session.defaultSession.webRequest.onBeforeSendHeaders(
@@ -613,12 +632,19 @@ app.whenReady().then(async () => {
       });
     }
   );
+
   await createWindow();
 
   screen.addListener(
     "display-metrics-changed",
     (_, display, changedMetrics) => {
-      const currentDisplay = screen.getDisplayMatching(win?.getBounds()!);
+      const bounds = win?.getBounds();
+
+      if (!bounds) {
+        return;
+      }
+
+      const currentDisplay = screen.getDisplayMatching(bounds);
       if (lastDisplay?.id === currentDisplay?.id) {
         return;
       }
@@ -639,6 +665,7 @@ app.whenReady().then(async () => {
 
 app.on("window-all-closed", async () => {
   if (isGameRunning) {
+    console.log("[window-all-closed] Game is running, not quitting");
     return;
   }
 
@@ -678,7 +705,7 @@ app.on("activate", () => {
 });
 
 app.on("render-process-gone", (event, webContents, detailed) => {
-  console.log("render-process-gone", detailed);
+  console.error("render-process-gone", detailed);
   webContents.reload();
 });
 
