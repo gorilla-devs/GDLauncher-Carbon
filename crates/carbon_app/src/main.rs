@@ -135,7 +135,7 @@ async fn get_available_port() -> TcpListener {
 
 async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
     info!("Starting router");
-    let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
+    let (invalidation_sender, _) = tokio::sync::broadcast::channel(1000);
 
     let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router().expose().build().arced();
 
