@@ -31,8 +31,8 @@ const downloadLinks = yamlfiles
     </div>
 
     <div class="flex-[0.5]">
-      <span class="text-white font-medium pb-4">Download</span>
-      <ul class="flex lg:flex-col gap-2 lg:gap-0">
+      <span class="text-white font-medium">Download</span>
+      <ul class="flex lg:flex-col gap-2 lg:gap-0 pt-4">
         <li>
           <HeaderLink href={downloadLinks[0]}>Windows</HeaderLink>
         </li>
@@ -47,8 +47,8 @@ const downloadLinks = yamlfiles
 
     <NewsLetter client:idle />
     <div class="flex-[0.5]">
-      <span class="text-white font-medium pb-4">Download old GDL</span>
-      <ul class="flex lg:flex-col gap-2 lg:gap-0">
+      <span class="text-white font-medium">Download old GDL</span>
+      <ul class="flex lg:flex-col gap-2 lg:gap-0 pt-4">
         <li>
           <HeaderLink href={APP_URLS.olddownload.win}>Windows</HeaderLink>
         </li>
@@ -61,8 +61,8 @@ const downloadLinks = yamlfiles
       </ul>
     </div>
     <div class="flex-[0.5]">
-      <span class="text-white font-medium pb-4">Legal</span>
-      <ul class="flex lg:flex-col gap-2 lg:gap-0">
+      <span class="text-white font-medium">Legal</span>
+      <ul class="flex lg:flex-col gap-2 lg:gap-0 pt-4">
         <li>
           <HeaderLink href="/terms-of-service" class="pt-4">
             Terms of service
@@ -74,8 +74,8 @@ const downloadLinks = yamlfiles
       </ul>
     </div>
     <div class="flex-1">
-      <span class="text-white font-medium pb-4">Get in Touch!</span>
-      <ul class="flex gap-2">
+      <span class="text-white font-medium">Get in Touch!</span>
+      <ul class="flex gap-2 pt-4">
         <li>
           <HeaderLink href="https://discord.gdlauncher.com/">
             <Image src={Discord} alt="social discord" />
@@ -110,9 +110,9 @@ const downloadLinks = yamlfiles
   footer {
     background-color: rgba(29, 32, 40, 1);
   }
-  @media screen and (max-width: 768px){
+  @media screen and (max-width: 768px) {
     footer > div {
-      gap: 1rem
+      gap: 1rem;
     }
   }
 </style>
