@@ -21,8 +21,8 @@ const downloadLinks = yamlfiles
 ---
 
 <footer class="flex flex-col">
-  <div class="flex flex-col lg:flex-row justify-between p-16">
-    <div class="flex flex-col items-start">
+  <div class="flex flex-col lg:flex-row justify-between p-16 space-x-0.5">
+    <div class="flex flex-col items-start flex-1">
       <Image src={Logo} alt="BH Logo" class="pb-4" />
       <p class="text-graygd w-1/2">
         GDLauncher is a simple, yet powerful Minecraft custom launcher with a
@@ -30,7 +30,7 @@ const downloadLinks = yamlfiles
       </p>
     </div>
 
-    <div>
+    <div class="flex-[0.5]">
       <span class="text-white font-medium pb-4">Download</span>
       <ul class="flex lg:flex-col gap-2 lg:gap-0">
         <li>
@@ -46,7 +46,7 @@ const downloadLinks = yamlfiles
     </div>
 
     <NewsLetter client:idle />
-    <div>
+    <div class="flex-[0.5]">
       <span class="text-white font-medium pb-4">Download old GDL</span>
       <ul class="flex lg:flex-col gap-2 lg:gap-0">
         <li>
@@ -60,7 +60,7 @@ const downloadLinks = yamlfiles
         </li>
       </ul>
     </div>
-    <div>
+    <div class="flex-[0.5]">
       <span class="text-white font-medium pb-4">Legal</span>
       <ul class="flex lg:flex-col gap-2 lg:gap-0">
         <li>
@@ -73,7 +73,7 @@ const downloadLinks = yamlfiles
         </li>
       </ul>
     </div>
-    <div>
+    <div class="flex-1">
       <span class="text-white font-medium pb-4">Get in Touch!</span>
       <ul class="flex gap-2">
         <li>
@@ -109,5 +109,10 @@ const downloadLinks = yamlfiles
   }
   footer {
     background-color: rgba(29, 32, 40, 1);
+  }
+  @media screen and (max-width: 768px){
+    footer > div {
+      gap: 1rem
+    }
   }
 </style>
