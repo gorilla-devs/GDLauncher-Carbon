@@ -3,6 +3,7 @@ title: "GDLauncher Carbon Official Release"
 description: "GDLauncher Carbon is now officially released, and it's available for download."
 author: Davide Ceschia
 pubDate: 01 March 2024
+heroImage: https://cdn.gdl.gg/articles/gdlauncher-carbon-out-now/thumbnail.jpg
 ---
 
 <details>
