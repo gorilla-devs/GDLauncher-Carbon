@@ -3,20 +3,19 @@ import { composeCDNArticleThumbnailAssetLink } from "../utils/composeCDNAssetLin
 
 const { post } = Astro.props;
 const formatDate = (date: Date) => {
-    let newdate = new Date(date);
+  let newdate = new Date(date);
 
-// Define options for date formatting
-let options: Intl.DateTimeFormatOptions = {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric'
+  // Define options for date formatting
+  let options: Intl.DateTimeFormatOptions = {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  };
+
+  // Create a formatter
+  let formatter = new Intl.DateTimeFormat("en-US", options);
+  return formatter.format(newdate);
 };
-
-// Create a formatter
-let formatter = new Intl.DateTimeFormat('en-US', options);
-return formatter.format(newdate);
-}
-
 ---
 
 <a href={`/blog/${post.slug}`}>
@@ -27,9 +26,7 @@ return formatter.format(newdate);
       style={{
         backgroundPosition: "center",
         backgroundSize: "cover",
-        backgroundImage: `url(${composeCDNArticleThumbnailAssetLink(
-          post.slug
-        )})`,
+        backgroundImage: `url(${post.data.heroImage})`,
       }}
       class="min-h-[18rem] bg-green-400 rounded-t-xl"
     >
@@ -47,7 +44,9 @@ return formatter.format(newdate);
         <h2 class="text-2xl font-bold mb-4">{post.data.title}</h2>
         <p class="text-slate-400">{post.data.description}</p>
       </div>
-      <p class="text-sm pt-3 text-slate-500">{post.data.author} - {formatDate(post.data.pubDate)}</p>
+      <p class="text-sm pt-3 text-slate-500">
+        {post.data.author} - {formatDate(post.data.pubDate)}
+      </p>
     </div>
   </article>
 </a>
