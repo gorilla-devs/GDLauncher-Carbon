@@ -143,9 +143,9 @@ declare module 'astro:content' {
   collection: "blog";
   data: InferEntrySchema<"blog">
 } & { render(): Render[".md"] };
-"gdlauncher-carbon-official-release.md": {
-	id: "gdlauncher-carbon-official-release.md";
-  slug: "gdlauncher-carbon-official-release";
+"gdlauncher-carbon-out-now.md": {
+	id: "gdlauncher-carbon-out-now.md";
+  slug: "gdlauncher-carbon-out-now";
   body: string;
   collection: "blog";
   data: InferEntrySchema<"blog">

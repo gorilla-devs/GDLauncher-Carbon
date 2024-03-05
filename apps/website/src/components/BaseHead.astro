@@ -19,14 +19,14 @@ const { title, description, image } = Astro.props as Props;
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta
   property="og:image"
-  content={image || composeCDNAssetLink("gdlauncher_logo_og.png")}
+  content={image || "https://cdn.gdl.gg/assets/website-preview.jpg"}
 />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content={title} />
 <meta name="twitter:description" content={description} />
 <meta
   property="twitter:image"
-  content={image || composeCDNAssetLink("gdlauncher_logo_og.png")}
+  content={image || "https://cdn.gdl.gg/assets/website-preview.jpg"}
 />
 
 <ViewTransitions />
