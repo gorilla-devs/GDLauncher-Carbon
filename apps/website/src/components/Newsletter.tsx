@@ -50,7 +50,7 @@ const NewsLetter = () => {
     setLoading(false);
   };
   return (
-    <div class="flex flex-col gap-2">
+    <div class="flex flex-col gap-2 flex-1 items-start justify-start">
       <span class="text-white font-medium pb-4">Newsletter</span>
       <input
         type="email"
