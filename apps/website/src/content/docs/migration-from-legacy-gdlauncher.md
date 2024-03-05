@@ -1,6 +1,6 @@
 # Migration from legacy GDLauncher
 
-If you're still using the old edition of GDLauncher, the migration to GDLauncher Carbon is simple. Here's how you can do it.
+If you're still using the GDLauncher Legacy, the migration to GDLauncher Carbon is simple. Here's how you can do it.
 
 ## Download GDLauncher Carbon
 
