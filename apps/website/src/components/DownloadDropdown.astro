@@ -2,18 +2,8 @@
 import yaml from "js-yaml";
 import Button from "./button/Button";
 import { RiArrowsArrowDownSLine } from "solid-icons/ri";
-const response = await Promise.all([
-  fetch("https://cdn-raw.gdl.gg/launcher/alpha.yml"),
-  fetch("https://cdn-raw.gdl.gg/launcher/alpha-mac.yml"),
-  fetch("https://cdn-raw.gdl.gg/launcher/alpha-linux.yml"),
-]);
-const yamlfiles = await Promise.all(response.map((val) => val.text()));
-const downloadLinks = yamlfiles
-  .map((val) => yaml.load(val))
-  .map(
-    (val: any) =>
-      `https://cdn-raw.gdl.gg/launcher/${val.path.includes("zip") ? val.path.replace("zip", "dmg") : val.path}`
-  );
+
+const downloadLinks = ["/download/windows", "/download/mac", "/download/linux"];
 ---
 
 <Button

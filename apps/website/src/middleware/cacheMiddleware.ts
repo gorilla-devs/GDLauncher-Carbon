@@ -8,7 +8,7 @@ interface ICachedResponse {
 
 const cache = new Map<Path, ICachedResponse>();
 
-export const onRequest: MiddlewareHandler = async (req, next) => {
+export const cacheMiddleware: MiddlewareHandler = async (req, next) => {
   console.log("[Middleware] onRequest", req.url.pathname);
 
   let ttl: number | undefined;
