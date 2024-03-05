@@ -1691,6 +1691,9 @@ impl From<importer::FullImportScanStatus> for FullImportScanStatus {
 }
 
 mod log {
+    use axum::extract::{ws::Message, WebSocketUpgrade};
+    use tracing::error;
+
     use super::*;
 
     #[derive(Debug, Deserialize)]
@@ -1700,23 +1703,27 @@ mod log {
 
     #[tracing::instrument(skip(app))]
     pub async fn log_handler(
-        State(app): State<App>,
         Query(query): Query<LogQuery>,
+        req: WebSocketUpgrade,
+        State(app): State<App>,
     ) -> impl IntoResponse {
-        tracing::info!("starting log stream");
+        req.on_upgrade(move |mut socket| async move {
+            tracing::info!("starting log stream");
 
-        let log_rx = app
-            .instance_manager()
-            .get_log(domain::GameLogId(query.id))
-            .await;
+            let log_rx = app
+                .instance_manager()
+                .get_log(domain::GameLogId(query.id))
+                .await;
 
-        let Ok(mut log_rx) = log_rx else {
-            tracing::warn!("log entry not found");
+            let Ok(mut log_rx) = log_rx else {
+                tracing::warn!("log entry not found");
 
-            return StatusCode::NOT_FOUND.into_response();
-        };
+                socket.send(Message::Text(r#"{"init":"notfound"}"#.to_string()));
+                return;
+            };
 
-        let s = async_stream::stream! {
+            socket.send(Message::Text(r#"{"init":"found"}"#.to_string()));
+
             tracing::trace!("starting log stream");
 
             let mut last_idx = 0;
@@ -1727,42 +1734,33 @@ mod log {
                 let new_lines = {
                     let log = log_rx.borrow();
 
-                    let new_lines
-                        = log
-                            .get_span(last_idx..)
-                            .into_iter()
-                            .inspect(|entry| tracing::trace!(?entry, "received log entry"))
-                            .map(|entry| {
-                                serde_json::to_vec(&entry)
-                                    .expect(
-                                        "serialization of a log entry should be infallible"
-                                    )
-                            })
-                            .collect::<Vec<_>>();
+                    let new_lines = log
+                        .get_span(last_idx..)
+                        .into_iter()
+                        .inspect(|entry| tracing::trace!(?entry, "received log entry"))
+                        .map(|entry| {
+                            serde_json::to_string(&entry)
+                                .expect("serialization of a log entry should be infallible")
+                        })
+                        .collect::<Vec<_>>();
 
                     last_idx = log.len();
 
                     new_lines
                 };
 
-
-
                 for line in new_lines {
-                    tracing::trace!("yielding log entry");
-
-                    yield Ok::<_, Infallible>(line)
+                    if let Err(e) = socket.send(Message::Text(line)).await {
+                        error!(?e, "Failed to send log entry");
+                    }
                 }
-
-
 
                 if let Err(_) = log_rx.changed().await {
-                    tracing::error!("`log_rx` was closed, killing log stream");
+                    error!("`log_rx` was closed, killing log stream");
 
-                    break
+                    return;
                 }
             }
-        };
-
-        (StatusCode::OK, StreamBody::new(s)).into_response()
+        })
     }
 }
