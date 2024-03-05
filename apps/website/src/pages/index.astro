@@ -90,7 +90,7 @@ Astro.locals.cache(60);
         </Button>
         <a
           href="/blog/gdlauncher-carbon-official-release"
-          class="bg-transparent text-bluegd-500 border-solid border-[1px] border-bluegd-500 rounded-smgd text-base py-4 px-10 cursor-pointer uppercase my-4 flex items-center"
+          class="bg-transparent text-bluegd-500 border-solid group border-[1px] hover:border-white transition-all duration-150 hover:text-white border-bluegd-500 rounded-smgd text-base py-4 px-10 cursor-pointer uppercase my-4 flex items-center"
         >
           NEW GDLauncher 2.0 Out Now! <div
             role="separator"
@@ -99,7 +99,9 @@ Astro.locals.cache(60);
           </div>
           <div class="flex items-center gap-4">
             <span>read post</span>
-            <AiOutlineArrowRight />
+            <AiOutlineArrowRight
+              class="group-hover:translate-x-4 transition-all duration-150"
+            />
           </div>
         </a>
         <div class="flex flex-col">
