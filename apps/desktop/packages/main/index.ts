@@ -195,26 +195,34 @@ export type Log = {
   message: string;
 };
 
-export type CoreModuleError = {
-  logs: Log[];
-};
-
 const isDev = import.meta.env.MODE === "development";
 
 const binaryName =
   os.platform() === "win32" ? "core_module.exe" : "core_module";
 
-type CoreModule = () => Promise<{
-  port: number;
-  kill: () => void;
-}>;
+export type CoreModule = () => Promise<
+  | {
+      type: "success";
+      result: {
+        port: number;
+        kill: () => void;
+      };
+    }
+  | {
+      type: "error";
+      logs: Log[];
+    }
+>;
 
 const loadCoreModule: CoreModule = () =>
-  new Promise((resolve, reject) => {
+  new Promise((resolve, _) => {
     if (isDev) {
       resolve({
-        port: 4650,
-        kill: () => {}
+        type: "success",
+        result: {
+          port: 4650,
+          kill: () => {}
+        }
       });
       return;
     }
@@ -245,7 +253,14 @@ const loadCoreModule: CoreModule = () =>
       );
     } catch (err) {
       console.error(`[CORE] Spawn error: ${err}`);
-      reject({
+
+      logs.push({
+        type: "error",
+        message: (err as unknown as string).toString()
+      });
+
+      resolve({
+        type: "error",
         logs
       });
 
@@ -254,7 +269,14 @@ const loadCoreModule: CoreModule = () =>
 
     coreModule.on("error", function (err) {
       console.error(`[CORE] Spawn error: ${err}`);
-      reject({
+
+      logs.push({
+        type: "error",
+        message: err.toString()
+      });
+
+      resolve({
+        type: "error",
         logs
       });
 
@@ -275,8 +297,11 @@ const loadCoreModule: CoreModule = () =>
           const port: number = row.split("|")[1];
           console.log(`[CORE] Port: ${port}`);
           resolve({
-            port,
-            kill: () => coreModule?.kill()
+            type: "success",
+            result: {
+              port,
+              kill: () => coreModule?.kill()
+            }
           });
         } else if (row.startsWith("_INSTANCE_STATE_:")) {
           const rightPart = row.split(":")[1];
@@ -338,12 +363,18 @@ const loadCoreModule: CoreModule = () =>
       console.log(`[CORE] Exit with code: ${code}`);
 
       if (code !== 0) {
-        reject(logs);
+        resolve({
+          type: "error",
+          logs
+        });
       }
 
       resolve({
-        port: 0,
-        kill: () => coreModule?.kill()
+        type: "success",
+        result: {
+          port: 0,
+          kill: () => coreModule?.kill()
+        }
       });
     });
   });
@@ -390,7 +421,7 @@ async function createWindow(): Promise<BrowserWindow> {
       contextIsolation: true,
       sandbox: app.isPackaged,
       webSecurity: true,
-      additionalArguments: [`--skipIntroAnimation=${skipIntroAnimation}`]
+      additionalArguments: [`--skip-intro-animation=${skipIntroAnimation}`]
     }
   });
 
@@ -547,7 +578,14 @@ ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
 
   await fs.mkdir(newPath, { recursive: true });
 
-  (await coreModule).kill();
+  try {
+    const cm = await coreModule;
+    if (cm.type === "success") {
+      cm.result.kill();
+    }
+  } catch {
+    // No op
+  }
 
   // TODO: Copy with progress
   await fse.copy(CURRENT_RUNTIME_PATH!, newPath, {
@@ -587,15 +625,15 @@ ipcMain.handle("validateRuntimePath", async (_, newPath: string | null) => {
   return true;
 });
 
-ipcMain.handle("getCoreModulePort", async () => {
-  let port = null;
-  try {
-    port = (await coreModule).port;
-  } catch (e) {
-    return e;
-  }
+ipcMain.handle("getCoreModule", async () => {
+  // we can assume this promise never rejects
+  const cm = await coreModule;
 
-  return port;
+  return {
+    type: cm.type,
+    logs: cm.type === "error" ? cm.logs : undefined,
+    port: cm.type === "success" ? cm.result.port : undefined
+  };
 });
 
 app.whenReady().then(async () => {
@@ -671,10 +709,13 @@ app.on("window-all-closed", async () => {
 
   try {
     let _coreModule = await coreModule;
-    _coreModule.kill();
+    if (_coreModule.type === "success") {
+      _coreModule.result.kill();
+    }
   } catch {
     // No op
   }
+
   win = null;
   app.quit();
 });
@@ -682,7 +723,9 @@ app.on("window-all-closed", async () => {
 app.on("before-quit", async () => {
   try {
     let _coreModule = await coreModule;
-    _coreModule.kill();
+    if (_coreModule.type === "success") {
+      _coreModule.result.kill();
+    }
   } catch {
     // No op
   }

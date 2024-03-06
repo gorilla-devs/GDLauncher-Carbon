@@ -44,7 +44,17 @@ declare global {
     openFolder: (path: string) => void;
     copyToClipboard: (text: string) => void;
     openCMPWindow: () => void;
-    getCoreModulePort: () => Promise<number>;
+    getCoreModule: () => Promise<
+      | {
+          type: "success";
+          port: string;
+        }
+      | {
+          type: "error";
+          logs: Log[];
+        }
+      | null
+    >;
     getCurrentOS: () => Promise<{ platform: string; arch: string }>;
     getInitialRuntimePath: () => Promise<string>;
     getRuntimePath: () => Promise<string>;
