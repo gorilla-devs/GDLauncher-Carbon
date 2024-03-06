@@ -270,6 +270,8 @@ impl InstanceImporter for ModrinthArchiveImporter {
                 app.instance_manager().get_default_group().await?,
                 name.unwrap_or_else(|| instance.index.name.clone()),
                 icon,
+                None,
+                None,
                 instance_version_source,
                 String::new(),
                 initializer,
