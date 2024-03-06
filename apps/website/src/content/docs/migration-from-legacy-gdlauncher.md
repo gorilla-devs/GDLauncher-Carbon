@@ -1,3 +1,7 @@
+---
+title: "Migration from legacy gdlauncher"
+---
+
 # Migration from legacy GDLauncher
 
 If you're still using the GDLauncher Legacy, the migration to GDLauncher Carbon is simple. Here's how you can do it.
@@ -19,6 +23,7 @@ After running GDLauncher Carbon and logging in, you'll be welcomed with an onboa
 
 If for any reason the auto import doesn't work, you should first of all report the issue to us [here](https://discord.gdlauncher.com).
 You can manually import your old instances by doing the following:
+
 - Create a new instance in GDLauncher Carbon with the same configuration. If it's a modpack, install the same exact version of the modpack. If it's a vanilla instance, install the same version of minecraft and modloader.
 - Open old GDLauncher data path.
 - Copy the content of the instance folder from the old GDLauncher instance path to the new GDLauncher Carbon instance path. Refer to the [troobleshooting](/docs/troubleshooting) page for details on the data path, or you can simply right click the instance tile and click "Open Instance Folder".

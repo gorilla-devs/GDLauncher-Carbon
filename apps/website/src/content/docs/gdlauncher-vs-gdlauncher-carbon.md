@@ -1,3 +1,7 @@
+---
+title: "Gdlauncher vs Gdlauncher carbon"
+---
+
 # GDLauncher vs GDLauncher Carbon
 
 GDLauncher Carbon is a new version of GDLauncher, built from the ground up with a new design and new features.
@@ -15,6 +19,7 @@ As part of the rewrite, we also fully redesigned the UI and UX to make it more u
 We have already reached and surpassed feature-parity with the old versions, and we are now working on polishing the experience and adding new features.
 
 Some of the new features include:
+
 - A new java manager, the most powerful of any launcher
 - A more stable and reliable modpack installation process, as well as modpack version management
 - Modrinth support

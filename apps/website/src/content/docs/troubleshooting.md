@@ -1,3 +1,7 @@
+---
+title: "Troubleshooting"
+---
+
 ## What to know about integrations?
 
 ## App Data Path
@@ -5,12 +9,15 @@
 This is the path where GDLauncher stores electron's data, as well as the Core Module Runtime Path by default.
 
 ### Windows
+
 `C:\Users\\{{Your Username}}\\AppData\Roaming\gdlauncher_carbon`
 
 ### macOS
+
 `/Users/{{Your Username}}/Library/Application Support/gdlauncher_carbon`
 
 ### Linux
+
 - if `$XDG_DATA_HOME` env is available: `$XDG_DATA_HOME/gdlauncher_carbon`
 - else: `{{homedir}}/.local/share/gdlauncher_carbon`
 

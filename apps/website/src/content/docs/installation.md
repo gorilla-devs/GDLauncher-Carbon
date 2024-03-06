@@ -1,3 +1,7 @@
+---
+title: "Gdlauncher installation"
+---
+
 # Installation
 
 ## Windows
