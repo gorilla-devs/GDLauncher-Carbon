@@ -361,6 +361,7 @@
   "handle_preferences": "Handle Preferences",
   "import_instances": "Import instances",
   "tracking.setting_disabled": "Disabled",
+  "SOON": "SOON",
   "tracking.setting_disabled_text": "Almost completely disables any metrics being sent to us. Doing this will also disable some functionalities like sending automatic bug reports and access to preview features.",
   "tracking.setting_anonymous": "Anonymous",
   "tracking.setting_anonymous_text": "Reduces the amount of metrics being sent to a minimum. All metrics being collected are completely anonymous. This doesn't affect any functionality.",
