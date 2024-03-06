@@ -592,7 +592,7 @@ ipcMain.handle("getCoreModulePort", async () => {
   try {
     port = (await coreModule).port;
   } catch (e) {
-    return (e as any).logs;
+    return e;
   }
 
   return port;

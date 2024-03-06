@@ -31,12 +31,14 @@ render(
         const convertedPort = Number(port);
 
         if (Number.isNaN(convertedPort)) {
+          console.error("CoreModule port is not a number", port);
           window.fatalError(port as any, "CoreModule");
           port = new Error("CoreModule");
         } else {
           port = convertedPort;
         }
       } catch (e) {
+        console.error("CoreModule port failed", e);
         window.fatalError(e as any, "CoreModule");
         port = new Error("CoreModule");
       }

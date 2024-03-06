@@ -4,12 +4,7 @@ import { For, Show } from "solid-js";
 import fetchData from "./instance.data";
 import { useParams, useRouteData } from "@solidjs/router";
 import { InstanceDetails } from "@gd/core_module/bindings";
-import {
-  format,
-  formatDistance,
-  formatDuration,
-  intervalToDuration
-} from "date-fns";
+import { format, formatDuration, intervalToDuration } from "date-fns";
 import FadedBanner, { FadedBannerSkeleton } from "@/components/FadedBanner";
 import { port } from "@/utils/rspcClient";
 import { Button } from "@gd/ui";
