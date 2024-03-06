@@ -215,10 +215,13 @@ impl InstanceImporter for LegacyGDLauncherImporter {
         };
 
         let seconds_played = instance.config.time_played.map(|x| x * 60);
-        let last_played = instance
-            .config
-            .last_played
-            .map(|x| DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(x as i64, 0), Utc));
+        let last_played = instance.config.last_played.and_then(|x| {
+            let Some(naive_date_time) = NaiveDateTime::from_timestamp_millis(x as i64) else {
+                return None;
+            };
+
+            Some(DateTime::<Utc>::from_utc(naive_date_time, Utc))
+        });
 
         let initializer = |instance_path: PathBuf| {
             let instance = &instance;
