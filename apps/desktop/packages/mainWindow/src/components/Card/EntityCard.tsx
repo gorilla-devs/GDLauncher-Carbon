@@ -1,6 +1,7 @@
 import { keys } from "@/managers/ModalsManager/modals/OnBoarding/ThirdStep";
 import { ImportEntityStatus } from "@gd/core_module/bindings";
 import { useTransContext } from "@gd/i18n";
+import { Show } from "solid-js";
 
 export interface EntityCardProps {
   entity: ImportEntityStatus;
@@ -29,11 +30,18 @@ const EntityCard = (props: EntityCardProps) => {
       onClick={props.onClick}
     >
       {/* <div class={`${props.icon} text-red-400 text-5xl`}></div> */}
-      <img
-        src={props.icon}
-        alt="icon"
-        class={`w-10 h-10 ${props.entity.supported ? "" : "opacity-20"}`}
-      />
+      {/* absolute left-0 right-0 text-center ml-auto mr-auto top-[30%] */}
+      <Show when={!props.entity.supported}>
+        <span class="text-teal-600 font-bold">{t("SOON")}</span>
+      </Show>
+      <div class="relative">
+        <img
+          src={props.icon}
+          alt="icon"
+          class={`w-10 h-10 ${props.entity.supported ? "" : "opacity-20"}`}
+        />
+      </div>
+
       <span class={`${props.entity.supported ? "" : "opacity-20"}`}>
         {t(keys[props.index])}
       </span>
