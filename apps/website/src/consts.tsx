@@ -26,8 +26,10 @@ export const APP_URLS = {
 };
 export const ADD_USER_ENDPOINT = `${APP_URLS.newsletter}/mailing`;
 
-export const SITE_TITLE = "GDLauncher - A Custom Minecraft Launcher";
-export const SITE_DESCRIPTION = "GDLauncher - A Custom Minecraft Launcher";
+export const SITE_TITLE =
+  "GDLauncher - Your All-In-One Modded Minecraft Launcher";
+export const SITE_DESCRIPTION =
+  "GDLauncher - Your All-In-One Modded Minecraft Launcher";
 
 export const DownloadItems: Array<{
   item: Element | string;
