@@ -122,12 +122,27 @@ Astro.locals.cache(60);
       </div>
       <div class="relative mx-auto z-10 pt-32">
         <div class="relative parallax">
-          <img
+          <!-- <img
             id="firstImg"
             src="https://cdn.gdl.gg/github-readme/home.png"
             alt="gd launcher"
             class="mx-auto responsive-image"
-          />
+          /> -->
+          <picture>
+            <source
+              srcset="https://cdn.gdl.gg/assets/website-home-app-screenshot.webp"
+              type="image/webp"
+            />
+            <source
+              srcset="https://cdn.gdl.gg/assets/website-home-app-screenshot.jpg"
+              type="image/jpeg"
+            />
+            <img
+              src="https://cdn.gdl.gg/assets/website-home-app-screenshot.jpg"
+              alt="gd launcher"
+              class="mx-auto responsive-image"
+            />
+          </picture>
           <!-- <Image
             id="secondImg"
             src={Export}
@@ -151,7 +166,7 @@ Astro.locals.cache(60);
 
           vanilla.init(document.querySelector(".parallax") as HTMLElement, {
             max: 15,
-            speed: 10000,
+            speed: 50000,
           });
         },
         { once: false }
