@@ -38,7 +38,8 @@ pub async fn scan_dir(path: &Path, filter: Option<&Vec<&str>>) -> anyhow::Result
             carbon_scheduler::buffered_digest(&mut file, |chunk| {
                 sha512.update(&chunk);
                 md5.update(&chunk);
-            }).await?;
+            })
+            .await?;
 
             let sha512 = sha512.finalize().into();
             let md5 = md5.finalize().into();
