@@ -2,7 +2,7 @@ import { defineConfig } from "astro/config";
 import mdx from "@astrojs/mdx";
 import tailwind from "@astrojs/tailwind";
 import sitemap from "@astrojs/sitemap";
-
+import cloudflare from "@astrojs/cloudflare";
 import solidJs from "@astrojs/solid-js";
 
 import yaml from "js-yaml";
@@ -22,7 +22,8 @@ const downloadLinks = yamlfiles
 
 // https://astro.build/config
 export default defineConfig({
-  site: "https://example.com",
+  output: "server",
+  adapter: cloudflare(),
   integrations: [tailwind(), mdx(), sitemap(), solidJs()],
   redirects: {
     "/download/windows": downloadLinks[0],
