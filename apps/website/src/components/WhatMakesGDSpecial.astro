@@ -12,8 +12,14 @@ import Feat9 from "../assets/Feat9.svg";
 // Component Script (JavaScript)
 ---
 
+
+
+
 <div class="flex flex-col items-center justify-center p-8 background relative">
+  
   <div class="absolute top-0 bg-[rgba(29, 32, 40, 1)] h-52 w-full -z-10"></div>
+  <div class="wave"></div>
+  
   <div
     class="py-4 px-10 uppercase font-bold z-10 bg-transparent text-bluegd-500 border-solid border-[1px] border-bluegd-500 rounded-smgd"
   >
@@ -228,4 +234,17 @@ import Feat9 from "../assets/Feat9.svg";
       width: 228px;
     }
   }
+  .wave {
+        --width: 100%;
+        width: var(--width);
+        height: calc(var(--width) / 2);
+        background-color: rgba(29, 32, 40, 1);
+        /* border-radius: 126% / 47%; */
+        clip-path: polygon(0 0, 100% 0, 100% 52%, 49% 31%, 46% 31%, 0 55%);
+        position: absolute;
+        top: 0;
+        overflow: hidden;
+        /* z-index: -1; */
+      }
+      
 </style>
