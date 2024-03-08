@@ -686,10 +686,23 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let overwrite_changed = !change_version_path.exists(); // TODO
 
+                    let staging_file = setup_path.join("staging.json");
+
                     let staged_text =
-                        tokio::fs::read_to_string(setup_path.join("staging.json")).await?;
+                        tokio::fs::read_to_string(&staging_file).await?;
                     let staging_snapshot = serde_json::from_str::<Vec<&str>>(&staged_text)
                         .context("could not parse staging snapshot")?;
+
+                    #[derive(Debug)]
+                    enum SkipReplaceReason {
+                        DeletedByUser,
+                        ModifiedByUser([u8; 16], [u8; 16]),
+                    }
+
+                    let mut new_files = Vec::<String>::new();
+                    let mut deleted_files = Vec::<String>::new();
+                    let mut replaced_files = Vec::<String>::new();
+                    let mut skipped_replacements = Vec::<(String, SkipReplaceReason)>::new();
 
                     debug!("Applying staged instance files");
                     let r: anyhow::Result<_> = async {
@@ -698,6 +711,8 @@ impl ManagerRef<'_, InstanceManager> {
                                 let mut original_file =
                                     instance_root.join("instance").join(&oldfile[1..]);
 
+                                trace!("Checking for replacement for packinfo file: {original_file:?}");
+
                                 if !original_file.exists() {
                                     let mut name = original_file.file_name().unwrap().to_owned();
                                     name.push(".disabled");
@@ -705,6 +720,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                                     if !original_file.exists() {
                                         // either the user deleted it or we already deleted it in the next check, skip
+                                        skipped_replacements.push((oldfile.clone(), SkipReplaceReason::DeletedByUser));
                                         continue;
                                     }
                                 }
@@ -719,12 +735,14 @@ impl ManagerRef<'_, InstanceManager> {
 
                                 if original_md5 != oldfilehash.md5 {
                                     // the user has modified this file so we shouldn't touch it
+                                    skipped_replacements.push((oldfile.clone(), SkipReplaceReason::ModifiedByUser(oldfilehash.md5, original_md5)));
                                     continue;
                                 }
 
                                 if !staging_snapshot.contains(&(&oldfile as &str)) {
                                     // file is not present in new version and old version was not changed, delete
                                     tokio::fs::remove_file(original_file).await?;
+                                    deleted_files.push(oldfile.clone());
                                     continue;
                                 }
 
@@ -733,6 +751,7 @@ impl ManagerRef<'_, InstanceManager> {
                                 if staged_file.is_file() {
                                     // old file matches the snapshotted version and new file is present, replace
                                     tokio::fs::rename(staged_file, original_file).await?;
+                                    replaced_files.push(oldfile.clone());
                                 }
                             }
                         }
@@ -748,6 +767,7 @@ impl ManagerRef<'_, InstanceManager> {
                                 // there was no record of this file in the packinfo or it would've been moved previously,
                                 // and the user has not created one in its place, add the file
 
+                                new_files.push(relpath.to_string_lossy().to_string());
                                 tokio::fs::create_dir_all(original_file.parent().unwrap()).await?;
                                 tokio::fs::rename(staged_file, original_file).await?;
                             }
@@ -760,6 +780,61 @@ impl ManagerRef<'_, InstanceManager> {
                     if let Err(e) = r {
                         return Err(e.context("Failed to apply staged instance changes"));
                     }
+
+                    trace!("Creating update audit files");
+                    let audit_dir = instance_root.join(".install_audit");
+
+                    // delete old audit dir if it exists
+                    if (audit_dir.exists()) {
+                        tokio::fs::remove_dir_all(&audit_dir).await?;
+                    }
+
+                    tokio::fs::create_dir(&audit_dir).await?;
+
+                    let audit_file = audit_dir.join("audit.txt");
+                    let mut audit_txt = "Install Audit\n".to_string();
+
+                    if (!skipped_replacements.is_empty()) {
+                        audit_txt += "\nFiles that could not be replaced:\n";
+
+                        for (file, reason) in skipped_replacements {
+                            match reason {
+                                SkipReplaceReason::DeletedByUser => audit_txt += &format!(" - {file}: deleted by user\n"),
+                                SkipReplaceReason::ModifiedByUser(original, current) => audit_txt += &format!(
+                                    " - {file}: modified by user\n     original md5: {}\n     current md5:  {}\n",
+                                    hex::encode(original),
+                                    hex::encode(current),
+                                ),
+                            }
+                        }
+                    }
+
+                    if (!deleted_files.is_empty()) {
+                        audit_txt += "\nFiles deleted:\n";
+
+                        for file in deleted_files {
+                            audit_txt += &format!(" - {file}\n");
+                        }
+                    }
+
+                    if (!replaced_files.is_empty()) {
+                        audit_txt += "\nFiles replaced:\n";
+
+                        for file in replaced_files {
+                            audit_txt += &format!(" - {file}\n");
+                        }
+                    }
+
+                    if (!new_files.is_empty()) {
+                        audit_txt += "\nFiles created:\n";
+
+                        for file in new_files {
+                            audit_txt += &format!(" - {file}\n");
+                        }
+                    }
+
+                    tokio::fs::write(audit_file, audit_txt).await?;
+                    let _ = tokio::fs::rename(staging_file, audit_dir.join("staged.json")).await;
 
                     trace!("Cleaning up staging directory");
                     tokio::fs::remove_dir_all(staging_dir).await?;
