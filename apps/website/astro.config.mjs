@@ -23,6 +23,7 @@ const downloadLinks = yamlfiles
 // https://astro.build/config
 export default defineConfig({
   output: "hybrid",
+  site: "https://gdlauncher.com",
   adapter: cloudflare(),
   integrations: [tailwind(), mdx(), sitemap(), solidJs()],
   redirects: {
