@@ -59,7 +59,7 @@ const Auth = () => {
         size="large"
         onClick={() => handleClick()}
       >
-        <i class="i-ri:microsoft-fill w-4 h-4" />
+        <i class="w-4 h-4 i-ri:microsoft-fill" />
         <Trans key="login.sign_in_with_microsoft" />
       </Button>
       <p class="text-darkSlate-50 text-sm max-w-90 mb-10">
