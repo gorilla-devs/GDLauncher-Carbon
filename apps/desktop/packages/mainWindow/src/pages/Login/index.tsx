@@ -92,10 +92,10 @@ export default function Login() {
           <video
             class="absolute flex justify-center items-center w-full p-0 h-screen object-cover"
             src={BackgroundVideo}
-            autoPlay
+            autoplay
             muted
             loop
-            playsInline
+            playsinline
           />
           <div
             style={{
