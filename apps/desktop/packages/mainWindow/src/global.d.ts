@@ -53,7 +53,6 @@ declare global {
           type: "error";
           logs: Log[];
         }
-      | null
     >;
     getCurrentOS: () => Promise<{ platform: string; arch: string }>;
     getInitialRuntimePath: () => Promise<string>;
