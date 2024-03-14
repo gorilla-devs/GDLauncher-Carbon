@@ -175,7 +175,7 @@ const Tile = (props: Props) => {
         setPayload({
           target: "Curseforge",
           save_path: undefined,
-          link_mods: true,
+          self_contained_addons_bundling: false,
           filter: { entries: {} },
 
           instance_id: instanceId
