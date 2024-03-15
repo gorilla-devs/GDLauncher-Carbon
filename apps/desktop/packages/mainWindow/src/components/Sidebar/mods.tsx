@@ -437,7 +437,11 @@ const Sidebar = () => {
   createEffect(() => {
     console.log("currentParentCategories", currentParentCategories());
     const selectedCategories = selectedItems()
-      .filter((item) => currentParentCategories().includes(item.split("//")[0]))
+      .filter((item) =>
+        isCurseforge()
+          ? currentParentCategories().includes(item.split("//")[0])
+          : item.includes("Categories")
+      )
       .map((item) => item.split("//")[1]);
     const objectCategories = selectedCategories.map((category) => {
       const categ = categories().find((item) => item.name === category);
