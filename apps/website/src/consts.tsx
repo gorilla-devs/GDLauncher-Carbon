@@ -6,7 +6,7 @@ import Linux from "./assets/Linux";
 import Windows from "./assets/Windows";
 
 export const APP_URLS = {
-  cdn: "https://edge.gdlauncher.com",
+  cdn: "https://cdn.gdlauncher.com",
   socials: {
     discord: "https://discord.gdlauncher.com",
     github: "https://github.com/gorilla-devs/GDLauncher-Carbon",
@@ -14,7 +14,6 @@ export const APP_URLS = {
     twitter: "https://twitter.com/gdlauncher",
   },
   newsletter: "https://api.gdlauncher.com/v1",
-  kofi: "https://ko-fi.com/gdlauncher",
   olddownload: {
     win: "https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-win-setup.exe",
     macOs:
