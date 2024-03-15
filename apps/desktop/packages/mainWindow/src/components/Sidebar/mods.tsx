@@ -1,24 +1,14 @@
 /* eslint-disable solid/no-innerhtml */
-import SiderbarWrapper from "./wrapper";
-import {
-  Cascader,
-  Checkbox,
-  Collapsable,
-  Dropdown,
-  Radio,
-  Skeleton
-} from "@gd/ui";
+import { Cascader, Dropdown } from "@gd/ui";
 import fetchData from "@/pages/Mods/modsBrowser.data";
 import { useRouteData, useSearchParams } from "@solidjs/router";
 import {
   createEffect,
   createMemo,
   createSignal,
-  For,
   getOwner,
   Match,
   runWithOwner,
-  Show,
   Switch
 } from "solid-js";
 import {
@@ -36,20 +26,19 @@ import {
   getValideInstance,
   PlatformIcon
 } from "@/utils/instances";
-import { Trans, useTransContext } from "@gd/i18n";
+import { useTransContext } from "@gd/i18n";
 import { useInfiniteModsQuery } from "../InfiniteScrollModsQueryWrapper";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import {
   curseforgeCategories,
-  getCategoryId,
   ModloaderIcon,
   modrinthCategories,
   supportedModloaders
 } from "@/utils/sidebar";
 import { rspcFetch } from "@/utils/rspcClient";
 import { createStore } from "solid-js/store";
-import { mappedMcVersions, mcVersions } from "@/utils/mcVersion";
-import { instanceId, setInstanceId } from "@/utils/browser";
+import { mcVersions } from "@/utils/mcVersion";
+import { setInstanceId } from "@/utils/browser";
 
 const mapTypeToColor = (type: McType) => {
   return (

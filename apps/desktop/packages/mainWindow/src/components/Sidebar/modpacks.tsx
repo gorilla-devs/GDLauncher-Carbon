@@ -17,7 +17,7 @@ import {
 import { ModpackPlatforms } from "@/utils/constants";
 import { capitalize } from "@/utils/helpers";
 import { CategoryIcon, PlatformIcon } from "@/utils/instances";
-import { Trans, useTransContext } from "@gd/i18n";
+import { useTransContext } from "@gd/i18n";
 import { useInfiniteModsQuery } from "../InfiniteScrollModsQueryWrapper";
 import {
   curseforgeCategories,
@@ -25,7 +25,7 @@ import {
   modrinthCategories,
   supportedModloaders
 } from "@/utils/sidebar";
-import { mappedMcVersions, mcVersions } from "@/utils/mcVersion";
+import { mcVersions } from "@/utils/mcVersion";
 import { createStore } from "solid-js/store";
 
 const mapTypeToColor = (type: McType) => {

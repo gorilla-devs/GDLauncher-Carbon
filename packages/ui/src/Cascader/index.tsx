@@ -2,7 +2,6 @@ import { Portal } from "solid-js/web";
 import ChildsMenu, { ChildsMenuProps } from "./ChildsMenu";
 import {
   Show,
-  createEffect,
   createSignal,
   mergeProps,
   onCleanup,
