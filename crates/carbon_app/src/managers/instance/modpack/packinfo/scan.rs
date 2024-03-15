@@ -27,16 +27,22 @@ pub async fn scan_dir(path: &Path, filter: Option<&Vec<&str>>) -> anyhow::Result
         }
 
         futures.push(async move {
-            let content = tokio::fs::read(path).await?;
-
             if relpath.ends_with(".disabled") {
                 relpath.truncate(relpath.len() - ".disabled".len());
             }
 
-            carbon_scheduler::cpu_join! {
-                let sha512 = Sha512::digest(&content).into();
-                let md5 = Md5::digest(&content).into();
-            }
+            let mut file = tokio::fs::File::open(path).await?;
+            let mut sha512 = Sha512::new();
+            let mut md5 = Md5::new();
+
+            carbon_scheduler::buffered_digest(&mut file, |chunk| {
+                sha512.update(&chunk);
+                md5.update(&chunk);
+            })
+            .await?;
+
+            let sha512 = sha512.finalize().into();
+            let md5 = md5.finalize().into();
 
             Ok::<_, anyhow::Error>((relpath, super::FileHashes { sha512, md5 }))
         });

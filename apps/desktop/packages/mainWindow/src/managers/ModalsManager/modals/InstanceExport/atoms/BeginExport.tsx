@@ -40,11 +40,11 @@ const BeginExport = () => {
   });
 
   const validatePayload = (payload: ExportArgs) => {
-    if (typeof payload.instance_id !== "number") return 0;
-    if (typeof payload.save_path !== "string") return 0;
+    if (typeof payload.instance_id !== "number") return false;
+    if (typeof payload.save_path !== "string") return false;
     const extension = _.last(payload.save_path.split("."));
-    if (extension !== "zip" && extension !== "mrpack") return 0;
-    return 1;
+    if (extension !== "zip" && extension !== "mrpack") return false;
+    return true;
   };
 
   const handleExportInstance = () => {
@@ -53,16 +53,17 @@ const BeginExport = () => {
     const obj = buildNestedObject(checkedFiles());
     const converted = convertNestedObject({ entries: obj });
     setPayload((prev) => ({ ...prev, filter: converted }));
-    console.log("payload", payload);
-    if (validatePayload(payload as ExportArgs)) {
-      console.log(payload);
-      exportInstanceMutation.mutate({
-        filter: payload.filter as ExportEntry,
-        instance_id: payload.instance_id as number,
-        save_path: payload.save_path as string,
-        target: payload.target,
-        link_mods: payload.link_mods
-      });
+
+    const exportObj = {
+      filter: payload.filter as ExportEntry,
+      instance_id: payload.instance_id as number,
+      save_path: payload.save_path as string,
+      target: payload.target,
+      self_contained_addons_bundling: !payload.self_contained_addons_bundling
+    };
+
+    if (validatePayload(exportObj)) {
+      exportInstanceMutation.mutate(exportObj);
     }
   };
 
@@ -83,7 +84,7 @@ const BeginExport = () => {
         }}
         type="primary"
         size="large"
-        disabled={validatePayload(payload as ExportArgs) === 0}
+        disabled={!validatePayload(payload as ExportArgs)}
       >
         {t("instance.begin_export")}
       </Button>

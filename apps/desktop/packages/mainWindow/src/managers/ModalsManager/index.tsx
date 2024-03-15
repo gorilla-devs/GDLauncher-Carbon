@@ -63,7 +63,7 @@ const defaultModals = {
   },
   modpack_version_update: {
     component: lazy(() => import("./modals/ModPackVersionUpdate")),
-    title: "Update Version"
+    title: "Change Modpack Version"
   },
   unlock_confirmation: {
     component: lazy(() => import("./modals/Confirmation")),

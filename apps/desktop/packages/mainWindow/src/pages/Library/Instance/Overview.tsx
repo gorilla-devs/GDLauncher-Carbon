@@ -4,7 +4,7 @@ import { For, Show } from "solid-js";
 import fetchData from "./instance.data";
 import { useParams, useRouteData } from "@solidjs/router";
 import { InstanceDetails } from "@gd/core_module/bindings";
-import { format, formatDistance } from "date-fns";
+import { format, formatDuration, intervalToDuration } from "date-fns";
 import FadedBanner, { FadedBannerSkeleton } from "@/components/FadedBanner";
 import { port } from "@/utils/rspcClient";
 import { Button } from "@gd/ui";
@@ -88,11 +88,11 @@ const Overview = () => {
         <Show when={routeData.instanceDetails.data?.secondsPlayed}>
           <Card
             title={t("instance.overview_card_played_time_title")}
-            text={formatDistance(
-              new Date(
-                routeData.instanceDetails.data?.lastPlayed || Date.now()
-              ).getTime(),
-              Date.now()
+            text={formatDuration(
+              intervalToDuration({
+                start: 0,
+                end: routeData.instanceDetails.data!.secondsPlayed * 1000
+              })
             )}
             icon="clock"
             class="flex-1"
@@ -102,10 +102,7 @@ const Overview = () => {
           <Card
             title={t("instance.overview_card_last_played_title")}
             text={format(
-              new Date(
-                (routeData.instanceDetails.data as InstanceDetails)
-                  ?.lastPlayed as string
-              ),
+              new Date(routeData.instanceDetails.data?.lastPlayed as string),
               "PPP"
             )}
             icon="sign"

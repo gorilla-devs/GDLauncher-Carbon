@@ -26,9 +26,11 @@ function useLoading() {
       const runtimePath = await ipcRenderer.invoke("getRuntimePath");
       const isString = typeof error === "string";
 
-      if (typeof error !== "string") {
+      if (Array.isArray(error)) {
         console.log("Error from preload", error);
         error = error.map((log) => log.message).join("<br /><br />");
+      } else {
+        error = error.toString();
       }
 
       oDiv.classList.add("appFatalCrash");

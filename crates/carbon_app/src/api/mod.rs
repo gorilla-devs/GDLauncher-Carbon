@@ -23,7 +23,7 @@ mod system_info;
 pub mod translation;
 mod vtask;
 
-#[derive(Clone, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct InvalidationEvent {
     pub key: &'static str,
     pub args: Option<serde_json::Value>,
@@ -52,25 +52,6 @@ pub fn build_rspc_router() -> impl RouterBuilderLike<App> {
         .yolo_merge(keys::settings::GROUP_PREFIX, settings::mount())
         .yolo_merge(keys::metrics::GROUP_PREFIX, metrics::mount())
         .yolo_merge(keys::systeminfo::GROUP_PREFIX, system_info::mount())
-        .subscription("invalidateQuery", move |t| {
-            t(move |app, _args: ()| {
-                stream! {
-                    let mut channel = app.invalidation_channel.subscribe();
-                    info!("Invalidation channel connected");
-                    loop {
-                        match channel.recv().await {
-                            Ok(event) => {
-                                tracing::trace!("Invalidated {}: {:?}", event.key, event.args);
-                                yield event;
-                            }
-                            Err(e) => {
-                              error!("Error receiving invalidation request: {}", e);
-                            }
-                        }
-                    }
-                }
-            })
-        })
 }
 
 pub fn build_axum_vanilla_router() -> axum::Router<Arc<AppInner>> {
@@ -93,9 +74,19 @@ async fn invalidation_ws_handler(
         let mut channel = app.invalidation_channel.subscribe();
         info!("Invalidation channel connected");
         while let Ok(event) = channel.recv().await {
-            let message = serde_json::to_string(&event).unwrap();
-            socket.send(Message::Text(message)).await.unwrap();
+            let Ok(message) = serde_json::to_string(&event) else {
+                error!("Failed to serialize invalidation event: {:?}", event);
+                continue;
+            };
+            match socket.send(Message::Text(message)).await {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("Failed to send invalidation event: {:?}", e);
+                }
+            }
         }
+
+        info!("Invalidation channel disconnected");
     })
 }
 

@@ -56,6 +56,27 @@ const SecondStep = (props: Props) => {
           </RightHandSide>
         </Row>
         <Row>
+          <Title
+            description={
+              <Trans key="settings:deletion_through_recycle_bin_text" />
+            }
+          >
+            <Trans key="settings:deletion_through_recycle_bin_title" />
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={settings.data?.deletionThroughRecycleBin}
+              onChange={(e) => {
+                settingsMutation.mutate({
+                  deletionThroughRecycleBin: {
+                    Set: e.currentTarget.checked
+                  }
+                });
+              }}
+            />
+          </RightHandSide>
+        </Row>
+        <Row>
           <Trans key="onboarding.manage_more_options_from_settings" />
         </Row>
       </RowsContainer>

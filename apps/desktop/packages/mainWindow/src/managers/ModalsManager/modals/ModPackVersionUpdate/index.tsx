@@ -13,7 +13,9 @@ const ModPackVersionUpdate = (props: ModalProps) => {
   const [currentPlatform, setCurrentPlatform] = createSignal<
     "modrinth" | "curseforge" | null
   >(null);
-  const [selectedVersion, setSelectedVersion] = createSignal<string>("");
+  const [selectedVersion, setSelectedVersion] = createSignal<string | null>(
+    null
+  );
   const navigate = useGDNavigate();
   const modalContext = useModal();
   const instance = rspc.createQuery(() => [
@@ -51,6 +53,12 @@ const ModPackVersionUpdate = (props: ModalProps) => {
 
     return undefined;
   };
+
+  createEffect(() => {
+    if (!selectedVersion()) {
+      setSelectedVersion(getProjectId()?.fileId?.toString() || "");
+    }
+  });
 
   const responseCF = rspc.createQuery(
     () => [
@@ -123,6 +131,8 @@ const ModPackVersionUpdate = (props: ModalProps) => {
   };
 
   const handleUpdate = () => {
+    if (!selectedVersion()) return;
+
     changeModpackMutation.mutate({
       instance: instanceId() as FEInstanceId,
       modpack: {
@@ -131,7 +141,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
           currentPlatform() === "curseforge"
             ? {
                 project_id: getProjectId()?.projectId as number,
-                file_id: parseInt(selectedVersion())
+                file_id: parseInt(selectedVersion()!)
               }
             : {
                 project_id: getProjectId()?.projectId.toString() as string,
@@ -157,6 +167,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
           <Dropdown
             class="bg-darkSlate-800 w-full"
             options={options()}
+            value={selectedVersion()}
             onChange={(option) => {
               setSelectedVersion(option.key.toString());
             }}
@@ -171,7 +182,11 @@ const ModPackVersionUpdate = (props: ModalProps) => {
             >
               {t("instance.cancel_export")}
             </Button>
-            <Button type="primary" onClick={handleUpdate}>
+            <Button
+              type="primary"
+              onClick={handleUpdate}
+              disabled={!selectedVersion()}
+            >
               {t("instance.instance_modal_instance_update")}
             </Button>
           </div>

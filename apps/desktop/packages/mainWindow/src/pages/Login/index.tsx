@@ -16,6 +16,7 @@ import { Trans, supportedLanguages, useTransContext } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
 import TermsAndConditions from "./TermsAndConditions";
 import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
+import BackgroundVideo from "/assets/images/login_background.webm";
 import { handleStatus } from "@/utils/login";
 import { parseError } from "@/utils/helpers";
 
@@ -87,12 +88,20 @@ export default function Login() {
         <Navigate href={"/library"} />
       </Match>
       <Match when={!isAlreadyAuthenticated()}>
-        <div class="flex justify-center items-center w-full p-0 h-screen bg-img-loginBG.webp">
+        <div class="flex justify-center items-center w-full p-0 h-screen">
+          <video
+            class="absolute flex justify-center items-center w-full p-0 h-screen object-cover"
+            src={BackgroundVideo}
+            autoplay
+            muted
+            loop
+            playsinline
+          />
           <div
             style={{
               "mix-blend-mode": "hard-light"
             }}
-            class="absolute left-0 right-0 bg-darkSlate-800 bottom-0 top-0 opacity-10"
+            class="absolute left-0 right-0 bg-darkSlate-800 bottom-0 top-0 opacity-30"
           />
           <div class="fixed right-6 bottom-6">
             <Dropdown

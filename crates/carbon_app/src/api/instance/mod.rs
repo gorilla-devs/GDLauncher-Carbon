@@ -422,7 +422,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                     args.instance_id.into(),
                     args.target.into(),
                     args.save_path.into(),
-                    args.link_mods,
+                    args.self_contained_addons_bundling,
                     args.filter.into(),
                 ).await?;
 
@@ -1060,7 +1060,7 @@ struct ExportArgs {
     instance_id: FEInstanceId,
     target: ExportTarget,
     save_path: String,
-    link_mods: bool,
+    self_contained_addons_bundling: bool,
     filter: ExportEntry,
 }
 

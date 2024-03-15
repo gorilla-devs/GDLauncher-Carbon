@@ -34,7 +34,7 @@ impl ManagerRef<'_, InstanceExportManager> {
         instance_id: InstanceId,
         target: ExportTarget,
         save_path: PathBuf,
-        link_mods: bool,
+        self_contained_addons_bundling: bool,
         filter: ExportEntry,
     ) -> anyhow::Result<VisualTaskId> {
         match target {
@@ -43,7 +43,7 @@ impl ManagerRef<'_, InstanceExportManager> {
                     self.app.clone(),
                     instance_id,
                     save_path,
-                    link_mods,
+                    self_contained_addons_bundling,
                     filter,
                 )
                 .await
@@ -53,7 +53,7 @@ impl ManagerRef<'_, InstanceExportManager> {
                     self.app.clone(),
                     instance_id,
                     save_path,
-                    link_mods,
+                    self_contained_addons_bundling,
                     filter,
                 )
                 .await

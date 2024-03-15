@@ -1,4 +1,5 @@
 use std::{
+    fs,
     io::{Cursor, Read},
     path::PathBuf,
     sync::Arc,
@@ -73,16 +74,17 @@ impl CurseforgeArchiveImporter {
             return Ok(None);
         }
 
-        let content = tokio::fs::read(&path).await?;
-
         let name = path
             .file_name()
             .expect("filename cannot be empty")
             .to_string_lossy()
             .to_string();
 
+        let path2 = path.clone();
         let r = tokio::task::spawn_blocking(move || {
-            let mut zip = zip::ZipArchive::new(Cursor::new(&content))
+            let mut file =
+                fs::File::open(path2).map_err(|_| Translation::InstanceImportMrpackMalformed)?;
+            let mut zip = zip::ZipArchive::new(&mut file)
                 .map_err(|_| Translation::InstanceImportCfZipMalformed)?;
 
             let mut manifest = zip
@@ -288,6 +290,8 @@ impl InstanceImporter for CurseforgeArchiveImporter {
                 app.instance_manager().get_default_group().await?,
                 name.unwrap_or_else(|| instance.manifest.name.clone()),
                 icon,
+                None,
+                None,
                 instance_version_source,
                 String::new(),
                 initializer,

@@ -12,7 +12,7 @@ import "./relaunch";
 
 const skipIntroAnimation =
   process.argv
-    .find((arg) => arg.startsWith("--skipIntroAnimation="))
+    .find((arg) => arg.startsWith("--skip-intro-animation="))
     ?.split("=")[1] === "true";
 
 const isDev = import.meta.env.DEV;

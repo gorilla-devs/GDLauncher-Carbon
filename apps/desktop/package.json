@@ -31,7 +31,7 @@
     "@rive-app/canvas": "^1.2.0",
     "@rspc/client": "0.0.0-main-7c0a67c1",
     "@rspc/solid": "0.0.0-main-7c0a67c1",
-    "@sentry/electron": "^4.11.0",
+    "@sentry/electron": "^4.19.0",
     "@solid-primitives/deep": "^0.2.3",
     "@solid-primitives/keyboard": "^1.2.5",
     "@solid-primitives/map": "^0.4.8",
@@ -46,6 +46,7 @@
     "date-fns": "^2.30.0",
     "dotenv": "^16.3.1",
     "electron": "^22.3.27",
+    "electron-log": "^5.1.1",
     "electron-notarize": "^1.2.2",
     "electron-playwright-helpers": "^1.6.0",
     "electron-updater": "^6.1.7",
@@ -70,5 +71,8 @@
   "env": {
     "//": "Used in build scripts",
     "PORT": 3344
+  },
+  "dependencies": {
+    "@sentry/vite-plugin": "^2.14.2"
   }
 }

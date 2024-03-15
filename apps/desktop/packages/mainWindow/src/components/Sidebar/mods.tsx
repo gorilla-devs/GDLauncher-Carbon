@@ -339,7 +339,6 @@ const Sidebar = () => {
                         ((modloader as any)?.name ||
                           modloader) as FEUnifiedModLoaderType
                       )}
-                      disabled={!isNaN(instanceId()!)}
                     >
                       <ModloaderIcon modloader={modloader} />
                       <p class="m-0">

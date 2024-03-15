@@ -923,8 +923,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             false => None,
         };
 
-        self.create_instance_ext(group, name, icon, version, notes, |_| async { Ok(()) })
-            .await
+        self.create_instance_ext(group, name, icon, None, None, version, notes, |_| async {
+            Ok(())
+        })
+        .await
     }
 
     #[tracing::instrument(skip(self, icon, initializer))]
@@ -933,6 +935,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         group: GroupId,
         name: String,
         icon: Option<(String, Vec<u8>)>,
+        seconds_played: Option<u32>,
+        last_played: Option<DateTime<Utc>>,
         version: InstanceVersionSource,
         notes: String,
         initializer: F,
@@ -977,8 +981,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             icon,
             date_created: Utc::now(),
             date_updated: Utc::now(),
-            last_played: None,
-            seconds_played: 0,
+            last_played,
+            seconds_played: seconds_played.unwrap_or(0),
             modpack: modpack.map(|modpack| info::ModpackInfo {
                 modpack,
                 locked: true,

@@ -1,6 +1,7 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 use anyhow::anyhow;
+use chrono::{DateTime, NaiveDateTime, Utc};
 use tokio::sync::RwLock;
 use tracing::trace;
 
@@ -213,6 +214,15 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             None => None,
         };
 
+        let seconds_played = instance.config.time_played.map(|x| x * 60);
+        let last_played = instance.config.last_played.and_then(|x| {
+            let Some(naive_date_time) = NaiveDateTime::from_timestamp_millis(x as i64) else {
+                return None;
+            };
+
+            Some(DateTime::<Utc>::from_utc(naive_date_time, Utc))
+        });
+
         let initializer = |instance_path: PathBuf| {
             let instance = &instance;
             async move {
@@ -249,6 +259,8 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                 app.instance_manager().get_default_group().await?,
                 name.unwrap_or_else(|| instance.filename.clone()),
                 icon,
+                seconds_played,
+                last_played,
                 instance_version_source,
                 String::new(),
                 initializer,
@@ -266,7 +278,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
 #[serde(rename_all = "camelCase")]
 pub struct LegacyGDLauncherConfig {
     loader: _Loader,
-    time_played: u64,
+    time_played: Option<u32>,
     last_played: Option<u64>,
     background: Option<String>,
 }
