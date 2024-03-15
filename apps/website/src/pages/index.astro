@@ -1,0 +1,176 @@
+---
+import BaseHead from "../components/BaseHead.astro";
+import Header from "../components/Header.astro";
+import Button from "../components/button/Button";
+import Download from "../components/Download.astro";
+import { Image } from "astro:assets";
+import BHLogo from "../assets/bh.svg";
+import Footer from "../components/Footer.astro";
+import "@fontsource/ubuntu";
+import { SITE_TITLE, SITE_DESCRIPTION, DownloadItems } from "../consts";
+import WhatMakesGDSpecial from "../components/WhatMakesGDSpecial.astro";
+import GdxCF from "../components/GdxCF.astro";
+import "../styles/HomeStyle.css";
+import DownloadDropdown from "../components/DownloadDropdown.astro";
+import { AiOutlineArrowRight } from "solid-icons/ai";
+
+Astro.locals.cache(60);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
+    <style>
+      body {
+        font-family: "Ubuntu", sans-serif;
+        background-color: rgba(29, 32, 40, 1);
+        overflow-x: hidden;
+      }
+      .background {
+        background-image: linear-gradient(
+            rgba(23, 29, 39, 0.3),
+            /* Your specified semi-transparent color */ rgba(23, 29, 39, 0.3)
+          ),
+          url("../assets/bg.svg");
+        background-size: cover;
+        /* background-position: center; */
+        background-repeat: no-repeat;
+        background-color: rgba(29, 32, 40, 1);
+      }
+      .wave {
+        --width: 100%;
+        width: var(--width);
+        height: calc(var(--width) / 4);
+        background-color: rgba(29, 32, 40, 1);
+        /* border-radius: 126% / 47%; */
+        clip-path: polygon(0 20%, 50% 0, 100% 20%, 100% 100%, 0 100%);
+        position: absolute;
+        bottom: 0;
+        overflow: hidden;
+        /* z-index: -1; */
+      }
+      /* .parallax > img {
+        height: 780px;
+        width: 100%;
+      } */
+      /* @media (min-width: 390px) and (max-width: 480px) {
+        .parallax > img {
+          height: 500px;
+          width: 100%;
+        }
+      } */
+      .responsive-image {
+        width: 1158px;
+        height: auto;
+        object-fit: cover;
+      }
+      .download-dropdown-mobile {
+        display: none;
+      }
+      @media (max-width: 467px) {
+        .download-dropdown-mobile {
+          display: block;
+        }
+      }
+    </style></head
+  >
+
+  <body>
+    <div class="min-h-screen background flex flex-col relative">
+      <Header />
+      <div class="flex flex-1 flex-col items-center justify-center gap-4">
+        <Button intent="secondary" class="rounded-xsgd hover:shadow-mdgd">
+          <a href="https://www.bisecthosting.com/gdl">
+            <div class="flex items-center gap-2">
+              <Image src={BHLogo} width="24" height="26" alt="bh logo" />
+              Get 25% OFF Minecraft Server Hosting w/ BisectHosting
+            </div>
+          </a>
+        </Button>
+        <a
+          href="/blog/gdlauncher-carbon-out-now"
+          class="bg-transparent text-bluegd-500 border-solid group border-[1px] hover:border-white transition-all duration-150 hover:text-white border-bluegd-500 rounded-smgd text-base py-4 px-10 cursor-pointer uppercase my-4 flex items-center"
+        >
+          NEW GDLauncher Carbon Out Now! <div
+            role="separator"
+            class="w-[1px] group-hover:bg-white bg-bluegd-400 h-6 mx-4"
+          >
+          </div>
+          <div class="flex items-center gap-4">
+            <span>read post</span>
+            <AiOutlineArrowRight
+              class="group-hover:translate-x-4 transition-all duration-150"
+            />
+          </div>
+        </a>
+        <div class="flex flex-col">
+          <h1 class="text-mdgd text-center font-bold text-white">
+            Elevate your Modded Minecraft
+          </h1>
+          <span class="text-mdgd text-center font-bold text-white">
+            Journey with GDLauncher
+          </span>
+          <span class="font-smgd text-graygd text-center">
+            Your All-In-One Minecraft Modded Launcher
+          </span>
+        </div>
+        <!-- <Button items={DownloadItems} isDropdown={true} intent="primary" size="medium">DOWNLOAD FOR</Button> -->
+        <Download />
+
+        <!-- <DownloadDropdown /> -->
+      </div>
+      <div class="relative mx-auto z-10 pt-32">
+        <div class="relative parallax">
+          <!-- <img
+            id="firstImg"
+            src="https://cdn.gdl.gg/github-readme/home.png"
+            alt="gd launcher"
+            class="mx-auto responsive-image"
+          /> -->
+          <picture>
+            <source
+              srcset="https://cdn.gdl.gg/assets/website-home-app-screenshot.webp"
+              type="image/webp"
+            />
+            <source
+              srcset="https://cdn.gdl.gg/assets/website-home-app-screenshot.jpg"
+              type="image/jpeg"
+            />
+            <img
+              src="https://cdn.gdl.gg/assets/website-home-app-screenshot.jpg"
+              alt="gd launcher"
+              class="mx-auto responsive-image"
+            />
+          </picture>
+          <!-- <Image
+            id="secondImg"
+            src={Export}
+            alt="gd launcher"
+            class="absolute right-0 bottom-0"
+          /> -->
+        </div>
+      </div>
+      <div class="wave"></div>
+    </div>
+
+    <WhatMakesGDSpecial />
+    <GdxCF />
+    <Footer />
+    <script>
+      import vanilla from "vanilla-tilt";
+      document.addEventListener(
+        "astro:page-load",
+        () => {
+          // This only runs once.
+
+          vanilla.init(document.querySelector(".parallax") as HTMLElement, {
+            max: 15,
+            speed: 50000,
+          });
+        },
+        { once: false }
+      );
+    </script>
+  </body>
+</html>

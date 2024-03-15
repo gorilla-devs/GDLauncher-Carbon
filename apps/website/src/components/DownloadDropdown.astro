@@ -1,0 +1,20 @@
+---
+import yaml from "js-yaml";
+import Button from "./button/Button";
+import { RiArrowsArrowDownSLine } from "solid-icons/ri";
+
+const downloadLinks = ["/download/windows", "/download/mac", "/download/linux"];
+---
+
+<Button
+  items={downloadLinks}
+  isDropdown={true}
+  intent="primary"
+  size="medium"
+  class="items-center rounded-xsgd"
+  client:only
+>
+  <span>DOWNLOAD FOR</span>
+  <div role="separator" class="w-[1px] bg-white h-6 mx-4"></div>
+  <RiArrowsArrowDownSLine size={20} />
+</Button>

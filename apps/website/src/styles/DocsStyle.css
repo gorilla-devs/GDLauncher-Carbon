@@ -1,0 +1,14 @@
+aside ul {
+  list-style: none;
+}
+li {
+  color: white;
+}
+main a {
+  color: rgba(40, 101, 164, 1);
+  text-decoration: underline;
+}
+main ul {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}

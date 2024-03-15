@@ -1,0 +1,86 @@
+---
+import { type CollectionEntry, getCollection } from "astro:content";
+import BlogPost from "../../layouts/BlogPost.astro";
+import Docs from "../../layouts/Docs.astro";
+
+export async function getStaticPaths() {
+  const posts = await getCollection("docs");
+  return posts.map((post) => ({
+    params: { slug: post.slug },
+    props: post,
+  }));
+}
+---
+
+<Docs
+  title="gdlauncher documentation"
+  category="full documented page for gdlauncher"
+>
+  <style></style>
+  <header>
+    <h1>Welcome to the GDLauncher Documentation</h1>
+  </header>
+
+  <section>
+    <h2>What is GDLauncher?</h2>
+    <p>
+      GDLauncher is a custom Minecraft launcher that provides additional
+      functionalities over the official Minecraft launcher, enabling users,
+      among other things, to install and manage multiple instances of the game,
+      each with its own set of mods and resource packs. You can find the full
+      list of features below.
+    </p>
+  </section>
+
+  <section>
+    <h2>Getting Started</h2>
+    <p>
+      This section will guide you through the initial steps required to set up
+      and start using GDLauncher
+    </p>
+    <ul>
+      <li>
+        <a href="/docs/getting-started/installation-windows">
+          Installation on Windows
+        </a>
+      </li>
+      <li>
+        <a href="/docs/getting-started/installation-macos">
+          Installation on macOS
+        </a>
+      </li>
+      <li>
+        <a href="/docs/getting-started/installation-linux">
+          Installation on Linux
+        </a>
+      </li>
+    </ul>
+
+    <section>
+      <h2>Features</h2>
+      <ul>
+        <li>
+          Easily install any minecraft version and modloader, including forge,
+          fabric, quilt, neoforge
+        </li>
+        <li>Install addons from CurseForge, Modrinth and more!</li>
+        <li>Install modpacks from CurseForge, Modrinth and more!</li>
+        <li>
+          Automatic Java Manager. You don't need to have java installed on your
+          system, the launcher will take care of installing the correct java
+          version for you!
+        </li>
+        <li>Built-in auto updater</li>
+        <li>Multi account support</li>
+        <li>
+          Still playing on your grandma's pc from the 80s? Don't worry, we got
+          you covered with Potato PC Mode!
+        </li>
+        <li>
+          Import/export instances from/to other launchers like Curseforge,
+          MultiMC, ATLauncher, Technic, Prism, Modrinth, FTB and more! (WIP)
+        </li>
+      </ul>
+    </section>
+  </section>
+</Docs>

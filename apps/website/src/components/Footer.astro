@@ -1,0 +1,118 @@
+---
+import Logo from "../assets/logo.svg";
+import { Image } from "astro:assets";
+import Button from "./button/Button";
+import HeaderLink from "./HeaderLink.astro";
+import Twitter from "../assets/twitter.svg";
+import Discord from "../assets/discord.svg";
+import NewsLetter from "./Newsletter";
+import { APP_URLS } from "../consts";
+import yaml from "js-yaml";
+
+const response = await Promise.all([
+  fetch("https://cdn-raw.gdl.gg/launcher/alpha.yml"),
+  fetch("https://cdn-raw.gdl.gg/launcher/alpha-mac.yml"),
+  fetch("https://cdn-raw.gdl.gg/launcher/alpha-linux.yml"),
+]);
+const yamlfiles = await Promise.all(response.map((val) => val.text()));
+const downloadLinks = yamlfiles
+  .map((val) => yaml.load(val))
+  .map((val: any) => `https://cdn-raw.gdl.gg/launcher/${val.path}`);
+---
+
+<footer class="flex flex-col">
+  <div class="flex flex-col lg:flex-row justify-between p-16 space-x-0.5">
+    <div class="flex flex-col items-start flex-1">
+      <Image src={Logo} alt="BH Logo" class="pb-4" />
+      <p class="text-graygd w-1/2">
+        GDLauncher is a simple, yet powerful Minecraft custom launcher with a
+        strong focus on the user experience.
+      </p>
+    </div>
+
+    <div class="flex-[0.5]">
+      <span class="text-white font-medium">Download</span>
+      <ul class="flex lg:flex-col gap-2 lg:gap-0 pt-4">
+        <li>
+          <HeaderLink href={downloadLinks[0]}>Windows</HeaderLink>
+        </li>
+        <li>
+          <HeaderLink href={downloadLinks[1]}>MacOs</HeaderLink>
+        </li>
+        <li>
+          <HeaderLink href={downloadLinks[2]}>Linux</HeaderLink>
+        </li>
+      </ul>
+    </div>
+
+    <NewsLetter client:idle />
+    <div class="flex-[0.5]">
+      <span class="text-white font-medium">Download old GDL</span>
+      <ul class="flex lg:flex-col gap-2 lg:gap-0 pt-4">
+        <li>
+          <HeaderLink href={APP_URLS.olddownload.win}>Windows</HeaderLink>
+        </li>
+        <li>
+          <HeaderLink href={APP_URLS.olddownload.macOs}>MacOs</HeaderLink>
+        </li>
+        <li>
+          <HeaderLink href={APP_URLS.olddownload.linux}>Linux</HeaderLink>
+        </li>
+      </ul>
+    </div>
+    <div class="flex-[0.5]">
+      <span class="text-white font-medium">Legal</span>
+      <ul class="flex lg:flex-col gap-2 lg:gap-0 pt-4">
+        <li>
+          <HeaderLink href="/terms-of-service" class="pt-4">
+            Terms of service
+          </HeaderLink>
+        </li>
+        <li>
+          <HeaderLink href="/privacy-statement">Privacy statement</HeaderLink>
+        </li>
+      </ul>
+    </div>
+    <div class="flex-1">
+      <span class="text-white font-medium">Get in Touch!</span>
+      <ul class="flex gap-2 pt-4">
+        <li>
+          <HeaderLink href="https://discord.gdlauncher.com/">
+            <Image src={Discord} alt="social discord" />
+          </HeaderLink>
+        </li>
+        <li>
+          <HeaderLink href="https://twitter.com/gdlauncher">
+            <Image src={Twitter} alt="social twitter" />
+          </HeaderLink>
+        </li>
+      </ul>
+      <div class="flex flex-col">
+        <span class="text-graygd"
+          >(C) {new Date().getFullYear()} by GorillaDevs Inc. | All Right Reserved</span
+        >
+      </div>
+    </div>
+  </div>
+  <span class="text-graygd text-center pb-2 text-sm"
+    >NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH
+    MOJANG.</span
+  >
+</footer>
+<style>
+  a {
+    cursor: pointer;
+    color: rgba(147, 153, 170, 1);
+  }
+  ul {
+    list-style: none;
+  }
+  footer {
+    background-color: rgba(29, 32, 40, 1);
+  }
+  @media screen and (max-width: 768px) {
+    footer > div {
+      gap: 1rem;
+    }
+  }
+</style>

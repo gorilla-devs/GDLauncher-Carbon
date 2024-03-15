@@ -1,3 +1,4 @@
+
 import { For, createSignal } from "solid-js";
 import SingleImport from "./SingleImport";
 import { rspc } from "@/utils/rspcClient";
@@ -30,6 +31,7 @@ const BeginImportStep = (props: {
             (x) => x.instance_name === props.instances![i]
           )
         });
+
         setState([...state(), "success"]);
       } catch (error) {
         setState([...state(), "error"]);

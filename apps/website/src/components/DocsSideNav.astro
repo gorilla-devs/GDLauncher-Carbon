@@ -1,0 +1,106 @@
+---
+import type { MDXInstance } from "astro";
+import { getCollection, type CollectionEntry } from "astro:content";
+
+const { pathname } = Astro.url;
+
+const sidebar = [
+  {
+    category: "Introduction",
+    pages: [
+      {
+        title: "Welcome to GDLauncher",
+        slug: "",
+      },
+    ],
+  },
+  {
+    category: "Installation",
+    pages: [
+      {
+        title: "Migration from Legacy GDLauncher",
+        slug: "migration-from-legacy-gdlauncher",
+      },
+      {
+        title: "Installation",
+        slug: "installation",
+      },
+    ],
+  },
+  {
+    category: "Troubleshooting",
+    pages: [
+      {
+        title: "Troubleshooting",
+        slug: "troubleshooting",
+      },
+    ],
+  },
+  {
+    category: "FAQ",
+    pages: [
+      {
+        title: "GDLauncher vs GDLauncher Carbon",
+        slug: "gdlauncher-vs-gdlauncher-carbon",
+      },
+    ],
+  },
+];
+---
+
+<style>
+  .active {
+    color: #2865a4;
+    font-weight: bold;
+  }
+</style>
+<div
+  class="px-12 md:px-24 lg:px-0 py-32 shadow-inner lg:shadow-none transition-colors"
+>
+  {
+    sidebar.map(({ category, pages }) => (
+      <>
+        <h3 class="mt-4 mb-2 text-2xl font-semibold capitalize first:mt-0 lg:text-lg text-white">
+          {category}
+        </h3>
+        <ul
+          aria-label={`Pages in ${category}`}
+          class="border-l text-lg lg:text-base"
+        >
+          {pages.map(({ title, slug }) => {
+            const matchesPath =
+              pathname === `/docs/${slug}/` || pathname === `/docs/${slug}`;
+
+            return (
+              <li
+                aria-label={title}
+                class:list={[
+                  "-ml-px border-l py-1 pl-4 text-graygd transition-all  hover:text-[#2865a4]",
+                  {
+                    "border-bluegd-500 border-l-2 border-solid active":
+                      matchesPath,
+                  },
+                  {
+                    "border-transparent dark:border-slate-600": !matchesPath,
+                  },
+                  {
+                    "hover:border-bluegd-500": !matchesPath,
+                  },
+                ]}
+              >
+                <a href={`/docs/${slug}`}>{title}</a>
+              </li>
+            );
+          })}
+        </ul>
+      </>
+    ))
+  }
+</div>
+<a
+  class="bg-black/20 backdrop-blur-sm select-none touch-manipulation lg:hidden"
+  href="#"
+  id="sidenav-close"
+  title="Close Menu"
+  aria-label="Close Menu"
+  onchange="history.go(-1)"></a>
