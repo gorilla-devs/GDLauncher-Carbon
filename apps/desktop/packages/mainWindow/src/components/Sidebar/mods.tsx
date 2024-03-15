@@ -79,6 +79,9 @@ const Sidebar = () => {
   const [selectedItems, setSelectedItems] = createSignal<string[]>([
     "Platform//Curseforge"
   ]);
+  const [currentParentCategories, setCurrentParentCategories] = createSignal<
+    Array<string>
+  >([]);
   const [menuData, setMenuData] = createSignal({
     hasSearch: false,
     isCheckbox: false,
@@ -190,12 +193,39 @@ const Sidebar = () => {
       return results;
     }
   };
-
+  createEffect(() => {
+    console.log(categories());
+  });
   const filteredInstances = () =>
     routeData.instancesUngrouped.data?.filter(
       (instance) => getValideInstance(instance.status)?.modloader
     );
   createEffect(() => {
+    const groupedByParentCategoryId = categories().reduce(
+      (accumulator: any, current: any) => {
+        // Use the parentCategoryId as a key
+        const key = current.parentCategoryId;
+
+        // If the accumulator doesn't have an array for this key, create it
+        if (!accumulator[key]) {
+          accumulator[key] = [];
+        }
+
+        // Push the current object into the correct array
+        accumulator[key].push(current);
+
+        // Return the accumulator for the next iteration
+        return accumulator;
+      },
+      {}
+    );
+
+    const NotFilteredCategories = () =>
+      isCurseforge()
+        ? curseforgeCategories()
+        : modrinthCategories().filter(
+            (category) => category.project_type === "mod"
+          );
     setMenuData((prev) => ({
       ...prev,
       items: prev.items.map((item) => {
@@ -304,27 +334,76 @@ const Sidebar = () => {
           };
         }
         if (item.label === "Categories") {
+          console.log("categories", categories());
+          let parentCategoriesIds: any;
+          if (isCurseforge()) {
+            parentCategoriesIds = Object.keys(groupedByParentCategoryId).map(
+              (key) => key
+            );
+            const parentCategories = NotFilteredCategories()
+              .filter((category: any) =>
+                parentCategoriesIds.includes(category.id.toString())
+              )
+              .map((category: any) => category.name);
+            setCurrentParentCategories(parentCategories);
+          }
+
           return {
             label: t("general.categories"),
             img: "",
             children: {
               hasSearch: true,
-              isCheckbox: true,
-              isParent: false,
+              isCheckbox: !isCurseforge(),
+              isParent: isCurseforge(),
               parentLabel: t("general.categories"),
+              items: isCurseforge()
+                ? Object.entries(groupedByParentCategoryId).map(
+                    ([key, value]) => {
+                      console.log("key", key);
 
-              items: categories().map((category) => {
-                return {
-                  label: category.name,
-                  img: <CategoryIcon category={category} />
-                };
-              })
+                      const parentCategory: any = NotFilteredCategories().find(
+                        (category: any) => category.id === parseInt(key)
+                      );
+                      console.log("value", parentCategory);
+                      return {
+                        label: parentCategory?.name,
+                        img: <CategoryIcon category={parentCategory} />,
+                        children: {
+                          hasSearch: true,
+                          isCheckbox: true,
+                          isParent: false,
+                          parentLabel: parentCategory?.name,
+                          items: (value as any).map((category: any) => {
+                            return {
+                              label: category.name,
+                              img: <CategoryIcon category={category} />
+                            };
+                          })
+                        }
+                      };
+                    }
+                  )
+                : categories().map((category) => {
+                    return {
+                      label: category.name,
+                      img: <CategoryIcon category={category} />
+                    };
+                  })
+              // items: categories().map((category) => {
+              //   return {
+              //     label: category.name,
+              //     img: <CategoryIcon category={category} />
+              //   };
+              // })
             }
           };
         }
         return item;
       })
     }));
+  });
+  createEffect(() => {
+    console.log(selectedItems());
   });
   createEffect(() => {
     const currentPlatform = selectedItems()
@@ -356,8 +435,9 @@ const Sidebar = () => {
   });
 
   createEffect(() => {
+    console.log("currentParentCategories", currentParentCategories());
     const selectedCategories = selectedItems()
-      .filter((item) => item.includes("Categories"))
+      .filter((item) => currentParentCategories().includes(item.split("//")[0]))
       .map((item) => item.split("//")[1]);
     const objectCategories = selectedCategories.map((category) => {
       const categ = categories().find((item) => item.name === category);
@@ -367,6 +447,7 @@ const Sidebar = () => {
         return [{ modrinth: (categ as MRFECategory).name }];
       }
     });
+    console.log("objectCategories", objectCategories);
     infiniteQuery.setQuery({
       categories: objectCategories as any
     });
