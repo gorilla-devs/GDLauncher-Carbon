@@ -21,4 +21,4 @@ The app is universal, which means it runs natively on both Intel and Apple Silic
 ## Linux
 
 To install GDLauncher for linux you just have to head over to our landing page and press download.
-You'll then download the appimage and run it normally.
+You'll then download the AppImage and run it normally.
