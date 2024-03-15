@@ -307,7 +307,6 @@ const Sidebar = () => {
       const modloader = modLoaders.map((item) =>
         item.split("//")[1].toLowerCase()
       );
-      console.log(modloader);
       infiniteQuery.setQuery({
         modloaders: modloader as FEUnifiedModLoaderType[]
       });

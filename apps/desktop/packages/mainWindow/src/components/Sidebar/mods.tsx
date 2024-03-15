@@ -193,9 +193,7 @@ const Sidebar = () => {
       return results;
     }
   };
-  createEffect(() => {
-    console.log(categories());
-  });
+
   const filteredInstances = () =>
     routeData.instancesUngrouped.data?.filter(
       (instance) => getValideInstance(instance.status)?.modloader
@@ -239,7 +237,6 @@ const Sidebar = () => {
               isParent: false,
               parentLabel: t("general.instances"),
               items: filteredInstances()?.map((instance) => {
-                console.log(instance.id);
                 return {
                   label: instance.name,
                   img: (
@@ -334,7 +331,6 @@ const Sidebar = () => {
           };
         }
         if (item.label === "Categories") {
-          console.log("categories", categories());
           let parentCategoriesIds: any;
           if (isCurseforge()) {
             parentCategoriesIds = Object.keys(groupedByParentCategoryId).map(
@@ -359,12 +355,9 @@ const Sidebar = () => {
               items: isCurseforge()
                 ? Object.entries(groupedByParentCategoryId).map(
                     ([key, value]) => {
-                      console.log("key", key);
-
                       const parentCategory: any = NotFilteredCategories().find(
                         (category: any) => category.id === parseInt(key)
                       );
-                      console.log("value", parentCategory);
                       return {
                         label: parentCategory?.name,
                         img: <CategoryIcon category={parentCategory} />,
@@ -403,9 +396,6 @@ const Sidebar = () => {
     }));
   });
   createEffect(() => {
-    console.log(selectedItems());
-  });
-  createEffect(() => {
     const currentPlatform = selectedItems()
       .find((item) => item.includes("Platform"))
       ?.split("//")[1];
@@ -435,7 +425,6 @@ const Sidebar = () => {
   });
 
   createEffect(() => {
-    console.log("currentParentCategories", currentParentCategories());
     const selectedCategories = selectedItems()
       .filter((item) =>
         isCurseforge()
@@ -451,7 +440,6 @@ const Sidebar = () => {
         return [{ modrinth: (categ as MRFECategory).name }];
       }
     });
-    console.log("objectCategories", objectCategories);
     infiniteQuery.setQuery({
       categories: objectCategories as any
     });
@@ -469,7 +457,6 @@ const Sidebar = () => {
       const modloader = modLoaders.map((item) =>
         item.split("//")[1].toLowerCase()
       );
-      console.log(modloader);
       infiniteQuery.setQuery({
         modloaders: modloader as FEUnifiedModLoaderType[]
       });
@@ -510,8 +497,6 @@ const Sidebar = () => {
           }
         }
 
-        console.log(newModloaders, [gameVersion]);
-
         infiniteQuery.setQuery({
           modloaders: newModloaders,
           gameVersions: [gameVersion]
@@ -522,270 +507,6 @@ const Sidebar = () => {
   });
 
   return (
-    // <SiderbarWrapper collapsable={false} noPadding>
-    //   <div class="h-full w-full box-border px-4 overflow-y-auto py-5">
-    //     <Show when={filteredInstances()}>
-    //       <Collapsable title={t("general.instances")} noPadding>
-    //         <div class="flex flex-col gap-3">
-    //           <Radio.group
-    //             onChange={async (val) => {
-    //               const details: any = await runWithOwner(owner, async () => {
-    //                 return rspcFetch(() => [
-    //                   "instance.getInstanceDetails",
-    //                   val
-    //                 ]);
-    //               });
-
-    //               setSearchParams({
-    //                 instanceId: val as number
-    //               });
-    //               setInstanceId(val as number);
-
-    //               const modloaders = details.data.modloaders.map(
-    //                 (v: any) => v.type_
-    //               );
-
-    //               const gameVersion = details.data.version;
-
-    //               let newModloaders = [];
-    //               if (modloaders) {
-    //                 if (modloaders?.includes("forge")) {
-    //                   newModloaders.push("forge");
-    //                 } else if (modloaders?.includes("quilt")) {
-    //                   newModloaders.push("fabric");
-    //                   newModloaders.push("quilt");
-    //                 } else {
-    //                   newModloaders = [...modloaders!] as any;
-    //                 }
-    //               }
-
-    //               console.log(newModloaders, [gameVersion]);
-
-    //               infiniteQuery.setQuery({
-    //                 modloaders: newModloaders,
-    //                 gameVersions: [gameVersion]
-    //               });
-    //             }}
-    //             value={instanceId()}
-    //           >
-    //             <For each={filteredInstances() || []}>
-    //               {(instance) => {
-    //                 return (
-    //                   <Radio name="instance" value={instance.id}>
-    //                     <div class="flex items-center justify-between gap-2">
-    //                       <div
-    //                         class="w-6 h-6 bg-center bg-cover"
-    //                         style={{
-    //                           "background-image": instance.icon_revision
-    //                             ? `url("${getInstanceImageUrl(
-    //                                 instance.id,
-    //                                 instance.icon_revision
-    //                               )}")`
-    //                             : `url("${DefaultImg}")`
-    //                         }}
-    //                       />
-    //                       <p class="m-0">{instance.name}</p>
-    //                     </div>
-    //                   </Radio>
-    //                 );
-    //               }}
-    //             </For>
-    //           </Radio.group>
-    //         </div>
-    //       </Collapsable>
-    //     </Show>
-    //     <Collapsable title={t("general.platform")} noPadding>
-    //       <div class="flex flex-col gap-3">
-    //         <Radio.group
-    //           onChange={(val) => {
-    //             infiniteQuery.setQuery({
-    //               searchApi: (val as string).toLowerCase() as FESearchAPI,
-    //               categories: []
-    //             });
-    //           }}
-    //           value={capitalize(infiniteQuery?.query?.searchApi)}
-    //         >
-    //           <For each={ModpackPlatforms}>
-    //             {(platform) => (
-    //               <Radio name="platform" value={platform}>
-    //                 <div class="flex items-center gap-2">
-    //                   <PlatformIcon platform={platform} />
-    //                   <p class="m-0">{platform}</p>
-    //                 </div>
-    //               </Radio>
-    //             )}
-    //           </For>
-    //         </Radio.group>
-    //       </div>
-    //     </Collapsable>
-    //     <Collapsable title={t("general.game_versions")} noPadding>
-    //       <Show when={mappedMcVersions().length > 0}>
-    //         <div class="flex flex-col gap-4 mt-2">
-    //           <div class="flex gap-2 items-center">
-    //             <Checkbox
-    //               checked={gameVersionFilters.snapshot}
-    //               onChange={(e) =>
-    //                 updateGameVersionsFilter({
-    //                   snapshot: e
-    //                 })
-    //               }
-    //             />
-    //             <div class="m-0 flex items-center">
-    //               <Trans key="instance.include_snapshot_versions" />
-    //             </div>
-    //           </div>
-    //           <div class="flex gap-2">
-    //             <Checkbox
-    //               checked={gameVersionFilters.oldAlpha}
-    //               onChange={(e) => updateGameVersionsFilter({ oldAlpha: e })}
-    //             />
-    //             <div class="m-0 flex items-center">
-    //               <Trans key="instance.include_old_alpha_versions" />
-    //             </div>
-    //           </div>
-    //           <div class="flex gap-2">
-    //             <Checkbox
-    //               checked={gameVersionFilters.oldBeta}
-    //               onChange={(e) => updateGameVersionsFilter({ oldBeta: e })}
-    //             />
-    //             <div class="m-0 flex items-center">
-    //               <Trans key="instance.include_old_beta_versions" />
-    //             </div>
-    //           </div>
-    //         </div>
-    //         <Dropdown
-    //           class="w-full"
-    //           containerClass="w-full mt-4"
-    //           options={filteredMappedGameVersions()}
-    //           disabled={!isNaN(instanceId()!)}
-    //           icon={<div class="i-ri:price-tag-3-fill" />}
-    //           value={infiniteQuery.query.gameVersions?.[0] || null}
-    //           onChange={(val) => {
-    //             infiniteQuery?.setQuery({
-    //               gameVersions: val.key ? [val.key as string] : null
-    //             });
-    //           }}
-    //         />
-    //       </Show>
-    //       <Show when={mappedMcVersions().length === 0}>
-    //         <Skeleton.select />
-    //       </Show>
-    //     </Collapsable>
-    //     <Collapsable title={t("general.modloaders")} noPadding>
-    //       <div class="flex flex-col gap-3">
-    //         <For each={modloaders()}>
-    //           {(modloader) => {
-    //             return (
-    //               <div class="flex items-center gap-2">
-    //                 <Checkbox
-    //                   onChange={(checked) => {
-    //                     const prevModloaders =
-    //                       infiniteQuery?.query.modloaders || [];
-
-    //                     const modloaderName =
-    //                       typeof modloader === "string"
-    //                         ? modloader
-    //                         : modloader.name;
-
-    //                     const filteredModloaders = prevModloaders.filter(
-    //                       (_modloader) => _modloader !== modloaderName
-    //                     );
-
-    //                     const newModloaders = checked
-    //                       ? [
-    //                           ...prevModloaders,
-    //                           modloaderName as FEUnifiedModLoaderType
-    //                         ]
-    //                       : filteredModloaders;
-
-    //                     infiniteQuery.setQuery({
-    //                       modloaders:
-    //                         newModloaders.length === 0 ? null : newModloaders
-    //                     });
-    //                   }}
-    //                   checked={infiniteQuery.query.modloaders?.includes(
-    //                     ((modloader as any)?.name ||
-    //                       modloader) as FEUnifiedModLoaderType
-    //                   )}
-    //                   disabled={!isNaN(instanceId()!)}
-    //                 />
-    //                 <ModloaderIcon modloader={modloader} />
-    //                 <p class="m-0">
-    //                   {capitalize(
-    //                     typeof modloader === "string"
-    //                       ? modloader
-    //                       : modloader.name
-    //                   )}
-    //                 </p>
-    //               </div>
-    //             );
-    //           }}
-    //         </For>
-    //       </div>
-    //     </Collapsable>
-    //     <Switch>
-    //       <Match when={categories().length > 0}>
-    //         <Collapsable title={t("general.categories")} noPadding>
-    //           <div class="flex flex-col gap-3">
-    //             <For each={categories()}>
-    //               {(category) => {
-    //                 const categoryObj = () =>
-    //                   isCurseforge()
-    //                     ? { curseforge: (category as CFFECategory).id }
-    //                     : { modrinth: (category as MRFECategory).name };
-
-    //                 const categoryId = () =>
-    //                   isCurseforge()
-    //                     ? (category as CFFECategory).id
-    //                     : (category as MRFECategory).name;
-
-    //                 const isCategoryIncluded = () =>
-    //                   infiniteQuery?.query.categories?.some(
-    //                     (item) =>
-    //                       ("curseforge" in item[0] &&
-    //                         item[0].curseforge === categoryId()) ||
-    //                       ("modrinth" in item[0] &&
-    //                         item[0].modrinth === categoryId())
-    //                   );
-
-    //                 return (
-    //                   <div class="flex items-center gap-3">
-    //                     <Checkbox
-    //                       checked={isCategoryIncluded()}
-    //                       onChange={(checked) => {
-    //                         const prevCategories =
-    //                           infiniteQuery?.query.categories || [];
-
-    //                         const newCategories = checked
-    //                           ? [...prevCategories, [categoryObj()]]
-    //                           : prevCategories.filter(
-    //                               (categ) =>
-    //                                 getCategoryId(categ[0]) !==
-    //                                 getCategoryId(categoryObj())
-    //                             );
-
-    //                         infiniteQuery.setQuery({
-    //                           categories: newCategories
-    //                         });
-    //                       }}
-    //                     />
-    //                     <div class="flex items-center gap-2 max-w-32">
-    //                       <CategoryIcon category={category} />
-    //                       <p class="m-0">{capitalize(category.name)}</p>
-    //                     </div>
-    //                   </div>
-    //                 );
-    //               }}
-    //             </For>
-    //           </div>
-    //         </Collapsable>
-    //       </Match>
-    //       <Match when={curseforgeCategories().length === 0}>
-    //         <Skeleton.modpackSidebarCategories />
-    //       </Match>
-    //     </Switch>
-    //   </div>
-    // </SiderbarWrapper>
     <Cascader
       children={<div class="cursor-pointer text-2xl i-ri-filter-line" />}
       {...menuData()}
