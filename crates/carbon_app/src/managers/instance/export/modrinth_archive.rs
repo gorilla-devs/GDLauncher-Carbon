@@ -378,7 +378,7 @@ mod test {
                 instance_id,
                 "folder_linked.zip",
                 ExportEntry(HashMap::from([(String::from("mods"), None)])),
-                true,
+                false,
             )
             .await?;
 
@@ -431,7 +431,7 @@ mod test {
                 instance_id,
                 "folder_unlinked.zip",
                 ExportEntry(HashMap::from([(String::from("mods"), None)])),
-                false,
+                true,
             )
             .await?;
 
@@ -473,7 +473,7 @@ mod test {
                 instance_id,
                 "nofolder_linked.zip",
                 ExportEntry(HashMap::from([])),
-                true,
+                false,
             )
             .await?;
 
@@ -513,7 +513,7 @@ mod test {
                 instance_id,
                 "nofolder_unlinked.zip",
                 ExportEntry(HashMap::from([])),
-                false,
+                true,
             )
             .await?;
 
@@ -559,7 +559,7 @@ mod test {
                         None,
                     )]))),
                 )])),
-                false,
+                true,
             )
             .await?;
 

@@ -13,7 +13,7 @@ export const APP_URLS = {
     instagram: "https://www.instagram.com/gdlauncher",
     twitter: "https://twitter.com/gdlauncher",
   },
-  newsletter: "https://api.gdlauncher.com/v1",
+  newsletter: "https://api.gdl.gg/v1",
   olddownload: {
     win: "https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-win-setup.exe",
     macOs:

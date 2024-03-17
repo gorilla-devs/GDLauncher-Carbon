@@ -90,7 +90,11 @@ pub async fn get_version(
                     ),
                 ],
             ),
-            vec![],
+            vec![
+                crate::db::partial_version_info_cache::partial_version_info::set(
+                    version_bytes.to_vec(),
+                ),
+            ],
         )
         .exec()
         .await?;
