@@ -13,6 +13,7 @@ import GdxCF from "../components/GdxCF.astro";
 import "../styles/HomeStyle.css";
 import DownloadDropdown from "../components/DownloadDropdown.astro";
 import { AiOutlineArrowRight } from "solid-icons/ai";
+import DownloadButton from "../components/DownloadButton.astro";
 
 Astro.locals.cache(60);
 ---
@@ -116,6 +117,8 @@ Astro.locals.cache(60);
           </span>
         </div>
         <!-- <Button items={DownloadItems} isDropdown={true} intent="primary" size="medium">DOWNLOAD FOR</Button> -->
+        
+        <DownloadButton />
         <Download />
 
         <!-- <DownloadDropdown /> -->
