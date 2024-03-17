@@ -31,7 +31,4 @@ export default defineConfig({
     "/download/mac": downloadLinks[1],
     "/download/linux": downloadLinks[2],
   },
-  server: {
-    port: 8000,
-  },
 });
