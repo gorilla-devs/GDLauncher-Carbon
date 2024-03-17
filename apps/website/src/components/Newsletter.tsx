@@ -37,7 +37,7 @@ const NewsLetter = () => {
           );
         } else {
           setSuccess(
-            "We have sent you a confirmation email, please confirm it. 🚀",
+            "We have sent you a confirmation email, please click on the confirmation link. 🚀",
           );
           setEmail("");
         }
