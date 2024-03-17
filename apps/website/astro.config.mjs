@@ -8,9 +8,9 @@ import solidJs from "@astrojs/solid-js";
 import yaml from "js-yaml";
 
 const response = await Promise.all([
-  fetch("https://cdn-raw.gdl.gg/staged/latest.yml"),
-  fetch("https://cdn-raw.gdl.gg/staged/latest-mac.yml"),
-  fetch("https://cdn-raw.gdl.gg/staged/latest-linux.yml"),
+  fetch("https://cdn-raw.gdl.gg/launcher/latest.yml"),
+  fetch("https://cdn-raw.gdl.gg/launcher/latest-mac.yml"),
+  fetch("https://cdn-raw.gdl.gg/launcher/latest-linux.yml"),
 ]);
 const yamlfiles = await Promise.all(response.map((val) => val.text()));
 const downloadLinks = yamlfiles
