@@ -25,7 +25,14 @@ export default defineConfig({
   output: "hybrid",
   site: "https://gdlauncher.com",
   adapter: cloudflare(),
-  integrations: [tailwind(), mdx(), sitemap(), solidJs()],
+  integrations: [
+    tailwind(),
+    mdx(),
+    sitemap({
+      filter: (page) => page !== "https://gdlauncher.com/newsletter/confirm/",
+    }),
+    solidJs(),
+  ],
   redirects: {
     "/download/windows": downloadLinks[0],
     "/download/mac": downloadLinks[1],

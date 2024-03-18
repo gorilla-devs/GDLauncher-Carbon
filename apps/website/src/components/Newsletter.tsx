@@ -1,4 +1,4 @@
-import { Show, createSignal } from "solid-js";
+import { Show, createEffect, createSignal } from "solid-js";
 import Button from "./button/Button";
 import { ADD_USER_ENDPOINT } from "../consts";
 
@@ -7,7 +7,6 @@ const NewsLetter = () => {
   const [error, setError] = createSignal<null | string>(null);
   const [loading, setLoading] = createSignal(false);
   const [success, setSuccess] = createSignal<null | string>(null);
-
   const addUser = async (body: any) => {
     return await fetch(ADD_USER_ENDPOINT, {
       method: "POST",
@@ -37,7 +36,7 @@ const NewsLetter = () => {
           );
         } else {
           setSuccess(
-            "We have sent you a confirmation email, please confirm it. 🚀",
+            "We have sent you a confirmation email, please click on the confirmation link. 🚀",
           );
           setEmail("");
         }
@@ -49,8 +48,12 @@ const NewsLetter = () => {
     }
     setLoading(false);
   };
+
   return (
-    <div class="flex flex-col gap-2 flex-1 items-start justify-start">
+    <div
+      class="flex flex-col gap-2 flex-1 items-start justify-start"
+      id="newsletter"
+    >
       <span class="text-white font-medium pb-4">Newsletter</span>
       <input
         type="email"
@@ -60,6 +63,7 @@ const NewsLetter = () => {
           const value = (e.target as HTMLInputElement).value;
           setEmail(value);
         }}
+        id="newsletter-email"
         name="email"
         class="bg-darkgd px-2 py-1 border-bluegd-500 border-[1px] rounded-md text-white outline-none"
       />

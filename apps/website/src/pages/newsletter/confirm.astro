@@ -1,5 +1,7 @@
 ---
 import "@fontsource/ubuntu";
+import { Image } from "astro:assets";
+import Logo from "../../assets/logo.svg";
 ---
 
 
@@ -16,7 +18,7 @@ import "@fontsource/ubuntu";
             rgba(23, 29, 39, 0.3),
             /* Your specified semi-transparent color */ rgba(23, 29, 39, 0.3)
           ),
-          url("../assets/bg.svg");
+          url("../../assets/bg.svg");
         background-size: cover;
         /* background-position: center; */
         background-repeat: no-repeat;
@@ -31,12 +33,12 @@ import "@fontsource/ubuntu";
         color: white;
         font-size: 3rem
       }
-      img {
-        max-width: 100%;
-        height: 2rem;
-      }
+      
     </style>
     <body>
-        <h1>You have successfully subscribed to the newsletter</h1>
+      
+      <Image src={Logo} alt="gdlauncher logo" width="373" height="240" />
+    
+        <h1 class="text-center">You have successfully subscribed to the newsletter</h1>
     </body>
 </html>

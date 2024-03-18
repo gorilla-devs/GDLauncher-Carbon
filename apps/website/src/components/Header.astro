@@ -30,6 +30,11 @@ const { pathname } = Astro.url;
       <HeaderLink class="text-graygd" href={APP_URLS.socials.github}>
         Github
       </HeaderLink>
+      
+      <HeaderLink class:list={"newsletter"} class="text-graygd" href="#newsletter">
+        Newsletter
+      </HeaderLink>
+      
     </div>
     <div class="sidenav">
       {pathname.includes("docs") && <DocsSideNav />}
@@ -63,7 +68,7 @@ const { pathname } = Astro.url;
   .gdlogo-mobile {
     display: none;
   }
-  @media screen and (max-width: 480px) {
+  @media screen and (max-width: 1081px) {
     .gdlogo-mobile {
       display: block;
       padding-top: 0;
@@ -78,12 +83,12 @@ const { pathname } = Astro.url;
   .sidenav {
     display: none;
   }
-  @media screen and (max-width: 480px) {
+  @media screen and (max-width: 1081px) {
     .sidenav {
       display: block;
     }
   }
-  @media screen and (max-width: 480px) {
+  @media screen and (max-width: 1081px) {
     /* .gdlogo {
       padding-top: 1rem;
     } */
@@ -102,7 +107,7 @@ const { pathname } = Astro.url;
     justify-content: center;
     gap: 8rem;
   }
-  @media screen and (max-width: 480px) {
+  @media screen and (max-width: 1081px) {
     nav {
       display: none;
     }
@@ -135,7 +140,7 @@ const { pathname } = Astro.url;
     padding: 0.5em 0.5em;
     cursor: pointer;
   }
-  @media screen and (max-width: 480px) {
+  @media screen and (max-width: 1081px) {
     nav {
       gap: 0rem;
       display: none;
@@ -148,7 +153,7 @@ const { pathname } = Astro.url;
 
 <script defer>
   window.addEventListener("resize", () => {
-    if (window.innerWidth > 480) {
+    if (window.innerWidth > 1081) {
       document.getElementById("sidebar").style.display = "flex";
     } else {
       if (!document.getElementById("sidebar").classList.contains("visible")) {
@@ -159,17 +164,30 @@ const { pathname } = Astro.url;
     }
   });
   function openNav() {
-    if (window.innerWidth <= 480) {
+    if (window.innerWidth <= 1081) {
       //   document.getElementById("sidebar").style.width = "100%";
       // document.getElementById("sidebar").style.display = "flex";
       document.getElementById("sidebar").style.display = "flex";
       document.getElementById("sidebar").classList.add("visible");
+      document.body.classList.add("no-scroll");
     }
   }
 
   function closeNav() {
-    if (window.innerWidth <= 480)
+    if (window.innerWidth <= 1081)
       document.getElementById("sidebar").style.display = "none";
     document.getElementById("sidebar").classList.remove("visible");
+    document.body.classList.remove("no-scroll");
   }
+  const newsletter = document.querySelector(".newsletter");
+ 
+  console.log(newsletter)
+  
+  newsletter.addEventListener("click", () => {
+    closeNav();
+     const newsletterInput = document.getElementById("newsletter-email");
+     setTimeout(() => {
+       newsletterInput?.focus?.();
+     }, 0);
+  });
 </script>
