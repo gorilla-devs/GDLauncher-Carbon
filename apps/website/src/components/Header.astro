@@ -30,6 +30,9 @@ const { pathname } = Astro.url;
       <HeaderLink class="text-graygd" href={APP_URLS.socials.github}>
         Github
       </HeaderLink>
+      <HeaderLink class="text-graygd" href="#newsletter">
+        Newsletter
+      </HeaderLink>
     </div>
     <div class="sidenav">
       {pathname.includes("docs") && <DocsSideNav />}

@@ -23,6 +23,9 @@ Astro.locals.cache(60);
   <head>
     <BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
     <style>
+      html {
+        scroll-behavior: smooth;
+      }
       body {
         font-family: "Ubuntu", sans-serif;
         background-color: rgba(29, 32, 40, 1);
@@ -117,7 +120,7 @@ Astro.locals.cache(60);
           </span>
         </div>
         <!-- <Button items={DownloadItems} isDropdown={true} intent="primary" size="medium">DOWNLOAD FOR</Button> -->
-        
+
         <DownloadButton />
         <Download />
 
