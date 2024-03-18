@@ -63,6 +63,7 @@ const NewsLetter = () => {
           const value = (e.target as HTMLInputElement).value;
           setEmail(value);
         }}
+        autofocus
         name="email"
         class="bg-darkgd px-2 py-1 border-bluegd-500 border-[1px] rounded-md text-white outline-none"
       />
