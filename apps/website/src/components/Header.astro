@@ -68,7 +68,7 @@ const { pathname } = Astro.url;
   .gdlogo-mobile {
     display: none;
   }
-  @media screen and (max-width: 480px) {
+  @media screen and (max-width: 1081px) {
     .gdlogo-mobile {
       display: block;
       padding-top: 0;
@@ -83,12 +83,12 @@ const { pathname } = Astro.url;
   .sidenav {
     display: none;
   }
-  @media screen and (max-width: 480px) {
+  @media screen and (max-width: 1081px) {
     .sidenav {
       display: block;
     }
   }
-  @media screen and (max-width: 480px) {
+  @media screen and (max-width: 1081px) {
     /* .gdlogo {
       padding-top: 1rem;
     } */
@@ -107,7 +107,7 @@ const { pathname } = Astro.url;
     justify-content: center;
     gap: 8rem;
   }
-  @media screen and (max-width: 480px) {
+  @media screen and (max-width: 1081px) {
     nav {
       display: none;
     }
@@ -140,7 +140,7 @@ const { pathname } = Astro.url;
     padding: 0.5em 0.5em;
     cursor: pointer;
   }
-  @media screen and (max-width: 480px) {
+  @media screen and (max-width: 1081px) {
     nav {
       gap: 0rem;
       display: none;
@@ -153,7 +153,7 @@ const { pathname } = Astro.url;
 
 <script defer>
   window.addEventListener("resize", () => {
-    if (window.innerWidth > 480) {
+    if (window.innerWidth > 1081) {
       document.getElementById("sidebar").style.display = "flex";
     } else {
       if (!document.getElementById("sidebar").classList.contains("visible")) {
@@ -164,7 +164,7 @@ const { pathname } = Astro.url;
     }
   });
   function openNav() {
-    if (window.innerWidth <= 480) {
+    if (window.innerWidth <= 1081) {
       //   document.getElementById("sidebar").style.width = "100%";
       // document.getElementById("sidebar").style.display = "flex";
       document.getElementById("sidebar").style.display = "flex";
@@ -173,7 +173,7 @@ const { pathname } = Astro.url;
   }
 
   function closeNav() {
-    if (window.innerWidth <= 480)
+    if (window.innerWidth <= 1081)
       document.getElementById("sidebar").style.display = "none";
     document.getElementById("sidebar").classList.remove("visible");
   }
