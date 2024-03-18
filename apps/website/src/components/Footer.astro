@@ -18,8 +18,6 @@ const yamlfiles = await Promise.all(response.map((val) => val.text()));
 const downloadLinks = yamlfiles
   .map((val) => yaml.load(val))
   .map((val: any) => `https://cdn-raw.gdl.gg/launcher/${val.path}`);
-const canonicalURL = new URL(Astro.url.pathname, Astro.site);
-console.log(canonicalURL);
 ---
 
 <footer class="flex flex-col">

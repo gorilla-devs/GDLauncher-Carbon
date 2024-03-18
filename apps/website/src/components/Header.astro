@@ -169,6 +169,7 @@ const { pathname } = Astro.url;
       // document.getElementById("sidebar").style.display = "flex";
       document.getElementById("sidebar").style.display = "flex";
       document.getElementById("sidebar").classList.add("visible");
+      document.body.classList.add("no-scroll");
     }
   }
 
@@ -176,6 +177,7 @@ const { pathname } = Astro.url;
     if (window.innerWidth <= 1081)
       document.getElementById("sidebar").style.display = "none";
     document.getElementById("sidebar").classList.remove("visible");
+    document.body.classList.remove("no-scroll");
   }
   const newsletter = document.querySelector(".newsletter");
  
