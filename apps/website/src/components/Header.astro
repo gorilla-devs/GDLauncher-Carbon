@@ -178,10 +178,11 @@ const { pathname } = Astro.url;
   const newsletter = document.querySelector(".newsletter");
  
   console.log(newsletter)
+  
   newsletter.addEventListener("click", () => {
      const newsletterInput = document.getElementById("newsletter-email");
      setTimeout(() => {
-       newsletterInput.focus();
+       newsletterInput?.focus?.();
      }, 0);
   });
 </script>
