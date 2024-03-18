@@ -30,7 +30,7 @@ const { pathname } = Astro.url;
       <HeaderLink class="text-graygd" href={APP_URLS.socials.github}>
         Github
       </HeaderLink>
-      <HeaderLink class="text-graygd" href="#newsletter">
+      <HeaderLink class:list={"newsletter"} class="text-graygd" href="#newsletter">
         Newsletter
       </HeaderLink>
     </div>
@@ -175,4 +175,13 @@ const { pathname } = Astro.url;
       document.getElementById("sidebar").style.display = "none";
     document.getElementById("sidebar").classList.remove("visible");
   }
+  const newsletter = document.querySelector(".newsletter");
+ 
+  console.log(newsletter)
+  newsletter.addEventListener("click", () => {
+     const newsletterInput = document.getElementById("newsletter-email");
+     setTimeout(() => {
+       newsletterInput.focus();
+     }, 0);
+  });
 </script>
