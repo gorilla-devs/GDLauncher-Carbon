@@ -72,18 +72,22 @@ Astro.locals.cache(60);
       .download-dropdown-mobile {
         display: none;
       }
-      @media (max-width: 467px) {
+      @media (max-width: 578px) {
         .download-dropdown-mobile {
           display: block;
         }
+        .title {
+          font-size: 2rem;
+        }
       }
+     
     </style></head
   >
 
   <body>
     <div class="min-h-screen background flex flex-col relative">
       <Header />
-      <div class="flex flex-1 flex-col items-center justify-center gap-4">
+      <div class="flex flex-1 flex-col items-center justify-center gap-4 p-2">
         <Button intent="secondary" class="rounded-xsgd hover:shadow-mdgd">
           <a href="https://www.bisecthosting.com/gdl">
             <div class="flex items-center gap-2">
@@ -109,10 +113,10 @@ Astro.locals.cache(60);
           </div>
         </a>
         <div class="flex flex-col">
-          <h1 class="text-mdgd text-center font-bold text-white">
+          <h1 class="text-mdgd text-center font-bold text-white title">
             Elevate your Modded Minecraft
           </h1>
-          <span class="text-mdgd text-center font-bold text-white">
+          <span class="text-mdgd text-center font-bold text-white title">
             Journey with GDLauncher
           </span>
           <span class="font-smgd text-graygd text-center">
@@ -126,7 +130,7 @@ Astro.locals.cache(60);
 
         <!-- <DownloadDropdown /> -->
       </div>
-      <div class="relative mx-auto z-10 pt-32">
+      <div class="relative mx-auto z-10 pt-32 pr-2 pl-2">
         <div class="relative parallax">
           <!-- <img
             id="firstImg"
