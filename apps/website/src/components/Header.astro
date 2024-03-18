@@ -30,9 +30,11 @@ const { pathname } = Astro.url;
       <HeaderLink class="text-graygd" href={APP_URLS.socials.github}>
         Github
       </HeaderLink>
+      
       <HeaderLink class:list={"newsletter"} class="text-graygd" href="#newsletter">
         Newsletter
       </HeaderLink>
+      
     </div>
     <div class="sidenav">
       {pathname.includes("docs") && <DocsSideNav />}
@@ -180,6 +182,7 @@ const { pathname } = Astro.url;
   console.log(newsletter)
   
   newsletter.addEventListener("click", () => {
+    closeNav();
      const newsletterInput = document.getElementById("newsletter-email");
      setTimeout(() => {
        newsletterInput?.focus?.();
