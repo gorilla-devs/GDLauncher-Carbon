@@ -1,4 +1,4 @@
-import { Show, createSignal } from "solid-js";
+import { Show, createEffect, createSignal } from "solid-js";
 import Button from "./button/Button";
 import { ADD_USER_ENDPOINT } from "../consts";
 
@@ -7,7 +7,8 @@ const NewsLetter = () => {
   const [error, setError] = createSignal<null | string>(null);
   const [loading, setLoading] = createSignal(false);
   const [success, setSuccess] = createSignal<null | string>(null);
-
+  const [currentUrl, setCurrentUrl] = createSignal("");
+  let ref;
   const addUser = async (body: any) => {
     return await fetch(ADD_USER_ENDPOINT, {
       method: "POST",
@@ -49,6 +50,12 @@ const NewsLetter = () => {
     }
     setLoading(false);
   };
+  createEffect(() => {
+    console.log(window.location.href.split("/").at(-1));
+    if (window.location.href.split("/").at(-1) === "#newsletter") {
+      ref!.focus();
+    }
+  });
   return (
     <div
       class="flex flex-col gap-2 flex-1 items-start justify-start"
@@ -63,7 +70,7 @@ const NewsLetter = () => {
           const value = (e.target as HTMLInputElement).value;
           setEmail(value);
         }}
-        autofocus
+        ref={ref}
         name="email"
         class="bg-darkgd px-2 py-1 border-bluegd-500 border-[1px] rounded-md text-white outline-none"
       />
