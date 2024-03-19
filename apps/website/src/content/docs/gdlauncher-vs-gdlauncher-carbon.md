@@ -1,5 +1,5 @@
 ---
-title: "Gdlauncher vs Gdlauncher carbon"
+title: "GDLauncher vs GDLauncher Carbon"
 ---
 
 # GDLauncher vs GDLauncher Carbon
@@ -20,11 +20,11 @@ We have already reached and surpassed feature-parity with the old versions, and 
 
 Some of the new features include:
 
-- A new java manager, the most powerful of any launcher
-- A more stable and reliable modpack installation process, as well as modpack version management
-- Modrinth support
-- A cross-modplatform mod auto updater
-- A lot more to come
+- **A new Java Manager**: You can choose to let GDLauncher take care of Java for you, or you can use our advanced java management system to manually manage versions.
+* **Seamless Mod and Modloader Installation**: Installing any Minecraft version and modloaders like Forge, Fabric, Quilt, and Neoforge is now easier than ever.
+* **Extensive Addon and Modpack Support**: You can directly install addons and modpacks from CurseForge and Modrinth.
+* **Modpack Updater**: Change modpack version at any time, and generate a precise changelog of applied changes.
+* **Import/Export Instances**: (Work in Progress) We're working on making it possible to move your game instances between GDLauncher Carbon and other launchers like CurseForge, MultiMC, ATLauncher, Technic, Prism, Modrinth, FTB, and more.
 
 ## What will happen to the old version?
 

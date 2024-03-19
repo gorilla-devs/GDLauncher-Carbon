@@ -1,5 +1,5 @@
 ---
-title: "Migration from legacy gdlauncher"
+title: "Migration from Legacy GDLauncher"
 ---
 
 # Migration from legacy GDLauncher

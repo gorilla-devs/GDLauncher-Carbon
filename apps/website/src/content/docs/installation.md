@@ -1,5 +1,5 @@
 ---
-title: "Gdlauncher installation"
+title: "GDLauncher Installation"
 ---
 
 # Installation
