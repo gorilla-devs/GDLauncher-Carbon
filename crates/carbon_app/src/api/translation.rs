@@ -1,4 +1,4 @@
-use rspc::Type;
+use specta::Type;
 use serde::Serialize;
 
 #[derive(Debug, Type, Serialize, Clone, PartialEq)]

@@ -103,6 +103,7 @@ export type Procedures = {
         { key: "java.setupManagedJava", input: FEManagedJavaSetupArgs, result: string } | 
         { key: "java.updateJavaProfile", input: FEUpdateJavaProfileArgs, result: null } | 
         { key: "java.validateCustomJavaPath", input: string, result: boolean } | 
+        { key: "longRunning", input: never, result: boolean } | 
         { key: "metrics.sendEvent", input: FEMetricsEvent, result: null } | 
         { key: "settings.setSettings", input: FESettingsUpdate, result: null } | 
         { key: "vtask.dismissTask", input: FETaskId, result: null },

@@ -24,7 +24,7 @@ use futures::future::BoxFuture;
 use futures::{join, Future};
 
 use prisma_client_rust::Direction;
-use rspc::Type;
+use specta::Type;
 use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
 use thiserror::Error;

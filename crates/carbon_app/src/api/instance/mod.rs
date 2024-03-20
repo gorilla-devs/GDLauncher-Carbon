@@ -4,14 +4,13 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::anyhow;
-use axum::body::StreamBody;
 use axum::extract::{Query, State};
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use chrono::{DateTime, Utc};
-use hyper::http::HeaderValue;
-use hyper::{HeaderMap, StatusCode};
-use rspc::{RouterBuilderLike, Type};
+use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 use crate::api::modplatforms::RemoteVersion;
 use crate::error::{AxumError, FeError};
@@ -29,7 +28,7 @@ use crate::domain::instance::{self as domain, InstanceModpackInfo};
 use crate::domain::modplatforms as mpdomain;
 use crate::managers::instance as manager;
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> RouterBuilder<App> {
     router! {
         query DEFAULT_GROUP[app, args: ()] {
             Ok(*app.instance_manager()
@@ -455,32 +454,37 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
         path: String,
     }
 
+    async fn instance_icon(
+        State(app): State<Arc<AppInner>>,
+        Query(query): Query<InstanceIconQuery>,
+    ) -> Result<impl IntoResponse, impl IntoResponse> {
+        let icon = app
+            .instance_manager()
+            .instance_icon(domain::InstanceId(query.id))
+            .await
+            .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
+
+        let res = match icon {
+            Some((name, icon)) => {
+                let mut headers = HeaderMap::new();
+                headers.insert(
+                    "filename",
+                    name.parse::<HeaderValue>()
+                        .map_err(|e| FeError::from_anyhow(&anyhow!(e)).make_axum())?,
+                );
+
+                (StatusCode::OK, headers, icon)
+            }
+            None => (StatusCode::NO_CONTENT, HeaderMap::new(), Vec::new()),
+        };
+
+        Ok::<_, AxumError>(res)
+    }
+
     axum::Router::new()
         .route(
             "/instanceIcon",
-            axum::routing::get(
-                |State(app): State<Arc<AppInner>>, Query(query): Query<InstanceIconQuery>| async move {
-                    let icon = app
-                        .instance_manager()
-                        .instance_icon(domain::InstanceId(query.id))
-                        .await
-                        .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
-
-                    Ok::<_, AxumError>(match icon {
-                        Some((name, icon)) => {
-                            let mut headers = HeaderMap::new();
-                            headers.insert(
-                                "filename",
-                                name.parse::<HeaderValue>()
-                                    .map_err(|e| FeError::from_anyhow(&anyhow!(e)).make_axum())?,
-                            );
-
-                            (StatusCode::OK, headers, icon)
-                        }
-                        None => (StatusCode::NO_CONTENT, HeaderMap::new(), Vec::new()),
-                    })
-                },
-            ),
+            axum::routing::get(instance_icon),
         )
         .route(
             "/modIcon",
@@ -498,12 +502,12 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                         .await
                         .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
 
-                    Ok::<_, AxumError>(match icon {
-                        Some(icon) => {
-                            (StatusCode::OK, icon)
-                        }
+                    let res = match icon {
+                        Some(icon) => (StatusCode::OK, icon),
                         None => (StatusCode::NO_CONTENT, Vec::new()),
-                    })
+                    };
+
+                    Ok(res)
                 }
             )
         )
@@ -516,12 +520,15 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                         .await
                         .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
 
-                        Ok::<_, AxumError>(match icon {
+
+                        let res = match icon {
                             Some(icon) => {
                                 (StatusCode::OK, icon)
                             }
                             None => (StatusCode::NO_CONTENT, Vec::new()),
-                        })
+                        };
+
+                        Ok::<_, AxumError>(res)
                 }
             )
         )
@@ -543,6 +550,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
         )
         .route("/log", axum::routing::get(log::log_handler))
 }
+
 #[derive(Type, Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct FEGroupId(i32);
 
@@ -1691,6 +1699,9 @@ impl From<importer::FullImportScanStatus> for FullImportScanStatus {
 }
 
 mod log {
+    use axum::extract::{ws::Message, WebSocketUpgrade};
+    use tracing::error;
+
     use super::*;
 
     #[derive(Debug, Deserialize)]
@@ -1700,23 +1711,27 @@ mod log {
 
     #[tracing::instrument(skip(app))]
     pub async fn log_handler(
-        State(app): State<App>,
         Query(query): Query<LogQuery>,
+        req: WebSocketUpgrade,
+        State(app): State<App>,
     ) -> impl IntoResponse {
-        tracing::info!("starting log stream");
+        req.on_upgrade(move |mut socket| async move {
+            tracing::info!("starting log stream");
 
-        let log_rx = app
-            .instance_manager()
-            .get_log(domain::GameLogId(query.id))
-            .await;
+            let log_rx = app
+                .instance_manager()
+                .get_log(domain::GameLogId(query.id))
+                .await;
 
-        let Ok(mut log_rx) = log_rx else {
-            tracing::warn!("log entry not found");
+            let Ok(mut log_rx) = log_rx else {
+                tracing::warn!("log entry not found");
 
-            return StatusCode::NOT_FOUND.into_response();
-        };
+                socket.send(Message::Text(r#"{"init":"notfound"}"#.to_string()));
+                return;
+            };
 
-        let s = async_stream::stream! {
+            socket.send(Message::Text(r#"{"init":"found"}"#.to_string()));
+
             tracing::trace!("starting log stream");
 
             let mut last_idx = 0;
@@ -1727,42 +1742,33 @@ mod log {
                 let new_lines = {
                     let log = log_rx.borrow();
 
-                    let new_lines
-                        = log
-                            .get_span(last_idx..)
-                            .into_iter()
-                            .inspect(|entry| tracing::trace!(?entry, "received log entry"))
-                            .map(|entry| {
-                                serde_json::to_vec(&entry)
-                                    .expect(
-                                        "serialization of a log entry should be infallible"
-                                    )
-                            })
-                            .collect::<Vec<_>>();
+                    let new_lines = log
+                        .get_span(last_idx..)
+                        .into_iter()
+                        .inspect(|entry| tracing::trace!(?entry, "received log entry"))
+                        .map(|entry| {
+                            serde_json::to_string(&entry)
+                                .expect("serialization of a log entry should be infallible")
+                        })
+                        .collect::<Vec<_>>();
 
                     last_idx = log.len();
 
                     new_lines
                 };
 
-
-
                 for line in new_lines {
-                    tracing::trace!("yielding log entry");
-
-                    yield Ok::<_, Infallible>(line)
+                    if let Err(e) = socket.send(Message::Text(line)).await {
+                        error!(?e, "Failed to send log entry");
+                    }
                 }
-
-
 
                 if let Err(_) = log_rx.changed().await {
-                    tracing::error!("`log_rx` was closed, killing log stream");
+                    error!("`log_rx` was closed, killing log stream");
 
-                    break
+                    return;
                 }
             }
-        };
-
-        (StatusCode::OK, StreamBody::new(s)).into_response()
+        })
     }
 }

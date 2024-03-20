@@ -9,7 +9,7 @@ import fetchData from "@/pages/app.data";
 import { AccountsDropdown } from "./AccountsDropdown";
 import { AccountStatus, AccountType } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
-import { port } from "@/utils/rspcClient";
+import { port, rspc } from "@/utils/rspcClient";
 import updateAvailable, {
   updateDownloaded,
   updateProgress
@@ -37,6 +37,8 @@ const AppNavbar = () => {
   const isLogin = useMatch(() => "/");
   const isSettings = useMatch(() => "/settings");
   const isSettingsNested = useMatch(() => "/settings/*");
+
+  const blockingMutation = rspc.createMutation("longRunning");
 
   const selectedIndex = () =>
     !!isSettings() || !!isSettingsNested()
@@ -120,6 +122,19 @@ const AppNavbar = () => {
                 >
                   <i class="flex i-ri:add-fill" />
                   <Trans key="sidebar.add_instance" />
+                </Button>
+                <Button
+                  class="w-max"
+                  size="small"
+                  type="primary"
+                  onClick={async () => {
+                    console.log("BLOCKING MUTATION");
+                    const x = await blockingMutation.mutateAsync(undefined);
+                    console.log("GOT IT MUTATION", x);
+                  }}
+                >
+                  <i class="flex i-ri:add-fill" />
+                  BLOCKING MUTATION
                 </Button>
               </Tab>
 

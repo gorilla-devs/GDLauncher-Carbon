@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 
 use anyhow::anyhow;
-use rspc::Type;
+use specta::Type;
 use serde::{Deserialize, Serialize};
 
 use super::curseforge::filters::CFFEModSearchParametersQuery;

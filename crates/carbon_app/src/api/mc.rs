@@ -3,10 +3,11 @@ use crate::api::managers::App;
 use crate::api::router::router;
 
 use daedalus::{minecraft, modded};
-use rspc::{RouterBuilderLike, Type};
+use rspc::{RouterBuilder};
+use specta::Type;
 use serde::{Deserialize, Serialize};
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> RouterBuilder<App> {
     router! {
         query GET_MINECRAFT_VERSIONS[app, _args: ()] {
             let res = app.minecraft_manager().get_minecraft_manifest().await?.versions;

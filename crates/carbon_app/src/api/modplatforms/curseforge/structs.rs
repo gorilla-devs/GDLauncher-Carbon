@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use chrono::DateTime;
 use chrono::Utc;
-use rspc::Type;
+use specta::Type;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 

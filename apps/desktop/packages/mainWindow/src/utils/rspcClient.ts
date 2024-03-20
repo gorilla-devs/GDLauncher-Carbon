@@ -1,5 +1,5 @@
 import { QueryClient } from "@tanstack/solid-query";
-import { createClient, createWSClient, wsLink } from "@rspc/client";
+import { WebsocketTransport, createClient } from "@rspc/client";
 import { createSolidQueryHooks } from "@rspc/solid";
 import type { Procedures } from "@gd/core_module";
 import { createEffect } from "solid-js";
@@ -21,16 +21,11 @@ export let port: number | null = null;
 
 export default function initRspc(_port: number) {
   port = _port;
-  const wsClient = createWSClient({
-    url: `ws://127.0.0.1:${_port}/rspc/ws`
-  });
+
+  const transport = new WebsocketTransport(`ws://127.0.0.1:${_port}/rspc/ws`);
 
   const client = createClient<Procedures>({
-    links: [
-      wsLink({
-        client: wsClient
-      })
-    ]
+    transport
   });
 
   const createInvalidateQuery = () => {

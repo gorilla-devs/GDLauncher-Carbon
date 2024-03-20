@@ -9,7 +9,8 @@ use crate::{
     },
     managers::App,
 };
-use rspc::{RouterBuilderLike, Type};
+use rspc::{RouterBuilder};
+use specta::Type;
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -17,7 +18,7 @@ use super::{
     Set,
 };
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> RouterBuilder<App> {
     router! {
         query GET_SETTINGS[app, _args: ()] {
             let response = app.settings_manager()

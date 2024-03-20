@@ -1,4 +1,5 @@
-use rspc::{RouterBuilderLike, Type};
+use rspc::{RouterBuilder};
+use specta::Type;
 use serde::{Deserialize, Serialize};
 
 use crate::api::keys::vtask::*;
@@ -10,7 +11,7 @@ use crate::managers::App;
 use super::router::router;
 use super::translation::Translation;
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> RouterBuilder<App> {
     router! {
         query GET_TASKS[app, args: ()] {
             Ok(app.task_manager().get_tasks().await

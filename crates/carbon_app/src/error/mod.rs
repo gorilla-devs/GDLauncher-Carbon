@@ -4,7 +4,7 @@ pub mod sentry;
 
 use std::fmt::{Debug, Display};
 
-use rspc::Type;
+use specta::Type;
 use serde::Serialize;
 
 #[derive(Debug, Type, Serialize)]

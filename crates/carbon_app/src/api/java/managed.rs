@@ -1,6 +1,6 @@
 use std::{collections::HashMap, ops::Deref};
 
-use rspc::Type;
+use specta::Type;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::java::JavaVersion;

@@ -4,7 +4,7 @@ use std::{
     str::FromStr,
 };
 
-use rspc::Type;
+use specta::Type;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::modplatforms::modrinth::{

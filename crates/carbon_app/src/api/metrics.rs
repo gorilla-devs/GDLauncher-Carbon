@@ -1,9 +1,10 @@
 use crate::api::router::router;
 use crate::api::{keys::metrics::SEND_EVENT, managers::App};
-use rspc::{RouterBuilderLike, Type};
+use rspc::{RouterBuilder};
+use specta::Type;
 use serde::{Deserialize, Serialize};
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> RouterBuilder<App> {
     router! {
         mutation SEND_EVENT[app, event: FEMetricsEvent] {
             tokio::spawn(async move {

@@ -1,4 +1,4 @@
-use rspc::Type;
+use specta::Type;
 use serde::{Deserialize, Serialize};
 
 use super::curseforge;

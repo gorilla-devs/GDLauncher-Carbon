@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use jsonwebtoken::{errors::ErrorKind, Algorithm, DecodingKey, Validation};
 use reqwest::StatusCode;
 use reqwest_middleware::ClientWithMiddleware;
-use rspc::Type;
+use specta::Type;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;

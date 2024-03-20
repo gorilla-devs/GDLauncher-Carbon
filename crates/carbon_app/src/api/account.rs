@@ -2,7 +2,8 @@ use std::sync::Arc;
 
 use axum::extract::{Query, State};
 use chrono::{DateTime, Utc};
-use rspc::{RouterBuilderLike, Type};
+use rspc::{RouterBuilder};
+use specta::Type;
 use serde::{Deserialize, Serialize};
 
 use crate::api::keys::account::*;
@@ -12,7 +13,7 @@ use crate::error::FeError;
 use crate::managers::account::api::XboxError;
 use crate::managers::{account, App, AppInner};
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> RouterBuilder<App> {
     router! {
         query GET_ACTIVE_UUID[app, args: ()] {
             app.account_manager().get_active_uuid().await
