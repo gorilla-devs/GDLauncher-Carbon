@@ -198,6 +198,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                     break 'version_source InstanceVersionSource::ModpackWithKnownVersion(
                         standard_version,
                         Modpack::Curseforge(curseforge_modpack),
+                        true,
                     );
                 }
             }

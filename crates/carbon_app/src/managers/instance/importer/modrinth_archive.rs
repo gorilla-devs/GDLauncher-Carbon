@@ -236,6 +236,7 @@ impl InstanceImporter for ModrinthArchiveImporter {
                     project_id: meta.project_id.clone(),
                     version_id: meta.version_id.clone(),
                 }),
+                true,
             ),
             None => InstanceVersionSource::Version(version),
         };

@@ -4,12 +4,14 @@ use std::sync::Arc;
 use crate::api::translation::Translation;
 use crate::domain::instance::info::{CurseforgeModpack, GameVersion, Modpack};
 use crate::managers::instance::InstanceVersionSource;
+use crate::managers::modplatforms::curseforge::convert_cf_version_to_standard_version;
 use crate::managers::AppInner;
 use crate::{domain::vtask::VisualTaskId, managers::instance::anyhow};
+use serde::Deserialize;
 use tokio::sync::RwLock;
 use tracing::{info, trace};
 
-use crate::domain::modplatforms::curseforge::manifest::Manifest;
+use crate::domain::modplatforms::curseforge::manifest::{Manifest, Minecraft, ModLoaders};
 
 use super::{
     ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter, InternalImportEntry,
@@ -20,11 +22,11 @@ use super::{
 struct Importable {
     filename: String,
     path: PathBuf,
-    manifest: Manifest,
-    meta: Option<CfMetadata>,
+    manifest: Option<Manifest>,
+    meta: CfMetadata,
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CfMetadata {
     name: String,
@@ -32,22 +34,30 @@ struct CfMetadata {
     project_id: u32,
     #[serde(rename = "fileID")]
     file_id: u32,
-    #[serde(rename = "installedModpack")]
     installed_modpack: Option<InstalledModpack>,
+    base_mod_loader: Option<BaseModLoader>,
+    game_version: String,
     last_played: Option<String>,
-    background: Option<String>,
+    is_unlocked: bool,
+    profile_image_path: Option<String>,
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, Deserialize)]
 struct InstalledModpack {
     #[serde(rename = "thumbnailUrl")]
     thumbnail_url: Option<String>,
 }
+
+#[derive(Debug, Clone, Deserialize)]
+struct BaseModLoader {
+    name: String,
+}
+
 impl From<Importable> for ImportableInstance {
     fn from(value: Importable) -> Self {
         Self {
-            filename: value.filename.clone(),
-            instance_name: value.filename,
+            filename: value.filename,
+            instance_name: value.meta.name,
         }
     }
 }
@@ -87,27 +97,29 @@ impl CurseforgeImporter {
         }
 
         let manifest_path: PathBuf = path.join("manifest.json");
-        if !config.is_file() {
-            return Ok(None);
-        }
 
         let config = tokio::fs::read_to_string(config).await?;
         let config = serde_json::from_str::<CfMetadata>(&config);
+
         let filename = path
             .file_name()
             .expect("filename cannot be empty")
             .to_string_lossy()
             .to_string();
 
-        let manifest = tokio::fs::read_to_string(manifest_path).await?;
-        let manifest = serde_json::from_str::<Manifest>(&manifest);
+        let manifest = tokio::fs::read_to_string(manifest_path)
+            .await
+            .ok()
+            .map(|text| serde_json::from_str::<Manifest>(&text).ok())
+            .flatten();
 
-        let merged = manifest.map(|manifest| Importable {
+        let merged = config.map(|config| Importable {
             filename: filename.clone(),
             path,
             manifest,
-            meta: config.ok(),
+            meta: config,
         });
+
         match merged {
             Ok(i) => Ok(Some(InternalImportEntry::Valid(i))),
             Err(_) => Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
@@ -164,10 +176,18 @@ impl InstanceImporter for CurseforgeImporter {
             .ok_or_else(|| anyhow!("invalid importable instance index {index}"))?;
 
         let icon = match &instance.meta {
-            Some(CfMetadata {
+            CfMetadata {
+                profile_image_path: Some(image),
+                ..
+            } => app
+                .instance_manager()
+                .load_icon(PathBuf::from(image.clone()))
+                .await
+                .ok(),
+            CfMetadata {
                 installed_modpack: Some(installed_modpack),
                 ..
-            }) => Some(
+            } => Some(
                 app.instance_manager()
                     .download_icon(
                         installed_modpack
@@ -194,18 +214,7 @@ impl InstanceImporter for CurseforgeImporter {
                 crate::domain::runtime_path::copy_dir_filter(&instance.path, &path, |path| {
                     match path.to_str() {
                         Some("minecraftinstance.json" | "manifest.json" | "modelist.html") => false,
-                        Some(p)
-                            if Some(p)
-                                == instance
-                                    .meta
-                                    .as_ref()
-                                    .unwrap()
-                                    .background
-                                    .to_owned()
-                                    .as_deref() =>
-                        {
-                            false
-                        }
+                        Some(p) if p.starts_with("profileImage") => false,
                         _ => true,
                     }
                 })
@@ -215,15 +224,50 @@ impl InstanceImporter for CurseforgeImporter {
             }
         };
 
-        let version = GameVersion::Standard(instance.manifest.minecraft.clone().try_into()?);
+        let dummy_string = daedalus::BRANDING
+            .get_or_init(daedalus::Branding::default)
+            .dummy_replace_string
+            .clone();
 
-        let instance_version_source = match &instance.meta {
-            Some(meta) => InstanceVersionSource::ModpackWithKnownVersion(
+        let standard_version = convert_cf_version_to_standard_version(
+            app.clone(),
+            Minecraft {
+                version: instance.meta.game_version.clone(),
+                mod_loaders: instance
+                    .meta
+                    .base_mod_loader
+                    .as_ref()
+                    .map(|loader| ModLoaders {
+                        id: {
+                            let mut name = &loader.name as &str;
+
+                            if name.starts_with("fabric") || name.starts_with("quilt") {
+                                if let Some((name2, _)) = name.rsplit_once('-') {
+                                    name = name2;
+                                }
+                            }
+
+                            dbg!(name).to_string()
+                        },
+                        primary: true,
+                    })
+                    .into_iter()
+                    .collect(),
+            },
+            dummy_string,
+        )
+        .await?;
+
+        let version = GameVersion::Standard(standard_version);
+
+        let instance_version_source = match &instance.manifest {
+            Some(manifest) => InstanceVersionSource::ModpackWithKnownVersion(
                 version,
                 Modpack::Curseforge(CurseforgeModpack {
-                    project_id: meta.project_id,
-                    file_id: meta.file_id,
+                    project_id: instance.meta.project_id,
+                    file_id: instance.meta.file_id,
                 }),
+                instance.meta.is_unlocked,
             ),
             None => InstanceVersionSource::Version(version),
         };
@@ -232,8 +276,10 @@ impl InstanceImporter for CurseforgeImporter {
             .instance_manager()
             .create_instance_ext(
                 app.instance_manager().get_default_group().await?,
-                name.unwrap_or_else(|| instance.manifest.name.clone()),
+                name.unwrap_or_else(|| instance.meta.name.clone()),
                 icon,
+                None,
+                None,
                 instance_version_source,
                 String::new(),
                 initializer,

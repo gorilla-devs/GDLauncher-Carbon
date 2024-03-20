@@ -1193,7 +1193,7 @@ impl TryFrom<CreateInstanceVersion> for manager::InstanceVersionSource {
     fn try_from(value: CreateInstanceVersion) -> anyhow::Result<Self> {
         Ok(match value {
             CreateInstanceVersion::Version(v) => Self::Version(v.try_into()?),
-            CreateInstanceVersion::Modpack(m) => Self::Modpack(m.into()),
+            CreateInstanceVersion::Modpack(m) => Self::Modpack(m.into(), true),
         })
     }
 }
