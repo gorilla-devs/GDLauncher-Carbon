@@ -1,6 +1,6 @@
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { formatDownloadCount, truncateText } from "@/utils/helpers";
-import { rspc, rspcFetch } from "@/utils/rspcClient";
+import { rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import { Button, createNotification, Popover, Spinner } from "@gd/ui";
 import { formatDistanceToNowStrict } from "date-fns";
@@ -36,49 +36,48 @@ const ModRow = (props: ModRowProps) => {
   const owner = getOwner();
   const [loading, setLoading] = createSignal(false);
   const [isRowSmall, setIsRowSmall] = createSignal(false);
+  const rspcContext = rspc.useContext();
 
   const mergedProps = mergeProps({ type: "Modpack" }, props);
   const navigate = useGDNavigate();
   const addNotification = createNotification();
 
-  const prepareInstanceMutation = rspc.createMutation(
-    ["instance.prepareInstance"],
-    {
-      onSuccess() {
-        setLoading(false);
-        addNotification("Instance successfully created.");
-      },
-      onError() {
-        setLoading(false);
-        addNotification("Error while creating the instance.", "error");
-      },
-      onSettled() {
-        setLoading(false);
-        navigate(`/library`);
-      }
+  const prepareInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.prepareInstance"],
+    onSuccess() {
+      setLoading(false);
+      addNotification("Instance successfully created.");
+    },
+    onError() {
+      setLoading(false);
+      addNotification("Error while creating the instance.", "error");
+    },
+    onSettled() {
+      setLoading(false);
+      navigate(`/library`);
     }
-  );
+  }));
 
   const instanceId = () => (props as ModProps)?.instanceId;
 
-  const loadIconMutation = rspc.createMutation(["instance.loadIconUrl"]);
+  const loadIconMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.loadIconUrl"]
+  }));
 
-  const createInstanceMutation = rspc.createMutation(
-    ["instance.createInstance"],
-    {
-      onMutate() {
-        setLoading(true);
-      },
-      onSuccess(instanceId) {
-        setLoading(true);
-        prepareInstanceMutation.mutate(instanceId);
-      },
-      onError() {
-        setLoading(false);
-        addNotification("Error while downloading the modpack.", "error");
-      }
+  const createInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.createInstance"],
+    onMutate() {
+      setLoading(true);
+    },
+    onSuccess(instanceId) {
+      setLoading(true);
+      prepareInstanceMutation.mutate(instanceId);
+    },
+    onError() {
+      setLoading(false);
+      addNotification("Error while downloading the modpack.", "error");
     }
-  );
+  }));
 
   const handleExplore = () => {
     navigate(
@@ -253,12 +252,13 @@ const ModRow = (props: ModRowProps) => {
 
                               let fileVersion = undefined;
                               if (!isCurseForgeData(props.data)) {
-                                const mrVersions = await rspcFetch(() => [
-                                  "modplatforms.modrinth.getProjectVersions",
-                                  {
-                                    project_id: getProjectId(props)
-                                  }
-                                ]);
+                                const mrVersions =
+                                  await rspcContext.client.query([
+                                    "modplatforms.modrinth.getProjectVersions",
+                                    {
+                                      project_id: getProjectId(props).toString()
+                                    }
+                                  ]);
 
                                 fileVersion = (mrVersions as any).data[0].id;
                               }

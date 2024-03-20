@@ -15,8 +15,12 @@ const TermsAndConditions = (props: Props) => {
   const modalsContext = useModal();
   const addNotification = createNotification();
 
-  const activeUuid = rspc.createQuery(() => ["account.getActiveUuid"]);
-  const settingsMutation = rspc.createMutation(["settings.setSettings"]);
+  const activeUuid = rspc.createQuery(() => ({
+    queryKey: ["account.getActiveUuid"]
+  }));
+  const settingsMutation = rspc.createMutation(() => ({
+    mutationKey: ["settings.setSettings"]
+  }));
 
   return (
     <div class="flex flex-col justify-between items-center text-center pb-4 pt-5 px-6 max-w-full h-full box-border">

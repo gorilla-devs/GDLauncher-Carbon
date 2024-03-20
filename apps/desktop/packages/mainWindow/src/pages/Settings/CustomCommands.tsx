@@ -7,9 +7,13 @@ import Title from "./components/Title";
 import RowsContainer from "./components/RowsContainer";
 
 const CustomCommands = () => {
-  const settings = rspc.createQuery(() => ["settings.getSettings"]);
+  const settings = rspc.createQuery(() => ({
+    queryKey: ["settings.getSettings"]
+  }));
 
-  const settingsMutation = rspc.createMutation(["settings.setSettings"]);
+  const settingsMutation = rspc.createMutation(() => ({
+    mutationKey: ["settings.setSettings"]
+  }));
 
   return (
     <>

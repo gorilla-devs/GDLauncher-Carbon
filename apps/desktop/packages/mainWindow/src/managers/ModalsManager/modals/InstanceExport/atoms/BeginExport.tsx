@@ -32,12 +32,13 @@ function convertNestedObject(obj: any): any {
 const BeginExport = () => {
   const [t] = useTransContext();
   const modalsContext = useModal();
-  const exportInstanceMutation = rspc.createMutation(["instance.export"], {
+  const exportInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.export"],
     onSuccess(taskId) {
       setTaskId(taskId);
       setExportStep(1);
     }
-  });
+  }));
 
   const validatePayload = (payload: ExportArgs) => {
     if (typeof payload.instance_id !== "number") return false;

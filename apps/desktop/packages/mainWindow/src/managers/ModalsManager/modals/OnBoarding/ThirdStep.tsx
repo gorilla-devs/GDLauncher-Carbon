@@ -30,19 +30,25 @@ export const keys = [
   "entity.multimc",
   "entity.prismlauncher"
 ];
+
 interface Props {
   prevStep: () => void;
   isImportInstance?: boolean;
 }
+
 const [currentEntity, setCurrentEntity] = createSignal<
   ImportEntityStatus | undefined
 >();
+
 const ThirdStep = (props: Props) => {
   const modalsContext = useModal();
 
   const [entity, setEntity] = createSignal<ImportEntityStatus | undefined>();
 
-  const entities = rspc.createQuery(() => ["instance.getImportableEntities"]);
+  const entities = rspc.createQuery(() => ({
+    queryKey: ["instance.getImportableEntities"]
+  }));
+
   const icons = [
     LegacyGDL,
     CurseForgeLogo,

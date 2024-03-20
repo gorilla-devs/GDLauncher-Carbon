@@ -13,7 +13,9 @@ import { ExportTarget } from "@gd/core_module/bindings";
 import { useTransContext } from "@gd/i18n";
 const ExportFormat = () => {
   const [t] = useTransContext();
-  const entities = rspc.createQuery(() => ["instance.getImportableEntities"]);
+  const entities = rspc.createQuery(() => ({
+    queryKey: ["instance.getImportableEntities"]
+  }));
 
   const icons = [
     CurseForgeLogo,

@@ -33,7 +33,9 @@ type IntervalType = ReturnType<typeof setInterval>;
 export const checkForUpdates = async () => {
   let interval: null | IntervalType = null;
 
-  let settings = rspc.createQuery(() => ["settings.getSettings"]);
+  let settings = rspc.createQuery(() => ({
+    queryKey: ["settings.getSettings"]
+  }));
 
   createEffect(() => {
     if (!settings.data) return;

@@ -21,15 +21,13 @@ const Versions = () => {
 
   const instanceId = () => parseInt(searchParams.instanceId, 10);
 
-  const instanceMods = rspc.createQuery(() => [
-    "instance.getInstanceMods",
-    instanceId()
-  ]);
+  const instanceMods = rspc.createQuery(() => ({
+    queryKey: ["instance.getInstanceMods", instanceId()]
+  }));
 
-  const instanceDetails = rspc.createQuery(() => [
-    "instance.getInstanceDetails",
-    instanceId()
-  ]);
+  const instanceDetails = rspc.createQuery(() => ({
+    queryKey: ["instance.getInstanceDetails", instanceId()]
+  }));
 
   createEffect(() => {
     if (!lastItem() || lastItem().index === infiniteQuery?.query.index) {

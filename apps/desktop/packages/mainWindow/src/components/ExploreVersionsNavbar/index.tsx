@@ -51,10 +51,9 @@ const ExploreVersionsNavbar = (props: Props) => {
     oldBeta: false
   });
 
-  const instanceDetails = rspc.createQuery(() => [
-    "instance.getInstanceDetails",
-    instanceId()
-  ]);
+  const instanceDetails = rspc.createQuery(() => ({
+    queryKey: ["instance.getInstanceDetails", instanceId()]
+  }));
 
   const modloaders = () => {
     let res: { label: string; key: string }[] = [];

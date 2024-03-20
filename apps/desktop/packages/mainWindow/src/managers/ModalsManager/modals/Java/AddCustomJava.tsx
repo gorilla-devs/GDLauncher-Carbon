@@ -11,11 +11,13 @@ const AddCustomJava = (props: ModalProps) => {
   const modalsContext = useModal();
   const addNotification = createNotification();
 
-  const createCustomJavaVersionMutation = rspc.createMutation([
-    "java.createCustomJavaVersion"
-  ]);
+  const createCustomJavaVersionMutation = rspc.createMutation(() => ({
+    mutationKey: ["java.createCustomJavaVersion"]
+  }));
 
-  const validateJavaPath = rspc.createMutation(["java.validateCustomJavaPath"]);
+  const validateJavaPath = rspc.createMutation(() => ({
+    mutationKey: ["java.validateCustomJavaPath"]
+  }));
 
   return (
     <ModalLayout width="w-100" noHeader={props.noHeader} title={props?.title}>
@@ -29,7 +31,7 @@ const AddCustomJava = (props: ModalProps) => {
               placeholder="Type a custom java path"
               icon={
                 <Switch>
-                  <Match when={validateJavaPath.isLoading}>
+                  <Match when={validateJavaPath.isPending}>
                     <div class="flex i-ri:loader-4-line animate-spin text-darkSlate-50" />
                   </Match>
                   <Match when={value()}>
@@ -62,8 +64,8 @@ const AddCustomJava = (props: ModalProps) => {
             <Button
               disabled={
                 !validPath() ||
-                validateJavaPath.isLoading ||
-                createCustomJavaVersionMutation.isLoading
+                validateJavaPath.isPending ||
+                createCustomJavaVersionMutation.isPending
               }
               onClick={() => {
                 createCustomJavaVersionMutation.mutate(value());

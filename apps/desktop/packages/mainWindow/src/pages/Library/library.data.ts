@@ -4,9 +4,15 @@ import { createEffect } from "solid-js";
 import { createStore } from "solid-js/store";
 
 const fetchData = () => {
-  const _instances = rspc.createQuery(() => ["instance.getAllInstances"]);
-  const groups = rspc.createQuery(() => ["instance.getGroups"]);
-  const _settings = rspc.createQuery(() => ["settings.getSettings"]);
+  const _instances = rspc.createQuery(() => ({
+    queryKey: ["instance.getAllInstances"]
+  }));
+  const groups = rspc.createQuery(() => ({
+    queryKey: ["instance.getGroups"]
+  }));
+  const _settings = rspc.createQuery(() => ({
+    queryKey: ["settings.getSettings"]
+  }));
 
   const [settings, _setSettings] = createStore<{
     data: FESettings | null;

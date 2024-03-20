@@ -47,12 +47,14 @@ const Versions = () => {
     routeData.instanceDetails.data?.modpack?.modpack.value?.project_id;
 
   if (modId()) {
-    const instanceDetails = rspc.createQuery(() => [
-      "modplatforms.curseforge.getMod",
-      {
-        modId: modId() as number
-      }
-    ]);
+    const instanceDetails = rspc.createQuery(() => ({
+      queryKey: [
+        "modplatforms.curseforge.getMod",
+        {
+          modId: modId() as number
+        }
+      ]
+    }));
 
     createEffect(() => {
       setMainFileId(instanceDetails.data?.data.mainFileId);

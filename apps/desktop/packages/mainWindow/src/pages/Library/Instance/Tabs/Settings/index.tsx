@@ -4,13 +4,7 @@ import { Trans, useTransContext } from "@gd/i18n";
 import { Button, Dropdown, Input, Radio, Slider, Switch } from "@gd/ui";
 import { useParams, useRouteData } from "@solidjs/router";
 import fetchData from "../../instance.data";
-import {
-  Match,
-  Show,
-  Suspense,
-  createMemo,
-  Switch as SolidSwitch
-} from "solid-js";
+import { Match, Show, createMemo, Switch as SolidSwitch } from "solid-js";
 import { InstanceDetails } from "@gd/core_module/bindings";
 import Title from "@/pages/Settings/components/Title";
 import Row from "@/pages/Settings/components/Row";
@@ -24,16 +18,16 @@ const Settings = () => {
   const [t] = useTransContext();
   const modalsContext = useModal();
   const params = useParams();
-  const updateInstanceMutation = rspc.createMutation(
-    ["instance.updateInstance"],
-    {
-      onMutate: (newData) => {
-        queryClient.setQueryData(["instance.getInstanceDetails"], newData);
-      }
+  const updateInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.updateInstance"],
+    onMutate: (newData: any) => {
+      queryClient.setQueryData(["instance.getInstanceDetails"], newData);
     }
-  );
+  }));
 
-  const getAllProfiles = rspc.createQuery(() => ["java.getJavaProfiles"]);
+  const getAllProfiles = rspc.createQuery(() => ({
+    queryKey: ["java.getJavaProfiles"]
+  }));
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 

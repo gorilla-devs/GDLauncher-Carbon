@@ -194,7 +194,8 @@ export const AccountsDropdown = (props: Props) => {
       (option) => option.key !== (activeAccount() as Label)?.uuid
     );
 
-  const setActiveUUIDMutation = rspc.createMutation(["account.setActiveUuid"], {
+  const setActiveUUIDMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.setActiveUuid"],
     onMutate: async (
       uuid
     ): Promise<{ previousActiveUUID: string } | undefined> => {
@@ -225,54 +226,48 @@ export const AccountsDropdown = (props: Props) => {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["account.setActiveUuid"] });
     }
-  });
+  }));
 
-  const accountEnrollCancelMutation = rspc.createMutation(
-    ["account.enroll.cancel"],
-    {
-      onError(error) {
-        addNotification(error.message, "error");
-        setLoginDeviceCode(null);
-        setAddAccountStarting(false);
-      },
-      onMutate() {
-        setLoadingAuthorization(false);
-        setEnrollmentInProgress(false);
-        setLoginDeviceCode(null);
-        setAddAccountStarting(false);
-      }
+  const accountEnrollCancelMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.enroll.cancel"],
+    onError(error) {
+      addNotification(error.message, "error");
+      setLoginDeviceCode(null);
+      setAddAccountStarting(false);
+    },
+    onMutate() {
+      setLoadingAuthorization(false);
+      setEnrollmentInProgress(false);
+      setLoginDeviceCode(null);
+      setAddAccountStarting(false);
     }
-  );
+  }));
 
-  const accountEnrollBeginMutation = rspc.createMutation(
-    ["account.enroll.begin"],
-    {
-      onMutate() {
-        setAddAccountStarting(true);
-      },
-      onError(error) {
-        if (enrollmentInProgress())
-          accountEnrollCancelMutation.mutate(undefined);
-        setAddAccountStarting(false);
-        addNotification(error.message, "error");
-      }
+  const accountEnrollBeginMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.enroll.begin"],
+    onMutate() {
+      setAddAccountStarting(true);
+    },
+    onError(error) {
+      if (enrollmentInProgress()) accountEnrollCancelMutation.mutate(undefined);
+      setAddAccountStarting(false);
+      addNotification(error.message, "error");
     }
-  );
+  }));
 
-  const accountEnrollFinalizeMutation = rspc.createMutation(
-    ["account.enroll.finalize"],
-    {
-      onError(error) {
-        addNotification(error.message, "error");
-      },
-      onMutate() {
-        setLoadingAuthorization(false);
-        setEnrollmentInProgress(false);
-      }
+  const accountEnrollFinalizeMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.enroll.finalize"],
+    onError(error) {
+      addNotification(error.message, "error");
+    },
+    onMutate() {
+      setLoadingAuthorization(false);
+      setEnrollmentInProgress(false);
     }
-  );
+  }));
 
-  const deleteAccountMutation = rspc.createMutation(["account.deleteAccount"], {
+  const deleteAccountMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.deleteAccount"],
     onMutate: async (
       uuid
     ): Promise<
@@ -339,7 +334,7 @@ export const AccountsDropdown = (props: Props) => {
         navigate("/");
       }
     }
-  });
+  }));
 
   const reset = () => {
     setEnrollmentInProgress(false);

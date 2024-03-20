@@ -62,8 +62,8 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   const [searchParams, _setSearchParams] = useSearchParams();
   let parentRef: HTMLDivElement | null = null;
 
-  const infiniteQuery = createInfiniteQuery({
-    queryKey: () => ["modplatforms.versions"],
+  const infiniteQuery = createInfiniteQuery(() => ({
+    queryKey: ["modplatforms.versions"],
     queryFn: async (ctx) => {
       setVersionsQuery({
         index: ctx.pageParam
@@ -149,9 +149,10 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
         } as VersionRowType;
       }
     },
+    initialPageParam: 0,
     getNextPageParam: (lastPage) => {
       if (props.modplatform === "modrinth") {
-        return false;
+        return null;
       }
 
       const index = lastPage?.index || 0;
@@ -159,14 +160,16 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
       const pageSize = versionsQuery.pageSize || 20;
       const hasNextPage = index + pageSize < totalCount;
 
-      return hasNextPage && index + pageSize;
+      console.log((hasNextPage && index + pageSize) || null);
+
+      return (hasNextPage && index + pageSize) || null;
     },
     enabled: false
-  });
+  }));
 
   const setQueryWrapper = (newValue: Partial<typeof versionsQuery>) => {
     setVersionsQuery(newValue);
-    infiniteQuery.remove();
+    // infiniteQuery.remove();
     infiniteQuery.refetch();
   };
 
@@ -189,7 +192,7 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
     });
   }
 
-  infiniteQuery.remove();
+  // infiniteQuery.remove();
   infiniteQuery.refetch();
 
   const allRows = () =>

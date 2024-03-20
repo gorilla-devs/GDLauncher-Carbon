@@ -22,7 +22,9 @@ type Props = {
 const JavaPathAutoComplete = (props: Props) => {
   const owner = getOwner();
   const [value, setValue] = createSignal(props.defaultValue || "");
-  let availableJavas = rspc.createQuery(() => ["java.getAvailableJavas"]);
+  let availableJavas = rspc.createQuery(() => ({
+    queryKey: ["java.getAvailableJavas"]
+  }));
 
   let runOnce = false;
 
@@ -33,9 +35,9 @@ const JavaPathAutoComplete = (props: Props) => {
     }
   });
 
-  const createCustomJavaVersionMutation = rspc.createMutation([
-    "java.createCustomJavaVersion"
-  ]);
+  const createCustomJavaVersionMutation = rspc.createMutation(() => ({
+    mutationKey: "java.createCustomJavaVersion"
+  }));
 
   const _autocompleteOptions = () => {
     if (!availableJavas.data) return [];
@@ -131,7 +133,7 @@ const JavaPathAutoComplete = (props: Props) => {
         inputColor={props.inputColor || ""}
         icon={
           <Switch>
-            <Match when={createCustomJavaVersionMutation.isLoading}>
+            <Match when={createCustomJavaVersionMutation.isPending}>
               <div class="flex i-ri:loader-4-line animate-spin text-darkSlate-50" />
             </Match>
             <Match when={javaComponent()}>

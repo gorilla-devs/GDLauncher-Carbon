@@ -40,9 +40,9 @@ export default function Login() {
     routeData.accounts.data?.length! > 0 &&
     routeData.settings.data?.termsAndPrivacyAccepted;
 
-  const accountEnrollFinalizeMutation = rspc.createMutation([
-    "account.enroll.finalize"
-  ]);
+  const accountEnrollFinalizeMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.enroll.finalize"]
+  }));
 
   const nextStep = () => {
     if (step() < 2) {

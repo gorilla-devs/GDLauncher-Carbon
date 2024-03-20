@@ -31,13 +31,15 @@ const ExportCheckboxParent = () => {
   const [allSelected, setAllSelected] = createSignal(false);
   const [someSelected, setSomeSelected] = createSignal(false);
   const [t] = useTransContext();
-  const explore = rspc.createQuery(() => [
-    "instance.explore",
-    {
-      instance_id: instanceId() as number,
-      path: []
-    }
-  ]);
+  const explore = rspc.createQuery(() => ({
+    queryKey: [
+      "instance.explore",
+      {
+        instance_id: instanceId() as number,
+        path: []
+      }
+    ]
+  }));
 
   createEffect(() => {
     if (!explore.data) return;

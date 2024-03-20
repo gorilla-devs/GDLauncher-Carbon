@@ -12,8 +12,13 @@ type Props = {
 };
 
 const SecondStep = (props: Props) => {
-  let settingsMutation = rspc.createMutation(["settings.setSettings"]);
-  let settings = rspc.createQuery(() => ["settings.getSettings"]);
+  let settingsMutation = rspc.createMutation(() => ({
+    mutationKey: ["settings.setSettings"]
+  }));
+  let settings = rspc.createQuery(() => ({
+    queryKey: ["settings.getSettings"]
+  }));
+
   return (
     <div class="flex flex-col justify-between h-full lg:w-160 box-border">
       <RowsContainer>

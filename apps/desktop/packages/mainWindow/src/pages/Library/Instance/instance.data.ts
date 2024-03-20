@@ -5,24 +5,21 @@ import { createStore, reconcile } from "solid-js/store";
 
 //@ts-ignore
 const fetchData = ({ params }) => {
-  const instanceDetails = rspc.createQuery(() => [
-    "instance.getInstanceDetails",
-    parseInt(params.id, 10)
-  ]);
+  const instanceDetails = rspc.createQuery(() => ({
+    queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)]
+  }));
 
-  const modpackInfo = rspc.createQuery(() => [
-    "instance.getModpackInfo",
-    parseInt(params.id, 10)
-  ]);
+  const modpackInfo = rspc.createQuery(() => ({
+    queryKey: ["instance.getModpackInfo", parseInt(params.id, 10)]
+  }));
 
-  const instancesUngrouped = rspc.createQuery(() => [
-    "instance.getAllInstances"
-  ]);
+  const instancesUngrouped = rspc.createQuery(() => ({
+    queryKey: ["instance.getAllInstances"]
+  }));
 
-  const _instanceMods = rspc.createQuery(() => [
-    "instance.getInstanceMods",
-    parseInt(params.id, 10)
-  ]);
+  const _instanceMods = rspc.createQuery(() => ({
+    queryKey: ["instance.getInstanceMods", parseInt(params.id, 10)]
+  }));
 
   const [instanceMods, setInstanceMods] = createStore({
     mods: [] as Mod[]
@@ -33,7 +30,9 @@ const fetchData = ({ params }) => {
     setInstanceMods("mods", reconcile(mods || []));
   });
 
-  const totalRam = rspc.createQuery(() => ["systeminfo.getTotalRAM"]);
+  const totalRam = rspc.createQuery(() => ({
+    queryKey: ["systeminfo.getTotalRAM"]
+  }));
 
   return {
     instanceDetails,
