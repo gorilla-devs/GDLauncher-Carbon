@@ -6,9 +6,9 @@ use chrono::{DateTime, Utc};
 use jsonwebtoken::{errors::ErrorKind, Algorithm, DecodingKey, Validation};
 use reqwest::StatusCode;
 use reqwest_middleware::ClientWithMiddleware;
-use specta::Type;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use specta::Type;
 use thiserror::Error;
 use tracing::{info, trace};
 

@@ -1,5 +1,5 @@
-use specta::Type;
 use serde::Serialize;
+use specta::Type;
 
 #[derive(Debug, Type, Serialize, Clone, PartialEq)]
 #[serde(tag = "translation", content = "args")]

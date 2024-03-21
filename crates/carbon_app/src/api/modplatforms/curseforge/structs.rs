@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use chrono::DateTime;
 use chrono::Utc;
-use specta::Type;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use strum_macros::EnumIter;
 
 use crate::domain::modplatforms::curseforge as mpcf;

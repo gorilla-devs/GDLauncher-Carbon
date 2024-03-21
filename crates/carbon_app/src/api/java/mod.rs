@@ -5,9 +5,9 @@ use crate::domain::java::{
     JavaComponentType, JavaVendor, SystemJavaProfileName, SYSTEM_JAVA_PROFILE_NAME_PREFIX,
 };
 use crate::{api::keys::java::*, domain::java::Java};
-use rspc::{RouterBuilder};
-use specta::Type;
+use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use std::collections::HashMap;
 
 use self::managed::{FEManagedJavaArch, FEManagedJavaOs, FEManagedJavaOsMap, FEVendor};

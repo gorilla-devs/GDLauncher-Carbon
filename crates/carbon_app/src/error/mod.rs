@@ -4,8 +4,8 @@ pub mod sentry;
 
 use std::fmt::{Debug, Display};
 
-use specta::Type;
 use serde::Serialize;
+use specta::Type;
 
 #[derive(Debug, Type, Serialize)]
 pub struct FeError {

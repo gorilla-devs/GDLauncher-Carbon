@@ -1,8 +1,8 @@
 use crate::api::router::router;
 use crate::api::{keys::metrics::SEND_EVENT, managers::App};
-use rspc::{RouterBuilder};
-use specta::Type;
+use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 pub(super) fn mount() -> RouterBuilder<App> {
     router! {

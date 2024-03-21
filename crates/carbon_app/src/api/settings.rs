@@ -9,9 +9,9 @@ use crate::{
     },
     managers::App,
 };
-use rspc::{RouterBuilder};
-use specta::Type;
+use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 use super::{
     modplatforms::{ModChannelWithUsage, ModPlatform, ModSources},

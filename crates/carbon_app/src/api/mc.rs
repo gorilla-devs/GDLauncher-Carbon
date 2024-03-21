@@ -3,9 +3,9 @@ use crate::api::managers::App;
 use crate::api::router::router;
 
 use daedalus::{minecraft, modded};
-use rspc::{RouterBuilder};
-use specta::Type;
+use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 pub(super) fn mount() -> RouterBuilder<App> {
     router! {

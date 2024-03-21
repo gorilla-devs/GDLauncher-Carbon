@@ -6,9 +6,9 @@ use async_stream::stream;
 use axum::extract::ws::Message;
 use axum::extract::{State, WebSocketUpgrade};
 use axum::response::IntoResponse;
-use rspc::{RouterBuilder};
-use specta::Type;
+use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use tracing::{error, info};
 
 mod account;

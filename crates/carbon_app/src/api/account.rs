@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use axum::extract::{Query, State};
 use chrono::{DateTime, Utc};
-use rspc::{RouterBuilder};
-use specta::Type;
+use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 use crate::api::keys::account::*;
 use crate::api::router::router;

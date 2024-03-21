@@ -24,9 +24,9 @@ use futures::future::BoxFuture;
 use futures::{join, Future};
 
 use prisma_client_rust::Direction;
-use specta::Type;
 use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
+use specta::Type;
 use thiserror::Error;
 use tokio::sync::{watch, Mutex, MutexGuard, RwLock};
 use tracing::{info, trace};

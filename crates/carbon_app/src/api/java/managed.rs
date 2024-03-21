@@ -1,7 +1,7 @@
 use std::{collections::HashMap, ops::Deref};
 
-use specta::Type;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 use crate::domain::java::JavaVersion;
 

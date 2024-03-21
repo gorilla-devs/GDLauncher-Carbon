@@ -1,6 +1,6 @@
-use rspc::{RouterBuilder};
-use specta::Type;
+use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use strum::IntoEnumIterator;
 use tracing::info;
 
