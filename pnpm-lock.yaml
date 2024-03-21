@@ -82,8 +82,8 @@ importers:
         specifier: ^5.28.5
         version: 5.28.5(solid-js@1.8.15)
       '@tanstack/solid-virtual':
-        specifier: 3.0.1
-        version: 3.0.1(solid-js@1.8.15)
+        specifier: 3.2.0
+        version: 3.2.0(solid-js@1.8.15)
       '@types/marked':
         specifier: ^5.0.2
         version: 5.0.2
@@ -6307,17 +6307,17 @@ packages:
       solid-js: 1.8.15
     dev: true
 
-  /@tanstack/solid-virtual@3.0.1(solid-js@1.8.15):
-    resolution: {integrity: sha512-DxP3GUBEDUNdCH50Q2RgRkaol3bAGpkMcJAdUIPWywEL37TkH/MC748nees0EXRylrC7RMP0zVNN3Z94WFBULA==}
+  /@tanstack/solid-virtual@3.2.0(solid-js@1.8.15):
+    resolution: {integrity: sha512-BGAEqd/CQ9iZdRZHUuX/JWNYeD6cGz2+3ndqZZlekRtENuzGXmVEj0W+Xz/6TId7pfxkfFSfanolCndNTct2vQ==}
     peerDependencies:
       solid-js: ^1.3.0
     dependencies:
-      '@tanstack/virtual-core': 3.0.0
+      '@tanstack/virtual-core': 3.2.0
       solid-js: 1.8.15
     dev: true
 
-  /@tanstack/virtual-core@3.0.0:
-    resolution: {integrity: sha512-SYXOBTjJb05rXa2vl55TTwO40A6wKu0R5i1qQwhJYNDIqaIGF7D0HsLw+pJAyi2OvntlEIVusx3xtbbgSUi6zg==}
+  /@tanstack/virtual-core@3.2.0:
+    resolution: {integrity: sha512-P5XgYoAw/vfW65byBbJQCw+cagdXDT/qH6wmABiLt4v4YBT2q2vqCOhihe+D1Nt325F/S/0Tkv6C5z0Lv+VBQQ==}
     dev: true
 
   /@testing-library/dom@8.20.1:

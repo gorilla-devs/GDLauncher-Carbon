@@ -2,14 +2,14 @@ import { useLocation, useMatch, useRouteData } from "@solidjs/router";
 import { For, Match, Show, Switch, createEffect } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
-import { Tab, TabList, Tabs, Spacing, Button, Tooltip } from "@gd/ui";
+import { Tab, TabList, Tabs, Spacing, Tooltip } from "@gd/ui";
 import getRouteIndex from "@/route/getRouteIndex";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "@/pages/app.data";
 import { AccountsDropdown } from "./AccountsDropdown";
 import { AccountStatus, AccountType } from "@gd/core_module/bindings";
 import { createStore } from "solid-js/store";
-import { port, rspc } from "@/utils/rspcClient";
+import { port } from "@/utils/rspcClient";
 import updateAvailable, {
   updateDownloaded,
   updateProgress
@@ -38,9 +38,9 @@ const AppNavbar = () => {
   const isSettings = useMatch(() => "/settings");
   const isSettingsNested = useMatch(() => "/settings/*");
 
-  const blockingMutation = rspc.createMutation(() => ({
-    mutationKey: "longRunning"
-  }));
+  // const blockingMutation = rspc.createMutation(() => ({
+  //   mutationKey: "longRunning"
+  // }));
 
   const selectedIndex = () =>
     !!isSettings() || !!isSettingsNested()
@@ -111,7 +111,7 @@ const AppNavbar = () => {
                 </For>
               </div>
               <Spacing class="hidden w-full lg:block" />
-              <Tab ignored noPadding>
+              {/* <Tab ignored noPadding>
                 <Button
                   class="w-max"
                   size="small"
@@ -138,7 +138,7 @@ const AppNavbar = () => {
                   <i class="flex i-ri:add-fill" />
                   BLOCKING MUTATION
                 </Button>
-              </Tab>
+              </Tab> */}
 
               <div class="flex gap-6 items-center">
                 <div
