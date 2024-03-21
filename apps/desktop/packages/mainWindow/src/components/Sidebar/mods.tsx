@@ -175,9 +175,8 @@ const Sidebar = () => {
                   });
                   setInstanceId(val as number);
 
-                  const modloaders = details.data.modloaders.map(
-                    (v: any) => v.type_
-                  );
+                  const modloaders =
+                    details.data?.modloaders.map((v: any) => v.type_) || [];
 
                   const gameVersion = details.data.version;
 

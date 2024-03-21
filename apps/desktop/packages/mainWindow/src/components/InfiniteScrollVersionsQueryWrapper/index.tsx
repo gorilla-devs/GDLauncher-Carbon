@@ -160,8 +160,6 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
       const pageSize = versionsQuery.pageSize || 20;
       const hasNextPage = index + pageSize < totalCount;
 
-      console.log((hasNextPage && index + pageSize) || null);
-
       return (hasNextPage && index + pageSize) || null;
     },
     enabled: false
@@ -169,7 +167,9 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
 
   const setQueryWrapper = (newValue: Partial<typeof versionsQuery>) => {
     setVersionsQuery(newValue);
-    // infiniteQuery.remove();
+    rspcContext.queryClient.removeQueries({
+      queryKey: ["modplatforms.versions"]
+    });
     infiniteQuery.refetch();
   };
 
@@ -192,7 +192,9 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
     });
   }
 
-  // infiniteQuery.remove();
+  rspcContext.queryClient.removeQueries({
+    queryKey: ["modplatforms.versions"]
+  });
   infiniteQuery.refetch();
 
   const allRows = () =>
@@ -206,7 +208,7 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
     },
     getScrollElement: () => parentRef,
     estimateSize: () => 62,
-    overscan: 10
+    overscan: 0
   });
 
   const context = {

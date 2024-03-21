@@ -39,8 +39,6 @@ const ModsBrowser = () => {
 
   const infiniteQuery = useInfiniteModsQuery();
 
-  const rows = () => infiniteQuery.allRows();
-
   const allVirtualRows = () => infiniteQuery.rowVirtualizer.getVirtualItems();
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -68,7 +66,7 @@ const ModsBrowser = () => {
   }));
 
   createEffect(() => {
-    if (!lastItem() || lastItem().index === infiniteQuery?.query.index) {
+    if (!lastItem()) {
       return;
     }
 
@@ -77,7 +75,7 @@ const ModsBrowser = () => {
       : lastItem().index;
 
     if (
-      lastItemIndex >= rows().length - 1 &&
+      mods().length - lastItemIndex < 5 &&
       infiniteQuery?.infiniteQuery.hasNextPage &&
       !infiniteQuery.infiniteQuery.isFetchingNextPage
     ) {
@@ -113,7 +111,7 @@ const ModsBrowser = () => {
 
   const mods = () =>
     infiniteQuery?.infiniteQuery.data
-      ? infiniteQuery.infiniteQuery.data.pages.flatMap((d) => d.data)
+      ? infiniteQuery.infiniteQuery.data.pages.flatMap((d: any) => d.data)
       : [];
 
   const hasFiltersData = createMemo(() => Boolean(sortingFields()));

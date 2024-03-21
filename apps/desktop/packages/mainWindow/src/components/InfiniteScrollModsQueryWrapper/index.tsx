@@ -78,8 +78,6 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
         index: ctx.pageParam + query.pageSize!
       });
 
-      console.log("Querying", query);
-
       return rspcContext.client.query(["modplatforms.unifiedSearch", query]);
     },
     initialPageParam: 0,
@@ -88,8 +86,6 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
       const totalCount = lastPage.pagination?.totalCount || 0;
       const pageSize = query.pageSize || 20;
       const hasNextPage = index + pageSize < totalCount;
-
-      console.log((hasNextPage && index) || null);
 
       return (hasNextPage && index) || null;
     },
@@ -139,10 +135,8 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
         .query(["instance.getInstanceDetails", _instanceId])
         .then((details) => {
           setQueryWrapper({
-            modloaders: (details as any).data.modloaders.map(
-              (v: any) => v.type_
-            ),
-            gameVersions: [(details as any).data.version]
+            modloaders: details?.modloaders.map((v: any) => v.type_) || [],
+            gameVersions: details?.version ? [details?.version] : []
           });
         });
     } else if (lastType() === "mod") {
