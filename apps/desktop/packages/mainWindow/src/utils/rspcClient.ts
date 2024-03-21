@@ -2,7 +2,6 @@ import { QueryClient } from "@tanstack/solid-query";
 import { WebsocketTransport, createClient } from "@rspc/client";
 import { createSolidQueryHooks } from "@rspc/solid";
 import type { Procedures } from "@gd/core_module";
-import { createEffect } from "solid-js";
 
 export const rspc = createSolidQueryHooks<Procedures>();
 export const queryClient = new QueryClient({
@@ -52,7 +51,9 @@ export default function initRspc(_port: number) {
           key.push(data.args);
         }
         // console.log("Invalidations channel", key, data.args);
-        context.queryClient.invalidateQueries(key);
+        context.queryClient.invalidateQueries({
+          queryKey: key
+        });
       });
 
       socket.addEventListener("close", () => {

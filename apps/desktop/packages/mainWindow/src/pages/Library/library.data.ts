@@ -4,7 +4,7 @@ import { createEffect } from "solid-js";
 import { createStore } from "solid-js/store";
 
 const fetchData = () => {
-  const _instances = rspc.createQuery(() => ({
+  const instances = rspc.createQuery(() => ({
     queryKey: ["instance.getAllInstances"]
   }));
   const groups = rspc.createQuery(() => ({
@@ -29,20 +29,20 @@ const fetchData = () => {
     });
   });
 
-  const [instances, _setInstances] = createStore<{
-    data: ListInstance[] | null;
-    isLoading: boolean;
-  }>({
-    data: null,
-    isLoading: _instances.isLoading || _instances.isInitialLoading
-  });
+  // const [instances, _setInstances] = createStore<{
+  //   data: ListInstance[] | null;
+  //   isLoading: boolean;
+  // }>({
+  //   data: null,
+  //   isLoading: _instances.isLoading || _instances.isInitialLoading
+  // });
 
-  createEffect(() => {
-    _setInstances({
-      data: _instances.data,
-      isLoading: _instances.isLoading || _instances.isInitialLoading
-    });
-  });
+  // createEffect(() => {
+  //   _setInstances({
+  //     data: _instances.data,
+  //     isLoading: _instances.isLoading || _instances.isInitialLoading
+  //   });
+  // });
 
   return { settings, instances, groups };
 };

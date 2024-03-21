@@ -208,7 +208,7 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
     },
     getScrollElement: () => parentRef,
     estimateSize: () => 62,
-    overscan: 0
+    overscan: 10
   });
 
   const context = {

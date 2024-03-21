@@ -75,7 +75,7 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
     queryKey: ["modplatforms.unifiedSearch"],
     queryFn: (ctx) => {
       getQueryFunction({
-        index: ctx.pageParam + query.pageSize!
+        index: ctx.pageParam
       });
 
       return rspcContext.client.query(["modplatforms.unifiedSearch", query]);
@@ -87,7 +87,7 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
       const pageSize = query.pageSize || 20;
       const hasNextPage = index + pageSize < totalCount;
 
-      return (hasNextPage && index) || null;
+      return (hasNextPage && index + 20) || null;
     },
     enabled: false
   }));

@@ -254,7 +254,7 @@ const ModsBrowser = () => {
           </Match>
         </Switch>
         <div
-          class="flex flex-col gap-2 left-0 right-0 absolute overflow-y-hidden bottom-0 pb-5"
+          class="flex flex-col gap-2 left-0 right-0 absolute overflow-y-hidden bottom-0"
           style={{
             top: `${headerHeight()}px`
           }}

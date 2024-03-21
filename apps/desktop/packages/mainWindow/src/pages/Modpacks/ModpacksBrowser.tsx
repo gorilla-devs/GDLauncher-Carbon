@@ -152,7 +152,7 @@ const ModpackBrowser = () => {
           </Match>
         </Switch>
         <div
-          class="flex flex-col gap-2 left-0 right-0 absolute bottom-0 pb-5 overflow-y-hidden"
+          class="flex flex-col gap-2 left-0 right-0 absolute bottom-0 overflow-y-hidden"
           style={{
             top: `${headerHeight()}px`
           }}
