@@ -1,5 +1,5 @@
 import { rspc } from "@/utils/rspcClient";
-import { FESettings, ListInstance } from "@gd/core_module/bindings";
+import { FESettings } from "@gd/core_module/bindings";
 import { createEffect } from "solid-js";
 import { createStore } from "solid-js/store";
 
