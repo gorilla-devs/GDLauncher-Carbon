@@ -4,6 +4,7 @@ import {
   createEffect,
   createResource,
   createSignal,
+  ErrorBoundary,
   Match,
   Show,
   Switch
@@ -66,30 +67,40 @@ render(
     });
 
     return (
-      <Switch>
-        <Match when={isIntroAnimationFinished()}>
-          <Switch>
-            <Match when={isReady()}>
-              <InnerApp port={coreModuleLoaded() as unknown as number} />
-            </Match>
-            <Match when={!isReady()}>
-              <div class="flex justify-center items-center h-screen w-screen">
-                <div class="animate-spin rounded-full h-12 w-12 bg-blue-500 i-ri:loader-4-line" />
-              </div>
-            </Match>
-          </Switch>
-        </Match>
-        <Match when={!isIntroAnimationFinished()}>
-          <div class="w-full flex justify-center items-center h-screen">
-            <RiveAppWapper
-              src={GDAnimation}
-              onStop={() => {
-                setIsIntroAnimationFinished(true);
-              }}
-            />
-          </div>
-        </Match>
-      </Switch>
+      <ErrorBoundary
+        fallback={(err) => {
+          console.error("Window errored", err);
+
+          window.fatalError(err, "Window");
+
+          return <></>;
+        }}
+      >
+        <Switch>
+          <Match when={isIntroAnimationFinished()}>
+            <Switch>
+              <Match when={isReady()}>
+                <InnerApp port={coreModuleLoaded() as unknown as number} />
+              </Match>
+              <Match when={!isReady()}>
+                <div class="flex justify-center items-center h-screen w-screen">
+                  <div class="animate-spin rounded-full h-12 w-12 bg-blue-500 i-ri:loader-4-line" />
+                </div>
+              </Match>
+            </Switch>
+          </Match>
+          <Match when={!isIntroAnimationFinished()}>
+            <div class="w-full flex justify-center items-center h-screen">
+              <RiveAppWapper
+                src={GDAnimation}
+                onStop={() => {
+                  setIsIntroAnimationFinished(true);
+                }}
+              />
+            </div>
+          </Match>
+        </Switch>
+      </ErrorBoundary>
     );
   },
   document.getElementById("root") as HTMLElement
@@ -118,7 +129,9 @@ const _i18nInstance = i18n.use(icu).createInstance();
 
 const TransWrapper = (props: TransWrapperProps) => {
   const [isI18nReady, setIsI18nReady] = createSignal(false);
-  const trackPageView = rspc.createMutation(["metrics.sendEvent"]);
+  const trackPageView = rspc.createMutation(() => ({
+    mutationKey: "metrics.sendEvent"
+  }));
 
   window.addEventListener("hashchange", () => {
     trackPageView.mutate({
@@ -127,9 +140,13 @@ const TransWrapper = (props: TransWrapperProps) => {
     });
   });
 
-  const settings = rspc.createQuery(() => ["settings.getSettings"], {
-    async onSuccess(settings) {
-      let { language } = settings;
+  const settings = rspc.createQuery(() => ({
+    queryKey: ["settings.getSettings"]
+  }));
+
+  createEffect(async () => {
+    if (settings.isSuccess) {
+      let { language } = settings.data;
       if (!_i18nInstance.isInitialized) {
         let maybeEnglish = null;
         if (language !== "english") {

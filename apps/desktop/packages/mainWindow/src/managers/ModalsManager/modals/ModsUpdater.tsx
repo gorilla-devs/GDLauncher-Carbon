@@ -24,12 +24,13 @@ const AppUpdate = (props: ModalProps) => {
     setIsDestroyed(true);
   });
 
-  const updateModMutation = rspc.createMutation(["instance.updateMod"], {
+  const updateModMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.updateMod"],
     onError: (err) => {
       console.error(err);
-      addNotification(`Error updating mod: ${err.cause?.message}`, "error");
+      addNotification(`Error updating mod: ${err?.message}`, "error");
     }
-  });
+  }));
 
   const updateMods = async () => {
     for (const modId of data().mods) {
@@ -41,7 +42,7 @@ const AppUpdate = (props: ModalProps) => {
       } catch (err) {
         console.error(err);
         addNotification(
-          `Error updating mod: ${(err as RSPCError).cause?.message}`,
+          `Error updating mod: ${(err as RSPCError)?.message}`,
           "error"
         );
       } finally {

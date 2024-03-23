@@ -16,7 +16,9 @@ enum _Theme {
 }
 
 const initThemes = () => {
-  let theme = rspc.createQuery(() => ["settings.getSettings"]);
+  let theme = rspc.createQuery(() => ({
+    queryKey: ["settings.getSettings"]
+  }));
   const themeName = () => theme.data?.theme;
   createEffect(() => {
     if (!themeName()) {

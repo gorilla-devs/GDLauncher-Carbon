@@ -70,6 +70,7 @@ const Modpack = () => {
   const [loading, setLoading] = createSignal(false);
   const navigate = useGDNavigate();
   const params = useParams();
+  const rspcContext = rspc.useContext();
   const infiniteQuery = useInfiniteVersionsQuery();
   const addNotification = createNotification();
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -111,39 +112,21 @@ const Modpack = () => {
 
   const isFetching = () => routeData.modpackDetails?.isLoading;
 
-  const loadIconMutation = rspc.createMutation(["instance.loadIconUrl"]);
+  const loadIconMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.loadIconUrl"]
+  }));
 
-  const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
+  const defaultGroup = rspc.createQuery(() => ({
+    queryKey: ["instance.getDefaultGroup"]
+  }));
 
-  const prepareInstanceMutation = rspc.createMutation(
-    ["instance.prepareInstance"],
-    {
-      onSuccess() {
-        addNotification("Instance successfully created.");
-      },
-      onError() {
-        setLoading(false);
-        addNotification("Error while creating the instance.", "error");
-      },
-      onSettled() {
-        navigate(`/library`);
-      }
-    }
-  );
+  const prepareInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.prepareInstance"]
+  }));
 
-  const createInstanceMutation = rspc.createMutation(
-    ["instance.createInstance"],
-    {
-      onSuccess(instanceId) {
-        setLoading(true);
-        prepareInstanceMutation.mutate(instanceId);
-      },
-      onError() {
-        setLoading(false);
-        addNotification("Error while downloading the modpack.", "error");
-      }
-    }
-  );
+  const createInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.createInstance"]
+  }));
 
   const generateModpackObj = () => {
     const isCurseforge = routeData.isCurseforge;
@@ -192,7 +175,7 @@ const Modpack = () => {
       ? (routeData.modpackDetails?.data as FEModResponse).data.logo?.url
       : (routeData.modpackDetails?.data as MRFEProject).icon_url;
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     setLoading(true);
     const instanceIcon = icon();
 
@@ -202,28 +185,39 @@ const Modpack = () => {
     const modpackObj = generateModpackObj();
 
     if (name && modpackObj) {
-      createInstanceMutation.mutate({
-        group: defaultGroup.data || 1,
-        use_loaded_icon: true,
-        notes: "",
-        name: name,
-        version: {
-          Modpack: modpackObj
-        }
-      });
+      try {
+        const instanceId = await createInstanceMutation.mutateAsync({
+          group: defaultGroup.data || 1,
+          use_loaded_icon: true,
+          notes: "",
+          name: name,
+          version: {
+            Modpack: modpackObj
+          }
+        });
+
+        setLoading(true);
+        await prepareInstanceMutation.mutateAsync(instanceId);
+      } catch (err) {
+        console.error(err);
+        addNotification("Error while downloading the modpack.", "error");
+      } finally {
+        setLoading(false);
+        navigate(`/library`);
+      }
     }
 
     setLoading(false);
   };
 
-  createEffect(() => {
+  createEffect(async () => {
     if (instanceId() !== undefined && !isNaN(instanceId())) {
-      const mods = rspc.createQuery(() => [
+      const mods = await rspcContext.client.query([
         "instance.getInstanceMods",
         instanceId() as number
       ]);
 
-      if (mods.data) setInstanceMods(mods.data);
+      if (mods) setInstanceMods(mods);
     }
   });
 

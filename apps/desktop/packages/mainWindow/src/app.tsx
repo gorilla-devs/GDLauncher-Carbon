@@ -23,8 +23,13 @@ const App = (props: Props) => {
 
   checkForUpdates();
 
-  const setIsFirstRun = rspc.createMutation(["settings.setSettings"]);
-  const isFirstRun = rspc.createQuery(() => ["settings.getSettings"]);
+  const setIsFirstRun = rspc.createMutation(() => ({
+    mutationKey: "settings.setSettings"
+  }));
+
+  const isFirstRun = rspc.createQuery(() => ({
+    queryKey: ["settings.getSettings"]
+  }));
 
   createEffect(() => {
     if (isFirstRun.data?.isFirstLaunch && currentRoute.pathname !== "/") {

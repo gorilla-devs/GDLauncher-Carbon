@@ -33,19 +33,29 @@ const Java = () => {
   const javas = () => javasData()?.data || [];
   const modalsContext = useModal();
 
-  const settings = rspc.createQuery(() => ["settings.getSettings"]);
+  const settings = rspc.createQuery(() => ({
+    queryKey: ["settings.getSettings"]
+  }));
 
-  const profileAssignments = rspc.createQuery(() => [
-    "java.systemJavaProfileAssignments"
-  ]);
+  const profileAssignments = rspc.createQuery(() => ({
+    queryKey: ["java.systemJavaProfileAssignments"]
+  }));
 
-  const settingsMutation = rspc.createMutation(["settings.setSettings"]);
+  const settingsMutation = rspc.createMutation(() => ({
+    mutationKey: ["settings.setSettings"]
+  }));
 
-  const updateProfile = rspc.createMutation(["java.updateJavaProfile"]);
+  const updateProfile = rspc.createMutation(() => ({
+    mutationKey: ["java.updateJavaProfile"]
+  }));
 
-  const deleteProfile = rspc.createMutation(["java.deleteJavaProfile"]);
+  const deleteProfile = rspc.createMutation(() => ({
+    mutationKey: ["java.deleteJavaProfile"]
+  }));
 
-  let deleteJavaMutation = rspc.createMutation(["java.deleteJavaVersion"]);
+  let deleteJavaMutation = rspc.createMutation(() => ({
+    mutationKey: ["java.deleteJavaVersion"]
+  }));
 
   const mbTotalRAM = () =>
     Math.round(Number(routeData.totalRam.data) / 1024 / 1024);

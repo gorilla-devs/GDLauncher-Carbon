@@ -45,23 +45,17 @@ const SingleEntity = (props: {
     isLoading: false
   });
 
-  const entityDefaultPath = rspc.createQuery(() => [
-    "instance.getImportEntityDefaultPath",
-    props.entity.entity
-  ]);
-  const scanImportableInstancesMutation = rspc.createMutation(
-    ["instance.setImportScanTarget"],
-    {
-      onSettled: () => {
-        queryClient.invalidateQueries({
-          queryKey: ["instance.getImportScanStatus"]
-        });
-      }
-    }
-  );
-  const importScanStatus = rspc.createQuery(() => [
-    "instance.getImportScanStatus"
-  ]);
+  const entityDefaultPath = rspc.createQuery(() => ({
+    queryKey: ["instance.getImportEntityDefaultPath", props.entity.entity]
+  }));
+  const scanImportableInstancesMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.setImportScanTarget"]
+  }));
+
+  const importScanStatus = rspc.createQuery(() => ({
+    queryKey: ["instance.getImportScanStatus"]
+  }));
+
   createEffect(() => {
     if (!entityDefaultPath.data) {
       setPath("");
@@ -70,16 +64,28 @@ const SingleEntity = (props: {
     setPath(entityDefaultPath.data!);
   });
 
-  createEffect(() => {
+  createEffect(async () => {
     if (path()) {
-      scanImportableInstancesMutation.mutate([
+      await scanImportableInstancesMutation.mutateAsync([
         props.entity.entity,
         path() as string
       ]);
+
+      queryClient.invalidateQueries({
+        queryKey: ["instance.getImportScanStatus"]
+      });
     } else {
-      scanImportableInstancesMutation.mutate([props.entity.entity, ""]);
+      await scanImportableInstancesMutation.mutateAsync([
+        props.entity.entity,
+        ""
+      ]);
+
+      queryClient.invalidateQueries({
+        queryKey: ["instance.getImportScanStatus"]
+      });
     }
   });
+
   createEffect(() => {
     const status = importScanStatus.data;
     if (status) {

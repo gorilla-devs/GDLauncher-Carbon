@@ -64,15 +64,13 @@ const Modpack = () => {
 
   const instanceId = () => parseInt(searchParams.instanceId, 10);
 
-  const instanceDetails = rspc.createQuery(() => [
-    "instance.getInstanceDetails",
-    instanceId()
-  ]);
+  const instanceDetails = rspc.createQuery(() => ({
+    queryKey: ["instance.getInstanceDetails", instanceId()]
+  }));
 
-  const instanceMods = rspc.createQuery(() => [
-    "instance.getInstanceMods",
-    instanceId()
-  ]);
+  const instanceMods = rspc.createQuery(() => ({
+    queryKey: ["instance.getInstanceMods", instanceId()]
+  }));
 
   const instancePages = () => [
     {

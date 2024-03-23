@@ -17,16 +17,14 @@ const Confirmation = (props: ModalProps) => {
   const data: () => Props = () => props.data;
   const modalContext = useModal();
   const [t] = useTransContext();
-  const updateInstanceMutation = rspc.createMutation(
-    ["instance.updateInstance"],
-    {
-      onMutate: (newData) => {
-        queryClient.setQueryData(["instance.getInstanceDetails"], newData);
-      }
+  const updateInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.updateInstance"],
+
+    onMutate: (newData) => {
+      queryClient.setQueryData(["instance.getInstanceDetails"], newData);
     }
-  );
-  console.log(props);
-  console.log(props.title);
+  }));
+
   return (
     <ModalLayout
       noHeader={props.noHeader}

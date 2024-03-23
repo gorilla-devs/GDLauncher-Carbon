@@ -18,20 +18,13 @@ const ModPackVersionUpdate = (props: ModalProps) => {
   );
   const navigate = useGDNavigate();
   const modalContext = useModal();
-  const instance = rspc.createQuery(() => [
-    "instance.getInstanceDetails",
-    instanceId() as number
-  ]);
+  const instance = rspc.createQuery(() => ({
+    queryKey: ["instance.getInstanceDetails", instanceId() as number]
+  }));
 
-  const changeModpackMutation = rspc.createMutation(
-    ["instance.changeModpack"],
-    {
-      onSuccess() {
-        modalContext?.closeModal();
-        navigate("/library");
-      }
-    }
-  );
+  const changeModpackMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.changeModpack"]
+  }));
 
   const getProjectId = () => {
     const modpack = instance.data?.modpack?.modpack;
@@ -60,8 +53,8 @@ const ModPackVersionUpdate = (props: ModalProps) => {
     }
   });
 
-  const responseCF = rspc.createQuery(
-    () => [
+  const responseCF = rspc.createQuery(() => ({
+    queryKey: [
       "modplatforms.curseforge.getModFiles",
       {
         modId: getProjectId()?.projectId as number,
@@ -70,22 +63,18 @@ const ModPackVersionUpdate = (props: ModalProps) => {
         }
       }
     ],
-    {
-      enabled: false
-    }
-  );
+    enabled: false
+  }));
 
-  const responseModrinth = rspc.createQuery(
-    () => [
+  const responseModrinth = rspc.createQuery(() => ({
+    queryKey: [
       "modplatforms.modrinth.getProjectVersions",
       {
         project_id: getProjectId()?.projectId.toString()!
       }
     ],
-    {
-      enabled: false
-    }
-  );
+    enabled: false
+  }));
 
   createEffect(() => {
     if (currentPlatform() === "curseforge") {
@@ -130,10 +119,10 @@ const ModPackVersionUpdate = (props: ModalProps) => {
     );
   };
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!selectedVersion()) return;
 
-    changeModpackMutation.mutate({
+    await changeModpackMutation.mutateAsync({
       instance: instanceId() as FEInstanceId,
       modpack: {
         type: currentPlatform(),
@@ -149,6 +138,9 @@ const ModPackVersionUpdate = (props: ModalProps) => {
               }
       } as Modpack
     });
+
+    modalContext?.closeModal();
+    navigate("/library");
   };
 
   return (

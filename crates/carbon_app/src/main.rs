@@ -10,7 +10,6 @@ use crate::managers::{
     App, AppInner,
 };
 
-use rspc::RouterBuilderLike;
 use serde_json::Value;
 use std::{path::PathBuf, sync::Arc};
 use tokio::net::TcpListener;
@@ -40,7 +39,6 @@ pub fn main() {
         let mut args = std::env::args();
         if args.any(|arg| arg == "--generate-ts-bindings") {
             crate::api::build_rspc_router()
-                .expose()
                 .config(
                     rspc::Config::new().export_ts_bindings(
                         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -137,7 +135,7 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
     info!("Starting router");
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(1000);
 
-    let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router().expose().build().arced();
+    let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router().build().arced();
 
     // We disable CORS because this is just an example. DON'T DO THIS IN PRODUCTION!
     let cors = CorsLayer::new()
@@ -164,9 +162,11 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
     .unwrap();
 
     let app1 = app.clone();
+    let rspc_axum_router: axum::Router<Arc<AppInner>> = rspc_axum::endpoint(router, move || app);
+
     let app = axum::Router::new()
         .nest("/", crate::api::build_axum_vanilla_router())
-        .nest("/rspc", router.endpoint(move || app).axum())
+        .nest("/rspc", rspc_axum_router)
         .layer(cors)
         .with_state(app1);
 
@@ -197,11 +197,7 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
         }
     });
 
-    let std_tcp_listener = listener.into_std().unwrap();
-
-    axum::Server::from_tcp(std_tcp_listener)
-        .unwrap()
-        .serve(app.into_make_service())
+    axum::serve(listener, app.into_make_service())
         .await
         .unwrap();
 }

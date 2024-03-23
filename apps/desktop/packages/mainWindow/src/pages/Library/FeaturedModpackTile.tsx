@@ -25,7 +25,9 @@ const FeaturedModpackTile = () => {
   const [taskId, setTaskId] = createSignal<number | null>(null);
   const [shouldShow, setShouldShow] = createSignal(true);
 
-  const trackDownload = rspc.createMutation(["metrics.sendEvent"]);
+  const trackDownload = rspc.createMutation(() => ({
+    mutationKey: ["metrics.sendEvent"]
+  }));
 
   const [hexingTales] = createResource(() => {
     return rspcContext.client.query([
@@ -36,19 +38,25 @@ const FeaturedModpackTile = () => {
     ]);
   });
 
-  const instances = rspc.createQuery(() => ["instance.getAllInstances"]);
+  const instances = rspc.createQuery(() => ({
+    queryKey: ["instance.getAllInstances"]
+  }));
 
-  const prepareInstanceMutation = rspc.createMutation([
-    "instance.prepareInstance"
-  ]);
+  const prepareInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.prepareInstance"]
+  }));
 
-  const loadIconMutation = rspc.createMutation(["instance.loadIconUrl"]);
+  const loadIconMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.loadIconUrl"]
+  }));
 
-  const createInstanceMutation = rspc.createMutation([
-    "instance.createInstance"
-  ]);
+  const createInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.createInstance"]
+  }));
 
-  const task = rspc.createQuery(() => ["vtask.getTask", taskId()]);
+  const task = rspc.createQuery(() => ({
+    queryKey: ["vtask.getTask", taskId()]
+  }));
 
   createEffect((prev) => {
     if (taskId() && prev && !task.data) {

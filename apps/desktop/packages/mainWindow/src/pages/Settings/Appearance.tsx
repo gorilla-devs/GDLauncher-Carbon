@@ -13,11 +13,12 @@ const Appearance = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const themeName = () => routeData?.data?.data?.theme || "default";
 
-  const settingsMutation = rspc.createMutation(["settings.setSettings"], {
+  const settingsMutation = rspc.createMutation(() => ({
+    mutationKey: ["settings.setSettings"],
     onMutate: (newTheme) => {
       queryClient.setQueryData(["settings.setSettings"], newTheme);
     }
-  });
+  }));
 
   // const anotherTheme = getThemeColors(anotherThemeName);
   const themes = getAvailableThemes();

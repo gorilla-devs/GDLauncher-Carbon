@@ -36,10 +36,10 @@ import {
   modrinthCategories,
   supportedModloaders
 } from "@/utils/sidebar";
-import { rspcFetch } from "@/utils/rspcClient";
 import { createStore } from "solid-js/store";
 import { mappedMcVersions, mcVersions } from "@/utils/mcVersion";
 import { instanceId, setInstanceId } from "@/utils/browser";
+import { rspc } from "@/utils/rspcClient";
 
 const mapTypeToColor = (type: McType) => {
   return (
@@ -63,6 +63,7 @@ const mapTypeToColor = (type: McType) => {
 const Sidebar = () => {
   let owner = getOwner();
   const routeData: ReturnType<typeof fetchData> = useRouteData();
+  const rspcContext = rspc.useContext();
   const [gameVersionFilters, setGameVersionFilters] = createStore({
     snapshot: false,
     oldAlpha: false,
@@ -163,9 +164,9 @@ const Sidebar = () => {
               <Radio.group
                 onChange={async (val) => {
                   const details: any = await runWithOwner(owner, async () => {
-                    return rspcFetch(() => [
+                    return rspcContext.client.query([
                       "instance.getInstanceDetails",
-                      val
+                      val as number
                     ]);
                   });
 
@@ -174,9 +175,8 @@ const Sidebar = () => {
                   });
                   setInstanceId(val as number);
 
-                  const modloaders = details.data.modloaders.map(
-                    (v: any) => v.type_
-                  );
+                  const modloaders =
+                    details.data?.modloaders.map((v: any) => v.type_) || [];
 
                   const gameVersion = details.data.version;
 

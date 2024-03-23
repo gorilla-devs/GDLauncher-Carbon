@@ -1,8 +1,7 @@
 import { QueryClient } from "@tanstack/solid-query";
-import { createClient, createWSClient, wsLink } from "@rspc/client";
+import { WebsocketTransport, createClient } from "@rspc/client";
 import { createSolidQueryHooks } from "@rspc/solid";
 import type { Procedures } from "@gd/core_module";
-import { createEffect } from "solid-js";
 
 export const rspc = createSolidQueryHooks<Procedures>();
 export const queryClient = new QueryClient({
@@ -21,16 +20,11 @@ export let port: number | null = null;
 
 export default function initRspc(_port: number) {
   port = _port;
-  const wsClient = createWSClient({
-    url: `ws://127.0.0.1:${_port}/rspc/ws`
-  });
+
+  const transport = new WebsocketTransport(`ws://127.0.0.1:${_port}/rspc/ws`);
 
   const client = createClient<Procedures>({
-    links: [
-      wsLink({
-        client: wsClient
-      })
-    ]
+    transport
   });
 
   const createInvalidateQuery = () => {
@@ -57,7 +51,9 @@ export default function initRspc(_port: number) {
           key.push(data.args);
         }
         // console.log("Invalidations channel", key, data.args);
-        context.queryClient.invalidateQueries(key);
+        context.queryClient.invalidateQueries({
+          queryKey: key
+        });
       });
 
       socket.addEventListener("close", () => {
@@ -80,19 +76,4 @@ export default function initRspc(_port: number) {
     client,
     createInvalidateQuery
   };
-}
-
-export async function rspcFetch(...args: any[]) {
-  // using .apply to avoid typescript error
-  const res = rspc.createQuery.apply(null, args as any);
-
-  return new Promise((resolve, reject) => {
-    createEffect(() => {
-      if (res.error) {
-        reject(res);
-      } else if (res.status === "success") {
-        resolve(res);
-      }
-    });
-  });
 }

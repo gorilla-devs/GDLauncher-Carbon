@@ -1,4 +1,3 @@
-
 import { For, createSignal } from "solid-js";
 import SingleImport from "./SingleImport";
 import { rspc } from "@/utils/rspcClient";
@@ -10,17 +9,15 @@ const BeginImportStep = (props: {
   instances?: Array<string>;
 }) => {
   const [state, setState] = createSignal<string[]>([]);
-  const importInstanceMutation = rspc.createMutation(
-    ["instance.importInstance"],
-    {
-      onSuccess(taskId) {
-        setTaskIds([...(taskIds() || []), taskId]);
-      },
-      onError() {
-        setTaskIds([...(taskIds() || []), undefined]);
-      }
+  const importInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.importInstance"],
+    onSuccess(taskId) {
+      setTaskIds([...(taskIds() || []), taskId]);
+    },
+    onError() {
+      setTaskIds([...(taskIds() || []), undefined]);
     }
-  );
+  }));
 
   async function createMutations() {
     for (let i = 0; i < props.instances!.length; i++) {

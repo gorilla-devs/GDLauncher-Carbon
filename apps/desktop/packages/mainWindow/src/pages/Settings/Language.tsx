@@ -10,7 +10,10 @@ import Title from "./components/Title";
 import changeLanguage from "@/utils/language";
 
 const Language = () => {
-  let settings = rspc.createQuery(() => ["settings.getSettings"]);
+  let settings = rspc.createQuery(() => ({
+    queryKey: ["settings.getSettings"]
+  }));
+
   const owner = getOwner();
 
   return (

@@ -10,7 +10,9 @@ import { rspc } from "@/utils/rspcClient";
 import { Match, Show, Switch, createResource } from "solid-js";
 
 const AppUpdate = (props: ModalProps) => {
-  const settings = rspc.createQuery(() => ["settings.getSettings"]);
+  const settings = rspc.createQuery(() => ({
+    queryKey: ["settings.getSettings"]
+  }));
   const [os] = createResource(() => window.getCurrentOS());
 
   const releaseChannelTransKey = () => {

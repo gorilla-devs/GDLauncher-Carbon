@@ -9,14 +9,12 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
   const modalsContext = useModal();
   const addNotification = createNotification();
 
-  const deleteInstanceMutation = rspc.createMutation(
-    ["instance.deleteInstance"],
-    {
-      onError: (error) => {
-        addNotification(error.message, "error");
-      }
+  const deleteInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.deleteInstance"],
+    onError: (error) => {
+      addNotification(error.message, "error");
     }
-  );
+  }));
 
   return (
     <ModalLayout

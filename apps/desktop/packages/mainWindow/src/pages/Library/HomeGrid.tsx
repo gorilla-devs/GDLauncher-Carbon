@@ -78,7 +78,9 @@ const HomeGrid = () => {
     setInstancesTileSize(routeData.settings.data?.instancesTileSize!);
   });
 
-  const settingsMutation = rspc.createMutation(["settings.setSettings"]);
+  const settingsMutation = rspc.createMutation(() => ({
+    mutationKey: ["settings.setSettings"]
+  }));
 
   let inputRef: HTMLInputElement | undefined;
 

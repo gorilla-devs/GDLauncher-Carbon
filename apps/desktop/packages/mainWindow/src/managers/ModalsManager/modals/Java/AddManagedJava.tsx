@@ -23,7 +23,9 @@ const osMappedNames: mappedOS = {
 };
 
 const AddManagedJava = (props: ModalProps) => {
-  let javaVendors = rspc.createQuery(() => ["java.getManagedVendors"]);
+  let javaVendors = rspc.createQuery(() => ({
+    queryKey: ["java.getManagedVendors"]
+  }));
 
   const [vendor, setVendor] = createSignal<FEVendor>("azul");
   const [currentOs, setCurrentOs] = createSignal<{
@@ -39,23 +41,13 @@ const AddManagedJava = (props: ModalProps) => {
   const addNotification = createNotification();
 
   // eslint-disable-next-line solid/reactivity
-  let versionsByVendor = rspc.createQuery(() => [
-    "java.getManagedVersionsByVendor",
-    vendor()
-  ]);
+  let versionsByVendor = rspc.createQuery(() => ({
+    queryKey: ["java.getManagedVersionsByVendor", vendor()]
+  }));
 
-  let addJavaMutation = rspc.createMutation(["java.setupManagedJava"], {
-    onMutate() {
-      setLoading(true);
-    },
-    onSuccess() {
-      addNotification("Java added successfully");
-    },
-    onSettled() {
-      modalsContext?.closeModal();
-      setLoading(false);
-    }
-  });
+  let addJavaMutation = rspc.createMutation(() => ({
+    mutationKey: ["java.setupManagedJava"]
+  }));
 
   onMount(() => {
     window.getCurrentOS().then((currentOs) => {
@@ -151,17 +143,27 @@ const AddManagedJava = (props: ModalProps) => {
             <Button
               rounded={false}
               loading={loading()}
-              onClick={() => {
+              onClick={async () => {
                 const id = selectedJavaVersion() || mappedJavaVersions()[0].key;
                 const vend = vendor() || mappedVendors()[0].key;
 
                 if (currentOs().arch && currentOs().platform && id && vend) {
-                  addJavaMutation.mutate({
-                    arch: currentOs().arch as FEManagedJavaArch,
-                    os: currentOs().platform as FEManagedJavaOs,
-                    id,
-                    vendor: vend
-                  });
+                  try {
+                    setLoading(true);
+
+                    await addJavaMutation.mutateAsync({
+                      arch: currentOs().arch as FEManagedJavaArch,
+                      os: currentOs().platform as FEManagedJavaOs,
+                      id,
+                      vendor: vend
+                    });
+
+                    addNotification("Java added successfully");
+                  } catch (err) {
+                    console.error(err);
+                    modalsContext?.closeModal();
+                    setLoading(false);
+                  }
                 }
               }}
             >

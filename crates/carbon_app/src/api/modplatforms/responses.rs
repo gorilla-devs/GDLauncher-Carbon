@@ -1,5 +1,5 @@
-use rspc::Type;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 use super::curseforge;
 use super::curseforge::structs::CFFEMod;

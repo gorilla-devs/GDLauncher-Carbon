@@ -55,19 +55,21 @@ const Tile = (props: Props) => {
   const navigate = useGDNavigate();
   const modalsContext = useModal();
 
-  const launchInstanceMutation = rspc.createMutation([
-    "instance.launchInstance"
-  ]);
+  const launchInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.launchInstance"]
+  }));
 
-  const killInstanceMutation = rspc.createMutation(["instance.killInstance"]);
+  const killInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.killInstance"]
+  }));
 
-  const openFolderMutation = rspc.createMutation([
-    "instance.openInstanceFolder"
-  ]);
+  const openFolderMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.openInstanceFolder"]
+  }));
 
-  const duplicateInstanceMutation = rspc.createMutation([
-    "instance.duplicateInstance"
-  ]);
+  const duplicateInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.duplicateInstance"]
+  }));
 
   const handleOpenFolder = () => {
     openFolderMutation.mutate({

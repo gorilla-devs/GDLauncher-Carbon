@@ -5,15 +5,16 @@ use crate::domain::java::{
     JavaComponentType, JavaVendor, SystemJavaProfileName, SYSTEM_JAVA_PROFILE_NAME_PREFIX,
 };
 use crate::{api::keys::java::*, domain::java::Java};
-use rspc::{RouterBuilderLike, Type};
+use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use std::collections::HashMap;
 
 use self::managed::{FEManagedJavaArch, FEManagedJavaOs, FEManagedJavaOsMap, FEVendor};
 
 mod managed;
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> RouterBuilder<App> {
     router! {
         query GET_AVAILABLE_JAVAS[app, _args: ()] {
             get_all_available_javas(app, _args).await

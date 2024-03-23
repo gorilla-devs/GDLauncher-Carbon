@@ -70,13 +70,15 @@ const ModUpdateTooltip = (props: {
   modName: string;
   instanceId: number;
 }) => {
-  const updatePreview = rspc.createQuery(() => [
-    "instance.findModUpdate",
-    {
-      instance_id: props.instanceId,
-      mod_id: props.modId
-    }
-  ]);
+  const updatePreview = rspc.createQuery(() => ({
+    queryKey: [
+      "instance.findModUpdate",
+      {
+        instance_id: props.instanceId,
+        mod_id: props.modId
+      }
+    ]
+  }));
 
   return (
     <div class="text-lightSlate-200 h-40 flex flex-col items-center gap-4 w-80">
@@ -119,17 +121,20 @@ const Mod = (props: Props) => {
   const location = useLocation();
   const instanceId = () => getInstanceIdFromPath(location.pathname);
 
-  const task = rspc.createQuery(() => ["vtask.getTask", updateModTaskId()]);
+  const task = rspc.createQuery(() => ({
+    queryKey: ["vtask.getTask", updateModTaskId()]
+  }));
 
-  const updateModMutation = rspc.createMutation(["instance.updateMod"], {
+  const updateModMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.updateMod"],
     onSuccess: (data) => {
       setUpdateModTaskId(data);
     },
     onError: (err) => {
       console.error(err);
-      addNotification(`Error updating mod: ${err.cause?.message}`, "error");
+      addNotification(`Error updating mod: ${err.message}`, "error");
     }
-  });
+  }));
 
   createEffect(() => {
     if (task.data === null) {
@@ -142,7 +147,8 @@ const Mod = (props: Props) => {
     }
   });
 
-  const enableModMutation = rspc.createMutation(["instance.enableMod"], {
+  const enableModMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.enableMod"],
     onMutate: (data) => {
       queryClient.setQueryData(
         ["instance.getInstanceMods", data.instance_id],
@@ -177,9 +183,10 @@ const Mod = (props: Props) => {
         }
       );
     }
-  });
+  }));
 
-  const disableModMutation = rspc.createMutation(["instance.disableMod"], {
+  const disableModMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.disableMod"],
     onMutate: (data) => {
       queryClient.setQueryData(
         ["instance.getInstanceMods", data.instance_id],
@@ -214,9 +221,10 @@ const Mod = (props: Props) => {
         }
       );
     }
-  });
+  }));
 
-  const deleteModMutation = rspc.createMutation(["instance.deleteMod"], {
+  const deleteModMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.deleteMod"],
     onMutate: (data) => {
       queryClient.setQueryData(
         ["instance.getInstanceMods", data.instance_id],
@@ -244,7 +252,7 @@ const Mod = (props: Props) => {
         }
       );
     }
-  });
+  }));
 
   const imagePlatform = () => {
     if (props.mod.curseforge?.has_image) return "curseforge";
@@ -339,7 +347,7 @@ const Mod = (props: Props) => {
           </Show>
           <Show when={props.mod.has_update && !props.isInstanceLocked}>
             <Show
-              when={updateModTaskId() !== null || updateModMutation.isLoading}
+              when={updateModTaskId() !== null || updateModMutation.isPending}
             >
               <i
                 class="flex w-5 h-5"
@@ -347,7 +355,7 @@ const Mod = (props: Props) => {
                   "i-ri:download-2-fill text-darkSlate-500 hover:text-green-500":
                     updateModTaskId() === null,
                   "i-ri:loader-4-line animate-spin text-green-500":
-                    updateModTaskId() !== null || updateModMutation.isLoading
+                    updateModTaskId() !== null || updateModMutation.isPending
                 }}
                 onClick={(e) => {
                   e.stopPropagation();
@@ -359,7 +367,7 @@ const Mod = (props: Props) => {
               />
             </Show>
             <Show
-              when={updateModTaskId() === null && !updateModMutation.isLoading}
+              when={updateModTaskId() === null && !updateModMutation.isPending}
             >
               <Tooltip
                 content={
@@ -381,7 +389,7 @@ const Mod = (props: Props) => {
                     "i-ri:download-2-fill text-darkSlate-500 hover:text-green-500":
                       updateModTaskId() === null,
                     "i-ri:loader-4-line animate-spin text-green-500":
-                      updateModTaskId() !== null || updateModMutation.isLoading
+                      updateModTaskId() !== null || updateModMutation.isPending
                   }}
                   onClick={(e) => {
                     e.stopPropagation();

@@ -2,8 +2,8 @@ use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 
 use anyhow::anyhow;
-use rspc::Type;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 use super::curseforge::filters::CFFEModSearchParametersQuery;
 use super::modrinth;

@@ -9,15 +9,16 @@ use crate::{
     },
     managers::App,
 };
-use rspc::{RouterBuilderLike, Type};
+use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 use super::{
     modplatforms::{ModChannelWithUsage, ModPlatform, ModSources},
     Set,
 };
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> RouterBuilder<App> {
     router! {
         query GET_SETTINGS[app, _args: ()] {
             let response = app.settings_manager()
