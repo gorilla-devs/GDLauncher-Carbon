@@ -1,7 +1,7 @@
 import { LogEntry, LogEntryLevel } from "@/utils/logs";
-import { port } from "@/utils/rspcClient";
+import { port, rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
-import { useRouteData } from "@solidjs/router";
+import { useParams } from "@solidjs/router";
 import {
   For,
   Match,
@@ -12,24 +12,26 @@ import {
   onCleanup,
   onMount
 } from "solid-js";
-import fetchData from "../../instance.logs.data";
 import { Button, Tooltip } from "@gd/ui";
 
 const Logs = () => {
   const [logsCopied, setLogsCopied] = createSignal(false);
   const [logs, setLogs] = createSignal<LogEntry[]>([]);
+  const params = useParams();
 
-  const routeData = useRouteData<typeof fetchData>();
+  const _logs = rspc.createQuery(() => ({
+    queryKey: ["instance.getLogs", parseInt(params.id, 10)]
+  }));
 
   const instanceLogs = () => {
-    if (!routeData.logs.data) {
+    if (!_logs.data) {
       return undefined;
     }
 
-    return routeData.logs.data[routeData.logs.data.length - 1];
+    return _logs.data[_logs.data.length - 1];
   };
 
-  createEffect(async () => {
+  createEffect(() => {
     if (instanceLogs()) {
       setLogs([]);
 

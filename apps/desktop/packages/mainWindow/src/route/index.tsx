@@ -11,7 +11,6 @@ import ModpackVersionsData from "@/pages/Modpacks/modpack.versions";
 import ModVersionsData from "@/pages/Mods/mods.versions";
 import ModpackScreenshotsData from "@/pages/Modpacks/modpack.screenshots";
 import InstanceData from "@/pages/Library/Instance/instance.data";
-import InstanceLogsData from "@/pages/Library/Instance/instance.logs.data";
 import LibraryData from "@/pages/Library/library.data";
 /* Defining the routes for the application. */
 
@@ -62,8 +61,7 @@ export const routes: RouteDefinition[] = [
                 path: "/logs",
                 component: lazy(
                   () => import("@/pages/Library/Instance/Tabs/Log")
-                ),
-                data: InstanceLogsData
+                )
               },
               {
                 path: "/resourcepacks",
