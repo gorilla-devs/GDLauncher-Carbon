@@ -234,9 +234,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await
         }
 
-        query GET_LOGS[app, args: ()] {
+        query GET_LOGS[app, id: FEInstanceId] {
             Ok(app.instance_manager()
-               .get_logs()
+               .get_logs(id.into())
                .await
                .into_iter()
                .map(GameLogEntry::from)

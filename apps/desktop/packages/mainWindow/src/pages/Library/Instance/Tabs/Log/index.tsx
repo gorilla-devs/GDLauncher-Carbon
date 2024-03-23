@@ -1,97 +1,57 @@
-import { LogEntryLevel, logsObj, setLogsObj } from "@/utils/logs";
+import { LogEntry, LogEntryLevel } from "@/utils/logs";
 import { port } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
-import { useParams, useRouteData } from "@solidjs/router";
+import { useRouteData } from "@solidjs/router";
 import {
   For,
   Match,
   Show,
   Switch,
   createEffect,
-  createResource,
   createSignal,
   onCleanup,
   onMount
 } from "solid-js";
 import fetchData from "../../instance.logs.data";
-import { getRunningState } from "@/utils/instances";
 import { Button, Tooltip } from "@gd/ui";
-
-const fetchLogs = async (logId: number) => {
-  return fetch(`http://127.0.0.1:${port}/instance/log?id=${logId}`);
-};
 
 const Logs = () => {
   const [logsCopied, setLogsCopied] = createSignal(false);
-  const params = useParams();
+  const [logs, setLogs] = createSignal<LogEntry[]>([]);
 
   const routeData = useRouteData<typeof fetchData>();
 
-  const instanceId = () => parseInt(params.id, 10);
-
-  const instanceLogs = () =>
-    routeData.logs.data
-      ?.reverse()
-      .find((item) => item.instance_id === instanceId());
-
-  const logId = () => instanceLogs()?.id;
-
-  const [allLogs, { refetch }] = createResource(logId, fetchLogs);
-
-  async function streamToJson(readableStream: ReadableStream) {
-    // Get the reader from the stream
-    // eslint-disable-next-line no-undef
-    let reader: ReadableStreamDefaultReader;
-    // Check if the stream is locked
-    if (readableStream.locked) {
-      // Stream is locked, use the existing reader
-      if (readableStream.locked) {
-        throw new Error("ReadableStream is locked but no reader found");
-      }
-      reader = readableStream.getReader();
-    } else {
-      // Stream is not locked, get a new reader
-      reader = readableStream.getReader();
+  const instanceLogs = () => {
+    if (!routeData.logs.data) {
+      return undefined;
     }
 
-    // Read the stream
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const { value, done } = await reader.read();
+    return routeData.logs.data[routeData.logs.data.length - 1];
+  };
 
-      if (done) {
-        // Stream has ended
-        break;
-      }
+  createEffect(async () => {
+    if (instanceLogs()) {
+      setLogs([]);
 
-      const fixedJson =
-        "[" +
-        new TextDecoder("utf-8").decode(value).replace(/}{/g, "},{") +
-        "]";
-      const json = JSON.parse(fixedJson);
-      setLogsObj(instanceId(), (prev) => [...(prev || []), ...json]);
-    }
-  }
+      const wsConnection = new WebSocket(
+        `ws://127.0.0.1:${port}/instance/log?id=${instanceLogs()?.id}`
+      );
 
-  createEffect(() => {
-    if (routeData.instanceDetails.data) {
-      const isRunning = getRunningState(routeData.instanceDetails.data.state);
-      if (isRunning) {
-        refetch();
-      }
+      wsConnection.onmessage = (event) => {
+        const newLog = JSON.parse(event.data) as LogEntry;
+        setLogs((prevLogs) => [...prevLogs, newLog]);
+      };
+
+      onCleanup(() => {
+        if (wsConnection && wsConnection.readyState === wsConnection.OPEN) {
+          wsConnection.close();
+        }
+      });
     }
   });
-
-  createEffect(() => {
-    if (allLogs()?.body) {
-      streamToJson((allLogs() as any).body);
-    }
-  });
-
-  const instanceLogss = () => logsObj[instanceId()] || [];
 
   const copyLogsToClipboard = () => {
-    window.copyToClipboard(JSON.stringify(instanceLogss()));
+    window.copyToClipboard(JSON.stringify(instanceLogs()));
     setLogsCopied(true);
   };
 
@@ -167,8 +127,8 @@ const Logs = () => {
       </div>
       <div class="pb-4 max-h-full flex flex-col divide-y divide-darkSlate-500 divide-x-none divide-solid select-text">
         <Switch>
-          <Match when={(instanceLogss().length || 0) > 0}>
-            <For each={instanceLogss()}>
+          <Match when={(logs().length || 0) > 0}>
+            <For each={logs()}>
               {(log) => {
                 let levelColorClass = "";
 
@@ -217,7 +177,7 @@ const Logs = () => {
               }}
             </For>
           </Match>
-          <Match when={(instanceLogss().length || 0) === 0}>
+          <Match when={(logs().length || 0) === 0}>
             <div class="h-full flex justify-center items-center">
               <p>
                 <Trans key="logs.no_logs" />

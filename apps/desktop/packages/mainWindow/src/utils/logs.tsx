@@ -1,5 +1,3 @@
-import { createStore } from "solid-js/store";
-
 export type LogEntry = {
   sourceKind: LogEntrySourceKind;
   level: LogEntryLevel;
@@ -28,7 +26,3 @@ export enum LogEntryLevel {
   // eslint-disable-next-line no-unused-vars
   Error = "Error"
 }
-
-export const [logsObj, setLogsObj] = createStore<{ [id: number]: LogEntry[] }>(
-  {}
-);
