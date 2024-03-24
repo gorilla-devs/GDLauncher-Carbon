@@ -1255,9 +1255,13 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .invalidate(INSTANCE_DETAILS, Some(update.instance_id.0.into()));
 
         if need_reinstall {
-            tokio::fs::create_dir_all(path.join(".setup"))
+            let setup = path.join(".setup");
+            tokio::fs::create_dir_all(&setup)
                 .await
                 .context("writing incomplete instance marker")?;
+            tokio::fs::create_dir_all(setup.join("modpack-complete"))
+                .await
+                .context("writing modpack complete")?;
 
             let app = self.app.clone();
             tokio::spawn(async move {

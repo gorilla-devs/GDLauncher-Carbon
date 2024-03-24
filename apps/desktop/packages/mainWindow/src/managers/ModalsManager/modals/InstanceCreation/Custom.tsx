@@ -22,6 +22,7 @@ import { blobToBase64 } from "@/utils/helpers";
 import { mcVersions } from "@/utils/mcVersion";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { ReactiveMap } from "@solid-primitives/map";
+import { getInstanceImageUrl } from "@/utils/instances";
 
 type MappedMcVersions = ManifestVersion & { hasModloader?: boolean };
 
@@ -158,7 +159,13 @@ const Custom = (props: Pick<ModalProps, "data">) => {
       )?.loaders;
 
       setLoaderVersions(versions || []);
-    } else if (neoForgeVersionsQuery.data && isNeoForge()) {
+    } else {
+      setLoaderVersions([]);
+    }
+  });
+
+  createEffect(() => {
+    if (neoForgeVersionsQuery.data && isNeoForge()) {
       const versions = neoForgeVersionsQuery?.data?.gameVersions.find(
         (v) => v.id === (mcVersion() || (mappedMcVersions()?.[0]?.id as string))
       )?.loaders;
@@ -314,6 +321,26 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     );
   };
 
+  const isNameDiff = () => title() && title() !== instanceData()?.title;
+  const isMcVersionDiff = () =>
+    mcVersion() && mcVersion() !== instanceData()?.mcVersion;
+  const isModloaderDiff = () => loader() !== instanceData()?.modloader;
+  const isModloaderVersionDiff = () =>
+    chosenLoaderVersion() !== instanceData()?.modloaderVersion;
+  const isIconDiff = () => bgPreview() !== instanceData()?.img; // not checking for null as it can be unset
+
+  const isUpdatingWithDiffs = () => {
+    if (!instanceData()) return true;
+
+    return (
+      isNameDiff() ||
+      isMcVersionDiff() ||
+      isModloaderDiff() ||
+      isModloaderVersionDiff() ||
+      isIconDiff()
+    );
+  };
+
   const handleCreate = async () => {
     if (!title()) {
       setError("Fields must be filled in!");
@@ -375,19 +402,24 @@ const Custom = (props: Pick<ModalProps, "data">) => {
       try {
         await updateInstanceMutation.mutateAsync({
           instance: parseInt((instanceData() as Instancetype).id, 10),
-          useLoadedIcon: { Set: !!bgPreview() },
-          name: { Set: title()! },
-          version: {
-            Set: mcVersion() || (mappedMcVersions()?.[0]?.id as string)
-          },
-          modloader: {
-            Set: loader()
-              ? ({
-                  type_: loader() as CFFEModLoaderType,
-                  version: chosenLoaderVersion() || loaderVersions()[0].id
-                } as ModLoader)
+          useLoadedIcon: isIconDiff() ? { Set: Boolean(bgPreview()) } : null,
+          name: isNameDiff() ? { Set: title()! } : null,
+          version: isMcVersionDiff()
+            ? {
+                Set: mcVersion() || (mappedMcVersions()?.[0]?.id as string)
+              }
+            : null,
+          modloader:
+            isModloaderDiff() || isModloaderVersionDiff()
+              ? {
+                  Set: loader()
+                    ? ({
+                        type_: loader() as CFFEModLoaderType,
+                        version: chosenLoaderVersion() || loaderVersions()[0].id
+                      } as ModLoader)
+                    : null
+                }
               : null
-          }
         });
 
         modalsContext?.closeModal();
@@ -427,7 +459,9 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             <div
               class="relative flex justify-center items-center bg-darkSlate-900 cursor-pointer bg-center bg-cover h-20 rounded-xl w-20"
               style={{
-                "background-image": `url("${bgPreview()}")`
+                ...(bgPreview() && {
+                  "background-image": `url("${bgPreview()}")`
+                })
               }}
               onClick={() => {
                 window
@@ -701,7 +735,8 @@ const Custom = (props: Pick<ModalProps, "data">) => {
           <Button
             disabled={Boolean(
               (loaderVersions().length === 0 && loader()) ||
-                mappedMcVersions().length === 0
+                mappedMcVersions().length === 0 ||
+                !isUpdatingWithDiffs()
             )}
             type="primary"
             style={{ width: "100%", "max-width": "200px" }}
