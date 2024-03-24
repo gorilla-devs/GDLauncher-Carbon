@@ -968,11 +968,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             None => InstanceIcon::Default,
         };
 
-        let (version, modpack) = match version {
-            InstanceVersionSource::Version(version) => (Some(version), None),
-            InstanceVersionSource::Modpack(modpack) => (None, Some(modpack)),
-            InstanceVersionSource::ModpackWithKnownVersion(version, modpack) => {
-                (Some(version), Some(modpack))
+        let (version, modpack, pack_locked) = match version {
+            InstanceVersionSource::Version(version) => (Some(version), None, false),
+            InstanceVersionSource::Modpack(modpack, locked) => (None, Some(modpack), locked),
+            InstanceVersionSource::ModpackWithKnownVersion(version, modpack, locked) => {
+                (Some(version), Some(modpack), locked)
             }
         };
 
@@ -985,7 +985,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             seconds_played: seconds_played.unwrap_or(0),
             modpack: modpack.map(|modpack| info::ModpackInfo {
                 modpack,
-                locked: true,
+                locked: pack_locked,
             }),
             game_configuration: info::GameConfig {
                 version,
@@ -1991,8 +1991,8 @@ pub struct Mod {
 #[derive(Debug)]
 pub enum InstanceVersionSource {
     Version(info::GameVersion),
-    Modpack(info::Modpack),
-    ModpackWithKnownVersion(info::GameVersion, info::Modpack),
+    Modpack(info::Modpack, bool),
+    ModpackWithKnownVersion(info::GameVersion, info::Modpack, bool),
 }
 
 #[derive(Error, Debug)]
