@@ -1,8 +1,9 @@
 import { Show, createEffect, createSignal } from "solid-js";
 import Button from "./button/Button";
 import { ADD_USER_ENDPOINT } from "../consts";
+import { ImSpinner9 } from "solid-icons/im";
 
-const NewsLetter = () => {
+const NewsLetterAction = () => {
   const [email, setEmail] = createSignal("");
   const [error, setError] = createSignal<null | string>(null);
   const [loading, setLoading] = createSignal(false);
@@ -50,38 +51,42 @@ const NewsLetter = () => {
   };
 
   return (
-    <div
-      class="flex flex-col gap-2 flex-1 items-start justify-start"
-      id="newsletter"
-    >
-      <span class="text-white font-medium pb-4">Newsletter</span>
-      <input
-        type="email"
-        placeholder="Email"
-        value={email()}
-        onInput={(e) => {
-          const value = (e.target as HTMLInputElement).value;
-          setEmail(value);
-        }}
-        id="newsletter-email"
-        name="email"
-        class="bg-darkgd px-2 py-1 border-bluegd-500 border-[1px] rounded-md text-white outline-none"
-      />
+    <div class="flex gap-2 flex-col justify-center">
+      <div class="flex flex-col md:flex-row gap-2 mx-auto">
+        <input
+          type="email"
+          placeholder="Email"
+          value={email()}
+          onInput={(e) => {
+            const value = (e.target as HTMLInputElement).value;
+            setEmail(value);
+          }}
+          id="newsletter-email"
+          name="email"
+          class="p-3 text-black rounded-xsgd outline-none"
+        />
+        <Button
+          intent="primary"
+          size="small"
+          onClick={handleSubmit as any}
+          disabled={loading()}
+          class={`flex items-center justify-center rounded-xssgd ${loading() ? "w-6" : ""}`}
+        >
+          <Show when={loading()}>
+            <ImSpinner9 class="animate-spin" />
+          </Show>
+          <Show when={!loading()}>
+            <span class="font-semibold">SUBSCRIBE TO NEWSLETTER</span>
+          </Show>
+        </Button>
+      </div>
       <Show when={error()}>
-        <div class="text-red-400">{error()}</div>
+        <div class="text-red-400 font-semibold">{error()}</div>
       </Show>
       <Show when={success()}>
-        <div class="text-green-400">{success()}</div>
+        <div class="text-green-400 font-semibold">{success()}</div>
       </Show>
-      <Button
-        intent="primary"
-        size="small"
-        onClick={handleSubmit as any}
-        class="mt-3 rounded-xsgd"
-      >
-        SUBSCRIBE TO NEWSLETTER
-      </Button>
     </div>
   );
 };
-export default NewsLetter;
+export default NewsLetterAction;

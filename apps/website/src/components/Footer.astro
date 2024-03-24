@@ -1,11 +1,9 @@
 ---
 import Logo from "../assets/logo.svg";
 import { Image } from "astro:assets";
-import Button from "./button/Button";
 import HeaderLink from "./HeaderLink.astro";
 import Twitter from "../assets/twitter.svg";
 import Discord from "../assets/discord.svg";
-import NewsLetter from "./Newsletter";
 import { APP_URLS } from "../consts";
 import yaml from "js-yaml";
 
@@ -45,7 +43,7 @@ const downloadLinks = yamlfiles
       </ul>
     </div>
 
-    <NewsLetter client:idle />
+    <!-- <NewsLetter client:idle /> -->
     <div class="flex-[0.5]">
       <span class="text-white font-medium">Download old GDL</span>
       <ul class="flex lg:flex-col gap-2 lg:gap-0 pt-4">
