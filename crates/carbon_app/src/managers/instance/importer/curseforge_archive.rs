@@ -256,6 +256,7 @@ impl InstanceImporter for CurseforgeArchiveImporter {
                     project_id: meta.project_id,
                     file_id: meta.file_id,
                 }),
+                true,
             ),
             None => InstanceVersionSource::Version(version),
         };
