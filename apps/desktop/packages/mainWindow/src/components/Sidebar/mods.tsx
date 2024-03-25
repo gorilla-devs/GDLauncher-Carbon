@@ -187,6 +187,12 @@ const Sidebar = () => {
     routeData.instancesUngrouped.data?.filter(
       (instance) => getValideInstance(instance.status)?.modloader
     );
+  const NotFilteredCategories = () =>
+    isCurseforge()
+      ? curseforgeCategories()
+      : modrinthCategories().filter(
+          (category) => category.project_type === "mod"
+        );
   createEffect(() => {
     const groupedByParentCategoryId = categories().reduce(
       (accumulator: any, current: any) => {
@@ -207,12 +213,6 @@ const Sidebar = () => {
       {}
     );
 
-    const NotFilteredCategories = () =>
-      isCurseforge()
-        ? curseforgeCategories()
-        : modrinthCategories().filter(
-            (category) => category.project_type === "mod"
-          );
     setMenuData((prev) => ({
       ...prev,
       items: prev.items.map((item) => {
@@ -338,8 +338,8 @@ const Sidebar = () => {
             img: "",
             children: {
               hasSearch: true,
-              isCheckbox: !isCurseforge(),
-              isParent: isCurseforge(),
+              isCheckbox: true,
+              isParent: false,
               parentLabel: t("general.categories"),
               items: isCurseforge()
                 ? Object.entries(groupedByParentCategoryId).map(
@@ -384,6 +384,7 @@ const Sidebar = () => {
       })
     }));
   });
+
   createEffect(() => {
     const currentPlatform = selectedItems()
       .find((item) => item.includes("Platform"))
@@ -414,15 +415,19 @@ const Sidebar = () => {
   });
 
   createEffect(() => {
+    const clonedParentCategories = currentParentCategories();
+    clonedParentCategories.push("Categories");
     const selectedCategories = selectedItems()
       .filter((item) =>
         isCurseforge()
-          ? currentParentCategories().includes(item.split("//")[0])
+          ? clonedParentCategories.includes(item.split("//")[0])
           : item.includes("Categories")
       )
       .map((item) => item.split("//")[1]);
     const objectCategories = selectedCategories.map((category) => {
-      const categ = categories().find((item) => item.name === category);
+      const categ = NotFilteredCategories().find(
+        (item) => item.name === category
+      );
       if (isCurseforge()) {
         return [{ curseforge: (categ as CFFECategory).id }];
       } else {
