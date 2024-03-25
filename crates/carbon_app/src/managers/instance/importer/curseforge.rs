@@ -78,7 +78,9 @@ impl CurseforgeImporter {
         let userdirs = directories::UserDirs::new().ok_or(anyhow!("Cannot build basedirs"))?;
 
         #[cfg(not(target_os = "windows"))]
-        let p = userdirs.document_dir().ok_or(anyhow!("Cannot build document_dir"))?;
+        let p = userdirs
+            .document_dir()
+            .ok_or(anyhow!("Cannot build document_dir"))?;
         #[cfg(target_os = "windows")]
         let p = userdirs.home_dir();
 
