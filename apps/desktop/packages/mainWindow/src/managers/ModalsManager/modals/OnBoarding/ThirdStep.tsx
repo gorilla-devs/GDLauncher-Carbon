@@ -2,7 +2,7 @@ import { useModal } from "../..";
 import { Button } from "@gd/ui";
 import { rspc } from "@/utils/rspcClient";
 import { For, Match, Show, Switch, createSignal } from "solid-js";
-import { ImportEntityStatus } from "@gd/core_module/bindings";
+import { ImportEntity, ImportEntityStatus } from "@gd/core_module/bindings";
 import EntityCard from "@/components/Card/EntityCard";
 import SingleEntity, { setInstances, setStep } from "./SingleEntity";
 
@@ -18,18 +18,53 @@ import { Trans } from "@gd/i18n";
 import { isDownloaded } from "./SingleImport";
 import { taskIds } from "@/utils/import";
 
-export const keys = [
-  "entity.legacygdlauncher",
-  "entity.curseforgezip",
-  "entity.mrpack",
-  "entity.curseforge",
-  "entity.modrinth",
-  "entity.atlauncher",
-  "entity.technic",
-  "entity.ftb",
-  "entity.multimc",
-  "entity.prismlauncher"
-];
+type ImportEntityValue = {
+  translation: string;
+  icon: string;
+};
+
+export const ENTITIES: Record<ImportEntity, ImportEntityValue> = {
+  LegacyGDLauncher: {
+    translation: "entity.legacygdlauncher",
+    icon: LegacyGDL
+  },
+  ATLauncher: {
+    translation: "entity.atlauncher",
+    icon: ATLauncherLogo
+  },
+  CurseForge: {
+    translation: "entity.curseforge",
+    icon: CurseForgeLogo
+  },
+  FTB: {
+    translation: "entity.ftb",
+    icon: FTBLogo
+  },
+  MultiMC: {
+    translation: "entity.multimc",
+    icon: MultiMCLogo
+  },
+  Technic: {
+    translation: "entity.technic",
+    icon: TechnicLogo
+  },
+  PrismLauncher: {
+    translation: "entity.prismlauncher",
+    icon: PrismLogo
+  },
+  Modrinth: {
+    translation: "entity.modrinth",
+    icon: ModrinthLogo
+  },
+  CurseForgeZip: {
+    translation: "entity.curseforgezip",
+    icon: CurseForgeLogo
+  },
+  MRPack: {
+    translation: "entity.mrpack",
+    icon: ModrinthLogo
+  }
+};
 
 interface Props {
   prevStep: () => void;
@@ -48,19 +83,6 @@ const ThirdStep = (props: Props) => {
   const entities = rspc.createQuery(() => ({
     queryKey: ["instance.getImportableEntities"]
   }));
-
-  const icons = [
-    LegacyGDL,
-    CurseForgeLogo,
-    ModrinthLogo,
-    CurseForgeLogo,
-    ModrinthLogo,
-    ATLauncherLogo,
-    TechnicLogo,
-    FTBLogo,
-    MultiMCLogo,
-    PrismLogo
-  ];
 
   const handleClickEntity = (ent: ImportEntityStatus) => {
     if (ent.supported) {
@@ -105,12 +127,12 @@ const ThirdStep = (props: Props) => {
                     (a.supported === true ? 1 : 0)
                 )}
               >
-                {(entity, i) => (
+                {(entity) => (
                   <EntityCard
                     entity={entity}
-                    icon={icons[i()]}
+                    icon={ENTITIES[entity.entity].icon}
+                    translation={ENTITIES[entity.entity].translation}
                     onClick={[handleClickEntity, entity]}
-                    index={i()}
                   />
                 )}
               </For>

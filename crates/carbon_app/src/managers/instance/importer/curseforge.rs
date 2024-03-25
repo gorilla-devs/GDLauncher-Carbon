@@ -75,16 +75,14 @@ impl CurseforgeImporter {
     }
 
     pub async fn get_default_scan_path() -> anyhow::Result<PathBuf> {
-        let basedirs = directories::BaseDirs::new().ok_or(anyhow!("Cannot build basedirs"))?;
+        let userdirs = directories::UserDirs::new().ok_or(anyhow!("Cannot build basedirs"))?;
 
-        #[cfg(target_os = "linux")]
-        let p = basedirs.home_dir().join("Documents");
-        #[cfg(not(target_os = "linux"))]
-        let p = basedirs.data_dir();
-        let mut p = p.join("curseforge");
-        #[cfg(target_os = "linux")]
-        let mut p = p.join("minecraft/Instances");
-        Ok(p)
+        #[cfg(not(target_os = "windows"))]
+        let p = userdirs.document_dir();
+        #[cfg(target_os = "windows")]
+        let p = userdirs.home_dir();
+
+        Ok(p.join("curseforge").join("minecraft").join("Instances"))
     }
 
     async fn scan_instance(
