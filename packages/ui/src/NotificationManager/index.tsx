@@ -1,5 +1,13 @@
-import { createContext, createEffect, For, JSX, useContext } from "solid-js";
+import {
+  createContext,
+  createEffect,
+  createSignal,
+  For,
+  JSX,
+  useContext,
+} from "solid-js";
 import { createStore, produce } from "solid-js/store";
+import { Tooltip } from "../Tooltip";
 
 type NotificationType = "success" | "warning" | "error";
 type NotificationPosition = "bottom" | "top";
@@ -11,11 +19,13 @@ type Notification = {
   position?: NotificationPosition;
   duration: number;
   remainingDuration: number;
+  progressAnimationId?: number;
+  progressStart?: number;
   expanded: boolean;
   timerId?: number;
-  progressIntervalId?: number;
   copied: boolean;
   isMouseInside: boolean;
+  fadingOut: boolean;
 };
 
 type Props = {
@@ -36,9 +46,11 @@ const NotificationsProvider = (props: Props) => {
   const [notifications, setNotifications] = createStore<
     Record<number, Notification>
   >({});
+  const [windowFocused, setWindowFocused] = createSignal(true);
 
   createEffect(() => {
     const onFocus = () => {
+      setWindowFocused(true);
       for (const notification of Object.values(notifications)) {
         if (notification.isMouseInside) continue;
 
@@ -48,6 +60,7 @@ const NotificationsProvider = (props: Props) => {
       }
     };
     const onBlur = () => {
+      setWindowFocused(false);
       for (const notification of Object.values(notifications)) {
         if (notification.remainingDuration > 0) {
           pauseTimer(notification);
@@ -63,6 +76,50 @@ const NotificationsProvider = (props: Props) => {
       window.removeEventListener("blur", onBlur);
     };
   });
+
+  const removeNotification = (id: number) => {
+    const notification = notifications[id];
+
+    if (!notification) return;
+
+    if (notification.timerId) {
+      clearTimeout(notification.timerId);
+    }
+    if (notification.progressAnimationId) {
+      cancelAnimationFrame(notification.progressAnimationId);
+    }
+
+    setNotifications(id, "fadingOut", true);
+
+    setTimeout(() => {
+      setNotifications(produce((prev) => delete prev[id]));
+    }, 170);
+  };
+
+  function animateBar(ts: number, id: number) {
+    const notification = notifications[id];
+    const now = Date.now();
+    const delta = now - ts;
+
+    if (!notification || delta < 5) {
+      requestAnimationFrame(() => animateBar(ts, id));
+      return;
+    }
+
+    const newRemainingTime = Math.ceil(
+      Math.max(0, notification.remainingDuration - delta)
+    );
+
+    setNotifications(notification.id, "remainingDuration", newRemainingTime);
+
+    if (newRemainingTime > 0) {
+      setNotifications(
+        notification.id,
+        "progressAnimationId",
+        requestAnimationFrame(() => animateBar(now, notification.id))
+      );
+    }
+  }
 
   const addNotification = (
     name: string,
@@ -82,52 +139,46 @@ const NotificationsProvider = (props: Props) => {
       expanded: false,
       copied: false,
       isMouseInside: false,
+      fadingOut: false,
     };
 
-    newNotification.progressIntervalId = window.setInterval(() => {
-      setNotifications(id, "remainingDuration", (prev) =>
-        Math.max(prev - 16, 0)
-      );
-    }, 16);
+    newNotification.progressStart = Date.now();
+    newNotification.progressAnimationId = requestAnimationFrame(() => {
+      animateBar(newNotification.progressStart!, newNotification.id);
+    });
 
     newNotification.timerId = window.setTimeout(() => {
-      setNotifications(produce((prev) => delete prev[id]));
-      if (newNotification.progressIntervalId) {
-        clearInterval(newNotification.progressIntervalId);
-      }
+      removeNotification(id);
     }, duration);
 
     setNotifications(id, newNotification);
   };
 
   const pauseTimer = (notification: Notification) => {
-    if (notification.timerId) clearTimeout(notification.timerId);
-    if (notification.progressIntervalId)
-      clearInterval(notification.progressIntervalId);
-    notification.timerId = undefined;
-    notification.progressIntervalId = undefined;
+    if (notification.timerId) {
+      clearTimeout(notification.timerId);
+      setNotifications(notification.id, "timerId", undefined);
+    }
+    if (notification.progressAnimationId) {
+      cancelAnimationFrame(notification.progressAnimationId);
+      setNotifications(notification.id, "progressAnimationId", undefined);
+      setNotifications(notification.id, "progressStart", undefined);
+    }
   };
 
   const resumeTimer = (notification: Notification) => {
-    const newProgressIntervalId = window.setInterval(() => {
-      setNotifications(notification.id, "remainingDuration", (prev) =>
-        Math.max(prev - 16, 0)
-      );
-    }, 16);
-
     const newTimerId = window.setTimeout(() => {
-      setNotifications(produce((prev) => delete prev[notification.id]));
-      if (newProgressIntervalId) {
-        clearInterval(newProgressIntervalId);
-      }
+      removeNotification(notification.id);
     }, notification.remainingDuration);
 
+    const newProgressStart = Date.now();
+    const newProgressId = requestAnimationFrame(() => {
+      animateBar(newProgressStart, notification.id);
+    });
+
     setNotifications(notification.id, "timerId", newTimerId);
-    setNotifications(
-      notification.id,
-      "progressIntervalId",
-      newProgressIntervalId
-    );
+    setNotifications(notification.id, "progressStart", newProgressStart);
+    setNotifications(notification.id, "progressAnimationId", newProgressId);
   };
 
   return (
@@ -144,6 +195,9 @@ const NotificationsProvider = (props: Props) => {
               }px)`,
               "overflow-wrap": "anywhere",
               transition: "height 0.3s ease-in-out",
+              animation: `.2s ease-in-out ${
+                notification.fadingOut ? "fadeOut" : "fadeIn"
+              }`,
             }}
             classList={{
               "h-68": notification.expanded,
@@ -155,14 +209,22 @@ const NotificationsProvider = (props: Props) => {
             onMouseEnter={() => {
               setNotifications(notification.id, "isMouseInside", true);
 
-              if (notification.remainingDuration > 0 && !notification.copied) {
+              if (
+                notification.remainingDuration > 0 &&
+                !notification.copied &&
+                windowFocused()
+              ) {
                 pauseTimer(notification);
               }
             }}
             onMouseLeave={() => {
               setNotifications(notification.id, "isMouseInside", false);
 
-              if (notification.remainingDuration > 0 && !notification.copied) {
+              if (
+                notification.remainingDuration > 0 &&
+                !notification.copied &&
+                windowFocused()
+              ) {
                 resumeTimer(notification);
               }
             }}
@@ -203,35 +265,32 @@ const NotificationsProvider = (props: Props) => {
                 <div
                   class="w-6 h-6 text-darkSlate-300 i-ri:close-fill hover:text-lightSlate-100 duration-100 ease-in-out"
                   onClick={() => {
-                    pauseTimer(notification);
-                    setNotifications(
-                      produce((prev) => delete prev[notification.id])
-                    );
+                    removeNotification(notification.id);
                   }}
                 />
-                <div
-                  class="w-6 h-6"
-                  classList={{
-                    "text-darkSlate-300 hover:text-lightSlate-100 duration-100 ease-in-out i-ri:file-copy-2-fill":
-                      !notification.copied,
-                    "text-green-400 i-ri:checkbox-circle-fill":
-                      notification.copied,
-                  }}
-                  onClick={() => {
-                    navigator.clipboard.writeText(notification.name);
-                    setNotifications(notification.id, "copied", true);
+                <Tooltip content={"Copy"}>
+                  <div
+                    class="w-6 h-6"
+                    classList={{
+                      "text-darkSlate-300 hover:text-lightSlate-100 duration-100 ease-in-out i-ri:file-copy-2-fill":
+                        !notification.copied,
+                      "text-green-400 i-ri:checkbox-circle-fill":
+                        notification.copied,
+                    }}
+                    onClick={() => {
+                      navigator.clipboard.writeText(notification.name);
+                      setNotifications(notification.id, "copied", true);
+                      pauseTimer(notification);
+                      setTimeout(() => {
+                        setNotifications(notification.id, "copied", false);
 
-                    pauseTimer(notification);
-
-                    setTimeout(() => {
-                      setNotifications(notification.id, "copied", false);
-
-                      if (!notification.isMouseInside) {
-                        resumeTimer(notification);
-                      }
-                    }, 2000);
-                  }}
-                />
+                        if (!notification.isMouseInside && windowFocused()) {
+                          resumeTimer(notification);
+                        }
+                      }, 2000);
+                    }}
+                  />
+                </Tooltip>
               </div>
             </div>
           </div>

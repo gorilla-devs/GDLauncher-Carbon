@@ -126,10 +126,10 @@ const AppNavbar = () => {
                   size="small"
                   type="primary"
                   onClick={() => {
-                    // modalsContext?.openModal({
-                    //   name: "instanceCreation"
-                    // });
-                    notification("Notigication name Notigication name Notigication nameNotigication nameNotigication nameNotigication nameNotigication name", "success");
+                    modalsContext?.openModal({
+                      name: "instanceCreation"
+                    });
+                    // notification("Notigication name Notigication name Notigication nameNotigication nameNotigication nameNotigication name", "success");
                   }}
                 >
                   <i class="flex i-ri:add-fill" />

@@ -1259,9 +1259,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             tokio::fs::create_dir_all(&setup)
                 .await
                 .context("writing incomplete instance marker")?;
-            tokio::fs::create_dir_all(setup.join("modpack-complete"))
-                .await
-                .context("writing modpack complete")?;
+            // tokio::fs::create_dir_all(setup.join("modpack-complete"))
+            //     .await
+            //     .context("writing modpack complete")?;
 
             let app = self.app.clone();
             tokio::spawn(async move {
