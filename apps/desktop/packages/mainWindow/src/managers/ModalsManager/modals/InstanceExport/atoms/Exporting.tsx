@@ -12,36 +12,28 @@ export { failedMsg, setFailedMsg };
 export default function Exporting() {
   const [t] = useTransContext();
   const [progress, setProgress] = createSignal(0);
-  const rspcContext = rspc.useContext();
 
-  createEffect(async () => {
-    if (taskId() !== undefined) {
-      try {
-        const task = await rspcContext.client.query([
-          "vtask.getTask",
-          taskId() || null
-        ]);
+  const vtask = rspc.createQuery(() => ({
+    queryKey: ["vtask.getTask", taskId() || null]
+  }));
 
-        if (task && task.progress) {
-          if (task.progress.type == "Known") {
-            setProgress(Math.floor(task.progress.value * 100));
-          }
-          if (task.progress.type === "Failed") {
-            setFailedMsg(task.progress.value.cause[1].display as string);
-            setExportStep(2);
-          }
-        }
-        const isFailed = task && task.progress.type === "Failed";
-        const isDownloaded = task === null && progress() !== 0;
-        if (isDownloaded || isFailed) {
-          setTaskId(undefined);
-        }
-        if (isDownloaded) {
-          setExportStep(2);
-        }
-      } catch (err) {
-        console.log(err);
+  createEffect(() => {
+    if (vtask.data && vtask.data.progress) {
+      if (vtask.data.progress.type == "Known") {
+        setProgress(Math.floor((vtask.data.progress.value || 1) * 100));
       }
+      if (vtask.data.progress.type === "Failed") {
+        setFailedMsg(vtask.data.progress.value.cause[1].display as string);
+        setExportStep(2);
+      }
+    }
+    const isFailed = vtask.data && vtask.data.progress.type === "Failed";
+    const isDownloaded = vtask.data === null && progress() !== 0;
+    if (isDownloaded || isFailed) {
+      setTaskId(undefined);
+    }
+    if (isDownloaded) {
+      setExportStep(2);
     }
   });
 
