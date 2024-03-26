@@ -5,6 +5,8 @@ import {
   For,
   useContext,
   JSX,
+  Switch,
+  Match,
 } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { Tooltip } from "../Tooltip";
@@ -262,7 +264,19 @@ const NotificationsProvider = (props: Props) => {
                     );
                   }}
                 />
-                <div class="min-w-6 w-6 h-6 i-ri:check-fill text-green-400" />
+                <Switch>
+                  <Match
+                    when={
+                      notification.type === "error" ||
+                      notification.type === "warning"
+                    }
+                  >
+                    <div class="min-w-6 w-6 h-6 i-ri:error-warning-fill text-red-400" />
+                  </Match>
+                  <Match when={notification.type === "success"}>
+                    <div class="min-w-6 w-6 h-6 i-ri:check-fill text-green-400" />
+                  </Match>
+                </Switch>
                 <div class="w-auto h-full overflow-y-auto m-4 text-left">
                   <div class="font-bold text-xl pb-2">{notification.name}</div>
                   <div class="text-md">{notification.name}</div>
