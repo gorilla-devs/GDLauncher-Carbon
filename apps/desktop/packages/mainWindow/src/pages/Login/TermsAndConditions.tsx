@@ -134,7 +134,8 @@ const TermsAndConditions = (props: Props) => {
                   });
 
                   props.nextStep();
-                } catch {
+                } catch (err) {
+                  console.log(err);
                   addNotification("Error during consent saving", "error");
                 }
 

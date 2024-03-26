@@ -31,6 +31,7 @@ impl TermsAndPrivacy {
         }
     }
 
+    #[tracing::instrument(skip(self, secret))]
     pub async fn record_consent<'b>(
         &self,
         consent_type: ConsentType,
@@ -47,6 +48,8 @@ impl TermsAndPrivacy {
                 sha
             }
         };
+
+        tracing::info!("Recording consent. Latest sha: {}", latest_sha);
 
         #[derive(Debug, Serialize)]
         pub struct Body<'c> {
@@ -66,17 +69,19 @@ impl TermsAndPrivacy {
             consented,
         };
 
-        let res = self
-            .http_client
-            .post(&consent_url)
-            .json(&body)
-            .send()
-            .await?;
+        let res = self.http_client.post(&consent_url).json(&body).send().await;
 
-        if !res.status().is_success() {
-            tracing::error!("Failed to record consent: {:?}", res);
-
-            anyhow::bail!("Failed to record consent");
+        match res {
+            Ok(res) => {
+                if res.status().is_success() {
+                    tracing::info!("Consent recorded successfully");
+                } else {
+                    tracing::error!("Failed to record consent: {:?}", res);
+                }
+            }
+            Err(e) => {
+                tracing::error!("Failed to record consent: {:?}", e);
+            }
         }
 
         Ok(())

@@ -6,7 +6,7 @@ use crate::{
     db::app_configuration::{self, post_exit_hook, wrapper_command},
     domain::{self as domain, modplatforms::ModChannelWithUsage, runtime_path},
 };
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use chrono::Utc;
 use itertools::Itertools;
 use reqwest_middleware::ClientWithMiddleware;
@@ -307,7 +307,13 @@ impl ManagerRef<'_, SettingsManager> {
                     &random_user_uuid,
                     &secret,
                 )
-                .await?;
+                .await
+                .with_context(|| {
+                    format!(
+                        "Failed to record terms and privacy consent: {}",
+                        terms_and_privacy_accepted
+                    )
+                })?;
         }
 
         if let Some(metrics_enabled) = incoming_settings.metrics_enabled {
@@ -327,7 +333,10 @@ impl ManagerRef<'_, SettingsManager> {
                     &random_user_uuid,
                     &secret,
                 )
-                .await?;
+                .await
+                .with_context(|| {
+                    format!("Failed to record metrics consent: {}", metrics_enabled)
+                })?;
         }
 
         if !queries.is_empty() {
