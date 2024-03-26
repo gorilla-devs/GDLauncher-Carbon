@@ -118,9 +118,6 @@ function Slider(props: Props) {
     }
   };
 
-  createEffect(() => {
-    if (props.value !== undefined) onChange(props.value);
-  });
 
   const onChange = (val: number) => {
     setCurrentValue(val);
