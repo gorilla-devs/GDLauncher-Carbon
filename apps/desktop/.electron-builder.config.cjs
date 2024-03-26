@@ -131,6 +131,7 @@ module.exports = {
 
     console.log("Notarizing...");
     return await notarize({
+      tool: "notarytool",
       appBundleId: appId,
       appPath: `${appOutDir}/${appName}.app`,
       appleId: process.env.APPLE_ID,
