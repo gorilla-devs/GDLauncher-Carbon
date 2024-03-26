@@ -31,7 +31,7 @@ pub async fn export_modrinth(
     app: Arc<AppInner>,
     instance_id: InstanceId,
     save_path: PathBuf,
-    link_mods: bool,
+    self_contained_addons_bundling: bool,
     mut filter: ExportEntry,
 ) -> anyhow::Result<VisualTaskId> {
     let instance_manager = app.instance_manager();
@@ -82,7 +82,7 @@ pub async fn export_modrinth(
                 .edit(|data| data.state = TaskState::KnownProgress)
                 .await;
 
-            if link_mods {
+            if !self_contained_addons_bundling {
                 let mods_filter = filter.0.get_mut("mods");
                 if let Some(mods_filter) = mods_filter {
                     let t_scan = vtask.subtask(Translation::InstanceExportScanningMods);
@@ -317,7 +317,7 @@ mod test {
         instance_id: InstanceId,
         filename: &str,
         export_entry: ExportEntry,
-        link_mods: bool,
+        self_contained_addons_bundling: bool,
     ) -> anyhow::Result<()> {
         let target_file = app
             .settings_manager()
@@ -333,7 +333,7 @@ mod test {
                 instance_id,
                 ExportTarget::Modrinth,
                 target_file.clone(),
-                link_mods,
+                self_contained_addons_bundling,
                 export_entry,
             )
             .await?;
@@ -378,7 +378,7 @@ mod test {
                 instance_id,
                 "folder_linked.zip",
                 ExportEntry(HashMap::from([(String::from("mods"), None)])),
-                true,
+                false,
             )
             .await?;
 
@@ -431,7 +431,7 @@ mod test {
                 instance_id,
                 "folder_unlinked.zip",
                 ExportEntry(HashMap::from([(String::from("mods"), None)])),
-                false,
+                true,
             )
             .await?;
 
@@ -473,7 +473,7 @@ mod test {
                 instance_id,
                 "nofolder_linked.zip",
                 ExportEntry(HashMap::from([])),
-                true,
+                false,
             )
             .await?;
 
@@ -513,7 +513,7 @@ mod test {
                 instance_id,
                 "nofolder_unlinked.zip",
                 ExportEntry(HashMap::from([])),
-                false,
+                true,
             )
             .await?;
 
@@ -559,7 +559,7 @@ mod test {
                         None,
                     )]))),
                 )])),
-                false,
+                true,
             )
             .await?;
 

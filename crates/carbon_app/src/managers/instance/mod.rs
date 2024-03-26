@@ -2,27 +2,31 @@ use std::collections::HashSet;
 use std::ffi::{OsStr, OsString};
 use std::fmt::Display;
 
+use std::sync::Arc;
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
 use crate::api::keys::instance::*;
 use crate::api::translation::Translation;
 use crate::db::read_filters::StringFilter;
 use crate::domain::instance::info::{GameVersion, InstanceIcon, Modpack};
+use crate::domain::java::{SystemJavaProfileName, SYSTEM_JAVA_PROFILE_NAME_PREFIX};
 use crate::domain::modplatforms::curseforge::filters::{ModFileParameters, ModParameters};
 use crate::domain::modplatforms::modrinth::search::{ProjectID, VersionID};
 use crate::domain::modplatforms::ModPlatform;
 use crate::domain::vtask::VisualTaskId;
+use crate::livenesstracker::LivenessTracker;
 use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::{DateTime, Utc};
+use daedalus::minecraft::MinecraftJavaProfile;
 use fs_extra::dir::CopyOptions;
 use futures::future::BoxFuture;
 use futures::{join, Future};
 
 use prisma_client_rust::Direction;
-use rspc::Type;
 use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
+use specta::Type;
 use thiserror::Error;
 use tokio::sync::{watch, Mutex, MutexGuard, RwLock};
 use tracing::{info, trace};
@@ -67,6 +71,8 @@ pub struct InstanceManager {
     export_manager: InstanceExportManager,
     game_logs: RwLock<HashMap<GameLogId, (InstanceId, watch::Receiver<GameLog>)>>,
     modpack_info_semaphore: Mutex<()>,
+    pub any_instance_running: Arc<watch::Sender<bool>>,
+    instance_running_tracker: Arc<LivenessTracker>,
 }
 
 impl Default for InstanceManager {
@@ -77,6 +83,8 @@ impl Default for InstanceManager {
 
 impl InstanceManager {
     pub fn new() -> Self {
+        let any_instance_running = Arc::new(watch::channel(false).0);
+
         Self {
             instances: RwLock::new(HashMap::new()),
             index_lock: Mutex::new(()),
@@ -87,6 +95,10 @@ impl InstanceManager {
             export_manager: InstanceExportManager::new(),
             game_logs: RwLock::new(HashMap::new()),
             modpack_info_semaphore: Mutex::new(()),
+            any_instance_running: any_instance_running.clone(),
+            instance_running_tracker: LivenessTracker::new(move |count| {
+                drop(any_instance_running.send_replace(count != 0))
+            }),
         }
     }
 }
@@ -332,11 +344,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                         Some(GameVersion::Custom(_)) => None,
                                         None => None,
                                     },
-                                    modpack_platform: status
+                                    modpack: status
                                         .config
                                         .modpack
                                         .as_ref()
-                                        .map(|modpack| modpack.modpack.as_platform()),
+                                        .map(|modpack| modpack.modpack.clone()),
                                     state: (&status.state).into(),
                                 })
                             }
@@ -911,8 +923,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             false => None,
         };
 
-        self.create_instance_ext(group, name, icon, version, notes, |_| async { Ok(()) })
-            .await
+        self.create_instance_ext(group, name, icon, None, None, version, notes, |_| async {
+            Ok(())
+        })
+        .await
     }
 
     #[tracing::instrument(skip(self, icon, initializer))]
@@ -921,6 +935,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         group: GroupId,
         name: String,
         icon: Option<(String, Vec<u8>)>,
+        seconds_played: Option<u32>,
+        last_played: Option<DateTime<Utc>>,
         version: InstanceVersionSource,
         notes: String,
         initializer: F,
@@ -952,11 +968,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             None => InstanceIcon::Default,
         };
 
-        let (version, modpack) = match version {
-            InstanceVersionSource::Version(version) => (Some(version), None),
-            InstanceVersionSource::Modpack(modpack) => (None, Some(modpack)),
-            InstanceVersionSource::ModpackWithKnownVersion(version, modpack) => {
-                (Some(version), Some(modpack))
+        let (version, modpack, pack_locked) = match version {
+            InstanceVersionSource::Version(version) => (Some(version), None, false),
+            InstanceVersionSource::Modpack(modpack, locked) => (None, Some(modpack), locked),
+            InstanceVersionSource::ModpackWithKnownVersion(version, modpack, locked) => {
+                (Some(version), Some(modpack), locked)
             }
         };
 
@@ -965,17 +981,18 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             icon,
             date_created: Utc::now(),
             date_updated: Utc::now(),
-            last_played: None,
-            seconds_played: 0,
+            last_played,
+            seconds_played: seconds_played.unwrap_or(0),
             modpack: modpack.map(|modpack| info::ModpackInfo {
                 modpack,
-                locked: true,
+                locked: pack_locked,
             }),
             game_configuration: info::GameConfig {
                 version,
                 global_java_args: true,
                 extra_java_args: None,
                 memory: None,
+                java_override: None,
                 game_resolution: None,
             },
             pre_launch_hook: None,
@@ -1124,6 +1141,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             info.wrapper_command = wrapper_command;
         }
 
+        if let Some(java_override) = update.java_override {
+            info!(?java_override, "Updating java override");
+            info.game_configuration.java_override = java_override;
+        }
+
         let mut need_reinstall = false;
 
         if let Some(version) = update.version {
@@ -1233,9 +1255,13 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .invalidate(INSTANCE_DETAILS, Some(update.instance_id.0.into()));
 
         if need_reinstall {
-            tokio::fs::create_dir_all(path.join(".setup"))
+            let setup = path.join(".setup");
+            tokio::fs::create_dir_all(&setup)
                 .await
                 .context("writing incomplete instance marker")?;
+            // tokio::fs::create_dir_all(setup.join("modpack-complete"))
+            //     .await
+            //     .context("writing modpack complete")?;
 
             let app = self.app.clone();
             tokio::spawn(async move {
@@ -1583,14 +1609,44 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             InstanceIcon::RelativePath(_) => instance.icon_revision,
         };
 
+        let mc_version = match &instance.config.game_configuration.version {
+            Some(info::GameVersion::Standard(version)) => Some(version.release.clone()),
+            Some(info::GameVersion::Custom(custom)) => Some(custom.clone()),
+            None => None,
+        };
+
+        let mut version_info = None;
+
+        if let Some(mc_version) = &mc_version {
+            version_info = Some(
+                self.app
+                    .minecraft_manager()
+                    .get_minecraft_version(&mc_version)
+                    .await,
+            );
+        }
+
+        let required_java_profile = mc_version.clone().and_then(|version| {
+            let version_info = version_info.unwrap().ok();
+            let java = version_info
+                .map(|version| version.java_version)
+                .and_then(|version| version.map(|version| version.component));
+
+            let Some(java) = java else {
+                return None;
+            };
+
+            let Ok(required_java) = MinecraftJavaProfile::try_from(java.as_str()) else {
+                return None;
+            };
+
+            Some(SystemJavaProfileName::from(required_java).to_string())
+        });
+
         Ok(domain::InstanceDetails {
             favorite: instance.favorite,
             name: instance.config.name.clone(),
-            version: match &instance.config.game_configuration.version {
-                Some(info::GameVersion::Standard(version)) => Some(version.release.clone()),
-                Some(info::GameVersion::Custom(custom)) => Some(custom.clone()),
-                None => None,
-            },
+            version: mc_version,
             modpack: instance.config.modpack.clone(),
             locked: instance
                 .config
@@ -1611,6 +1667,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 Some(info::GameVersion::Custom(_)) => Vec::new(), // todo
                 None => Vec::new(),
             },
+            java_override: instance.config.game_configuration.java_override.clone(),
+            required_java_profile,
             state: (&instance.state).into(),
             notes: instance.config.notes.clone(),
             icon_revision,
@@ -1797,7 +1855,7 @@ pub enum ListInstanceStatus {
 pub struct ValidListInstance {
     pub mc_version: Option<String>,
     pub modloader: Option<info::ModLoaderType>,
-    pub modpack_platform: Option<ModPlatform>,
+    pub modpack: Option<Modpack>,
     pub state: domain::LaunchState,
 }
 
@@ -1937,8 +1995,8 @@ pub struct Mod {
 #[derive(Debug)]
 pub enum InstanceVersionSource {
     Version(info::GameVersion),
-    Modpack(info::Modpack),
-    ModpackWithKnownVersion(info::GameVersion, info::Modpack),
+    Modpack(info::Modpack, bool),
+    ModpackWithKnownVersion(info::GameVersion, info::Modpack, bool),
 }
 
 #[derive(Error, Debug)]
@@ -2375,7 +2433,7 @@ mod test {
                 status: ListInstanceStatus::Valid(ValidListInstance {
                     mc_version: Some(String::from("1.7.10")),
                     modloader: None,
-                    modpack_platform: None,
+                    modpack: None,
                     state: domain::LaunchState::Inactive { failed_task: None },
                 }),
                 locked: false,
@@ -2409,6 +2467,7 @@ mod test {
                 global_java_args: None,
                 extra_java_args: None,
                 memory: None,
+                java_override: None,
                 pre_launch_hook: None,
                 post_exit_hook: None,
                 wrapper_command: None,

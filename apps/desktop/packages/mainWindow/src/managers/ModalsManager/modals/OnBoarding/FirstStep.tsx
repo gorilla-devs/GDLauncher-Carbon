@@ -7,8 +7,12 @@ type Props = {
 };
 
 const FirstStep = (props: Props) => {
-  const accounts = rspc.createQuery(() => ["account.getAccounts"]);
-  const activeUuid = rspc.createQuery(() => ["account.getActiveUuid"]);
+  const accounts = rspc.createQuery(() => ({
+    queryKey: ["account.getAccounts"]
+  }));
+  const activeUuid = rspc.createQuery(() => ({
+    queryKey: ["account.getActiveUuid"]
+  }));
 
   const currentAccount = accounts.data?.find(
     (account) => account.uuid === activeUuid.data

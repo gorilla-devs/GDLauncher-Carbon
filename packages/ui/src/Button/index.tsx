@@ -72,7 +72,6 @@ const getVariant = (
     "rounded-full": rounded,
     "rounded-md": !rounded,
     uppercase,
-    "cursor-pointer": !isLoading && !isDisabled && !cursor,
     "cursor-not-allowed": isDisabled && !cursor,
     "box-border": true,
     "border-solid": true,

@@ -74,23 +74,19 @@ const ExportCheckbox = (props: {
 }) => {
   const [isOpen, setIsOpen] = createSignal(false);
   const [contents, setContents] = createSignal<any[]>([]);
+  const rspcContext = rspc.useContext();
 
-  createEffect(() => {
+  createEffect(async () => {
     if (!isOpen() && contents().length === 0) {
-      rspc.createQuery(
-        () => [
-          "instance.explore",
-          {
-            instance_id: instanceId() as number,
-            path: props.folder.path as Array<string>
-          }
-        ],
+      const res = await rspcContext.client.query([
+        "instance.explore",
         {
-          onSuccess: (data) => {
-            setContents(data as any);
-          }
+          instance_id: instanceId() as number,
+          path: props.folder.path as Array<string>
         }
-      );
+      ]);
+
+      setContents(res);
     }
   });
 

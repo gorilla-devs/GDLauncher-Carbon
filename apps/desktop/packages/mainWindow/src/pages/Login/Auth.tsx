@@ -11,18 +11,17 @@ const Auth = () => {
   const [retry, setRetry] = createSignal(0);
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
-  const accountEnrollCancelMutation = rspc.createMutation([
-    "account.enroll.cancel"
-  ]);
+  const accountEnrollCancelMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.enroll.cancel"]
+  }));
 
-  const accountEnrollBeginMutation = rspc.createMutation(
-    ["account.enroll.begin"],
-    {
-      onError() {
-        retryLogin();
-      }
+  const accountEnrollBeginMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.enroll.begin"],
+
+    onError() {
+      retryLogin();
     }
-  );
+  }));
 
   const retryLogin = () => {
     while (retry() <= 3) {
@@ -59,14 +58,10 @@ const Auth = () => {
         size="large"
         onClick={() => handleClick()}
       >
-        <Trans
-          key="login.sign_in_with_microsoft"
-          options={{
-            defaultValue: "Sign in with Microsoft"
-          }}
-        />
+        <i class="w-4 h-4 i-ri:microsoft-fill" />
+        <Trans key="login.sign_in_with_microsoft" />
       </Button>
-      <p class="text-darkSlate-50 text-sm mb-10 max-w-90">
+      <p class="text-darkSlate-50 text-sm max-w-90 mb-10">
         <Trans
           key="login.sign_in_with_microsoft_text"
           options={{

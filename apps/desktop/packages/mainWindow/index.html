@@ -77,6 +77,10 @@
         cursor: default !important;
       }
 
+      *[data-cursor-pointer] {
+        cursor: pointer !important;
+      }
+
       input {
         cursor: text !important;
       }
@@ -111,6 +115,14 @@
       // TODO: handle sourcemaps decoding + sentry
       if (!import.meta.env.DEV) {
         window.onerror = (msg, url, line, col, error) => {
+          console.log(
+            "Handling global uncaught error",
+            msg,
+            url,
+            line,
+            col,
+            error
+          );
           window.fatalError(msg, url.split("/").slice(-3).join(" -> "));
           return true;
         };
@@ -131,6 +143,10 @@
         right: 0;
         display: none;
       "
+    ></div>
+    <div
+      id="notifications"
+      style="position: fixed; z-index: 200; bottom: 0; left: 0"
     ></div>
     <div id="root"></div>
     <div id="appFatalCrash"></div>

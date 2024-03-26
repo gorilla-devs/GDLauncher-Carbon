@@ -1,6 +1,6 @@
 use std::{
     io::{Read, Seek},
-    path::{Path, PathBuf},
+    path::Path,
 };
 use thiserror::Error;
 use tracing::trace;
@@ -35,10 +35,7 @@ impl CompressionFormat {
     }
 }
 
-fn detect_compression_format<T>(file: &mut T) -> Result<CompressionFormat, CompressionError>
-where
-    T: Read,
-{
+fn detect_compression_format(file: &mut impl Read) -> Result<CompressionFormat, CompressionError> {
     let mut header = [0; 262]; // Magic number to hold the max possible offset (tar) of 257 bytes + 5 relevant bytes
     let _bytes = file.read(&mut header)?;
     if let Ok(format) = CompressionFormat::from_bytes(&header) {
@@ -48,17 +45,14 @@ where
     Err(CompressionError::UnknownFormat)
 }
 
-fn decompress_zip<R>(
-    archive: &mut zip::ZipArchive<R>,
-    dest: PathBuf,
-) -> Result<(), CompressionError>
+fn decompress_zip<R>(archive: &mut zip::ZipArchive<R>, dest: &Path) -> Result<(), CompressionError>
 where
     R: Read + Seek,
 {
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)?;
         let outpath = match file.enclosed_name() {
-            Some(path) => Path::new(&dest).join(path),
+            Some(path) => dest.join(path),
             None => continue,
         };
 
@@ -104,7 +98,7 @@ where
 
 fn decompress_tar<R>(
     archive: &mut tar::Archive<R>,
-    dest_folder: PathBuf,
+    dest_folder: &Path,
 ) -> Result<(), CompressionError>
 where
     R: Read,
@@ -113,7 +107,7 @@ where
     Ok(())
 }
 
-fn decompress_gzip(archive_path: PathBuf, dest_folder: PathBuf) -> Result<(), CompressionError> {
+fn decompress_gzip(archive_path: &Path, dest_folder: &Path) -> Result<(), CompressionError> {
     let archive_file = std::fs::File::open(&archive_path)?;
     let mut archive = flate2::read::GzDecoder::new(archive_file);
 
@@ -155,14 +149,14 @@ where
         match format {
             CompressionFormat::Zip => {
                 let mut archive = zip::ZipArchive::new(file_clone)?;
-                decompress_zip(&mut archive, dest_folder_clone)?;
+                decompress_zip(&mut archive, &dest_folder_clone)?;
             }
             CompressionFormat::Tar => {
                 let mut archive = tar::Archive::new(file_clone);
-                decompress_tar(&mut archive, dest_folder_clone)?;
+                decompress_tar(&mut archive, &dest_folder_clone)?;
             }
             CompressionFormat::Gzip => {
-                decompress_gzip(path_clone, dest_folder_clone)?;
+                decompress_gzip(&path_clone, &dest_folder_clone)?;
             }
         }
 
@@ -199,22 +193,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_decompress_zip() {
-        let file_path = PathBuf::from("fixtures/compressed.zip");
-        let dest_folder = PathBuf::from("tests_decompressed/zip");
+        let file_path = Path::new("fixtures/compressed.zip");
+        let dest_folder = Path::new("tests_decompressed/zip");
         decompress(&file_path, &dest_folder).await.unwrap();
     }
 
     #[tokio::test]
     async fn test_decompress_tar() {
-        let file_path = PathBuf::from("fixtures/compressed.tar");
-        let dest_folder = PathBuf::from("tests_decompressed/tar");
+        let file_path = Path::new("fixtures/compressed.tar");
+        let dest_folder = Path::new("tests_decompressed/tar");
         decompress(&file_path, &dest_folder).await.unwrap();
     }
 
     #[tokio::test]
     async fn test_decompress_tar_gzip() {
-        let file_path = PathBuf::from("fixtures/compressed.tar.gz");
-        let dest_folder = PathBuf::from("tests_decompressed/tar_gzip");
+        let file_path = Path::new("fixtures/compressed.tar.gz");
+        let dest_folder = Path::new("tests_decompressed/tar_gzip");
         decompress(&file_path, &dest_folder).await.unwrap();
     }
 

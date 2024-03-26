@@ -20,6 +20,7 @@ import { sortArrayByGameVersion } from "@/utils/mods";
 
 const Changelog = () => {
   const params = useParams();
+  const rspcContext = rspc.useContext();
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
   const lastFile = () =>
@@ -63,7 +64,7 @@ const Changelog = () => {
     }
   });
 
-  createEffect(() => {
+  createEffect(async () => {
     const modpackId = parseInt(params.id, 10);
 
     if (routeData.isCurseforge) {
@@ -71,31 +72,37 @@ const Changelog = () => {
         fileId() !== undefined ||
         (lastFile() && (lastFile() as CFFEFile).id !== undefined)
       ) {
-        // eslint-disable-next-line solid/reactivity
-        const changelogQuery = rspc.createQuery(() => [
-          "modplatforms.curseforge.getModFileChangelog",
-          {
-            modId: modpackId,
-            fileId:
-              parseInt(fileId() as string, 10) || (lastFile() as CFFEFile).id
-          }
-        ]);
-        setChangelog(changelogQuery.data?.data);
+        try {
+          const changelogQuery = await rspcContext.client.query([
+            "modplatforms.curseforge.getModFileChangelog",
+            {
+              modId: modpackId,
+              fileId:
+                parseInt(fileId() as string, 10) || (lastFile() as CFFEFile).id
+            }
+          ]);
+          setChangelog(changelogQuery.data);
+        } catch (e) {
+          console.error(e);
+        }
       }
     }
   });
 
-  createEffect(() => {
+  createEffect(async () => {
     if (!routeData.isCurseforge) {
       if (fileId() !== undefined) {
-        // eslint-disable-next-line solid/reactivity
-        const changelogQuery = rspc.createQuery(() => [
-          "modplatforms.modrinth.getVersion",
-          fileId() as string
-        ]);
+        try {
+          const changelogQuery = await rspcContext.client.query([
+            "modplatforms.modrinth.getVersion",
+            fileId() as string
+          ]);
 
-        if (changelogQuery.data?.changelog) {
-          setChangelog(changelogQuery.data.changelog);
+          if (changelogQuery?.changelog) {
+            setChangelog(changelogQuery.changelog);
+          }
+        } catch (err) {
+          console.error(err);
         }
       }
     }

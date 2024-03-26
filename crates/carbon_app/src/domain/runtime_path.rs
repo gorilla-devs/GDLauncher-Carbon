@@ -67,7 +67,7 @@ impl NativesPath {
     }
 }
 
-// TODO: WIP
+#[derive(Debug)]
 pub struct ManagedJavasPath(PathBuf);
 
 impl ManagedJavasPath {
@@ -165,6 +165,7 @@ impl InstancePath {
     }
 }
 
+#[derive(Debug)]
 pub struct TempPath(PathBuf);
 
 impl TempPath {

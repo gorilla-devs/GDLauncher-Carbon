@@ -8,7 +8,6 @@ import {
   JSX,
   Show,
   mergeProps,
-  createEffect,
 } from "solid-js";
 
 interface Marks {
@@ -118,10 +117,6 @@ function Slider(props: Props) {
     }
   };
 
-  createEffect(() => {
-    if (props.value !== undefined) onChange(props.value);
-  });
-
   const onChange = (val: number) => {
     setCurrentValue(val);
     props?.onChange?.(val);
@@ -230,7 +225,7 @@ function Slider(props: Props) {
                         }),
                   }}
                   classList={{
-                    "bg-darkSlate-900 border-darkSlate-900":
+                    "bg-darkSlate-800 border-darkSlate-600":
                       calcOffset(parseInt(value, 10)) >=
                       calcOffset(currentValue()),
                     "bg-primary-500 border-primary-500":
@@ -244,7 +239,7 @@ function Slider(props: Props) {
                   }}
                 />
                 <p
-                  class="flex flex-col mb-0 text-xs text-lightSlate-500"
+                  class="flex flex-col mb-0 text-xs text-darkGray-300 font-semibold"
                   classList={{
                     "-ml-2 mt-2 max-w-25": !props.vertical,
                     "-mt-2 mr-2": props.vertical,

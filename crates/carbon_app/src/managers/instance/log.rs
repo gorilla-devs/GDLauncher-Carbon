@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use serde::Serialize;
 use std::{
     ops::{Bound, RangeBounds},
@@ -198,16 +199,18 @@ impl ManagerRef<'_, InstanceManager> {
         }
     }
 
-    pub async fn get_logs(self) -> Vec<GameLogEntry> {
+    pub async fn get_logs(self, instance_id: InstanceId) -> Vec<GameLogEntry> {
         self.game_logs
             .read()
             .await
             .iter()
+            .filter(|(_, (id, _))| *id == instance_id)
             .map(|(id, (instance_id, rx))| GameLogEntry {
                 id: *id,
                 instance_id: *instance_id,
                 active: rx.has_changed().is_ok(),
             })
+            .sorted_by_key(|entry| entry.id.0)
             .collect()
     }
 }

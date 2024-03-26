@@ -37,8 +37,12 @@ const defaultModals = {
     component: lazy(() => import("./modals/TermsAndConditions")),
     title: "Terms and Conditions"
   },
-  addJava: {
-    component: lazy(() => import("./modals/Java/AddJava")),
+  addManagedJava: {
+    component: lazy(() => import("./modals/Java/AddManagedJava")),
+    title: "Add java version"
+  },
+  addCustomJava: {
+    component: lazy(() => import("./modals/Java/AddCustomJava")),
     title: "Add java version"
   },
   modDetails: {
@@ -59,7 +63,15 @@ const defaultModals = {
   },
   modpack_version_update: {
     component: lazy(() => import("./modals/ModPackVersionUpdate")),
-    title: "Update Version"
+    title: "Change Modpack Version"
+  },
+  unlock_confirmation: {
+    component: lazy(() => import("./modals/Confirmation")),
+    title: "Unlock Instance"
+  },
+  unpair_confirmation: {
+    component: lazy(() => import("./modals/Confirmation")),
+    title: "Unpair Instance"
   },
   notification: {
     component: lazy(() => import("./modals/Notification")),
@@ -88,6 +100,10 @@ const defaultModals = {
   modsUpdater: {
     component: lazy(() => import("./modals/ModsUpdater")),
     title: "Mods Updater"
+  },
+  javaProfileCreation: {
+    component: lazy(() => import("./modals/JavaProfileCreationModal")),
+    title: "Create Java Profile"
   }
 };
 
@@ -212,15 +228,15 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                         title={title}
                       />
                     </div>
-                    <div class="absolute inset-0 bg-darkSlate-900 backdrop-blur-sm opacity-80" />
+                    <div class="absolute inset-0 bg-darkSlate-900 opacity-80" />
                   </div>
 
                   <div
-                    class="h-screen duration-100 ease-in-out text-white transition-all grid place-items-center z-99 origin-center"
+                    class="h-screen duration-100 ease-in-out text-white place-items-center z-999 origin-center bg-darkSlate-900 opacity-80"
                     style={{
-                      width: `${adSize.width + 40}px`
+                      width: `${adSize.width}px`
                     }}
-                    onClick={() => {
+                    onMouseDown={() => {
                       if (!preventClose) {
                         closeModal();
                       }

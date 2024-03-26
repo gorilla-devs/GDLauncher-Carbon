@@ -1,0 +1,99 @@
+---
+import BaseHead from "../../components/BaseHead.astro";
+import "@fontsource/ubuntu";
+import Header from "../../components/Header.astro";
+import Footer from "../../components/Footer.astro";
+import { SITE_TITLE, SITE_DESCRIPTION } from "../../consts";
+import { getCollection } from "astro:content";
+import FormattedDate from "../../components/FormattedDate.astro";
+import ArticleCard from "../../components/ArticleCard.astro";
+
+const posts = (await getCollection("blog")).sort(
+  (a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf()
+);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
+    <style>
+      body {
+        font-family: "Ubuntu", sans-serif;
+        background-image: linear-gradient(
+            rgba(23, 29, 39, 0.3),
+            rgba(23, 29, 39, 0.3)
+          ),
+          url("../../assets/patern.svg");
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-color: rgba(29, 32, 40, 1);
+      }
+      main {
+        /* max-width: 960px; */
+        display: flex;
+        justify-content: center;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      ul {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2rem;
+        list-style-type: none;
+        padding: 0;
+      }
+      ul li {
+        flex: 1 1 calc(50% - 2rem);
+        max-width: calc(50% - 2rem);
+      }
+      ul li a {
+        text-decoration: none;
+        color: inherit;
+      }
+      ul li img {
+        width: 100%;
+        height: auto;
+        border-radius: 12px;
+        transition: transform 0.3s ease;
+      }
+      .title,
+      .date {
+        display: block; /* Ensure these are block-level for proper spacing */
+        color: white;
+        text-align: center;
+      }
+      .title {
+        margin-top: 0.5rem;
+        font-size: 1.2rem;
+      }
+      .date {
+        font-size: 0.9rem;
+        color: rgba(147, 153, 170, 1);
+      }
+      @media (max-width: 720px) {
+        ul {
+          gap: 1rem;
+        }
+        ul li {
+          /* flex-basis: 100%; */
+          max-width: 100%;
+        }
+        .title {
+          font-size: 1rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <Header />
+    <main>
+      <section>
+        <ul>
+          {posts.map((post) => <ArticleCard post={post} />)}
+        </ul>
+      </section>
+    </main>
+    <Footer />
+  </body>
+</html>

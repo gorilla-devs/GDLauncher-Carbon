@@ -202,24 +202,24 @@ impl Middleware for CacheMiddleware {
 
 #[cfg(test)]
 mod test {
-    use std::{net::TcpListener, time::SystemTime};
+    use std::time::SystemTime;
 
     use axum::{http::header, routing::get, Router};
     use chrono::{Duration, Utc};
+    use tokio::net::TcpListener;
 
     use crate::managers::App;
 
     macro_rules! launch_server {
         [$($headers:expr),*] => {{
-            let tcp_listener = TcpListener::bind("127.0.0.1:0").unwrap();
+            let tcp_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
             let port = tcp_listener.local_addr().unwrap().port();
 
             let server = Router::new()
                 .route("/", get(|| async { ([$($headers),*], "test") }));
 
             tokio::spawn(async {
-                axum::Server::from_tcp(tcp_listener).unwrap()
-                    .serve(server.into_make_service())
+                axum::serve(tcp_listener, server.into_make_service())
                     .await
                     .unwrap();
             });

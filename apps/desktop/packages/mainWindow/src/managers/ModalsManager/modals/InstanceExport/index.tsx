@@ -2,7 +2,7 @@ import { ModalProps } from "../..";
 import ModalLayout from "../../ModalLayout";
 import ExportFormat from "./atoms/ExportFormat";
 import FilesSelection from "./atoms/FilesSelection";
-import FilesBundle from "./atoms/FilesBundle";
+import SelfContainedArchive from "./atoms/SelfContainedArchive";
 import ExportPath from "./atoms/ExportPath";
 import BeginExport from "./atoms/BeginExport";
 import { Match, Switch, createSignal } from "solid-js";
@@ -17,7 +17,7 @@ interface IPayload {
   instance_id: number | undefined;
   target: ExportTarget;
   save_path: string | undefined;
-  link_mods: boolean;
+  self_contained_addons_bundling: boolean;
   filter: {};
 }
 
@@ -25,7 +25,7 @@ const [payload, setPayload] = createStore<IPayload>({
   instance_id: undefined,
   target: "Curseforge",
   save_path: undefined,
-  link_mods: true,
+  self_contained_addons_bundling: false,
   filter: { entries: {} }
 });
 export { payload, setPayload };
@@ -45,7 +45,7 @@ const InstanceExport = (props: ModalProps) => {
             <ExportFormat />
             {/* <ExportNameVersion /> */}
             <FilesSelection />
-            <FilesBundle />
+            <SelfContainedArchive />
             <ExportPath />
             <BeginExport />
           </Match>

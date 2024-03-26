@@ -92,40 +92,53 @@ const Custom = (props: Pick<ModalProps, "data">) => {
   const modalsContext = useModal();
   const navigate = useGDNavigate();
 
-  const forgeVersionsQuery = rspc.createQuery(() => ["mc.getForgeVersions"], {
-    enabled: false,
-    onSuccess(data) {
-      data.gameVersions.forEach((version) => {
+  const forgeVersionsQuery = rspc.createQuery(() => ({
+    queryKey: ["mc.getForgeVersions"],
+    enabled: false
+  }));
+
+  createEffect(() => {
+    if (forgeVersionsQuery.isFetched) {
+      forgeVersionsQuery.data?.gameVersions.forEach((version) => {
         forgeHashmap.set(version.id, version.loaders);
       });
     }
   });
 
-  const neoForgeVersionsQuery = rspc.createQuery(
-    () => ["mc.getNeoforgeVersions"],
-    {
-      enabled: false,
-      onSuccess(data) {
-        data.gameVersions.forEach((version) => {
-          neoForgeHashmap.set(version.id, version.loaders);
-        });
-      }
-    }
-  );
+  const neoForgeVersionsQuery = rspc.createQuery(() => ({
+    queryKey: ["mc.getNeoforgeVersions"],
+    enabled: false
+  }));
 
-  const fabricVersionsQuery = rspc.createQuery(() => ["mc.getFabricVersions"], {
-    enabled: false,
-    onSuccess(data) {
-      data.gameVersions.forEach((version) => {
+  createEffect(() => {
+    if (neoForgeVersionsQuery.isFetched) {
+      neoForgeVersionsQuery.data?.gameVersions.forEach((version) => {
+        neoForgeHashmap.set(version.id, version.loaders);
+      });
+    }
+  });
+
+  const fabricVersionsQuery = rspc.createQuery(() => ({
+    queryKey: ["mc.getFabricVersions"],
+    enabled: false
+  }));
+
+  createEffect(() => {
+    if (fabricVersionsQuery.isFetched) {
+      fabricVersionsQuery.data?.gameVersions.forEach((version) => {
         fabricHashmap.set(version.id, version.loaders);
       });
     }
   });
 
-  const quiltVersionsQuery = rspc.createQuery(() => ["mc.getQuiltVersions"], {
-    enabled: false,
-    onSuccess(data) {
-      data.gameVersions.forEach((version) => {
+  const quiltVersionsQuery = rspc.createQuery(() => ({
+    queryKey: ["mc.getQuiltVersions"],
+    enabled: false
+  }));
+
+  createEffect(() => {
+    if (quiltVersionsQuery.isFetched) {
+      quiltVersionsQuery.data?.gameVersions.forEach((version) => {
         quiltHashmap.set(version.id, version.loaders);
       });
     }
@@ -145,7 +158,13 @@ const Custom = (props: Pick<ModalProps, "data">) => {
       )?.loaders;
 
       setLoaderVersions(versions || []);
-    } else if (neoForgeVersionsQuery.data && isNeoForge()) {
+    } else {
+      setLoaderVersions([]);
+    }
+  });
+
+  createEffect(() => {
+    if (neoForgeVersionsQuery.data && isNeoForge()) {
       const versions = neoForgeVersionsQuery?.data?.gameVersions.find(
         (v) => v.id === (mcVersion() || (mappedMcVersions()?.[0]?.id as string))
       )?.loaders;
@@ -238,65 +257,21 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     { label: t("instance.quilt"), key: "quilt" }
   ];
 
-  const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
+  const defaultGroup = rspc.createQuery(() => ({
+    queryKey: ["instance.getDefaultGroup"]
+  }));
 
-  const prepareInstanceMutation = rspc.createMutation(
-    ["instance.prepareInstance"],
-    {
-      onSuccess() {
-        modalsContext?.closeModal();
-        navigate(`/library`);
-        addNotification("Instance successfully created.");
-      },
+  const prepareInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.prepareInstance"]
+  }));
 
-      onError() {
-        addNotification("Error while creating the instance.", "error");
-        modalsContext?.closeModal();
-      }
-    }
-  );
+  const createInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.createInstance"]
+  }));
 
-  const createInstanceMutation = rspc.createMutation(
-    ["instance.createInstance"],
-    {
-      onSuccess(instanceId) {
-        prepareInstanceMutation.mutate(instanceId);
-      },
-      onError() {
-        modalsContext?.closeModal();
-        addNotification("Error while creating the instance.", "error");
-      },
-      onSettled() {
-        setError("");
-        setCustomTitle("");
-        setError("");
-        setBgPreview(null);
-        setMcVersion("");
-        setChosenLoaderVersion("");
-      }
-    }
-  );
-  const updateInstanceMutation = rspc.createMutation(
-    ["instance.updateInstance"],
-    {
-      onSuccess() {
-        modalsContext?.closeModal();
-        addNotification("Instance successfully updated.");
-      },
-      onError() {
-        modalsContext?.closeModal();
-        addNotification("Error while creating the instance.", "error");
-      },
-      onSettled() {
-        setError("");
-        setCustomTitle("");
-        setError("");
-        setBgPreview(null);
-        setMcVersion("");
-        setChosenLoaderVersion("");
-      }
-    }
-  );
+  const updateInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.updateInstance"]
+  }));
 
   const mapTypeToColor = (
     type: McType,
@@ -345,37 +320,76 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     );
   };
 
-  const handleCreate = () => {
+  const isNameDiff = () => title() && title() !== instanceData()?.title;
+  const isMcVersionDiff = () =>
+    mcVersion() && mcVersion() !== instanceData()?.mcVersion;
+  const isModloaderDiff = () => loader() !== instanceData()?.modloader;
+  const isModloaderVersionDiff = () =>
+    chosenLoaderVersion() !== instanceData()?.modloaderVersion;
+  const isIconDiff = () => bgPreview() !== instanceData()?.img; // not checking for null as it can be unset
+
+  const isUpdatingWithDiffs = () => {
+    if (!instanceData()) return true;
+
+    return (
+      isNameDiff() ||
+      isMcVersionDiff() ||
+      isModloaderDiff() ||
+      isModloaderVersionDiff() ||
+      isIconDiff()
+    );
+  };
+
+  const handleCreate = async () => {
     if (!title()) {
       setError("Fields must be filled in!");
     } else {
       setError("");
 
-      createInstanceMutation.mutate({
-        group: defaultGroup.data || 1,
-        use_loaded_icon: true,
-        notes: "",
-        name: title()!,
-        version: {
-          Version: {
-            Standard: {
-              release: mcVersion() || (mappedMcVersions()?.[0]?.id as string),
-              modloaders: loader()
-                ? [
-                    {
-                      type_: loader() as CFFEModLoaderType,
-                      version: chosenLoaderVersion() || loaderVersions()[0].id
-                    } as ModLoader
-                  ]
-                : []
+      try {
+        const instanceId = await createInstanceMutation.mutateAsync({
+          group: defaultGroup.data || 1,
+          use_loaded_icon: true,
+          notes: "",
+          name: title()!,
+          version: {
+            Version: {
+              Standard: {
+                release: mcVersion() || (mappedMcVersions()?.[0]?.id as string),
+                modloaders: loader()
+                  ? [
+                      {
+                        type_: loader() as CFFEModLoaderType,
+                        version: chosenLoaderVersion() || loaderVersions()[0].id
+                      } as ModLoader
+                    ]
+                  : []
+              }
             }
           }
-        }
-      });
+        });
+
+        await prepareInstanceMutation.mutateAsync(instanceId);
+
+        modalsContext?.closeModal();
+        navigate(`/library`);
+        addNotification("Instance successfully created.");
+      } catch (err) {
+        console.error(err);
+        modalsContext?.closeModal();
+        addNotification("Error while creating the instance.", "error");
+      } finally {
+        setError("");
+        setCustomTitle("");
+        setError("");
+        setBgPreview(null);
+        setMcVersion("");
+        setChosenLoaderVersion("");
+      }
     }
   };
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!title()) {
       setError("Fields must be filled in!");
       return;
@@ -384,22 +398,43 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     if (instanceData()?.id) {
       setError("");
 
-      updateInstanceMutation.mutate({
-        instance: parseInt((instanceData() as Instancetype).id, 10),
-        useLoadedIcon: { Set: !!bgPreview() },
-        name: { Set: title()! },
-        version: {
-          Set: mcVersion() || (mappedMcVersions()?.[0]?.id as string)
-        },
-        modloader: {
-          Set: loader()
-            ? ({
-                type_: loader() as CFFEModLoaderType,
-                version: chosenLoaderVersion() || loaderVersions()[0].id
-              } as ModLoader)
-            : null
-        }
-      });
+      try {
+        await updateInstanceMutation.mutateAsync({
+          instance: parseInt((instanceData() as Instancetype).id, 10),
+          useLoadedIcon: isIconDiff() ? { Set: Boolean(bgPreview()) } : null,
+          name: isNameDiff() ? { Set: title()! } : null,
+          version: isMcVersionDiff()
+            ? {
+                Set: mcVersion() || (mappedMcVersions()?.[0]?.id as string)
+              }
+            : null,
+          modloader:
+            isModloaderDiff() || isModloaderVersionDiff()
+              ? {
+                  Set: loader()
+                    ? ({
+                        type_: loader() as CFFEModLoaderType,
+                        version: chosenLoaderVersion() || loaderVersions()[0].id
+                      } as ModLoader)
+                    : null
+                }
+              : null
+        });
+
+        modalsContext?.closeModal();
+        addNotification("Instance successfully updated.");
+      } catch (err) {
+        console.error(err);
+        modalsContext?.closeModal();
+        addNotification("Error while creating the instance.", "error");
+      } finally {
+        setError("");
+        setCustomTitle("");
+        setError("");
+        setBgPreview(null);
+        setMcVersion("");
+        setChosenLoaderVersion("");
+      }
     }
   };
 
@@ -423,7 +458,9 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             <div
               class="relative flex justify-center items-center bg-darkSlate-900 cursor-pointer bg-center bg-cover h-20 rounded-xl w-20"
               style={{
-                "background-image": `url("${bgPreview()}")`
+                ...(bgPreview() && {
+                  "background-image": `url("${bgPreview()}")`
+                })
               }}
               onClick={() => {
                 window
@@ -697,7 +734,8 @@ const Custom = (props: Pick<ModalProps, "data">) => {
           <Button
             disabled={Boolean(
               (loaderVersions().length === 0 && loader()) ||
-                mappedMcVersions().length === 0
+                mappedMcVersions().length === 0 ||
+                !isUpdatingWithDiffs()
             )}
             type="primary"
             style={{ width: "100%", "max-width": "200px" }}

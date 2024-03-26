@@ -28,62 +28,57 @@ const ModDetails = (props: ModalProps) => {
   const fileId = () => getFileId(modDetails());
   const projectId = () => getProjectId(modDetails());
   const modalsContext = useModal();
+  const rspcContext = rspc.useContext();
   const [modpackDescription, setModpackDescription] = createSignal("");
   const [taskId, setTaskId] = createSignal<undefined | number>(undefined);
 
   const location = useLocation();
   const instanceId = () => getInstanceIdFromPath(location.pathname);
 
-  const installModMutation = rspc.createMutation(["instance.installMod"], {
-    onMutate() {
-      setLoading(true);
-    },
-    onSuccess(taskId) {
-      setTaskId(taskId);
-    }
-  });
+  const installModMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.installMod"]
+  }));
 
-  const mods = rspc.createQuery(() => [
-    "instance.getInstanceMods",
-    parseInt(instanceId() as string, 10)
-  ]);
+  const mods = rspc.createQuery(() => ({
+    queryKey: ["instance.getInstanceMods", parseInt(instanceId() as string, 10)]
+  }));
 
-  createEffect(() => {
+  createEffect(async () => {
     if (taskId() !== undefined) {
-      // eslint-disable-next-line solid/reactivity
-      const task = rspc.createQuery(() => [
+      const task = await rspcContext.client.query([
         "vtask.getTask",
         taskId() as number
       ]);
 
       const isDowloaded = () =>
-        (task.data?.download_total || 0) > 0 &&
-        task.data?.download_total === task.data?.downloaded;
+        (task?.download_total || 0) > 0 &&
+        task?.download_total === task?.downloaded;
 
       if (isDowloaded()) setLoading(false);
     }
   });
 
-  createEffect(() => {
+  createEffect(async () => {
     if (projectId() && isCurseForgeData(modDetails())) {
-      const modpackDescription = rspc.createQuery(() => [
+      const modpackDescription = await rspcContext.client.query([
         "modplatforms.curseforge.getModDescription",
         { modId: projectId() as number }
       ]);
-      if (modpackDescription.data?.data)
-        setModpackDescription(modpackDescription.data?.data);
+      if (modpackDescription.data)
+        setModpackDescription(modpackDescription.data);
     }
   });
 
-  createEffect(() => {
+  createEffect(async () => {
     if (projectId() && !isCurseForgeData(modDetails())) {
-      const modpackDescription = rspc.createQuery(() => [
+      const modpackDescription = await rspcContext.client.query([
         "modplatforms.modrinth.getProject",
         projectId() as string
       ]);
-      if (modpackDescription.data?.body)
+
+      if (modpackDescription?.body)
         setModpackDescription(
-          marked.parse(sanitizeHtml(modpackDescription.data?.body || ""))
+          marked.parse(sanitizeHtml(modpackDescription?.body || ""))
         );
     }
   });
@@ -124,16 +119,22 @@ const ModDetails = (props: ModalProps) => {
             uppercase
             type="glow"
             size={propss.size}
-            onClick={() => {
+            onClick={async () => {
               const fileId = getFileId(modDetails());
-
               if (fileId && instanceId()) {
-                installModMutation.mutate({
-                  mod_source: modSourceObj(),
-                  instance_id: parseInt(instanceId() as string, 10),
-                  install_deps: true,
-                  replaces_mod: null
-                });
+                try {
+                  setLoading(true);
+                  await installModMutation.mutateAsync({
+                    mod_source: modSourceObj(),
+                    instance_id: parseInt(instanceId() as string, 10),
+                    install_deps: true,
+                    replaces_mod: null
+                  });
+
+                  setTaskId(taskId);
+                } catch (err) {
+                  console.error(err);
+                }
               }
             }}
           >

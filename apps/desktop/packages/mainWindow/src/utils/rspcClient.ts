@@ -1,13 +1,8 @@
 import { QueryClient } from "@tanstack/solid-query";
-import {
-  createClient,
-  createWSClient,
-  Unsubscribable,
-  wsLink
-} from "@rspc/client";
+import { WebsocketTransport, createClient } from "@rspc/client";
 import { createSolidQueryHooks } from "@rspc/solid";
 import type { Procedures } from "@gd/core_module";
-import { createEffect } from "solid-js";
+import { createNotification } from "@gd/ui";
 
 export const rspc = createSolidQueryHooks<Procedures>();
 export const queryClient = new QueryClient({
@@ -25,69 +20,66 @@ export const queryClient = new QueryClient({
 export let port: number | null = null;
 
 export default function initRspc(_port: number) {
+  const addNotification = createNotification();
+
   port = _port;
-  const wsClient = createWSClient({
-    url: `ws://127.0.0.1:${_port}/rspc/ws`
-  });
+
+  const transport = new WebsocketTransport(`ws://127.0.0.1:${_port}/rspc/ws`);
 
   const client = createClient<Procedures>({
-    links: [
-      wsLink({
-        client: wsClient
-      })
-    ]
+    transport,
+    onError: (error) => {
+      addNotification(error.message, "error");
+    }
   });
 
   const createInvalidateQuery = () => {
     const context = rspc.useContext();
-    let subscription: Unsubscribable | null = null;
+    let socket: WebSocket;
 
-    function init() {
-      if (!subscription) {
-        subscription = client.subscription(["invalidateQuery"], {
-          onData: (invalidateOperation) => {
-            const key = [invalidateOperation!.key];
-            if (invalidateOperation.args !== null) {
-              key.push(invalidateOperation.args);
-            }
-            console.log("invalidateQuery", key);
-            context.queryClient.invalidateQueries(key);
-          }
+    type InvalidateOperation = {
+      key: string;
+      args: any;
+    };
+
+    function connect() {
+      // Create a new WebSocket connection
+      socket = new WebSocket(`ws://127.0.0.1:${_port}/invalidations`);
+
+      socket.addEventListener("open", () => {
+        console.log("Invalidations channel connected");
+      });
+
+      socket.addEventListener("message", (event) => {
+        const data: InvalidateOperation = JSON.parse(event.data);
+        const key = [data.key];
+        if (data.args !== null) {
+          key.push(data.args);
+        }
+        // console.log("Invalidations channel", key, data.args);
+        context.queryClient.invalidateQueries({
+          queryKey: key
         });
-      }
+      });
+
+      socket.addEventListener("close", () => {
+        console.log(
+          "Invalidations channel disconnected. Attempting to reconnect..."
+        );
+        setTimeout(connect, 1000);
+      });
+
+      socket.addEventListener("error", (error) => {
+        console.error("Invalidations channel error:", error);
+        socket.close();
+      });
     }
 
-    wsClient.getConnection()?.addEventListener("open", (_event) => {
-      init();
-    });
-
-    wsClient.getConnection()?.addEventListener("close", (_event) => {
-      subscription?.unsubscribe();
-      subscription = null;
-    });
-
-    if (!subscription) {
-      init();
-    }
+    connect();
   };
 
   return {
     client,
     createInvalidateQuery
   };
-}
-
-export async function rspcFetch(...args: any[]) {
-  // using .apply to avoid typescript error
-  const res = rspc.createQuery.apply(null, args as any);
-
-  return new Promise((resolve, reject) => {
-    createEffect(() => {
-      if (res.error) {
-        reject(res);
-      } else if (res.status === "success") {
-        resolve(res);
-      }
-    });
-  });
 }

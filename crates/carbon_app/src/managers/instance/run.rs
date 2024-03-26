@@ -1,11 +1,12 @@
-use crate::domain::instance::info::{self, Modpack, ModpackInfo, StandardVersion};
-use crate::domain::java::SystemJavaProfileName;
+use crate::domain::instance::info::{self, JavaOverride, Modpack, ModpackInfo, StandardVersion};
+use crate::domain::java::{JavaComponent, JavaComponentType, SystemJavaProfileName};
 use crate::domain::metrics::Event;
 use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
 use crate::domain::modplatforms::modrinth::search::VersionID;
 use crate::domain::runtime_path::InstancePath;
 use crate::domain::vtask::VisualTaskId;
 use crate::managers::instance::modpack::packinfo;
+use crate::managers::java::java_checker::{JavaChecker, RealJavaChecker};
 use crate::managers::java::managed::Step;
 use crate::managers::minecraft::assets::get_assets_dir;
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
@@ -44,7 +45,7 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{watch, Semaphore};
+use tokio::sync::{watch, Mutex, Semaphore};
 use tokio::task::JoinHandle;
 use tokio::{io::AsyncReadExt, sync::mpsc};
 use tracing::{debug, info, trace};
@@ -53,6 +54,7 @@ use tracing::{debug, info, trace};
 pub struct PersistenceManager {
     instance_download_lock: Semaphore,
     loader_install_lock: Semaphore,
+    java_check_lock: Mutex<()>,
 }
 
 impl PersistenceManager {
@@ -60,6 +62,7 @@ impl PersistenceManager {
         Self {
             instance_download_lock: Semaphore::new(1),
             loader_install_lock: Semaphore::new(1),
+            java_check_lock: Mutex::new(()),
         }
     }
 }
@@ -106,6 +109,13 @@ impl ManagerRef<'_, InstanceManager> {
                 bail!("cannot prepare an instance that is already running");
             }
         }
+
+        let auto_manage_java_system_profiles = self
+            .app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .auto_manage_java_system_profiles;
 
         let mut config = data.config.clone();
 
@@ -187,6 +197,8 @@ impl ManagerRef<'_, InstanceManager> {
                 settings.wrapper_command.clone()
             }
         };
+
+        let java_override = config.game_configuration.java_override.clone();
 
         let runtime_path = self.app.settings_manager().runtime_path.clone();
         let instance_path = runtime_path
@@ -674,10 +686,23 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let overwrite_changed = !change_version_path.exists(); // TODO
 
+                    let staging_file = setup_path.join("staging.json");
+
                     let staged_text =
-                        tokio::fs::read_to_string(setup_path.join("staging.json")).await?;
+                        tokio::fs::read_to_string(&staging_file).await?;
                     let staging_snapshot = serde_json::from_str::<Vec<&str>>(&staged_text)
                         .context("could not parse staging snapshot")?;
+
+                    #[derive(Debug)]
+                    enum SkipReplaceReason {
+                        DeletedByUser,
+                        ModifiedByUser([u8; 16], [u8; 16]),
+                    }
+
+                    let mut new_files = Vec::<String>::new();
+                    let mut deleted_files = Vec::<String>::new();
+                    let mut replaced_files = Vec::<String>::new();
+                    let mut skipped_replacements = Vec::<(String, SkipReplaceReason)>::new();
 
                     debug!("Applying staged instance files");
                     let r: anyhow::Result<_> = async {
@@ -686,6 +711,8 @@ impl ManagerRef<'_, InstanceManager> {
                                 let mut original_file =
                                     instance_root.join("instance").join(&oldfile[1..]);
 
+                                trace!("Checking for replacement for packinfo file: {original_file:?}");
+
                                 if !original_file.exists() {
                                     let mut name = original_file.file_name().unwrap().to_owned();
                                     name.push(".disabled");
@@ -693,21 +720,29 @@ impl ManagerRef<'_, InstanceManager> {
 
                                     if !original_file.exists() {
                                         // either the user deleted it or we already deleted it in the next check, skip
+                                        skipped_replacements.push((oldfile.clone(), SkipReplaceReason::DeletedByUser));
                                         continue;
                                     }
                                 }
 
-                                let original_conent = tokio::fs::read(&original_file).await?;
-                                let original_md5: [u8; 16] = Md5::digest(&original_conent).into();
+                                let mut original_md5 = Md5::new();
+                                let mut file = tokio::fs::File::open(&original_file).await?;
+                                carbon_scheduler::buffered_digest(&mut file, |chunk| {
+                                    original_md5.update(chunk);
+                                }).await?;
+                                drop(file);
+                                let original_md5: [u8; 16] = original_md5.finalize().into();
 
                                 if original_md5 != oldfilehash.md5 {
                                     // the user has modified this file so we shouldn't touch it
+                                    skipped_replacements.push((oldfile.clone(), SkipReplaceReason::ModifiedByUser(oldfilehash.md5, original_md5)));
                                     continue;
                                 }
 
                                 if !staging_snapshot.contains(&(&oldfile as &str)) {
                                     // file is not present in new version and old version was not changed, delete
                                     tokio::fs::remove_file(original_file).await?;
+                                    deleted_files.push(oldfile.clone());
                                     continue;
                                 }
 
@@ -716,6 +751,7 @@ impl ManagerRef<'_, InstanceManager> {
                                 if staged_file.is_file() {
                                     // old file matches the snapshotted version and new file is present, replace
                                     tokio::fs::rename(staged_file, original_file).await?;
+                                    replaced_files.push(oldfile.clone());
                                 }
                             }
                         }
@@ -731,6 +767,7 @@ impl ManagerRef<'_, InstanceManager> {
                                 // there was no record of this file in the packinfo or it would've been moved previously,
                                 // and the user has not created one in its place, add the file
 
+                                new_files.push(relpath.to_string_lossy().to_string());
                                 tokio::fs::create_dir_all(original_file.parent().unwrap()).await?;
                                 tokio::fs::rename(staged_file, original_file).await?;
                             }
@@ -743,6 +780,61 @@ impl ManagerRef<'_, InstanceManager> {
                     if let Err(e) = r {
                         return Err(e.context("Failed to apply staged instance changes"));
                     }
+
+                    trace!("Creating update audit files");
+                    let audit_dir = instance_root.join(".install_audit");
+
+                    // delete old audit dir if it exists
+                    if (audit_dir.exists()) {
+                        tokio::fs::remove_dir_all(&audit_dir).await?;
+                    }
+
+                    tokio::fs::create_dir(&audit_dir).await?;
+
+                    let audit_file = audit_dir.join("audit.txt");
+                    let mut audit_txt = "Install Audit\n".to_string();
+
+                    if (!skipped_replacements.is_empty()) {
+                        audit_txt += "\nFiles that could not be replaced:\n";
+
+                        for (file, reason) in skipped_replacements {
+                            match reason {
+                                SkipReplaceReason::DeletedByUser => audit_txt += &format!(" - {file}: deleted by user\n"),
+                                SkipReplaceReason::ModifiedByUser(original, current) => audit_txt += &format!(
+                                    " - {file}: modified by user\n     original md5: {}\n     current md5:  {}\n",
+                                    hex::encode(original),
+                                    hex::encode(current),
+                                ),
+                            }
+                        }
+                    }
+
+                    if (!deleted_files.is_empty()) {
+                        audit_txt += "\nFiles deleted:\n";
+
+                        for file in deleted_files {
+                            audit_txt += &format!(" - {file}\n");
+                        }
+                    }
+
+                    if (!replaced_files.is_empty()) {
+                        audit_txt += "\nFiles replaced:\n";
+
+                        for file in replaced_files {
+                            audit_txt += &format!(" - {file}\n");
+                        }
+                    }
+
+                    if (!new_files.is_empty()) {
+                        audit_txt += "\nFiles created:\n";
+
+                        for file in new_files {
+                            audit_txt += &format!(" - {file}\n");
+                        }
+                    }
+
+                    tokio::fs::write(audit_file, audit_txt).await?;
+                    let _ = tokio::fs::rename(staging_file, audit_dir.join("staged.json")).await;
 
                     trace!("Cleaning up staging directory");
                     tokio::fs::remove_dir_all(staging_dir).await?;
@@ -775,115 +867,203 @@ impl ManagerRef<'_, InstanceManager> {
 
                 t_request_version_info.update_items(1, 2);
 
-                let java = {
-                    // If instance has profile override, short circuit and use that
-                    // ....
-                    // else
+                let mut required_java_system_profile = SystemJavaProfileName::from(
+                    daedalus::minecraft::MinecraftJavaProfile::try_from(
+                        version_info
+                            .java_version
+                            .as_ref()
+                            .ok_or_else(|| {
+                                anyhow::anyhow!("instance java version unsupported")
+                            })?
+                            .component
+                            .as_str(),
+                    )?,
+                );
 
-                    let mut required_java = SystemJavaProfileName::from(
-                        daedalus::minecraft::MinecraftJavaProfile::try_from(
-                            &version_info
-                                .java_version
-                                .as_ref()
-                                .ok_or_else(|| {
-                                    anyhow::anyhow!("instance java version unsupported")
-                                })?
-                                .component as &str,
-                        )?,
-                    );
+                tracing::debug!("This instance requires system profile: {:?}", required_java_system_profile);
 
-                    // Forge 1.16.5 requires an older java 8 version so we inject the legacy fixed 1 profile
-                    if &version.release == "1.16.5"
-                        && *&version
-                            .modloaders
-                            .iter()
-                            .find(|v| v.type_ == ModLoaderType::Forge)
-                            .is_some()
-                    {
-                        required_java = SystemJavaProfileName::LegacyFixed1;
-                    }
-
-                    tracing::debug!("Required java: {:?}", required_java);
-
-                    let auto_manage_java = app
-                        .settings_manager()
-                        .get_settings()
-                        .await?
-                        .auto_manage_java;
-
-                    let usable_java = app
-                        .java_manager()
-                        .get_usable_java_for_profile_name(required_java)
-                        .await?;
-
-                    tracing::debug!("Usable java: {:?}", usable_java);
-
-                    match usable_java {
-                        Some(path) => path,
-                        None => {
-                            if !auto_manage_java {
-                                return bail!(
-                                    "No usable java found and auto manage java is disabled"
-                                );
+                let java_component_override = match java_override {
+                    Some(path) => match path {
+                        JavaOverride::Path(value) => {
+                            if let Some(value) = value {
+                                trace!("Java path override: {:?}", value);
+                                Some(
+                                    RealJavaChecker::get_bin_info(
+                                        &RealJavaChecker,
+                                        &PathBuf::from(value),
+                                        JavaComponentType::Custom,
+                                    )
+                                    .await,
+                                )
+                            } else {
+                                Some(anyhow::bail!("Java path is not set"))
                             }
+                        }
+                        JavaOverride::Profile(value) => {
+                            if let Some(value) = value {
+                                if let Ok(all_profiles) = app.java_manager().get_java_profiles().await
+                                {
+                                    if let Ok(all_javas) =
+                                        app.java_manager().get_available_javas().await
+                                    {
+                                        let mut result = None;
+                                        for profile in all_profiles.iter() {
+                                            if profile.name == value {
+                                                if auto_manage_java_system_profiles && profile.is_system && value == required_java_system_profile.to_string() {
+                                                    // !! THIS IS USED TO EFFECTIVELY TREAT IT AS A NON-OVERRIDE, SO THAT THE LAUNCHER MANAGES THE PROFILE NORMALLY !!
+                                                    trace!("Java profile override BUT ignoring: {:?}", profile.name);
+                                                    result = None;
+                                                } else {
+                                                    if let Some(java_id) = profile.java_id.as_ref() {
+                                                        let java_component =
+                                                            all_javas.iter().find_map(|javas| {
+                                                                javas.1.iter().find_map(|java| {
+                                                                    if &java.id == java_id {
+                                                                        Some(java.component.clone())
+                                                                    } else {
+                                                                        None
+                                                                    }
+                                                                })
+                                                            });
 
-                            let t_download_java =
-                                task.subtask(Translation::InstanceTaskLaunchDownloadJava);
+                                                        if let Some(java_component) = java_component {
+                                                            trace!("Java profile override: {:?}", java_component);
+                                                            result = Some(Ok(java_component));
+                                                        } else {
+                                                            result = Some(anyhow::bail!(
+                                                                "Java profile has associated java id that does not exist"
+                                                            ));
+                                                        }
+                                                    } else {
+                                                        result = Some(anyhow::bail!(
+                                                            "Java profile has no associated java id"
+                                                        ));
+                                                    }
+                                                }
+                                            }
+                                        }
 
-                            let t_extract_java =
-                                task.subtask(Translation::InstanceTaskLaunchExtractJava);
-                            t_download_java.set_weight(0.0);
-                            t_extract_java.set_weight(0.0);
-
-                            let (progress_watch_tx, mut progress_watch_rx) =
-                                watch::channel(Step::Idle);
-
-                            // dropped when the sender is dropped
-                            tokio::spawn(async move {
-                                let mut started = false;
-                                let mut dl_completed = false;
-
-                                while progress_watch_rx.changed().await.is_ok() {
-                                    let step = progress_watch_rx.borrow();
-
-                                    if !started && !matches!(*step, Step::Idle) {
-                                        t_download_java.set_weight(10.0);
-                                        t_extract_java.set_weight(3.0);
-                                        started = true;
+                                        result
+                                    } else {
+                                        Some(anyhow::bail!("Could not get available javas"))
                                     }
+                                } else {
+                                    Some(anyhow::bail!("Could not get java profiles"))
+                                }
+                            } else {
+                                Some(anyhow::bail!("Java profile is not set"))
+                            }
+                        }
+                    },
+                    None => None,
+                };
 
-                                    match *step {
-                                        Step::Downloading(downloaded, total) => t_download_java
-                                            .update_download(downloaded as u32, total as u32, true),
-                                        Step::Extracting(count, total) => {
-                                            if !dl_completed {
-                                                t_download_java.complete_download();
-                                                dl_completed = true;
+                let java = {
+                    if let Some(java_component_override) = java_component_override {
+                        java_component_override?
+                    } else {
+                        // Forge 1.16.5 requires an older java 8 version so we inject the legacy fixed 1 profile
+                        if &version.release == "1.16.5"
+                            && *&version
+                                .modloaders
+                                .iter()
+                                .find(|v| v.type_ == ModLoaderType::Forge)
+                                .is_some()
+                        {
+                            required_java_system_profile = SystemJavaProfileName::LegacyFixed1;
+                        }
+
+                        let instance_manager = app.instance_manager();
+                        let _guard = instance_manager
+                            .persistence_manager
+                            .java_check_lock
+                            .lock()
+                            .await;
+
+
+                        let usable_java = app
+                            .java_manager()
+                            .get_usable_java_for_profile_name(required_java_system_profile)
+                            .await?;
+
+                        tracing::debug!("Usable java: {:?}", usable_java);
+
+                        match usable_java {
+                            Some(path) => path,
+                            None => {
+                                if !auto_manage_java_system_profiles {
+                                    bail!(
+                                        "No usable java found and auto manage java is disabled"
+                                    );
+                                }
+
+                                let t_download_java =
+                                    task.subtask(Translation::InstanceTaskLaunchDownloadJava);
+
+                                let t_extract_java =
+                                    task.subtask(Translation::InstanceTaskLaunchExtractJava);
+                                t_download_java.set_weight(0.0);
+                                t_extract_java.set_weight(0.0);
+
+                                let (progress_watch_tx, mut progress_watch_rx) =
+                                    watch::channel(Step::Idle);
+
+                                // dropped when the sender is dropped
+                                tokio::spawn(async move {
+                                    let mut started = false;
+                                    let mut dl_completed = false;
+
+                                    while progress_watch_rx.changed().await.is_ok() {
+                                        let step = progress_watch_rx.borrow();
+
+                                        if !started && !matches!(*step, Step::Idle) {
+                                            t_download_java.set_weight(10.0);
+                                            t_extract_java.set_weight(3.0);
+                                            started = true;
+                                        }
+
+                                        match *step {
+                                            Step::Downloading(downloaded, total) => t_download_java
+                                                .update_download(
+                                                    downloaded as u32,
+                                                    total as u32,
+                                                    true,
+                                                ),
+                                            Step::Extracting(count, total) => {
+                                                if !dl_completed {
+                                                    t_download_java.complete_download();
+                                                    dl_completed = true;
+                                                }
+
+                                                t_extract_java
+                                                    .update_items(count as u32, total as u32);
                                             }
 
-                                            t_extract_java.update_items(count as u32, total as u32);
+                                            Step::Done => {
+                                                t_download_java.complete_download();
+                                                t_extract_java.complete_items();
+                                            }
+
+                                            Step::Idle => {}
                                         }
 
-                                        Step::Done => {
-                                            t_download_java.complete_download();
-                                            t_extract_java.complete_items();
-                                        }
-
-                                        Step::Idle => {}
+                                        // this is already debounced in setup_managed
                                     }
+                                });
 
-                                    // this is already debounced in setup_managed
+                                let path = app
+                                    .java_manager()
+                                    .require_java_install(
+                                        required_java_system_profile,
+                                        true,
+                                        Some(progress_watch_tx),
+                                    )
+                                    .await?;
+
+                                match path {
+                                    Some(path) => path,
+                                    None => return Ok(None),
                                 }
-                            });
-
-                            let path = app
-                                .java_manager()
-                                .require_java_install(required_java, true, Some(progress_watch_tx))
-                                .await?;
-
-                            match path {
-                                Some(path) => path,
-                                None => return Ok(None),
                             }
                         }
                     }
@@ -1318,6 +1498,8 @@ impl ManagerRef<'_, InstanceManager> {
                 Ok(None) => {}
                 Ok(Some(mut child)) => {
                     drop(task);
+
+                    let _liveness_watch = app.instance_manager().instance_running_tracker.marker();
 
                     let _ = app
                         .rich_presence_manager()

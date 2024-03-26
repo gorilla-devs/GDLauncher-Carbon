@@ -40,8 +40,6 @@ const ModsBrowser = () => {
 
   const infiniteQuery = useInfiniteModsQuery();
 
-  const rows = () => infiniteQuery.allRows();
-
   const allVirtualRows = () => infiniteQuery.rowVirtualizer.getVirtualItems();
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -60,18 +58,16 @@ const ModsBrowser = () => {
     return res;
   });
 
-  const instanceMods = rspc.createQuery(() => [
-    "instance.getInstanceMods",
-    instanceId()
-  ]);
+  const instanceMods = rspc.createQuery(() => ({
+    queryKey: ["instance.getInstanceMods", instanceId()]
+  }));
 
-  const instanceDetails = rspc.createQuery(() => [
-    "instance.getInstanceDetails",
-    instanceId()
-  ]);
+  const instanceDetails = rspc.createQuery(() => ({
+    queryKey: ["instance.getInstanceDetails", instanceId()]
+  }));
 
   createEffect(() => {
-    if (!lastItem() || lastItem().index === infiniteQuery?.query.index) {
+    if (!lastItem()) {
       return;
     }
 
@@ -80,7 +76,7 @@ const ModsBrowser = () => {
       : lastItem().index;
 
     if (
-      lastItemIndex >= rows().length - 1 &&
+      mods().length - lastItemIndex < 5 &&
       infiniteQuery?.infiniteQuery.hasNextPage &&
       !infiniteQuery.infiniteQuery.isFetchingNextPage
     ) {
@@ -116,7 +112,7 @@ const ModsBrowser = () => {
 
   const mods = () =>
     infiniteQuery?.infiniteQuery.data
-      ? infiniteQuery.infiniteQuery.data.pages.flatMap((d) => d.data)
+      ? infiniteQuery.infiniteQuery.data.pages.flatMap((d: any) => d.data)
       : [];
 
   const hasFiltersData = createMemo(() => Boolean(sortingFields()));
@@ -146,7 +142,7 @@ const ModsBrowser = () => {
                         : `url("${DefaultImg}")`
                   }}
                 >
-                  <div class="absolute z-0 bg-gradient-to-r from-darkSlate-700 from-50% inset-0" />
+                  <div class="absolute z-0 from-darkSlate-700 inset-0 bg-gradient-to-r from-50%" />
                   <div class="absolute inset-0 from-darkSlate-700 z-0 bg-gradient-to-t" />
                   <div class="flex gap-4 z-10 items-center">
                     <Button
@@ -260,7 +256,7 @@ const ModsBrowser = () => {
           </Match>
         </Switch>
         <div
-          class="flex flex-col gap-2 left-0 right-0 absolute overflow-y-hidden bottom-0 pb-5"
+          class="flex flex-col gap-2 left-0 right-0 absolute overflow-y-hidden bottom-0"
           style={{
             top: `${headerHeight()}px`
           }}

@@ -20,7 +20,7 @@ import { getInstanceIdFromPath, setLastInstanceOpened } from "@/utils/routes";
 import { Trans, useTransContext } from "@gd/i18n";
 import fetchData from "@/pages/Library/library.data";
 import { createStore, reconcile } from "solid-js/store";
-import { InstancesStore, isListInstanceValid } from "@/utils/instances";
+import { InstancesStore } from "@/utils/instances";
 import InstanceTile from "../InstanceTile";
 import skull from "/assets/images/icons/skull.png";
 import { CFFEModLoaderType } from "@gd/core_module/bindings";
@@ -51,9 +51,10 @@ const Sidebar = () => {
 
     if (filteredData()) {
       filteredData()?.forEach((instance) => {
-        const validInstance = isListInstanceValid(instance.status)
-          ? instance.status.Valid
-          : null;
+        const validInstance =
+          instance.status.status === "valid"
+            ? instance.status.value
+            : undefined;
 
         const modloader = validInstance?.modloader || "vanilla";
         if (modloader) {
@@ -210,13 +211,7 @@ const Sidebar = () => {
               />
               <Show when={isSidebarOpened()}>
                 <p class="text-darkSlate-50 text-center text-xs max-w-50">
-                  <Trans
-                    key="instance.no_instances_text"
-                    options={{
-                      defaultValue:
-                        "At the moment there are not instances. Add one to start playing!"
-                    }}
-                  />
+                  <Trans key="instance.no_instances_text" />
                 </p>
               </Show>
             </div>

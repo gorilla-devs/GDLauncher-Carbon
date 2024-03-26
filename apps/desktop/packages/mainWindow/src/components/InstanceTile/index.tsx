@@ -1,22 +1,17 @@
 import { createEffect, createSignal } from "solid-js";
 import Tile from "../Instance/Tile";
 import {
-  isListInstanceValid,
-  getValideInstance,
   getPreparingState,
   getRunningState,
-  getInValideInstance,
   getInactiveState,
   getInstanceImageUrl,
-  getDeletingState
+  isInstanceDeleting
 } from "@/utils/instances";
-import { ListInstance, FESubtask, FETask } from "@gd/core_module/bindings";
+import { ListInstance, FESubtask } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { rspc } from "@/utils/rspcClient";
 import { createStore } from "solid-js/store";
 import { bytesToMB } from "@/utils/helpers";
-import { RSPCError } from "@rspc/client";
-import { CreateQueryResult } from "@tanstack/solid-query";
 
 type InstanceDownloadProgress = {
   totalDownload: number;
@@ -42,35 +37,37 @@ const InstanceTile = (props: {
 
   const navigate = useGDNavigate();
 
-  const validInstance = () => getValideInstance(props.instance.status);
-  const invalidInstance = () => getInValideInstance(props.instance.status);
-  const inactiveState = () => getInactiveState(props.instance.status);
-  const isPreparingState = () => getPreparingState(props.instance.status);
-  const isDeleting = () => getDeletingState(props.instance.status) as boolean;
+  const validInstance = () =>
+    props.instance.status.status === "valid"
+      ? props.instance.status.value
+      : undefined;
+
+  const invalidInstance = () =>
+    props.instance.status.status === "invalid"
+      ? props.instance.status.value
+      : undefined;
+
+  const inactiveState = () => getInactiveState(validInstance()?.state);
+  const isPreparingState = () => getPreparingState(validInstance()?.state);
+  const isDeleting = () => isInstanceDeleting(validInstance()?.state);
 
   const modloader = () => validInstance()?.modloader;
 
   const taskId = () => isPreparingState();
 
-  const isRunning = () => getRunningState(props.instance.status);
-  const dismissTaskMutation = rspc.createMutation(["vtask.dismissTask"]);
+  const isRunning = () => getRunningState(validInstance()?.state);
+  const dismissTaskMutation = rspc.createMutation(() => ({
+    mutationKey: ["vtask.dismissTask"]
+  }));
 
-  const [task, setTask] = createSignal<CreateQueryResult<
-    FETask | null,
-    RSPCError
-  > | null>(null);
-
-  createEffect(() => {
-    if (taskId() !== undefined) {
-      setTask(rspc.createQuery(() => ["vtask.getTask", taskId() as number]));
-    }
-  });
+  const task = rspc.createQuery(() => ({
+    queryKey: ["vtask.getTask", taskId() || null]
+  }));
 
   createEffect(() => {
     setFailError("");
-    if (task() !== null && task()?.data) {
-      const data = (task() as CreateQueryResult<FETask | null, RSPCError>)
-        .data as FETask;
+    if (task !== null && task?.data) {
+      const data = task.data;
       setProgress("totalDownload", data.download_total);
       setProgress("downloaded", data.downloaded);
       if (data.progress.type === "Known") {
@@ -91,10 +88,10 @@ const InstanceTile = (props: {
     }
   });
 
-  const failedTask = rspc.createQuery(
-    () => ["vtask.getTask", inactiveState() as number],
-    { enabled: false }
-  );
+  const failedTask = rspc.createQuery(() => ({
+    queryKey: ["vtask.getTask", inactiveState() as number],
+    enabled: false
+  }));
 
   createEffect(() => {
     if (inactiveState() !== null && inactiveState() !== undefined) {
@@ -119,7 +116,7 @@ const InstanceTile = (props: {
       instance={props.instance}
       modloader={modloader()}
       version={validInstance()?.mc_version}
-      isInvalid={!isListInstanceValid(props.instance.status)}
+      isInvalid={props.instance.status.status === "invalid"}
       failError={failError()}
       isRunning={!!isRunning()}
       isPreparing={isPreparingState() !== undefined}

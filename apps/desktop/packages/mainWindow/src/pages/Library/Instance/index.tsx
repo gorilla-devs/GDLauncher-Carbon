@@ -23,9 +23,7 @@ import {
   ListInstance
 } from "@gd/core_module/bindings";
 import {
-  getCurseForgeData,
   getInstanceImageUrl,
-  getModrinthData,
   getPreparingState,
   getRunningState
 } from "@/utils/instances";
@@ -51,6 +49,7 @@ type InstancePage = {
 const Instance = () => {
   const navigate = useGDNavigate();
   const params = useParams();
+  const rspcContext = rspc.useContext();
   const location = useLocation();
   const [editableName, setEditableName] = createSignal(false);
   const [isFavorite, setIsFavorite] = createSignal(false);
@@ -71,7 +70,8 @@ const Instance = () => {
     setTabsTranslate(-backButtonRef.offsetWidth);
   });
 
-  const setFavoriteMutation = rspc.createMutation(["instance.setFavorite"], {
+  const setFavoriteMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.setFavorite"],
     onMutate: async (
       obj
     ): Promise<
@@ -137,7 +137,7 @@ const Instance = () => {
         );
       }
     }
-  });
+  }));
 
   createEffect(() => {
     if (routeData.instanceDetails.data)
@@ -184,15 +184,17 @@ const Instance = () => {
   const selectedIndex = () =>
     getRouteIndex(instancePages(), location.pathname, true);
 
-  const launchInstanceMutation = rspc.createMutation([
-    "instance.launchInstance"
-  ]);
+  const launchInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.launchInstance"]
+  }));
 
-  const updateInstanceMutation = rspc.createMutation([
-    "instance.updateInstance"
-  ]);
+  const updateInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.updateInstance"]
+  }));
 
-  const killInstanceMutation = rspc.createMutation(["instance.killInstance"]);
+  const killInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.killInstance"]
+  }));
 
   const isRunning = () =>
     routeData.instanceDetails.data?.state &&
@@ -203,36 +205,36 @@ const Instance = () => {
     getPreparingState(routeData.instanceDetails.data?.state);
 
   const curseforgeData = () =>
-    routeData.instanceDetails.data?.modpack &&
-    getCurseForgeData(routeData.instanceDetails.data.modpack.modpack);
+    routeData.instanceDetails.data?.modpack?.modpack.type === "curseforge" &&
+    routeData.instanceDetails.data?.modpack?.modpack.value;
 
-  createEffect(() => {
+  createEffect(async () => {
     const isCurseforge = curseforgeData();
     if (isCurseforge) {
       setModpackDetails(
-        rspc.createQuery(() => [
+        await rspcContext.client.query([
           "modplatforms.curseforge.getMod",
           {
             modId: isCurseforge.project_id as number
           }
-        ]).data
+        ])
       );
     }
   });
 
   const modrinthData = () =>
-    routeData.instanceDetails.data?.modpack &&
-    getModrinthData(routeData.instanceDetails.data.modpack.modpack);
+    routeData.instanceDetails.data?.modpack?.modpack.type === "modrinth" &&
+    routeData.instanceDetails.data?.modpack?.modpack.value;
 
-  createEffect(() => {
+  createEffect(async () => {
     const isModrinth = modrinthData();
 
     if (isModrinth) {
       setModpackDetails(
-        rspc.createQuery(() => [
+        await rspcContext.client.query([
           "modplatforms.modrinth.getProject",
           isModrinth.project_id
-        ]).data
+        ])
       );
     }
   });
@@ -287,9 +289,9 @@ const Instance = () => {
   let refStickyTabs: HTMLDivElement;
   const [isSticky, setIsSticky] = createSignal(false);
 
-  const openFolderMutation = rspc.createMutation([
-    "instance.openInstanceFolder"
-  ]);
+  const openFolderMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.openInstanceFolder"]
+  }));
 
   const handleEdit = () => {
     modalsContext?.openModal(
@@ -301,7 +303,14 @@ const Instance = () => {
         modloader: routeData.instanceDetails.data?.modloaders[0]?.type_,
         title: routeData.instanceDetails.data?.name,
         mcVersion: routeData.instanceDetails.data?.version,
-        modloaderVersion: routeData.instanceDetails.data?.modloaders[0]?.version
+        modloaderVersion:
+          routeData.instanceDetails.data?.modloaders[0]?.version,
+        img: routeData.instanceDetails.data?.iconRevision
+          ? getInstanceImageUrl(
+              params.id,
+              routeData.instanceDetails.data?.iconRevision
+            )
+          : null
       }
     );
   };
@@ -334,7 +343,7 @@ const Instance = () => {
         setPayload({
           target: "Curseforge",
           save_path: undefined,
-          link_mods: true,
+          self_contained_addons_bundling: false,
           filter: { entries: {} },
           instance_id: parseInt(instanceId as string, 10)
         });

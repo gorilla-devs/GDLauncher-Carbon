@@ -70,10 +70,17 @@ pub enum GameResolution {
 }
 
 #[derive(Debug, Clone)]
+pub enum JavaOverride {
+    Profile(Option<String>),
+    Path(Option<String>),
+}
+
+#[derive(Debug, Clone)]
 pub struct GameConfig {
     pub version: Option<GameVersion>,
     pub global_java_args: bool,
     pub extra_java_args: Option<String>,
+    pub java_override: Option<JavaOverride>,
     pub memory: Option<(u16, u16)>,
     pub game_resolution: Option<GameResolution>,
 }

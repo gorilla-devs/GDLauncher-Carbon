@@ -35,10 +35,10 @@ import {
   modrinthCategories,
   supportedModloaders
 } from "@/utils/sidebar";
-import { rspcFetch } from "@/utils/rspcClient";
 import { createStore } from "solid-js/store";
-import { mcVersions } from "@/utils/mcVersion";
-import { setInstanceId } from "@/utils/browser";
+import { mappedMcVersions, mcVersions } from "@/utils/mcVersion";
+import { instanceId, setInstanceId } from "@/utils/browser";
+import { rspc } from "@/utils/rspcClient";
 
 const mapTypeToColor = (type: McType) => {
   return (
@@ -99,6 +99,7 @@ const Sidebar = () => {
     ]
   });
   const routeData: ReturnType<typeof fetchData> = useRouteData();
+  const rspcContext = rspc.useContext();
   const [gameVersionFilters, setGameVersionFilters] = createStore({
     snapshot: false,
     oldAlpha: false,
@@ -467,7 +468,10 @@ const Sidebar = () => {
       )?.id;
       const changeInstance = async () => {
         const details: any = await runWithOwner(owner, async () => {
-          return rspcFetch(() => ["instance.getInstanceDetails", instanceId]);
+          return rspcContext.client.query([
+            "instance.getInstanceDetails",
+            instanceId as number
+          ]);
         });
 
         setSearchParams({

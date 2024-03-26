@@ -1,0 +1,44 @@
+---
+import "@fontsource/ubuntu";
+import { Image } from "astro:assets";
+import Logo from "../../assets/logo.svg";
+---
+
+
+
+<html>
+    <head>
+        <title>GDLauncher - Successfully subscribed to the newsletter</title>
+    </head>
+    <style>
+        body {
+        font-family: "Ubuntu", sans-serif;
+        /* background-color: rgba(29, 32, 40, 1); */
+        background-image: linear-gradient(
+            rgba(23, 29, 39, 0.3),
+            /* Your specified semi-transparent color */ rgba(23, 29, 39, 0.3)
+          ),
+          url("../../assets/bg.svg");
+        background-size: cover;
+        /* background-position: center; */
+        background-repeat: no-repeat;
+        background-color: rgba(29, 32, 40, 1);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+      }
+      h1 {
+        color: white;
+        font-size: 3rem
+      }
+      
+    </style>
+    <body>
+      
+      <Image src={Logo} alt="gdlauncher logo" width="373" height="240" />
+    
+        <h1 class="text-center">You have successfully subscribed to the newsletter</h1>
+    </body>
+</html>

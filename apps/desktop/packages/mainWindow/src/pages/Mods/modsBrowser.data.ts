@@ -1,24 +1,28 @@
 import { rspc } from "@/utils/rspcClient";
 
 const fetchData = () => {
-  const forgeCategories = rspc.createQuery(() => [
-    "modplatforms.curseforge.getCategories"
-  ]);
+  const forgeCategories = rspc.createQuery(() => ({
+    queryKey: ["modplatforms.curseforge.getCategories"]
+  }));
 
-  const modrinthCategories = rspc.createQuery(() => [
-    "modplatforms.modrinth.getCategories"
-  ]);
+  const modrinthCategories = rspc.createQuery(() => ({
+    queryKey: ["modplatforms.modrinth.getCategories"]
+  }));
 
-  const minecraftVersions = rspc.createQuery(() => ["mc.getMinecraftVersions"]);
-  const modrinthModloaders = rspc.createQuery(() => [
-    "modplatforms.modrinth.getLoaders"
-  ]);
+  const minecraftVersions = rspc.createQuery(() => ({
+    queryKey: ["mc.getMinecraftVersions"]
+  }));
+  const modrinthModloaders = rspc.createQuery(() => ({
+    queryKey: ["modplatforms.modrinth.getLoaders"]
+  }));
 
-  const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
+  const defaultGroup = rspc.createQuery(() => ({
+    queryKey: ["instance.getDefaultGroup"]
+  }));
 
-  const instancesUngrouped = rspc.createQuery(() => [
-    "instance.getAllInstances"
-  ]);
+  const instancesUngrouped = rspc.createQuery(() => ({
+    queryKey: ["instance.getAllInstances"]
+  }));
 
   return {
     forgeCategories,

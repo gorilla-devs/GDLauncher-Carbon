@@ -6,7 +6,9 @@ import ModalLayout from "../ModalLayout";
 import { Suspense } from "solid-js";
 
 const TermsAndConditions = (props: ModalProps) => {
-  const body = rspc.createQuery(() => ["settings.getTermsOfServiceBody"]);
+  const body = rspc.createQuery(() => ({
+    queryKey: ["settings.getTermsOfServiceBody"]
+  }));
 
   const sanitizedHtml = () => {
     if (!body.data) return undefined;

@@ -10,16 +10,17 @@ use crate::{
     api::keys::instance::*,
     api::translation::Translation,
     domain::vtask::VisualTaskId,
-    managers::{AppInner, ManagerRef},
+    managers::{modplatforms::curseforge::CurseForge, AppInner, ManagerRef},
 };
 
 use self::{
-    curseforge_archive::CurseforgeArchiveImporter, legacy_gdlauncher::LegacyGDLauncherImporter,
-    modrinth_archive::ModrinthArchiveImporter,
+    curseforge::CurseforgeImporter, curseforge_archive::CurseforgeArchiveImporter,
+    legacy_gdlauncher::LegacyGDLauncherImporter, modrinth_archive::ModrinthArchiveImporter,
 };
 
 use super::{export::InstanceExportManager, InstanceManager};
 
+mod curseforge;
 mod curseforge_archive;
 mod legacy_gdlauncher;
 mod modrinth_archive;
@@ -193,10 +194,11 @@ impl Entity {
     pub fn list() -> Vec<(Self, bool, SelectionType)> {
         use strum::IntoEnumIterator;
 
-        const SUPPORT: [Entity; 3] = [
+        const SUPPORT: [Entity; 4] = [
             Entity::LegacyGDLauncher,
             Entity::CurseForgeZip,
             Entity::MRPack,
+            Entity::CurseForge,
         ];
 
         Self::iter()
@@ -209,6 +211,7 @@ impl Entity {
             Self::LegacyGDLauncher => Arc::new(LegacyGDLauncherImporter::new()),
             Self::CurseForgeZip => Arc::new(CurseforgeArchiveImporter::new()),
             Self::MRPack => Arc::new(ModrinthArchiveImporter::new()),
+            Self::CurseForge => Arc::new(CurseforgeImporter::new()),
             _ => todo!(),
         }
     }
@@ -218,6 +221,7 @@ impl Entity {
             Self::LegacyGDLauncher => {
                 Some(LegacyGDLauncherImporter::get_default_scan_path().await?)
             }
+            Self::CurseForge => Some(CurseforgeImporter::get_default_scan_path().await?),
             _ => None,
         })
     }

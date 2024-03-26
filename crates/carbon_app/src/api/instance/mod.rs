@@ -4,14 +4,13 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use anyhow::anyhow;
-use axum::body::StreamBody;
 use axum::extract::{Query, State};
+use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use chrono::{DateTime, Utc};
-use hyper::http::HeaderValue;
-use hyper::{HeaderMap, StatusCode};
-use rspc::{RouterBuilderLike, Type};
+use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 use crate::api::modplatforms::RemoteVersion;
 use crate::error::{AxumError, FeError};
@@ -29,7 +28,7 @@ use crate::domain::instance::{self as domain, InstanceModpackInfo};
 use crate::domain::modplatforms as mpdomain;
 use crate::managers::instance as manager;
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> RouterBuilder<App> {
     router! {
         query DEFAULT_GROUP[app, args: ()] {
             Ok(*app.instance_manager()
@@ -235,9 +234,9 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                 .await
         }
 
-        query GET_LOGS[app, args: ()] {
+        query GET_LOGS[app, id: FEInstanceId] {
             Ok(app.instance_manager()
-               .get_logs()
+               .get_logs(id.into())
                .await
                .into_iter()
                .map(GameLogEntry::from)
@@ -422,7 +421,7 @@ pub(super) fn mount() -> impl RouterBuilderLike<App> {
                     args.instance_id.into(),
                     args.target.into(),
                     args.save_path.into(),
-                    args.link_mods,
+                    args.self_contained_addons_bundling,
                     args.filter.into(),
                 ).await?;
 
@@ -455,32 +454,37 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
         path: String,
     }
 
+    async fn instance_icon(
+        State(app): State<Arc<AppInner>>,
+        Query(query): Query<InstanceIconQuery>,
+    ) -> Result<impl IntoResponse, impl IntoResponse> {
+        let icon = app
+            .instance_manager()
+            .instance_icon(domain::InstanceId(query.id))
+            .await
+            .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
+
+        let res = match icon {
+            Some((name, icon)) => {
+                let mut headers = HeaderMap::new();
+                headers.insert(
+                    "filename",
+                    name.parse::<HeaderValue>()
+                        .map_err(|e| FeError::from_anyhow(&anyhow!(e)).make_axum())?,
+                );
+
+                (StatusCode::OK, headers, icon)
+            }
+            None => (StatusCode::NO_CONTENT, HeaderMap::new(), Vec::new()),
+        };
+
+        Ok::<_, AxumError>(res)
+    }
+
     axum::Router::new()
         .route(
             "/instanceIcon",
-            axum::routing::get(
-                |State(app): State<Arc<AppInner>>, Query(query): Query<InstanceIconQuery>| async move {
-                    let icon = app
-                        .instance_manager()
-                        .instance_icon(domain::InstanceId(query.id))
-                        .await
-                        .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
-
-                    Ok::<_, AxumError>(match icon {
-                        Some((name, icon)) => {
-                            let mut headers = HeaderMap::new();
-                            headers.insert(
-                                "filename",
-                                name.parse::<HeaderValue>()
-                                    .map_err(|e| FeError::from_anyhow(&anyhow!(e)).make_axum())?,
-                            );
-
-                            (StatusCode::OK, headers, icon)
-                        }
-                        None => (StatusCode::NO_CONTENT, HeaderMap::new(), Vec::new()),
-                    })
-                },
-            ),
+            axum::routing::get(instance_icon),
         )
         .route(
             "/modIcon",
@@ -498,12 +502,12 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                         .await
                         .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
 
-                    Ok::<_, AxumError>(match icon {
-                        Some(icon) => {
-                            (StatusCode::OK, icon)
-                        }
+                    let res = match icon {
+                        Some(icon) => (StatusCode::OK, icon),
                         None => (StatusCode::NO_CONTENT, Vec::new()),
-                    })
+                    };
+
+                    Ok(res)
                 }
             )
         )
@@ -516,12 +520,15 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                         .await
                         .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
 
-                        Ok::<_, AxumError>(match icon {
+
+                        let res = match icon {
                             Some(icon) => {
                                 (StatusCode::OK, icon)
                             }
                             None => (StatusCode::NO_CONTENT, Vec::new()),
-                        })
+                        };
+
+                        Ok::<_, AxumError>(res)
                 }
             )
         )
@@ -543,6 +550,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
         )
         .route("/log", axum::routing::get(log::log_handler))
 }
+
 #[derive(Type, Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct FEGroupId(i32);
 
@@ -594,6 +602,8 @@ struct ListInstance {
 }
 
 #[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "status", content = "value")]
 enum ListInstanceStatus {
     Valid(ValidListInstance),
     Invalid(InvalidListInstance),
@@ -603,14 +613,8 @@ enum ListInstanceStatus {
 struct ValidListInstance {
     mc_version: Option<String>,
     modloader: Option<FEInstanceModloaderType>,
-    modpack_platform: Option<ModpackPlatform>,
+    modpack: Option<Modpack>,
     state: LaunchState,
-}
-
-#[derive(Type, Debug, Serialize)]
-enum ModpackPlatform {
-    Curseforge,
-    Modrinth,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -651,6 +655,30 @@ struct ChangeModpack {
     modpack: Modpack,
 }
 
+#[derive(Type, Debug, Deserialize, Serialize)]
+enum FEJavaOverride {
+    Profile(Option<String>),
+    Path(Option<String>),
+}
+
+impl From<domain::info::JavaOverride> for FEJavaOverride {
+    fn from(value: domain::info::JavaOverride) -> Self {
+        match value {
+            domain::info::JavaOverride::Profile(p) => Self::Profile(p),
+            domain::info::JavaOverride::Path(p) => Self::Path(p),
+        }
+    }
+}
+
+impl From<FEJavaOverride> for domain::info::JavaOverride {
+    fn from(value: FEJavaOverride) -> Self {
+        match value {
+            FEJavaOverride::Profile(p) => Self::Profile(p),
+            FEJavaOverride::Path(p) => Self::Path(p),
+        }
+    }
+}
+
 #[derive(Type, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct FEUpdateInstance {
@@ -665,6 +693,8 @@ struct FEUpdateInstance {
     version: Option<Set<String>>,
     #[specta(optional)]
     modloader: Option<Set<Option<ModLoader>>>,
+    #[specta(optional)]
+    java_override: Option<Set<Option<FEJavaOverride>>>,
     #[specta(optional)]
     global_java_args: Option<Set<bool>>,
     #[specta(optional)]
@@ -782,6 +812,8 @@ struct ModpackInfo {
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "type", content = "value")]
 enum Modpack {
     Curseforge(CurseforgeModpack),
     Modrinth(ModrinthModpack),
@@ -863,6 +895,8 @@ struct InstanceDetails {
     last_played: Option<DateTime<Utc>>,
     seconds_played: u32,
     modloaders: Vec<ModLoader>,
+    java_override: Option<FEJavaOverride>,
+    required_java_profile: Option<String>,
     pre_launch_hook: Option<String>,
     post_exit_hook: Option<String>,
     wrapper_command: Option<String>,
@@ -934,6 +968,8 @@ enum FEInstanceModloaderType {
 }
 
 #[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "state", content = "value")]
 enum LaunchState {
     Inactive {
         failed_task: Option<FETaskId>,
@@ -1032,7 +1068,7 @@ struct ExportArgs {
     instance_id: FEInstanceId,
     target: ExportTarget,
     save_path: String,
-    link_mods: bool,
+    self_contained_addons_bundling: bool,
     filter: ExportEntry,
 }
 
@@ -1124,6 +1160,8 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             last_played: value.last_played,
             seconds_played: value.seconds_played,
             modloaders: value.modloaders.into_iter().map(Into::into).collect(),
+            java_override: value.java_override.map(Into::into),
+            required_java_profile: value.required_java_profile,
             notes: value.notes,
             state: value.state.into(),
             icon_revision: value.icon_revision,
@@ -1131,15 +1169,6 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             pre_launch_hook: value.pre_launch_hook,
             post_exit_hook: value.post_exit_hook,
             wrapper_command: value.wrapper_command,
-        }
-    }
-}
-
-impl From<mpdomain::ModPlatform> for ModpackPlatform {
-    fn from(value: mpdomain::ModPlatform) -> Self {
-        match value {
-            mpdomain::ModPlatform::Curseforge => Self::Curseforge,
-            mpdomain::ModPlatform::Modrinth => Self::Modrinth,
         }
     }
 }
@@ -1172,7 +1201,7 @@ impl TryFrom<CreateInstanceVersion> for manager::InstanceVersionSource {
     fn try_from(value: CreateInstanceVersion) -> anyhow::Result<Self> {
         Ok(match value {
             CreateInstanceVersion::Version(v) => Self::Version(v.try_into()?),
-            CreateInstanceVersion::Modpack(m) => Self::Modpack(m.into()),
+            CreateInstanceVersion::Modpack(m) => Self::Modpack(m.into(), true),
         })
     }
 }
@@ -1342,7 +1371,7 @@ impl From<manager::ValidListInstance> for ValidListInstance {
         Self {
             mc_version: value.mc_version,
             modloader: value.modloader.map(Into::into),
-            modpack_platform: value.modpack_platform.map(Into::into),
+            modpack: value.modpack.map(Into::into),
             state: value.state.into(),
         }
     }
@@ -1532,6 +1561,7 @@ impl TryFrom<FEUpdateInstance> for domain::InstanceSettingsUpdate {
             modloader: value
                 .modloader
                 .map(|x| x.inner().and_then(|v| v.try_into().ok())),
+            java_override: value.java_override.map(|x| x.inner().map(Into::into)),
             global_java_args: value.global_java_args.map(|x| x.inner()),
             extra_java_args: value.extra_java_args.map(|x| x.inner()),
             memory: value.memory.map(|x| x.inner().map(Into::into)),
@@ -1669,6 +1699,9 @@ impl From<importer::FullImportScanStatus> for FullImportScanStatus {
 }
 
 mod log {
+    use axum::extract::{ws::Message, WebSocketUpgrade};
+    use tracing::error;
+
     use super::*;
 
     #[derive(Debug, Deserialize)]
@@ -1678,23 +1711,27 @@ mod log {
 
     #[tracing::instrument(skip(app))]
     pub async fn log_handler(
-        State(app): State<App>,
         Query(query): Query<LogQuery>,
+        req: WebSocketUpgrade,
+        State(app): State<App>,
     ) -> impl IntoResponse {
-        tracing::info!("starting log stream");
+        req.on_upgrade(move |mut socket| async move {
+            tracing::info!("starting log stream");
 
-        let log_rx = app
-            .instance_manager()
-            .get_log(domain::GameLogId(query.id))
-            .await;
+            let log_rx = app
+                .instance_manager()
+                .get_log(domain::GameLogId(query.id))
+                .await;
 
-        let Ok(mut log_rx) = log_rx else {
-            tracing::warn!("log entry not found");
+            let Ok(mut log_rx) = log_rx else {
+                tracing::warn!("log entry not found");
 
-            return StatusCode::NOT_FOUND.into_response();
-        };
+                socket.send(Message::Text(r#"{"init":"notfound"}"#.to_string()));
+                return;
+            };
 
-        let s = async_stream::stream! {
+            socket.send(Message::Text(r#"{"init":"found"}"#.to_string()));
+
             tracing::trace!("starting log stream");
 
             let mut last_idx = 0;
@@ -1705,42 +1742,33 @@ mod log {
                 let new_lines = {
                     let log = log_rx.borrow();
 
-                    let new_lines
-                        = log
-                            .get_span(last_idx..)
-                            .into_iter()
-                            .inspect(|entry| tracing::trace!(?entry, "received log entry"))
-                            .map(|entry| {
-                                serde_json::to_vec(&entry)
-                                    .expect(
-                                        "serialization of a log entry should be infallible"
-                                    )
-                            })
-                            .collect::<Vec<_>>();
+                    let new_lines = log
+                        .get_span(last_idx..)
+                        .into_iter()
+                        .inspect(|entry| tracing::trace!(?entry, "received log entry"))
+                        .map(|entry| {
+                            serde_json::to_string(&entry)
+                                .expect("serialization of a log entry should be infallible")
+                        })
+                        .collect::<Vec<_>>();
 
                     last_idx = log.len();
 
                     new_lines
                 };
 
-
-
                 for line in new_lines {
-                    tracing::trace!("yielding log entry");
-
-                    yield Ok::<_, Infallible>(line)
+                    if let Err(e) = socket.send(Message::Text(line)).await {
+                        error!(?e, "Failed to send log entry");
+                    }
                 }
-
-
 
                 if let Err(_) = log_rx.changed().await {
-                    tracing::error!("`log_rx` was closed, killing log stream");
+                    error!("`log_rx` was closed, killing log stream");
 
-                    break
+                    return;
                 }
             }
-        };
-
-        (StatusCode::OK, StreamBody::new(s)).into_response()
+        })
     }
 }

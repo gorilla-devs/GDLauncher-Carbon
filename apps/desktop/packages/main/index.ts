@@ -6,8 +6,8 @@ import {
   app,
   BrowserWindow,
   dialog,
+  Display,
   ipcMain,
-  Menu,
   OpenDialogOptions,
   SaveDialogOptions,
   screen,
@@ -20,6 +20,8 @@ import fs from "fs/promises";
 import fss from "fs";
 import fse from "fs-extra";
 import { spawn } from "child_process";
+import crypto from "crypto";
+import log from "electron-log/main";
 import type { ChildProcessWithoutNullStreams } from "child_process";
 import * as Sentry from "@sentry/electron/main";
 import "./preloadListeners";
@@ -94,7 +96,7 @@ function validateArgument(arg: string): Argument | null {
 export function getPatchedUserData() {
   let appData = null;
 
-  if (os.platform() !== "linux") {
+  if (os.platform() === "darwin" || os.platform() === "win32") {
     appData = app.getPath("appData");
   } else {
     // monkey patch linux since it defaults to .config instead of .local/share
@@ -110,7 +112,16 @@ export function getPatchedUserData() {
   return path.join(appData, "gdlauncher_carbon");
 }
 
+const skipIntroAnimation = fss.existsSync(getPatchedUserData());
+
 app.setPath("userData", getPatchedUserData());
+
+Object.assign(console, log.functions);
+
+log.transports.file.resolvePathFn = (variables) =>
+  path.join(getPatchedUserData(), variables.fileName!);
+log.initialize();
+log.eventLogger.startLogging();
 
 if (app.isPackaged) {
   const overrideCLIDataPath = validateArgument("--runtime_path");
@@ -127,6 +138,10 @@ if (app.isPackaged) {
 
 console.log("Userdata path:", app.getPath("userData"));
 console.log("Runtime path:", CURRENT_RUNTIME_PATH);
+
+const sentrySessionId = crypto.randomUUID();
+
+console.log("SENTRY SESSION ID", sentrySessionId);
 
 const allowMultipleInstances = validateArgument(
   "--gdl_allow_multiple_instances"
@@ -147,9 +162,32 @@ if (!disableSentry) {
     process.removeListener("uncaughtException", handleUncaughtException);
 
     Sentry.init({
-      dsn: import.meta.env.VITE_MAIN_DSN
+      dsn: import.meta.env.VITE_MAIN_DSN,
+      release: __APP_VERSION__,
+      dist: os.platform()
+    });
+
+    Sentry.setContext("session", {
+      gdl_session_id: sentrySessionId
     });
   }
+}
+
+const disableGPU = validateArgument("--disable-gpu");
+
+if (disableGPU) {
+  app.commandLine.appendSwitch("no-sandbox");
+  app.commandLine.appendSwitch("disable-gpu");
+  app.commandLine.appendSwitch("disable-software-rasterizer");
+  app.commandLine.appendSwitch("disable-gpu-compositing");
+  app.commandLine.appendSwitch("disable-gpu-rasterization");
+  app.commandLine.appendSwitch("disable-gpu-sandbox");
+  app.commandLine.appendSwitch("--no-sandbox");
+}
+
+// Disable GPU Acceleration for Windows 7
+if (disableGPU || (release().startsWith("6.1") && platform() === "win32")) {
+  app.disableHardwareAcceleration();
 }
 
 export type Log = {
@@ -157,26 +195,34 @@ export type Log = {
   message: string;
 };
 
-export type CoreModuleError = {
-  logs: Log[];
-};
-
 const isDev = import.meta.env.MODE === "development";
 
 const binaryName =
   os.platform() === "win32" ? "core_module.exe" : "core_module";
 
-type CoreModule = () => Promise<{
-  port: number;
-  kill: () => void;
-}>;
+export type CoreModule = () => Promise<
+  | {
+      type: "success";
+      result: {
+        port: number;
+        kill: () => void;
+      };
+    }
+  | {
+      type: "error";
+      logs: Log[];
+    }
+>;
 
 const loadCoreModule: CoreModule = () =>
-  new Promise((resolve, reject) => {
+  new Promise((resolve, _) => {
     if (isDev) {
       resolve({
-        port: 4650,
-        kill: () => {}
+        type: "success",
+        result: {
+          port: 4650,
+          kill: () => {}
+        }
       });
       return;
     }
@@ -207,7 +253,14 @@ const loadCoreModule: CoreModule = () =>
       );
     } catch (err) {
       console.error(`[CORE] Spawn error: ${err}`);
-      reject({
+
+      logs.push({
+        type: "error",
+        message: (err as unknown as string).toString()
+      });
+
+      resolve({
+        type: "error",
         logs
       });
 
@@ -216,7 +269,14 @@ const loadCoreModule: CoreModule = () =>
 
     coreModule.on("error", function (err) {
       console.error(`[CORE] Spawn error: ${err}`);
-      reject({
+
+      logs.push({
+        type: "error",
+        message: err.toString()
+      });
+
+      resolve({
+        type: "error",
         logs
       });
 
@@ -237,8 +297,11 @@ const loadCoreModule: CoreModule = () =>
           const port: number = row.split("|")[1];
           console.log(`[CORE] Port: ${port}`);
           resolve({
-            port,
-            kill: () => coreModule?.kill()
+            type: "success",
+            result: {
+              port,
+              kill: () => coreModule?.kill()
+            }
           });
         } else if (row.startsWith("_INSTANCE_STATE_:")) {
           const rightPart = row.split(":")[1];
@@ -269,7 +332,7 @@ const loadCoreModule: CoreModule = () =>
             switch (action) {
               case "closeWindow":
                 if (!win) {
-                  createWindow(true);
+                  createWindow();
                 }
                 break;
               case "hideWindow":
@@ -300,14 +363,18 @@ const loadCoreModule: CoreModule = () =>
       console.log(`[CORE] Exit with code: ${code}`);
 
       if (code !== 0) {
-        reject({
+        resolve({
+          type: "error",
           logs
         });
       }
 
       resolve({
-        port: 0,
-        kill: () => coreModule?.kill()
+        type: "success",
+        result: {
+          port: 0,
+          kill: () => coreModule?.kill()
+        }
       });
     });
   });
@@ -316,11 +383,6 @@ const coreModule = loadCoreModule();
 
 if ((app as any).overwolf) {
   (app as any).overwolf.disableAnonymousAnalytics();
-}
-
-// Disable GPU Acceleration for Windows 7
-if (release().startsWith("6.1") && platform() === "win32") {
-  app.disableHardwareAcceleration();
 }
 
 // Set application name for Windows 10+ notifications
@@ -336,13 +398,12 @@ if (process.defaultApp) {
   app.setAsDefaultProtocolClient("gdlauncher");
 }
 
-const menu = Menu.buildFromTemplate([]);
-Menu.setApplicationMenu(menu);
+let lastDisplay: Display | null = null;
 
-async function createWindow(
-  skipIntroAnimation = false
-): Promise<BrowserWindow> {
-  const { minWidth, minHeight, width, height } = getAdSize();
+async function createWindow(): Promise<BrowserWindow> {
+  const currentDisplay = screen.getPrimaryDisplay();
+  lastDisplay = currentDisplay;
+  const { minWidth, minHeight, height, width } = getAdSize(currentDisplay);
 
   win = new BrowserWindow({
     title: "GDLauncher Carbon",
@@ -360,8 +421,27 @@ async function createWindow(
       contextIsolation: true,
       sandbox: app.isPackaged,
       webSecurity: true,
-      additionalArguments: [`--skipIntroAnimation=${skipIntroAnimation}`]
+      additionalArguments: [`--skip-intro-animation=${skipIntroAnimation}`]
     }
+  });
+
+  win.on("move", () => {
+    const bounds = win?.getBounds();
+
+    if (!bounds) {
+      return;
+    }
+
+    const currentDisplay = screen.getDisplayMatching(bounds);
+    if (lastDisplay?.id === currentDisplay?.id) {
+      return;
+    }
+
+    lastDisplay = currentDisplay;
+    const { minWidth, minHeight, adSize } = getAdSize(currentDisplay);
+    win?.setMinimumSize(minWidth, minHeight);
+    win?.setSize(minWidth, minHeight);
+    win?.webContents?.send("adSizeChanged", adSize);
   });
 
   win.webContents.on("will-navigate", (e, url) => {
@@ -449,7 +529,8 @@ ipcMain.handle("relaunch", () => {
 });
 
 ipcMain.handle("getAdSize", async () => {
-  return getAdSize().adSize;
+  const currentDisplay = screen.getDisplayMatching(win?.getBounds()!);
+  return getAdSize(currentDisplay).adSize;
 });
 
 ipcMain.handle("openFileDialog", async (_, opts: OpenDialogOptions) => {
@@ -497,7 +578,14 @@ ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
 
   await fs.mkdir(newPath, { recursive: true });
 
-  (await coreModule).kill();
+  try {
+    const cm = await coreModule;
+    if (cm.type === "success") {
+      cm.result.kill();
+    }
+  } catch {
+    // No op
+  }
 
   // TODO: Copy with progress
   await fse.copy(CURRENT_RUNTIME_PATH!, newPath, {
@@ -537,20 +625,23 @@ ipcMain.handle("validateRuntimePath", async (_, newPath: string | null) => {
   return true;
 });
 
-ipcMain.handle("getCoreModulePort", async () => {
-  let port = null;
-  try {
-    port = (await coreModule).port;
-  } catch (e) {
-    return (e as any).logs;
-  }
+ipcMain.handle("getCoreModule", async () => {
+  // we can assume this promise never rejects
+  const cm = await coreModule;
 
-  return port;
+  return {
+    type: cm.type,
+    logs: cm.type === "error" ? cm.logs : undefined,
+    port: cm.type === "success" ? cm.result.port : undefined
+  };
 });
 
 app.whenReady().then(async () => {
-  // Expose chrome's accessibility tree by default
-  app.setAccessibilitySupportEnabled(true);
+  const accessibility = validateArgument("--enable-accessibility");
+
+  if (accessibility) {
+    app.setAccessibilitySupportEnabled(true);
+  }
 
   console.log("OVERWOLF APP ID", process.env.OVERWOLF_APP_UID);
   session.defaultSession.webRequest.onBeforeSendHeaders(
@@ -579,12 +670,26 @@ app.whenReady().then(async () => {
       });
     }
   );
+
   await createWindow();
 
   screen.addListener(
     "display-metrics-changed",
     (_, display, changedMetrics) => {
-      const { minWidth, minHeight } = getAdSize();
+      const bounds = win?.getBounds();
+
+      if (!bounds) {
+        return;
+      }
+
+      const currentDisplay = screen.getDisplayMatching(bounds);
+      if (lastDisplay?.id === currentDisplay?.id) {
+        return;
+      }
+
+      lastDisplay = currentDisplay;
+
+      const { minWidth, minHeight } = getAdSize(currentDisplay);
       if (changedMetrics.includes("workArea")) {
         win?.setMinimumSize(minWidth, minHeight);
         win?.setSize(minWidth, minHeight);
@@ -598,15 +703,19 @@ app.whenReady().then(async () => {
 
 app.on("window-all-closed", async () => {
   if (isGameRunning) {
+    console.log("[window-all-closed] Game is running, not quitting");
     return;
   }
 
   try {
     let _coreModule = await coreModule;
-    _coreModule.kill();
+    if (_coreModule.type === "success") {
+      _coreModule.result.kill();
+    }
   } catch {
     // No op
   }
+
   win = null;
   app.quit();
 });
@@ -614,7 +723,9 @@ app.on("window-all-closed", async () => {
 app.on("before-quit", async () => {
   try {
     let _coreModule = await coreModule;
-    _coreModule.kill();
+    if (_coreModule.type === "success") {
+      _coreModule.result.kill();
+    }
   } catch {
     // No op
   }
@@ -626,18 +737,18 @@ app.on("second-instance", (_e, _argv) => {
     if (win.isMinimized()) win.restore();
     win.focus();
   } else {
-    createWindow(true);
+    createWindow();
   }
 });
 
 app.on("activate", () => {
   if (!win) {
-    createWindow(true);
+    createWindow();
   }
 });
 
 app.on("render-process-gone", (event, webContents, detailed) => {
-  console.log("render-process-gone", detailed);
+  console.error("render-process-gone", detailed);
   webContents.reload();
 });
 

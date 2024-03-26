@@ -7,6 +7,7 @@ use daedalus::{
     modded::Manifest,
 };
 use reqwest::Url;
+use tokio::sync::Mutex;
 
 use crate::domain::{
     java::JavaArch,
@@ -49,6 +50,9 @@ impl ManagerRef<'_, MinecraftManager> {
     }
 
     pub async fn get_minecraft_version(self, mc_version: &str) -> anyhow::Result<VersionInfo> {
+        static LOCK: Mutex<()> = Mutex::const_new(());
+        let _guard = LOCK.lock().await;
+
         minecraft::get_version(
             self.app.prisma_client.clone(),
             &self.app.reqwest_client,

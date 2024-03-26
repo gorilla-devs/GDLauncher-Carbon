@@ -24,23 +24,19 @@ interface Props {
 const CodeStep = (props: Props) => {
   const [error, setError] = createSignal<null | string>(null);
 
-  const accountEnrollCancelMutation = rspc.createMutation(
-    ["account.enroll.cancel"],
-    {
-      onError(error) {
-        setError(error.message);
-      }
+  const accountEnrollCancelMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.enroll.cancel"],
+    onError(error) {
+      setError(error.message);
     }
-  );
+  }));
 
-  const accountEnrollBeginMutation = rspc.createMutation(
-    ["account.enroll.begin"],
-    {
-      onError(error) {
-        setError(error.message);
-      }
+  const accountEnrollBeginMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.enroll.begin"],
+    onError(error) {
+      setError(error.message);
     }
-  );
+  }));
 
   const userCode = () => props.deviceCodeObject?.userCode;
   const oldUserCode = () => props.deviceCodeObject?.userCode;
@@ -143,6 +139,7 @@ const CodeStep = (props: Props) => {
             props.prevStep();
           }}
         >
+          <i class="i-ri:arrow-left-line w-4 h-4" />
           <Trans
             key="login.step_back"
             options={{

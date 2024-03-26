@@ -10,9 +10,8 @@ interface Props {
 
 function Checkbox(props: Props) {
   const isChecked = () => props.checked;
-
-  // eslint-disable-next-line solid/reactivity
   const [checked, setChecked] = createSignal(isChecked());
+  const [isHovered, setIsHovered] = createSignal(false); // Track hover state
 
   createEffect(() => {
     setChecked(props.checked);
@@ -28,25 +27,28 @@ function Checkbox(props: Props) {
     }
     return "hsla(224, 16%, 10%, 1)"; // bg-darkSlate-900 with 100% opacity
   };
+
   return (
-    <div class="flex  rounded-md items-center gap-2 font-sans">
-      <div
-        class={`flex justify-center items-center h-5 w-5 min-w-5 min-h-5 rounded-md hover:border-darkSlate-300 hover:border-solid hover:border-1 box-border cursor-pointer `}
-        classList={
-          {
-            // "bg-primary-500": checked() && !props.disabled,
-            // "bg-darkSlate-500": !checked(),
-            // "bg-darkSlate-900": props.disabled,
-          }
+    <div
+      class="flex rounded-md items-center gap-2 cursor-pointer"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onClick={() => {
+        if (!props.disabled) {
+          const check = !checked();
+          setChecked(check);
+          props.onChange?.(check);
         }
+      }}
+    >
+      <div
+        class={`flex justify-center items-center h-5 w-5 min-w-5 min-h-5 rounded-md box-border ${
+          isHovered() && !props.disabled
+            ? "border-darkSlate-300 border-solid border"
+            : ""
+        }`}
         style={{
           "background-color": getBackgroundColor(),
-        }}
-        onClick={() => {
-          if (!props.disabled) {
-            const check = setChecked(!checked());
-            props.onChange?.(check);
-          }
         }}
       >
         <Show when={checked()}>
@@ -59,7 +61,7 @@ function Checkbox(props: Props) {
           />
         </Show>
         <Show when={!checked() && props.indeterminate}>
-          <div class="h-3 w-3 min-w-3 min-h-3 rounded-sm   bg-primary-500" />
+          <div class="h-3 w-3 min-w-3 min-h-3 rounded-sm bg-primary-500" />
         </Show>
       </div>
       <Show when={props.children}>{props.children}</Show>

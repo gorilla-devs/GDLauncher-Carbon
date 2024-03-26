@@ -1,86 +1,146 @@
-import { Button, Dropdown } from "@gd/ui";
+import { Button, Dropdown, Spinner } from "@gd/ui";
 import { ModalProps, useModal } from "../..";
 import ModalLayout from "../../ModalLayout";
 import { rspc } from "@/utils/rspcClient";
 import { instanceId } from "@/utils/browser";
-import { Show, createSignal } from "solid-js";
-import {
-  CurseforgeModpack,
-  FEInstanceId,
-  ModrinthModpack
-} from "@gd/core_module/bindings";
+import { Show, createEffect, createSignal } from "solid-js";
+import { FEInstanceId, Modpack } from "@gd/core_module/bindings";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { useTransContext } from "@gd/i18n";
 
 const ModPackVersionUpdate = (props: ModalProps) => {
   const [t] = useTransContext();
-  const [currentPlatform, setCurrentPlatform] = createSignal<string>("");
-  const [selectedVersion, setSelectedVersion] = createSignal<string>("");
+  const [currentPlatform, setCurrentPlatform] = createSignal<
+    "modrinth" | "curseforge" | null
+  >(null);
+  const [selectedVersion, setSelectedVersion] = createSignal<string | null>(
+    null
+  );
   const navigate = useGDNavigate();
   const modalContext = useModal();
-  const instance = rspc.createQuery(() => [
-    "instance.getInstanceDetails",
-    instanceId() as number
-  ]);
-  const changeModpackMutation = rspc.createMutation(
-    ["instance.changeModpack"],
-    {
-      onSuccess() {
-        modalContext?.closeModal();
-        navigate("/library");
-      }
-    }
-  );
+  const instance = rspc.createQuery(() => ({
+    queryKey: ["instance.getInstanceDetails", instanceId() as number]
+  }));
+
+  const changeModpackMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.changeModpack"]
+  }));
+
   const getProjectId = () => {
     const modpack = instance.data?.modpack?.modpack;
     if (modpack) {
-      if ("Curseforge" in modpack) {
-        const curseforgeModpack: CurseforgeModpack = modpack.Curseforge;
+      if (modpack.type === "curseforge") {
         setCurrentPlatform("curseforge");
         return {
-          projectId: curseforgeModpack.project_id,
-          fileId: curseforgeModpack.file_id
+          projectId: modpack.value.project_id,
+          fileId: modpack.value.file_id
         };
       } else {
-        const modrinthModpack: ModrinthModpack = modpack.Modrinth;
         setCurrentPlatform("modrinth");
         return {
-          projectId: modrinthModpack.project_id,
-          fileId: modrinthModpack.version_id
+          projectId: modpack.value.project_id,
+          fileId: modpack.value.version_id
         };
       }
     }
+
     return undefined;
   };
-  const response = rspc.createQuery(() => [
-    "modplatforms.curseforge.getModFiles",
-    {
-      modId: getProjectId()?.projectId as number,
-      query: {
-        pageSize: 300
-      }
+
+  createEffect(() => {
+    if (!selectedVersion()) {
+      setSelectedVersion(getProjectId()?.fileId?.toString() || "");
     }
-  ]);
-  const handleUpdate = () => {
-    const obj = {
+  });
+
+  const responseCF = rspc.createQuery(() => ({
+    queryKey: [
+      "modplatforms.curseforge.getModFiles",
+      {
+        modId: getProjectId()?.projectId as number,
+        query: {
+          pageSize: 300
+        }
+      }
+    ],
+    enabled: false
+  }));
+
+  const responseModrinth = rspc.createQuery(() => ({
+    queryKey: [
+      "modplatforms.modrinth.getProjectVersions",
+      {
+        project_id: getProjectId()?.projectId.toString()!
+      }
+    ],
+    enabled: false
+  }));
+
+  createEffect(() => {
+    if (currentPlatform() === "curseforge") {
+      responseCF.refetch();
+    } else if (currentPlatform() === "modrinth") {
+      responseModrinth.refetch();
+    }
+  });
+
+  const response = () =>
+    currentPlatform() === "curseforge" ? responseCF : responseModrinth;
+
+  const options = () => {
+    if (currentPlatform() === "curseforge") {
+      return (
+        responseCF.data?.data.map((file) => ({
+          label: (
+            <div class="flex justify-between w-full">
+              <span>{file.displayName}</span>
+              <Show when={file.id === getProjectId()?.fileId}>
+                <span class="text-green-500">{`[ Current ]`}</span>
+              </Show>
+            </div>
+          ),
+          key: file.id.toString()
+        })) || []
+      );
+    }
+
+    return (
+      responseModrinth.data?.map((file) => ({
+        label: (
+          <div class="flex justify-between w-full">
+            <span>{file.name}</span>
+            <Show when={file.id === getProjectId()?.fileId}>
+              <span class="text-green-500">{`[ Current ]`}</span>
+            </Show>
+          </div>
+        ),
+        key: file.id.toString()
+      })) || []
+    );
+  };
+
+  const handleUpdate = async () => {
+    if (!selectedVersion()) return;
+
+    await changeModpackMutation.mutateAsync({
       instance: instanceId() as FEInstanceId,
-      modpack:
-        currentPlatform() === "curseforge"
-          ? {
-              Curseforge: {
+      modpack: {
+        type: currentPlatform(),
+        value:
+          currentPlatform() === "curseforge"
+            ? {
                 project_id: getProjectId()?.projectId as number,
-                file_id: parseInt(selectedVersion())
+                file_id: parseInt(selectedVersion()!)
               }
-            }
-          : {
-              Modrinth: {
+            : {
                 project_id: getProjectId()?.projectId.toString() as string,
                 version_id: selectedVersion()
               }
-            }
-    };
-    console.log(obj);
-    changeModpackMutation.mutate(obj);
+      } as Modpack
+    });
+
+    modalContext?.closeModal();
+    navigate("/library");
   };
 
   return (
@@ -92,25 +152,15 @@ const ModPackVersionUpdate = (props: ModalProps) => {
       scrollable="overflow-y-scroll scrollbar-hide"
     >
       <div class="flex flex-col p-4 w-120 gap-4">
-        <Show when={response.isLoading || instance.isLoading}>loading ...</Show>
-        <Show when={!response.isLoading && !instance.isLoading}>
+        <Show when={response().isLoading || instance.isLoading}>
+          <Spinner />
+        </Show>
+        <Show when={!response().isLoading && !instance.isLoading}>
           <Dropdown
             class="bg-darkSlate-800 w-full"
-            options={
-              response.data?.data.map((file) => ({
-                label: (
-                  <div class="flex justify-between w-full">
-                    <span>{file.displayName}</span>
-                    <Show when={file.id === getProjectId()?.fileId}>
-                      <span class="text-green-500">{`[ Current ]`}</span>
-                    </Show>
-                  </div>
-                ),
-                key: file.id
-              })) || []
-            }
+            options={options()}
+            value={selectedVersion()}
             onChange={(option) => {
-              console.log(option.key);
               setSelectedVersion(option.key.toString());
             }}
           />
@@ -124,7 +174,11 @@ const ModPackVersionUpdate = (props: ModalProps) => {
             >
               {t("instance.cancel_export")}
             </Button>
-            <Button type="primary" onClick={handleUpdate}>
+            <Button
+              type="primary"
+              onClick={handleUpdate}
+              disabled={!selectedVersion()}
+            >
               {t("instance.instance_modal_instance_update")}
             </Button>
           </div>

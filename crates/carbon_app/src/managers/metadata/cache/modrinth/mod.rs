@@ -357,11 +357,10 @@ impl ModplatformCacher for ModrinthModCacher {
 
                     let image = icon.to_vec();
 
-                    let image = tokio::task::spawn_blocking(move || {
+                    let image = carbon_scheduler::cpu_block(|| {
                         let scaled = super::scale_mod_image(&image[..])?;
                         Ok::<_, anyhow::Error>(scaled)
-                    })
-                        .await??;
+                    }).await?;
 
                     drop(scale_guard);
 

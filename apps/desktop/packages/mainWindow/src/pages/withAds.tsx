@@ -1,7 +1,7 @@
 import { AdsBanner } from "@/components/AdBanner";
 import AppNavbar from "@/components/Navbar";
 import { Outlet, useRouteData } from "@solidjs/router";
-import { createEffect } from "solid-js";
+import { Match, Show, Switch, createEffect } from "solid-js";
 import fetchData from "./app.data";
 import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion";
 import {
@@ -12,6 +12,7 @@ import {
 import adSize from "@/utils/adhelper";
 import { Trans } from "@gd/i18n";
 import { useModal } from "@/managers/ModalsManager";
+import { BisectBanner } from "@/components/BisectBanner";
 
 function withAdsLayout() {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -61,14 +62,13 @@ function withAdsLayout() {
         <main class="relative flex-grow">
           <div class="flex justify-end h-[calc(100vh-60px)]">
             <div
-              class="flex"
               style={{
                 width: `calc(100vw - ${adSize.width}px)`
               }}
             >
               <Outlet />
             </div>
-            <div>
+            <div class="flex flex-col justify-between h-[calc(100vh-100px)]">
               <div
                 class="bg-darkSlate-800 py-4"
                 style={{
@@ -76,7 +76,16 @@ function withAdsLayout() {
                   height: `${adSize.height}px`
                 }}
               >
-                <AdsBanner />
+                <Show when={adSize.shouldShow}>
+                  <Switch>
+                    <Match when={adSize.useFallbackAd}>
+                      <BisectBanner />
+                    </Match>
+                    <Match when={!adSize.useFallbackAd}>
+                      <AdsBanner />
+                    </Match>
+                  </Switch>
+                </Show>
               </div>
               <div class="flex justify-center">
                 <div

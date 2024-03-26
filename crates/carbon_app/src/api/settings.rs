@@ -9,15 +9,16 @@ use crate::{
     },
     managers::App,
 };
-use rspc::{RouterBuilderLike, Type};
+use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 use super::{
     modplatforms::{ModChannelWithUsage, ModPlatform, ModSources},
     Set,
 };
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> RouterBuilder<App> {
     router! {
         query GET_SETTINGS[app, _args: ()] {
             let response = app.settings_manager()
@@ -228,7 +229,7 @@ struct FESettings {
     is_first_launch: bool,
     game_resolution: Option<GameResolution>,
     java_custom_args: String,
-    auto_manage_java: bool,
+    auto_manage_java_system_profiles: bool,
     mod_sources: ModSources,
     terms_and_privacy_accepted: bool,
     metrics_enabled: bool,
@@ -265,7 +266,7 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
                 .game_resolution
                 .and_then(|r| GameResolution::from_str(&r).ok()),
             java_custom_args: data.java_custom_args,
-            auto_manage_java: data.auto_manage_java,
+            auto_manage_java_system_profiles: data.auto_manage_java_system_profiles,
             mod_sources: ModSources {
                 channels: {
                     use crate::domain::modplatforms::ModChannelWithUsage as DModChannelWithUsage;
@@ -382,7 +383,7 @@ pub struct FESettingsUpdate {
     #[specta(optional)]
     pub java_custom_args: Option<Set<String>>,
     #[specta(optional)]
-    pub auto_manage_java: Option<Set<bool>>,
+    pub auto_manage_java_system_profiles: Option<Set<bool>>,
     #[specta(optional)]
     pub mod_sources: Option<Set<ModSources>>,
     #[specta(optional)]

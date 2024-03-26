@@ -41,7 +41,7 @@ const ModpackBrowser = () => {
 
   const lastItem = () => allVirtualRows()[allVirtualRows().length - 1];
   createEffect(() => {
-    if (!lastItem() || lastItem().index === infiniteQuery?.query.index) {
+    if (!lastItem()) {
       return;
     }
 
@@ -50,7 +50,7 @@ const ModpackBrowser = () => {
       : lastItem().index;
 
     if (
-      lastItemIndex >= modpacks().length - 1 &&
+      modpacks().length - lastItemIndex < 5 &&
       infiniteQuery?.infiniteQuery.hasNextPage &&
       !infiniteQuery.infiniteQuery.isFetchingNextPage
     ) {
@@ -154,7 +154,7 @@ const ModpackBrowser = () => {
           </Match>
         </Switch>
         <div
-          class="flex flex-col gap-2 left-0 right-0 absolute bottom-0 pb-5 overflow-y-hidden"
+          class="flex flex-col gap-2 left-0 right-0 absolute bottom-0 overflow-y-hidden"
           style={{
             top: `${headerHeight()}px`
           }}

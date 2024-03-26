@@ -12,23 +12,30 @@ type Props = {
 };
 
 const SecondStep = (props: Props) => {
-  let settingsMutation = rspc.createMutation(["settings.setSettings"]);
-  let settings = rspc.createQuery(() => ["settings.getSettings"]);
+  let settingsMutation = rspc.createMutation(() => ({
+    mutationKey: ["settings.setSettings"]
+  }));
+  let settings = rspc.createQuery(() => ({
+    queryKey: ["settings.getSettings"]
+  }));
+
   return (
     <div class="flex flex-col justify-between h-full lg:w-160 box-border">
       <RowsContainer>
         <Row>
           <Title
-            description={<Trans key="java.auto_handle_java_description" />}
+            description={
+              <Trans key="java.auto_manage_java_system_profiles_text" />
+            }
           >
-            <Trans key="java.auto_handle_java" />
+            <Trans key="java.auto_manage_java_system_profiles" />
           </Title>
           <RightHandSide>
             <Switch
-              checked={settings.data?.autoManageJava}
+              checked={settings.data?.autoManageJavaSystemProfiles}
               onChange={(e) => {
                 settingsMutation.mutate({
-                  autoManageJava: {
+                  autoManageJavaSystemProfiles: {
                     Set: e.target.checked
                   }
                 });
@@ -46,6 +53,27 @@ const SecondStep = (props: Props) => {
               onChange={(e) => {
                 settingsMutation.mutate({
                   showNews: {
+                    Set: e.currentTarget.checked
+                  }
+                });
+              }}
+            />
+          </RightHandSide>
+        </Row>
+        <Row>
+          <Title
+            description={
+              <Trans key="settings:deletion_through_recycle_bin_text" />
+            }
+          >
+            <Trans key="settings:deletion_through_recycle_bin_title" />
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={settings.data?.deletionThroughRecycleBin}
+              onChange={(e) => {
+                settingsMutation.mutate({
+                  deletionThroughRecycleBin: {
                     Set: e.currentTarget.checked
                   }
                 });

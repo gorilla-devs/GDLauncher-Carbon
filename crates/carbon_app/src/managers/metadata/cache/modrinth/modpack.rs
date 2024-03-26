@@ -105,11 +105,20 @@ pub async fn get_modpack_metadata(
                     .bytes()
                     .await?;
 
-                let scaled_image = tokio::task::spawn_blocking(move || {
+                let mcm = app.meta_cache_manager();
+                let permit = mcm
+                    .image_scale_semaphore
+                    .acquire()
+                    .await
+                    .expect("the image scale semaphore is never closed");
+
+                let scaled_image = carbon_scheduler::cpu_block(|| {
                     let scaled = cache::scale_mod_image(&original_image[..])?;
                     Ok::<_, anyhow::Error>(scaled)
                 })
-                .await??;
+                .await?;
+
+                drop(permit);
 
                 icon_bytes = Some(scaled_image);
             }

@@ -30,7 +30,7 @@ const Overview = () => {
         transformTags: {
           a: sanitizeHtml.simpleTransform("a", { class: "text-blue-500" }),
           img: sanitizeHtml.simpleTransform("img", {
-            class: "max-w-full w-auto"
+            class: "max-w-full h-auto"
           })
         }
       });

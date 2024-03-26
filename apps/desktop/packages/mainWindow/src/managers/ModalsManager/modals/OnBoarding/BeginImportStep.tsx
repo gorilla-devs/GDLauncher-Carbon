@@ -9,17 +9,15 @@ const BeginImportStep = (props: {
   instances?: Array<string>;
 }) => {
   const [state, setState] = createSignal<string[]>([]);
-  const importInstanceMutation = rspc.createMutation(
-    ["instance.importInstance"],
-    {
-      onSuccess(taskId) {
-        setTaskIds([...(taskIds() || []), taskId]);
-      },
-      onError() {
-        setTaskIds([...(taskIds() || []), undefined]);
-      }
+  const importInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.importInstance"],
+    onSuccess(taskId) {
+      setTaskIds([...(taskIds() || []), taskId]);
+    },
+    onError() {
+      setTaskIds([...(taskIds() || []), undefined]);
     }
-  );
+  }));
 
   async function createMutations() {
     for (let i = 0; i < props.instances!.length; i++) {
@@ -30,6 +28,7 @@ const BeginImportStep = (props: {
             (x) => x.instance_name === props.instances![i]
           )
         });
+
         setState([...state(), "success"]);
       } catch (error) {
         setState([...state(), "error"]);

@@ -15,39 +15,37 @@ const SingleImport = (props: {
 }) => {
   const [progress, setProgress] = createSignal(0);
   const [state, setState] = createSignal("idle");
-  // const rspcContext = rspc.useContext();
+  const rspcContext = rspc.useContext();
 
-  createEffect(() => {
-    async function runner() {
-      if (taskIds() !== undefined) {
-        rspc.createQuery(() => ["vtask.getTask", props.taskId || null], {
-          onSuccess: (task) => {
-            if (task && task.progress) {
-              if (task.progress.type == "Known") {
-                setProgress(Math.floor(task.progress.value * 100));
-              }
-            }
-            const isFailed = task && task.progress.type === "Failed";
-            const isDownloaded = task === null && progress() !== 0;
-            if (isDownloaded || isFailed) {
-              const taskIdsArray = taskIds();
-              taskIdsArray[props.instanceIndex] = undefined;
-              setTaskIds(taskIdsArray);
-            }
-            if (isFailed) {
-              setState("failed");
-            } else if (isDownloaded) {
-              setState("completed");
-              setIsDownloaded(true);
-            }
+  createEffect(async () => {
+    if (taskIds() !== undefined) {
+      try {
+        const task = await rspcContext.client.query([
+          "vtask.getTask",
+          props.taskId || null
+        ]);
+
+        if (task && task.progress) {
+          if (task.progress.type == "Known") {
+            setProgress(Math.floor(task.progress.value * 100));
           }
-        });
+        }
+        const isFailed = task && task.progress.type === "Failed";
+        const isDownloaded = task === null && progress() !== 0;
+        if (isDownloaded || isFailed) {
+          const taskIdsArray = taskIds();
+          taskIdsArray[props.instanceIndex] = undefined;
+          setTaskIds(taskIdsArray);
+        }
+        if (isFailed) {
+          setState("failed");
+        } else if (isDownloaded) {
+          setState("completed");
+          setIsDownloaded(true);
+        }
+      } catch (e) {
+        console.error(e);
       }
-    }
-    try {
-      runner();
-    } catch (err) {
-      console.error(err);
     }
   });
 

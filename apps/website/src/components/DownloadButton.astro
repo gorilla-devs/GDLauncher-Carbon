@@ -1,0 +1,24 @@
+---
+import Button from "./button/Button";
+import Windows from "../assets/Windows";
+import Apple from "../assets/Apple";
+import Linux from "../assets/Linux";
+import { DownloadLink } from "./DownloadLink";
+import jsYaml from "js-yaml";
+
+// const response = await Promise.all([
+//   fetch("https://cdn-raw.gdl.gg/launcher/alpha.yml"),
+//   fetch("https://cdn-raw.gdl.gg/launcher/alpha-mac.yml"),
+//   fetch("https://cdn-raw.gdl.gg/launcher/alpha-linux.yml"),
+// ]);
+// const yamlfiles = await Promise.all(response.map((val) => val.text()));
+// const downloadLinks = yamlfiles
+//   .map((val) => jsYaml.load(val))
+//   .map((val: any) => `https://cdn-raw.gdl.gg/launcher/${val.path}`);
+
+const downloadLinks = ["/download/windows", "/download/mac", "/download/linux"];
+---
+
+<Button intent="primary" class="uppercase items-center rounded-xsgd">
+  <DownloadLink urls={downloadLinks} client:only />
+</Button>

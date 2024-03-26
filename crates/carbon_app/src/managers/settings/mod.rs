@@ -252,11 +252,13 @@ impl ManagerRef<'_, SettingsManager> {
             ));
         }
 
-        if let Some(auto_manage_java) = incoming_settings.auto_manage_java.as_ref() {
+        if let Some(auto_manage_java_system_profiles) =
+            incoming_settings.auto_manage_java_system_profiles.as_ref()
+        {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
-                vec![app_configuration::auto_manage_java::set(
-                    auto_manage_java.clone().inner(),
+                vec![app_configuration::auto_manage_java_system_profiles::set(
+                    auto_manage_java_system_profiles.clone().inner(),
                 )],
             ));
         }
@@ -333,8 +335,10 @@ impl ManagerRef<'_, SettingsManager> {
             self.app.invalidate(GET_SETTINGS, None);
         }
 
-        if let Some(auto_manage_java) = incoming_settings.auto_manage_java {
-            if auto_manage_java.inner() {
+        if let Some(auto_manage_java_system_profiles) =
+            incoming_settings.auto_manage_java_system_profiles
+        {
+            if auto_manage_java_system_profiles.inner() {
                 super::java::scan_and_sync::sync_system_java_profiles(db).await?;
             }
         }

@@ -7,7 +7,6 @@ import { useRouteData } from "@solidjs/router";
 import fetchData from "../../instance.data";
 import { rspc } from "@/utils/rspcClient";
 import { CFFEFile } from "@gd/core_module/bindings";
-import { getCurseForgeData } from "@/utils/instances";
 
 const NoVersions = () => {
   return (
@@ -44,17 +43,18 @@ const Versions = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const modId = () =>
-    routeData.instanceDetails.data?.modpack &&
-    getCurseForgeData(routeData.instanceDetails.data.modpack.modpack)
-      ?.project_id;
+    routeData.instanceDetails?.data?.modpack?.modpack?.type === "curseforge" &&
+    routeData.instanceDetails.data?.modpack?.modpack.value?.project_id;
 
   if (modId()) {
-    const instanceDetails = rspc.createQuery(() => [
-      "modplatforms.curseforge.getMod",
-      {
-        modId: modId() as number
-      }
-    ]);
+    const instanceDetails = rspc.createQuery(() => ({
+      queryKey: [
+        "modplatforms.curseforge.getMod",
+        {
+          modId: modId() as number
+        }
+      ]
+    }));
 
     createEffect(() => {
       setMainFileId(instanceDetails.data?.data.mainFileId);

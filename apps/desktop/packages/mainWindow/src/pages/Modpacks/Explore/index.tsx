@@ -1,7 +1,12 @@
 /* eslint-disable i18next/no-literal-string */
 import ContentWrapper from "@/components/ContentWrapper";
 import { useGDNavigate } from "@/managers/NavigationManager";
-import { FEModResponse, MRFEProject, Mod } from "@gd/core_module/bindings";
+import {
+  FEModResponse,
+  MRFEProject,
+  Mod,
+  Modpack as ModpackType
+} from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import {
   Button,
@@ -10,6 +15,7 @@ import {
   Tab,
   TabList,
   Tabs,
+  Tooltip,
   createNotification
 } from "@gd/ui";
 import {
@@ -64,6 +70,7 @@ const Modpack = () => {
   const [loading, setLoading] = createSignal(false);
   const navigate = useGDNavigate();
   const params = useParams();
+  const rspcContext = rspc.useContext();
   const infiniteQuery = useInfiniteVersionsQuery();
   const addNotification = createNotification();
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -105,39 +112,21 @@ const Modpack = () => {
 
   const isFetching = () => routeData.modpackDetails?.isLoading;
 
-  const loadIconMutation = rspc.createMutation(["instance.loadIconUrl"]);
+  const loadIconMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.loadIconUrl"]
+  }));
 
-  const defaultGroup = rspc.createQuery(() => ["instance.getDefaultGroup"]);
+  const defaultGroup = rspc.createQuery(() => ({
+    queryKey: ["instance.getDefaultGroup"]
+  }));
 
-  const prepareInstanceMutation = rspc.createMutation(
-    ["instance.prepareInstance"],
-    {
-      onSuccess() {
-        addNotification("Instance successfully created.");
-      },
-      onError() {
-        setLoading(false);
-        addNotification("Error while creating the instance.", "error");
-      },
-      onSettled() {
-        navigate(`/library`);
-      }
-    }
-  );
+  const prepareInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.prepareInstance"]
+  }));
 
-  const createInstanceMutation = rspc.createMutation(
-    ["instance.createInstance"],
-    {
-      onSuccess(instanceId) {
-        setLoading(true);
-        prepareInstanceMutation.mutate(instanceId);
-      },
-      onError() {
-        setLoading(false);
-        addNotification("Error while downloading the modpack.", "error");
-      }
-    }
-  );
+  const createInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.createInstance"]
+  }));
 
   const generateModpackObj = () => {
     const isCurseforge = routeData.isCurseforge;
@@ -148,11 +137,12 @@ const Modpack = () => {
         return addNotification("Error while downloading the modpack.", "error");
       }
       return {
-        Curseforge: {
+        type: "curseforge",
+        value: {
           file_id: routeData.modpackDetails.data.data.mainFileId,
           project_id: routeData.modpackDetails.data.data.id
         }
-      };
+      } as ModpackType;
     } else {
       const versions = routeData.modrinthProjectVersions.data;
 
@@ -164,11 +154,12 @@ const Modpack = () => {
       const versionId = versions[versions.length - 1];
 
       const modrinth = {
-        Modrinth: {
+        type: "modrinth",
+        value: {
           project_id: routeData.modpackDetails.data.id,
           version_id: versionId.id
         }
-      };
+      } as ModpackType;
 
       return modrinth;
     }
@@ -184,7 +175,7 @@ const Modpack = () => {
       ? (routeData.modpackDetails?.data as FEModResponse).data.logo?.url
       : (routeData.modpackDetails?.data as MRFEProject).icon_url;
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     setLoading(true);
     const instanceIcon = icon();
 
@@ -194,28 +185,39 @@ const Modpack = () => {
     const modpackObj = generateModpackObj();
 
     if (name && modpackObj) {
-      createInstanceMutation.mutate({
-        group: defaultGroup.data || 1,
-        use_loaded_icon: true,
-        notes: "",
-        name: name,
-        version: {
-          Modpack: modpackObj
-        }
-      });
+      try {
+        const instanceId = await createInstanceMutation.mutateAsync({
+          group: defaultGroup.data || 1,
+          use_loaded_icon: true,
+          notes: "",
+          name: name,
+          version: {
+            Modpack: modpackObj
+          }
+        });
+
+        setLoading(true);
+        await prepareInstanceMutation.mutateAsync(instanceId);
+      } catch (err) {
+        console.error(err);
+        addNotification("Error while downloading the modpack.", "error");
+      } finally {
+        setLoading(false);
+        navigate(`/library`);
+      }
     }
 
     setLoading(false);
   };
 
-  createEffect(() => {
+  createEffect(async () => {
     if (instanceId() !== undefined && !isNaN(instanceId())) {
-      const mods = rspc.createQuery(() => [
+      const mods = await rspcContext.client.query([
         "instance.getInstanceMods",
         instanceId() as number
       ]);
 
-      if (mods.data) setInstanceMods(mods.data);
+      if (mods) setInstanceMods(mods);
     }
   });
 
@@ -261,7 +263,7 @@ const Modpack = () => {
                 "background-position": "right-5rem"
               }}
             />
-            <div class="z-20 top-5 sticky left-5 w-fit">
+            <div class="z-20 top-5 sticky w-full flex justify-between px-4 box-border">
               <Button
                 onClick={() => navigate(-1)}
                 icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
@@ -270,6 +272,26 @@ const Modpack = () => {
               >
                 <Trans key="instance.step_back" />
               </Button>
+              <Tooltip content={<Trans key="instance.open_in_browser" />}>
+                <Button
+                  rounded
+                  size="small"
+                  type="transparent"
+                  onClick={() => {
+                    if (routeData.isCurseforge) {
+                      window.openExternalLink(
+                        `https://www.curseforge.com/minecraft/modpacks/${routeData.modpackDetails.data?.data.slug}`
+                      );
+                    } else {
+                      window.openExternalLink(
+                        `https://modrinth.com/modpack/${routeData.modpackDetails.data?.slug}`
+                      );
+                    }
+                  }}
+                >
+                  <div class="text-xl i-ri:external-link-line" />
+                </Button>
+              </Tooltip>
             </div>
             <div class="flex justify-center sticky px-4 z-20 bg-gradient-to-t h-24 top-52 from-darkSlate-800 from-10% z-40">
               <div class="flex gap-4 w-full lg:flex-row">

@@ -8,8 +8,13 @@ import RightHandSide from "./components/RightHandSide";
 import { rspc } from "@/utils/rspcClient";
 
 const Privacy = () => {
-  const settings = rspc.createQuery(() => ["settings.getSettings"]);
-  const settingsMutation = rspc.createMutation(["settings.setSettings"]);
+  const settings = rspc.createQuery(() => ({
+    queryKey: ["settings.getSettings"]
+  }));
+
+  const settingsMutation = rspc.createMutation(() => ({
+    mutationKey: ["settings.setSettings"]
+  }));
 
   return (
     <>

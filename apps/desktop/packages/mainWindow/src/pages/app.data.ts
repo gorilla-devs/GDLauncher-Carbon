@@ -1,25 +1,31 @@
 import { rspc } from "@/utils/rspcClient";
 
 const fetchData = () => {
-  const minecraftVersions = rspc.createQuery(() => ["mc.getMinecraftVersions"]);
-  const accounts = rspc.createQuery(() => ["account.getAccounts"]);
-  const activeUuid = rspc.createQuery(() => ["account.getActiveUuid"]);
-  const status = rspc.createQuery(() => ["account.enroll.getStatus"]);
-  const curseForgeModloaders = rspc.createQuery(() => [
-    "modplatforms.curseforge.getModloaders"
-  ]);
-  const modrinthModloaders = rspc.createQuery(() => [
-    "modplatforms.modrinth.getLoaders"
-  ]);
-  const curseforgeCategories = rspc.createQuery(() => [
-    "modplatforms.curseforge.getCategories"
-  ]);
+  const minecraftVersions = rspc.createQuery(() => ({
+    queryKey: ["mc.getMinecraftVersions"]
+  }));
+  const accounts = rspc.createQuery(() => ({
+    queryKey: ["account.getAccounts"]
+  }));
+  const activeUuid = rspc.createQuery(() => ({
+    queryKey: ["account.getActiveUuid"]
+  }));
+  const status = rspc.createQuery(() => ({
+    queryKey: ["account.enroll.getStatus"]
+  }));
+  const curseForgeModloaders = rspc.createQuery(() => ({
+    queryKey: ["modplatforms.curseforge.getModloaders"]
+  }));
+  const modrinthModloaders = rspc.createQuery(() => ({
+    queryKey: ["modplatforms.modrinth.getLoaders"]
+  }));
+  const curseforgeCategories = rspc.createQuery(() => ({
+    queryKey: ["modplatforms.curseforge.getCategories"]
+  }));
 
-  console.log(curseForgeModloaders);
-
-  const modrinthCategories = rspc.createQuery(() => [
-    "modplatforms.modrinth.getCategories"
-  ]);
+  const modrinthCategories = rspc.createQuery(() => ({
+    queryKey: ["modplatforms.modrinth.getCategories"]
+  }));
 
   return {
     accounts,

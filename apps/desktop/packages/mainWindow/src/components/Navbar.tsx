@@ -2,7 +2,7 @@ import { useLocation, useMatch, useRouteData } from "@solidjs/router";
 import { For, Match, Show, Switch, createEffect } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
-import { Tab, TabList, Tabs, Spacing, Button, Tooltip } from "@gd/ui";
+import { Tab, TabList, Tabs, Spacing, Tooltip, Button } from "@gd/ui";
 import getRouteIndex from "@/route/getRouteIndex";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "@/pages/app.data";
@@ -38,6 +38,10 @@ const AppNavbar = () => {
   const isSettings = useMatch(() => "/settings");
   const isSettingsNested = useMatch(() => "/settings/*");
 
+  // const blockingMutation = rspc.createMutation(() => ({
+  //   mutationKey: "longRunning"
+  // }));
+
   const selectedIndex = () =>
     !!isSettings() || !!isSettingsNested()
       ? 5
@@ -68,7 +72,12 @@ const AppNavbar = () => {
 
   return (
     <Show when={!isLogin()}>
-      <nav class="flex items-center bg-darkSlate-800 text-white px-5 h-20">
+      <nav
+        class="flex items-center bg-darkSlate-800 text-white px-5"
+        style={{
+          height: "60px"
+        }}
+      >
         <div class="flex items-center" style={{ width: "19rem" }}>
           <img
             src={GDLauncherWideLogo}
@@ -116,6 +125,19 @@ const AppNavbar = () => {
                   <i class="flex i-ri:add-fill" />
                   <Trans key="sidebar.add_instance" />
                 </Button>
+                {/* <Button
+                  class="w-max"
+                  size="small"
+                  type="primary"
+                  onClick={async () => {
+                    console.log("BLOCKING MUTATION");
+                    const x = await blockingMutation.mutateAsync(undefined);
+                    console.log("GOT IT MUTATION", x);
+                  }}
+                >
+                  <i class="flex i-ri:add-fill" />
+                  BLOCKING MUTATION
+                </Button> */}
               </Tab>
 
               <div class="flex gap-6 items-center">

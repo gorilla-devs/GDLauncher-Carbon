@@ -16,7 +16,7 @@ import {
   FEUnifiedSearchType
 } from "@gd/core_module/bindings";
 import { createVirtualizer } from "@tanstack/solid-virtual";
-import { rspc, rspcFetch } from "@/utils/rspcClient";
+import { rspc } from "@/utils/rspcClient";
 import { scrollTop, setInstanceId } from "@/utils/browser";
 import {
   modpacksQuery,
@@ -71,24 +71,26 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
     ...(props.initialQuery || {})
   };
 
-  const infiniteQuery = createInfiniteQuery({
-    queryKey: () => ["modplatforms.unifiedSearch"],
+  const infiniteQuery = createInfiniteQuery(() => ({
+    queryKey: ["modplatforms.unifiedSearch"],
     queryFn: (ctx) => {
       getQueryFunction({
-        index: ctx.pageParam + query.pageSize!
+        index: ctx.pageParam
       });
 
       return rspcContext.client.query(["modplatforms.unifiedSearch", query]);
     },
+    initialPageParam: 0,
     getNextPageParam: (lastPage) => {
       const index = lastPage?.pagination?.index || 0;
       const totalCount = lastPage.pagination?.totalCount || 0;
       const pageSize = query.pageSize || 20;
       const hasNextPage = index + pageSize < totalCount;
-      return hasNextPage && index;
+
+      return (hasNextPage && index + 20) || null;
     },
     enabled: false
-  });
+  }));
 
   // when the user navigates away from the page, get the scroll position
   function getCurrentScrollPosition() {
@@ -110,12 +112,14 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
     },
     getScrollElement: () => parentRef(),
     estimateSize: () => 150,
-    overscan: 15
+    overscan: 0
   });
 
   const setQueryWrapper = (newValue: Partial<FEUnifiedSearchParameters>) => {
     getQueryFunction(newValue);
-    infiniteQuery.remove();
+    rspcContext.queryClient.removeQueries({
+      queryKey: ["modplatforms.unifiedSearch"]
+    });
     infiniteQuery.refetch();
     // rowVirtualizer.scrollToIndex(0);
   };
@@ -127,16 +131,14 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
     if (_instanceId && !lastType()) {
       setInstanceId(_instanceId);
 
-      rspcFetch(() => ["instance.getInstanceDetails", _instanceId]).then(
-        (details) => {
+      rspcContext.client
+        .query(["instance.getInstanceDetails", _instanceId])
+        .then((details) => {
           setQueryWrapper({
-            modloaders: (details as any).data.modloaders.map(
-              (v: any) => v.type_
-            ),
-            gameVersions: [(details as any).data.version]
+            modloaders: details?.modloaders.map((v: any) => v.type_) || [],
+            gameVersions: details?.version ? [details?.version] : []
           });
-        }
-      );
+        });
     } else if (lastType() === "mod") {
       setSearchParams({
         instanceId: undefined
@@ -144,7 +146,9 @@ const InfiniteScrollModsQueryWrapper = (props: Props) => {
       setInstanceId(undefined);
     }
 
-    infiniteQuery.remove();
+    rspcContext.queryClient.removeQueries({
+      queryKey: ["modplatforms.unifiedSearch"]
+    });
     infiniteQuery.refetch();
     parentRef()?.scrollTo(0, scrollTop());
     setLastType(mergedProps.type);

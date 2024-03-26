@@ -28,7 +28,9 @@ const General = () => {
     routeData?.data?.data || {}
   );
 
-  const settingsMutation = rspc.createMutation(["settings.setSettings"]);
+  const settingsMutation = rspc.createMutation(() => ({
+    mutationKey: ["settings.setSettings"]
+  }));
 
   createEffect(() => {
     if (routeData.data.data) setSettings(routeData.data.data);

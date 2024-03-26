@@ -1,0 +1,36 @@
+{
+  "name": "@gd/website",
+  "type": "module",
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro check && astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^9.1.0",
+    "@astrojs/mdx": "^2.1.1",
+    "@astrojs/rss": "^4.0.1",
+    "@astrojs/sitemap": "^3.0.3",
+    "@astrojs/solid-js": "^3.0.2",
+    "@fontsource/ubuntu": "^5.0.8",
+    "astro": "^4.4.5",
+    "class-variance-authority": "^0.7.0",
+    "js-yaml": "^4.1.0",
+    "lodash": "^4.17.21",
+    "marked": "^9.0.3",
+    "solid-icons": "^1.1.0",
+    "solid-js": "^1.8.7",
+    "tailwind-merge": "^2.2.0",
+    "vanilla-tilt": "^1.8.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.4.1",
+    "@astrojs/tailwind": "^5.0.3",
+    "@types/js-yaml": "^4.0.9",
+    "sharp": "^0.33.1",
+    "tailwindcss": "^3.3.6"
+  }
+}

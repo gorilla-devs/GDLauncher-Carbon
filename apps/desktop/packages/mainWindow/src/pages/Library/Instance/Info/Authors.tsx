@@ -23,10 +23,12 @@ const Authors = (props: Props) => {
       props.isModrinth &&
       (props.modpackDetails as MRFEProject)?.team
     ) {
-      const modrinthAuthorsQuery = rspc.createQuery(() => [
-        "modplatforms.modrinth.getTeam",
-        (props.modpackDetails as MRFEProject)?.team
-      ]);
+      const modrinthAuthorsQuery = rspc.createQuery(() => ({
+        queryKey: [
+          "modplatforms.modrinth.getTeam",
+          (props.modpackDetails as MRFEProject)?.team
+        ]
+      }));
 
       if (modrinthAuthorsQuery.data) setAuthors(modrinthAuthorsQuery.data);
     }

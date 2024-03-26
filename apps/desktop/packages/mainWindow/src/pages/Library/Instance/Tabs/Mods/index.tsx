@@ -37,13 +37,19 @@ const Mods = () => {
   const isInstanceLocked = () =>
     routeData.instanceDetails.data?.modpack?.locked;
 
-  const deleteModMutation = rspc.createMutation(["instance.deleteMod"]);
-  const disableModMutation = rspc.createMutation(["instance.disableMod"]);
-  const enableModMutation = rspc.createMutation(["instance.enableMod"]);
+  const deleteModMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.deleteMod"]
+  }));
+  const disableModMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.disableMod"]
+  }));
+  const enableModMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.enableMod"]
+  }));
 
-  const openFolderMutation = rspc.createMutation([
-    "instance.openInstanceFolder"
-  ]);
+  const openFolderMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.openInstanceFolder"]
+  }));
 
   const filteredMods = createMemo(() => {
     const filterName = filter().replaceAll(" ", "").toLowerCase();

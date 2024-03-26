@@ -1,0 +1,32 @@
+---
+import composeCDNAssetLink from "../utils/composeCDNAssetLink";
+import "../styles/global.css";
+import { ViewTransitions } from "astro:transitions";
+export interface Props {
+  title: string;
+  description: string;
+  image?: string;
+}
+
+const { title, description, image } = Astro.props as Props;
+---
+
+<title>{title}</title>
+<meta name="description" content={title} />
+<meta name="og:title" property="og:title" content={title} />
+<meta property="og:type" content="website" />
+<meta property="og:description" content={description} />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta
+  property="og:image"
+  content={image || "https://cdn.gdl.gg/assets/website-preview.jpg"}
+/>
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={title} />
+<meta name="twitter:description" content={description} />
+<meta
+  property="twitter:image"
+  content={image || "https://cdn.gdl.gg/assets/website-preview.jpg"}
+/>
+
+<ViewTransitions />

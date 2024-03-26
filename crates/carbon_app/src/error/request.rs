@@ -3,8 +3,8 @@ use std::fmt::{self, Display, Formatter};
 use super::json::get_json_context;
 use anyhow::anyhow;
 use reqwest::{Response, StatusCode, Url};
-use rspc::Type;
 use serde::Serialize;
+use specta::Type;
 use thiserror::Error;
 
 #[derive(Error, Debug, Clone)]

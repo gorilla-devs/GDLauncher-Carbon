@@ -1,5 +1,5 @@
-use rspc::Type;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 use crate::domain::modplatforms::curseforge::{
     Category, CurseForgeResponse, File, MinecraftModLoaderIndex, Mod,

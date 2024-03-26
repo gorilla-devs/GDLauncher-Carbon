@@ -6,11 +6,12 @@ import { createEffect, createSignal } from "solid-js";
 const VersionRow = (props: Props) => {
   const [loading, setLoading] = createSignal(false);
 
-  const installModMutation = rspc.createMutation(["instance.installMod"], {
+  const installModMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.installMod"],
     onMutate() {
       setLoading(true);
     }
-  });
+  }));
 
   const onPrimaryAction = () => {
     if (!props.instanceId) return;

@@ -3,12 +3,8 @@ import { Trans, useTransContext } from "@gd/i18n";
 import { For, Show } from "solid-js";
 import fetchData from "./instance.data";
 import { useParams, useRouteData } from "@solidjs/router";
-import {
-  CurseforgeModpack,
-  InstanceDetails,
-  ModrinthModpack
-} from "@gd/core_module/bindings";
-import { format, formatDistance } from "date-fns";
+import { InstanceDetails } from "@gd/core_module/bindings";
+import { format, formatDuration, intervalToDuration } from "date-fns";
 import FadedBanner, { FadedBannerSkeleton } from "@/components/FadedBanner";
 import { port } from "@/utils/rspcClient";
 import { Button } from "@gd/ui";
@@ -21,33 +17,20 @@ const Overview = () => {
   const navigate = useGDNavigate();
   const [t] = useTransContext();
 
-  const modpackPlatform = () => {
-    if (
-      "Curseforge" in (routeData.instanceDetails.data?.modpack?.modpack || {})
-    ) {
-      return "Curseforge";
-    } else if (
-      "Modrinth" in (routeData.instanceDetails.data?.modpack?.modpack || {})
-    ) {
-      return "Modrinth";
-    }
-  };
+  const modpackPlatform = () =>
+    routeData.instanceDetails.data?.modpack?.modpack.type;
 
   const modpackProjectId = () => {
     if (
-      "Curseforge" in (routeData.instanceDetails.data?.modpack?.modpack || {})
+      routeData.instanceDetails.data?.modpack?.modpack.type === "curseforge"
     ) {
-      return (
-        (routeData.instanceDetails.data?.modpack?.modpack as any)
-          ?.Curseforge as CurseforgeModpack
-      ).project_id;
+      return routeData.instanceDetails.data?.modpack?.modpack?.value
+        ?.project_id;
     } else if (
-      "Modrinth" in (routeData.instanceDetails.data?.modpack?.modpack || {})
+      routeData.instanceDetails.data?.modpack?.modpack.type === "modrinth"
     ) {
-      return (
-        (routeData.instanceDetails.data?.modpack?.modpack as any)
-          ?.Modrinth as ModrinthModpack
-      ).project_id;
+      return routeData.instanceDetails.data?.modpack?.modpack?.value
+        ?.project_id;
     }
   };
 
@@ -105,11 +88,11 @@ const Overview = () => {
         <Show when={routeData.instanceDetails.data?.secondsPlayed}>
           <Card
             title={t("instance.overview_card_played_time_title")}
-            text={formatDistance(
-              new Date(
-                routeData.instanceDetails.data?.lastPlayed || Date.now()
-              ).getTime(),
-              Date.now()
+            text={formatDuration(
+              intervalToDuration({
+                start: 0,
+                end: routeData.instanceDetails.data!.secondsPlayed * 1000
+              })
             )}
             icon="clock"
             class="flex-1"
@@ -119,10 +102,7 @@ const Overview = () => {
           <Card
             title={t("instance.overview_card_last_played_title")}
             text={format(
-              new Date(
-                (routeData.instanceDetails.data as InstanceDetails)
-                  ?.lastPlayed as string
-              ),
+              new Date(routeData.instanceDetails.data?.lastPlayed as string),
               "PPP"
             )}
             icon="sign"
@@ -180,11 +160,11 @@ const Overview = () => {
                     rounded={false}
                     type="outline"
                     onClick={() => {
-                      if (modpackPlatform() === "Curseforge") {
+                      if (modpackPlatform() === "curseforge") {
                         window.openExternalLink(
                           `https://www.curseforge.com/minecraft/modpacks/${routeData.modpackInfo.data?.url_slug}`
                         );
-                      } else if (modpackPlatform() === "Modrinth") {
+                      } else if (modpackPlatform() === "modrinth") {
                         window.openExternalLink(
                           `https://modrinth.com/mod/${routeData.modpackInfo.data?.url_slug}`
                         );
@@ -198,13 +178,13 @@ const Overview = () => {
                     rounded={false}
                     type="primary"
                     onClick={() => {
-                      if (modpackPlatform() === "Curseforge") {
+                      if (modpackPlatform() === "curseforge") {
                         navigate(
                           `/modpacks/${modpackProjectId()}/curseforge?instanceId=${
                             params.id
                           }`
                         );
-                      } else if (modpackPlatform() === "Modrinth") {
+                      } else if (modpackPlatform() === "modrinth") {
                         navigate(
                           `/modpacks/${modpackProjectId()}/modrith?instanceId=${
                             params.id

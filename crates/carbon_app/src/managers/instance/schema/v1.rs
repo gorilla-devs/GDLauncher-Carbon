@@ -163,6 +163,12 @@ where
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum JavaOverride {
+    Profile(Option<String>),
+    Path(Option<String>),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct GameConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<GameVersion>,
@@ -179,6 +185,9 @@ pub struct GameConfig {
     #[serde(serialize_with = "serialize_resolution")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub game_resolution: Option<GameResolution>,
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub java_override: Option<JavaOverride>,
 }
 
 fn default_global_java_args() -> bool {
@@ -264,6 +273,28 @@ impl From<info::Instance> for Instance {
             wrapper_command: value.wrapper_command,
             mod_sources: value.mod_sources.map(Into::into),
             notes: value.notes,
+        }
+    }
+}
+
+impl From<JavaOverride> for info::JavaOverride {
+    fn from(value: JavaOverride) -> Self {
+        use JavaOverride as Schema;
+
+        match value {
+            Schema::Profile(value) => Self::Profile(value),
+            Schema::Path(value) => Self::Path(value),
+        }
+    }
+}
+
+impl From<info::JavaOverride> for JavaOverride {
+    fn from(value: info::JavaOverride) -> Self {
+        use info::JavaOverride as Info;
+
+        match value {
+            Info::Profile(value) => Self::Profile(value),
+            Info::Path(value) => Self::Path(value),
         }
     }
 }
@@ -370,6 +401,7 @@ impl From<GameConfig> for info::GameConfig {
             extra_java_args: value.extra_java_args,
             memory: value.memory.map(Into::into),
             game_resolution: value.game_resolution.map(Into::into),
+            java_override: value.java_override.map(Into::into),
         }
     }
 }
@@ -382,6 +414,7 @@ impl From<info::GameConfig> for GameConfig {
             extra_java_args: value.extra_java_args,
             memory: value.memory.map(Into::into),
             game_resolution: value.game_resolution.map(Into::into),
+            java_override: value.java_override.map(Into::into),
         }
     }
 }

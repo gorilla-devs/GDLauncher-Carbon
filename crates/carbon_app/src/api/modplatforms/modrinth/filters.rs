@@ -4,8 +4,8 @@ use std::{
     str::FromStr,
 };
 
-use rspc::Type;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 
 use crate::domain::modplatforms::modrinth::{
     project::ProjectVersionsFilters,

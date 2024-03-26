@@ -1,5 +1,6 @@
-use rspc::{RouterBuilderLike, Type};
+use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
+use specta::Type;
 use strum::IntoEnumIterator;
 use tracing::info;
 
@@ -130,7 +131,7 @@ impl From<domain::RemoteVersion> for RemoteVersion {
     }
 }
 
-pub(super) fn mount() -> impl RouterBuilderLike<App> {
+pub(super) fn mount() -> RouterBuilder<App> {
     router! {
         // Curseforge
         query CURSEFORGE_SEARCH[app, filters: curseforge::filters::CFFEModSearchParameters] {
