@@ -8,7 +8,6 @@ import {
   JSX,
   Show,
   mergeProps,
-  createEffect,
 } from "solid-js";
 
 interface Marks {
@@ -117,10 +116,6 @@ function Slider(props: Props) {
       onChange(value);
     }
   };
-
-  createEffect(() => {
-    if (props.value !== undefined) onChange(props.value);
-  });
 
   const onChange = (val: number) => {
     setCurrentValue(val);

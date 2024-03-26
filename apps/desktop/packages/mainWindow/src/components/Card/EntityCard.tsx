@@ -1,4 +1,3 @@
-import { keys } from "@/managers/ModalsManager/modals/OnBoarding/ThirdStep";
 import { ImportEntityStatus } from "@gd/core_module/bindings";
 import { useTransContext } from "@gd/i18n";
 import { Show } from "solid-js";
@@ -7,7 +6,7 @@ export interface EntityCardProps {
   entity: ImportEntityStatus;
   icon: string;
   onClick?: [(_entity: ImportEntityStatus) => void, ImportEntityStatus];
-  index: number;
+  translation: string;
   className?: string;
   selected?: boolean;
 }
@@ -43,7 +42,7 @@ const EntityCard = (props: EntityCardProps) => {
       </div>
 
       <span class={`${props.entity.supported ? "" : "opacity-20"}`}>
-        {t(keys[props.index])}
+        {t(props.translation)}
       </span>
     </li>
   );

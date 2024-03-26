@@ -60,7 +60,7 @@ const BeginExport = () => {
       instance_id: payload.instance_id as number,
       save_path: payload.save_path as string,
       target: payload.target,
-      self_contained_addons_bundling: !payload.self_contained_addons_bundling
+      self_contained_addons_bundling: payload.self_contained_addons_bundling
     };
 
     if (validatePayload(exportObj)) {

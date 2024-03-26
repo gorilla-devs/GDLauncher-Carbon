@@ -1,5 +1,5 @@
 import { Trans } from "@gd/i18n";
-import { ModalProps, useModal } from "@/managers/ModalsManager";
+import { ModalProps } from "@/managers/ModalsManager";
 import ModalLayout from "@/managers/ModalsManager/ModalLayout";
 import { Button, Dropdown, createNotification } from "@gd/ui";
 import { rspc } from "@/utils/rspcClient";
@@ -37,7 +37,6 @@ const AddManagedJava = (props: ModalProps) => {
   );
   const [selectedJavaVersion, setSelectedJavaVersion] = createSignal("");
   const [loading, setLoading] = createSignal(false);
-  const modalsContext = useModal();
   const addNotification = createNotification();
 
   // eslint-disable-next-line solid/reactivity
@@ -161,7 +160,6 @@ const AddManagedJava = (props: ModalProps) => {
                     addNotification("Java added successfully");
                   } catch (err) {
                     console.error(err);
-                    modalsContext?.closeModal();
                     setLoading(false);
                   }
                 }
