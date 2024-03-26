@@ -15,6 +15,7 @@ use crate::domain::modplatforms::modrinth::search::{ProjectID, VersionID};
 use crate::domain::modplatforms::ModPlatform;
 use crate::domain::vtask::VisualTaskId;
 use crate::livenesstracker::LivenessTracker;
+use crate::managers::instance::modpack::PackVersionFile;
 use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::{DateTime, Utc};
@@ -983,7 +984,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             date_updated: Utc::now(),
             last_played,
             seconds_played: seconds_played.unwrap_or(0),
-            modpack: modpack.map(|modpack| info::ModpackInfo {
+            modpack: modpack.clone().map(|modpack| info::ModpackInfo {
                 modpack,
                 locked: pack_locked,
             }),
@@ -1007,9 +1008,19 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await
             .context("writing instance json")?;
 
-        tokio::fs::create_dir(tmpdir.join(".setup"))
+        let setup_path = tmpdir.join(".setup");
+        tokio::fs::create_dir(&setup_path)
             .await
             .context("writing setup marker")?;
+
+        if let Some(modpack) = modpack {
+            let pack_version_text = serde_json::to_string(&PackVersionFile::from(modpack))?;
+            tokio::fs::write(
+                setup_path.join("change-pack-version.json"),
+                &pack_version_text,
+            )
+            .await?;
+        }
 
         trace!("Running extended instance initializer");
         initializer(tmpdir.to_path_buf()).await?;
