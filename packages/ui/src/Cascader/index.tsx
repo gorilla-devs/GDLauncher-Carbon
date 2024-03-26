@@ -109,7 +109,7 @@ const Cascader = (props: ParentProps) => {
               position: "absolute",
               top: y() + 100 + "px",
               left: x() + 20 + "px",
-              "z-index": "1000000",
+              "z-index": "100",
             }}
             // onClick={closeContextMenu}
           >
