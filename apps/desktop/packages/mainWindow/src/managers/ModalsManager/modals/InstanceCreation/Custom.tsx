@@ -22,7 +22,6 @@ import { blobToBase64 } from "@/utils/helpers";
 import { mcVersions } from "@/utils/mcVersion";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { ReactiveMap } from "@solid-primitives/map";
-import { getInstanceImageUrl } from "@/utils/instances";
 
 type MappedMcVersions = ManifestVersion & { hasModloader?: boolean };
 
