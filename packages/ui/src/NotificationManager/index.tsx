@@ -3,20 +3,21 @@ import {
   createEffect,
   createSignal,
   For,
-  JSX,
   useContext,
+  JSX,
 } from "solid-js";
 import { createStore, produce } from "solid-js/store";
 import { Tooltip } from "../Tooltip";
+import { Portal } from "solid-js/web";
 
 type NotificationType = "success" | "warning" | "error";
-type NotificationPosition = "bottom" | "top";
+// type NotificationPosition = "bottom" | "top";
 
 type Notification = {
   id: number;
   name: string;
   type?: NotificationType;
-  position?: NotificationPosition;
+  // position?: NotificationPosition;
   duration: number;
   remainingDuration: number;
   progressAnimationId?: number;
@@ -24,35 +25,34 @@ type Notification = {
   expanded: boolean;
   timerId?: number;
   copied: boolean;
-  isMouseInside: boolean;
   fadingOut: boolean;
 };
+
+const NotificationContext = createContext<
+  (
+    _name: string,
+    _type?: NotificationType,
+    // _position?: NotificationPosition,
+    _duration?: number
+  ) => void
+>();
 
 type Props = {
   children: JSX.Element;
 };
-
-const NotificationContext =
-  createContext<
-    (
-      _name: string,
-      _type?: NotificationType,
-      _position?: NotificationPosition,
-      _duration?: number
-    ) => void
-  >();
 
 const NotificationsProvider = (props: Props) => {
   const [notifications, setNotifications] = createStore<
     Record<number, Notification>
   >({});
   const [windowFocused, setWindowFocused] = createSignal(true);
+  const [isHovering, setIsHovering] = createSignal(false);
 
   createEffect(() => {
     const onFocus = () => {
       setWindowFocused(true);
       for (const notification of Object.values(notifications)) {
-        if (notification.isMouseInside) continue;
+        if (isHovering()) continue;
 
         if (notification.remainingDuration > 0) {
           resumeTimer(notification);
@@ -124,7 +124,7 @@ const NotificationsProvider = (props: Props) => {
   const addNotification = (
     name: string,
     type: NotificationType = "success",
-    position: NotificationPosition = "bottom",
+    // position: NotificationPosition = "bottom",
     duration = 7000
   ) => {
     const id = Date.now();
@@ -133,12 +133,10 @@ const NotificationsProvider = (props: Props) => {
       id,
       name,
       type,
-      position,
       duration,
       remainingDuration: duration,
       expanded: false,
       copied: false,
-      isMouseInside: false,
       fadingOut: false,
     };
 
@@ -183,119 +181,153 @@ const NotificationsProvider = (props: Props) => {
 
   return (
     <NotificationContext.Provider value={addNotification}>
-      <For each={Object.values(notifications)}>
-        {(notification, i) => (
-          <div
-            class="min-w-50 w-fit max-w-100 h-26 left-5 items-center bg-darkSlate-900 flex justify-between px-4 py-4 text-white fixed rounded-lg z-100 shadow-md shadow-darkSlate-900"
-            style={{
-              transform: `translate(0, ${
-                notification.position === "bottom"
-                  ? `-${i() * 45}`
-                  : `${i() * 45}`
-              }px)`,
-              "overflow-wrap": "anywhere",
-              transition: "height 0.3s ease-in-out",
-              animation: `.2s ease-in-out ${
-                notification.fadingOut ? "fadeOut" : "fadeIn"
-              }`,
-            }}
-            classList={{
-              "h-68": notification.expanded,
-              "bottom-5": notification.position === "bottom",
-              "bottom-auto": notification.position !== "bottom",
-              "top-5": notification.position === "top",
-              "top-auto": notification.position !== "top",
-            }}
-            onMouseEnter={() => {
-              setNotifications(notification.id, "isMouseInside", true);
+      <Portal mount={document.getElementById("notifications") as HTMLElement}>
+        <div
+          class="flex flex-col gap-4 overflow-y-auto p-5"
+          style={{
+            "max-height": "calc(100vh - 1.25rem)",
+          }}
+          onMouseEnter={() => {
+            setIsHovering(true);
 
-              if (
-                notification.remainingDuration > 0 &&
-                !notification.copied &&
-                windowFocused()
-              ) {
-                pauseTimer(notification);
+            const areAllValid = Object.values(notifications).every(
+              (notification) => !notification.copied
+            );
+
+            if (areAllValid && windowFocused()) {
+              for (const notification of Object.values(notifications)) {
+                if (notification.remainingDuration > 0) {
+                  pauseTimer(notification);
+                }
               }
-            }}
-            onMouseLeave={() => {
-              setNotifications(notification.id, "isMouseInside", false);
+            }
+          }}
+          onMouseLeave={() => {
+            setIsHovering(false);
 
-              if (
-                notification.remainingDuration > 0 &&
-                !notification.copied &&
-                windowFocused()
-              ) {
-                resumeTimer(notification);
+            const areAllValid = Object.values(notifications).every(
+              (notification) => !notification.copied
+            );
+
+            if (areAllValid && windowFocused()) {
+              for (const notification of Object.values(notifications)) {
+                if (notification.remainingDuration > 0) {
+                  resumeTimer(notification);
+                }
               }
-            }}
-          >
-            <div
-              class="absolute top-0 left-0 h-1 w-full"
-              classList={{
-                "bg-red-400": notification.type === "error",
-                "bg-yellow-400": notification.type === "warning",
-                "bg-green-400": notification.type === "success",
-              }}
-              style={{
-                "border-radius": "0.5rem 0.5rem 0 0",
-                width: `${
-                  (notification.remainingDuration / notification.duration) * 100
-                }%`,
-              }}
-            />
-
-            <div
-              class="absolute left-4 top-4 min-w-6 min-h-6 w-6 h-6 text-darkSlate-300 hover:text-lightSlate-100 duration-100 ease-in-out"
-              classList={{
-                "i-ri:arrow-up-s-line": !notification.expanded,
-                "i-ri:arrow-down-s-line": notification.expanded,
-              }}
-              onClick={() => {
-                setNotifications(notification.id, "expanded", (prev) => !prev);
-              }}
-            />
-            <div class="min-w-6 min-h-6 w-6 h-6 i-ri:check-fill text-green-400" />
-            <div class="w-auto h-full overflow-y-auto mx-4">
-              <div class="font-bold text-lg">{notification.name}</div>
-              <div class="text-md">{notification.name}</div>
-            </div>
-            <div class="min-h-full h-full flex flex-row gap-4">
-              <div class="min-w-[1px] w-[1px] h-full bg-darkSlate-700" />
-              <div class="flex flex-col justify-between">
+            }
+          }}
+        >
+          <For each={Object.values(notifications)}>
+            {(notification) => (
+              <div
+                class="relative w-100 h-26 min-h-26 items-center bg-darkSlate-900 flex justify-between px-4 py-4 text-white rounded-lg shadow-md shadow-darkSlate-900"
+                style={{
+                  transition: "all 0.3s ease-in-out",
+                  animation: `.2s ease-in-out ${
+                    notification.fadingOut ? "fadeOut" : "fadeIn"
+                  }`,
+                }}
+                classList={{
+                  "h-68 min-h-68": notification.expanded,
+                }}
+              >
                 <div
-                  class="w-6 h-6 text-darkSlate-300 i-ri:close-fill hover:text-lightSlate-100 duration-100 ease-in-out"
-                  onClick={() => {
-                    removeNotification(notification.id);
+                  class="absolute top-0 left-0 h-1 w-full"
+                  classList={{
+                    "bg-red-400": notification.type === "error",
+                    "bg-yellow-400": notification.type === "warning",
+                    "bg-green-400": notification.type === "success",
+                  }}
+                  style={{
+                    "border-radius": "0.5rem 0.5rem 0 0",
+                    width: `${
+                      (notification.remainingDuration / notification.duration) *
+                      100
+                    }%`,
                   }}
                 />
-                <Tooltip content={"Copy"}>
-                  <div
-                    class="w-6 h-6"
-                    classList={{
-                      "text-darkSlate-300 hover:text-lightSlate-100 duration-100 ease-in-out i-ri:file-copy-2-fill":
-                        !notification.copied,
-                      "text-green-400 i-ri:checkbox-circle-fill":
-                        notification.copied,
-                    }}
-                    onClick={() => {
-                      navigator.clipboard.writeText(notification.name);
-                      setNotifications(notification.id, "copied", true);
-                      pauseTimer(notification);
-                      setTimeout(() => {
-                        setNotifications(notification.id, "copied", false);
 
-                        if (!notification.isMouseInside && windowFocused()) {
-                          resumeTimer(notification);
-                        }
-                      }, 2000);
-                    }}
-                  />
-                </Tooltip>
+                <div
+                  class="absolute left-4 top-4 w-6 h-6 text-darkSlate-300 hover:text-lightSlate-100 duration-100 ease-in-out"
+                  classList={{
+                    "i-ri:arrow-up-s-line": !notification.expanded,
+                    "i-ri:arrow-down-s-line": notification.expanded,
+                  }}
+                  onClick={() => {
+                    setNotifications(
+                      notification.id,
+                      "expanded",
+                      (prev) => !prev
+                    );
+                  }}
+                />
+                <div class="min-w-6 w-6 h-6 i-ri:check-fill text-green-400" />
+                <div class="w-auto h-full overflow-y-auto m-4 text-left">
+                  <div class="font-bold text-xl pb-2">{notification.name}</div>
+                  <div class="text-md">{notification.name}</div>
+                </div>
+                <div class="h-full flex flex-row gap-4">
+                  <div class="min-w-[1px] w-[1px] h-full bg-darkSlate-700" />
+                  <div class="flex flex-col justify-between">
+                    <div
+                      class="w-6 h-6 text-darkSlate-300 i-ri:close-fill hover:text-lightSlate-100 duration-100 ease-in-out"
+                      onClick={() => {
+                        removeNotification(notification.id);
+                      }}
+                    />
+                    <Tooltip content={"Copy"}>
+                      <div
+                        class="w-6 h-6"
+                        classList={{
+                          "text-darkSlate-300 hover:text-lightSlate-100 duration-100 ease-in-out i-ri:file-copy-2-fill":
+                            !notification.copied,
+                          "text-green-400 i-ri:checkbox-circle-fill":
+                            notification.copied,
+                        }}
+                        onClick={() => {
+                          navigator.clipboard.writeText(notification.name);
+                          setNotifications(notification.id, "copied", true);
+
+                          for (const notification of Object.values(
+                            notifications
+                          )) {
+                            if (notification.remainingDuration > 0) {
+                              pauseTimer(notification);
+                            }
+                          }
+
+                          setTimeout(() => {
+                            setNotifications(notification.id, "copied", false);
+
+                            const areAllValid = Object.values(
+                              notifications
+                            ).every((notification) => !notification.copied);
+
+                            if (
+                              areAllValid &&
+                              !isHovering() &&
+                              windowFocused()
+                            ) {
+                              for (const notification of Object.values(
+                                notifications
+                              )) {
+                                if (notification.remainingDuration > 0) {
+                                  resumeTimer(notification);
+                                }
+                              }
+                            }
+                          }, 2000);
+                        }}
+                      />
+                    </Tooltip>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-        )}
-      </For>
+            )}
+          </For>
+        </div>
+      </Portal>
       {props.children}
     </NotificationContext.Provider>
   );

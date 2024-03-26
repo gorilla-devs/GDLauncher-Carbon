@@ -2,15 +2,7 @@ import { useLocation, useMatch, useRouteData } from "@solidjs/router";
 import { For, Match, Show, Switch, createEffect } from "solid-js";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { NAVBAR_ROUTES } from "@/constants";
-import {
-  Tab,
-  TabList,
-  Tabs,
-  Spacing,
-  Tooltip,
-  Button,
-  createNotification
-} from "@gd/ui";
+import { Tab, TabList, Tabs, Spacing, Tooltip, Button } from "@gd/ui";
 import getRouteIndex from "@/route/getRouteIndex";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import fetchData from "@/pages/app.data";
@@ -41,7 +33,6 @@ const AppNavbar = () => {
   const navigate = useGDNavigate();
   const [accounts, setAccounts] = createStore<AccountsStatus[]>([]);
   const modalsContext = useModal();
-  const notification = createNotification();
 
   const isLogin = useMatch(() => "/");
   const isSettings = useMatch(() => "/settings");
@@ -129,7 +120,6 @@ const AppNavbar = () => {
                     modalsContext?.openModal({
                       name: "instanceCreation"
                     });
-                    // notification("Notigication name Notigication name Notigication nameNotigication nameNotigication nameNotigication name", "success");
                   }}
                 >
                   <i class="flex i-ri:add-fill" />
