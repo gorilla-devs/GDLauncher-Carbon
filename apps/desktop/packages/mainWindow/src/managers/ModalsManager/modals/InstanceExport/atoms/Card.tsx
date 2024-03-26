@@ -4,10 +4,7 @@ import { ExportTarget } from "@gd/core_module/bindings";
 
 export const Card = (
   props: EntityCardProps & {
-    instance: {
-      title: ExportTarget;
-      id: number;
-    };
+    instanceTitle: ExportTarget;
   }
 ) => {
   return (
@@ -16,13 +13,13 @@ export const Card = (
       onClick={() => {
         setPayload({
           ...payload,
-          target: props.instance.title
+          target: props.instanceTitle
         });
       }}
     >
       <EntityCard
         {...props}
-        selected={props.instance.title === payload.target}
+        selected={props.instanceTitle === payload.target}
       />
     </div>
   );
