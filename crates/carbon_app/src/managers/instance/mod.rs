@@ -2006,7 +2006,9 @@ pub struct Mod {
 #[derive(Debug)]
 pub enum InstanceVersionSource {
     Version(info::GameVersion),
+    /// (version, modpack, locked)
     Modpack(info::Modpack, bool),
+    /// (version, modpack, locked)
     ModpackWithKnownVersion(info::GameVersion, info::Modpack, bool),
 }
 
@@ -2533,13 +2535,14 @@ mod test {
                 default_group_id,
                 String::from("curseforge instance"),
                 false,
-                InstanceVersionSource::Modpack(info::Modpack::Curseforge(
-                    info::CurseforgeModpack {
+                InstanceVersionSource::Modpack(
+                    info::Modpack::Curseforge(info::CurseforgeModpack {
                         // RLCraft
                         project_id: 285109,
                         file_id: 4612979,
-                    },
-                )),
+                    }),
+                    true,
+                ),
                 String::new(),
             )
             .await?;
@@ -2550,11 +2553,14 @@ mod test {
                 default_group_id,
                 String::from("modrinth instance"),
                 false,
-                InstanceVersionSource::Modpack(info::Modpack::Modrinth(info::ModrinthModpack {
-                    // Fabulously Optimized
-                    project_id: String::from("1KVo5zza"),
-                    version_id: String::from("HH3vor7X"),
-                })),
+                InstanceVersionSource::Modpack(
+                    info::Modpack::Modrinth(info::ModrinthModpack {
+                        // Fabulously Optimized
+                        project_id: String::from("1KVo5zza"),
+                        version_id: String::from("HH3vor7X"),
+                    }),
+                    true,
+                ),
                 String::new(),
             )
             .await?;
