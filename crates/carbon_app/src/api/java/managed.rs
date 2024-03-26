@@ -71,7 +71,7 @@ impl From<crate::domain::java::JavaArch> for FEManagedJavaArch {
         use crate::domain::java::JavaArch;
         match v {
             JavaArch::X86_64 => Self::X64,
-            JavaArch::X86_32 => Self::X64,
+            JavaArch::X86_32 => Self::X86,
             JavaArch::Arm32 => Self::Arm32,
             JavaArch::Arm64 => Self::Arm64,
         }
@@ -82,7 +82,7 @@ impl From<FEManagedJavaArch> for crate::domain::java::JavaArch {
     fn from(v: FEManagedJavaArch) -> Self {
         match v {
             FEManagedJavaArch::X64 => Self::X86_64,
-            FEManagedJavaArch::X86 => Self::X86_64,
+            FEManagedJavaArch::X86 => Self::X86_32,
             FEManagedJavaArch::Arm32 => Self::Arm32,
             FEManagedJavaArch::Arm64 => Self::Arm64,
         }

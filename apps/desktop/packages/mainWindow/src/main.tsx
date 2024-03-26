@@ -113,8 +113,7 @@ type InnerAppProps = {
 };
 
 const InnerApp = (props: InnerAppProps) => {
-  // eslint-disable-next-line solid/reactivity
-  let { client, createInvalidateQuery } = initRspc(props.port);
+  const { client, createInvalidateQuery } = initRspc(props.port);
 
   return (
     <rspc.Provider client={client as any} queryClient={queryClient}>
