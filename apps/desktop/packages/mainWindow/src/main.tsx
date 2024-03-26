@@ -80,7 +80,9 @@ render(
           <Match when={isIntroAnimationFinished()}>
             <Switch>
               <Match when={isReady()}>
-                <InnerApp port={coreModuleLoaded() as unknown as number} />
+                <NotificationsProvider>
+                  <InnerApp port={coreModuleLoaded() as unknown as number} />
+                </NotificationsProvider>
               </Match>
               <Match when={!isReady()}>
                 <div class="flex justify-center items-center h-screen w-screen">
@@ -111,8 +113,7 @@ type InnerAppProps = {
 };
 
 const InnerApp = (props: InnerAppProps) => {
-  // eslint-disable-next-line solid/reactivity
-  let { client, createInvalidateQuery } = initRspc(props.port);
+  const { client, createInvalidateQuery } = initRspc(props.port);
 
   return (
     <rspc.Provider client={client as any} queryClient={queryClient}>
@@ -194,13 +195,11 @@ const TransWrapper = (props: TransWrapperProps) => {
       <TransProvider instance={_i18nInstance}>
         <Router source={hashIntegration()}>
           <NavigationManager>
-            <NotificationsProvider>
-              <ContextMenuProvider>
-                <ModalProvider>
-                  <App createInvalidateQuery={props.createInvalidateQuery} />
-                </ModalProvider>
-              </ContextMenuProvider>
-            </NotificationsProvider>
+            <ContextMenuProvider>
+              <ModalProvider>
+                <App createInvalidateQuery={props.createInvalidateQuery} />
+              </ModalProvider>
+            </ContextMenuProvider>
           </NavigationManager>
         </Router>
       </TransProvider>

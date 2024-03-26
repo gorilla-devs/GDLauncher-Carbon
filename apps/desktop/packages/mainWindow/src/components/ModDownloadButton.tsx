@@ -18,29 +18,26 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   const [loading, setLoading] = createSignal(false);
   const [taskId, setTaskId] = createSignal<number | null>(null);
   const [progress, setProgress] = createSignal<number | null>(null);
-  const rspcContext = rspc.useContext();
 
   const installLatestModMutation = rspc.createMutation(() => ({
-    mutationKey: "instance.installLatestMod"
-  }));
-
-  createEffect(() => {
-    if (installLatestModMutation.isPending) {
+    mutationKey: "instance.installLatestMod",
+    onSuccess(taskId) {
+      setTaskId(taskId);
+    },
+    onMutate() {
       setLoading(true);
     }
-
-    if (installLatestModMutation.isSuccess) {
-      setTaskId(installLatestModMutation.data);
-    }
-  });
+  }));
 
   createEffect(async () => {
     if (taskId() !== null) {
-      const task = await rspcContext.client.query(["vtask.getTask", taskId()]);
+      const task = rspc.createQuery(() => ({
+        queryKey: ["vtask.getTask", taskId()]
+      }));
 
       createEffect(() => {
-        if (task?.progress.type === "Known") {
-          setProgress(Math.round(task?.progress.value * 100));
+        if (task?.data?.progress.type === "Known") {
+          setProgress(Math.round(task?.data?.progress.value * 100));
         }
       });
     }
