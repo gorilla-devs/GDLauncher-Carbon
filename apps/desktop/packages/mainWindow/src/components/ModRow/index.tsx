@@ -66,9 +66,6 @@ const ModRow = (props: ModRowProps) => {
 
   const createInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.createInstance"],
-    onMutate() {
-      setLoading(true);
-    },
     onSuccess(instanceId) {
       setLoading(true);
       prepareInstanceMutation.mutate(instanceId);
@@ -247,6 +244,8 @@ const ModRow = (props: ModRowProps) => {
                             runWithOwner(owner, async () => {
                               if (props.type !== "Modpack") return;
 
+                              setLoading(true);
+
                               const imgUrl = getLogoUrl(props);
                               if (imgUrl) loadIconMutation.mutate(imgUrl);
 
@@ -260,7 +259,7 @@ const ModRow = (props: ModRowProps) => {
                                     }
                                   ]);
 
-                                fileVersion = (mrVersions as any).data[0].id;
+                                fileVersion = mrVersions[0].id;
                               }
 
                               createInstanceMutation.mutate({

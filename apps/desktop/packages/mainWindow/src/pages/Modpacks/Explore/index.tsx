@@ -408,12 +408,7 @@ const Modpack = () => {
                           <Button
                             variant={isModInstalled() ? "green" : "primary"}
                           >
-                            <Trans
-                              key="mod.downloaded"
-                              options={{
-                                defaultValue: "Downloaded"
-                              }}
-                            />
+                            <Trans key="mod.downloaded" />
                           </Button>
                         </Match>
                       </Switch>
