@@ -288,13 +288,19 @@ impl<T: tempentry::TempEntryType> TempEntry<T> {
         let res = tokio::fs::rename(&*self, &path).await;
 
         if let Err(err) = &res {
-            tokio::fs::copy(&path, &*self).await.with_context(|| {
+            tokio::fs::copy(&*self, &path).await.with_context(|| {
                 format!(
                     "failed to copy {} to {}",
+                    (&*self).display(),
                     path.as_ref().display(),
-                    (&*self).display()
                 )
             })?;
+
+            if self.is_dir() {
+                tokio::fs::remove_dir_all(&*self).await?;
+            } else {
+                tokio::fs::remove_file(&*self).await?;
+            }
         }
 
         Ok(())
