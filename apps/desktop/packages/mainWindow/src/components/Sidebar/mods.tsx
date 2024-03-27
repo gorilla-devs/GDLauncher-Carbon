@@ -36,8 +36,8 @@ import {
   supportedModloaders
 } from "@/utils/sidebar";
 import { createStore } from "solid-js/store";
-import { mappedMcVersions, mcVersions } from "@/utils/mcVersion";
-import { instanceId, setInstanceId } from "@/utils/browser";
+import { mcVersions } from "@/utils/mcVersion";
+import { setInstanceId } from "@/utils/browser";
 import { rspc } from "@/utils/rspcClient";
 import _ from "lodash";
 

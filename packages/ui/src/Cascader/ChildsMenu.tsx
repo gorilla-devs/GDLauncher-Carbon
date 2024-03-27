@@ -2,7 +2,6 @@ import { For, Portal, Show } from "solid-js/web";
 import { Input } from "../Input";
 import { Accessor, Setter, createSignal } from "solid-js";
 import CascaderItem from "./CascaderItem";
-import { Radio } from "../Radio";
 
 export interface ChildsMenuProps {
   items: {
@@ -23,40 +22,40 @@ export interface ChildsMenuProps {
 const ChildsMenu = (props: ChildsMenuProps) => {
   const [search, setSearch] = createSignal("");
   const [openItem, setOpenItem] = createSignal<string | null>(null);
-  const [radioValue, setRadio] = createSignal<string | number>(
-    props
-      .selectedItems()
-      .find((item) => item.includes(props.parentLabel as string))
-      ?.split("//")[1] || ""
-  );
+  // const [radioValue, setRadio] = createSignal<string | number>(
+  //   props
+  //     .selectedItems()
+  //     .find((item) => item.includes(props.parentLabel as string))
+  //     ?.split("//")[1] || ""
+  // );
 
   const toggleMenu = (label: string) => {
     setOpenItem((prev) => (prev === label ? null : label));
   };
-  const handleRadio = (val: string | number | string[] | undefined) => {
-    props.setSelectedItems((prev) => {
-      const newItems = [...prev];
-      const index = newItems.findIndex((item) =>
-        item.includes(props.parentLabel as string)
-      );
-      let newValue = "";
-      const findElement = props.items.find((item) => item.id === val);
-      if (findElement) {
-        newValue = `${props.parentLabel}//${findElement.label}`;
-      } else {
-        newValue = `${props.parentLabel}//${val}`;
-      }
+  // const handleRadio = (val: string | number | string[] | undefined) => {
+  //   props.setSelectedItems((prev) => {
+  //     const newItems = [...prev];
+  //     const index = newItems.findIndex((item) =>
+  //       item.includes(props.parentLabel as string)
+  //     );
+  //     let newValue = "";
+  //     const findElement = props.items.find((item) => item.id === val);
+  //     if (findElement) {
+  //       newValue = `${props.parentLabel}//${findElement.label}`;
+  //     } else {
+  //       newValue = `${props.parentLabel}//${val}`;
+  //     }
 
-      if (index === -1) {
-        newItems.push(newValue);
-      } else {
-        newItems[index] = newValue;
-      }
-      setRadio(val as string);
+  //     if (index === -1) {
+  //       newItems.push(newValue);
+  //     } else {
+  //       newItems[index] = newValue;
+  //     }
+  //     setRadio(val as string);
 
-      return newItems;
-    });
-  };
+  //     return newItems;
+  //   });
+  // };
   return (
     <Portal mount={document.getElementById("menu-id") as Node}>
       <div class="max-h-72 w-52 bg-[#272b35] rounded-md p-3 flex flex-col gap-2 overflow-x-auto scrollbar-hide shadow-md shadow-darkSlate-900">
