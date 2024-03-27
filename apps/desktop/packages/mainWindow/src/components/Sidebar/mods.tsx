@@ -39,6 +39,7 @@ import { createStore } from "solid-js/store";
 import { mappedMcVersions, mcVersions } from "@/utils/mcVersion";
 import { instanceId, setInstanceId } from "@/utils/browser";
 import { rspc } from "@/utils/rspcClient";
+import _ from "lodash";
 
 const mapTypeToColor = (type: McType) => {
   return (
@@ -391,9 +392,12 @@ const Sidebar = () => {
   });
 
   createEffect(() => {
-    const currentPlatform = selectedItems()
-      .find((item) => item.includes("Platform"))
-      ?.split("//")[1];
+    const currentPlatform = _.capitalize(
+      selectedItems()
+        .find((item) => item.includes("Platform"))
+        ?.split("//")[1]
+    );
+
     if (
       (isCurseforge() && currentPlatform !== "Curseforge") ||
       (!isCurseforge() && currentPlatform !== "Modrinth")
@@ -482,7 +486,7 @@ const Sidebar = () => {
           instanceId: instanceId as number
         });
         setInstanceId(instanceId as number);
-        console.log("details", details);
+
         const modloaders = details.modloaders.map((v: any) => v.type_);
 
         const gameVersion = details.version;
