@@ -188,6 +188,9 @@ const Sidebar = () => {
     routeData.instancesUngrouped.data?.filter(
       (instance) => getValideInstance(instance.status)?.modloader
     );
+  createEffect(() => {
+    console.log(routeData.instancesUngrouped.data);
+  });
   const NotFilteredCategories = () =>
     isCurseforge()
       ? curseforgeCategories()
@@ -217,6 +220,7 @@ const Sidebar = () => {
     setMenuData((prev) => ({
       ...prev,
       items: prev.items.map((item) => {
+        console.log(filteredInstances());
         if (item.label === "Instances") {
           return {
             label: t("general.instances"),

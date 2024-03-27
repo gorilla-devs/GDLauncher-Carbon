@@ -2,6 +2,7 @@ import { Accessor, Setter, Show, createEffect, createSignal } from "solid-js";
 import { Checkbox } from "../Checkbox";
 import ChildsMenu, { ChildsMenuProps } from "./ChildsMenu";
 import { Radio } from "../Radio";
+import _ from "lodash";
 
 const CascaderItem = (props: {
   label: string;
@@ -17,6 +18,12 @@ const CascaderItem = (props: {
   selectedItems: Accessor<string[]>;
   setSelectedItems: Setter<string[]>;
   parentLabel?: string;
+  items: {
+    label: string;
+    img: any;
+    id?: string | number;
+    children?: ChildsMenuProps;
+  }[];
 }) => {
   const [numberOfCheckedItems, setNumberOfCheckedItems] = createSignal(0);
   const [currentSelectedItem, setCurrentSelectedItem] = createSignal("None");
@@ -32,7 +39,31 @@ const CascaderItem = (props: {
       );
     }
   });
+  const handleRadio = (val: string | number | string[] | undefined) => {
+    props.setSelectedItems((prev) => {
+      const newItems = [...prev];
+      const index = newItems.findIndex((item) =>
+        item.includes(props.parentLabel as string)
+      );
+      let newValue = "";
+      const findElement = props.items.find(
+        (item) => item.id === val || item.label === val
+      );
+      if (findElement) {
+        newValue = `${props.parentLabel}//${findElement.label}`;
+      } else {
+        newValue = `${props.parentLabel}//${val}`;
+      }
 
+      if (index === -1) {
+        newItems.push(newValue);
+      } else {
+        newItems[index] = newValue;
+      }
+
+      return newItems;
+    });
+  };
   createEffect(() => {
     if (props.children) {
       const index = props
@@ -79,7 +110,9 @@ const CascaderItem = (props: {
           checked={
             props
               .selectedItems()
-              .filter((item) => item.split("//")[1] === props.label).length > 0
+              .filter(
+                (item) => item.split("//")[1] === _.capitalize(props.label)
+              ).length > 0
           }
           children={
             <div class="flex items-center gap-2">
@@ -91,7 +124,12 @@ const CascaderItem = (props: {
       </Show>
       <Show when={!props.isCheckbox && !props.isParent}>
         <Radio
-          name={props.label}
+          onChange={handleRadio}
+          checked={
+            props
+              .selectedItems()
+              .filter((item) => item.split("//")[1] === props.label).length > 0
+          }
           value={props.id || props.label}
           children={
             <div class="flex items-center gap-2">

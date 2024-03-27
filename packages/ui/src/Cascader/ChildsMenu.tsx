@@ -85,34 +85,36 @@ const ChildsMenu = (props: ChildsMenuProps) => {
                 setSelectedItems={props.setSelectedItems}
                 parentLabel={props.parentLabel}
                 id={item.id}
+                items={props.items}
               />
             )}
           </For>
         </Show>
         <Show when={!props.isCheckbox && !props.isParent}>
-          <Radio.group value={radioValue()} onChange={handleRadio}>
-            <For
-              each={props.items.filter((item) => item.label.includes(search()))}
-            >
-              {(item) => (
-                <CascaderItem
-                  name={props.parentLabel}
-                  value={item.label}
-                  children={item.children}
-                  isCheckbox={false}
-                  label={item.label}
-                  isOpen={openItem() === item.label}
-                  onToggleMenu={() => toggleMenu(item.label)}
-                  isParent={props?.isParent}
-                  img={item.img}
-                  selectedItems={props.selectedItems}
-                  setSelectedItems={props.setSelectedItems}
-                  parentLabel={props.parentLabel}
-                  id={item.id}
-                />
-              )}
-            </For>
-          </Radio.group>
+          {/* <Radio.group value={radioValue()} onChange={handleRadio}> */}
+          <For
+            each={props.items.filter((item) => item.label.includes(search()))}
+          >
+            {(item) => (
+              <CascaderItem
+                name={props.parentLabel}
+                value={item.label}
+                children={item.children}
+                isCheckbox={false}
+                label={item.label}
+                isOpen={openItem() === item.label}
+                onToggleMenu={() => toggleMenu(item.label)}
+                isParent={props?.isParent}
+                img={item.img}
+                selectedItems={props.selectedItems}
+                setSelectedItems={props.setSelectedItems}
+                parentLabel={props.parentLabel}
+                id={item.id}
+                items={props.items}
+              />
+            )}
+          </For>
+          {/* </Radio.group> */}
         </Show>
         <Show when={props.hasChildren}>{props.hasChildren}</Show>
       </div>

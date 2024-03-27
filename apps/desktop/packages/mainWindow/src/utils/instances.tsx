@@ -45,7 +45,7 @@ export const getInactiveState = (status: LaunchState | undefined) => {
 export const getValideInstance = (
   status: ListInstanceStatus
 ): ValidListInstance | undefined => {
-  if (!isListInstanceInvalid(status)) return status.Valid;
+  if (status.status === "valid") return status.value;
 };
 export const isSubTaskDownload = (input: FESubtask): input is FESubtask => {
   return typeof input === "object" && "download" in input;
