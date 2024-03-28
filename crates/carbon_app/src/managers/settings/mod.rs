@@ -12,7 +12,7 @@ use itertools::Itertools;
 use reqwest_middleware::ClientWithMiddleware;
 use std::path::PathBuf;
 
-mod terms_and_privacy;
+pub mod terms_and_privacy;
 
 pub(crate) struct SettingsManager {
     pub runtime_path: runtime_path::RuntimePath,
