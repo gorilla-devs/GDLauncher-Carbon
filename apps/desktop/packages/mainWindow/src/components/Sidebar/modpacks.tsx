@@ -27,7 +27,7 @@ import {
 } from "@/utils/sidebar";
 import { mcVersions } from "@/utils/mcVersion";
 import { createStore } from "solid-js/store";
-
+import _ from "lodash";
 const mapTypeToColor = (type: McType) => {
   return (
     <Switch>
@@ -299,6 +299,7 @@ const Sidebar = () => {
     const modLoaders = selectedItems().filter((item) =>
       item.includes("Modloader")
     );
+
     if (modLoaders.length === 0) {
       infiniteQuery.setQuery({
         modloaders: null
@@ -314,9 +315,12 @@ const Sidebar = () => {
   });
 
   createEffect(() => {
-    const currentPlatform = selectedItems()
-      .find((item) => item.includes("Platform"))
-      ?.split("//")[1];
+    const currentPlatform = _.capitalize(
+      selectedItems()
+        .find((item) => item.includes("Platform"))
+        ?.split("//")[1]
+    );
+
     if (
       (isCurseforge() && currentPlatform !== "Curseforge") ||
       (!isCurseforge() && currentPlatform !== "Modrinth")

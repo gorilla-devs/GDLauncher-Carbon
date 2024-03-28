@@ -110,9 +110,7 @@ const CascaderItem = (props: {
           checked={
             props
               .selectedItems()
-              .filter(
-                (item) => item.split("//")[1] === _.capitalize(props.label)
-              ).length > 0
+              .filter((item) => item.split("//")[1] === props.label).length > 0
           }
           children={
             <div class="flex items-center gap-2">

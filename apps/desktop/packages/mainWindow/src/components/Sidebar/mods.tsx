@@ -466,6 +466,9 @@ const Sidebar = () => {
     }
   });
   createEffect(() => {
+    console.log(selectedItems());
+  });
+  createEffect(() => {
     const currentInstance = selectedItems()
       .find((item) => item.includes("Instances"))
       ?.split("//")[1];
