@@ -121,49 +121,61 @@ async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
 
     let latest_tos_privacy_checksum = TermsAndPrivacy::get_latest_consent_sha()
         .await
-        .map_err(DatabaseError::TermsAndPrivacy)?;
+        .map_err(DatabaseError::TermsAndPrivacy);
 
-    let mut should_empty_tos_privacy = false;
-    let mut should_empty_metrics = false;
+    match latest_tos_privacy_checksum {
+        Ok(latest_tos_privacy_checksum) => {
+            let mut should_empty_tos_privacy = false;
+            let mut should_empty_metrics = false;
 
-    if let Some(metrics_enabled_last_update) = app_config.metrics_enabled_last_update {
-        if metrics_enabled_last_update < chrono::Utc::now() - chrono::Duration::days(365) {
-            should_empty_metrics = true;
+            if let Some(metrics_enabled_last_update) = app_config.metrics_enabled_last_update {
+                if metrics_enabled_last_update < chrono::Utc::now() - chrono::Duration::days(365) {
+                    should_empty_metrics = true;
+                }
+            }
+
+            if app_config.terms_and_privacy_accepted_checksum
+                != Some(latest_tos_privacy_checksum.clone())
+            {
+                should_empty_tos_privacy = true;
+            }
+
+            tracing::info!(
+                    "Should empty tos_privacy: {}, should empty metrics: {}, latest tos_privacy checksum: {}, current tos_privacy checksum: {:?}",
+                    should_empty_tos_privacy,
+                    should_empty_metrics,
+                    latest_tos_privacy_checksum,
+                    app_config.terms_and_privacy_accepted_checksum
+                );
+
+            if should_empty_tos_privacy || should_empty_metrics {
+                let mut updates = vec![];
+
+                if should_empty_tos_privacy {
+                    updates.push(app_configuration::terms_and_privacy_accepted::set(false));
+                    updates.push(app_configuration::terms_and_privacy_accepted_checksum::set(
+                        None,
+                    ));
+                }
+
+                if should_empty_metrics {
+                    updates.push(app_configuration::metrics_enabled::set(false));
+                    updates.push(app_configuration::metrics_enabled_last_update::set(None));
+                }
+
+                db_client
+                    .app_configuration()
+                    .update(db::app_configuration::id::equals(0), updates)
+                    .exec()
+                    .await?;
+            }
         }
-    }
-
-    if app_config.terms_and_privacy_accepted_checksum != Some(latest_tos_privacy_checksum.clone()) {
-        should_empty_tos_privacy = true;
-    }
-
-    tracing::info!(
-        "Should empty tos_privacy: {}, should empty metrics: {}, latest tos_privacy checksum: {}, current tos_privacy checksum: {:?}",
-        should_empty_tos_privacy,
-        should_empty_metrics,
-        latest_tos_privacy_checksum,
-        app_config.terms_and_privacy_accepted_checksum
-    );
-
-    if should_empty_tos_privacy || should_empty_metrics {
-        let mut updates = vec![];
-
-        if should_empty_tos_privacy {
-            updates.push(app_configuration::terms_and_privacy_accepted::set(false));
-            updates.push(app_configuration::terms_and_privacy_accepted_checksum::set(
-                None,
-            ));
+        Err(err) => {
+            tracing::error!(
+                "Error while fetching latest terms and privacy checksum: {:?}",
+                err
+            );
         }
-
-        if should_empty_metrics {
-            updates.push(app_configuration::metrics_enabled::set(false));
-            updates.push(app_configuration::metrics_enabled_last_update::set(None));
-        }
-
-        db_client
-            .app_configuration()
-            .update(db::app_configuration::id::equals(0), updates)
-            .exec()
-            .await?;
     }
 
     JavaManager::ensure_profiles_in_db(db_client)
