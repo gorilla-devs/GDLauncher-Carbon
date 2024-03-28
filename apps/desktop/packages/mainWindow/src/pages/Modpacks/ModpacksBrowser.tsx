@@ -27,6 +27,7 @@ import {
   NoMoreModpacks
 } from "./ModpacksStatus";
 import { useInfiniteModsQuery } from "@/components/InfiniteScrollModsQueryWrapper";
+import Sidebar from "@/components/Sidebar/modpacks";
 
 const ModpackBrowser = () => {
   const [t] = useTransContext();
@@ -97,6 +98,7 @@ const ModpackBrowser = () => {
           </Match>
           <Match when={hasFiltersData()}>
             <div class="flex items-center justify-between gap-3 pb-4 flex-wrap">
+              <Sidebar />
               <Input
                 placeholder="Type Here"
                 value={infiniteQuery?.query.searchQuery || ""}

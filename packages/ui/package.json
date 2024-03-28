@@ -31,6 +31,7 @@
     "@unocss/eslint-config": "^0.53.1",
     "@unocss/transformer-directives": "^0.55.0",
     "babel-loader": "^9.1.2",
+    "class-variance-authority": "^0.7.0",
     "concurrently": "^8.2.0",
     "eslint": "^8.43.0",
     "eslint-config-prettier": "^8.8.0",

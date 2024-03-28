@@ -42,7 +42,11 @@ export const getInactiveState = (status: LaunchState | undefined) => {
     return status.value.failed_task;
   }
 };
-
+export const getValideInstance = (
+  status: ListInstanceStatus
+): ValidListInstance | undefined => {
+  if (status.status === "valid") return status.value;
+};
 export const isSubTaskDownload = (input: FESubtask): input is FESubtask => {
   return typeof input === "object" && "download" in input;
 };
@@ -158,8 +162,10 @@ export const CategoryIcon = (props: {
   );
 };
 
-export const PlatformIcon = (props: { modpack: "curseforge" | "modrinth" }) => {
-  return <img class="h-4 w-4" src={getModpackPlatformIcon(props.modpack)} />;
+export const PlatformIcon = (props: {
+  platform: "curseforge" | "modrinth";
+}) => {
+  return <img class="h-4 w-4" src={getModpackPlatformIcon(props.platform)} />;
 };
 
 export const [importedInstances, setImportedInstances] = createSignal<number[]>(

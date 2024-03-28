@@ -16,8 +16,9 @@ import App from "@/app";
 import { ModalProvider } from "@/managers/ModalsManager";
 import "virtual:uno.css";
 import "@gd/ui/style.css";
-import { ContextMenuProvider, NotificationsProvider } from "@gd/ui";
+import { NotificationsProvider, ContextMenuProvider } from "@gd/ui";
 import { NavigationManager } from "./managers/NavigationManager";
+import { ContextCascaderProvider } from "@gd/ui";
 // import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
 import RiveAppWapper from "./utils/RiveAppWrapper";
 import GDAnimation from "./gd_logo_animation.riv";
@@ -195,11 +196,15 @@ const TransWrapper = (props: TransWrapperProps) => {
       <TransProvider instance={_i18nInstance}>
         <Router source={hashIntegration()}>
           <NavigationManager>
-            <ContextMenuProvider>
-              <ModalProvider>
-                <App createInvalidateQuery={props.createInvalidateQuery} />
-              </ModalProvider>
-            </ContextMenuProvider>
+            <NotificationsProvider>
+              <ContextCascaderProvider>
+                <ContextMenuProvider>
+                  <ModalProvider>
+                    <App createInvalidateQuery={props.createInvalidateQuery} />
+                  </ModalProvider>
+                </ContextMenuProvider>
+              </ContextCascaderProvider>
+            </NotificationsProvider>
           </NavigationManager>
         </Router>
       </TransProvider>
