@@ -126,16 +126,23 @@ async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
     let mut should_empty_tos_privacy = false;
     let mut should_empty_metrics = false;
 
-    // New terms checksum ??
     if let Some(metrics_enabled_last_update) = app_config.metrics_enabled_last_update {
         if metrics_enabled_last_update < chrono::Utc::now() - chrono::Duration::days(365) {
             should_empty_metrics = true;
         }
     }
 
-    if app_config.terms_and_privacy_accepted_checksum != Some(latest_tos_privacy_checksum) {
+    if app_config.terms_and_privacy_accepted_checksum != Some(latest_tos_privacy_checksum.clone()) {
         should_empty_tos_privacy = true;
     }
+
+    tracing::info!(
+        "Should empty tos_privacy: {}, should empty metrics: {}, latest tos_privacy checksum: {}, current tos_privacy checksum: {:?}",
+        should_empty_tos_privacy,
+        should_empty_metrics,
+        latest_tos_privacy_checksum,
+        app_config.terms_and_privacy_accepted_checksum
+    );
 
     if should_empty_tos_privacy || should_empty_metrics {
         let mut updates = vec![];

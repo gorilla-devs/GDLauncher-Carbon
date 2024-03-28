@@ -233,6 +233,7 @@ struct FESettings {
     mod_sources: ModSources,
     terms_and_privacy_accepted: bool,
     metrics_enabled: bool,
+    metrics_enabled_last_update: Option<chrono::DateTime<chrono::FixedOffset>>,
     random_user_uuid: String,
 }
 
@@ -289,6 +290,7 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             },
             terms_and_privacy_accepted: data.terms_and_privacy_accepted,
             metrics_enabled: data.metrics_enabled,
+            metrics_enabled_last_update: data.metrics_enabled_last_update,
             random_user_uuid: data.random_user_uuid,
         })
     }

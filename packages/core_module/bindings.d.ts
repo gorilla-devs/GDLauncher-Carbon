@@ -203,11 +203,13 @@ export type FEUnifiedPagination = { index: number; pageSize: number; resultCount
 
 export type ModSources = { channels: ModChannelWithUsage[]; platform_blacklist: ModPlatform[] }
 
-export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: FEReleaseChannel; concurrentDownloads: number; downloadDependencies: boolean; launcherActionOnGameLaunch: FELauncherActionOnGameLaunch; showNews: boolean; instancesSortBy: InstancesSortBy; instancesSortByAsc: boolean; instancesGroupBy: InstancesGroupBy; instancesGroupByAsc: boolean; instancesTileSize: number; deletionThroughRecycleBin: boolean; xmx: number; xms: number; preLaunchHook: string | null; wrapperCommand: string | null; postExitHook: string | null; isFirstLaunch: boolean; gameResolution: GameResolution | null; javaCustomArgs: string; autoManageJavaSystemProfiles: boolean; modSources: ModSources; termsAndPrivacyAccepted: boolean; metricsEnabled: boolean; randomUserUuid: string }
+export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: FEReleaseChannel; concurrentDownloads: number; downloadDependencies: boolean; launcherActionOnGameLaunch: FELauncherActionOnGameLaunch; showNews: boolean; instancesSortBy: InstancesSortBy; instancesSortByAsc: boolean; instancesGroupBy: InstancesGroupBy; instancesGroupByAsc: boolean; instancesTileSize: number; deletionThroughRecycleBin: boolean; xmx: number; xms: number; preLaunchHook: string | null; wrapperCommand: string | null; postExitHook: string | null; isFirstLaunch: boolean; gameResolution: GameResolution | null; javaCustomArgs: string; autoManageJavaSystemProfiles: boolean; modSources: ModSources; termsAndPrivacyAccepted: boolean; metricsEnabled: boolean; metricsEnabledLastUpdate: string | null; randomUserUuid: string }
 
 export type ModSource = { Curseforge: CurseforgeMod } | { Modrinth: ModrinthMod }
 
 export type ModpackInfo = { modpack: Modpack; locked: boolean }
+
+export type FESettingsUpdate = { theme?: Set<string> | null; language?: Set<string> | null; reducedMotion?: Set<boolean> | null; discordIntegration?: Set<boolean> | null; releaseChannel?: Set<FEReleaseChannel> | null; concurrentDownloads?: Set<number> | null; downloadDependencies?: Set<boolean> | null; instancesSortBy?: Set<InstancesSortBy> | null; instancesSortByAsc?: Set<boolean> | null; instancesGroupBy?: Set<InstancesGroupBy> | null; instancesGroupByAsc?: Set<boolean> | null; instancesTileSize?: Set<number> | null; deletionThroughRecycleBin?: Set<boolean> | null; showNews?: Set<boolean> | null; xmx?: Set<number> | null; xms?: Set<number> | null; preLaunchHook?: Set<string | null> | null; wrapperCommand?: Set<string | null> | null; postExitHook?: Set<string | null> | null; isFirstLaunch?: Set<boolean> | null; launcherActionOnGameLaunch?: Set<FELauncherActionOnGameLaunch> | null; gameResolution?: Set<GameResolution | null> | null; javaCustomArgs?: Set<string> | null; autoManageJavaSystemProfiles?: Set<boolean> | null; modSources?: Set<ModSources> | null; termsAndPrivacyAccepted?: Set<boolean> | null; metricsEnabled?: Set<boolean> | null }
 
 export type ListInstanceStatus = { status: "valid"; value: ValidListInstance } | { status: "invalid"; value: InvalidListInstance }
 
@@ -234,6 +236,8 @@ export type FEGroupId = number
 export type CFFEFilesParameters = { body: CFFEFilesParametersBody }
 
 export type ModrinthMod = { project_id: string; version_id: string }
+
+export type FELauncherActionOnGameLaunch = "quitApp" | "closeWindow" | "minimizeWindow" | "hideWindow" | "none"
 
 export type AccountType = "microsoft" | "offline"
 
@@ -278,8 +282,6 @@ export type InstanceFolder = "Root" | "Data" | "Mods" | "Configs" | "Screenshots
 export type FEManagedJavaArchMap = { [key: FEManagedJavaArch]: FEManagedJavaVersion[] }
 
 export type ModLoader = { type_: FEInstanceModloaderType; version: string }
-
-export type FELauncherActionOnGameLaunch = "quitApp" | "closeWindow" | "minimizeWindow" | "hideWindow" | "none"
 
 export type CFFEFilesParametersBody = { fileIds: number[] }
 
@@ -508,8 +510,6 @@ export type CFFEModSearchParametersQuery = { gameId: number; searchFilter: strin
 export type FEUnifiedSearchResult = { curseforge: CFFEMod } | { modrinth: MRFEProjectSearchResult }
 
 export type CFFEModFileChangelogParameters = { modId: number; fileId: number }
-
-export type FESettingsUpdate = { theme?: Set<string> | null; language?: Set<string> | null; reducedMotion?: Set<boolean> | null; discordIntegration?: Set<boolean> | null; releaseChannel?: Set<FEReleaseChannel> | null; concurrentDownloads?: Set<number> | null; downloadDependencies?: Set<boolean> | null; instancesSortBy?: Set<InstancesSortBy> | null; instancesSortByAsc?: Set<boolean> | null; instancesGroupBy?: Set<InstancesGroupBy> | null; instancesGroupByAsc?: Set<boolean> | null; instancesTileSize?: Set<number> | null; deletionThroughRecycleBin?: Set<boolean> | null; showNews?: Set<boolean> | null; xmx?: Set<number> | null; xms?: Set<number> | null; preLaunchHook?: Set<string | null> | null; wrapperCommand?: Set<string | null> | null; postExitHook?: Set<string | null> | null; isFirstLaunch?: Set<boolean> | null; launcherActionOnGameLaunch?: Set<FELauncherActionOnGameLaunch> | null; gameResolution?: Set<GameResolution | null> | null; javaCustomArgs?: Set<string> | null; autoManageJavaSystemProfiles?: Set<boolean> | null; modSources?: Set<ModSources> | null; termsAndPrivacyAccepted?: Set<boolean> | null; metricsEnabled?: Set<boolean> | null }
 
 export type ExportArgs = { instance_id: FEInstanceId; target: ExportTarget; save_path: string; self_contained_addons_bundling: boolean; filter: ExportEntry }
 
