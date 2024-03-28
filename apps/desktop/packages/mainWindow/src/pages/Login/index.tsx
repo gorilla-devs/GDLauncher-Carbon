@@ -38,7 +38,8 @@ export default function Login() {
   const isAlreadyAuthenticated = () =>
     routeData?.activeUuid?.data &&
     routeData.accounts.data?.length! > 0 &&
-    routeData.settings.data?.termsAndPrivacyAccepted;
+    routeData.settings.data?.termsAndPrivacyAccepted &&
+    Boolean(routeData.settings.data?.metricsEnabledLastUpdate);
 
   const accountEnrollFinalizeMutation = rspc.createMutation(() => ({
     mutationKey: ["account.enroll.finalize"]

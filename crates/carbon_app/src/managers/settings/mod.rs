@@ -12,7 +12,7 @@ use itertools::Itertools;
 use reqwest_middleware::ClientWithMiddleware;
 use std::path::PathBuf;
 
-mod terms_and_privacy;
+pub mod terms_and_privacy;
 
 pub(crate) struct SettingsManager {
     pub runtime_path: runtime_path::RuntimePath,
@@ -300,7 +300,8 @@ impl ManagerRef<'_, SettingsManager> {
                 )],
             ));
 
-            self.terms_and_privacy
+            let checksum = self
+                .terms_and_privacy
                 .record_consent(
                     terms_and_privacy::ConsentType::TermsAndPrivacy,
                     terms_and_privacy_accepted,
@@ -314,6 +315,16 @@ impl ManagerRef<'_, SettingsManager> {
                         terms_and_privacy_accepted
                     )
                 })?;
+
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![
+                    app_configuration::terms_and_privacy_accepted::set(true),
+                    app_configuration::terms_and_privacy_accepted_checksum::set(Some(
+                        checksum.to_string(),
+                    )),
+                ],
+            ));
         }
 
         if let Some(metrics_enabled) = incoming_settings.metrics_enabled {
