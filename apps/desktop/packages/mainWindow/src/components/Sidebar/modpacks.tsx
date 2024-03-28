@@ -294,26 +294,24 @@ const Sidebar = () => {
       categories: objectCategories as any
     });
   });
-
+  const modLoaders = createMemo(() =>
+    selectedItems().filter((item) => item.includes("Modloader"))
+  );
   createEffect(() => {
-    const modLoaders = selectedItems().filter((item) =>
-      item.includes("Modloader")
-    );
-
     if (modLoaders.length === 0) {
       infiniteQuery.setQuery({
         modloaders: null
       });
     } else {
-      const modloader = modLoaders.map((item) =>
+      const modloader = modLoaders().map((item) =>
         item.split("//")[1].toLowerCase()
       );
+
       infiniteQuery.setQuery({
         modloaders: modloader as FEUnifiedModLoaderType[]
       });
     }
-  });
-
+  }, [selectedItems]);
   createEffect(() => {
     const currentPlatform = _.capitalize(
       selectedItems()
