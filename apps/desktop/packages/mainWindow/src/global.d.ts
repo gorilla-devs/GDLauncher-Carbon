@@ -39,7 +39,6 @@ declare global {
       cb: (event: Electron.IpcRendererEvent) => void
     ) => void;
     installUpdate: () => void;
-    downloadUpdate: () => void;
     openExternalLink: (link: string) => void;
     openFolder: (path: string) => void;
     copyToClipboard: (text: string) => void;
