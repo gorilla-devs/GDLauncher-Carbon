@@ -104,6 +104,10 @@ const defaultModals = {
   javaProfileCreation: {
     component: lazy(() => import("./modals/JavaProfileCreationModal")),
     title: "Create Java Profile"
+  },
+  windowCloseWarning: {
+    component: lazy(() => import("./modals/WindowCloseWarning")),
+    title: "Are you sure you want to quit?"
   }
 };
 

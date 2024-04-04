@@ -6,6 +6,7 @@ import { rspc } from "@/utils/rspcClient";
 import { useModal } from "./managers/ModalsManager";
 import { useKeyDownEvent } from "@solid-primitives/keyboard";
 import { checkForUpdates } from "./utils/updater";
+import { windowCloseWarningAcquireLock } from "./managers/ModalsManager/modals/WindowCloseWarning";
 
 type Props = {
   createInvalidateQuery: () => void;
@@ -19,6 +20,14 @@ const App = (props: Props) => {
 
   // eslint-disable-next-line solid/reactivity
   props.createInvalidateQuery();
+
+  window.onShowWindowCloseModal(() => {
+    if (windowCloseWarningAcquireLock) {
+      modalsContext?.openModal({
+        name: "windowCloseWarning"
+      });
+    }
+  });
 
   initThemes();
 

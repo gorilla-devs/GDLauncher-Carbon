@@ -1,16 +1,19 @@
-use self::terms_and_privacy::TermsAndPrivacy;
+use std::path::PathBuf;
 
-use super::ManagerRef;
-use crate::{
-    api::{keys::settings::*, settings::FESettingsUpdate},
-    db::app_configuration::{self, post_exit_hook, wrapper_command},
-    domain::{self as domain, modplatforms::ModChannelWithUsage, runtime_path},
-};
 use anyhow::{anyhow, Context};
 use chrono::Utc;
 use itertools::Itertools;
 use reqwest_middleware::ClientWithMiddleware;
-use std::path::PathBuf;
+
+use crate::{
+    api::{keys::settings::*, settings::FESettingsUpdate},
+    db::app_configuration::{self},
+    domain::{modplatforms::ModChannelWithUsage, runtime_path, self as domain},
+};
+
+use super::ManagerRef;
+
+use self::terms_and_privacy::TermsAndPrivacy;
 
 pub mod terms_and_privacy;
 
@@ -101,6 +104,15 @@ impl ManagerRef<'_, SettingsManager> {
                 app_configuration::id::equals(0),
                 vec![app_configuration::launcher_action_on_game_launch::set(
                     launcher_action_on_game_launch.inner().into(),
+                )],
+            ));
+        }
+
+        if let Some(show_app_close_warning) = incoming_settings.show_app_close_warning.clone() {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![app_configuration::show_app_close_warning::set(
+                    show_app_close_warning.inner(),
                 )],
             ));
         }
@@ -353,6 +365,10 @@ impl ManagerRef<'_, SettingsManager> {
         if !queries.is_empty() {
             db._batch(queries).await?;
             self.app.invalidate(GET_SETTINGS, None);
+
+            if let Some(show_app_close_warning) = incoming_settings.show_app_close_warning {
+                println!("_SHOW_APP_CLOSE_WARNING_:{}", show_app_close_warning.inner());
+            }
         }
 
         if let Some(auto_manage_java_system_profiles) =

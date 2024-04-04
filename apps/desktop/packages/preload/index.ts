@@ -1,4 +1,4 @@
-import { contextBridge } from "electron";
+import { contextBridge, ipcRenderer } from "electron";
 
 import "./loading";
 import "./core_module_loader";
@@ -23,3 +23,11 @@ if (isDev || skipIntroAnimation) {
     isDev || skipIntroAnimation
   );
 }
+
+contextBridge.exposeInMainWorld("onShowWindowCloseModal", async (cb: any) =>
+  ipcRenderer.on("showAppCloseWarning", cb)
+);
+
+contextBridge.exposeInMainWorld("closeWindow", async () =>
+  ipcRenderer.invoke("closeWindow")
+);

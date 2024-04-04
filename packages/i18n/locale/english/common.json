@@ -421,5 +421,10 @@
   "assigned_java_path": "Assigned Java Path:",
   "add_custom_java_path": "Add Custom Path",
   "java_autocomplete.not_found": "Not found",
-  "java_autocomplete.create_new_custom": "Create New [CUSTOM]"
+  "java_autocomplete.create_new_custom": "Create New [CUSTOM]",
+  "window_close_title": "A GAME IS CURRENTLY RUNNING",
+  "window_close_text_1": "Closing the app will prevent some features from working properly.",
+  "window_close_text_2": "You can also <0>customize the default game launch behavior</0>.",
+  "window_close_never_show": "Never show this again",
+  "window_close_quit_app": "Quit App"
 }

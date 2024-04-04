@@ -19,10 +19,10 @@ import path, { join, resolve } from "path";
 import fs from "fs/promises";
 import fss from "fs";
 import fse from "fs-extra";
+import type { ChildProcessWithoutNullStreams } from "child_process";
 import { spawn } from "child_process";
 import crypto from "crypto";
 import log from "electron-log/main";
-import type { ChildProcessWithoutNullStreams } from "child_process";
 import * as Sentry from "@sentry/electron/main";
 import "./preloadListeners";
 import getAdSize from "./adSize";
@@ -39,6 +39,7 @@ export let CURRENT_RUNTIME_PATH: string | null = null;
 let win: BrowserWindow | null = null;
 
 let isGameRunning = false;
+let showAppCloseWarning = true;
 
 export function initRTPath(override: string | null | undefined) {
   if (override) {
@@ -331,13 +332,14 @@ const loadCoreModule: CoreModule = () =>
             isGameRunning = false;
             switch (action) {
               case "closeWindow":
-                if (!win) {
+                if (!win || win.isDestroyed()) {
                   createWindow();
                 }
                 break;
               case "hideWindow":
               case "minimizeWindow":
                 win?.show();
+                win?.focus();
                 break;
               case "none":
                 break;
@@ -346,6 +348,9 @@ const loadCoreModule: CoreModule = () =>
                 break;
             }
           }
+        } else if (row.startsWith("_SHOW_APP_CLOSE_WARNING_:")) {
+          const rightPart = row.split(":")[1];
+          showAppCloseWarning = rightPart === "true";
         }
       }
       console.log(`[CORE] Message: ${dataString}`);
@@ -405,6 +410,11 @@ async function createWindow(): Promise<BrowserWindow> {
   lastDisplay = currentDisplay;
   const { minWidth, minHeight, height, width } = getAdSize(currentDisplay);
 
+  if (!win || win.isDestroyed()) {
+    win?.destroy();
+    win = null;
+  }
+
   win = new BrowserWindow({
     title: "GDLauncher Carbon",
     minHeight,
@@ -444,8 +454,19 @@ async function createWindow(): Promise<BrowserWindow> {
     win?.webContents?.send("adSizeChanged", adSize);
   });
 
+  win.on("close", (e) => {
+    if (!isGameRunning) {
+      return;
+    }
+
+    if (showAppCloseWarning) {
+      e.preventDefault();
+      win?.webContents.send("showAppCloseWarning");
+    }
+  });
+
   win.webContents.on("will-navigate", (e, url) => {
-    if (win && url !== win.webContents.getURL()) {
+    if (win && !win.isDestroyed() && url !== win.webContents.getURL()) {
       e.preventDefault();
       shell.openExternal(url);
     }
@@ -552,6 +573,11 @@ ipcMain.handle("openFolder", async (_, path) => {
 ipcMain.handle("openCMPWindow", async () => {
   // @ts-ignore
   app.overwolf.openCMPWindow();
+});
+
+ipcMain.handle("closeWindow", async () => {
+  win?.close();
+  win?.destroy();
 });
 
 ipcMain.handle("getUserData", async () => {
@@ -702,11 +728,6 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", async () => {
-  if (isGameRunning) {
-    console.log("[window-all-closed] Game is running, not quitting");
-    return;
-  }
-
   try {
     let _coreModule = await coreModule;
     if (_coreModule.type === "success") {
@@ -714,6 +735,11 @@ app.on("window-all-closed", async () => {
     }
   } catch {
     // No op
+  }
+
+  if (win && !win.isDestroyed()) {
+    win.close();
+    win.destroy();
   }
 
   win = null;
@@ -732,7 +758,7 @@ app.on("before-quit", async () => {
 });
 
 app.on("second-instance", (_e, _argv) => {
-  if (win) {
+  if (win && !win.isDestroyed()) {
     // Focus on the main window if the user tried to open another
     if (win.isMinimized()) win.restore();
     win.focus();
@@ -742,7 +768,7 @@ app.on("second-instance", (_e, _argv) => {
 });
 
 app.on("activate", () => {
-  if (!win) {
+  if (!win || win.isDestroyed()) {
     createWindow();
   }
 });

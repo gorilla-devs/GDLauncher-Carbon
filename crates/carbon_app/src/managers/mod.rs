@@ -1,18 +1,19 @@
-use crate::api::keys::Key;
-use crate::api::InvalidationEvent;
-use crate::db::PrismaClient;
-
-use crate::managers::settings::SettingsManager;
 use std::cell::UnsafeCell;
-
 use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
-use thiserror::Error;
 
+use thiserror::Error;
 use tokio::sync::broadcast::{self, error::RecvError};
 use tracing::error;
+
+pub use app::AppInner;
+
+use crate::api::InvalidationEvent;
+use crate::api::keys::Key;
+use crate::db::PrismaClient;
+use crate::managers::settings::SettingsManager;
 
 use self::account::AccountManager;
 use self::download::DownloadManager;
@@ -46,13 +47,14 @@ pub enum AppError {
 pub const GDL_API_BASE: &str = env!("BASE_API");
 
 mod app {
+    use sentry::capture_error;
     use tracing::error;
 
     use crate::{cache_middleware, domain, iridium_client::get_client};
 
     use super::{
-        java::JavaManager, metadata::cache::MetaCacheManager, metrics::MetricsManager,
-        modplatforms::ModplatformsManager, system_info::SystemInfoManager, *,
+        *, java::JavaManager, metadata::cache::MetaCacheManager,
+        metrics::MetricsManager, modplatforms::ModplatformsManager, system_info::SystemInfoManager,
     };
 
     pub struct AppInner {
@@ -148,6 +150,21 @@ mod app {
 
             let _app = app.clone();
             tokio::spawn(async move {
+                let settings = _app.settings_manager().get_settings().await;
+
+                match settings {
+                    Ok(settings) => {
+                        let show_app_close_warning = settings.show_app_close_warning;
+                        println!("_SHOW_APP_CLOSE_WARNING_:{}", show_app_close_warning);
+                    },
+                    Err(e) => {
+                        error!("Error getting settings: {e}");
+                    }
+                };
+            });
+
+            let _app = app.clone();
+            tokio::spawn(async move {
                 let _ = _app.clone().rich_presence_manager().start_presence().await;
             });
 
@@ -207,14 +224,13 @@ mod app {
     }
 }
 
-pub use app::AppInner;
-
 pub struct ManagerRef<'a, T> {
     pub manager: &'a T,
     pub app: &'a Arc<AppInner>,
 }
 
 impl<T> Copy for ManagerRef<'_, T> {}
+
 impl<T> Clone for ManagerRef<'_, T> {
     fn clone(&self) -> Self {
         *self
@@ -228,6 +244,7 @@ impl<T> Deref for ManagerRef<'_, T> {
         self.manager
     }
 }
+
 pub struct AppRef(pub Weak<AppInner>);
 
 impl AppRef {
@@ -246,6 +263,7 @@ impl AppRef {
 pub struct UnsafeAppRef(Weak<UnsafeCell<MaybeUninit<AppInner>>>);
 
 unsafe impl Send for UnsafeAppRef {}
+
 unsafe impl Sync for UnsafeAppRef {}
 
 impl UnsafeAppRef {
