@@ -338,8 +338,12 @@ const loadCoreModule: CoreModule = () =>
                 break;
               case "hideWindow":
               case "minimizeWindow":
-                win?.show();
-                win?.focus();
+                if (win && !win.isDestroyed()) {
+                  win?.show();
+                  win?.focus();
+                } else {
+                  createWindow();
+                }
                 break;
               case "none":
                 break;
@@ -382,6 +386,21 @@ const loadCoreModule: CoreModule = () =>
         }
       });
     });
+
+    setTimeout(() => {
+      if (coreModule?.killed) {
+        return;
+      }
+
+      console.error(`[CORE] Took too long to start`);
+
+      Sentry.captureException(new Error("Core module took too long to start"));
+
+      resolve({
+        type: "error",
+        logs
+      });
+    }, 15000);
   });
 
 const coreModule = loadCoreModule();
@@ -405,12 +424,21 @@ if (process.defaultApp) {
 
 let lastDisplay: Display | null = null;
 
+let isSpawningWindow = false;
+
 async function createWindow(): Promise<BrowserWindow> {
+  if (isSpawningWindow) {
+    return win!;
+  }
+
+  isSpawningWindow = true;
+
   const currentDisplay = screen.getPrimaryDisplay();
   lastDisplay = currentDisplay;
   const { minWidth, minHeight, height, width } = getAdSize(currentDisplay);
 
   if (!win || win.isDestroyed()) {
+    win?.close();
     win?.destroy();
     win = null;
   }
@@ -493,6 +521,8 @@ async function createWindow(): Promise<BrowserWindow> {
   });
 
   win.on("ready-to-show", () => {
+    isSpawningWindow = false;
+
     coreModule.finally(() => {
       win?.show();
     });
@@ -697,6 +727,22 @@ app.whenReady().then(async () => {
     }
   );
 
+  app.on("second-instance", (_e, _argv) => {
+    if (win && !win.isDestroyed()) {
+      // Focus on the main window if the user tried to open another
+      if (win.isMinimized()) win.restore();
+      win.focus();
+    } else {
+      createWindow();
+    }
+  });
+
+  app.on("activate", () => {
+    if (!win || win.isDestroyed()) {
+      createWindow();
+    }
+  });
+
   await createWindow();
 
   screen.addListener(
@@ -728,6 +774,10 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", async () => {
+  if (isSpawningWindow) {
+    return;
+  }
+
   try {
     let _coreModule = await coreModule;
     if (_coreModule.type === "success") {
@@ -754,22 +804,6 @@ app.on("before-quit", async () => {
     }
   } catch {
     // No op
-  }
-});
-
-app.on("second-instance", (_e, _argv) => {
-  if (win && !win.isDestroyed()) {
-    // Focus on the main window if the user tried to open another
-    if (win.isMinimized()) win.restore();
-    win.focus();
-  } else {
-    createWindow();
-  }
-});
-
-app.on("activate", () => {
-  if (!win || win.isDestroyed()) {
-    createWindow();
   }
 });
 
