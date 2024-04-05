@@ -203,7 +203,7 @@ dependencies = [
  "serde_json",
  "serde_path_to_error",
  "serde_urlencoded",
- "sha1",
+ "sha1 0.10.6",
  "sync_wrapper",
  "tokio",
  "tokio-tungstenite",
@@ -476,7 +476,7 @@ dependencies = [
  "serde_json",
  "serde_qs",
  "serde_repr",
- "sha1",
+ "sha1 0.10.6",
  "sha2 0.10.8",
  "shlex",
  "specta",
@@ -532,7 +532,7 @@ dependencies = [
  "reqwest",
  "reqwest-middleware",
  "reqwest-retry",
- "sha1",
+ "sha1 0.10.6",
  "sha2 0.10.8",
  "thiserror",
  "tokio",
@@ -839,7 +839,7 @@ dependencies = [
 [[package]]
 name = "daedalus"
 version = "0.1.21"
-source = "git+https://github.com/gorilla-devs/daedalus?rev=49294d07b0e66affe837faa75ba44285803ba1ab#49294d07b0e66affe837faa75ba44285803ba1ab"
+source = "git+https://github.com/gorilla-devs/daedalus?rev=5f8874fec2488ba830773b5d04102531ca60dc35#5f8874fec2488ba830773b5d04102531ca60dc35"
 dependencies = [
  "backon",
  "bytes",
@@ -849,7 +849,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "sha1",
+ "sha1 0.6.1",
  "thiserror",
  "tokio",
  "url",
@@ -3995,6 +3995,15 @@ dependencies = [
 
 [[package]]
 name = "sha1"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c1da05c97445caa12d05e848c4a4fcbbea29e748ac28f7e80e9b010392063770"
+dependencies = [
+ "sha1_smol",
+]
+
+[[package]]
+name = "sha1"
 version = "0.10.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3bf829a2d51ab4a5ddf1352d8470c140cadc8301b2ae1789db023f01cedd6ba"
@@ -4003,6 +4012,12 @@ dependencies = [
  "cpufeatures",
  "digest 0.10.7",
 ]
+
+[[package]]
+name = "sha1_smol"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ae1a47186c03a32177042e55dbc5fd5aee900b8e0069a8d70fba96a9375cd012"
 
 [[package]]
 name = "sha2"
@@ -4838,7 +4853,7 @@ dependencies = [
  "httparse",
  "log",
  "rand 0.8.5",
- "sha1",
+ "sha1 0.10.6",
  "thiserror",
  "url",
  "utf-8",
@@ -5525,7 +5540,7 @@ dependencies = [
  "flate2",
  "hmac",
  "pbkdf2",
- "sha1",
+ "sha1 0.10.6",
  "time",
  "zstd",
 ]
