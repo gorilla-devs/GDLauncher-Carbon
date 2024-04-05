@@ -8,7 +8,7 @@ use reqwest_middleware::ClientWithMiddleware;
 use crate::{
     api::{keys::settings::*, settings::FESettingsUpdate},
     db::app_configuration::{self},
-    domain::{modplatforms::ModChannelWithUsage, runtime_path, self as domain},
+    domain::{self as domain, modplatforms::ModChannelWithUsage, runtime_path},
 };
 
 use super::ManagerRef;
@@ -367,7 +367,10 @@ impl ManagerRef<'_, SettingsManager> {
             self.app.invalidate(GET_SETTINGS, None);
 
             if let Some(show_app_close_warning) = incoming_settings.show_app_close_warning {
-                println!("_SHOW_APP_CLOSE_WARNING_:{}", show_app_close_warning.inner());
+                println!(
+                    "_SHOW_APP_CLOSE_WARNING_:{}",
+                    show_app_close_warning.inner()
+                );
             }
         }
 

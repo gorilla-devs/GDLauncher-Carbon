@@ -10,8 +10,8 @@ use tracing::error;
 
 pub use app::AppInner;
 
-use crate::api::InvalidationEvent;
 use crate::api::keys::Key;
+use crate::api::InvalidationEvent;
 use crate::db::PrismaClient;
 use crate::managers::settings::SettingsManager;
 
@@ -53,8 +53,8 @@ mod app {
     use crate::{cache_middleware, domain, iridium_client::get_client};
 
     use super::{
-        *, java::JavaManager, metadata::cache::MetaCacheManager,
-        metrics::MetricsManager, modplatforms::ModplatformsManager, system_info::SystemInfoManager,
+        java::JavaManager, metadata::cache::MetaCacheManager, metrics::MetricsManager,
+        modplatforms::ModplatformsManager, system_info::SystemInfoManager, *,
     };
 
     pub struct AppInner {
@@ -156,7 +156,7 @@ mod app {
                     Ok(settings) => {
                         let show_app_close_warning = settings.show_app_close_warning;
                         println!("_SHOW_APP_CLOSE_WARNING_:{}", show_app_close_warning);
-                    },
+                    }
                     Err(e) => {
                         error!("Error getting settings: {e}");
                     }
