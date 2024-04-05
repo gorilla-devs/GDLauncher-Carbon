@@ -839,7 +839,7 @@ dependencies = [
 [[package]]
 name = "daedalus"
 version = "0.1.21"
-source = "git+https://github.com/gorilla-devs/daedalus?rev=6362627c092a69c28c4ddc9f93715c8e9113964d#6362627c092a69c28c4ddc9f93715c8e9113964d"
+source = "git+https://github.com/gorilla-devs/daedalus?rev=49294d07b0e66affe837faa75ba44285803ba1ab#49294d07b0e66affe837faa75ba44285803ba1ab"
 dependencies = [
  "backon",
  "bytes",
@@ -2869,7 +2869,7 @@ dependencies = [
 [[package]]
 name = "prisma-client-rust"
 version = "0.6.7"
-source = "git+https://github.com/gorilla-devs/prisma-client-rust?rev=35f853c47ac1bdb6fc05f12a7b15d9455ff354c6#35f853c47ac1bdb6fc05f12a7b15d9455ff354c6"
+source = "git+https://github.com/gorilla-devs/prisma-client-rust?rev=f74daf611f5ce8c20351eb05014b9176df2f0939#f74daf611f5ce8c20351eb05014b9176df2f0939"
 dependencies = [
  "base64 0.13.1",
  "bigdecimal",
@@ -2903,7 +2903,7 @@ dependencies = [
 [[package]]
 name = "prisma-client-rust-cli"
 version = "0.6.7"
-source = "git+https://github.com/gorilla-devs/prisma-client-rust?rev=35f853c47ac1bdb6fc05f12a7b15d9455ff354c6#35f853c47ac1bdb6fc05f12a7b15d9455ff354c6"
+source = "git+https://github.com/gorilla-devs/prisma-client-rust?rev=f74daf611f5ce8c20351eb05014b9176df2f0939#f74daf611f5ce8c20351eb05014b9176df2f0939"
 dependencies = [
  "directories",
  "flate2",
@@ -2923,7 +2923,7 @@ dependencies = [
 [[package]]
 name = "prisma-client-rust-macros"
 version = "0.6.7"
-source = "git+https://github.com/gorilla-devs/prisma-client-rust?rev=35f853c47ac1bdb6fc05f12a7b15d9455ff354c6#35f853c47ac1bdb6fc05f12a7b15d9455ff354c6"
+source = "git+https://github.com/gorilla-devs/prisma-client-rust?rev=f74daf611f5ce8c20351eb05014b9176df2f0939#f74daf611f5ce8c20351eb05014b9176df2f0939"
 dependencies = [
  "convert_case 0.6.0",
  "proc-macro2",
@@ -2934,7 +2934,7 @@ dependencies = [
 [[package]]
 name = "prisma-client-rust-sdk"
 version = "0.6.7"
-source = "git+https://github.com/gorilla-devs/prisma-client-rust?rev=35f853c47ac1bdb6fc05f12a7b15d9455ff354c6#35f853c47ac1bdb6fc05f12a7b15d9455ff354c6"
+source = "git+https://github.com/gorilla-devs/prisma-client-rust?rev=f74daf611f5ce8c20351eb05014b9176df2f0939#f74daf611f5ce8c20351eb05014b9176df2f0939"
 dependencies = [
  "convert_case 0.5.0",
  "dml",
