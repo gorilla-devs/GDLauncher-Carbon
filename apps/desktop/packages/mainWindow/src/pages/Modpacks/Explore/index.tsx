@@ -134,7 +134,11 @@ const Modpack = () => {
     if (isCurseforge) {
       if (!routeData.modpackDetails.data) {
         setLoading(false);
-        return addNotification("Error while downloading the modpack.", "error");
+        return addNotification({
+          name: "Error while downloading the modpack.",
+          content: "Modpack details not found.",
+          type: "error"
+        });
       }
       return {
         type: "curseforge",
@@ -148,7 +152,11 @@ const Modpack = () => {
 
       if (!versions || !routeData.modpackDetails.data) {
         setLoading(false);
-        return addNotification("Error while downloading the modpack.", "error");
+        return addNotification({
+          name: "Error while downloading the modpack.",
+          content: "Modpack details not found.",
+          type: "error"
+        });
       }
 
       const versionId = versions[versions.length - 1];
@@ -200,7 +208,11 @@ const Modpack = () => {
         await prepareInstanceMutation.mutateAsync(instanceId);
       } catch (err) {
         console.error(err);
-        addNotification("Error while downloading the modpack.", "error");
+        addNotification({
+          name: "Error while downloading the modpack.",
+          content: "Check the console for more information.",
+          type: "error"
+        });
       } finally {
         setLoading(false);
         navigate(`/library`);

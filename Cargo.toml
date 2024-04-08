@@ -47,7 +47,7 @@ md-5 = "0.10.5"
 murmurhash32 = { git = "https://github.com/gorilla-devs/murmurhash32", rev = "4dfdc49b727581bbdcad4a2315452a2c28db6093" }
 nom = "7"
 num_cpus = "1.16.0"
-opener = "0.6.1"
+opener = "0.7.0"
 parking_lot = "0.12.1"
 prisma-client-rust = { git = "https://github.com/gorilla-devs/prisma-client-rust", rev = "f74daf611f5ce8c20351eb05014b9176df2f0939", features = [
   "sqlite-create-many",

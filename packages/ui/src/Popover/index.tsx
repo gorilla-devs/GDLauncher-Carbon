@@ -163,7 +163,7 @@ const Popover = (_props: Props) => {
 
   return (
     <>
-      <Show when={props.opened || PopoverOpened()}>
+      <Show when={(props.opened || PopoverOpened()) && props.content}>
         <Portal>
           <div
             onMouseEnter={() => {

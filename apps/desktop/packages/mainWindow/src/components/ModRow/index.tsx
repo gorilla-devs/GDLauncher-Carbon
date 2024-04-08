@@ -46,11 +46,17 @@ const ModRow = (props: ModRowProps) => {
     mutationKey: ["instance.prepareInstance"],
     onSuccess() {
       setLoading(false);
-      addNotification("Instance successfully created.");
+      addNotification({
+        name: "Instance successfully created.",
+        type: "success"
+      });
     },
     onError() {
       setLoading(false);
-      addNotification("Error while creating the instance.", "error");
+      addNotification({
+        name: "Error while creating the instance.",
+        type: "error"
+      });
     },
     onSettled() {
       setLoading(false);
@@ -72,7 +78,10 @@ const ModRow = (props: ModRowProps) => {
     },
     onError() {
       setLoading(false);
-      addNotification("Error while downloading the modpack.", "error");
+      addNotification({
+        name: "Error while downloading the modpack.",
+        type: "error"
+      });
     }
   }));
 

@@ -30,7 +30,22 @@ export default function initRspc(_port: number) {
     transport,
     onError: (error) => {
       console.error("RSPC error:", error);
-      addNotification(error.message, "error");
+
+      try {
+        let parsed = JSON.parse(error.message);
+        addNotification({
+          name: "RSPC Error",
+          content: parsed.cause.reduce((acc: string, e: any) => {
+            return acc + (!acc ? "" : " | ") + e.display;
+          }, ""),
+          type: "error"
+        });
+      } catch {
+        addNotification({
+          name: error.message,
+          type: "error"
+        });
+      }
     }
   });
 

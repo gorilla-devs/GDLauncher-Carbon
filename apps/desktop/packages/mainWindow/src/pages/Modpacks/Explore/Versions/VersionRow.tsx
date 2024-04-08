@@ -58,10 +58,18 @@ const VersionRow = (props: Props) => {
       await prepareInstanceMutation.mutateAsync(instanceId);
 
       setLoading(true);
-      addNotification("Instance successfully created.");
+      addNotification({
+        name: "Downloading modpack",
+        content: "Your modpack is being downloaded.",
+        type: "success"
+      });
     } catch (err) {
       setLoading(false);
-      addNotification("Error while downloading the modpack.", "error");
+      addNotification({
+        name: "Error while creating instance",
+        content: "Check the console for more information.",
+        type: "error"
+      });
     } finally {
       setLoading(false);
       navigate(`/library`);

@@ -136,7 +136,11 @@ const TermsAndConditions = (props: Props) => {
                   props.nextStep();
                 } catch (err) {
                   console.log(err);
-                  addNotification("Error during consent saving", "error");
+                  addNotification({
+                    name: "Error while accepting terms and conditions",
+                    content: "Check the console for more information.",
+                    type: "error"
+                  });
                 }
 
                 setLoadingButton(false);

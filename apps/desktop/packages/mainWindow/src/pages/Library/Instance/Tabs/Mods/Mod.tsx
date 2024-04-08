@@ -132,7 +132,11 @@ const Mod = (props: Props) => {
     },
     onError: (err) => {
       console.error(err);
-      addNotification(`Error updating mod: ${err.message}`, "error");
+      addNotification({
+        name: `Error updating mod`,
+        content: err.message,
+        type: "error"
+      });
     }
   }));
 
@@ -140,10 +144,14 @@ const Mod = (props: Props) => {
     if (task.data === null) {
       setUpdateModTaskId(null);
     } else if (task.data?.progress.type === "Failed") {
-      addNotification(
-        `Error updating mod: ${task.data?.progress.value}`,
-        "error"
-      );
+      addNotification({
+        name: `Error updating mod`,
+        content: task.data?.progress.value.cause.reduce(
+          (acc, val) => acc + val + "\n",
+          ""
+        ),
+        type: "error"
+      });
     }
   });
 

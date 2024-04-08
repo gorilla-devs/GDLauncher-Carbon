@@ -12,7 +12,11 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
   const deleteInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.deleteInstance"],
     onError: (error) => {
-      addNotification(error.message, "error");
+      addNotification({
+        name: "Cannot delete instance",
+        content: error.message,
+        type: "error"
+      });
     }
   }));
 

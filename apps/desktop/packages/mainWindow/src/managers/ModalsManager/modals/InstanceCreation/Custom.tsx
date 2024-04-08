@@ -373,11 +373,17 @@ const Custom = (props: Pick<ModalProps, "data">) => {
 
         modalsContext?.closeModal();
         navigate(`/library`);
-        addNotification("Instance successfully created.");
+        addNotification({
+          name: "Instance successfully created.",
+          type: "success"
+        });
       } catch (err) {
         console.error(err);
         modalsContext?.closeModal();
-        addNotification("Error while creating the instance.", "error");
+        addNotification({
+          name: "Error while creating the instance.",
+          type: "error"
+        });
       } finally {
         setError("");
         setCustomTitle("");
@@ -422,11 +428,17 @@ const Custom = (props: Pick<ModalProps, "data">) => {
         });
 
         modalsContext?.closeModal();
-        addNotification("Instance successfully updated.");
+        addNotification({
+          name: "Instance successfully updated.",
+          type: "success"
+        });
       } catch (err) {
         console.error(err);
         modalsContext?.closeModal();
-        addNotification("Error while creating the instance.", "error");
+        addNotification({
+          name: "Error while creating the instance.",
+          type: "error"
+        });
       } finally {
         setError("");
         setCustomTitle("");

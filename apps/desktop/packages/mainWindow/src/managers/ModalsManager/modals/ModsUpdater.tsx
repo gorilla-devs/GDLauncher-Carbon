@@ -28,7 +28,11 @@ const AppUpdate = (props: ModalProps) => {
     mutationKey: ["instance.updateMod"],
     onError: (err) => {
       console.error(err);
-      addNotification(`Error updating mod: ${err?.message}`, "error");
+      addNotification({
+        name: `Error updating mod`,
+        content: err?.message,
+        type: "error"
+      });
     }
   }));
 
@@ -41,10 +45,11 @@ const AppUpdate = (props: ModalProps) => {
         });
       } catch (err) {
         console.error(err);
-        addNotification(
-          `Error updating mod: ${(err as RSPCError)?.message}`,
-          "error"
-        );
+        addNotification({
+          name: `Error updating mod`,
+          content: (err as RSPCError)?.message,
+          type: "error"
+        });
       } finally {
         setModsUpdated((prev) => prev + 1);
       }
@@ -52,7 +57,10 @@ const AppUpdate = (props: ModalProps) => {
       if (isDestroyed()) return;
     }
 
-    addNotification("Mods updated successfully!", "success");
+    addNotification({
+      name: "Mods updated successfully!",
+      type: "success"
+    });
     modalsContext?.closeModal();
   };
 

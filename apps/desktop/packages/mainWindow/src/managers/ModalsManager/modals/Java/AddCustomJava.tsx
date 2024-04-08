@@ -69,10 +69,10 @@ const AddCustomJava = (props: ModalProps) => {
               }
               onClick={() => {
                 createCustomJavaVersionMutation.mutate(value());
-                addNotification(
-                  "Custom Java Path added successfully",
-                  "success"
-                );
+                addNotification({
+                  name: "Custom Java Path added successfully",
+                  type: "success"
+                });
                 modalsContext?.closeModal();
               }}
             >

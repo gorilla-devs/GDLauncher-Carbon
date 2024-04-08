@@ -105,15 +105,25 @@ const CodeStep = (props: Props) => {
     if (isCodeExpired) {
       handleRefersh();
     } else if (typeof error === "string") {
-      addNotification(t(`error.${error}`), "error");
+      addNotification({
+        name: "Authentication Error",
+        content: t(`error.${error}`),
+        type: "error"
+      });
     } else {
       if (typeof error.xboxAccount === "string")
-        addNotification(t(`error.xbox_${error.xboxAccount}`), "error");
-      else
-        addNotification(
-          `${t("error.xbox_code")} ${error.xboxAccount.unknown}`,
-          "error"
-        );
+        addNotification({
+          name: "Authentication Error",
+          content: t(`error.xbox_${error.xboxAccount}`),
+          type: "error"
+        });
+      else {
+        addNotification({
+          name: "Authentication Error",
+          content: `${t("error.xbox_code")} ${error.xboxAccount.unknown}`,
+          type: "error"
+        });
+      }
     }
   };
 
@@ -163,7 +173,10 @@ const CodeStep = (props: Props) => {
                 class="text-lightSlate-600 flex gap-2 items-center hover:text-lightSlate-50"
                 onClick={() => {
                   navigator.clipboard.writeText(deviceCodeLink()!);
-                  addNotification("The link has been copied");
+                  addNotification({
+                    name: "The link has been copied",
+                    type: "success"
+                  });
                 }}
               >
                 <div class="w-4 h-4 i-ri:link" />
@@ -188,7 +201,10 @@ const CodeStep = (props: Props) => {
             id="login-link-btn"
             onClick={() => {
               window.copyToClipboard(userCode() || "");
-              addNotification("The code has been copied");
+              addNotification({
+                name: "The code has been copied",
+                type: "success"
+              });
             }}
           />
           <Show when={expired()}>

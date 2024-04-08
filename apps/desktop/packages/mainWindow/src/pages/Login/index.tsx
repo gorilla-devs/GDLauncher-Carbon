@@ -70,7 +70,11 @@ export default function Login() {
         if (routeData.status.data) setStep(2);
       },
       onError(error) {
-        if (error) addNotification(parseError(error), "error");
+        if (error)
+          addNotification({
+            name: parseError(error),
+            type: "error"
+          });
         setStep(1);
       },
       onComplete() {

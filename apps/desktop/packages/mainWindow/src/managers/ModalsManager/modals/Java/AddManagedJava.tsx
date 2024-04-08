@@ -157,7 +157,10 @@ const AddManagedJava = (props: ModalProps) => {
                       vendor: vend
                     });
 
-                    addNotification("Java added successfully");
+                    addNotification({
+                      name: "Java added successfully",
+                      type: "success"
+                    });
                   } catch (err) {
                     console.error(err);
                     setLoading(false);
