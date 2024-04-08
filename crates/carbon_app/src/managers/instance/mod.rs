@@ -1525,8 +1525,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             InstanceFolder::ShaderPacks => path.get_shaderpacks_path().to_path_buf(),
         };
 
-        if !path.is_dir() {
-            bail!("folder does not exist");
+        if !path.is_file() && !path.is_dir() {
+            tokio::fs::create_dir_all(&path).await.with_context(|| {
+                format!("Creating instance folder at `{}`", path.to_string_lossy())
+            })?;
+        } else if path.is_file() && !path.is_dir() {
+            bail!("Path is a file, not a directory");
         }
 
         opener::open(path)?;
