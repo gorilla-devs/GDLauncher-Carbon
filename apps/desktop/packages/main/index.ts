@@ -325,6 +325,7 @@ const loadCoreModule: CoreModule = () =>
               case "none":
                 break;
               case "quitApp":
+                showAppCloseWarning = false;
                 app.quit();
                 break;
             }
