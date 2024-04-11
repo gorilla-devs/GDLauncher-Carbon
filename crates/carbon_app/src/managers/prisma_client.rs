@@ -79,6 +79,13 @@ async fn find_appropriate_default_xmx() -> i32 {
 }
 
 async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
+    let release_channel = match APP_VERSION {
+        v if v.contains("alpha") => "alpha",
+        v if v.contains("beta") => "beta",
+        _ => "stable",
+    }
+    .to_string();
+
     // Create base app config
     if db_client.app_configuration().count(vec![]).exec().await? == 0 {
         trace!("No app configuration found. Creating default one");
@@ -88,20 +95,15 @@ async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
         let sr = ring::rand::SystemRandom::new();
         sr.fill(&mut buf).unwrap();
 
-        let release_channel = match APP_VERSION {
-            v if v.contains("alpha") => "alpha",
-            v if v.contains("beta") => "beta",
-            _ => "stable",
-        }
-        .to_string();
-
         db_client
             .app_configuration()
             .create(
-                release_channel,
+                release_channel.clone(),
                 find_appropriate_default_xmx().await,
                 Vec::from(buf),
-                vec![],
+                vec![app_configuration::last_app_version::set(Some(
+                    APP_VERSION.to_string(),
+                ))],
             )
             .exec()
             .await?;
@@ -113,6 +115,27 @@ async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
         .exec()
         .await?
         .expect("It's unreasonable to expect that the app configuration doesn't exist");
+
+    let mut updates = vec![];
+
+    let is_equal_to_current_version = app_config
+        .last_app_version
+        .as_ref()
+        .map(|last_version| last_version == APP_VERSION)
+        .unwrap_or(false);
+
+    let should_force_release_channel =
+        if APP_VERSION.contains("alpha") && !is_equal_to_current_version {
+            true
+        } else if APP_VERSION.contains("beta") && !is_equal_to_current_version {
+            true
+        } else {
+            false
+        };
+
+    if should_force_release_channel {
+        updates.push(app_configuration::release_channel::set(String::from(release_channel)));
+    }
 
     let is_metrics_consent_too_old = app_config
         .metrics_enabled_last_update
@@ -149,8 +172,6 @@ async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
                 );
 
             if should_empty_tos_privacy || should_empty_metrics {
-                let mut updates = vec![];
-
                 if should_empty_tos_privacy {
                     updates.push(app_configuration::terms_and_privacy_accepted::set(false));
                     updates.push(app_configuration::terms_and_privacy_accepted_checksum::set(
@@ -162,12 +183,6 @@ async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
                     updates.push(app_configuration::metrics_enabled::set(false));
                     updates.push(app_configuration::metrics_enabled_last_update::set(None));
                 }
-
-                db_client
-                    .app_configuration()
-                    .update(db::app_configuration::id::equals(0), updates)
-                    .exec()
-                    .await?;
             }
         }
         Err(err) => {
@@ -177,6 +192,12 @@ async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
             );
         }
     }
+
+    db_client
+        .app_configuration()
+        .update(db::app_configuration::id::equals(0), updates)
+        .exec()
+        .await?;
 
     JavaManager::ensure_profiles_in_db(db_client)
         .await

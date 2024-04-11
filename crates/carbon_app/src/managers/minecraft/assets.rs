@@ -42,19 +42,33 @@ pub async fn get_meta(
             return Ok((asset_index, db_cache.assets_index));
         } else {
             tracing::warn!(
-                "Failed to deserialize asset index for {} from cache, re-fetching: {}",
+                "Failed to deserialize asset index for {} from cache, re-fetching: {} from {}",
                 version_asset_index.id,
-                db_cache.id
+                db_cache.id,
+                version_asset_index.url.clone()
             );
         }
     }
 
-    let asset_index = reqwest_client
+    let resp = reqwest_client
         .get(version_asset_index.url.clone())
         .send()
-        .await?
-        .bytes()
         .await?;
+
+    if !resp.status().is_success() {
+        anyhow::bail!(
+            "Failed to fetch asset index from `{}`: {}",
+            version_asset_index.url,
+            resp.status()
+        );
+    }
+
+    let asset_index = resp.bytes().await.with_context(|| {
+        format!(
+            "Failed to fetch asset index from `{}`",
+            version_asset_index.url
+        )
+    })?;
 
     db_client
         .assets_meta_cache()

@@ -360,6 +360,8 @@
   "logs.no_logs": "No logs available",
   "logs.copy": "Copy logs",
   "logs.scroll_top": "Scroll to top",
+  "Copy": "Copy",
+  "copied_to_clipboard": "Copied to clipboard",
   "introduction": "Introduction",
   "handle_preferences": "Handle Preferences",
   "import_instances": "Import instances",

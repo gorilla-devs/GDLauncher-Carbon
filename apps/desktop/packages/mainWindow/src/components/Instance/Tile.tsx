@@ -6,7 +6,7 @@ import {
   FESubtask,
   Translation
 } from "@gd/core_module/bindings";
-import { For, Match, Show, Switch, mergeProps } from "solid-js";
+import { For, Match, Show, Switch, createSignal, mergeProps } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
 import { ContextMenu, Popover, Spinner, Tooltip } from "@gd/ui";
@@ -49,6 +49,8 @@ const Tile = (props: Props) => {
     { variant: "default", isLoading: false },
     props
   );
+
+  const [copiedError, setCopiedError] = createSignal(false);
 
   const rspcContext = rspc.useContext();
   const [t] = useTransContext();
@@ -227,8 +229,38 @@ const Tile = (props: Props) => {
             content={
               props.failError ? (
                 <div class="p-4 border-solid border-white b-1">
-                  <div class="text-xl pb-4">
-                    <Trans key="error" />
+                  <div class="text-xl pb-4 w-full flex justify-between">
+                    <div>
+                      <Trans key="error" />
+                    </div>
+                    <div>
+                      <Tooltip
+                        content={
+                          copiedError() ? t("copied_to_clipboard") : t("Copy")
+                        }
+                      >
+                        <div
+                          class="w-6 h-6"
+                          classList={{
+                            "text-darkSlate-300 hover:text-lightSlate-100 duration-100 ease-in-out i-ri:file-copy-2-fill":
+                              !copiedError(),
+                            "text-green-400 i-ri:checkbox-circle-fill":
+                              copiedError()
+                          }}
+                          onClick={() => {
+                            navigator.clipboard.writeText(
+                              props.failError as string
+                            );
+
+                            setCopiedError(true);
+
+                            setTimeout(() => {
+                              setCopiedError(false);
+                            }, 2000);
+                          }}
+                        />
+                      </Tooltip>
+                    </div>
                   </div>
                   <div>{props.failError}</div>
                 </div>
@@ -280,8 +312,8 @@ const Tile = (props: Props) => {
                     <div class="absolute z-10 text-2xl i-ri:alert-fill text-yellow-500 top-1 right-1" />
                   </Show>
                   <Show when={props.failError}>
-                    <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
-                    <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
+                    <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-60 from-30% w-full h-full rounded-2xl" />
+                    <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-60 w-full h-full rounded-2xl" />
                     <div class="i-ri:alert-fill absolute left-0 right-0 top-0 m-auto z-10 text-4xl text-red-500 bottom-20" />
                     <div class="mt-10 z-10 text-center">
                       <div class="text-3xl font-bold">

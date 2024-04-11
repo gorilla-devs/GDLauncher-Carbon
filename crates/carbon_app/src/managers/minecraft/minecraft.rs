@@ -81,13 +81,6 @@ pub async fn get_version(
         .await
         .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 
-    if let Some(db_cache) = db_cache {
-        let version_info = serde_json::from_slice(&db_cache.version_info)
-            .map_err(|err| anyhow::anyhow!("Failed to deserialize version info: {}", err))?;
-
-        return Ok(version_info);
-    }
-
     let url = meta_base_url
         .join(&format!(
             "minecraft/{}/versions/{}.json",
@@ -95,7 +88,39 @@ pub async fn get_version(
         ))
         .unwrap();
 
-    let version_meta = reqwest_client.get(url).send().await?.bytes().await?;
+    if let Some(db_cache) = db_cache {
+        let db_cache = serde_json::from_slice(&db_cache.version_info);
+        if let Ok(db_cache) = db_cache {
+            trace!("Minecraft version {} found in cache", mc_version);
+            return Ok(db_cache);
+        } else {
+            tracing::warn!(
+                "Failed to deserialize minecraft version for {} from cache, re-fetching from {}",
+                mc_version,
+                url.clone()
+            );
+        }
+    }
+
+    let resp = reqwest_client.get(url.clone()).send().await?;
+
+    let status = resp.status();
+
+    if !status.is_success() {
+        anyhow::bail!(
+            "Failed to fetch minecraft version from `{}`: {}",
+            url.clone(),
+            status
+        );
+    }
+
+    let version_meta = resp.bytes().await.with_context(|| {
+        format!(
+            "Failed to fetch minecraft version from `{}`: {}",
+            url.clone(),
+            status
+        )
+    })?;
 
     db_client
         .version_info_cache()

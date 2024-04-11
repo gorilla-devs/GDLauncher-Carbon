@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use anyhow::Context;
 use daedalus::modded::{LoaderVersion, Manifest, PartialVersionInfo};
 use thiserror::Error;
 use tokio::sync::Mutex;
@@ -52,6 +53,11 @@ pub async fn get_version(
         .await
         .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 
+    let version_url = meta_base_url.join(&format!(
+        "fabric/{}/versions/{}.json",
+        META_VERSION, fabric_version
+    ))?;
+
     if let Some(db_cache) = db_cache {
         let db_cache = serde_json::from_slice(&db_cache.partial_version_info);
 
@@ -60,22 +66,32 @@ pub async fn get_version(
             return Ok(db_cache);
         } else {
             tracing::warn!(
-                "Failed to deserialize fabric version for {} from cache, re-fetching",
-                fabric_version
+                "Failed to deserialize fabric version for {} from cache, re-fetching from {}",
+                fabric_version,
+                version_url.clone()
             );
         }
     }
 
-    let version_url = meta_base_url.join(&format!(
-        "fabric/{}/versions/{}.json",
-        META_VERSION, fabric_version
-    ))?;
-    let version_bytes = reqwest_client
-        .get(version_url)
-        .send()
-        .await?
-        .bytes()
-        .await?;
+    let resp = reqwest_client.get(version_url.clone()).send().await?;
+
+    let status = resp.status();
+
+    if !status.is_success() {
+        anyhow::bail!(
+            "Failed to fetch fabric version from `{}`: {}",
+            version_url.clone(),
+            status
+        );
+    }
+
+    let version_bytes = resp.bytes().await.with_context(|| {
+        format!(
+            "Failed to fetch fabric version from `{}`: {}",
+            version_url.clone(),
+            status
+        )
+    })?;
 
     db_client
         .partial_version_info_cache()
