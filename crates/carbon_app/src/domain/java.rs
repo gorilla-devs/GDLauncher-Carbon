@@ -316,6 +316,7 @@ pub enum SystemJavaProfileName {
     Beta,
     Gamma,
     GammaSnapshot,
+    Delta,
     MinecraftJavaExe,
 }
 
@@ -330,6 +331,7 @@ impl SystemJavaProfileName {
             Self::Beta => java_version.major == 17,
             Self::Gamma => java_version.major == 17,
             Self::GammaSnapshot => java_version.major == 17,
+            Self::Delta => java_version.major == 21,
             Self::MinecraftJavaExe => java_version.major == 14,
         }
     }
@@ -343,6 +345,7 @@ impl From<MinecraftJavaProfile> for SystemJavaProfileName {
             MinecraftJavaProfile::JavaRuntimeBeta => Self::Beta,
             MinecraftJavaProfile::JavaRuntimeGamma => Self::Gamma,
             MinecraftJavaProfile::JavaRuntimeGammaSnapshot => Self::GammaSnapshot,
+            MinecraftJavaProfile::JavaRuntimeDelta => Self::Delta,
             MinecraftJavaProfile::MinecraftJavaExe => Self::MinecraftJavaExe,
         }
     }
@@ -359,6 +362,7 @@ impl ToString for SystemJavaProfileName {
             Self::Beta => "beta",
             Self::Gamma => "gamma",
             Self::GammaSnapshot => "gamma_snapshot",
+            Self::Delta => "delta",
             Self::MinecraftJavaExe => "mc_java_exe",
         };
 
@@ -383,6 +387,7 @@ impl TryFrom<&str> for SystemJavaProfileName {
             "beta" => Ok(Self::Beta),
             "gamma" => Ok(Self::Gamma),
             "gamma_snapshot" => Ok(Self::GammaSnapshot),
+            "delta" => Ok(Self::Delta),
             "mc_java_exe" => Ok(Self::MinecraftJavaExe),
             _ => bail!("Invalid system java profile name: {}", value),
         }
