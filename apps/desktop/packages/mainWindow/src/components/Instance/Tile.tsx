@@ -9,7 +9,7 @@ import {
 import { For, Match, Show, Switch, mergeProps } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
-import { ContextMenu, Spinner, Tooltip } from "@gd/ui";
+import { ContextMenu, Popover, Spinner, Tooltip } from "@gd/ui";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { useModal } from "@/managers/ModalsManager";
@@ -223,211 +223,232 @@ const Tile = (props: Props) => {
     <Switch>
       <Match when={mergedProps.variant === "default"}>
         <ContextMenu menuItems={menuItems()}>
-          <div
-            class="flex justify-center flex-col relative select-none group items-start"
-            style={{ "pointer-events": "auto" }}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (
-                !props.isLoading &&
-                !isInQueue() &&
-                !props.isInvalid &&
-                !props.failError &&
-                !props.isDeleting
-              ) {
-                props?.onClick?.(e);
-              }
-            }}
+          <Popover
+            content={
+              props.failError ? (
+                <div class="p-4 border-solid border-white b-1">
+                  <div class="text-xl pb-4">
+                    <Trans key="error" />
+                  </div>
+                  <div>{props.failError}</div>
+                </div>
+              ) : undefined
+            }
           >
             <div
-              class="relative rounded-2xl overflow-hidden border-1 border-solid border-darkSlate-600"
-              classList={{
-                "h-100 w-100": props.size === 5,
-                "h-70 w-70": props.size === 4,
-                "h-50 w-50": props.size === 3,
-                "h-38 w-38": props.size === 2,
-                "h-20 w-20": props.size === 1
+              class="flex justify-center flex-col relative select-none group items-start"
+              style={{ "pointer-events": "auto" }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (
+                  !props.isLoading &&
+                  !isInQueue() &&
+                  !props.isInvalid &&
+                  !props.isDeleting
+                ) {
+                  props?.onClick?.(e);
+                }
               }}
             >
               <div
-                class="flex justify-center relative items-center rounded-2xl overflow-hidden h-full w-full bg-cover bg-center"
+                class="relative rounded-2xl overflow-hidden border-1 border-solid border-darkSlate-600"
                 classList={{
-                  grayscale: props.isLoading || isInQueue()
-                }}
-                style={{
-                  "background-image": props.img
-                    ? `url("${props.img}")`
-                    : `url("${DefaultImg}")`
+                  "h-100 w-100": props.size === 5,
+                  "h-70 w-70": props.size === 4,
+                  "h-50 w-50": props.size === 3,
+                  "h-38 w-38": props.size === 2,
+                  "h-20 w-20": props.size === 1
                 }}
               >
-                <Show when={props.isInvalid}>
-                  <h2 class="text-sm text-center z-20">
-                    <Trans key="instance.error_invalid" />
-                  </h2>
-                  <div class="w-full rounded-2xl z-10 absolute right-0 h-full top-0 bottom-0 left-0 bg-gradient-to-l from-black opacity-50 from-30%" />
-                  <div class="z-10 absolute top-0 bottom-0 left-0 right-0 from-black opacity-50 w-full h-full rounded-2xl bg-gradient-to-t" />
-                  <div class="absolute z-10 text-2xl i-ri:alert-fill text-yellow-500 top-1 right-1" />
-                </Show>
-                <Show when={props.failError}>
-                  <h2 class="text-center z-20 text-sm">{props.failError}</h2>
-                  <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
-                  <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
-                  <div class="i-ri:alert-fill absolute top-1 right-1 z-10 text-2xl text-red-500" />
-                </Show>
-
                 <div
-                  class="group flex justify-center items-center absolute rounded-full cursor-pointer ease-in-out duration-100 hidden h-12 w-12 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
+                  class="flex justify-center relative items-center rounded-2xl overflow-hidden h-full w-full bg-cover bg-center"
                   classList={{
-                    "scale-100 bg-red-500": props.isLoading,
-                    "bg-primary-500 hover:bg-primary-400 text-2xl hover:text-3xl hover:drop-shadow-2xl":
-                      !props.isRunning,
-                    "scale-0": !props.isRunning,
-                    "bg-red-500 scale-100": props.isRunning,
-
-                    "group-hover:scale-100 group-hover:drop-shadow-xl":
-                      !props.isLoading &&
-                      !isInQueue() &&
-                      !props.isInvalid &&
-                      !props.failError &&
-                      !props.isRunning &&
-                      !props.isDeleting
+                    grayscale: props.isLoading || isInQueue()
                   }}
-                  style={{ "pointer-events": "auto" }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlePlayClick();
+                  style={{
+                    "background-image": props.img
+                      ? `url("${props.img}")`
+                      : `url("${DefaultImg}")`
                   }}
                 >
-                  <div
-                    class="text-white"
-                    classList={{
-                      "i-ri:play-fill": !props.isRunning,
-                      "i-ri:stop-fill text-xl": props.isRunning
-                    }}
-                  />
-                </div>
-
-                <Show
-                  when={
-                    props.isLoading &&
-                    props.percentage !== undefined &&
-                    props.percentage !== null
-                  }
-                >
-                  <div class="flex flex-col justify-center items-center z-20 w-full h-full gap-2 p-4">
-                    <h3 class="text-center opacity-50 m-0 text-3xl">
-                      {Math.round(props.percentage as number)}%
-                    </h3>
-                    <div class="h-10">
-                      <For each={props.subTasks}>
-                        {(subTask) => (
-                          <div
-                            class="text-center"
-                            classList={{
-                              "text-xs":
-                                props.subTasks && props.subTasks?.length > 1,
-                              "text-md": props.subTasks?.length === 1
-                            }}
-                          >
-                            <Trans
-                              key={subTask.name.translation}
-                              options={getTranslationArgs(subTask.name)}
-                            />
-                          </div>
-                        )}
-                      </For>
+                  <Show when={props.isInvalid}>
+                    <h2 class="text-sm text-center z-20">
+                      <Trans key="instance.error_invalid" />
+                    </h2>
+                    <div class="w-full rounded-2xl z-10 absolute right-0 h-full top-0 bottom-0 left-0 bg-gradient-to-l from-black opacity-50 from-30%" />
+                    <div class="z-10 absolute top-0 bottom-0 left-0 right-0 from-black opacity-50 w-full h-full rounded-2xl bg-gradient-to-t" />
+                    <div class="absolute z-10 text-2xl i-ri:alert-fill text-yellow-500 top-1 right-1" />
+                  </Show>
+                  <Show when={props.failError}>
+                    <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
+                    <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
+                    <div class="i-ri:alert-fill absolute left-0 right-0 top-0 m-auto z-10 text-4xl text-red-500 bottom-20" />
+                    <div class="mt-10 z-10 text-center">
+                      <div class="text-3xl font-bold">
+                        <Trans key="error" />
+                      </div>
+                      <div class="text-sm">
+                        (<Trans key="hover_for_details" />)
+                      </div>
                     </div>
-                  </div>
-                </Show>
-                <Show when={isInQueue() || props.isDeleting}>
-                  <div class="flex flex-col gap-2 items-center z-12">
-                    <Spinner />
-                    <span class="font-bold">
-                      <Show when={props.isDeleting}>
-                        <Trans key="instance.isDeleting" />
-                      </Show>
-                      <Show when={isInQueue()}>
-                        <Trans key="instance.isInQueue" />
-                      </Show>
-                    </span>
-                  </div>
-                </Show>
-                <Show when={validInstance()?.modpack}>
-                  <div class="absolute flex justify-center items-center border-1 border-solid border-darkSlate-600 bg-darkSlate-900 rounded-lg p-2 top-2 right-2">
-                    <img
-                      class="w-4 h-4"
-                      src={getModpackPlatformIcon(
-                        validInstance()?.modpack?.type
-                      )}
+                  </Show>
+
+                  <div
+                    class="group flex justify-center items-center absolute rounded-full cursor-pointer ease-in-out duration-100 hidden h-12 w-12 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 will-change-transform"
+                    classList={{
+                      "scale-100 bg-red-500": props.isLoading,
+                      "bg-primary-500 hover:bg-primary-400 text-2xl hover:text-3xl hover:drop-shadow-2xl":
+                        !props.isRunning,
+                      "scale-0": !props.isRunning,
+                      "bg-red-500 scale-100": props.isRunning,
+
+                      "group-hover:scale-100 group-hover:drop-shadow-xl":
+                        !props.isLoading &&
+                        !isInQueue() &&
+                        !props.isInvalid &&
+                        !props.failError &&
+                        !props.isRunning &&
+                        !props.isDeleting
+                    }}
+                    style={{ "pointer-events": "auto" }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePlayClick();
+                    }}
+                  >
+                    <div
+                      class="text-white"
+                      classList={{
+                        "i-ri:play-fill": !props.isRunning,
+                        "i-ri:stop-fill text-xl": props.isRunning
+                      }}
                     />
                   </div>
-                </Show>
-                <Show when={props.isLoading || isInQueue() || props.isDeleting}>
-                  <div class="absolute top-0 bottom-0 left-0 right-0 backdrop-blur-sm z-11" />
-                  <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
-                  <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
-                </Show>
-              </div>
-              <Show when={props.isLoading && props.percentage !== undefined}>
-                <div
-                  class="absolute left-0 bottom-0 rounded-full z-40 bg-primary-500 h-1"
-                  style={{
-                    width: `${props.percentage}%`
-                  }}
-                />
-              </Show>
-            </div>
-            <h4
-              class="text-ellipsis whitespace-nowrap mt-2 mb-1"
-              classList={{
-                "text-white":
-                  !props.isLoading && !isInQueue() && !props.isDeleting,
-                "text-lightGray-900":
-                  props.isLoading || isInQueue() || props.isDeleting,
-                "max-w-100": props.size === 5,
-                "max-w-70": props.size === 4,
-                "max-w-50": props.size === 3,
-                "max-w-38": props.size === 2,
-                "max-w-20": props.size === 1
-              }}
-            >
-              <Tooltip
-                content={
-                  props.instance.name.length > 20 ? props.instance.name : ""
-                }
-                placement="top"
-                class="w-full text-ellipsis overflow-hidden"
-              >
-                {props.instance.name}
-              </Tooltip>
-            </h4>
-            <Switch>
-              <Match when={!props.isLoading && !props.isPreparing}>
-                <div class="flex gap-2 justify-between text-lightGray-900">
-                  <span class="flex gap-1">
-                    <Show when={props.modloader}>
+
+                  <Show
+                    when={
+                      props.isLoading &&
+                      props.percentage !== undefined &&
+                      props.percentage !== null
+                    }
+                  >
+                    <div class="flex flex-col justify-center items-center z-20 w-full h-full gap-2 p-4">
+                      <h3 class="text-center opacity-50 m-0 text-3xl">
+                        {Math.round(props.percentage as number)}%
+                      </h3>
+                      <div class="h-10">
+                        <For each={props.subTasks}>
+                          {(subTask) => (
+                            <div
+                              class="text-center"
+                              classList={{
+                                "text-xs":
+                                  props.subTasks && props.subTasks?.length > 1,
+                                "text-md": props.subTasks?.length === 1
+                              }}
+                            >
+                              <Trans
+                                key={subTask.name.translation}
+                                options={getTranslationArgs(subTask.name)}
+                              />
+                            </div>
+                          )}
+                        </For>
+                      </div>
+                    </div>
+                  </Show>
+                  <Show when={isInQueue() || props.isDeleting}>
+                    <div class="flex flex-col gap-2 items-center z-12">
+                      <Spinner />
+                      <span class="font-bold">
+                        <Show when={props.isDeleting}>
+                          <Trans key="instance.isDeleting" />
+                        </Show>
+                        <Show when={isInQueue()}>
+                          <Trans key="instance.isInQueue" />
+                        </Show>
+                      </span>
+                    </div>
+                  </Show>
+                  <Show when={validInstance()?.modpack}>
+                    <div class="absolute flex justify-center items-center border-1 border-solid border-darkSlate-600 bg-darkSlate-900 rounded-lg p-2 top-2 right-2">
                       <img
                         class="w-4 h-4"
-                        src={getCFModloaderIcon(
-                          props.modloader as CFFEModLoaderType
+                        src={getModpackPlatformIcon(
+                          validInstance()?.modpack?.type
                         )}
                       />
-                    </Show>
-                    <Show when={props.size !== 1}>
-                      <p class="m-0">{props.modloader?.toString()}</p>
-                    </Show>
-                  </span>
-                  <p class="m-0">{props.version}</p>
+                    </div>
+                  </Show>
+                  <Show
+                    when={props.isLoading || isInQueue() || props.isDeleting}
+                  >
+                    <div class="absolute top-0 bottom-0 left-0 right-0 backdrop-blur-sm z-11" />
+                    <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl" />
+                    <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl" />
+                  </Show>
                 </div>
-              </Match>
-              <Match when={props.isLoading}>
-                <p class="m-0 text-center text-lightGray-900">
-                  {Math.round(props.downloaded || 0)}MB/
-                  {Math.round(props.totalDownload || 0)}MB
-                </p>
-              </Match>
-            </Switch>
-          </div>
+                <Show when={props.isLoading && props.percentage !== undefined}>
+                  <div
+                    class="absolute left-0 bottom-0 rounded-full z-40 bg-primary-500 h-1"
+                    style={{
+                      width: `${props.percentage}%`
+                    }}
+                  />
+                </Show>
+              </div>
+              <h4
+                class="text-ellipsis whitespace-nowrap mt-2 mb-1"
+                classList={{
+                  "text-white":
+                    !props.isLoading && !isInQueue() && !props.isDeleting,
+                  "text-lightGray-900":
+                    props.isLoading || isInQueue() || props.isDeleting,
+                  "max-w-100": props.size === 5,
+                  "max-w-70": props.size === 4,
+                  "max-w-50": props.size === 3,
+                  "max-w-38": props.size === 2,
+                  "max-w-20": props.size === 1
+                }}
+              >
+                <Tooltip
+                  content={
+                    props.instance.name.length > 20 ? props.instance.name : ""
+                  }
+                  placement="top"
+                  class="w-full text-ellipsis overflow-hidden"
+                >
+                  {props.instance.name}
+                </Tooltip>
+              </h4>
+              <Switch>
+                <Match when={!props.isLoading && !props.isPreparing}>
+                  <div class="flex gap-2 justify-between text-lightGray-900">
+                    <span class="flex gap-1">
+                      <Show when={props.modloader}>
+                        <img
+                          class="w-4 h-4"
+                          src={getCFModloaderIcon(
+                            props.modloader as CFFEModLoaderType
+                          )}
+                        />
+                      </Show>
+                      <Show when={props.size !== 1}>
+                        <p class="m-0">{props.modloader?.toString()}</p>
+                      </Show>
+                    </span>
+                    <p class="m-0">{props.version}</p>
+                  </div>
+                </Match>
+                <Match when={props.isLoading}>
+                  <p class="m-0 text-center text-lightGray-900">
+                    {Math.round(props.downloaded || 0)}MB/
+                    {Math.round(props.totalDownload || 0)}MB
+                  </p>
+                </Match>
+              </Switch>
+            </div>
+          </Popover>
         </ContextMenu>
       </Match>
       <Match when={mergedProps.variant === "sidebar"}>
@@ -610,7 +631,7 @@ const Tile = (props: Props) => {
                 <div class="i-ri:alert-fill text-yellow-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
               </Show>
               <Show when={props.failError}>
-                <div class="i-ri:alert-fill text-red-500 absolute top-1/2 -translate-y-1/2 right-2 z-10 text-2xl" />
+                <div class="i-ri:alert-fill text-red-500 absolute top-1/2 -translate-y-1/2 right-1/2 z-10 text-2xl" />
               </Show>
 
               <div

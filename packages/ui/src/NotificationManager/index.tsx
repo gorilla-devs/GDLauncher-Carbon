@@ -12,12 +12,13 @@ import { createStore, produce } from "solid-js/store";
 import { Tooltip } from "../Tooltip";
 import { Portal } from "solid-js/web";
 
-type NotificationType = "success" | "warning" | "error";
+export type NotificationType = "success" | "warning" | "error";
 // type NotificationPosition = "bottom" | "top";
 
-type Notification = {
+export type Notification = {
   id: number;
-  name: string;
+  name: string | JSX.Element;
+  content?: string | JSX.Element;
   type?: NotificationType;
   // position?: NotificationPosition;
   duration: number;
@@ -30,14 +31,15 @@ type Notification = {
   fadingOut: boolean;
 };
 
-const NotificationContext = createContext<
-  (
-    _name: string,
-    _type?: NotificationType,
-    // _position?: NotificationPosition,
-    _duration?: number
-  ) => void
->();
+export type NotificationT = {
+  name: string | JSX.Element;
+  content?: string | JSX.Element;
+  type?: NotificationType;
+  // position?: NotificationPosition,
+  duration?: number;
+};
+
+const NotificationContext = createContext<(_: NotificationT) => void>();
 
 type Props = {
   children: JSX.Element;
@@ -123,17 +125,18 @@ const NotificationsProvider = (props: Props) => {
     }
   }
 
-  const addNotification = (
-    name: string,
-    type: NotificationType = "success",
-    // position: NotificationPosition = "bottom",
-    duration = 7000
-  ) => {
+  const addNotification = ({
+    name,
+    content,
+    type,
+    duration = 7000,
+  }: NotificationT) => {
     const id = Date.now();
 
     const newNotification: Notification = {
       id,
       name,
+      content,
       type,
       duration,
       remainingDuration: duration,
@@ -279,7 +282,9 @@ const NotificationsProvider = (props: Props) => {
                 </Switch>
                 <div class="w-auto h-full overflow-y-auto m-4 text-left">
                   <div class="font-bold text-xl pb-2">{notification.name}</div>
-                  <div class="text-md">{notification.name}</div>
+                  <div class="text-md">
+                    {notification.content || notification.name}
+                  </div>
                 </div>
                 <div class="h-full flex flex-row gap-4">
                   <div class="min-w-[1px] w-[1px] h-full bg-darkSlate-700" />
@@ -300,7 +305,9 @@ const NotificationsProvider = (props: Props) => {
                             notification.copied,
                         }}
                         onClick={() => {
-                          navigator.clipboard.writeText(notification.name);
+                          navigator.clipboard.writeText(
+                            notification.name?.toString() || ""
+                          );
                           setNotifications(notification.id, "copied", true);
 
                           for (const notification of Object.values(

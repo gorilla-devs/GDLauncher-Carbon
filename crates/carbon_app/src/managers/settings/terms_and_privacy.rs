@@ -8,9 +8,6 @@ use uuid::Uuid;
 
 use crate::managers::GDL_API_BASE;
 
-const BASE_GH_API_REPO_URL: &str = "https://api.github.com/repos/gorilla-devs/ToS-Privacy";
-const BASE_GH_REPO_URL: &str = "https://raw.githubusercontent.com/gorilla-devs/ToS-Privacy";
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ConsentType {
@@ -19,34 +16,23 @@ pub enum ConsentType {
 }
 
 pub struct TermsAndPrivacy {
-    latest_sha: Arc<Mutex<Option<String>>>,
     http_client: ClientWithMiddleware,
 }
 
 impl TermsAndPrivacy {
     pub fn new(http_client: ClientWithMiddleware) -> Self {
-        Self {
-            latest_sha: Arc::new(Mutex::new(None)),
-            http_client,
-        }
+        Self { http_client }
     }
 
+    #[tracing::instrument(skip(self, secret))]
     pub async fn record_consent<'b>(
         &self,
         consent_type: ConsentType,
         consented: bool,
         user_id: &'b Uuid,
         secret: &'b Vec<u8>,
-    ) -> anyhow::Result<()> {
-        let mut lock = self.latest_sha.lock().await;
-        let latest_sha = match lock.as_ref() {
-            Some(sha) => sha.to_owned(),
-            None => {
-                let sha = self.update_latest_commit_sha().await?;
-                *lock = Some(sha.clone());
-                sha
-            }
-        };
+    ) -> anyhow::Result<String> {
+        tracing::info!("Recording consent");
 
         #[derive(Debug, Serialize)]
         pub struct Body<'c> {
@@ -54,69 +40,45 @@ impl TermsAndPrivacy {
             pub secret: &'c Vec<u8>,
             pub consent_type: ConsentType,
             pub consented: bool,
-            pub document_hash: String,
         }
 
         let consent_url = format!("{}/v1/record_consent", GDL_API_BASE);
         let body = Body {
-            document_hash: latest_sha,
             secret,
             user_id,
             consent_type,
             consented,
         };
 
-        let res = self
-            .http_client
-            .post(&consent_url)
-            .json(&body)
-            .send()
-            .await?;
+        let resp = self.http_client.post(&consent_url).json(&body).send().await;
 
-        if !res.status().is_success() {
-            tracing::error!("Failed to record consent: {:?}", res);
+        let accepted_sha = match resp {
+            Ok(res) => {
+                if res.status().is_success() {
+                    tracing::info!("Consent recorded successfully");
 
-            anyhow::bail!("Failed to record consent");
-        }
+                    let sha = res.text().await?;
+                    tracing::info!("Accepted sha: {}", sha);
 
-        Ok(())
-    }
-
-    pub async fn update_latest_commit_sha(&self) -> anyhow::Result<String> {
-        let response = self
-            .http_client
-            .get(&format!("{BASE_GH_API_REPO_URL}/commits/master"))
-            .send()
-            .await?
-            .json::<serde_json::Value>()
-            .await?;
-
-        let sha = response
-            .get("sha")
-            .ok_or_else(|| anyhow::anyhow!("No sha found"))?
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("Sha is not a string"))?;
-
-        Ok(sha.to_owned())
-    }
-
-    pub async fn fetch_terms_of_service_body(&self) -> anyhow::Result<String> {
-        let mut lock = self.latest_sha.lock().await;
-        let latest_sha = match lock.as_ref() {
-            Some(sha) => sha.to_owned(),
-            None => {
-                let sha = self.update_latest_commit_sha().await?;
-                *lock = Some(sha.clone());
-                sha
+                    sha
+                } else {
+                    tracing::error!("Failed to record consent: {:?}", res);
+                    return Err(anyhow::anyhow!("Failed to record consent"));
+                }
+            }
+            Err(e) => {
+                tracing::error!("Failed to record consent: {:?}", e);
+                return Err(anyhow::anyhow!("Failed to record consent"));
             }
         };
 
+        Ok(accepted_sha)
+    }
+
+    pub async fn fetch_terms_of_service_body(&self) -> anyhow::Result<String> {
         let response = self
             .http_client
-            .get(format!(
-                "{}/{}/terms-of-service.md",
-                BASE_GH_REPO_URL, latest_sha
-            ))
+            .get(format!("{}/v1/terms_of_service_md", GDL_API_BASE,))
             .send()
             .await?
             .text()
@@ -126,28 +88,27 @@ impl TermsAndPrivacy {
     }
 
     pub async fn fetch_privacy_statement_body(&self) -> anyhow::Result<String> {
-        let mut lock = self.latest_sha.lock().await;
-        let latest_sha = match lock.as_ref() {
-            Some(sha) => sha.to_owned(),
-            None => {
-                let sha = self.update_latest_commit_sha().await?;
-                *lock = Some(sha.clone());
-                sha
-            }
-        };
-
         let response = self
             .http_client
-            .get(format!(
-                "{}/{}/privacy-statement.md",
-                BASE_GH_REPO_URL, latest_sha
-            ))
+            .get(format!("{}/v1/privacy_statement_md", GDL_API_BASE,))
             .send()
             .await?
             .text()
             .await?;
 
         Ok(parse_markdown_document(&response))
+    }
+
+    pub async fn get_latest_consent_sha() -> anyhow::Result<String> {
+        let client = crate::iridium_client::get_client().build();
+
+        let url = format!("{}/v1/latest_consent_checksum", GDL_API_BASE);
+
+        let latest_consent_sha = client.get(&url).send().await?.text().await?;
+
+        tracing::info!("Latest consent sha: {}", latest_consent_sha);
+
+        Ok(latest_consent_sha)
     }
 }
 

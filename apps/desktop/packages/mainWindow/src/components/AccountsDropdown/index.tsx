@@ -214,7 +214,10 @@ export const AccountsDropdown = (props: Props) => {
       _variables,
       context: { previousActiveUUID: string } | undefined
     ) => {
-      addNotification(error.message, "error");
+      addNotification({
+        name: error.message,
+        type: "error"
+      });
 
       if (context?.previousActiveUUID) {
         queryClient.setQueryData(
@@ -231,7 +234,10 @@ export const AccountsDropdown = (props: Props) => {
   const accountEnrollCancelMutation = rspc.createMutation(() => ({
     mutationKey: ["account.enroll.cancel"],
     onError(error) {
-      addNotification(error.message, "error");
+      addNotification({
+        name: error.message,
+        type: "error"
+      });
       setLoginDeviceCode(null);
       setAddAccountStarting(false);
     },
@@ -251,14 +257,20 @@ export const AccountsDropdown = (props: Props) => {
     onError(error) {
       if (enrollmentInProgress()) accountEnrollCancelMutation.mutate(undefined);
       setAddAccountStarting(false);
-      addNotification(error.message, "error");
+      addNotification({
+        name: error.message,
+        type: "error"
+      });
     }
   }));
 
   const accountEnrollFinalizeMutation = rspc.createMutation(() => ({
     mutationKey: ["account.enroll.finalize"],
     onError(error) {
-      addNotification(error.message, "error");
+      addNotification({
+        name: error.message,
+        type: "error"
+      });
     },
     onMutate() {
       setLoadingAuthorization(false);
@@ -310,7 +322,10 @@ export const AccountsDropdown = (props: Props) => {
       if (routeData.accounts.data?.length === 0) {
         navigate("/");
       } else {
-        addNotification(error.message, "error");
+        addNotification({
+          name: error.message,
+          type: "error"
+        });
 
         if (context?.previousAccounts) {
           queryClient.setQueryData(
@@ -362,14 +377,19 @@ export const AccountsDropdown = (props: Props) => {
         reset();
         accountEnrollCancelMutation.mutate(undefined);
         if (error)
-          addNotification(
-            "somethign went wrong while adding an account",
-            "error"
-          );
+          addNotification({
+            name: "Could not add account",
+            content: error.toString(),
+            type: "error"
+          });
       },
       onError(error) {
         reset();
-        if (error) addNotification(error?.message, "error");
+        if (error)
+          addNotification({
+            name: error?.message,
+            type: "error"
+          });
       },
       onComplete() {
         setLoadingAuthorization(false);
@@ -633,7 +653,10 @@ export const AccountsDropdown = (props: Props) => {
                             (loginDeviceCode() as DeviceCode).userCode
                           );
                         }
-                        addNotification("The code has been copied");
+                        addNotification({
+                          name: "Copied to clipboard",
+                          type: "success"
+                        });
                       }}
                     />
                   </div>

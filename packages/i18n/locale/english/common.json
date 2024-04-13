@@ -71,6 +71,8 @@
   "featured.show_more": "Show more",
   "popular_modpacks": "Popular Modpacks",
   "general": "General",
+  "error": "Error",
+  "hover_for_details": "Hover for details",
   "instance_sorting": "Instance Sorting",
   "select_instance_sorting_method": "Select the method in which instances should be sorted.",
   "expert_user_mod": "Expert user mod",
@@ -382,7 +384,7 @@
   "app_update.new_update_available_text": "A new version of GDLauncher is available!",
   "app_update.join_our_discord": "MacOS builds are not digitally signed yet. This means that it is not able to auto update. Please join our discord to access the link to the new version",
   "app_update.discord_link": "Discord Link",
-  "app_update.download": "Download",
+  "app_update.starting_download": "Starting download...",
   "app_update.downloading": "Downloading... ({{progress}}%)",
   "app_update.apply_and_restart": "Apply And Restart",
   "app_update.current_version": "Current Version",
@@ -421,5 +423,11 @@
   "assigned_java_path": "Assigned Java Path:",
   "add_custom_java_path": "Add Custom Path",
   "java_autocomplete.not_found": "Not found",
-  "java_autocomplete.create_new_custom": "Create New [CUSTOM]"
+  "java_autocomplete.create_new_custom": "Create New [CUSTOM]",
+  "window_close_title": "A GAME IS CURRENTLY RUNNING",
+  "window_close_text_1": "Closing the app will prevent some features from working properly.",
+  "window_close_text_2": "You can also <0>customize the default game launch behavior</0>.",
+  "window_close_never_show": "Never show this again",
+  "window_close_quit_app": "Quit App",
+  "view_logs": "View Logs"
 }

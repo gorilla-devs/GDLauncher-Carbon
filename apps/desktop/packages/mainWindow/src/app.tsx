@@ -1,4 +1,4 @@
-import { createEffect, untrack } from "solid-js";
+import { createEffect, createSignal, untrack } from "solid-js";
 import { useLocation, useRoutes } from "@solidjs/router";
 import { routes } from "./route";
 import initThemes from "./utils/theme";
@@ -6,18 +6,28 @@ import { rspc } from "@/utils/rspcClient";
 import { useModal } from "./managers/ModalsManager";
 import { useKeyDownEvent } from "@solid-primitives/keyboard";
 import { checkForUpdates } from "./utils/updater";
+import { windowCloseWarningAcquireLock } from "./managers/ModalsManager/modals/WindowCloseWarning";
 
 type Props = {
   createInvalidateQuery: () => void;
 };
 
 const App = (props: Props) => {
+  const [runItOnce, setRunItOnce] = createSignal(true);
   const Route = useRoutes(routes);
   const modalsContext = useModal();
   const currentRoute = useLocation();
 
   // eslint-disable-next-line solid/reactivity
   props.createInvalidateQuery();
+
+  window.onShowWindowCloseModal(() => {
+    if (windowCloseWarningAcquireLock) {
+      modalsContext?.openModal({
+        name: "windowCloseWarning"
+      });
+    }
+  });
 
   initThemes();
 
@@ -32,7 +42,11 @@ const App = (props: Props) => {
   }));
 
   createEffect(() => {
-    if (isFirstRun.data?.isFirstLaunch && currentRoute.pathname !== "/") {
+    if (
+      isFirstRun.data?.isFirstLaunch &&
+      currentRoute.pathname !== "/" &&
+      runItOnce()
+    ) {
       untrack(() => {
         modalsContext?.openModal({ name: "onBoarding" });
         setIsFirstRun.mutate({
@@ -41,6 +55,7 @@ const App = (props: Props) => {
           }
         });
       });
+      setRunItOnce(false);
     }
   });
 

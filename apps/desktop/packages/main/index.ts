@@ -19,10 +19,10 @@ import path, { join, resolve } from "path";
 import fs from "fs/promises";
 import fss from "fs";
 import fse from "fs-extra";
+import type { ChildProcessWithoutNullStreams } from "child_process";
 import { spawn } from "child_process";
 import crypto from "crypto";
 import log from "electron-log/main";
-import type { ChildProcessWithoutNullStreams } from "child_process";
 import * as Sentry from "@sentry/electron/main";
 import "./preloadListeners";
 import getAdSize from "./adSize";
@@ -39,6 +39,7 @@ export let CURRENT_RUNTIME_PATH: string | null = null;
 let win: BrowserWindow | null = null;
 
 let isGameRunning = false;
+let showAppCloseWarning = true;
 
 export function initRTPath(override: string | null | undefined) {
   if (override) {
@@ -324,6 +325,7 @@ const loadCoreModule: CoreModule = () =>
               case "none":
                 break;
               case "quitApp":
+                showAppCloseWarning = false;
                 app.quit();
                 break;
             }
@@ -331,13 +333,18 @@ const loadCoreModule: CoreModule = () =>
             isGameRunning = false;
             switch (action) {
               case "closeWindow":
-                if (!win) {
+                if (!win || win.isDestroyed()) {
                   createWindow();
                 }
                 break;
               case "hideWindow":
               case "minimizeWindow":
-                win?.show();
+                if (win && !win.isDestroyed()) {
+                  win?.show();
+                  win?.focus();
+                } else {
+                  createWindow();
+                }
                 break;
               case "none":
                 break;
@@ -346,6 +353,9 @@ const loadCoreModule: CoreModule = () =>
                 break;
             }
           }
+        } else if (row.startsWith("_SHOW_APP_CLOSE_WARNING_:")) {
+          const rightPart = row.split(":")[1];
+          showAppCloseWarning = rightPart === "true";
         }
       }
       console.log(`[CORE] Message: ${dataString}`);
@@ -377,6 +387,21 @@ const loadCoreModule: CoreModule = () =>
         }
       });
     });
+
+    setTimeout(() => {
+      if (coreModule?.killed) {
+        return;
+      }
+
+      console.error(`[CORE] Took too long to start`);
+
+      Sentry.captureException(new Error("Core module took too long to start"));
+
+      resolve({
+        type: "error",
+        logs
+      });
+    }, 15000);
   });
 
 const coreModule = loadCoreModule();
@@ -400,10 +425,24 @@ if (process.defaultApp) {
 
 let lastDisplay: Display | null = null;
 
+let isSpawningWindow = false;
+
 async function createWindow(): Promise<BrowserWindow> {
+  if (isSpawningWindow) {
+    return win!;
+  }
+
+  isSpawningWindow = true;
+
   const currentDisplay = screen.getPrimaryDisplay();
   lastDisplay = currentDisplay;
   const { minWidth, minHeight, height, width } = getAdSize(currentDisplay);
+
+  if (!win || win.isDestroyed()) {
+    win?.close();
+    win?.destroy();
+    win = null;
+  }
 
   win = new BrowserWindow({
     title: "GDLauncher Carbon",
@@ -444,8 +483,19 @@ async function createWindow(): Promise<BrowserWindow> {
     win?.webContents?.send("adSizeChanged", adSize);
   });
 
+  win.on("close", (e) => {
+    if (!isGameRunning) {
+      return;
+    }
+
+    if (showAppCloseWarning) {
+      e.preventDefault();
+      win?.webContents.send("showAppCloseWarning");
+    }
+  });
+
   win.webContents.on("will-navigate", (e, url) => {
-    if (win && url !== win.webContents.getURL()) {
+    if (win && !win.isDestroyed() && url !== win.webContents.getURL()) {
       e.preventDefault();
       shell.openExternal(url);
     }
@@ -472,6 +522,8 @@ async function createWindow(): Promise<BrowserWindow> {
   });
 
   win.on("ready-to-show", () => {
+    isSpawningWindow = false;
+
     coreModule.finally(() => {
       win?.show();
     });
@@ -552,6 +604,11 @@ ipcMain.handle("openFolder", async (_, path) => {
 ipcMain.handle("openCMPWindow", async () => {
   // @ts-ignore
   app.overwolf.openCMPWindow();
+});
+
+ipcMain.handle("closeWindow", async () => {
+  win?.close();
+  win?.destroy();
 });
 
 ipcMain.handle("getUserData", async () => {
@@ -671,6 +728,22 @@ app.whenReady().then(async () => {
     }
   );
 
+  app.on("second-instance", (_e, _argv) => {
+    if (win && !win.isDestroyed()) {
+      // Focus on the main window if the user tried to open another
+      if (win.isMinimized()) win.restore();
+      win.focus();
+    } else {
+      createWindow();
+    }
+  });
+
+  app.on("activate", () => {
+    if (!win || win.isDestroyed()) {
+      createWindow();
+    }
+  });
+
   await createWindow();
 
   screen.addListener(
@@ -702,8 +775,7 @@ app.whenReady().then(async () => {
 });
 
 app.on("window-all-closed", async () => {
-  if (isGameRunning) {
-    console.log("[window-all-closed] Game is running, not quitting");
+  if (isSpawningWindow) {
     return;
   }
 
@@ -714,6 +786,11 @@ app.on("window-all-closed", async () => {
     }
   } catch {
     // No op
+  }
+
+  if (win && !win.isDestroyed()) {
+    win.close();
+    win.destroy();
   }
 
   win = null;
@@ -728,22 +805,6 @@ app.on("before-quit", async () => {
     }
   } catch {
     // No op
-  }
-});
-
-app.on("second-instance", (_e, _argv) => {
-  if (win) {
-    // Focus on the main window if the user tried to open another
-    if (win.isMinimized()) win.restore();
-    win.focus();
-  } else {
-    createWindow();
-  }
-});
-
-app.on("activate", () => {
-  if (!win) {
-    createWindow();
   }
 });
 

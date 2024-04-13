@@ -86,7 +86,10 @@ const JavaProfileCreationModal = (props: ModalProps) => {
                 javaId: javaId()
               });
 
-              notification("Profile created successfully!", "success");
+              notification({
+                name: "Profile created",
+                type: "success"
+              });
 
               modalsContext?.closeModal();
             }}

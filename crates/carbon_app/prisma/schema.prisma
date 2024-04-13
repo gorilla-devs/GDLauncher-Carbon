@@ -29,6 +29,7 @@ model AppConfiguration {
   deletionThroughRecycleBin       Boolean   @default(true)
   gameResolution                  String?
   launcherActionOnGameLaunch      String    @default("none")
+  showAppCloseWarning             Boolean   @default(true)
   javaCustomArgs                  String    @default("")
   xmx                             Int
   xms                             Int       @default(1024)

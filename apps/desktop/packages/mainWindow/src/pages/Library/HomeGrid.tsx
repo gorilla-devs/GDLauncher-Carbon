@@ -34,6 +34,7 @@ import {
 } from "@gd/core_module/bindings";
 import { initNews } from "@/utils/news";
 import { rspc } from "@/utils/rspcClient";
+import { createStore, reconcile } from "solid-js/store";
 
 const NewsWrapper = () => {
   const newsInitializer = initNews();
@@ -66,13 +67,19 @@ const NewsWrapper = () => {
 const HomeGrid = () => {
   const [t] = useTransContext();
 
-  // const rspcContext = rspc.useContext();
-
   const [filter, setFilter] = createSignal("");
 
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
   const [instancesTileSize, setInstancesTileSize] = createSignal(2);
+
+  const [instances, setInstances] = createStore<
+    {
+      id: string | number | null;
+      name: string;
+      instances: ListInstance[];
+    }[]
+  >([]);
 
   createEffect(() => {
     setInstancesTileSize(routeData.settings.data?.instancesTileSize!);
@@ -245,6 +252,10 @@ const HomeGrid = () => {
     }
 
     return iterable;
+  });
+
+  createEffect(() => {
+    setInstances(reconcile(iterableFilteredGroups()));
   });
 
   const sortByOptions: {
@@ -504,7 +515,7 @@ const HomeGrid = () => {
               </Popover>
             </div>
             <div class="mt-4">
-              <For each={iterableFilteredGroups() || []}>
+              <For each={instances || []}>
                 {(group) => (
                   <Show when={group.instances.length > 0}>
                     <Collapsable

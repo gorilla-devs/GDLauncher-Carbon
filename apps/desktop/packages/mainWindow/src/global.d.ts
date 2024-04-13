@@ -39,7 +39,6 @@ declare global {
       cb: (event: Electron.IpcRendererEvent) => void
     ) => void;
     installUpdate: () => void;
-    downloadUpdate: () => void;
     openExternalLink: (link: string) => void;
     openFolder: (path: string) => void;
     copyToClipboard: (text: string) => void;
@@ -60,6 +59,8 @@ declare global {
     changeRuntimePath: (newPath: string | null) => Promise<void>;
     validateRuntimePath: (newPath: string | null) => Promise<boolean>;
     skipIntroAnimation: boolean;
+    closeWindow: () => void;
+    onShowWindowCloseModal: (cb: () => void) => void;
   }
 }
 

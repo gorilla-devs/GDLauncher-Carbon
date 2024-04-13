@@ -342,7 +342,7 @@ impl ManagerRef<'_, InstanceManager> {
                         Ok(text) => Some(Modpack::from(serde_json::from_str::<PackVersionFile>(
                             &text,
                         )?)),
-                        Err(_) => config.modpack.as_ref().map(|m| m.modpack.clone()),
+                        Err(_) => None,
                     };
 
                     enum Modplatform {
@@ -697,6 +697,7 @@ impl ManagerRef<'_, InstanceManager> {
                     enum SkipReplaceReason {
                         DeletedByUser,
                         ModifiedByUser([u8; 16], [u8; 16]),
+                        InSaveFolder,
                     }
 
                     let mut new_files = Vec::<String>::new();
@@ -740,6 +741,11 @@ impl ManagerRef<'_, InstanceManager> {
                                 }
 
                                 if !staging_snapshot.contains(&(&oldfile as &str)) {
+                                    if oldfile.starts_with("/saves") {
+                                        skipped_replacements.push((oldfile.clone(), SkipReplaceReason::InSaveFolder));
+                                        continue;
+                                    }
+
                                     // file is not present in new version and old version was not changed, delete
                                     tokio::fs::remove_file(original_file).await?;
                                     deleted_files.push(oldfile.clone());
@@ -805,6 +811,7 @@ impl ManagerRef<'_, InstanceManager> {
                                     hex::encode(original),
                                     hex::encode(current),
                                 ),
+                                SkipReplaceReason::InSaveFolder => audit_txt += &format!(" - {file}: files in /saves will never be modified\n"),
                             }
                         }
                     }
@@ -1251,17 +1258,17 @@ impl ManagerRef<'_, InstanceManager> {
                                 Some(serde_json::from_str::<Vec<&str>>(&staged_text).context(
                                     "could not parse staging snapshot for packinfo creation",
                                 )?);
-                        }
 
-                        let packinfo =
-                            packinfo::scan_dir(&instance_path.get_data_path(), filter.as_ref())
+                            let packinfo =
+                                packinfo::scan_dir(&instance_path.get_data_path(), filter.as_ref())
+                                    .await?;
+                            let packinfo_str = packinfo::make_packinfo(packinfo)?;
+                            tokio::fs::write(
+                                instance_path.get_root().join("packinfo.json"),
+                                packinfo_str,
+                            )
                                 .await?;
-                        let packinfo_str = packinfo::make_packinfo(packinfo)?;
-                        tokio::fs::write(
-                            instance_path.get_root().join("packinfo.json"),
-                            packinfo_str,
-                        )
-                        .await?;
+                        }
 
                         t_generating_packinfo.complete_opaque();
                     }

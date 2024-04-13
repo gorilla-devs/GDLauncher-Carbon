@@ -1,5 +1,9 @@
 use std::str::FromStr;
 
+use rspc::RouterBuilder;
+use serde::{Deserialize, Serialize};
+use specta::Type;
+
 use crate::{
     api::{
         keys::settings::{
@@ -9,9 +13,6 @@ use crate::{
     },
     managers::App,
 };
-use rspc::RouterBuilder;
-use serde::{Deserialize, Serialize};
-use specta::Type;
 
 use super::{
     modplatforms::{ModChannelWithUsage, ModPlatform, ModSources},
@@ -214,6 +215,7 @@ struct FESettings {
     concurrent_downloads: i32,
     download_dependencies: bool,
     launcher_action_on_game_launch: FELauncherActionOnGameLaunch,
+    show_app_close_warning: bool,
     show_news: bool,
     instances_sort_by: InstancesSortBy,
     instances_sort_by_asc: bool,
@@ -233,6 +235,7 @@ struct FESettings {
     mod_sources: ModSources,
     terms_and_privacy_accepted: bool,
     metrics_enabled: bool,
+    metrics_enabled_last_update: Option<chrono::DateTime<chrono::FixedOffset>>,
     random_user_uuid: String,
 }
 
@@ -262,6 +265,7 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             post_exit_hook: data.post_exit_hook,
             is_first_launch: data.is_first_launch,
             launcher_action_on_game_launch: data.launcher_action_on_game_launch.try_into()?,
+            show_app_close_warning: data.show_app_close_warning,
             game_resolution: data
                 .game_resolution
                 .and_then(|r| GameResolution::from_str(&r).ok()),
@@ -289,6 +293,7 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             },
             terms_and_privacy_accepted: data.terms_and_privacy_accepted,
             metrics_enabled: data.metrics_enabled,
+            metrics_enabled_last_update: data.metrics_enabled_last_update,
             random_user_uuid: data.random_user_uuid,
         })
     }
@@ -378,6 +383,8 @@ pub struct FESettingsUpdate {
     pub is_first_launch: Option<Set<bool>>,
     #[specta(optional)]
     pub launcher_action_on_game_launch: Option<Set<FELauncherActionOnGameLaunch>>,
+    #[specta(optional)]
+    pub show_app_close_warning: Option<Set<bool>>,
     #[specta(optional)]
     pub game_resolution: Option<Set<Option<GameResolution>>>,
     #[specta(optional)]

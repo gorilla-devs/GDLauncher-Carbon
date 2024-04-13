@@ -23,7 +23,7 @@ const TermsAndConditions = (props: Props) => {
   }));
 
   return (
-    <div class="flex flex-col justify-between items-center text-center pb-4 pt-5 px-6 max-w-full h-full box-border">
+    <div class="flex flex-col justify-between items-center text-center h-full box-border pb-4 pt-5 px-6 max-w-full">
       <div class="flex flex-col justify-between items-center w-full">
         <div class="flex flex-col gap-4 w-full">
           <div class="flex justify-between">
@@ -134,8 +134,13 @@ const TermsAndConditions = (props: Props) => {
                   });
 
                   props.nextStep();
-                } catch {
-                  addNotification("Error during consent saving", "error");
+                } catch (err) {
+                  console.log(err);
+                  addNotification({
+                    name: "Error while accepting terms and conditions",
+                    content: "Check the console for more information.",
+                    type: "error"
+                  });
                 }
 
                 setLoadingButton(false);

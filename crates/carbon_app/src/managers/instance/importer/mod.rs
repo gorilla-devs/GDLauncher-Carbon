@@ -122,7 +122,10 @@ impl ManagerRef<'_, InstanceImportManager> {
                 status: scanner.get_status().await,
                 scanning: *scanning,
             }),
-            None => Err(anyhow!("scan target is not set")),
+            None => Ok(FullImportScanStatus {
+                status: ImportScanStatus::NoResults,
+                scanning: false,
+            }),
         }
     }
 

@@ -295,7 +295,7 @@ const General = () => {
             />
           </RightHandSide>
         </Row>
-        <Row>
+        <Row id="launcher_action_on_game_launch">
           <Title
             description={
               <Trans key="settings:launcher_action_on_game_launch_text" />
@@ -363,6 +363,27 @@ const General = () => {
                 settingsMutation.mutate({
                   launcherActionOnGameLaunch: {
                     Set: action
+                  }
+                });
+              }}
+            />
+          </RightHandSide>
+        </Row>
+        <Row>
+          <Title
+            description={
+              <Trans key="settings:show_window_close_warning_text" />
+            }
+          >
+            <Trans key="settings:show_window_close_warning_title" />
+          </Title>
+          <RightHandSide>
+            <Switch
+              checked={settings.showAppCloseWarning}
+              onChange={(e) => {
+                settingsMutation.mutate({
+                  showAppCloseWarning: {
+                    Set: e.currentTarget.checked
                   }
                 });
               }}

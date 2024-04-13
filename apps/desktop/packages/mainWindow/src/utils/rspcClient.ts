@@ -29,7 +29,23 @@ export default function initRspc(_port: number) {
   const client = createClient<Procedures>({
     transport,
     onError: (error) => {
-      addNotification(error.message, "error");
+      console.error("RSPC error:", error);
+
+      try {
+        let parsed = JSON.parse(error.message);
+        addNotification({
+          name: "RSPC Error",
+          content: parsed.cause.reduce((acc: string, e: any) => {
+            return acc + (!acc ? "" : " | ") + e.display;
+          }, ""),
+          type: "error"
+        });
+      } catch {
+        addNotification({
+          name: error.message,
+          type: "error"
+        });
+      }
     }
   });
 

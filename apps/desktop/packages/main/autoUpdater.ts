@@ -47,11 +47,6 @@ export default function initAutoUpdater(win: BrowserWindow | null) {
     }
   );
 
-  ipcMain.handle("downloadUpdate", async () => {
-    console.log("Downloading update");
-    autoUpdater.downloadUpdate();
-  });
-
   autoUpdater.on("update-available", (updateInfo) => {
     console.log("Update available", updateInfo);
     if (win) {
@@ -69,7 +64,7 @@ export default function initAutoUpdater(win: BrowserWindow | null) {
   autoUpdater.on("download-progress", (progress) => {
     console.log("Download progress", progress);
     if (win) {
-      win?.webContents.send("downloadProgress", progress);
+      win.webContents.send("downloadProgress", progress);
     }
   });
 

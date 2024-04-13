@@ -38,7 +38,8 @@ export default function Login() {
   const isAlreadyAuthenticated = () =>
     routeData?.activeUuid?.data &&
     routeData.accounts.data?.length! > 0 &&
-    routeData.settings.data?.termsAndPrivacyAccepted;
+    routeData.settings.data?.termsAndPrivacyAccepted &&
+    Boolean(routeData.settings.data?.metricsEnabledLastUpdate);
 
   const accountEnrollFinalizeMutation = rspc.createMutation(() => ({
     mutationKey: ["account.enroll.finalize"]
@@ -69,7 +70,11 @@ export default function Login() {
         if (routeData.status.data) setStep(2);
       },
       onError(error) {
-        if (error) addNotification(parseError(error), "error");
+        if (error)
+          addNotification({
+            name: parseError(error),
+            type: "error"
+          });
         setStep(1);
       },
       onComplete() {

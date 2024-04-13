@@ -1,6 +1,7 @@
 import { JSX, children } from "solid-js";
 
 type Props = {
+  id?: string;
   children: JSX.Element;
   class?: string;
   forceContentBelow?: boolean;
@@ -16,6 +17,7 @@ function Row(props: Props) {
           (props.forceContentBelow ? " flex-col items-stretch " : "") +
           props.class || ""
       }
+      {...(props.id ? { id: props.id } : {})}
     >
       {c()}
     </div>

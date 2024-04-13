@@ -18,7 +18,10 @@ const CopyIcon = (props: Props) => {
       onClick={() => {
         if (!props.text) return;
         navigator.clipboard.writeText(props.text as string);
-        addNotification("Copied to clipboard", "success");
+        addNotification({
+          name: "Copied to clipboard",
+          type: "success"
+        });
         setClicked(true);
         setTimeout(() => {
           setClicked(false);

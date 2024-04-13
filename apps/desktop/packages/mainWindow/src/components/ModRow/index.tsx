@@ -46,11 +46,17 @@ const ModRow = (props: ModRowProps) => {
     mutationKey: ["instance.prepareInstance"],
     onSuccess() {
       setLoading(false);
-      addNotification("Instance successfully created.");
+      addNotification({
+        name: "Instance successfully created.",
+        type: "success"
+      });
     },
     onError() {
       setLoading(false);
-      addNotification("Error while creating the instance.", "error");
+      addNotification({
+        name: "Error while creating the instance.",
+        type: "error"
+      });
     },
     onSettled() {
       setLoading(false);
@@ -66,16 +72,16 @@ const ModRow = (props: ModRowProps) => {
 
   const createInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.createInstance"],
-    onMutate() {
-      setLoading(true);
-    },
     onSuccess(instanceId) {
       setLoading(true);
       prepareInstanceMutation.mutate(instanceId);
     },
     onError() {
       setLoading(false);
-      addNotification("Error while downloading the modpack.", "error");
+      addNotification({
+        name: "Error while downloading the modpack.",
+        type: "error"
+      });
     }
   }));
 
@@ -247,6 +253,8 @@ const ModRow = (props: ModRowProps) => {
                             runWithOwner(owner, async () => {
                               if (props.type !== "Modpack") return;
 
+                              setLoading(true);
+
                               const imgUrl = getLogoUrl(props);
                               if (imgUrl) loadIconMutation.mutate(imgUrl);
 
@@ -260,7 +268,7 @@ const ModRow = (props: ModRowProps) => {
                                     }
                                   ]);
 
-                                fileVersion = (mrVersions as any).data[0].id;
+                                fileVersion = mrVersions[0].id;
                               }
 
                               createInstanceMutation.mutate({
