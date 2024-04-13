@@ -134,7 +134,9 @@ async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
         };
 
     if should_force_release_channel {
-        updates.push(app_configuration::release_channel::set(String::from(release_channel)));
+        updates.push(app_configuration::release_channel::set(String::from(
+            release_channel,
+        )));
     }
 
     let is_metrics_consent_too_old = app_config
