@@ -124,7 +124,17 @@ pub async fn get_version(
 
     db_client
         .version_info_cache()
-        .create(mc_version.to_string(), version_meta.to_vec(), vec![])
+        .upsert(
+            crate::db::version_info_cache::id::equals(mc_version.to_string()),
+            crate::db::version_info_cache::create(
+                mc_version.to_string(),
+                version_meta.to_vec(),
+                vec![],
+            ),
+            vec![crate::db::version_info_cache::version_info::set(
+                version_meta.to_vec(),
+            )],
+        )
         .exec()
         .await?;
 
@@ -204,11 +214,11 @@ pub async fn get_lwjgl_meta(
             crate::db::lwjgl_meta_cache::create(
                 db_entry_name.clone(),
                 serde_json::to_vec(&lwjgl).unwrap(),
-                vec![crate::db::lwjgl_meta_cache::lwjgl::set(
-                    serde_json::to_vec(&lwjgl).unwrap(),
-                )],
+                vec![],
             ),
-            vec![],
+            vec![crate::db::lwjgl_meta_cache::lwjgl::set(
+                serde_json::to_vec(&lwjgl).unwrap(),
+            )],
         )
         .exec()
         .await?;

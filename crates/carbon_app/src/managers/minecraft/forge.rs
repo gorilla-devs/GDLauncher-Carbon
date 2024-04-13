@@ -115,11 +115,7 @@ pub async fn get_version(
             crate::db::partial_version_info_cache::create(
                 db_entry_name.clone(),
                 version_bytes.to_vec(),
-                vec![
-                    crate::db::partial_version_info_cache::partial_version_info::set(
-                        version_bytes.to_vec(),
-                    ),
-                ],
+                vec![],
             ),
             vec![
                 crate::db::partial_version_info_cache::partial_version_info::set(
