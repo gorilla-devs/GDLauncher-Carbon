@@ -52,8 +52,8 @@ importers:
         specifier: ^24.7.0
         version: 24.7.0
       '@playwright/test':
-        specifier: ^1.38.1
-        version: 1.41.1
+        specifier: ^1.43.1
+        version: 1.43.1
       '@rive-app/canvas':
         specifier: ^1.2.0
         version: 1.2.4
@@ -115,8 +115,8 @@ importers:
         specifier: ^1.2.2
         version: 1.2.2
       electron-playwright-helpers:
-        specifier: ^1.6.0
-        version: 1.7.0
+        specifier: ^1.7.1
+        version: 1.7.1
       electron-updater:
         specifier: ^6.1.7
         version: 6.1.7
@@ -3980,12 +3980,12 @@ packages:
     engines: {node: ^12.20.0 || ^14.18.0 || >=16.0.0}
     dev: true
 
-  /@playwright/test@1.41.1:
-    resolution: {integrity: sha512-9g8EWTjiQ9yFBXc6HjCWe41msLpxEX0KhmfmPl9RPLJdfzL4F0lg2BdJ91O9azFdl11y1pmpwdjBiSxvqc+btw==}
+  /@playwright/test@1.43.1:
+    resolution: {integrity: sha512-HgtQzFgNEEo4TE22K/X7sYTYNqEMMTZmFS8kTq6m8hXj+m1D8TgwgIbumHddJa9h4yl4GkKb8/bgAl2+g7eDgA==}
     engines: {node: '>=16'}
     hasBin: true
     dependencies:
-      playwright: 1.41.1
+      playwright: 1.43.1
     dev: true
 
   /@polka/url@1.0.0-next.24:
@@ -9351,8 +9351,8 @@ packages:
       - supports-color
     dev: true
 
-  /electron-playwright-helpers@1.7.0:
-    resolution: {integrity: sha512-N/i/VYmZoNcuqJoL+HnZqpA1nDTsbhHpMIcu6AP6oJF7wUow1b/ooAadpbxnh67AuT5sbmqYBYGWD8GqlPo7bQ==}
+  /electron-playwright-helpers@1.7.1:
+    resolution: {integrity: sha512-S9mo7LfpERgub2WIuYVPpib4XKFeAqBP+mxYf5Bv7E0B5GUB+LUbSj6Fpu39h18Ar635Nf9nQYTmypjuvaYJng==}
     dependencies:
       '@electron/asar': 3.2.8
     dev: true
@@ -13537,26 +13537,10 @@ packages:
       pathe: 1.1.2
     dev: true
 
-  /playwright-core@1.41.1:
-    resolution: {integrity: sha512-/KPO5DzXSMlxSX77wy+HihKGOunh3hqndhqeo/nMxfigiKzogn8kfL0ZBDu0L1RKgan5XHCPmn6zXd2NUJgjhg==}
-    engines: {node: '>=16'}
-    hasBin: true
-    dev: true
-
   /playwright-core@1.43.1:
     resolution: {integrity: sha512-EI36Mto2Vrx6VF7rm708qSnesVQKbxEWvPrfA1IPY6HgczBplDx7ENtx+K2n4kJ41sLLkuGfmb0ZLSSXlDhqPg==}
     engines: {node: '>=16'}
     hasBin: true
-    dev: true
-
-  /playwright@1.41.1:
-    resolution: {integrity: sha512-gdZAWG97oUnbBdRL3GuBvX3nDDmUOuqzV/D24dytqlKt+eI5KbwusluZRGljx1YoJKZ2NRPaeWiFTeGZO7SosQ==}
-    engines: {node: '>=16'}
-    hasBin: true
-    dependencies:
-      playwright-core: 1.41.1
-    optionalDependencies:
-      fsevents: 2.3.2
     dev: true
 
   /playwright@1.43.1:
@@ -16829,7 +16813,7 @@ packages:
       browserslist: 4.22.2
       chrome-trace-event: 1.0.3
       enhanced-resolve: 5.15.0
-      es-module-lexer: 1.4.1
+      es-module-lexer: 1.5.0
       eslint-scope: 5.1.1
       events: 3.3.0
       glob-to-regexp: 0.4.1
