@@ -61,6 +61,7 @@ declare global {
     skipIntroAnimation: boolean;
     closeWindow: () => void;
     onShowWindowCloseModal: (cb: () => void) => void;
+    relaunch: () => void;
   }
 }
 

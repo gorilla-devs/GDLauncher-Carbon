@@ -198,12 +198,25 @@ pub async fn get_lwjgl_meta(
 
     tracing::trace!("LWJGL JSON URL: {}", lwjgl_json_url);
 
-    let lwjgl = reqwest_client
-        .get(lwjgl_json_url)
-        .send()
-        .await?
-        .json()
-        .await?;
+    let resp = reqwest_client.get(lwjgl_json_url.clone()).send().await?;
+
+    let status = resp.status();
+
+    if !status.is_success() {
+        anyhow::bail!(
+            "Failed to fetch minecraft version from `{}`: {}",
+            lwjgl_json_url.clone(),
+            status
+        );
+    }
+
+    let lwjgl = resp.bytes().await.with_context(|| {
+        format!(
+            "Failed to fetch minecraft version from `{}`: {}",
+            lwjgl_json_url.clone(),
+            status
+        )
+    })?;
 
     let db_entry_name = format!("{}-{}", version_info_lwjgl_requirement.uid, lwjgl_suggest);
 
@@ -211,19 +224,13 @@ pub async fn get_lwjgl_meta(
         .lwjgl_meta_cache()
         .upsert(
             crate::db::lwjgl_meta_cache::id::equals(db_entry_name.clone()),
-            crate::db::lwjgl_meta_cache::create(
-                db_entry_name.clone(),
-                serde_json::to_vec(&lwjgl).unwrap(),
-                vec![],
-            ),
-            vec![crate::db::lwjgl_meta_cache::lwjgl::set(
-                serde_json::to_vec(&lwjgl).unwrap(),
-            )],
+            crate::db::lwjgl_meta_cache::create(db_entry_name.clone(), lwjgl.to_vec(), vec![]),
+            vec![crate::db::lwjgl_meta_cache::lwjgl::set(lwjgl.to_vec())],
         )
         .exec()
         .await?;
 
-    Ok(lwjgl)
+    Ok(serde_json::from_slice(&lwjgl)?)
 }
 
 #[cfg(target_os = "windows")]

@@ -317,6 +317,7 @@
   "onboarding.prev": "Back",
   "onboarding.start_playing": "Start playing!",
   "onboarding.select_all": "Select All",
+  "changelogs.no_changes": "No changes",
   "InstanceTaskLaunch": "Launching {{name}}",
   "InstanceTaskLaunchRequestVersions": "Requesting versions",
   "InstanceTaskLaunchDownloadFiles": "Downloading game files",
