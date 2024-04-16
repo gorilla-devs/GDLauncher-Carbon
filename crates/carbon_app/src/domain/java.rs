@@ -316,6 +316,7 @@ pub enum SystemJavaProfileName {
     Beta,
     Gamma,
     GammaSnapshot,
+    Delta,
     MinecraftJavaExe,
 }
 
@@ -330,20 +331,27 @@ impl SystemJavaProfileName {
             Self::Beta => java_version.major == 17,
             Self::Gamma => java_version.major == 17,
             Self::GammaSnapshot => java_version.major == 17,
+            Self::Delta => java_version.major == 21,
             Self::MinecraftJavaExe => java_version.major == 14,
         }
     }
 }
 
-impl From<MinecraftJavaProfile> for SystemJavaProfileName {
-    fn from(value: MinecraftJavaProfile) -> Self {
+impl TryFrom<MinecraftJavaProfile> for SystemJavaProfileName {
+    type Error = anyhow::Error;
+
+    fn try_from(value: MinecraftJavaProfile) -> Result<Self, Self::Error> {
         match value {
-            MinecraftJavaProfile::JreLegacy => Self::Legacy,
-            MinecraftJavaProfile::JavaRuntimeAlpha => Self::Alpha,
-            MinecraftJavaProfile::JavaRuntimeBeta => Self::Beta,
-            MinecraftJavaProfile::JavaRuntimeGamma => Self::Gamma,
-            MinecraftJavaProfile::JavaRuntimeGammaSnapshot => Self::GammaSnapshot,
-            MinecraftJavaProfile::MinecraftJavaExe => Self::MinecraftJavaExe,
+            MinecraftJavaProfile::JreLegacy => Ok(Self::Legacy),
+            MinecraftJavaProfile::JavaRuntimeAlpha => Ok(Self::Alpha),
+            MinecraftJavaProfile::JavaRuntimeBeta => Ok(Self::Beta),
+            MinecraftJavaProfile::JavaRuntimeGamma => Ok(Self::Gamma),
+            MinecraftJavaProfile::JavaRuntimeGammaSnapshot => Ok(Self::GammaSnapshot),
+            MinecraftJavaProfile::JavaRuntimeDelta => Ok(Self::Delta),
+            MinecraftJavaProfile::MinecraftJavaExe => Ok(Self::MinecraftJavaExe),
+            MinecraftJavaProfile::Unknown(value) => {
+                bail!("Unknown MinecraftJavaProfile: {}", value)
+            }
         }
     }
 }
@@ -359,6 +367,7 @@ impl ToString for SystemJavaProfileName {
             Self::Beta => "beta",
             Self::Gamma => "gamma",
             Self::GammaSnapshot => "gamma_snapshot",
+            Self::Delta => "delta",
             Self::MinecraftJavaExe => "mc_java_exe",
         };
 
@@ -383,6 +392,7 @@ impl TryFrom<&str> for SystemJavaProfileName {
             "beta" => Ok(Self::Beta),
             "gamma" => Ok(Self::Gamma),
             "gamma_snapshot" => Ok(Self::GammaSnapshot),
+            "delta" => Ok(Self::Delta),
             "mc_java_exe" => Ok(Self::MinecraftJavaExe),
             _ => bail!("Invalid system java profile name: {}", value),
         }

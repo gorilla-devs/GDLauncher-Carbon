@@ -18,16 +18,6 @@ const __dirname = dirname(__filename);
 
 let electronApp: ElectronApplication;
 
-const isArm64 = () => {
-  let arm64 = true;
-  try {
-    fs.accessSync(`./release/mac-arm64`);
-  } catch {
-    arm64 = false;
-  }
-  return arm64;
-};
-
 const getRootPath = () => {
   let basePath = path.resolve(__dirname, "../", "release");
 
@@ -89,8 +79,6 @@ const isCoreModulePresent = () => {
 };
 
 test.describe("Init Tests", () => {
-  test.skip(() => isArm64(), "Only x64 is supported on macOS CI");
-
   test.beforeAll(async () => {
     expect(isCoreModulePresent()).toBeTruthy();
 
@@ -138,6 +126,12 @@ test.describe("Init Tests", () => {
 
     const currentUrl = await page.url();
     expect(getActualUrl(currentUrl)).toBe("/");
+
+    const loginContainer = await (
+      await page.waitForSelector("#main-login-page")
+    )?.innerHTML();
+
+    expect(loginContainer).not.toBeUndefined();
   });
 
   // Also test missing core_module

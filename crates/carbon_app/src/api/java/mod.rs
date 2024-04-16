@@ -51,12 +51,14 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
             for version in minecraft_manifest {
                 if let Some(profile_name) = version.java_profile {
-                    let system_profile_name = SystemJavaProfileName::from(profile_name).to_string();
+                    let system_profile_name = SystemJavaProfileName::try_from(profile_name);
 
-                    assignments
-                        .entry(system_profile_name)
+                    if let Ok(system_profile_name) = system_profile_name {
+                        assignments
+                        .entry(system_profile_name.to_string())
                         .or_insert_with(Vec::new)
                         .push(version.id);
+                    }
                 }
             }
 
@@ -254,6 +256,7 @@ pub enum FESystemJavaProfileName {
     Beta,
     Gamma,
     GammaSnapshot,
+    Delta,
     MinecraftJavaExe,
 }
 
@@ -267,6 +270,7 @@ impl From<crate::domain::java::SystemJavaProfileName> for FESystemJavaProfileNam
             SystemJavaProfileName::Beta => Self::Beta,
             SystemJavaProfileName::Gamma => Self::Gamma,
             SystemJavaProfileName::GammaSnapshot => Self::GammaSnapshot,
+            SystemJavaProfileName::Delta => Self::Delta,
             SystemJavaProfileName::MinecraftJavaExe => Self::MinecraftJavaExe,
         }
     }
@@ -281,6 +285,7 @@ impl From<FESystemJavaProfileName> for crate::domain::java::SystemJavaProfileNam
             FESystemJavaProfileName::Beta => Self::Beta,
             FESystemJavaProfileName::Gamma => Self::Gamma,
             FESystemJavaProfileName::GammaSnapshot => Self::GammaSnapshot,
+            FESystemJavaProfileName::Delta => Self::Delta,
             FESystemJavaProfileName::MinecraftJavaExe => Self::MinecraftJavaExe,
         }
     }

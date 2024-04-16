@@ -573,8 +573,17 @@ async function createWindow(): Promise<BrowserWindow> {
 }
 
 // Handlers
-ipcMain.handle("relaunch", () => {
+ipcMain.handle("relaunch", async () => {
   console.info("relaunching app...");
+
+  try {
+    let _coreModule = await coreModule;
+    if (_coreModule.type === "success") {
+      _coreModule.result.kill();
+    }
+  } catch {
+    // No op
+  }
 
   app.relaunch();
   app.exit();

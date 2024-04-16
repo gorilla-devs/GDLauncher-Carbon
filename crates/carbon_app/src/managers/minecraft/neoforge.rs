@@ -5,7 +5,7 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::bail;
+use anyhow::{bail, Context};
 use daedalus::{
     modded::{LoaderVersion, Manifest, PartialVersionInfo, Processor, SidedDataEntry},
     GradleSpecifier,
@@ -86,12 +86,26 @@ pub async fn get_version(
         "neoforge/{}/versions/{}.json",
         META_VERSION, neoforge_version
     ))?;
-    let version_bytes = reqwest_client
-        .get(version_url)
-        .send()
-        .await?
-        .bytes()
-        .await?;
+
+    let resp = reqwest_client.get(version_url.clone()).send().await?;
+
+    let status = resp.status();
+
+    if !status.is_success() {
+        anyhow::bail!(
+            "Failed to fetch neoforge version from `{}`: {}",
+            version_url.clone(),
+            status
+        );
+    }
+
+    let version_bytes = resp.bytes().await.with_context(|| {
+        format!(
+            "Failed to fetch neoforge version from `{}`: {}",
+            version_url.clone(),
+            status
+        )
+    })?;
 
     db_client
         .partial_version_info_cache()
@@ -100,11 +114,7 @@ pub async fn get_version(
             crate::db::partial_version_info_cache::create(
                 db_entry_name.clone(),
                 version_bytes.to_vec(),
-                vec![
-                    crate::db::partial_version_info_cache::partial_version_info::set(
-                        version_bytes.to_vec(),
-                    ),
-                ],
+                vec![],
             ),
             vec![
                 crate::db::partial_version_info_cache::partial_version_info::set(

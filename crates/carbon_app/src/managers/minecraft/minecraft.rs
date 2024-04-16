@@ -81,13 +81,6 @@ pub async fn get_version(
         .await
         .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 
-    if let Some(db_cache) = db_cache {
-        let version_info = serde_json::from_slice(&db_cache.version_info)
-            .map_err(|err| anyhow::anyhow!("Failed to deserialize version info: {}", err))?;
-
-        return Ok(version_info);
-    }
-
     let url = meta_base_url
         .join(&format!(
             "minecraft/{}/versions/{}.json",
@@ -95,11 +88,53 @@ pub async fn get_version(
         ))
         .unwrap();
 
-    let version_meta = reqwest_client.get(url).send().await?.bytes().await?;
+    if let Some(db_cache) = db_cache {
+        let db_cache = serde_json::from_slice(&db_cache.version_info);
+        if let Ok(db_cache) = db_cache {
+            trace!("Minecraft version {} found in cache", mc_version);
+            return Ok(db_cache);
+        } else {
+            tracing::warn!(
+                "Failed to deserialize minecraft version for {} from cache, re-fetching from {}",
+                mc_version,
+                url.clone()
+            );
+        }
+    }
+
+    let resp = reqwest_client.get(url.clone()).send().await?;
+
+    let status = resp.status();
+
+    if !status.is_success() {
+        anyhow::bail!(
+            "Failed to fetch minecraft version from `{}`: {}",
+            url.clone(),
+            status
+        );
+    }
+
+    let version_meta = resp.bytes().await.with_context(|| {
+        format!(
+            "Failed to fetch minecraft version from `{}`: {}",
+            url.clone(),
+            status
+        )
+    })?;
 
     db_client
         .version_info_cache()
-        .create(mc_version.to_string(), version_meta.to_vec(), vec![])
+        .upsert(
+            crate::db::version_info_cache::id::equals(mc_version.to_string()),
+            crate::db::version_info_cache::create(
+                mc_version.to_string(),
+                version_meta.to_vec(),
+                vec![],
+            ),
+            vec![crate::db::version_info_cache::version_info::set(
+                version_meta.to_vec(),
+            )],
+        )
         .exec()
         .await?;
 
@@ -163,12 +198,25 @@ pub async fn get_lwjgl_meta(
 
     tracing::trace!("LWJGL JSON URL: {}", lwjgl_json_url);
 
-    let lwjgl = reqwest_client
-        .get(lwjgl_json_url)
-        .send()
-        .await?
-        .json()
-        .await?;
+    let resp = reqwest_client.get(lwjgl_json_url.clone()).send().await?;
+
+    let status = resp.status();
+
+    if !status.is_success() {
+        anyhow::bail!(
+            "Failed to fetch minecraft version from `{}`: {}",
+            lwjgl_json_url.clone(),
+            status
+        );
+    }
+
+    let lwjgl = resp.bytes().await.with_context(|| {
+        format!(
+            "Failed to fetch minecraft version from `{}`: {}",
+            lwjgl_json_url.clone(),
+            status
+        )
+    })?;
 
     let db_entry_name = format!("{}-{}", version_info_lwjgl_requirement.uid, lwjgl_suggest);
 
@@ -176,19 +224,13 @@ pub async fn get_lwjgl_meta(
         .lwjgl_meta_cache()
         .upsert(
             crate::db::lwjgl_meta_cache::id::equals(db_entry_name.clone()),
-            crate::db::lwjgl_meta_cache::create(
-                db_entry_name.clone(),
-                serde_json::to_vec(&lwjgl).unwrap(),
-                vec![crate::db::lwjgl_meta_cache::lwjgl::set(
-                    serde_json::to_vec(&lwjgl).unwrap(),
-                )],
-            ),
-            vec![],
+            crate::db::lwjgl_meta_cache::create(db_entry_name.clone(), lwjgl.to_vec(), vec![]),
+            vec![crate::db::lwjgl_meta_cache::lwjgl::set(lwjgl.to_vec())],
         )
         .exec()
         .await?;
 
-    Ok(lwjgl)
+    Ok(serde_json::from_slice(&lwjgl)?)
 }
 
 #[cfg(target_os = "windows")]

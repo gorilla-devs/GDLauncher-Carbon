@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use anyhow::{anyhow, bail};
+use anyhow::{anyhow, bail, Context};
 use axum::routing::trace;
 use chrono::{DateTime, Utc};
 use jsonwebtoken::{errors::ErrorKind, Algorithm, DecodingKey, Validation};
@@ -198,10 +198,12 @@ impl MsAuth {
                 ),
             ])
             .send()
-            .await?
+            .await
+            .with_context(|| format!("Failed to refresh auth token with refresh token"))?
             .error_for_status()?
             .json::<RefreshResponse>()
-            .await?;
+            .await
+            .with_context(|| format!("Failed to parse refresh response"))?;
 
         trace!("Refreshed auth token");
 
@@ -250,10 +252,12 @@ impl XboxAuth {
                 .header("Accept", "application/json")
                 .json(&json)
                 .send()
-                .await?
+                .await
+                .with_context(|| format!("Failed to authenticate Xbox account"))?
                 .error_for_status()?
                 .json::<XblToken>()
-                .await?;
+                .await
+                .with_context(|| format!("Failed to parse Xbox auth response"))?;
 
             response.token
         };
@@ -278,7 +282,8 @@ impl XboxAuth {
             .header("Content-Type", "application/json")
             .json(&json)
             .send()
-            .await?;
+            .await
+            .with_context(|| format!("Failed to get XSTS token"))?;
 
         match response.status() {
             StatusCode::OK => {
@@ -302,7 +307,10 @@ impl XboxAuth {
                     uhs: String,
                 }
 
-                let response = response.json::<XstsToken>().await?;
+                let response = response
+                    .json::<XstsToken>()
+                    .await
+                    .with_context(|| format!("Failed to parse XSTS token response"))?;
 
                 Ok(Ok(Self {
                     xsts_token: response.token,
@@ -331,7 +339,10 @@ impl XboxAuth {
                     xerr: u32,
                 }
 
-                let xsts_err = response.json::<XstsError>().await?;
+                let xsts_err = response
+                    .json::<XstsError>()
+                    .await
+                    .with_context(|| format!("Failed to parse XSTS error response"))?;
 
                 Ok(Err(XboxError::from_xerr(xsts_err.xerr)))
             }
@@ -409,10 +420,12 @@ impl McAuth {
             .header("Accept", "application/json")
             .json(&json)
             .send()
-            .await?
+            .await
+            .with_context(|| format!("Failed to authenticate Minecraft account"))?
             .error_for_status()?
             .json::<McAuthResponse>()
-            .await?;
+            .await
+            .with_context(|| format!("Failed to parse Minecraft auth response"))?;
 
         trace!("Got Minecraft auth token");
 
@@ -438,10 +451,12 @@ impl McAuth {
             .get("https://api.minecraftservices.com/entitlements/mcstore")
             .bearer_auth(&self.access_token)
             .send()
-            .await?
+            .await
+            .with_context(|| format!("Failed to check game entitlement"))?
             .error_for_status()?
             .json::<EntitlementResponse>()
-            .await?;
+            .await
+            .with_context(|| format!("Failed to parse game entitlement response"))?;
 
         trace!("Got game entitlement");
 
@@ -505,7 +520,8 @@ pub async fn get_profile(
         .get("https://api.minecraftservices.com/minecraft/profile")
         .bearer_auth(access_token)
         .send()
-        .await?;
+        .await
+        .with_context(|| format!("Failed to get game profile"))?;
 
     match response.status() {
         StatusCode::UNAUTHORIZED => Ok(Err(GetProfileError::AuthTokenInvalid)),

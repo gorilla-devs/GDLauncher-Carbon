@@ -44,11 +44,11 @@ image = { version = "0.24.5" }
 jsonwebtoken = "8.2.0"
 # libc = "0.2"
 md-5 = "0.10.5"
+carbon_scheduler = { git = "https://github.com/gorilla-devs/carbon_scheduler", rev = "4212ac32ca648ceb45e4d8c849360203f96c2be2" }
 murmurhash32 = { git = "https://github.com/gorilla-devs/murmurhash32", rev = "4dfdc49b727581bbdcad4a2315452a2c28db6093" }
 nom = "7"
 num_cpus = "1.16.0"
 opener = "0.7.0"
-parking_lot = "0.12.1"
 prisma-client-rust = { git = "https://github.com/gorilla-devs/prisma-client-rust", rev = "f74daf611f5ce8c20351eb05014b9176df2f0939", features = [
   "sqlite-create-many",
   "sqlite",
@@ -59,7 +59,6 @@ prisma-client-rust-cli = { git = "https://github.com/gorilla-devs/prisma-client-
   "sqlite",
   "migrations",
 ], default_features = false }
-rayon = "1.9.0"
 regex = "1.7.0"
 const_format = "0.2.32"
 reqwest = { version = "0.11.13", default-features = false, features = [
@@ -75,7 +74,7 @@ specta = "1"
 rspc-axum = "0.1.1"
 serde = "1.0.197"
 serde_json = "1.0.114"
-daedalus = { git = "https://github.com/gorilla-devs/daedalus", rev = "5f8874fec2488ba830773b5d04102531ca60dc35" }
+daedalus = { git = "https://github.com/gorilla-devs/daedalus", rev = "c088da887b872d8a4d4f066485c2240bd2559340" }
 sha1 = "0.10.5"
 sha2 = "0.10.6"
 tar = "0.4.38"

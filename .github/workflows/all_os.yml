@@ -60,6 +60,11 @@ jobs:
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           GDL_AUTH: ${{ secrets.GDL_AUTH }}
         run: pnpm test
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/desktop/playwright-report
   ubuntu_x64:
     defaults:
       run:
@@ -114,6 +119,11 @@ jobs:
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           GDL_AUTH: ${{ secrets.GDL_AUTH }}
         run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/desktop/playwright-report
   windows_x64:
     defaults:
       run:
@@ -178,3 +188,8 @@ jobs:
           GDL_AUTH: ${{ secrets.GDL_AUTH }}
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: pnpm test
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/desktop/playwright-report

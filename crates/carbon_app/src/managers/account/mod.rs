@@ -16,7 +16,7 @@ use std::{
     sync::{Arc, Weak},
     time::{Duration, Instant},
 };
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use thiserror::Error;
 use tokio::sync::{Mutex, RwLock};
@@ -727,7 +727,11 @@ impl AccountRefreshService {
                             continue;
                         };
 
-                        if token_expires < Utc::now() - chrono::Duration::hours(1) {
+                        let expiration_threshold = Utc::now() - chrono::Duration::hours(12);
+
+                        trace!("Checking account {uuid} for token expiration. Expires at {token_expires}. Current time is {now}. Comparison is {token_expires} < {expiration_threshold}", now = Utc::now());
+
+                        if token_expires < expiration_threshold {
                             debug!(
                                 "Attempting to refresh access token for expired account {}",
                                 &account.uuid

@@ -7,7 +7,7 @@ use reqwest_middleware::ClientWithMiddleware;
 
 use crate::{
     api::{keys::settings::*, settings::FESettingsUpdate},
-    db::app_configuration::{self},
+    db::app_configuration::{self, last_app_version},
     domain::{self as domain, modplatforms::ModChannelWithUsage, runtime_path},
 };
 
@@ -113,6 +113,15 @@ impl ManagerRef<'_, SettingsManager> {
                 app_configuration::id::equals(0),
                 vec![app_configuration::show_app_close_warning::set(
                     show_app_close_warning.inner(),
+                )],
+            ));
+        }
+
+        if let Some(last_app_version) = incoming_settings.last_app_version.clone() {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![app_configuration::last_app_version::set(
+                    last_app_version.inner(),
                 )],
             ));
         }

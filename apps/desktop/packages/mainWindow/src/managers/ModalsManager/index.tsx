@@ -108,6 +108,10 @@ const defaultModals = {
   windowCloseWarning: {
     component: lazy(() => import("./modals/WindowCloseWarning")),
     title: "Are you sure you want to quit?"
+  },
+  changelogs: {
+    component: lazy(() => import("./modals/Changelogs")),
+    title: "Welcome to a new version of GDLauncher!"
   }
 };
 

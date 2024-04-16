@@ -93,7 +93,10 @@ export default function Login() {
         <Navigate href={"/library"} />
       </Match>
       <Match when={!isAlreadyAuthenticated()}>
-        <div class="flex justify-center items-center w-full p-0 h-screen">
+        <div
+          class="flex justify-center items-center w-full p-0 h-screen"
+          id="main-login-page"
+        >
           <video
             class="absolute flex justify-center items-center w-full p-0 h-screen object-cover"
             src={BackgroundVideo}

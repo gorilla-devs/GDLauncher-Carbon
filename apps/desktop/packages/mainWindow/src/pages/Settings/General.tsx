@@ -444,11 +444,24 @@ const General = () => {
           </RightHandSide>
         </Row>
         <Row class="bg-darkSlate-900 rounded-xl px-6 py-4">
-          <img src={GDLauncherWideLogo} class="h-14 cursor-pointer" />
+          <img
+            src={GDLauncherWideLogo}
+            class="h-14 cursor-pointer hover:opacity-80 transition-opacity duration-200 ease-in-out"
+            onClick={() => {
+              modalsContext?.openModal({
+                name: "changelogs"
+              });
+            }}
+          />
           <RightHandSide>
             <div>
               <div class="flex justify-end gap-4 flex-col items-center 2xl:flex-row">
-                <Button type="secondary">
+                <Button
+                  type="secondary"
+                  onClick={() => {
+                    window.relaunch();
+                  }}
+                >
                   <div class="flex items-center gap-2">
                     <i class="w-5 h-5 i-ri:restart-line" />
                     <div>

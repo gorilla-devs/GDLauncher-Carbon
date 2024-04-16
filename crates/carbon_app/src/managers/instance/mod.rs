@@ -1655,7 +1655,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 return None;
             };
 
-            Some(SystemJavaProfileName::from(required_java).to_string())
+            SystemJavaProfileName::try_from(required_java)
+                .map(|v| v.to_string())
+                .ok()
         });
 
         Ok(domain::InstanceDetails {

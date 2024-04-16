@@ -260,8 +260,6 @@ export type MRFEAdditionalFileType = "requiredResourcePack" | "optionalResourceP
 
 export type ExportArgs = { instance_id: FEInstanceId; target: ExportTarget; save_path: string; self_contained_addons_bundling: boolean; filter: ExportEntry }
 
-export type FELauncherActionOnGameLaunch = "quitApp" | "closeWindow" | "minimizeWindow" | "hideWindow" | "none"
-
 export type CFFEModSearchSortField = "featured" | "popularity" | "lastUpdated" | "name" | "author" | "totalDownloads" | "category" | "gameVersion"
 
 export type UpdateMod = { instance_id: FEInstanceId; mod_id: string }
@@ -324,6 +322,8 @@ export type MRFELicense = { id: string; name: string; url: string | null }
 
 export type MRFERequestedVersionStatus = "listed" | "archived" | "draft" | "unlisted"
 
+export type FEJavaProfile = { name: string; javaId: string | null; isSystem: boolean }
+
 export type ValidListInstance = { mc_version: string | null; modloader: FEInstanceModloaderType | null; modpack: Modpack | null; state: LaunchState }
 
 export type ChangeModpack = { instance: FEInstanceId; modpack: Modpack }
@@ -339,7 +339,7 @@ export type ListInstance = { id: FEInstanceId; group_id: FEGroupId; name: string
 
 export type CFFEFileDependency = { modId: number; relationType: CFFEFileRelationType }
 
-export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: FEReleaseChannel; concurrentDownloads: number; downloadDependencies: boolean; launcherActionOnGameLaunch: FELauncherActionOnGameLaunch; showAppCloseWarning: boolean; showNews: boolean; instancesSortBy: InstancesSortBy; instancesSortByAsc: boolean; instancesGroupBy: InstancesGroupBy; instancesGroupByAsc: boolean; instancesTileSize: number; deletionThroughRecycleBin: boolean; xmx: number; xms: number; preLaunchHook: string | null; wrapperCommand: string | null; postExitHook: string | null; isFirstLaunch: boolean; gameResolution: GameResolution | null; javaCustomArgs: string; autoManageJavaSystemProfiles: boolean; modSources: ModSources; termsAndPrivacyAccepted: boolean; metricsEnabled: boolean; metricsEnabledLastUpdate: string | null; randomUserUuid: string }
+export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: FEReleaseChannel; lastAppVersion: string | null; concurrentDownloads: number; downloadDependencies: boolean; launcherActionOnGameLaunch: FELauncherActionOnGameLaunch; showAppCloseWarning: boolean; showNews: boolean; instancesSortBy: InstancesSortBy; instancesSortByAsc: boolean; instancesGroupBy: InstancesGroupBy; instancesGroupByAsc: boolean; instancesTileSize: number; deletionThroughRecycleBin: boolean; xmx: number; xms: number; preLaunchHook: string | null; wrapperCommand: string | null; postExitHook: string | null; isFirstLaunch: boolean; gameResolution: GameResolution | null; javaCustomArgs: string; autoManageJavaSystemProfiles: boolean; modSources: ModSources; termsAndPrivacyAccepted: boolean; metricsEnabled: boolean; metricsEnabledLastUpdate: string | null; randomUserUuid: string }
 
 export type MRFEProjectIDs = string[]
 
@@ -405,6 +405,8 @@ export type CFFEModFilesParametersQuery = { gameVersion?: string | null; modLoad
 
 export type ConfigurationParseErrorType = "Syntax" | "Data" | "Eof" | "Unknown"
 
+export type FELauncherActionOnGameLaunch = "quitApp" | "closeWindow" | "minimizeWindow" | "hideWindow" | "none"
+
 export type SetFavorite = { instance: FEInstanceId; favorite: boolean }
 
 export type CFFEModFileParameters = { modId: number; fileId: number }
@@ -417,11 +419,7 @@ export type MRFEVersionFile = { hashes: MRFEHashes; url: string; filename: strin
 
 export type FEUnifiedSearchResponse = { searchApi: FESearchAPI; data: FEUnifiedSearchResult[]; pagination: FEUnifiedPagination | null }
 
-export type FEJavaProfile = { name: string; javaId: string | null; isSystem: boolean }
-
 export type MRFESearchIndex = "relevance" | "downloads" | "follows" | "newest" | "updated"
-
-export type FESettingsUpdate = { theme?: Set<string> | null; language?: Set<string> | null; reducedMotion?: Set<boolean> | null; discordIntegration?: Set<boolean> | null; releaseChannel?: Set<FEReleaseChannel> | null; concurrentDownloads?: Set<number> | null; downloadDependencies?: Set<boolean> | null; instancesSortBy?: Set<InstancesSortBy> | null; instancesSortByAsc?: Set<boolean> | null; instancesGroupBy?: Set<InstancesGroupBy> | null; instancesGroupByAsc?: Set<boolean> | null; instancesTileSize?: Set<number> | null; deletionThroughRecycleBin?: Set<boolean> | null; showNews?: Set<boolean> | null; xmx?: Set<number> | null; xms?: Set<number> | null; preLaunchHook?: Set<string | null> | null; wrapperCommand?: Set<string | null> | null; postExitHook?: Set<string | null> | null; isFirstLaunch?: Set<boolean> | null; launcherActionOnGameLaunch?: Set<FELauncherActionOnGameLaunch> | null; showAppCloseWarning?: Set<boolean> | null; gameResolution?: Set<GameResolution | null> | null; javaCustomArgs?: Set<string> | null; autoManageJavaSystemProfiles?: Set<boolean> | null; modSources?: Set<ModSources> | null; termsAndPrivacyAccepted?: Set<boolean> | null; metricsEnabled?: Set<boolean> | null }
 
 export type FETask = { name: Translation; progress: Progress; downloaded: number; download_total: number; active_subtasks: FESubtask[] }
 
@@ -432,6 +430,8 @@ export type CFFEModSearchSortOrder = "ascending" | "descending"
 export type CFFEFileIndex = { gameVersion: string; fileId: number; filename: string; releaseType: CFFEFileReleaseType; gameVersionTypeId: number | null; modLoader: CFFEModLoaderType | null }
 
 export type DuplicateInstance = { instance: FEInstanceId; new_name: string }
+
+export type FESettingsUpdate = { theme?: Set<string> | null; language?: Set<string> | null; reducedMotion?: Set<boolean> | null; discordIntegration?: Set<boolean> | null; releaseChannel?: Set<FEReleaseChannel> | null; lastAppVersion?: Set<string | null> | null; concurrentDownloads?: Set<number> | null; downloadDependencies?: Set<boolean> | null; instancesSortBy?: Set<InstancesSortBy> | null; instancesSortByAsc?: Set<boolean> | null; instancesGroupBy?: Set<InstancesGroupBy> | null; instancesGroupByAsc?: Set<boolean> | null; instancesTileSize?: Set<number> | null; deletionThroughRecycleBin?: Set<boolean> | null; showNews?: Set<boolean> | null; xmx?: Set<number> | null; xms?: Set<number> | null; preLaunchHook?: Set<string | null> | null; wrapperCommand?: Set<string | null> | null; postExitHook?: Set<string | null> | null; isFirstLaunch?: Set<boolean> | null; launcherActionOnGameLaunch?: Set<FELauncherActionOnGameLaunch> | null; showAppCloseWarning?: Set<boolean> | null; gameResolution?: Set<GameResolution | null> | null; javaCustomArgs?: Set<string> | null; autoManageJavaSystemProfiles?: Set<boolean> | null; modSources?: Set<ModSources> | null; termsAndPrivacyAccepted?: Set<boolean> | null; metricsEnabled?: Set<boolean> | null }
 
 export type MRFEProjectType = "mod" | "shader" | "modpack" | "resourcepack" | "plugin" | "project" | "datapack"
 

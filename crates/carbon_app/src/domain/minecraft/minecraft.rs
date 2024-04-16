@@ -78,7 +78,7 @@ pub fn os_rule(rule: &OsRule, java_arch: &JavaArch) -> bool {
     }
 
     if let Some(name) = &rule.name {
-        rule_match &= &Os::native_arch(java_arch) == name;
+        rule_match &= &Os::native_arch(java_arch) == name || &Os::native() == name;
     }
 
     if let Some(version) = &rule.version {

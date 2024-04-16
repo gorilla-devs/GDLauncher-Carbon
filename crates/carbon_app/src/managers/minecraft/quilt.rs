@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use anyhow::Context;
 use daedalus::modded::{LoaderVersion, Manifest, PartialVersionInfo};
 use thiserror::Error;
 use tokio::sync::Mutex;
@@ -70,12 +71,26 @@ pub async fn get_version(
         "quilt/{}/versions/{}.json",
         META_VERSION, quilt_version
     ))?;
-    let version_bytes = reqwest_client
-        .get(version_url)
-        .send()
-        .await?
-        .bytes()
-        .await?;
+
+    let resp = reqwest_client.get(version_url.clone()).send().await?;
+
+    let status = resp.status();
+
+    if !status.is_success() {
+        anyhow::bail!(
+            "Failed to fetch quilt version from `{}`: {}",
+            version_url.clone(),
+            status
+        );
+    }
+
+    let version_bytes = resp.bytes().await.with_context(|| {
+        format!(
+            "Failed to fetch quilt version from `{}`: {}",
+            version_url.clone(),
+            status
+        )
+    })?;
 
     db_client
         .partial_version_info_cache()
@@ -84,11 +99,7 @@ pub async fn get_version(
             crate::db::partial_version_info_cache::create(
                 db_entry_name.clone(),
                 version_bytes.to_vec(),
-                vec![
-                    crate::db::partial_version_info_cache::partial_version_info::set(
-                        version_bytes.to_vec(),
-                    ),
-                ],
+                vec![],
             ),
             vec![
                 crate::db::partial_version_info_cache::partial_version_info::set(

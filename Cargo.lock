@@ -461,9 +461,7 @@ dependencies = [
  "num_cpus",
  "opener",
  "openssl",
- "parking_lot 0.12.1",
  "prisma-client-rust",
- "rayon",
  "regex",
  "reqwest",
  "reqwest-middleware",
@@ -550,6 +548,7 @@ dependencies = [
 [[package]]
 name = "carbon_scheduler"
 version = "0.0.0"
+source = "git+https://github.com/gorilla-devs/carbon_scheduler?rev=4212ac32ca648ceb45e4d8c849360203f96c2be2#4212ac32ca648ceb45e4d8c849360203f96c2be2"
 dependencies = [
  "futures",
  "parking_lot 0.12.1",
@@ -839,7 +838,7 @@ dependencies = [
 [[package]]
 name = "daedalus"
 version = "0.1.21"
-source = "git+https://github.com/gorilla-devs/daedalus?rev=5f8874fec2488ba830773b5d04102531ca60dc35#5f8874fec2488ba830773b5d04102531ca60dc35"
+source = "git+https://github.com/gorilla-devs/daedalus?rev=c088da887b872d8a4d4f066485c2240bd2559340#c088da887b872d8a4d4f066485c2240bd2559340"
 dependencies = [
  "backon",
  "bytes",

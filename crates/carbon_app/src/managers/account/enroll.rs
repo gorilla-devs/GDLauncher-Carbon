@@ -9,6 +9,7 @@ use async_trait::async_trait;
 use futures::{future::abortable, stream::AbortHandle};
 use thiserror::Error;
 use tokio::sync::RwLock;
+use tracing::trace;
 
 /// Active process of adding an account
 pub struct EnrollmentTask {
@@ -109,16 +110,27 @@ impl EnrollmentTask {
             };
 
             let task = || async {
+                trace!("Refreshing MsAuth with refresh token");
                 // attempt to refresh token
                 let ms_auth = MsAuth::refresh(&client, &refresh_token).await?;
 
+                trace!("Successfully refreshed MsAuth with refresh token");
+
                 update_status(EnrollmentStatus::McLogin).await;
+
+                trace!("Authenticating with XBox");
 
                 // authenticate with XBox
                 let xbox_auth = XboxAuth::from_ms(&ms_auth, &client).await??;
 
+                trace!("Successfully authenticated with XBox");
+
+                trace!("Authenticating with MC");
+
                 // authenticate with MC
                 let mc_auth = McAuth::auth_ms(xbox_auth, &client).await?;
+
+                trace!("Successfully authenticated with MC");
 
                 update_status(EnrollmentStatus::PopulateAccount).await;
                 let account = McAccount {
