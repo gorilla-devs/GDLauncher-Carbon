@@ -874,18 +874,22 @@ impl ManagerRef<'_, InstanceManager> {
 
                 t_request_version_info.update_items(1, 2);
 
-                let mut required_java_system_profile = SystemJavaProfileName::from(
-                    daedalus::minecraft::MinecraftJavaProfile::try_from(
-                        version_info
-                            .java_version
-                            .as_ref()
-                            .ok_or_else(|| {
-                                anyhow::anyhow!("instance java version unsupported")
-                            })?
-                            .component
-                            .as_str(),
-                    )?,
-                );
+                let java_profile = daedalus::minecraft::MinecraftJavaProfile::try_from(
+                    version_info
+                        .java_version
+                        .as_ref()
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("Java version not provided")
+                        })?
+                        .component
+                        .as_str(),
+                ).with_context(
+                    || anyhow::anyhow!("instance java version unsupported")
+                )?;
+
+                let mut required_java_system_profile = SystemJavaProfileName::try_from(java_profile).with_context(
+                    || anyhow::anyhow!("System java version unsupported")
+                )?;
 
                 tracing::debug!("This instance requires system profile: {:?}", required_java_system_profile);
 

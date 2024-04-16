@@ -51,12 +51,14 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
             for version in minecraft_manifest {
                 if let Some(profile_name) = version.java_profile {
-                    let system_profile_name = SystemJavaProfileName::from(profile_name).to_string();
+                    let system_profile_name = SystemJavaProfileName::try_from(profile_name);
 
-                    assignments
-                        .entry(system_profile_name)
+                    if let Ok(system_profile_name) = system_profile_name {
+                        assignments
+                        .entry(system_profile_name.to_string())
                         .or_insert_with(Vec::new)
                         .push(version.id);
+                    }
                 }
             }
 

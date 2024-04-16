@@ -337,16 +337,21 @@ impl SystemJavaProfileName {
     }
 }
 
-impl From<MinecraftJavaProfile> for SystemJavaProfileName {
-    fn from(value: MinecraftJavaProfile) -> Self {
+impl TryFrom<MinecraftJavaProfile> for SystemJavaProfileName {
+    type Error = anyhow::Error;
+
+    fn try_from(value: MinecraftJavaProfile) -> Result<Self, Self::Error> {
         match value {
-            MinecraftJavaProfile::JreLegacy => Self::Legacy,
-            MinecraftJavaProfile::JavaRuntimeAlpha => Self::Alpha,
-            MinecraftJavaProfile::JavaRuntimeBeta => Self::Beta,
-            MinecraftJavaProfile::JavaRuntimeGamma => Self::Gamma,
-            MinecraftJavaProfile::JavaRuntimeGammaSnapshot => Self::GammaSnapshot,
-            MinecraftJavaProfile::JavaRuntimeDelta => Self::Delta,
-            MinecraftJavaProfile::MinecraftJavaExe => Self::MinecraftJavaExe,
+            MinecraftJavaProfile::JreLegacy => Ok(Self::Legacy),
+            MinecraftJavaProfile::JavaRuntimeAlpha => Ok(Self::Alpha),
+            MinecraftJavaProfile::JavaRuntimeBeta => Ok(Self::Beta),
+            MinecraftJavaProfile::JavaRuntimeGamma => Ok(Self::Gamma),
+            MinecraftJavaProfile::JavaRuntimeGammaSnapshot => Ok(Self::GammaSnapshot),
+            MinecraftJavaProfile::JavaRuntimeDelta => Ok(Self::Delta),
+            MinecraftJavaProfile::MinecraftJavaExe => Ok(Self::MinecraftJavaExe),
+            MinecraftJavaProfile::Unknown(value) => {
+                bail!("Unknown MinecraftJavaProfile: {}", value)
+            }
         }
     }
 }
