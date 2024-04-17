@@ -187,17 +187,16 @@ impl InstanceImporter for CurseforgeImporter {
             CfMetadata {
                 installed_modpack: Some(installed_modpack),
                 ..
-            } => Some(
-                app.instance_manager()
-                    .download_icon(
-                        installed_modpack
-                            .thumbnail_url
-                            .as_ref()
-                            .unwrap()
-                            .to_string(),
-                    )
-                    .await?,
-            ),
+            } => {
+                if let Some(thumbnail_url) = installed_modpack.thumbnail_url.as_ref() {
+                    app.instance_manager()
+                        .download_icon(thumbnail_url.to_string())
+                        .await
+                        .ok()
+                } else {
+                    None
+                }
+            }
             _ => None,
         };
 
