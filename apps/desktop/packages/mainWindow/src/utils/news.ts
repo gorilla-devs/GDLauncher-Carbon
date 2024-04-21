@@ -1,4 +1,3 @@
-import axios from "axios";
 import { MOJANG_API, NEWS_URL } from "@/constants";
 
 export interface NewsItem {
@@ -53,7 +52,9 @@ export interface IconImage {}
 
 export const initNews = async () => {
   try {
-    const { data } = await axios.get(NEWS_URL);
+    const resp = await fetch(NEWS_URL);
+
+    const data = await resp.json();
 
     const filteredNews = data.entries.filter(
       (entry: NewsItem) => entry.tag === "News"
