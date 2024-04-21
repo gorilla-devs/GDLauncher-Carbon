@@ -66,7 +66,8 @@ const InstanceTile = (props: {
 
   createEffect(() => {
     setFailError("");
-    if (task !== null && task?.data) {
+
+    if (taskId() && task?.data) {
       const data = task.data;
       setProgress("totalDownload", data.download_total);
       setProgress("downloaded", data.downloaded);
@@ -79,6 +80,14 @@ const InstanceTile = (props: {
       } else {
         setIsLoading(false);
       }
+    } else if (taskId() && !task.data) {
+      setIsLoading(false);
+      setProgress({
+        totalDownload: 0,
+        downloaded: 0,
+        percentage: 0,
+        subTasks: undefined
+      });
     }
   });
 
