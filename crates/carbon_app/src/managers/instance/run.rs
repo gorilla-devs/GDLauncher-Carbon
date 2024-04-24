@@ -284,6 +284,9 @@ impl ManagerRef<'_, InstanceManager> {
                 let t_download_files = task.subtask(Translation::InstanceTaskLaunchDownloadFiles);
                 t_download_files.set_weight(20.0);
 
+                let t_scan_files = task.subtask(Translation::InstanceTaskLaunchCheckingFiles);
+                t_scan_files.set_weight(5.0);
+
                 let t_generating_packinfo =
                     task.subtask(Translation::InstanceTaskGeneratingPackInfo);
 
@@ -1193,9 +1196,30 @@ impl ManagerRef<'_, InstanceManager> {
                     .await?
                     .concurrent_downloads;
 
+                let (progress_watch_tx, mut progress_watch_rx) =
+                tokio::sync::watch::channel(carbon_net::Progress::new());
+
+                // dropped when the sender is dropped
+                tokio::spawn(async move {
+                    while progress_watch_rx.changed().await.is_ok() {
+                        {
+                            let progress = progress_watch_rx.borrow();
+                            t_scan_files.update_download(
+                                progress.current_size as u32,
+                                progress.total_size as u32,
+                                false,
+                            );
+                        }
+
+                        tokio::time::sleep(Duration::from_millis(200)).await;
+                    }
+
+                    t_scan_files.complete_download();
+                });
+
                 let download_required = carbon_net::download_multiple(
                     &downloads[..],
-                    None,
+                    Some(progress_watch_tx),
                     concurrency as usize,
                     deep_check,
                     true,

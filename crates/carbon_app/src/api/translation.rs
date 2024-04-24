@@ -7,9 +7,6 @@ pub enum Translation {
     #[cfg(test)]
     Test,
     InstanceTaskDeleting,
-    ModCacheTaskUpdate,
-    ModCacheTaskUpdateScanFiles,
-    ModCacheTaskUpdateQueryApis,
     InstanceTaskLaunch {
         name: String,
     },
@@ -26,6 +23,7 @@ pub enum Translation {
     InstanceTaskLaunchDownloadJava,
     InstanceTaskLaunchExtractJava,
     InstanceTaskLaunchWaitDownloadFiles,
+    InstanceTaskLaunchCheckingFiles,
     InstanceTaskLaunchDownloadFiles,
     InstanceTaskGeneratingPackInfo,
     InstanceTaskFillCache,

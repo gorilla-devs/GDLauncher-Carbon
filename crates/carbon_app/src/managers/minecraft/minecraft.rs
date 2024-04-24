@@ -72,6 +72,9 @@ pub async fn get_version(
     mc_version: &str,
     meta_base_url: &Url,
 ) -> anyhow::Result<VersionInfo> {
+    static LOCK: Mutex<()> = Mutex::const_new(());
+    let _guard = LOCK.lock().await;
+
     let db_cache = db_client
         .version_info_cache()
         .find_unique(crate::db::version_info_cache::id::equals(
