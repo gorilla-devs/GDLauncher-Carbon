@@ -228,6 +228,8 @@ const loadCoreModule: CoreModule = () =>
       return;
     }
 
+    let started = false;
+
     const coreModulePath = path.resolve(
       __dirname,
       "../../../../resources/binaries",
@@ -297,6 +299,9 @@ const loadCoreModule: CoreModule = () =>
         if (row.startsWith("_STATUS_:")) {
           const port: number = row.split("|")[1];
           console.log(`[CORE] Port: ${port}`);
+
+          started = true;
+
           resolve({
             type: "success",
             result: {
@@ -389,7 +394,7 @@ const loadCoreModule: CoreModule = () =>
     });
 
     setTimeout(() => {
-      if (coreModule?.killed) {
+      if (coreModule?.killed || started) {
         return;
       }
 
