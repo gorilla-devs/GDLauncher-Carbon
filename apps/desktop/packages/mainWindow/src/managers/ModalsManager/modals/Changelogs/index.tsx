@@ -3,7 +3,7 @@ import ModalLayout from "../../ModalLayout";
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 
 import { Trans } from "@gd/i18n";
-import { For, Match, Switch } from "solid-js";
+import { For, Match, Show, Switch } from "solid-js";
 import changelogs, { Changelog } from "./changelogs";
 
 type SectionProps = {
@@ -84,11 +84,19 @@ const Section = (props: SectionProps) => {
           <Match when={list().length > 0}>
             <ul class="pl-4">
               <For each={list()}>
-                {(item) => (
-                  <li>
+                {(item, index) => (
+                  <li
+                    classList={{
+                      "pb-4": index() !== list().length - 1
+                    }}
+                  >
                     <span class="text-white font-bold">{item.title}</span>
-                    &nbsp;
-                    <span class="text-lightSlate-500">{item.description}</span>
+                    <Show when={item.description}>
+                      &nbsp;
+                      <span class="text-lightSlate-500">
+                        {item.description}
+                      </span>
+                    </Show>
                   </li>
                 )}
               </For>
