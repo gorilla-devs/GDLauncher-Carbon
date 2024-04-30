@@ -18,6 +18,9 @@ const changelogs: Changelog = {
   ],
   fixed: [
     {
+      title: "Fixed Minecraft session token not being correctly refreshed."
+    },
+    {
       title: "Fixed open mods folder",
       description: "not working when mods folder doesn't exist."
     },
