@@ -727,11 +727,13 @@ impl AccountRefreshService {
                             continue;
                         };
 
-                        let expiration_threshold = Utc::now() - chrono::Duration::hours(12);
+                        let now = Utc::now();
+                        let token_expiration_threshold =
+                            token_expires - chrono::Duration::hours(12);
 
-                        trace!("Checking account {uuid} for token expiration. Expires at {token_expires}. Current time is {now}. Comparison is {token_expires} < {expiration_threshold}", now = Utc::now());
+                        trace!("Checking account {uuid} for token expiration. Expires at {token_expires}. Current time is {now}. Comparison is {token_expiration_threshold} < {now}", now = Utc::now());
 
-                        if token_expires < expiration_threshold {
+                        if token_expiration_threshold < now {
                             debug!(
                                 "Attempting to refresh access token for expired account {}",
                                 &account.uuid
