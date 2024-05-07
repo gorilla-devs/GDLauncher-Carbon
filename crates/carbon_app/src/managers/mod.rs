@@ -52,6 +52,11 @@ mod app {
 
     use crate::{cache_middleware, domain, iridium_client::get_client};
 
+    use self::java::{
+        discovery::{Discovery, RealDiscovery},
+        java_checker::RealJavaChecker,
+    };
+
     use super::{
         java::JavaManager, metadata::cache::MetaCacheManager, metrics::MetricsManager,
         modplatforms::ModplatformsManager, system_info::SystemInfoManager, *,
@@ -138,15 +143,6 @@ mod app {
             };
 
             account::AccountRefreshService::start(Arc::downgrade(&app));
-
-            let _app = app.clone();
-            tokio::spawn(async move {
-                _app.meta_cache_manager().launch_background_tasks().await;
-                _app.clone()
-                    .instance_manager()
-                    .launch_background_tasks()
-                    .await;
-            });
 
             let _app = app.clone();
             tokio::spawn(async move {
