@@ -23,11 +23,19 @@ incremental = true
 debug-assertions = true
 
 [workspace.dependencies]
+sqlx = { version = "0.7.3", features = [
+  "runtime-tokio",
+  "sqlite",
+  "migrate",
+  "macros",
+  "uuid",
+  "chrono",
+], default-features = false }
 anyhow = { version = "1.0.81", features = ["backtrace"] }
 async-stream = "0.3.3"
 async-trait = "0.1.61"
 axum = "0.7.4"
-chrono = "0.4.23"
+chrono = { version = "0.4.23", features = ["serde"] }
 derive_more = "0.99.17"
 openssl = { version = "0.10", features = [
   "vendored",
@@ -49,16 +57,6 @@ murmurhash32 = { git = "https://github.com/gorilla-devs/murmurhash32", rev = "4d
 nom = "7"
 num_cpus = "1.16.0"
 opener = "0.7.0"
-prisma-client-rust = { git = "https://github.com/gorilla-devs/prisma-client-rust", rev = "f74daf611f5ce8c20351eb05014b9176df2f0939", features = [
-  "sqlite-create-many",
-  "sqlite",
-  "migrations",
-], default_features = false }
-prisma-client-rust-cli = { git = "https://github.com/gorilla-devs/prisma-client-rust", rev = "f74daf611f5ce8c20351eb05014b9176df2f0939", features = [
-  "sqlite-create-many",
-  "sqlite",
-  "migrations",
-], default_features = false }
 regex = "1.7.0"
 const_format = "0.2.32"
 reqwest = { version = "0.11.13", default-features = false, features = [

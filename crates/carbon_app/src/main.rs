@@ -19,7 +19,6 @@ use tracing::info;
 pub mod api;
 mod app_version;
 pub mod cache_middleware;
-pub(crate) mod db;
 pub mod domain;
 mod error;
 pub mod iridium_client;
@@ -166,7 +165,7 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
 
     crate::managers::java::JavaManager::scan_and_sync(
         auto_manage_java_system_profiles,
-        &app.prisma_client,
+        &app.repo,
         &RealDiscovery::new(app.settings_manager().runtime_path.clone()),
         &RealJavaChecker,
     )

@@ -1,5 +1,6 @@
 use std::{path::PathBuf, sync::Arc};
 
+use carbon_repo::Repo;
 use strum::IntoEnumIterator;
 use tracing::{info, trace, warn};
 
@@ -121,7 +122,7 @@ async fn update_java_component_in_db_to_invalid(
 
 #[tracing::instrument(level = "trace", skip_all)]
 pub async fn scan_and_sync_local<T, G>(
-    db: &Arc<PrismaClient>,
+    repo: &Repo,
     discovery: &T,
     java_checker: &G,
 ) -> anyhow::Result<()>
@@ -130,7 +131,7 @@ where
     G: JavaChecker,
 {
     let local_javas = discovery.find_java_paths().await;
-    let java_profiles = db
+    let java_profiles = repo
         .java_profile()
         .find_many(vec![])
         .with(crate::db::java_profile::java::fetch())
@@ -154,7 +155,7 @@ where
             .await;
 
         let db_entry =
-            get_java_component_from_db(db, resolved_java_path.to_string_lossy().to_string())
+            get_java_component_from_db(repo, resolved_java_path.to_string_lossy().to_string())
                 .await?;
 
         if let Some(db_entry) = &db_entry {
@@ -192,12 +193,12 @@ where
                 if db_entry.is_some() {
                     if is_java_used_in_profile {
                         update_java_component_in_db_to_invalid(
-                            db,
+                            repo,
                             resolved_java_path.display().to_string(),
                         )
                         .await?;
                     } else {
-                        db.java()
+                        repo.java()
                             .delete(crate::db::java::UniqueWhereParam::PathEquals(
                                 resolved_java_path.display().to_string(),
                             ))
@@ -210,8 +211,8 @@ where
     }
 
     // Cleanup unscanned local javas (if they are not default)
-    let local_javas_from_db = db
-        .java()
+    let local_javas_from_db = repo
+        .java
         .find_many(vec![crate::db::java::r#type::equals(
             JavaComponentType::Local.to_string(),
         )])
@@ -245,9 +246,9 @@ where
             .any(|java_profile_path| local_java_from_db.path == java_profile_path);
 
         if is_used_in_profile {
-            update_java_component_in_db_to_invalid(db, local_java_from_db.path).await?;
+            update_java_component_in_db_to_invalid(repo, local_java_from_db.path).await?;
         } else {
-            db.java()
+            repo.java()
                 .delete(crate::db::java::UniqueWhereParam::PathEquals(
                     local_java_from_db.path,
                 ))

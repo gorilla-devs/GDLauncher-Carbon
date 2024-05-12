@@ -12,7 +12,6 @@ pub use app::AppInner;
 
 use crate::api::keys::Key;
 use crate::api::InvalidationEvent;
-use crate::db::PrismaClient;
 use crate::managers::settings::SettingsManager;
 
 use self::account::AccountManager;
@@ -74,10 +73,10 @@ mod app {
         pub(crate) metrics_manager: MetricsManager,
         pub(crate) modplatforms_manager: ModplatformsManager,
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
-        pub(crate) prisma_client: Arc<PrismaClient>,
         task_manager: VisualTaskManager,
         system_info_manager: SystemInfoManager,
         rich_presence_manager: rich_presence::RichPresenceManager,
+        pub(crate) repo: carbon_repo::Repo,
     }
 
     macro_rules! manager_getter {
@@ -131,10 +130,10 @@ mod app {
                     ),
                     invalidation_channel,
                     reqwest_client: http_client.clone(),
-                    prisma_client: Arc::clone(&db_client),
                     task_manager: VisualTaskManager::new(),
                     system_info_manager: SystemInfoManager::new(),
                     rich_presence_manager: rich_presence::RichPresenceManager::new(),
+                    repo: carbon_repo::Repo::new(&db_client),
                 }));
 
                 // SAFETY: This pointer cast is safe because UnsafeCell and MaybeUninit do not

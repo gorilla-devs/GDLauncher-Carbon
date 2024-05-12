@@ -1,4 +1,5 @@
 use anyhow::bail;
+use carbon_repo::Repo;
 use prisma_client_rust::{prisma_errors::query_engine::UniqueKeyViolation, QueryError};
 use strum::IntoEnumIterator;
 use tokio::sync::{watch, Mutex};
@@ -96,7 +97,7 @@ impl JavaManager {
 
     pub async fn scan_and_sync<T, G>(
         auto_manage_java_system_profiles: bool,
-        db: &Arc<PrismaClient>,
+        repo: &Repo,
         discovery: &T,
         java_checker: &G,
     ) -> anyhow::Result<()>
@@ -104,12 +105,12 @@ impl JavaManager {
         T: Discovery,
         G: JavaChecker,
     {
-        scan_and_sync::scan_and_sync_local(db, discovery, java_checker).await?;
-        scan_and_sync::scan_and_sync_custom(db, java_checker).await?;
-        scan_and_sync::scan_and_sync_managed(db, discovery, java_checker).await?;
+        scan_and_sync::scan_and_sync_local(repo, discovery, java_checker).await?;
+        scan_and_sync::scan_and_sync_custom(repo, java_checker).await?;
+        scan_and_sync::scan_and_sync_managed(repo, discovery, java_checker).await?;
 
         if auto_manage_java_system_profiles {
-            scan_and_sync::sync_system_java_profiles(db).await?;
+            scan_and_sync::sync_system_java_profiles(repo).await?;
         }
 
         Ok(())

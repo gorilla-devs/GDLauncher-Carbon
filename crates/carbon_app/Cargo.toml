@@ -37,11 +37,7 @@ carbon_compression = { path = "../carbon_compression" }
 carbon_net = { path = "../carbon_net" }
 carbon_scheduler = { workspace = true }
 uuid = { workspace = true }
-prisma-client-rust = { workspace = true, features = [
-  "sqlite-create-many",
-  "sqlite",
-  "migrations",
-], default_features = false }
+sqlx = { workspace = true }
 strum_macros = { workspace = true }
 strum = { workspace = true }
 regex = { workspace = true }
@@ -78,13 +74,15 @@ display-info = "0.4.3"
 # libc = { workspace = true }
 nom = { workspace = true }
 carbon_parsing = { path = "../carbon_parsing" }
+carbon_repo = { path = "../carbon_repo" }
 
 [target.'cfg(windows)'.dependencies]
 winreg = { workspace = true }
 # winapi = { version = "0.3.9" }
 
-[target.'cfg(target_os = "linux")'.dependencies]
-openssl = { workspace = true }
+# is this needed anymore??
+# [target.'cfg(target_os = "linux")'.dependencies]
+# openssl = { workspace = true }
 
 [build-dependencies]
 serde_json = { workspace = true }

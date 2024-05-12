@@ -31,7 +31,7 @@ impl Middleware for CacheMiddleware {
         let app = unsafe { self.app.upgrade() };
 
         fn build_cached(
-            status: i32,
+            status: i64,
             body: Vec<u8>,
             cached: bool,
         ) -> std::result::Result<Response, ()> {
@@ -50,14 +50,13 @@ impl Middleware for CacheMiddleware {
         let mut cached = if method != Method::GET {
             None
         } else {
-            app.prisma_client
-                .http_cache()
-                .find_first(vec![WhereParam::Url(StringFilter::Equals(
-                    req.url().to_string(),
-                ))])
-                .exec()
-                .await
-                .map_err(|e| reqwest_middleware::Error::Middleware(anyhow!(e)))?
+            Some(
+                app.repo
+                    .http_cache
+                    .get_entry(req.url().to_string())
+                    .await
+                    .map_err(|e| reqwest_middleware::Error::Middleware(anyhow!(e)))?,
+            )
         };
 
         // return the cached value if fresh
@@ -160,23 +159,16 @@ impl Middleware for CacheMiddleware {
                 let body = response.bytes().await?;
 
                 let _ = app
-                    .prisma_client
-                    ._batch((
-                        app.prisma_client
-                            .http_cache()
-                            // will not fail when not found
-                            .delete_many(vec![WhereParam::Url(StringFilter::Equals(url.clone()))]),
-                        app.prisma_client.http_cache().create(
-                            url,
-                            status,
-                            body.to_vec(),
-                            vec![
-                                SetParam::SetExpiresAt(expires.map(Into::into)),
-                                SetParam::SetLastModified(last_modified),
-                                SetParam::SetEtag(etag),
-                            ],
-                        ),
-                    ))
+                    .repo
+                    .http_cache
+                    .upsert_cache(carbon_repo::http_cache::HTTPCache {
+                        url: url.clone(),
+                        status_code: status as i64,
+                        data: body.to_vec(),
+                        expires_at: expires.map(Into::into),
+                        last_modified,
+                        etag,
+                    })
                     .await;
 
                 match build_cached(status, body.to_vec(), false) {
