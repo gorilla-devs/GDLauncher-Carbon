@@ -43,7 +43,7 @@ function watchMain(mainWindow) {
  */
 function watchPreload(mainWindow) {
   return build({
-    configFile: "packages/preload/vite.config.js",
+    configFile: "packages/preload/vite.config.cjs",
     mode: "development",
     plugins: [
       {

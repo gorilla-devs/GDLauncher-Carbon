@@ -85,7 +85,13 @@ render(
                 </NotificationsProvider>
               </Match>
               <Match when={!isReady()}>
-                <div class="flex justify-center items-center h-screen w-screen">
+                <div class="flex flex-col gap-8 justify-center items-center h-screen w-screen">
+                  <div class="text-xl">
+                    {
+                      // Hardcoded because we don't know the language at this point
+                      "App initialization is taking longer than expected. Please wait for up to 2 minutes."
+                    }
+                  </div>
                   <div class="animate-spin rounded-full h-12 w-12 bg-blue-500 i-ri:loader-4-line" />
                 </div>
               </Match>

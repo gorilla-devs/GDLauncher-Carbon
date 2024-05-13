@@ -179,8 +179,8 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
         let reqwest_client = reqwest::Client::new();
         loop {
             counter += 1;
-            // If we've waited for 10 seconds, give up
-            if counter > 50 {
+            // If we've waited for 40 seconds, give up
+            if counter > 200 {
                 panic!("Server failed to start in time");
             }
 

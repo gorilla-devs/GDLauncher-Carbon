@@ -136,8 +136,6 @@ export type MRFEVersion = { name: string; version_number: string; changelog: str
 
 export type CFFESortableGameVersion = { gameVersionName: string; gameVersionPadded: string; gameVersion: string; gameVersionReleaseDate: string; gameVersionTypeId: number | null }
 
-export type XboxError = "noAccount" | "xboxServicesBanned" | "adultVerificationRequired" | "childAccount" | { unknown: number }
-
 export type ImportScanStatus = "NoResults" | { SingleResult: ImportEntry } | { MultiResult: ImportEntry[] }
 
 export type FEManagedJavaArchMap = { [key: FEManagedJavaArch]: FEManagedJavaVersion[] }
@@ -145,6 +143,8 @@ export type FEManagedJavaArchMap = { [key: FEManagedJavaArch]: FEManagedJavaVers
 export type MRFETeamMember = { team_id: string; user: MRFEUser; role: string; ordering: string | null }
 
 export type ExportTarget = "Curseforge" | "Modrinth"
+
+export type FEUpdateJavaProfileArgs = { profileName: string; javaId?: string | null }
 
 export type FEModdedManifestVersion = { id: string; stable: boolean; loaders: FEModdedManifestLoaderVersion[] }
 
@@ -260,6 +260,8 @@ export type MRFEAdditionalFileType = "requiredResourcePack" | "optionalResourceP
 
 export type ExportArgs = { instance_id: FEInstanceId; target: ExportTarget; save_path: string; self_contained_addons_bundling: boolean; filter: ExportEntry }
 
+export type FEJavaComponent = { id: string; path: string; version: string; type: FEJavaComponentType; isValid: boolean }
+
 export type CFFEModSearchSortField = "featured" | "popularity" | "lastUpdated" | "name" | "author" | "totalDownloads" | "category" | "gameVersion"
 
 export type UpdateMod = { instance_id: FEInstanceId; mod_id: string }
@@ -284,8 +286,6 @@ export type MRFEProject = { slug: string; title: string; description: string; ca
 
 export type MRFECategoriesResponse = MRFECategory[]
 
-export type FECreateJavaProfileArgs = { profileName: string; javaId: string | null }
-
 export type ModPlatform = "Curseforge" | "Modrinth"
 
 export type InstanceMod = { instance_id: FEInstanceId; mod_id: string }
@@ -302,13 +302,11 @@ export type CreateInstance = { group: FEGroupId; name: string; use_loaded_icon: 
 
 export type FEReleaseChannel = "stable" | "alpha" | "beta"
 
-export type FEUpdateJavaProfileArgs = { profileName: string; javaId?: string | null }
-
 export type McType = "old_alpha" | "old_beta" | "release" | "snapshot"
 
 export type ModChannelWithUsage = { channel: ModChannel; allow_updates: boolean }
 
-export type Translation = { translation: "InstanceTaskDeleting" } | { translation: "ModCacheTaskUpdate" } | { translation: "ModCacheTaskUpdateScanFiles" } | { translation: "ModCacheTaskUpdateQueryApis" } | { translation: "InstanceTaskLaunch"; args: { name: string } } | { translation: "InstanceTaskPrepare"; args: { name: string } } | { translation: "InstanceTaskLaunchRequestVersions" } | { translation: "InstanceTaskLaunchRequestModpack" } | { translation: "InstanceTaskLaunchDownloadModpack" } | { translation: "InstanceTaskLaunchDownloadModpackFiles" } | { translation: "InstanceTaskLaunchExtractModpackFiles" } | { translation: "InstanceTaskLaunchDownloadAddonMetadata" } | { translation: "InstanceTaskLaunchApplyStagedPatches" } | { translation: "InstanceTaskLaunchDownloadJava" } | { translation: "InstanceTaskLaunchExtractJava" } | { translation: "InstanceTaskLaunchWaitDownloadFiles" } | { translation: "InstanceTaskLaunchDownloadFiles" } | { translation: "InstanceTaskGeneratingPackInfo" } | { translation: "InstanceTaskFillCache" } | { translation: "InstanceTaskLaunchExtractNatives" } | { translation: "InstanceTaskReconstructAssets" } | { translation: "InstanceTaskLaunchRunForgeProcessors" } | { translation: "InstanceTaskLaunchRunNeoforgeProcessors" } | { translation: "InstanceTaskInstallMod"; args: { mod_name: string; instance_name: string } } | { translation: "InstanceTaskInstallModDownloadFile" } | { translation: "FinalizingImport" } | { translation: "InstanceImportLegacyBadConfigFile" } | { translation: "InstanceImportCfZipMalformed" } | { translation: "InstanceImportCfZipMissingManifest" } | { translation: "InstanceImportCfZipMalformedManifest" } | { translation: "InstanceImportCfZipNotMinecraftModpack" } | { translation: "InstanceImportMrpackMalformed" } | { translation: "InstanceImportMrpackMissingManifest" } | { translation: "InstanceImportMrpackMalformedManifest" } | { translation: "InstanceExport" } | { translation: "InstanceExportScanningMods" } | { translation: "InstanceExportCacheMods" } | { translation: "InstanceExportCalculateSize" } | { translation: "InstanceExportCreatingBundle" }
+export type Translation = { translation: "InstanceTaskDeleting" } | { translation: "InstanceTaskLaunch"; args: { name: string } } | { translation: "InstanceTaskPrepare"; args: { name: string } } | { translation: "InstanceTaskLaunchRequestVersions" } | { translation: "InstanceTaskLaunchRequestModpack" } | { translation: "InstanceTaskLaunchDownloadModpack" } | { translation: "InstanceTaskLaunchDownloadModpackFiles" } | { translation: "InstanceTaskLaunchExtractModpackFiles" } | { translation: "InstanceTaskLaunchDownloadAddonMetadata" } | { translation: "InstanceTaskLaunchApplyStagedPatches" } | { translation: "InstanceTaskLaunchDownloadJava" } | { translation: "InstanceTaskLaunchExtractJava" } | { translation: "InstanceTaskLaunchWaitDownloadFiles" } | { translation: "InstanceTaskLaunchCheckingFiles" } | { translation: "InstanceTaskLaunchDownloadFiles" } | { translation: "InstanceTaskGeneratingPackInfo" } | { translation: "InstanceTaskFillCache" } | { translation: "InstanceTaskLaunchExtractNatives" } | { translation: "InstanceTaskReconstructAssets" } | { translation: "InstanceTaskLaunchRunForgeProcessors" } | { translation: "InstanceTaskLaunchRunNeoforgeProcessors" } | { translation: "InstanceTaskInstallMod"; args: { mod_name: string; instance_name: string } } | { translation: "InstanceTaskInstallModDownloadFile" } | { translation: "FinalizingImport" } | { translation: "InstanceImportLegacyBadConfigFile" } | { translation: "InstanceImportCfZipMalformed" } | { translation: "InstanceImportCfZipMissingManifest" } | { translation: "InstanceImportCfZipMalformedManifest" } | { translation: "InstanceImportCfZipNotMinecraftModpack" } | { translation: "InstanceImportMrpackMalformed" } | { translation: "InstanceImportMrpackMissingManifest" } | { translation: "InstanceImportMrpackMalformedManifest" } | { translation: "InstanceExport" } | { translation: "InstanceExportScanningMods" } | { translation: "InstanceExportCacheMods" } | { translation: "InstanceExportCalculateSize" } | { translation: "InstanceExportCreatingBundle" }
 
 export type MRFETeamResponse = MRFETeamMember[]
 
@@ -322,11 +320,11 @@ export type MRFELicense = { id: string; name: string; url: string | null }
 
 export type MRFERequestedVersionStatus = "listed" | "archived" | "draft" | "unlisted"
 
-export type FEJavaProfile = { name: string; javaId: string | null; isSystem: boolean }
-
 export type ValidListInstance = { mc_version: string | null; modloader: FEInstanceModloaderType | null; modpack: Modpack | null; state: LaunchState }
 
 export type ChangeModpack = { instance: FEInstanceId; modpack: Modpack }
+
+export type FEJavaProfile = { name: string; javaId: string | null; isSystem: boolean }
 
 export type ExploreEntryType = { File: { size: number } } | "Directory"
 
@@ -367,10 +365,6 @@ export type FESearchAPI = "curseforge" | "modrinth"
 
 export type MRFEVersionID = string
 
-export type FEJavaComponent = { id: string; path: string; version: string; type: FEJavaComponentType; isValid: boolean }
-
-export type FEJavaComponentType = "local" | "managed" | "custom"
-
 export type MRFECategory = { icon: string; name: string; project_type: MRFEProjectType; header: string }
 
 export type FEJavaOverride = { Profile: string | null } | { Path: string | null }
@@ -404,6 +398,8 @@ export type GameResolution = { type: "Standard"; value: [number, number] } | { t
 export type CFFEModFilesParametersQuery = { gameVersion?: string | null; modLoaderType?: CFFEModLoaderType | null; gameVersionTypeId?: number | null; index?: number | null; pageSize?: number | null }
 
 export type ConfigurationParseErrorType = "Syntax" | "Data" | "Eof" | "Unknown"
+
+export type XboxError = "noAccount" | "xboxServicesBanned" | "adultVerificationRequired" | "childAccount" | { unknown: number }
 
 export type FELauncherActionOnGameLaunch = "quitApp" | "closeWindow" | "minimizeWindow" | "hideWindow" | "none"
 
@@ -479,6 +475,8 @@ export type FeError = { cause: CauseSegment[]; backtrace: string }
 
 export type CFFEModLinks = { websiteUrl: string | null; wikiUrl: string | null; issuesUrl: string | null; sourceUrl: string | null }
 
+export type FEJavaComponentType = "local" | "managed" | "custom"
+
 export type FEModsResponse = { data: CFFEMod[]; pagination: CFFEPagination | null }
 
 export type AccountEntry = { username: string; uuid: string; lastUsed: string; type: AccountType }
@@ -496,6 +494,8 @@ export type MRFEProjectSupportRange = "required" | "optional" | "unsupported" | 
 export type RemoteVersion = ({ platform: "Curseforge" } & CFFEFile) | ({ platform: "Modrinth" } & MRFEVersion)
 
 export type CFFEModSearchParametersQuery = { gameId: number; searchFilter: string | null; gameVersion: string | null; categoryIds: number[] | null; sortOrder: CFFEModSearchSortOrder | null; sortField: CFFEModSearchSortField | null; classId: CFFEClassId | null; modLoaderTypes: CFFEModLoaderType[] | null; gameVersionTypeId: number | null; authorId: number | null; slug: string | null; index: number | null; pageSize: number | null }
+
+export type FECreateJavaProfileArgs = { profileName: string; javaId: string | null }
 
 export type CurseforgeMod = { project_id: number; file_id: number }
 

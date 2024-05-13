@@ -38,7 +38,7 @@ function useLoading() {
       let fontSize = isString ? "1.3rem" : "1rem";
 
       const errorText = `
-      <div style="font-size: ${fontSize}; font-weight: 300; background: var(--darkSlate-900); height: 40%; overflow-y: auto; padding: 16px; text-align: left; margin: 16px; border-radius: 8px;">
+      <div style="font-size: ${fontSize}; font-weight: 300; background: var(--darkSlate-900); height: 40%; overflow-y: auto; padding: 16px; text-align: left; margin: 16px; border-radius: 8px; overflow-wrap: break-word;">
         ${error}
       </div>`;
 
@@ -47,8 +47,9 @@ function useLoading() {
         <div style="margin-top: 2rem;">
           <span style="color: var(--primary-400); font-weight: 800;">GDLauncher</span> couldn't launch
         </div>
-        <div style="font-size: 1rem; margin-top: 16px; margin-bottom: 16px;">
-          Cannot load module "${moduleName}"
+        <div style="font-size: 1rem; margin-top: 16px; margin-bottom: 16px; display: flex; justify-content: center; gap: 2rem;">
+          <div>Cannot load module "${moduleName}"</div>
+          <div style="font-weight: 200">App version ${__APP_VERSION__}</div>
         </div>
       </div>
       <div style="font-weight: 300; font-size: 1rem; padding: 16px; text-align: left;">

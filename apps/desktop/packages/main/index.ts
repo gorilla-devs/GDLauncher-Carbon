@@ -393,20 +393,25 @@ const loadCoreModule: CoreModule = () =>
       });
     });
 
-    setTimeout(() => {
-      if (coreModule?.killed || started) {
-        return;
-      }
+    setTimeout(
+      () => {
+        if (coreModule?.killed || started) {
+          return;
+        }
 
-      console.error(`[CORE] Took too long to start`);
+        console.error(`[CORE] Took too long to start`);
 
-      Sentry.captureException(new Error("Core module took too long to start"));
+        Sentry.captureException(
+          new Error("Core module took too long to start")
+        );
 
-      resolve({
-        type: "error",
-        logs
-      });
-    }, 15000);
+        resolve({
+          type: "error",
+          logs
+        });
+      },
+      60 * 2 * 1000
+    );
   });
 
 const coreModule = loadCoreModule();
@@ -457,7 +462,7 @@ async function createWindow(): Promise<BrowserWindow> {
     width,
     titleBarStyle: "default",
     frame: true,
-    show: false,
+    show: true,
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
