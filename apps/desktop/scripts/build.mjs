@@ -5,7 +5,7 @@ await build({
   mode: "production"
 });
 await build({
-  configFile: "packages/preload/vite.config.js",
+  configFile: "packages/preload/vite.config.cjs",
   mode: "production"
 });
 await build({
