@@ -12,7 +12,6 @@ export default defineConfig({
   mode: process.env.NODE_ENV,
   root: __dirname,
   plugins: [
-    solidPlugin(),
     Unocss({
       ...unocssConfig,
       rules: [
@@ -37,7 +36,8 @@ export default defineConfig({
           ([, content]) => ({ content: JSON.stringify(content) })
         ]
       ]
-    })
+    }),
+    solidPlugin()
   ],
   assetsInclude: "**/*.riv",
   envDir: resolve(__dirname, "../../../../"),

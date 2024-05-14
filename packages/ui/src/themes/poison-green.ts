@@ -85,6 +85,10 @@ const poisonGreen: Theme = {
   "green-900": "hsla(116, 50%, 24%, 1)",
   "brands-curseforge": "#f16436",
   "brands-modrinth": "#1bd96a",
+  "brands-twitchPurpleDark": "#6441a5",
+  "brands-twitchPurpleLight": "#B9A3E3",
+  "brands-twitchWhite": "#f1f1f1",
+  "brands-twitchBlack": "#262626",
 };
 
 export { poisonGreen };

@@ -84,6 +84,10 @@ type Theme = {
   "green-900": string;
   "brands-curseforge": string;
   "brands-modrinth": string;
+  "brands-twitchPurpleDark": string;
+  "brands-twitchPurpleLight": string;
+  "brands-twitchWhite": string;
+  "brands-twitchBlack": string;
 };
 
 export type { Theme };

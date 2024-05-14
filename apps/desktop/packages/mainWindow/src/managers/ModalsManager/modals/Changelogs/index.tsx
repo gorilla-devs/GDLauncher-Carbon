@@ -5,6 +5,7 @@ import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import { Trans } from "@gd/i18n";
 import { For, Match, Show, Switch } from "solid-js";
 import changelogs, { Changelog } from "./changelogs";
+import { Button } from "@gd/ui";
 
 type SectionProps = {
   type: keyof Changelog;
@@ -82,7 +83,7 @@ const Section = (props: SectionProps) => {
             <Trans key="changelogs.no_changes" />
           </Match>
           <Match when={list().length > 0}>
-            <ul class="pl-4">
+            <ul class="pl-4 my-0">
               <For each={list()}>
                 {(item, index) => (
                   <li
@@ -114,20 +115,47 @@ const Changelogs = (props: ModalProps) => {
       noHeader={props.noHeader}
       title={props?.title}
       noPadding
-      height="h-110"
+      height="min-h-130 h-1/3"
       width="w-130"
     >
-      <div class="w-full h-full overflow-auto p-5 box-border">
-        <div class="relative flex items-center justify-center my-4">
+      <div class="w-full h-full overflow-auto px-5 pb-5 box-border">
+        {/* <div class="relative flex items-center justify-center my-4">
           <img src={GDLauncherWideLogo} class="w-80" />
           <div class="absolute -top-3 left-43 font-bold">
             {"v"}
             {__APP_VERSION__}
           </div>
-        </div>
+        </div> */}
+
+        <h2>
+          <Trans
+            key="changelogs.whats_new_in"
+            options={{
+              version: __APP_VERSION__
+            }}
+          />
+        </h2>
         <Section type="new" />
         <Section type="improved" />
         <Section type="fixed" />
+        <div class="rounded-md flex flex-col items-center gap-4">
+          <hr class="w-full" />
+          <div class="text-brands-twitchWhite">
+            <Trans key="changelogs.watch_on_twitch_description" />
+          </div>
+
+          <Button
+            backgroundColor="bg-brands-twitchPurpleDark"
+            onClick={() => {
+              window.open("https://twitch.tv/blarfoon", "_blank");
+            }}
+          >
+            <div class="flex items-center justify-center gap-4 animate-wiggle animate-delay-1400 animate-loop">
+              <div class="i-ri:twitch-fill w-6 h-6 inline-block" />
+              <Trans key="changelogs.watch_on_twitch" />
+            </div>
+          </Button>
+        </div>
       </div>
     </ModalLayout>
   );

@@ -17,6 +17,7 @@ interface Props
   children: HTMLElement | string | JSX.Element;
   style?: any;
   textColor?: string;
+  backgroundColor?: string;
   type?: Type;
   rounded?: boolean;
   disabled?: boolean;
@@ -40,7 +41,8 @@ const getVariant = (
   isLoading: boolean,
   variant: string,
   cursor: string | undefined,
-  textColor?: string
+  textColor?: string,
+  backgroundColor?: string
 ) => {
   const isLarge = size === "large";
   const isMedium = size === "medium";
@@ -48,6 +50,10 @@ const getVariant = (
 
   const commonStyle = {
     ...(textColor && { [textColor]: true }),
+    ...(backgroundColor && {
+      [backgroundColor]: true,
+      "hover:brightness-120": true,
+    }),
     "transition-all": true,
     "overflow-hidden": true,
     "duration-100": true,
@@ -84,8 +90,11 @@ const getVariant = (
   const variants = {
     primary: {
       ...commonStyle,
-      [`${!isDisabled ? `bg-${variant}-500` : "bg-[#1D2028]"}`]: true,
-      [`${!isDisabled ? `hover:bg-${variant}-300` : ""}`]: true,
+      [`${
+        !isDisabled && !backgroundColor ? `bg-${variant}-500` : "bg-[#1D2028]"
+      }`]: true,
+      [`${!isDisabled && !backgroundColor ? `hover:bg-${variant}-300` : ""}`]:
+        true,
       // "filter brightness-75": isDisabled,
       "text-[#404759]": isDisabled,
       "border-0": true,
@@ -199,7 +208,8 @@ function Button(props: Props) {
           !!props.loading,
           props.variant || "primary",
           props.cursor,
-          props.textColor
+          props.textColor,
+          props.backgroundColor
         ),
         ...props.classList,
       }}

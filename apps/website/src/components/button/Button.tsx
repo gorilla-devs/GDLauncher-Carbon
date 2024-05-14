@@ -62,6 +62,7 @@ const Button = (props: ButtonProps & Props) => {
   const intent = props.intent;
   const size = props.size;
   const className = props.class;
+
   return (
     <button
       onClick={() => {
