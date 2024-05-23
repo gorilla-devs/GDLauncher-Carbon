@@ -5,9 +5,10 @@ use crate::{
     db::{self, app_configuration, PrismaClient},
 };
 use ring::rand::SecureRandom;
+use rusqlite_migration::{Migrations, M};
 use sysinfo::{System, SystemExt};
 use thiserror::Error;
-use tracing::{debug, instrument, trace};
+use tracing::{debug, error, instrument, trace};
 
 use super::{java::JavaManager, settings::terms_and_privacy::TermsAndPrivacy};
 
@@ -16,9 +17,9 @@ pub enum DatabaseError {
     #[error("error raised while trying to build the client for DB: {0}")]
     Client(#[from] prisma_client_rust::NewClientError),
     #[error("error while trying to migrate the database")]
-    Migration(#[from] prisma_client_rust::migrations::MigrateDeployError),
-    #[error("error while trying to push to db")]
-    Push(#[from] prisma_client_rust::migrations::DbPushError),
+    MigrationConn(#[from] rusqlite::Error),
+    #[error("error while trying to migrate the database")]
+    Migration(#[from] rusqlite_migration::Error),
     #[error("error while trying to query db")]
     Query(#[from] prisma_client_rust::QueryError),
     #[error("error while ensuring java profiles in db")]
@@ -36,30 +37,99 @@ pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClie
         runtime_path.join("gdl_conf.db").to_str().unwrap()
     );
 
+    let migrations = vec![
+        M::up(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/prisma/migrations/20240120134904_init/migration.sql"
+        ))),
+        M::up(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/prisma/migrations/20240123180711_launcher_action_on_game_launch_game_resolution/migration.sql"
+        ))),
+        M::up(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/prisma/migrations/20240126072544_update_modpacks/migration.sql"
+        ))),
+        M::up(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/prisma/migrations/20240127230211_add_meta_cache/migration.sql"
+        ))),
+        M::up(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/prisma/migrations/20240204033019_add_instances_settings/migration.sql"
+        ))),
+        M::up(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/prisma/migrations/20240206064454_downloaddeps/migration.sql"
+        ))),
+        M::up(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/prisma/migrations/20240206225900_add_hooks/migration.sql"
+        ))),
+        M::up(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/prisma/migrations/20240212215946_fix_java_profiles/migration.sql"
+        ))),
+        M::up(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/prisma/migrations/20240220223507_rename_auto_manage_java_for_system_profiles/migration.sql"
+        ))),
+        M::up(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/prisma/migrations/20240403131726_add_show_app_close_warning_option/migration.sql"
+        ))),
+        M::up(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/prisma/migrations/20240410205605_add_last_app_version_and_updated_at/migration.sql"
+        ))),
+    ];
+
+    let migrations = Migrations::new(migrations);
+
     debug!("db uri: {}", db_uri);
+
+    debug!("Starting migration procedure");
+
+    let mut conn = rusqlite::Connection::open(&db_uri)?;
+
+    let results: Result<i32, _> =
+        conn.query_row("SELECT COUNT(*) FROM _prisma_migrations", [], |row| {
+            row.get(0)
+        });
+
+    let already_existing_migration_count = match results {
+        Ok(value) => Some(value),
+        Err(err) => None,
+    };
+
+    debug!(
+        "Found {:?} migrations from prisma. Converting them",
+        already_existing_migration_count
+    );
+
+    conn.pragma_update(None, "journal_mode", &"WAL").unwrap();
+
+    if let Some(already_existing_migration_count) = already_existing_migration_count {
+        conn.pragma_update(None, "user_version", &already_existing_migration_count)?;
+    }
+
+    let _ = conn.execute("DROP TABLE IF EXISTS _prisma_migrations", []);
+
+    conn.pragma_update(None, "journal_mode", &"DELETE").unwrap();
+
+    debug!("Migrating database");
+
+    migrations.to_latest(&mut conn)?;
+
+    debug!("Closing migration connection");
+
+    conn.close().unwrap();
+
+    debug!("Starting prisma connection");
 
     let db_client = db::new_client_with_url(&db_uri)
         .await
         .map_err(DatabaseError::Client)?;
-
-    debug!("Trying to migrate database");
-    let try_migrate = db_client._migrate_deploy().await;
-
-    #[cfg(debug_assertions)]
-    {
-        if try_migrate.is_err() {
-            debug!("Forcing reset of database");
-            db_client
-                ._db_push()
-                .accept_data_loss()
-                .force_reset()
-                .await?;
-        }
-    }
-    #[cfg(not(debug_assertions))]
-    {
-        try_migrate.map_err(DatabaseError::Migration)?;
-    }
 
     seed_init_db(&db_client).await?;
 

@@ -468,6 +468,8 @@ dependencies = [
  "ring 0.16.20",
  "rspc",
  "rspc-axum",
+ "rusqlite",
+ "rusqlite_migration",
  "sentry",
  "serde",
  "serde-enum-str",
@@ -3612,6 +3614,16 @@ dependencies = [
  "libsqlite3-sys",
  "memchr",
  "smallvec",
+]
+
+[[package]]
+name = "rusqlite_migration"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ef7dd29a4426624704d5966416682fb7ab3682f724986e9e3893eaca44accabc"
+dependencies = [
+ "log",
+ "rusqlite",
 ]
 
 [[package]]

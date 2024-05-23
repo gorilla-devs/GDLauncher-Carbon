@@ -37,6 +37,8 @@ carbon_compression = { path = "../carbon_compression" }
 carbon_net = { path = "../carbon_net" }
 carbon_scheduler = { workspace = true }
 uuid = { workspace = true }
+rusqlite = { version = "0.25.4", features = ["bundled"] }
+rusqlite_migration = "1.0.2"
 prisma-client-rust = { workspace = true, features = [
   "sqlite-create-many",
   "sqlite",
