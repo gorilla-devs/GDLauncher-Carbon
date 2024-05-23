@@ -1,6 +1,5 @@
 import { ModalProps } from "../../";
 import ModalLayout from "../../ModalLayout";
-import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 
 import { Trans } from "@gd/i18n";
 import { For, Match, Show, Switch } from "solid-js";
