@@ -13,9 +13,9 @@ const changelogs: Changelog = {
   new: [],
   fixed: [
     {
-      title: "Increased app crash timeout.",
+      title: "New database migration system.",
       description:
-        "This is only a temporary fix. The crashes are caused by Prisma Database Client and we are working on migrating to another database client, but it will take some time."
+        "Our previous system was hanging for some users. We have now implemented a new system that should be more reliable and faster."
     }
   ],
   improved: []
