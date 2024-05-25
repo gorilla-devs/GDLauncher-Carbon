@@ -4,8 +4,10 @@ use crate::{
     app_version::APP_VERSION,
     db::{self, app_configuration, PrismaClient},
 };
+use prisma_client_rust::raw;
 use ring::rand::SecureRandom;
 use rusqlite_migration::{Migrations, M};
+use serde::Deserialize;
 use sysinfo::{System, SystemExt};
 use thiserror::Error;
 use tracing::{debug, error, instrument, trace};
@@ -115,8 +117,6 @@ pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClie
 
     let _ = conn.execute("DROP TABLE IF EXISTS _prisma_migrations", []);
 
-    conn.pragma_update(None, "journal_mode", &"DELETE").unwrap();
-
     debug!("Migrating database");
 
     migrations.to_latest(&mut conn)?;
@@ -130,6 +130,30 @@ pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClie
     let db_client = db::new_client_with_url(&db_uri)
         .await
         .map_err(DatabaseError::Client)?;
+
+    #[derive(Deserialize)]
+    struct Whatever {}
+
+    let _: Vec<Whatever> = db_client
+        ._query_raw(raw!("PRAGMA journal_mode=WAL;"))
+        .exec()
+        .await
+        .unwrap();
+    let _: Vec<Whatever> = db_client
+        ._query_raw(raw!("PRAGMA synchronous=normal;"))
+        .exec()
+        .await
+        .unwrap();
+    let _: Vec<Whatever> = db_client
+        ._query_raw(raw!("PRAGMA temp_store=MEMORY;"))
+        .exec()
+        .await
+        .unwrap();
+    let _: Vec<Whatever> = db_client
+        ._query_raw(raw!("PRAGMA mmap_size = 30000000000;"))
+        .exec()
+        .await
+        .unwrap();
 
     seed_init_db(&db_client).await?;
 
