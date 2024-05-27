@@ -49,7 +49,7 @@ function useLoading() {
         </div>
         <div style="font-size: 1rem; margin-top: 16px; margin-bottom: 16px; display: flex; justify-content: center; gap: 2rem;">
           <div>Cannot load module "${moduleName}"</div>
-          <div style="font-weight: 200">App version ${__APP_VERSION__}</div>
+          <div style="font-weight: 200">v${__APP_VERSION__}</div>
         </div>
       </div>
       <div style="font-weight: 300; font-size: 1rem; padding: 16px; text-align: left;">

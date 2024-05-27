@@ -15,16 +15,15 @@ const SingleImport = (props: {
 }) => {
   const [progress, setProgress] = createSignal(0);
   const [state, setState] = createSignal("idle");
-  const rspcContext = rspc.useContext();
+
+  const _task = rspc.createQuery(() => ({
+    queryKey: ["vtask.getTask", props.taskId || null]
+  }));
 
   createEffect(async () => {
     if (taskIds() !== undefined) {
+      const task = _task.data;
       try {
-        const task = await rspcContext.client.query([
-          "vtask.getTask",
-          props.taskId || null
-        ]);
-
         if (task && task.progress) {
           if (task.progress.type == "Known") {
             setProgress(Math.floor(task.progress.value * 100));

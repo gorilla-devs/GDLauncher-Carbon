@@ -410,7 +410,7 @@ const loadCoreModule: CoreModule = () =>
           logs
         });
       },
-      60 * 2 * 1000
+      60 * 5 * 1000
     );
   });
 
