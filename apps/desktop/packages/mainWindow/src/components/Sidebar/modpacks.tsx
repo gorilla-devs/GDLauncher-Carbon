@@ -72,7 +72,9 @@ const Sidebar = () => {
         modloader.supported_project_types.includes("modpack")
       );
     } else if (searchApi === "curseforge") {
-      const results = supportedModloaders[searchApi];
+      const results = supportedModloaders[searchApi].filter(
+        (modloader) => modloader !== "unknown"
+      );
       return results;
     }
   };

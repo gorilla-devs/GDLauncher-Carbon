@@ -143,7 +143,10 @@ const Sidebar = () => {
         modloader.supported_project_types.includes("modpack")
       );
     } else if (searchApi === "curseforge") {
-      const results = supportedModloaders[searchApi];
+      const results = supportedModloaders[searchApi].filter(
+        (modloader) => modloader !== "unknown"
+      );
+
       return results;
     }
   };
@@ -163,7 +166,7 @@ const Sidebar = () => {
             <div class="flex flex-col gap-3">
               <Radio.group
                 onChange={async (val) => {
-                  const details: any = await runWithOwner(owner, async () => {
+                  const details = await runWithOwner(owner, async () => {
                     return rspcContext.client.query([
                       "instance.getInstanceDetails",
                       val as number
@@ -176,9 +179,13 @@ const Sidebar = () => {
                   setInstanceId(val as number);
 
                   const modloaders =
-                    details.data?.modloaders.map((v: any) => v.type_) || [];
+                    details?.modloaders.map((v: any) => v.type_) || [];
 
-                  const gameVersion = details.data.version;
+                  const gameVersion = details?.version;
+
+                  if (!gameVersion) {
+                    throw new Error("This instance has no game version set.");
+                  }
 
                   let newModloaders = [];
                   if (modloaders) {
@@ -289,7 +296,6 @@ const Sidebar = () => {
               class="w-full"
               containerClass="w-full mt-4"
               options={filteredMappedGameVersions()}
-              disabled={!isNaN(instanceId()!)}
               icon={<div class="i-ri:price-tag-3-fill" />}
               value={infiniteQuery.query.gameVersions?.[0] || null}
               onChange={(val) => {
