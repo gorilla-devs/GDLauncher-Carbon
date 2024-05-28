@@ -45,4 +45,6 @@ pub enum Event {
         campaign_id: String,
         item_id: String,
     },
+    ChangelogViewed,
+    ChangelogTwitchButtonClicked,
 }

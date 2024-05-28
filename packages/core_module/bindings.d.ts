@@ -128,7 +128,7 @@ export type CFFEModSearchParameters = { query: CFFEModSearchParametersQuery }
 
 export type MemoryRange = { min_mb: number; max_mb: number }
 
-export type FEMetricsEvent = { event_name: "page_view"; data: string } | { event_name: "featured_modpack_installed"; data: { campaign_id: string; item_id: string } }
+export type FEMetricsEvent = { event_name: "page_view"; data: string } | { event_name: "featured_modpack_installed"; data: { campaign_id: string; item_id: string } } | { event_name: "changelog_viewed" } | { event_name: "changelog_twitch_button_clicked" }
 
 export type GameLogId = number
 
