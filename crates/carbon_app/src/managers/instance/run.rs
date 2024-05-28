@@ -625,7 +625,12 @@ impl ManagerRef<'_, InstanceManager> {
                         deep_check,
                         false,
                     )
-                    .await?;
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "Failed to download modpack instance files for instance {instance_id}"
+                        )
+                    })?;
 
                     if let Some(v) = v {
                         tracing::info!("Modpack version: {v:?}");
@@ -1224,7 +1229,12 @@ impl ManagerRef<'_, InstanceManager> {
                     deep_check,
                     true,
                 )
-                .await?;
+                .await
+                .with_context(|| {
+                    format!(
+                        "Failed to verify instance files for instance {instance_id}"
+                    )
+                })?;
 
                 if download_required {
                     let wait_task = task.subtask(Translation::InstanceTaskLaunchWaitDownloadFiles);
@@ -1265,7 +1275,12 @@ impl ManagerRef<'_, InstanceManager> {
                         deep_check,
                         false,
                     )
-                    .await?;
+                    .await
+                    .with_context(|| {
+                        format!(
+                            "Failed to download instance files for instance {instance_id}"
+                        )
+                    })?;
                 }
 
                 // update mod metadata and add modpack complete flag after mods are downloaded

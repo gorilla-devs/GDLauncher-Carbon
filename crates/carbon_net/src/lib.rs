@@ -160,6 +160,8 @@ pub async fn download_file(
                     return Err(DownloadError::ChecksumMismatch {
                         expected: expected.clone(),
                         actual,
+                        url: downloadable_file.url.clone(),
+                        path: downloadable_file.path.display().to_string(),
                     });
                 }
             }
@@ -173,6 +175,8 @@ pub async fn download_file(
                     return Err(DownloadError::ChecksumMismatch {
                         expected: expected.clone(),
                         actual,
+                        url: downloadable_file.url.clone(),
+                        path: downloadable_file.path.display().to_string(),
                     });
                 }
             }
@@ -186,6 +190,8 @@ pub async fn download_file(
                     return Err(DownloadError::ChecksumMismatch {
                         expected: expected.clone(),
                         actual,
+                        url: downloadable_file.url.clone(),
+                        path: downloadable_file.path.display().to_string(),
                     });
                 }
             }
@@ -440,25 +446,61 @@ pub async fn download_multiple(
             }
 
             match file.checksum {
-                Some(Checksum::Sha1(hash)) => {
-                    if hash != hex::encode(sha1.finalize().as_slice()) {
-                        return Err(DownloadError::GenericDownload(
-                            "Checksum mismatch".to_owned(),
-                        ));
+                Some(Checksum::Sha1(expected_hash)) => {
+                    let actual_hash = hex::encode(sha1.finalize().as_slice());
+
+                    if expected_hash != actual_hash {
+                        tracing::error!(
+                            "Checksum mismatch for file: {} - expected: {} - got: {}",
+                            path.display(),
+                            expected_hash,
+                            actual_hash
+                        );
+
+                        return Err(DownloadError::ChecksumMismatch {
+                            expected: expected_hash,
+                            actual: actual_hash,
+                            url: url,
+                            path: path.display().to_string(),
+                        });
                     }
                 }
-                Some(Checksum::Sha256(hash)) => {
-                    if hash != hex::encode(sha256.finalize().as_slice()) {
-                        return Err(DownloadError::GenericDownload(
-                            "Checksum mismatch".to_owned(),
-                        ));
+                Some(Checksum::Sha256(expected_hash)) => {
+                    let actual_hash = hex::encode(sha256.finalize().as_slice());
+
+                    if expected_hash != actual_hash {
+                        tracing::error!(
+                            "Checksum mismatch for file: {} - expected: {} - got: {}",
+                            path.display(),
+                            expected_hash,
+                            actual_hash
+                        );
+
+                        return Err(DownloadError::ChecksumMismatch {
+                            expected: expected_hash,
+                            actual: actual_hash,
+                            url: url,
+                            path: path.display().to_string(),
+                        });
                     }
                 }
-                Some(Checksum::Md5(hash)) => {
-                    if hash != hex::encode(md5.finalize().as_slice()) {
-                        return Err(DownloadError::GenericDownload(
-                            "Checksum mismatch".to_owned(),
-                        ));
+                Some(Checksum::Md5(expected_hash)) => {
+                    let actual_hash = hex::encode(md5.finalize().as_slice());
+
+                    if expected_hash != actual_hash {
+                        tracing::error!(
+                            "Checksum mismatch for file: {} - expected: {} - got: {}",
+                            path.display(),
+                            expected_hash,
+                            actual_hash
+                        );
+
+                        return Err(DownloadError::ChecksumMismatch {
+                            expected: expected_hash,
+                            actual: actual_hash,
+                            url: url,
+                            path: path.display().to_string(),
+                        });
                     }
                 }
                 None => {}

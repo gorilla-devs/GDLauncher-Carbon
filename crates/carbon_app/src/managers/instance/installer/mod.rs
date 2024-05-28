@@ -1,4 +1,4 @@
-use anyhow::bail;
+use anyhow::{bail, Context};
 use carbon_net::{Checksum, Downloadable};
 use std::{ops::Deref, pin::Pin, sync::Arc, time::Duration};
 use tokio::{sync::Mutex, task::AbortHandle};
@@ -482,7 +482,14 @@ impl Installer {
                                 t_download_file.complete_download();
                             });
 
-                            carbon_net::download_file(downloadable, Some(progress_watch_tx)).await?
+                            carbon_net::download_file(downloadable, Some(progress_watch_tx))
+                                .await
+                                .with_context(|| {
+                                    format!(
+                                        "Failed to download addon file for `{:?}`",
+                                        downloadable
+                                    )
+                                })?;
                         }
 
                         if let Some(id) = replaces_mod_id {
