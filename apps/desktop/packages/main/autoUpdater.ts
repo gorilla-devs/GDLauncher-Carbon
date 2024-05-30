@@ -43,7 +43,12 @@ export default function initAutoUpdater(win: BrowserWindow | null) {
       autoUpdater.allowDowngrade = selectedChannelNumber < currentChannelNumber;
       console.log("Checking for updates", selectedChannel);
       console.log("Current version", autoUpdater.currentVersion);
-      autoUpdater.checkForUpdates();
+
+      try {
+        await autoUpdater.checkForUpdates();
+      } catch (error) {
+        console.error("Error checking for updates", error);
+      }
     }
   );
 
