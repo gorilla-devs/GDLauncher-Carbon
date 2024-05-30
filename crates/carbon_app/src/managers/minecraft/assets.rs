@@ -26,67 +26,80 @@ pub async fn get_meta(
     static LOCK: Mutex<()> = Mutex::const_new(());
     let _guard = LOCK.lock().await;
 
-    let db_cache = db_client
-        .assets_meta_cache()
-        .find_unique(crate::db::assets_meta_cache::id::equals(
-            version_asset_index.id.clone(),
-        ))
-        .exec()
-        .await?;
+    let update_cache = || async {
+        let resp = reqwest_client
+            .get(version_asset_index.url.clone())
+            .send()
+            .await?;
 
-    if let Some(db_cache) = db_cache {
-        let asset_index = serde_json::from_slice(&db_cache.assets_index);
-
-        if let Ok(asset_index) = asset_index {
-            trace!("Asset index {} found in cache", version_asset_index.id);
-            return Ok((asset_index, db_cache.assets_index));
-        } else {
-            tracing::warn!(
-                "Failed to deserialize asset index for {} from cache, re-fetching: {} from {}",
-                version_asset_index.id,
-                db_cache.id,
-                version_asset_index.url.clone()
+        if !resp.status().is_success() {
+            anyhow::bail!(
+                "Failed to fetch asset index from `{}`: {}",
+                version_asset_index.url,
+                resp.status()
             );
         }
-    }
 
-    let resp = reqwest_client
-        .get(version_asset_index.url.clone())
-        .send()
-        .await?;
+        let asset_index = resp.bytes().await.with_context(|| {
+            format!(
+                "Failed to fetch asset index from `{}`",
+                version_asset_index.url
+            )
+        })?;
 
-    if !resp.status().is_success() {
-        anyhow::bail!(
-            "Failed to fetch asset index from `{}`: {}",
-            version_asset_index.url,
-            resp.status()
-        );
-    }
+        db_client
+            .assets_meta_cache()
+            .upsert(
+                crate::db::assets_meta_cache::id::equals(version_asset_index.id.clone()),
+                crate::db::assets_meta_cache::create(
+                    version_asset_index.id.clone(),
+                    asset_index.to_vec(),
+                    vec![],
+                ),
+                vec![crate::db::assets_meta_cache::assets_index::set(
+                    asset_index.to_vec(),
+                )],
+            )
+            .exec()
+            .await?;
 
-    let asset_index = resp.bytes().await.with_context(|| {
-        format!(
-            "Failed to fetch asset index from `{}`",
-            version_asset_index.url
-        )
-    })?;
+        Ok(asset_index)
+    };
 
-    db_client
-        .assets_meta_cache()
-        .upsert(
-            crate::db::assets_meta_cache::id::equals(version_asset_index.id.clone()),
-            crate::db::assets_meta_cache::create(
-                version_asset_index.id.clone(),
-                asset_index.to_vec(),
-                vec![],
-            ),
-            vec![crate::db::assets_meta_cache::assets_index::set(
-                asset_index.to_vec(),
-            )],
-        )
-        .exec()
-        .await?;
+    let asset_index = update_cache().await;
 
-    Ok((serde_json::from_slice(&asset_index)?, asset_index.to_vec()))
+    let asset_index = match asset_index {
+        Ok(asset_index) => Ok((serde_json::from_slice(&asset_index)?, asset_index.to_vec())),
+        Err(err) => {
+            let db_cache = db_client
+                .assets_meta_cache()
+                .find_unique(crate::db::assets_meta_cache::id::equals(
+                    version_asset_index.id.clone(),
+                ))
+                .exec()
+                .await?;
+
+            if let Some(db_cache) = db_cache {
+                let asset_index = serde_json::from_slice(&db_cache.assets_index);
+
+                if let Ok(asset_index) = asset_index {
+                    trace!("Asset index {} found in cache", version_asset_index.id);
+                    return Ok((asset_index, db_cache.assets_index));
+                } else {
+                    tracing::warn!(
+                        "Failed to deserialize asset index for {} from cache, re-fetching: {} from {}",
+                        version_asset_index.id,
+                        db_cache.id,
+                        version_asset_index.url.clone()
+                    );
+                }
+            }
+
+            Err(err)
+        }
+    }?;
+
+    Ok(asset_index)
 }
 
 pub enum AssetsDir {

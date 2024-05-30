@@ -44,71 +44,82 @@ pub async fn get_version(
     static LOCK: Mutex<()> = Mutex::const_new(());
     let _guard = LOCK.lock().await;
 
-    let db_cache = db_client
-        .partial_version_info_cache()
-        .find_unique(crate::db::partial_version_info_cache::id::equals(
-            db_entry_name.clone(),
-        ))
-        .exec()
-        .await
-        .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
+    let update_cache = || async {
+        let version_url = meta_base_url.join(&format!(
+            "quilt/{}/versions/{}.json",
+            META_VERSION, quilt_version
+        ))?;
 
-    if let Some(db_cache) = db_cache {
-        let db_cache = serde_json::from_slice(&db_cache.partial_version_info);
+        let resp = reqwest_client.get(version_url.clone()).send().await?;
 
-        if let Ok(db_cache) = db_cache {
-            trace!("Quilt version {} found in cache", quilt_version);
-            return Ok(db_cache);
-        } else {
-            tracing::warn!(
-                "Failed to deserialize quilt version for {} from cache, re-fetching",
-                quilt_version
+        let status = resp.status();
+
+        if !status.is_success() {
+            anyhow::bail!(
+                "Failed to fetch quilt version from `{}`: {}",
+                version_url.clone(),
+                status
             );
         }
-    }
 
-    let version_url = meta_base_url.join(&format!(
-        "quilt/{}/versions/{}.json",
-        META_VERSION, quilt_version
-    ))?;
+        let version_bytes = resp.bytes().await.with_context(|| {
+            format!(
+                "Failed to fetch quilt version from `{}`: {}",
+                version_url.clone(),
+                status
+            )
+        })?;
 
-    let resp = reqwest_client.get(version_url.clone()).send().await?;
-
-    let status = resp.status();
-
-    if !status.is_success() {
-        anyhow::bail!(
-            "Failed to fetch quilt version from `{}`: {}",
-            version_url.clone(),
-            status
-        );
-    }
-
-    let version_bytes = resp.bytes().await.with_context(|| {
-        format!(
-            "Failed to fetch quilt version from `{}`: {}",
-            version_url.clone(),
-            status
-        )
-    })?;
-
-    db_client
-        .partial_version_info_cache()
-        .upsert(
-            crate::db::partial_version_info_cache::id::equals(db_entry_name.clone()),
-            crate::db::partial_version_info_cache::create(
-                db_entry_name.clone(),
-                version_bytes.to_vec(),
-                vec![],
-            ),
-            vec![
-                crate::db::partial_version_info_cache::partial_version_info::set(
+        db_client
+            .partial_version_info_cache()
+            .upsert(
+                crate::db::partial_version_info_cache::id::equals(db_entry_name.clone()),
+                crate::db::partial_version_info_cache::create(
+                    db_entry_name.clone(),
                     version_bytes.to_vec(),
+                    vec![],
                 ),
-            ],
-        )
-        .exec()
-        .await?;
+                vec![
+                    crate::db::partial_version_info_cache::partial_version_info::set(
+                        version_bytes.to_vec(),
+                    ),
+                ],
+            )
+            .exec()
+            .await?;
+
+        Ok(version_bytes)
+    };
+
+    let version_bytes = match update_cache().await {
+        Ok(version_bytes) => version_bytes,
+        Err(err) => {
+            let db_cache = db_client
+                .partial_version_info_cache()
+                .find_unique(crate::db::partial_version_info_cache::id::equals(
+                    db_entry_name.clone(),
+                ))
+                .exec()
+                .await
+                .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
+
+            if let Some(db_cache) = db_cache {
+                let db_cache = serde_json::from_slice(&db_cache.partial_version_info);
+
+                if let Ok(db_cache) = db_cache {
+                    trace!("Quilt version {} found in cache", quilt_version);
+                    return Ok(db_cache);
+                } else {
+                    tracing::warn!(
+                        "Failed to deserialize quilt version for {} from cache, re-fetching",
+                        quilt_version
+                    );
+                }
+            }
+
+            anyhow::bail!("Failed to fetch quilt version: {}", err);
+        }
+    };
 
     Ok(serde_json::from_slice(&version_bytes)?)
 }

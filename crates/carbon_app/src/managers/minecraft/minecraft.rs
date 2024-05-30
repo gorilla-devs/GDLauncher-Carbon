@@ -75,15 +75,6 @@ pub async fn get_version(
     static LOCK: Mutex<()> = Mutex::const_new(());
     let _guard = LOCK.lock().await;
 
-    let db_cache = db_client
-        .version_info_cache()
-        .find_unique(crate::db::version_info_cache::id::equals(
-            mc_version.to_string(),
-        ))
-        .exec()
-        .await
-        .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
-
     let url = meta_base_url
         .join(&format!(
             "minecraft/{}/versions/{}.json",
@@ -91,55 +82,79 @@ pub async fn get_version(
         ))
         .unwrap();
 
-    if let Some(db_cache) = db_cache {
-        let db_cache = serde_json::from_slice(&db_cache.version_info);
-        if let Ok(db_cache) = db_cache {
-            trace!("Minecraft version {} found in cache", mc_version);
-            return Ok(db_cache);
-        } else {
-            tracing::warn!(
-                "Failed to deserialize minecraft version for {} from cache, re-fetching from {}",
-                mc_version,
-                url.clone()
+    let update_cache = || async {
+        let resp = reqwest_client.get(url.clone()).send().await?;
+
+        let status = resp.status();
+
+        if !status.is_success() {
+            anyhow::bail!(
+                "Failed to fetch minecraft version from `{}`: {}",
+                url.clone(),
+                status
             );
         }
-    }
 
-    let resp = reqwest_client.get(url.clone()).send().await?;
+        let version_meta = resp.bytes().await.with_context(|| {
+            format!(
+                "Failed to fetch minecraft version from `{}`: {}",
+                url.clone(),
+                status
+            )
+        })?;
 
-    let status = resp.status();
+        db_client
+            .version_info_cache()
+            .upsert(
+                crate::db::version_info_cache::id::equals(mc_version.to_string()),
+                crate::db::version_info_cache::create(
+                    mc_version.to_string(),
+                    version_meta.to_vec(),
+                    vec![],
+                ),
+                vec![crate::db::version_info_cache::version_info::set(
+                    version_meta.to_vec(),
+                )],
+            )
+            .exec()
+            .await?;
 
-    if !status.is_success() {
-        anyhow::bail!(
-            "Failed to fetch minecraft version from `{}`: {}",
-            url.clone(),
-            status
-        );
-    }
+        Ok(version_meta)
+    };
 
-    let version_meta = resp.bytes().await.with_context(|| {
-        format!(
-            "Failed to fetch minecraft version from `{}`: {}",
-            url.clone(),
-            status
-        )
-    })?;
+    let version_meta = match update_cache().await {
+        Ok(version_meta) => version_meta,
+        Err(err) => {
+            let db_cache = db_client
+                .version_info_cache()
+                .find_unique(crate::db::version_info_cache::id::equals(
+                    mc_version.to_string(),
+                ))
+                .exec()
+                .await
+                .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 
-    db_client
-        .version_info_cache()
-        .upsert(
-            crate::db::version_info_cache::id::equals(mc_version.to_string()),
-            crate::db::version_info_cache::create(
-                mc_version.to_string(),
-                version_meta.to_vec(),
-                vec![],
-            ),
-            vec![crate::db::version_info_cache::version_info::set(
-                version_meta.to_vec(),
-            )],
-        )
-        .exec()
-        .await?;
+            if let Some(db_cache) = db_cache {
+                let db_cache = serde_json::from_slice(&db_cache.version_info);
+                if let Ok(db_cache) = db_cache {
+                    trace!("Minecraft version {} found in cache", mc_version);
+                    return Ok(db_cache);
+                } else {
+                    tracing::warn!(
+                        "Failed to deserialize minecraft version for {} from cache, re-fetching from {}",
+                        mc_version,
+                        url.clone()
+                    );
+                }
+            }
+
+            anyhow::bail!(
+                "Failed to fetch minecraft version from `{}`: {}",
+                url.clone(),
+                err
+            );
+        }
+    };
 
     Ok(serde_json::from_slice(&version_meta)?)
 }
@@ -170,68 +185,79 @@ pub async fn get_lwjgl_meta(
     static LOCK: Mutex<()> = Mutex::const_new(());
     let _guard = LOCK.lock().await;
 
-    let db_cache = db_client
-        .lwjgl_meta_cache()
-        .find_unique(crate::db::lwjgl_meta_cache::id::equals(format!(
-            "{}-{}",
-            version_info_lwjgl_requirement.uid, lwjgl_suggest
-        )))
-        .exec()
-        .await
-        .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
+    let update_cache = || async {
+        let lwjgl_json_url = meta_base_url.join(&format!(
+            "minecraft/{}/libraries/{}/{}.json",
+            META_VERSION, version_info_lwjgl_requirement.uid, lwjgl_suggest
+        ))?;
 
-    if let Some(db_cache) = db_cache {
-        let lwjgl = serde_json::from_slice(&db_cache.lwjgl);
+        tracing::trace!("LWJGL JSON URL: {}", lwjgl_json_url);
 
-        if let Ok(lwjgl) = lwjgl {
-            trace!("LWJGL version {} found in cache", lwjgl_suggest);
-            return Ok(lwjgl);
-        } else {
-            tracing::warn!(
-                "Failed to deserialize lwjgl version for {} from cache, re-fetching",
-                lwjgl_suggest
+        let resp = reqwest_client.get(lwjgl_json_url.clone()).send().await?;
+
+        let status = resp.status();
+
+        if !status.is_success() {
+            anyhow::bail!(
+                "Failed to fetch minecraft version from `{}`: {}",
+                lwjgl_json_url.clone(),
+                status
             );
         }
-    }
 
-    let lwjgl_json_url = meta_base_url.join(&format!(
-        "minecraft/{}/libraries/{}/{}.json",
-        META_VERSION, version_info_lwjgl_requirement.uid, lwjgl_suggest
-    ))?;
+        let lwjgl = resp.bytes().await.with_context(|| {
+            format!(
+                "Failed to fetch minecraft version from `{}`: {}",
+                lwjgl_json_url.clone(),
+                status
+            )
+        })?;
 
-    tracing::trace!("LWJGL JSON URL: {}", lwjgl_json_url);
+        let db_entry_name = format!("{}-{}", version_info_lwjgl_requirement.uid, lwjgl_suggest);
 
-    let resp = reqwest_client.get(lwjgl_json_url.clone()).send().await?;
+        db_client
+            .lwjgl_meta_cache()
+            .upsert(
+                crate::db::lwjgl_meta_cache::id::equals(db_entry_name.clone()),
+                crate::db::lwjgl_meta_cache::create(db_entry_name.clone(), lwjgl.to_vec(), vec![]),
+                vec![crate::db::lwjgl_meta_cache::lwjgl::set(lwjgl.to_vec())],
+            )
+            .exec()
+            .await?;
 
-    let status = resp.status();
+        Ok(lwjgl)
+    };
 
-    if !status.is_success() {
-        anyhow::bail!(
-            "Failed to fetch minecraft version from `{}`: {}",
-            lwjgl_json_url.clone(),
-            status
-        );
-    }
+    let lwjgl = match update_cache().await {
+        Ok(lwjgl) => lwjgl,
+        Err(err) => {
+            let db_cache = db_client
+                .lwjgl_meta_cache()
+                .find_unique(crate::db::lwjgl_meta_cache::id::equals(format!(
+                    "{}-{}",
+                    version_info_lwjgl_requirement.uid, lwjgl_suggest
+                )))
+                .exec()
+                .await
+                .map_err(|err| anyhow::anyhow!("Failed to query db: {}", err))?;
 
-    let lwjgl = resp.bytes().await.with_context(|| {
-        format!(
-            "Failed to fetch minecraft version from `{}`: {}",
-            lwjgl_json_url.clone(),
-            status
-        )
-    })?;
+            if let Some(db_cache) = db_cache {
+                let lwjgl = serde_json::from_slice(&db_cache.lwjgl);
 
-    let db_entry_name = format!("{}-{}", version_info_lwjgl_requirement.uid, lwjgl_suggest);
+                if let Ok(lwjgl) = lwjgl {
+                    trace!("LWJGL version {} found in cache", lwjgl_suggest);
+                    return Ok(lwjgl);
+                } else {
+                    tracing::warn!(
+                        "Failed to deserialize lwjgl version for {} from cache, re-fetching",
+                        lwjgl_suggest
+                    );
+                }
+            }
 
-    db_client
-        .lwjgl_meta_cache()
-        .upsert(
-            crate::db::lwjgl_meta_cache::id::equals(db_entry_name.clone()),
-            crate::db::lwjgl_meta_cache::create(db_entry_name.clone(), lwjgl.to_vec(), vec![]),
-            vec![crate::db::lwjgl_meta_cache::lwjgl::set(lwjgl.to_vec())],
-        )
-        .exec()
-        .await?;
+            anyhow::bail!("Failed to fetch lwjgl from `{}`: {}", lwjgl_suggest, err);
+        }
+    };
 
     Ok(serde_json::from_slice(&lwjgl)?)
 }
