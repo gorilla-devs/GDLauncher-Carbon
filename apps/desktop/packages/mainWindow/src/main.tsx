@@ -88,7 +88,7 @@ render(
               </Match>
               <Match when={!isReady()}>
                 <div class="flex flex-col gap-8 justify-center items-center h-screen w-screen">
-                  <Show when={Date.now() - startTime < 5000}>
+                  <Show when={Date.now() - startTime > 5000}>
                     <div class="text-xl">
                       {
                         // Hardcoded because we don't know the language at this point
