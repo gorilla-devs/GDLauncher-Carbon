@@ -5,7 +5,7 @@ import { theme } from "./unocss.theme.js";
 import { presetScrollbarHide } from "unocss-preset-scrollbar-hide";
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import supportedLanguages from "@gd/i18n/supportedLanguages.json";
+import { supportedLanguages } from "@gd/i18n";
 // import gdlIcons from "./unocss.icons.js";
 import transformerDirectives from "@unocss/transformer-directives";
 
@@ -18,13 +18,15 @@ const safelist = Object.values(supportedLanguages).map(
 const unocssConfig = {
   content: {
     pipeline: {
-      include: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"],
+      include: [
+        /(apps\/desktop\/packages|packages\/ui)\/.*\.(ts|tsx|html|js|jsx)$/,
+      ],
     },
   },
   presets: [
     presetAttributify(),
     presetWind(),
-    presetScrollbarHide(),
+    // presetScrollbarHide(),
     presetIcons({
       // collections: {
       //   gdl: gdlIcons,
@@ -38,7 +40,8 @@ const unocssConfig = {
         import("@iconify/json/json/fa6-solid.json").then((i) => i.default),
     }),
   ],
-  rules: [["scrollbar-gutter", { "scrollbar-gutter": "stable" }]],
+  rules: [],
+  // rules: [["scrollbar-gutter", { "scrollbar-gutter": "stable" }]],
   safelist,
   theme,
   transformers: [transformerDirectives()],

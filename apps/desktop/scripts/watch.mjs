@@ -17,7 +17,7 @@ function watchMain(mainWindow) {
   });
 
   return build({
-    configFile: "packages/main/vite.config.cjs",
+    configFile: "packages/main/vite.config.mjs",
     mode: "development",
     plugins: [
       {
@@ -43,7 +43,7 @@ function watchMain(mainWindow) {
  */
 function watchPreload(mainWindow) {
   return build({
-    configFile: "packages/preload/vite.config.cjs",
+    configFile: "packages/preload/vite.config.mjs",
     mode: "development",
     plugins: [
       {
@@ -60,7 +60,7 @@ function watchPreload(mainWindow) {
 }
 
 const mainWindow = await createServer({
-  configFile: "packages/mainWindow/vite.config.cjs"
+  configFile: "packages/mainWindow/vite.config.mjs"
 });
 
 await mainWindow.listen();

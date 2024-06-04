@@ -3,10 +3,13 @@ import { resolve } from "path";
 import os from "os";
 import { defineConfig, loadEnv } from "vite";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
+import { appVersion } from "@gd/config";
+import { dirname } from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig(({ mode }) => {
-  const config = require("@gd/config");
-  const appVersion = config.appVersion;
   const env = loadEnv(mode, resolve(__dirname, "../../../../"), "");
   const isDev = mode === "development";
 

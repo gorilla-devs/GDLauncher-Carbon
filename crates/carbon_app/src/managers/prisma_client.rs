@@ -84,6 +84,10 @@ pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClie
             env!("CARGO_MANIFEST_DIR"),
             "/prisma/migrations/20240410205605_add_last_app_version_and_updated_at/migration.sql"
         ))),
+        M::up(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/prisma/migrations/20240603145041_gdl_account/migration.sql"
+        ))),
     ];
 
     let migrations = Migrations::new(migrations);

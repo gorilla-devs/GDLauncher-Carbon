@@ -4,6 +4,10 @@ import solidPlugin from "vite-plugin-solid";
 import dts from "vite-plugin-dts";
 import Unocss from "unocss/vite";
 import { unocssConfig } from "@gd/config";
+import { dirname } from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   plugins: [

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "display": "Default",
+  "compilerOptions": {
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "declaration": true,
+    "noEmit": false,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "inlineSources": false,
+    "isolatedModules": false,
+    "module": "esnext",
+    "target": "ESNext",
+    "moduleResolution": "node",
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "preserveWatchOutput": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "outDir": "dist"
+  },
+  "types": ["vite/client", "**/**.d.ts"],
+  "include": ["**/*", "**/*.json"],
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/*.test.tsx"]
+}

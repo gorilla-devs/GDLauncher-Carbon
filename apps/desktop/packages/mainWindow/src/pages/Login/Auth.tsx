@@ -62,13 +62,7 @@ const Auth = () => {
         <Trans key="login.sign_in_with_microsoft" />
       </Button>
       <p class="text-darkSlate-50 text-sm max-w-90 mb-10">
-        <Trans
-          key="login.sign_in_with_microsoft_text"
-          options={{
-            defaultValue:
-              "Sign in with your Microsoft Account. By doing so, you accept all our policies and terms stated below."
-          }}
-        />
+        <Trans key="login.sign_in_with_microsoft_text" />
       </p>
       <Show when={error()}>
         <p class="m-0 text-red-500">{error()}</p>

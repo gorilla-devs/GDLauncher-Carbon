@@ -1,14 +1,17 @@
 {
   "name": "@gd/i18n",
   "main": "./index.ts",
+  "type": "module",
   "exports": {
     ".": {
-      "import": "./index.ts"
+      "import": "./dist/index.js"
     },
-    "./supportedLanguages.json": {
-      "import": "./supportedLanguages.json",
-      "default": "./supportedLanguages.json"
-    }
+    "./tsconfig.json": "./tsconfig.json"
+  },
+  "scripts": {
+    "dev": "tsc -p . -m esnext",
+    "build": "tsc -p . -m esnext && node noop.js",
+    "lint": "tsc -p . -m esnext --noEmit"
   },
   "devDependencies": {
     "@mbarzda/solid-i18next": "^1.2.2",

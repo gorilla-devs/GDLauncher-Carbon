@@ -1,9 +1,11 @@
 import { resolve } from "path";
 import { builtinModules } from "module";
 import { defineConfig } from "vite";
+import { appVersion } from "@gd/config";
+import { dirname } from "path";
+import { fileURLToPath } from "url";
 
-const config = require("@gd/config");
-const appVersion = config.appVersion;
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   root: __dirname,

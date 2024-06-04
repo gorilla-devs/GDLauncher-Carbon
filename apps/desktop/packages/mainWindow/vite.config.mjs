@@ -3,10 +3,11 @@ import { defineConfig } from "vite";
 import solidPlugin from "vite-plugin-solid";
 import Unocss from "unocss/vite";
 import pkg from "../../package.json";
+import { unocssConfig, appVersion } from "@gd/config";
+import { dirname } from "path";
+import { fileURLToPath } from "url";
 
-const config = require("@gd/config");
-const unocssConfig = config.unocssConfig;
-const appVersion = config.appVersion;
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   mode: process.env.NODE_ENV,

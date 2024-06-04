@@ -59,19 +59,19 @@ export function getAvailableThemes(): string[] {
   return Object.values(_Theme);
 }
 
-export function getThemeColors(themeName: string): UITheme | undefined {
+export function getThemeColor(themeName: string, color: keyof UITheme): string {
   switch (themeName) {
     case _Theme._Light: {
-      return lightTheme;
+      return `rgb(${lightTheme[color]})`;
     }
     case _Theme._PoisonGreen: {
-      return poisonGreen;
+      return `rgb(${poisonGreen[color]})`;
     }
     case _Theme._Dracula: {
-      return dracula;
+      return `rgb(${dracula[color]})`;
     }
     default: {
-      return mainTheme;
+      return `rgb(${mainTheme[color]})`;
     }
   }
 }

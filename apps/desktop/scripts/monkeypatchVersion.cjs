@@ -1,10 +1,11 @@
 const path = require("path");
 const fs = require("fs");
+import { appVersion } from "@gd/config";
 
 const packageJsonPath = path.join(__dirname, "..", "package.json");
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
 
-const actualVersion = require("@gd/config").appVersion;
+const actualVersion = appVersion;
 
 packageJson.version = actualVersion;
 

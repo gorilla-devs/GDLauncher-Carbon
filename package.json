@@ -10,7 +10,7 @@
     "sudo-init": "sudo npm i -g pnpm@8.15.0 && PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=true pnpm i",
     "codegen": "node iridium_patchfix.js && pnpm prisma:generate && pnpm rspc-bindings:generate",
     "watch:app": "turbo run dev --filter !@gd/website",
-    "watch:core": "cargo run -p carbon_app",
+    "watch:core": "RUST_BACKTRACE=1 cargo run -p carbon_app",
     "------divider-prepare------": "------divider------",
     "prepare-release:linux-x64": "cd target/x86_64-unknown-linux-gnu/release && cp ./carbon_app ./carbon_app.debug && strip -S ./carbon_app",
     "prepare-release:mac-x64": "cd target/x86_64-apple-darwin/release && dsymutil ./carbon_app && strip -S ./carbon_app",
@@ -61,7 +61,7 @@
   },
   "engines": {
     "pnpm": ">=8.15.0",
-    "node": ">=18.17.0"
+    "node": ">=18.18.0"
   },
   "packageManager": "pnpm@8.15.0"
 }

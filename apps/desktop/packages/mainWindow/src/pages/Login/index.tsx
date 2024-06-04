@@ -19,6 +19,7 @@ import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
 import BackgroundVideo from "/assets/images/login_background.webm";
 import { handleStatus } from "@/utils/login";
 import { parseError } from "@/utils/helpers";
+import GDLAccount from "./GDLAccount";
 
 export type DeviceCodeObjectType = {
   userCode: string;
@@ -46,7 +47,7 @@ export default function Login() {
   }));
 
   const nextStep = () => {
-    if (step() < 2) {
+    if (step() < 3) {
       setStep((prev) => prev + 1);
     }
   };
@@ -84,7 +85,15 @@ export default function Login() {
   });
 
   createEffect(() => {
-    if (routeData.settings.data?.termsAndPrivacyAccepted) setStep(1);
+    if (
+      !routeData.settings.data?.hasCompletedGdlAccountSetup &&
+      routeData?.activeUuid?.data &&
+      routeData.accounts.data?.length! > 0
+    ) {
+      setStep(1);
+    } else if (routeData.settings.data?.termsAndPrivacyAccepted) {
+      setStep(1);
+    }
   });
 
   return (
@@ -187,6 +196,9 @@ export default function Login() {
                   deviceCodeObject={deviceCodeObject()}
                   setDeviceCodeObject={setDeviceCodeObject}
                 />
+              </Match>
+              <Match when={step() === 3}>
+                <GDLAccount />
               </Match>
             </Switch>
           </div>

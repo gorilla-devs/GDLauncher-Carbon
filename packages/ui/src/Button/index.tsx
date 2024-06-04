@@ -10,7 +10,13 @@ import {
 import { Spinner } from "../Spinner";
 
 type Size = "small" | "medium" | "large";
-type Type = "primary" | "secondary" | "glow" | "outline" | "transparent";
+type Type =
+  | "primary"
+  | "secondary"
+  | "glow"
+  | "outline"
+  | "transparent"
+  | "text";
 
 interface Props
   extends Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "type"> {
@@ -137,6 +143,13 @@ const getVariant = (
       "border-transparent": true,
       "hover:border-1": !isDisabled,
       "hover:border-white": !isDisabled,
+    },
+    text: {
+      ...commonStyle,
+      // "bg-transparent": true,
+      "text-white": true,
+      "bg-primary-400/30": true,
+      "border-0": true,
     },
   };
 

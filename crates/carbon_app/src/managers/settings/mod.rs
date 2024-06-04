@@ -371,6 +371,26 @@ impl ManagerRef<'_, SettingsManager> {
                 })?;
         }
 
+        if let Some(has_completed_gdl_account_setup) =
+            incoming_settings.has_completed_gdl_account_setup
+        {
+            let has_completed_gdl_account_setup = has_completed_gdl_account_setup.inner();
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![app_configuration::has_completed_gdl_account_setup::set(
+                    has_completed_gdl_account_setup,
+                )],
+            ));
+        }
+
+        if let Some(gdl_account_id) = incoming_settings.gdl_account_id {
+            let gdl_account_id = gdl_account_id.inner();
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![app_configuration::gdl_account_id::set(gdl_account_id)],
+            ));
+        }
+
         if !queries.is_empty() {
             db._batch(queries).await?;
             self.app.invalidate(GET_SETTINGS, None);
