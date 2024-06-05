@@ -463,7 +463,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
   });
 
   return (
-    <div class="flex flex-col justify-between scrollbar-hide h-full w-120 overflow-y-scroll">
+    <div class="flex flex-col justify-between h-full w-120">
       <div class="flex flex-col justify-between gap-4 h-full p-5">
         <span class="flex flex-col justify-between gap-4">
           <div class="flex gap-4 w-full">
