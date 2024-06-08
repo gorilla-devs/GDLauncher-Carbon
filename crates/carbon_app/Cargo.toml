@@ -26,6 +26,7 @@ const_format = { workspace = true }
 # tracing-forest = { workspace = true }
 reqwest = { workspace = true }
 reqwest-middleware = { workspace = true }
+reqwest-retry = { workspace = true }
 async-stream = { workspace = true }
 dunce = { workspace = true }
 axum = { workspace = true, features = ["ws"] }

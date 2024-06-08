@@ -31,7 +31,7 @@ pub enum DatabaseError {
 }
 
 #[instrument]
-pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClient, DatabaseError> {
+pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClient, anyhow::Error> {
     let runtime_path = dunce::simplified(&runtime_path);
 
     let db_uri = format!(
@@ -172,7 +172,7 @@ async fn find_appropriate_default_xmx() -> i32 {
     }
 }
 
-async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
+async fn seed_init_db(db_client: &PrismaClient) -> Result<(), anyhow::Error> {
     let release_channel = match APP_VERSION {
         v if v.contains("alpha") => "alpha",
         v if v.contains("beta") => "beta",
@@ -200,7 +200,10 @@ async fn seed_init_db(db_client: &PrismaClient) -> Result<(), DatabaseError> {
                 ))],
             )
             .exec()
-            .await?;
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to create default app configuration: {e}"))?;
+
+        trace!("Created default app configuration");
     }
 
     let app_config = db_client

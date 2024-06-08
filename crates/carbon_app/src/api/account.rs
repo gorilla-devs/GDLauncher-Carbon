@@ -126,9 +126,13 @@ struct StatusFlags {
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]
 enum EnrollmentStatus {
+    RefreshingMSAuth,
     RequestingCode,
     PollingCode(DeviceCode),
-    QueryingAccount,
+    McLogin,
+    XboxAuth,
+    MCEntitlements,
+    McProfile,
     Complete(AccountEntry),
     Failed(EnrollmentError),
 }
@@ -209,9 +213,13 @@ impl From<&account::EnrollmentStatus> for Result<EnrollmentStatus, FeError> {
         use EnrollmentStatus as Api;
 
         Ok(match value {
+            BE::RefreshingMSAuth => Api::RefreshingMSAuth,
             BE::RequestingCode => Api::RequestingCode,
             BE::PollingCode(code) => Api::PollingCode(code.clone().into()),
-            BE::McLogin | BE::PopulateAccount => Api::QueryingAccount,
+            &BE::McLogin => Api::McLogin,
+            &BE::XboxAuth => Api::XboxAuth,
+            &BE::MCEntitlements => Api::MCEntitlements,
+            &BE::McProfile => Api::McProfile,
             BE::Complete(account) => Api::Complete({
                 // this is bad, but it used to be far worse
                 let account: account::FullAccount = account.clone().into();

@@ -19,10 +19,13 @@ pub struct EnrollmentTask {
 
 #[derive(Debug)]
 pub enum EnrollmentStatus {
+    RefreshingMSAuth,
     RequestingCode,
     PollingCode(DeviceCode),
     McLogin,
-    PopulateAccount,
+    XboxAuth,
+    MCEntitlements,
+    McProfile,
     Complete(FullAccount),
     Failed(anyhow::Result<EnrollmentError>),
 }
@@ -51,18 +54,26 @@ impl EnrollmentTask {
                 update_status(EnrollmentStatus::PollingCode(device_code.clone())).await;
                 let ms_auth = device_code.poll_ms_auth(&client).await??;
 
-                update_status(EnrollmentStatus::McLogin).await;
+                update_status(EnrollmentStatus::XboxAuth).await;
 
                 // authenticate with XBox
                 let xbox_auth = XboxAuth::from_ms(&ms_auth, &client).await??;
 
+                update_status(EnrollmentStatus::McLogin).await;
                 // authenticate with MC
                 let mc_auth = McAuth::auth_ms(xbox_auth, &client).await?;
 
-                update_status(EnrollmentStatus::PopulateAccount).await;
+                update_status(EnrollmentStatus::MCEntitlements).await;
+
+                let entitlements = mc_auth.get_entitlement(&client).await??;
+
+                update_status(EnrollmentStatus::McProfile).await;
+
+                let mc_profile = get_profile(&client, &mc_auth.access_token).await??;
+
                 let account = McAccount {
-                    entitlement: mc_auth.get_entitlement(&client).await??,
-                    profile: get_profile(&client, &mc_auth.access_token).await??,
+                    entitlement: entitlements.clone(),
+                    profile: mc_profile,
                     auth: mc_auth,
                 };
 
@@ -110,13 +121,15 @@ impl EnrollmentTask {
             };
 
             let task = || async {
+                update_status(EnrollmentStatus::RefreshingMSAuth).await;
+
                 trace!("Refreshing MsAuth with refresh token");
                 // attempt to refresh token
                 let ms_auth = MsAuth::refresh(&client, &refresh_token).await?;
 
                 trace!("Successfully refreshed MsAuth with refresh token");
 
-                update_status(EnrollmentStatus::McLogin).await;
+                update_status(EnrollmentStatus::XboxAuth).await;
 
                 trace!("Authenticating with XBox");
 
@@ -127,15 +140,24 @@ impl EnrollmentTask {
 
                 trace!("Authenticating with MC");
 
+                update_status(EnrollmentStatus::McLogin).await;
+
                 // authenticate with MC
                 let mc_auth = McAuth::auth_ms(xbox_auth, &client).await?;
 
                 trace!("Successfully authenticated with MC");
 
-                update_status(EnrollmentStatus::PopulateAccount).await;
+                update_status(EnrollmentStatus::MCEntitlements).await;
+
+                let entitlements = mc_auth.get_entitlement(&client).await??;
+
+                update_status(EnrollmentStatus::McProfile).await;
+
+                let mc_profile = get_profile(&client, &mc_auth.access_token).await??;
+
                 let account = McAccount {
-                    entitlement: mc_auth.get_entitlement(&client).await??,
-                    profile: get_profile(&client, &mc_auth.access_token).await??,
+                    entitlement: entitlements.clone(),
+                    profile: mc_profile,
                     auth: mc_auth,
                 };
 
