@@ -9,6 +9,7 @@ use std::path::PathBuf;
 use std::sync::atomic;
 use std::sync::atomic::AtomicI32;
 use std::sync::Arc;
+use std::thread::available_parallelism;
 use std::usize;
 
 use anyhow::anyhow;
@@ -63,6 +64,7 @@ pub struct MetaCacheManager {
     local_targets: LockNotify<CacheTargets>,
     curseforge_targets: LockNotify<CacheTargets>,
     modrinth_targets: LockNotify<CacheTargets>,
+    targets_semaphore: Semaphore,
     image_scale_semaphore: Semaphore,
     image_download_semaphore: Semaphore,
     watched_instance: watch::Sender<Option<InstanceId>>,
@@ -83,6 +85,7 @@ impl MetaCacheManager {
             local_targets: LockNotify::new(CacheTargets::new()),
             curseforge_targets: LockNotify::new(CacheTargets::new()),
             modrinth_targets: LockNotify::new(CacheTargets::new()),
+            targets_semaphore: Semaphore::new(20),
             image_scale_semaphore: Semaphore::new(1),
             image_download_semaphore: Semaphore::new(10),
             watched_instance: watch::channel(None).0,
@@ -1287,14 +1290,24 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                 }
             }
 
+            let default_parallelism_approx = available_parallelism().unwrap().get() / 2;
+
+            let rate_limiter = Arc::new(tokio::sync::Semaphore::new(default_parallelism_approx));
+
             let entry_futures = modpaths.into_iter().map(|(subpath, (enabled, _))| {
                 let pathbuf = &pathbuf;
                 let update_notifier = &update_notifier;
 
+                let rate_limiter = Arc::clone(&rate_limiter);
+
                 async move {
+                    let _permit = rate_limiter.acquire().await.expect("rate limiter");
+
                     app.meta_cache_manager()
                         .cache_mod_file_unchecked(instance_id, pathbuf, subpath, enabled)
                         .await?;
+
+                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
                     update_notifier.send(instance_id);
 

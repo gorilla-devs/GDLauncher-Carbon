@@ -3,6 +3,7 @@ use std::ffi::{OsStr, OsString};
 use std::fmt::Display;
 
 use std::sync::Arc;
+use std::time::Duration;
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 
 use crate::api::keys::instance::*;
@@ -128,6 +129,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let mut stream = tokio::fs::read_dir(instance_path).await?;
 
+        let updates_semaphore = Arc::new(tokio::sync::Semaphore::new(20));
+
         while let Some(dir) = stream.next_entry().await? {
             let path = dir.path();
 
@@ -186,7 +189,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .await;
 
             let app = self.app.clone();
+            let updates_semaphore = Arc::clone(&updates_semaphore);
             tokio::task::spawn(async move {
+                let _permit = updates_semaphore.acquire().await.unwrap();
+
+                trace!("Instance modpack update for {instance_id}",);
+
                 // ignore errors
                 let (_, _) = join!(
                     app.instance_manager()
@@ -194,6 +202,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     app.instance_manager()
                         .check_modrinth_modpack_updates(instance_id),
                 );
+
+                tokio::time::sleep(Duration::from_millis(10)).await;
             });
         }
 
