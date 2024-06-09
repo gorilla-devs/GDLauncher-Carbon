@@ -22,8 +22,7 @@ module.exports = {
     "eslint:recommended",
     "plugin:solid/typescript",
     "plugin:i18next/recommended",
-    "prettier",
-    "@unocss"
+    "prettier"
   ],
   ignorePatterns: ["dist/**/*", "node_modules/**/*"]
 };

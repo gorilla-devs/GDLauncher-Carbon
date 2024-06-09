@@ -21,7 +21,7 @@ module.exports = {
     ],
   },
   parser: "@typescript-eslint/parser",
-  plugins: ["solid", "prettier", "@unocss"],
+  plugins: ["solid", "prettier"],
   extends: [
     "eslint:recommended",
     "plugin:solid/typescript",
