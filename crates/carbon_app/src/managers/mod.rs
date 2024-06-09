@@ -93,13 +93,9 @@ mod app {
         ) -> App {
             let db_client = match prisma_client::load_and_migrate(runtime_path.clone()).await {
                 Ok(client) => Arc::new(client),
-                Err(prisma_client::DatabaseError::Migration(err)) => {
-                    error!("Database migration failed: {}", err);
-                    panic!("Database migration failed: {}", err);
-                }
-                Err(err) => {
-                    error!("Database connection failed: {}", err);
-                    panic!("Database connection failed: {}", err);
+                Err(e) => {
+                    error!("Database migration failed: {}", e);
+                    panic!("Database migration failed: {}", e);
                 }
             };
 

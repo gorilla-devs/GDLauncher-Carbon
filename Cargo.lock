@@ -465,6 +465,7 @@ dependencies = [
  "regex",
  "reqwest",
  "reqwest-middleware",
+ "reqwest-retry",
  "ring 0.16.20",
  "rspc",
  "rspc-axum",

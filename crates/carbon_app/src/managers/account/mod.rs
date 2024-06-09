@@ -10,15 +10,18 @@ use chrono::{FixedOffset, Utc};
 use prisma_client_rust::{
     chrono::DateTime, prisma_errors::query_engine::RecordNotFound, Direction, QueryError,
 };
+use reqwest::Client;
+use reqwest_middleware::ClientBuilder;
+use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use std::{
     collections::HashMap,
     mem,
     sync::{Arc, Weak},
     time::{Duration, Instant},
 };
+use thiserror::Error;
 use tracing::{debug, error, info, trace, warn};
 
-use thiserror::Error;
 use tokio::sync::{Mutex, RwLock};
 
 use anyhow::{anyhow, bail};
@@ -458,7 +461,11 @@ impl<'s> ManagerRef<'s, AccountManager> {
         match &mut *self.active_enrollment.write().await {
             Some(_) => bail!(BeginEnrollmentStatusError::InProgress),
             enrollment @ None => {
-                let client = self.app.reqwest_client.clone();
+                let retry_policy = ExponentialBackoff::builder().build_with_max_retries(10);
+                let reqwest_client = Client::builder().build()?;
+                let client = ClientBuilder::new(reqwest_client)
+                    .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+                    .build();
 
                 struct Invalidator(AppRef);
 

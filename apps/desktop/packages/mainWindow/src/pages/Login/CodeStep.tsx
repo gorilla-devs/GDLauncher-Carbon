@@ -1,5 +1,12 @@
 import { Button, LoadingBar, Popover } from "@gd/ui";
-import { createEffect, createSignal, onCleanup, Show } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  Match,
+  onCleanup,
+  Show,
+  Switch
+} from "solid-js";
 import { msToMinutes, msToSeconds, parseTwoDigitNumber } from "@/utils/helpers";
 import { Setter } from "solid-js";
 import { DeviceCode } from "@/components/CodeInput";
@@ -150,12 +157,7 @@ const CodeStep = (props: Props) => {
           }}
         >
           <i class="i-ri:arrow-left-line w-4 h-4" />
-          <Trans
-            key="login.step_back"
-            options={{
-              defaultValue: "Back"
-            }}
-          />
+          <Trans key="login.step_back" />
         </Button>
       </div>
       <div class="absolute top-4 right-4">
@@ -209,33 +211,17 @@ const CodeStep = (props: Props) => {
           />
           <Show when={expired()}>
             <p class="mb-0 mt-2 text-red-500">
-              <Trans
-                key="login.code_expired_message"
-                options={{
-                  defaultValue: "The code has been expired"
-                }}
-              />
+              <Trans key="login.code_expired_message" />
             </p>
           </Show>
         </div>
         <Show when={!expired()}>
           <p class="mb-0 text-darkSlate-50 mt-4">
             <span class="text-white mr-2">{countDown()}</span>
-            <Trans
-              key="login.before_expiring"
-              options={{
-                defaultValue: "before the code expires"
-              }}
-            />
+            <Trans key="login.before_expiring" />
           </p>
           <p class="text-darkSlate-50 mb-0">
-            <Trans
-              key="login.enter_code_in_browser"
-              options={{
-                defaultValue:
-                  "Enter the specified code on the browser page to complete the authorization"
-              }}
-            />
+            <Trans key="login.enter_code_in_browser" />
           </p>
         </Show>
       </div>
@@ -244,12 +230,23 @@ const CodeStep = (props: Props) => {
       </Show>
       <Show when={loading()}>
         <span class="mb-4 text-xs absolute text-darkSlate-100 bottom-1">
-          <Trans
-            key="login.waiting_login_code_msg"
-            options={{
-              defaultValue: "Waiting for authorization..."
-            }}
-          />
+          <Switch>
+            <Match when={(routeData.status.data as any)?.pollingCode}>
+              <Trans key="login.polling_microsoft_auth" />
+            </Match>
+            <Match when={routeData.status.data === "xboxAuth"}>
+              <Trans key="login.authenticating_xbox" />
+            </Match>
+            <Match when={routeData.status.data === "mcLogin"}>
+              <Trans key="login.authenticating_minecraft" />
+            </Match>
+            <Match when={routeData.status.data === "mcProfile"}>
+              <Trans key="login.retrieving_minecraft_profile" />
+            </Match>
+            <Match when={routeData.status.data === "mcentitlements"}>
+              <Trans key="login.retrieving_minecraft_entitlements" />
+            </Match>
+          </Switch>
         </span>
         <div class="w-full absolute overflow-hidden bottom-0">
           <LoadingBar class="" />
@@ -265,12 +262,7 @@ const CodeStep = (props: Props) => {
             window.openExternalLink(deviceCodeLink() || "");
           }}
         >
-          <Trans
-            key="login.open_in_browser"
-            options={{
-              defaultValue: "Copy and open in browser"
-            }}
-          />
+          <Trans key="login.open_in_browser" />
           <div class="text-md i-ri:external-link-fill" />
         </Button>
       </Show>
@@ -281,12 +273,7 @@ const CodeStep = (props: Props) => {
         >
           <span class="i-ri:refresh-line" />
           <h3 class="m-0">
-            <Trans
-              key="login.refresh"
-              options={{
-                defaultValue: "refresh"
-              }}
-            />
+            <Trans key="login.refresh" />
           </h3>
         </div>
       </Show>
