@@ -66,17 +66,17 @@ impl DeviceCode {
         })
     }
 
-    #[tracing::instrument(skip(self, client))]
-    pub async fn poll_ms_auth(
-        &self,
-        client: &ClientWithMiddleware,
-    ) -> anyhow::Result<Result<MsAuth, DeviceCodeExpiredError>> {
+    #[tracing::instrument(skip(self))]
+    pub async fn poll_ms_auth(&self) -> anyhow::Result<Result<MsAuth, DeviceCodeExpiredError>> {
+        // Since we're polling, we don't want a retry system
+        let bare_client = reqwest::Client::new();
+
         loop {
             tokio::time::sleep(self.polling_interval).await;
 
             trace!("Polling for auth token at {:?}", Utc::now());
 
-            let response = client
+            let response = bare_client
                 .post("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
                 .form(&[
                     ("client_id", env!("MS_AUTH_CLIENT_ID")),

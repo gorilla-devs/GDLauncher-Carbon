@@ -52,7 +52,7 @@ impl EnrollmentTask {
 
                 // poll ms auth
                 update_status(EnrollmentStatus::PollingCode(device_code.clone())).await;
-                let ms_auth = device_code.poll_ms_auth(&client).await??;
+                let ms_auth = device_code.poll_ms_auth().await??;
 
                 update_status(EnrollmentStatus::XboxAuth).await;
 
