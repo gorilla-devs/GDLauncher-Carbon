@@ -129,7 +129,7 @@ const getVariant = (
     glow: {
       ...commonStyle,
       [`bg-${variant}-500`]: !isDisabled,
-      [`drop-shadow-[0_0px_12px_var(--${variant}-500)]`]: !isDisabled,
+      [`drop-shadow-[0_0px_12px_rgb(var(--${variant}-500))]`]: !isDisabled,
       "bg-[#404759]": isDisabled,
       "text-[#8A8B8F]": isDisabled,
       "border-0": true,

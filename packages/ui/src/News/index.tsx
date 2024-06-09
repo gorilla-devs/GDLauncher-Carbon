@@ -124,7 +124,7 @@ const News = (props: CarouselProps) => {
                 class="absolute bottom-0 left-0 right-0 top-0"
                 style={{
                   background:
-                    "linear-gradient(180deg, rgba(29, 32, 40, 0) 0%, var(--darkSlate-800) 100%)",
+                    "linear-gradient(180deg, rgba(29, 32, 40, 0) 0%, rgb(var(--darkSlate-800)) 100%)",
                 }}
               />
               <div class="absolute bottom-10 left-5 flex flex-col select-none">
