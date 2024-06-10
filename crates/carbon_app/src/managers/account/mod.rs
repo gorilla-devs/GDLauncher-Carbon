@@ -6,15 +6,18 @@ use crate::{
 };
 use anyhow::ensure;
 use async_trait::async_trait;
+use axum::extract;
 use chrono::{FixedOffset, Utc};
+use jwt::{Header, Token};
 use prisma_client_rust::{
     chrono::DateTime, prisma_errors::query_engine::RecordNotFound, Direction, QueryError,
 };
 use reqwest::Client;
 use reqwest_middleware::ClientBuilder;
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
+use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     mem,
     sync::{Arc, Weak},
     time::{Duration, Instant},
@@ -136,9 +139,11 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(accounts
             .into_iter()
             .map(|account| {
-                let type_ = match &account.access_token {
-                    None => AccountType::Offline,
-                    Some(_) => AccountType::Microsoft,
+                let type_ = match (&account.access_token, &account.id_token) {
+                    (None, _) => AccountType::Offline,
+                    (Some(_), id_token) => AccountType::Microsoft {
+                        email: extract_email(id_token.as_ref()),
+                    },
                 };
 
                 Account {
@@ -177,7 +182,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             return Ok(None);
         };
 
-        if let AccountType::Microsoft = &account.account.type_ {
+        if let AccountType::Microsoft { .. } = &account.account.type_ {
             let refreshing = self
                 .currently_refreshing
                 .read()
@@ -219,6 +224,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     refresh_token,
                     token_expires,
                     id_token,
+                    email,
                     skin_id,
                 } => set_params.extend([
                     SetParam::SetAccessToken(Some(access_token)),
@@ -253,6 +259,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     refresh_token,
                     token_expires,
                     id_token,
+                    email,
                     skin_id,
                 } => vec![
                     SetParam::SetAccessToken(Some(access_token)),
@@ -368,6 +375,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                                     access_token: access_token.clone(),
                                     refresh_token: None,
                                     id_token: None,
+                                    email: None,
                                     token_expires: token_expires.clone(),
                                     skin_id: skin_id.clone(),
                                 },
@@ -846,16 +854,29 @@ pub struct FullAccount {
     pub last_used: DateTime<FixedOffset>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum FullAccountType {
     Offline,
     Microsoft {
         access_token: String,
         refresh_token: Option<String>,
         id_token: Option<String>,
+        email: Option<String>,
         token_expires: DateTime<Utc>,
         skin_id: Option<String>,
     },
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct Claims {
+    email: Option<String>,
+}
+
+fn extract_email(token: Option<&String>) -> Option<String> {
+    token.and_then(|token| {
+        let claims: Result<Token<Header, Claims, _>, _> = jwt::Token::parse_unverified(&*token);
+        claims.ok().and_then(|claims| claims.claims().email.clone())
+    })
 }
 
 /*impl From<FullAccount> for db::account::Data {
@@ -887,6 +908,7 @@ impl TryFrom<db::account::Data> for FullAccount {
         Ok(Self {
             type_: match value.access_token {
                 Some(access_token) => FullAccountType::Microsoft {
+                    email: extract_email(value.id_token.as_ref()),
                     access_token,
                     refresh_token: value.ms_refresh_token,
                     id_token: value.id_token,
@@ -914,8 +936,8 @@ impl From<FullAccount> for AccountWithStatus {
                 username: value.username,
                 uuid: value.uuid,
                 last_used: value.last_used.into(),
-                type_: match value.type_ {
-                    FullAccountType::Microsoft { .. } => AccountType::Microsoft,
+                type_: match value.type_.clone() {
+                    FullAccountType::Microsoft { email, .. } => AccountType::Microsoft { email },
                     FullAccountType::Offline => AccountType::Offline,
                 },
                 skin_id: match &value.type_ {
@@ -928,12 +950,14 @@ impl From<FullAccount> for AccountWithStatus {
                     refresh_token: None,
                     ..
                 }
-                | FullAccountType::Microsoft { id_token: None, .. } => AccountStatus::Invalid,
+                | FullAccountType::Microsoft { id_token: None, .. }
+                | FullAccountType::Microsoft { email: None, .. } => AccountStatus::Invalid,
                 FullAccountType::Microsoft {
                     access_token,
                     token_expires,
                     refresh_token: Some(_),
                     id_token: Some(_),
+                    email: Some(_),
                     skin_id: _,
                 } => match Utc::now() > DateTime::<Utc>::from(token_expires) {
                     true => AccountStatus::Expired,
@@ -955,7 +979,8 @@ impl From<api::FullAccount> for FullAccount {
             type_: FullAccountType::Microsoft {
                 access_token: value.mc.auth.access_token,
                 refresh_token: Some(value.ms.refresh_token),
-                id_token: Some(value.ms.id_token),
+                id_token: Some(value.ms.id_token.clone()),
+                email: extract_email(Some(&value.ms.id_token)),
                 token_expires: DateTime::<Utc>::from(value.mc.auth.expires_at),
                 skin_id: value.mc.profile.skin.map(|skin| skin.id),
             },

@@ -14,7 +14,7 @@ pub enum AccountType {
     /// Offline account with any username. Cannot log into servers.
     Offline,
     /// Authenticated MS account.
-    Microsoft,
+    Microsoft { email: Option<String> },
 }
 
 #[derive(Debug)]

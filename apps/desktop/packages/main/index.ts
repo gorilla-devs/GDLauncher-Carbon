@@ -622,7 +622,10 @@ ipcMain.handle("openFolder", async (_, path) => {
 
 ipcMain.handle("openCMPWindow", async () => {
   // @ts-ignore
-  app.overwolf.openCMPWindow();
+  if (app.overwolf.openCMPWindow) {
+    // @ts-ignore
+    app.overwolf.openCMPWindow();
+  }
 });
 
 ipcMain.handle("closeWindow", async () => {

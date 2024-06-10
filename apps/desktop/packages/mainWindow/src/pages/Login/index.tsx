@@ -40,7 +40,8 @@ export default function Login() {
     routeData?.activeUuid?.data &&
     routeData.accounts.data?.length! > 0 &&
     routeData.settings.data?.termsAndPrivacyAccepted &&
-    Boolean(routeData.settings.data?.metricsEnabledLastUpdate);
+    Boolean(routeData.settings.data?.metricsEnabledLastUpdate) &&
+    routeData.settings.data?.hasCompletedGdlAccountSetup;
 
   const accountEnrollFinalizeMutation = rspc.createMutation(() => ({
     mutationKey: ["account.enroll.finalize"]
@@ -90,7 +91,7 @@ export default function Login() {
       routeData?.activeUuid?.data &&
       routeData.accounts.data?.length! > 0
     ) {
-      setStep(1);
+      setStep(3);
     } else if (routeData.settings.data?.termsAndPrivacyAccepted) {
       setStep(1);
     }
@@ -151,7 +152,7 @@ export default function Login() {
             </div>
           </div>
           <div
-            class="flex flex-col items-center text-white relative justify-end rounded-2xl h-110 transition-transform duration-300 ease-in-out"
+            class="flex flex-col items-center text-white relative justify-end rounded-2xl h-130 transition-transform duration-300 ease-in-out"
             style={{
               background: "rgba(29, 32, 40, 0.8)",
               "justify-content": step() === 1 ? "flex-end" : "center"

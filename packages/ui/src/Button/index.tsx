@@ -146,9 +146,9 @@ const getVariant = (
     },
     text: {
       ...commonStyle,
-      // "bg-transparent": true,
+      "bg-transparent": true,
       "text-white": true,
-      "bg-primary-400/30": true,
+      "hover:bg-darkSlate-900": true,
       "border-0": true,
     },
   };

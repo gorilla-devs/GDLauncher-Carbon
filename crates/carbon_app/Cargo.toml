@@ -31,6 +31,7 @@ async-stream = { workspace = true }
 dunce = { workspace = true }
 axum = { workspace = true, features = ["ws"] }
 jsonwebtoken = { workspace = true }
+jwt = "0.16.0"
 async-trait = { workspace = true }
 chrono = { workspace = true }
 carbon_macro = { path = "../carbon_macro" }

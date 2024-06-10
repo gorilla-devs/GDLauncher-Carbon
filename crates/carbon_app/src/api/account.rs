@@ -102,8 +102,9 @@ struct AccountEntry {
 
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[serde(tag = "type", content = "value")]
 enum AccountType {
-    Microsoft,
+    Microsoft { email: Option<String> },
     Offline,
 }
 
@@ -171,7 +172,7 @@ impl From<domain::Account> for AccountEntry {
 impl From<domain::AccountType> for AccountType {
     fn from(value: domain::AccountType) -> Self {
         match value {
-            domain::AccountType::Microsoft => Self::Microsoft,
+            domain::AccountType::Microsoft { email } => Self::Microsoft { email },
             domain::AccountType::Offline => Self::Offline,
         }
     }

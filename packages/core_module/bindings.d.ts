@@ -134,8 +134,6 @@ export type FEMetricsEvent = { event_name: "page_view"; data: string } | { event
 
 export type GameLogId = number
 
-export type EnrollmentError = "deviceCodeExpired" | { xboxAccount: XboxError } | "noGameOwnership" | "noGameProfile"
-
 export type MRFEVersion = { name: string; version_number: string; changelog: string | null; dependencies: MRFEDependency[]; game_versions: string[]; version_type: MRFEVersionType; loaders: string[]; featured: boolean; status: MRFEStatus | null; requested_status: MRFERequestedVersionStatus | null; id: string; project_id: string; author_id: string; date_published: string; downloads: number; files: MRFEVersionFile[] }
 
 export type CFFESortableGameVersion = { gameVersionName: string; gameVersionPadded: string; gameVersion: string; gameVersionReleaseDate: string; gameVersionTypeId: number | null }
@@ -188,7 +186,7 @@ export type LaunchState = { state: "inactive"; value: { failed_task: FETaskId | 
 
 export type MRFESearchFacet = { Category: string } | { Version: string } | { License: string } | { ProjectType: string }
 
-export type AccountType = "microsoft" | "offline"
+export type AccountType = { type: "microsoft"; value: { email: string | null } } | { type: "offline" }
 
 export type MRFEProjectID = string
 
@@ -264,6 +262,8 @@ export type MRFEAdditionalFileType = "requiredResourcePack" | "optionalResourceP
 
 export type ExportArgs = { instance_id: FEInstanceId; target: ExportTarget; save_path: string; self_contained_addons_bundling: boolean; filter: ExportEntry }
 
+export type EnrollmentStatus = "refreshingMSAuth" | "requestingCode" | { pollingCode: DeviceCode } | "mcLogin" | "xboxAuth" | "mcentitlements" | "mcProfile" | { complete: AccountEntry } | { failed: EnrollmentError }
+
 export type FEJavaComponent = { id: string; path: string; version: string; type: FEJavaComponentType; isValid: boolean }
 
 export type CFFEModSearchSortField = "featured" | "popularity" | "lastUpdated" | "name" | "author" | "totalDownloads" | "category" | "gameVersion"
@@ -271,8 +271,6 @@ export type CFFEModSearchSortField = "featured" | "popularity" | "lastUpdated" |
 export type UpdateMod = { instance_id: FEInstanceId; mod_id: string }
 
 export type FEModFileResponse = { data: CFFEFile; pagination: CFFEPagination | null }
-
-export type AccountStatus = "ok" | "expired" | "refreshing" | "invalid"
 
 export type Set<T> = { Set: T }
 
@@ -306,6 +304,8 @@ export type CreateInstance = { group: FEGroupId; name: string; use_loaded_icon: 
 
 export type FEReleaseChannel = "stable" | "alpha" | "beta"
 
+export type DeviceCode = { userCode: string; verificationUri: string; expiresAt: string }
+
 export type McType = "old_alpha" | "old_beta" | "release" | "snapshot"
 
 export type ModChannelWithUsage = { channel: ModChannel; allow_updates: boolean }
@@ -313,6 +313,8 @@ export type ModChannelWithUsage = { channel: ModChannel; allow_updates: boolean 
 export type Translation = { translation: "InstanceTaskDeleting" } | { translation: "InstanceTaskLaunch"; args: { name: string } } | { translation: "InstanceTaskPrepare"; args: { name: string } } | { translation: "InstanceTaskLaunchRequestVersions" } | { translation: "InstanceTaskLaunchRequestModpack" } | { translation: "InstanceTaskLaunchDownloadModpack" } | { translation: "InstanceTaskLaunchDownloadModpackFiles" } | { translation: "InstanceTaskLaunchExtractModpackFiles" } | { translation: "InstanceTaskLaunchDownloadAddonMetadata" } | { translation: "InstanceTaskLaunchApplyStagedPatches" } | { translation: "InstanceTaskLaunchDownloadJava" } | { translation: "InstanceTaskLaunchExtractJava" } | { translation: "InstanceTaskLaunchWaitDownloadFiles" } | { translation: "InstanceTaskLaunchCheckingFiles" } | { translation: "InstanceTaskLaunchDownloadFiles" } | { translation: "InstanceTaskGeneratingPackInfo" } | { translation: "InstanceTaskFillCache" } | { translation: "InstanceTaskLaunchExtractNatives" } | { translation: "InstanceTaskReconstructAssets" } | { translation: "InstanceTaskLaunchRunForgeProcessors" } | { translation: "InstanceTaskLaunchRunNeoforgeProcessors" } | { translation: "InstanceTaskInstallMod"; args: { mod_name: string; instance_name: string } } | { translation: "InstanceTaskInstallModDownloadFile" } | { translation: "FinalizingImport" } | { translation: "InstanceImportLegacyBadConfigFile" } | { translation: "InstanceImportCfZipMalformed" } | { translation: "InstanceImportCfZipMissingManifest" } | { translation: "InstanceImportCfZipMalformedManifest" } | { translation: "InstanceImportCfZipNotMinecraftModpack" } | { translation: "InstanceImportMrpackMalformed" } | { translation: "InstanceImportMrpackMissingManifest" } | { translation: "InstanceImportMrpackMalformedManifest" } | { translation: "InstanceExport" } | { translation: "InstanceExportScanningMods" } | { translation: "InstanceExportCacheMods" } | { translation: "InstanceExportCalculateSize" } | { translation: "InstanceExportCreatingBundle" }
 
 export type MRFETeamResponse = MRFETeamMember[]
+
+export type AccountStatus = "ok" | "expired" | "refreshing" | "invalid"
 
 export type FEUnifiedSearchParameters = { searchQuery: string | null; categories: And<FEUnifiedSearchCategoryID> | null; gameVersions: Or<string> | null; modloaders: Or<FEUnifiedModLoaderType> | null; projectType: FEUnifiedSearchType | null; sortIndex: FEUnifiedModSortIndex | null; sortOrder: CFFEModSearchSortOrder | null; index: number | null; pageSize: number | null; searchApi: FESearchAPI }
 
@@ -481,10 +483,6 @@ export type AccountEntry = { username: string; uuid: string; lastUsed: string; t
 
 export type CFFEModFilesParameters = { modId: number; query: CFFEModFilesParametersQuery }
 
-export type EnrollmentStatus = "refreshingMSAuth" | "requestingCode" | { pollingCode: DeviceCode } | "mcLogin" | "xboxAuth" | "mcentitlements" | "mcProfile" | { complete: AccountEntry } | { failed: EnrollmentError }
-
-export type DeviceCode = { userCode: string; verificationUri: string; expiresAt: string }
-
 export type FETaskId = number
 
 export type InvalidListInstance = "JsonMissing" | { JsonError: ConfigurationParseError } | { Other: string }
@@ -494,6 +492,8 @@ export type MRFEProjectSupportRange = "required" | "optional" | "unsupported" | 
 export type RemoteVersion = ({ platform: "Curseforge" } & CFFEFile) | ({ platform: "Modrinth" } & MRFEVersion)
 
 export type CFFEModSearchParametersQuery = { gameId: number; searchFilter: string | null; gameVersion: string | null; categoryIds: number[] | null; sortOrder: CFFEModSearchSortOrder | null; sortField: CFFEModSearchSortField | null; classId: CFFEClassId | null; modLoaderTypes: CFFEModLoaderType[] | null; gameVersionTypeId: number | null; authorId: number | null; slug: string | null; index: number | null; pageSize: number | null }
+
+export type EnrollmentError = "deviceCodeExpired" | { xboxAccount: XboxError } | "noGameOwnership" | "noGameProfile"
 
 export type FECreateJavaProfileArgs = { profileName: string; javaId: string | null }
 
