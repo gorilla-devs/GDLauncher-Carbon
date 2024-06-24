@@ -15,7 +15,7 @@ use crate::{
 
 use self::{
     curseforge_archive::CurseforgeArchiveImporter, legacy_gdlauncher::LegacyGDLauncherImporter,
-    modrinth_archive::ModrinthArchiveImporter,
+    modrinth_archive::ModrinthArchiveImporter, prism::PrismImporter,
 };
 
 use super::{export::InstanceExportManager, InstanceManager};
@@ -23,6 +23,7 @@ use super::{export::InstanceExportManager, InstanceManager};
 mod curseforge_archive;
 mod legacy_gdlauncher;
 mod modrinth_archive;
+mod prism;
 
 #[derive(Debug)]
 pub struct InstanceImportManager {
@@ -193,10 +194,11 @@ impl Entity {
     pub fn list() -> Vec<(Self, bool, SelectionType)> {
         use strum::IntoEnumIterator;
 
-        const SUPPORT: [Entity; 3] = [
+        const SUPPORT: [Entity; 4] = [
             Entity::LegacyGDLauncher,
             Entity::CurseForgeZip,
             Entity::MRPack,
+            Entity::PrismLauncher,
         ];
 
         Self::iter()
@@ -209,6 +211,7 @@ impl Entity {
             Self::LegacyGDLauncher => Arc::new(LegacyGDLauncherImporter::new()),
             Self::CurseForgeZip => Arc::new(CurseforgeArchiveImporter::new()),
             Self::MRPack => Arc::new(ModrinthArchiveImporter::new()),
+            Self::PrismLauncher => Arc::new(PrismImporter::new()),
             _ => todo!(),
         }
     }
@@ -217,6 +220,9 @@ impl Entity {
         Ok(match self {
             Self::LegacyGDLauncher => {
                 Some(LegacyGDLauncherImporter::get_default_scan_path().await?)
+            }
+            Self::PrismLauncher => {
+                Some(PrismImporter::get_default_scan_path().await?)
             }
             _ => None,
         })
