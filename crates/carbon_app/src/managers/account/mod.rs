@@ -1,3 +1,4 @@
+use crate::db::app_configuration;
 use crate::domain::account::*;
 use crate::{
     api::keys::account::*,
@@ -195,6 +196,25 @@ impl<'s> ManagerRef<'s, AccountManager> {
         }
 
         Ok(Some(account.status))
+    }
+
+    async fn set_gdl_account_uuid(self, uuid: Option<String>) -> anyhow::Result<()> {
+        // ensure the account exists
+
+        // let Some(uuid) = uuid.as_ref() else {
+        //     self.get_account(uuid).await.map_err(|e| {
+        //         anyhow::anyhow!("failed to get account for setting gdl account uuid: {e}")
+        //     })?;
+        // };
+
+        // let account = self.app.prisma_client.app_configuration().update(
+        //     app_configuration::id::equals(0),
+        //     vec![app_configuration::gdl_account_uuid::set(uuid)],
+        // );
+
+        // account.exec().await?;
+
+        Ok(())
     }
 
     /// Add or update an account

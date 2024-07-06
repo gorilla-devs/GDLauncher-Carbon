@@ -300,7 +300,7 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             metrics_enabled_last_update: data.metrics_enabled_last_update,
             random_user_uuid: data.random_user_uuid,
             has_completed_gdl_account_setup: data.has_completed_gdl_account_setup,
-            gdl_account_id: data.gdl_account_id,
+            gdl_account_id: data.gdl_account_uuid,
         })
     }
 }

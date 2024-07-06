@@ -50,8 +50,8 @@ model AppConfiguration {
   metricsEnabled                  Boolean   @default(false)
   metricsEnabledLastUpdate        DateTime? // should ask again after 12 months
   hasCompletedGDLAccountSetup     Boolean   @default(false)
-  gdlAccountId                    String?
-  gdlAccount                      Account?  @relation(fields: [gdlAccountId], references: [uuid])
+  gdlAccountUuid                  String?
+  gdlAccount                      Account?  @relation(fields: [gdlAccountUuid], references: [uuid])
 }
 
 model Java {

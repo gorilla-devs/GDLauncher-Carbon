@@ -2,14 +2,13 @@ import ThemePreview from "@/components/ThemePreview";
 import { queryClient, rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import { useRouteData } from "@solidjs/router";
-import { For, Show, createEffect, createSignal } from "solid-js";
+import { For } from "solid-js";
 import fetchData from "./settings.general.data";
 import LoadingError from "@/components/LoadingError";
-import { applyTheme, getAvailableThemes, getThemeColor } from "@/utils/theme";
+import { getAvailableThemes, getThemeColor } from "@/utils/theme";
 import PageTitle from "./components/PageTitle";
 import Row from "./components/Row";
 import Title from "./components/Title";
-import RightHandSide from "./components/RightHandSide";
 
 const Appearance = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();

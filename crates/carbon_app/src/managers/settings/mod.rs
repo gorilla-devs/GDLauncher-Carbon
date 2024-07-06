@@ -383,14 +383,6 @@ impl ManagerRef<'_, SettingsManager> {
             ));
         }
 
-        if let Some(gdl_account_id) = incoming_settings.gdl_account_id {
-            let gdl_account_id = gdl_account_id.inner();
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::gdl_account_id::set(gdl_account_id)],
-            ));
-        }
-
         if !queries.is_empty() {
             db._batch(queries).await?;
             self.app.invalidate(GET_SETTINGS, None);

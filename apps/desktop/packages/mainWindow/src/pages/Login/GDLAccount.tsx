@@ -10,6 +10,10 @@ const GDLAccount = () => {
     string | number | null
   >(null);
 
+  const settingsMutation = rspc.createMutation(() => ({
+    mutationKey: ["settings.setSettings"]
+  }));
+
   const accounts = rspc.createQuery(() => ({
     queryKey: ["account.getAccounts"]
   }));
@@ -56,21 +60,41 @@ const GDLAccount = () => {
               : currentlySelectedAccount()?.username}
           </span>
           ). We use your token to authenticate you, your password is NEVER
-          stored.
+          stored. (Learn more about how it works{" "}
+          <a
+            href="https://www.microsoft.com/en-us/security/business/security-101/what-is-oauth"
+            target="_blank"
+            class="text-primary-300"
+          >
+            here
+          </a>
+          )
         </p>
         <h3 class="text-center font-bold">
           What if I lose access to my Microsoft account?
         </h3>
         <p class="text-lightSlate-500 text-md">
           Since we don't store any info about you, there is currently no way to
-          recover your GDLauncher account.
+          recover your GDLauncher account in case you lose access to your
+          Microsoft account.
         </p>
 
         <div class="underline mt-8">See More Details</div>
       </div>
 
       <div class="flex justify-between items-center gap-4 w-auto p-4">
-        <Button type="text">Skip</Button>
+        <Button
+          type="text"
+          onClick={() => {
+            settingsMutation.mutate({
+              hasCompletedGdlAccountSetup: {
+                Set: true
+              }
+            });
+          }}
+        >
+          Skip
+        </Button>
         <Button
           variant="primary"
           // disabled={!acceptedTOS()}
