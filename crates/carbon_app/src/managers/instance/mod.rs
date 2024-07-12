@@ -817,7 +817,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // trim whitespace (including windows does not end with ' ' requirement)
         let name = name.trim();
         // max 28 character name. this gives us 3 digets for numbers to use as discriminators
-        let name = &name[0..usize::min(name.len(), 28)];
+        let name = name.chars().take(28).collect::<String>();
 
         // sanitize any illegal filenames
         let mut name = match ILLEGAL_NAMES.contains(&(&name.to_lowercase() as &str)) {
@@ -2648,6 +2648,149 @@ mod test {
                 .len(),
             1
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_next_folder() -> anyhow::Result<()> {
+        let mut app = crate::setup_managers_for_test().await;
+
+        let (instance_name, _) = app.instance_manager().next_folder("some_instance").await?;
+
+        let default_group_id = app.instance_manager().get_default_group().await?;
+        let default_group = &app.instance_manager().list_groups().await?[0];
+        app.instance_manager()
+            .create_instance(
+                default_group_id,
+                instance_name.clone(),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.7.10"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+
+        assert_eq!(instance_name, "some_instance");
+
+        let (instance_name, _) = app.instance_manager().next_folder("some_instance").await?;
+
+        app.instance_manager()
+            .create_instance(
+                default_group_id,
+                instance_name.clone(),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.7.10"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+
+        assert_eq!(instance_name, "some_instance1");
+
+        let (instance_name, _) = app.instance_manager().next_folder("some_instance").await?;
+
+        app.instance_manager()
+            .create_instance(
+                default_group_id,
+                instance_name.clone(),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.7.10"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+
+        assert_eq!(instance_name, "some_instance2");
+
+        let (instance_name, _) = app.instance_manager().next_folder("ɀɃɏɔɮ˞˳̸").await?;
+
+        app.instance_manager()
+            .create_instance(
+                default_group_id,
+                instance_name.clone(),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.7.10"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+
+        assert_eq!(instance_name, "ɀɃɏɔɮ˞˳̸");
+
+        let (instance_name, _) = app
+            .instance_manager()
+            .next_folder("Cozy Cottage 𝘸𝘪𝘵𝘩 𝘴𝘢𝘶𝘤𝘦 🧂")
+            .await?;
+
+        assert_eq!(instance_name, "Cozy Cottage 𝘸𝘪𝘵𝘩 𝘴𝘢𝘶𝘤𝘦 🧂");
+
+        // Although the following two strings look the same, they are not.
+        // Different filesystems handle it differently.
+        // Treatment of Unicode canoncal decomposition among operating systems - Efstratios Rappos
+        // (https://arxiv.org/pdf/1711.10481)
+        let e_with_1_byte = "é"; // precomposed (U+00E9)
+        let e_with_2_bytes = "é"; // decomposed (U+0065 U+0301)
+
+        let (instance_name, _) = app.instance_manager().next_folder(e_with_1_byte).await?;
+
+        app.instance_manager()
+            .create_instance(
+                default_group_id,
+                instance_name.clone(),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.7.10"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+
+        assert_eq!(instance_name, e_with_1_byte);
+
+        let (instance_name, _) = app.instance_manager().next_folder(e_with_2_bytes).await?;
+
+        app.instance_manager()
+            .create_instance(
+                default_group_id,
+                instance_name.clone(),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.7.10"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+
+        let comparison = if std::env::consts::OS == "macos" {
+            format!("{}{}", e_with_2_bytes, "1") // macos saves as decomposed
+        } else {
+            e_with_2_bytes.to_string()
+        };
+
+        assert_eq!(instance_name, comparison);
 
         Ok(())
     }

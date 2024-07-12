@@ -52,6 +52,11 @@ mod app {
 
     use crate::{cache_middleware, domain, iridium_client::get_client};
 
+    use self::java::{
+        discovery::{Discovery, RealDiscovery},
+        java_checker::RealJavaChecker,
+    };
+
     use super::{
         java::JavaManager, metadata::cache::MetaCacheManager, metrics::MetricsManager,
         modplatforms::ModplatformsManager, system_info::SystemInfoManager, *,

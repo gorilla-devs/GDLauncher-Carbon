@@ -82,7 +82,7 @@ pub fn main() {
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .max_blocking_threads(100)
+        .max_blocking_threads(256)
         .build()
         .unwrap()
         .block_on(async {
@@ -109,17 +109,27 @@ pub fn main() {
             info!("Runtime path: {}", runtime_path.display());
 
             info!("Scanning ports");
+
+            let init_time = std::time::Instant::now();
+
             let listener = if cfg!(debug_assertions) {
                 TcpListener::bind("127.0.0.1:4650").await.unwrap()
             } else {
                 get_available_port().await
             };
 
+            info!(
+                "Found port: {:?} in {:?}",
+                listener.local_addr(),
+                init_time.elapsed()
+            );
+
             start_router(runtime_path, listener).await;
         });
 }
 
 async fn get_available_port() -> TcpListener {
+    info!("Scanning for available port");
     for port in 1025..65535 {
         let conn = TcpListener::bind(format!("127.0.0.1:{port}")).await;
         match conn {
@@ -127,6 +137,8 @@ async fn get_available_port() -> TcpListener {
             Err(_) => continue,
         }
     }
+
+    info!("No available port found");
 
     panic!("No available port found");
 }
@@ -159,9 +171,10 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
         &RealJavaChecker,
     )
     .await
-    .unwrap();
+    .expect("Failed to scan and sync java system profiles");
 
     let app1 = app.clone();
+    let app2 = app.clone();
     let rspc_axum_router: axum::Router<Arc<AppInner>> = rspc_axum::endpoint(router, move || app);
 
     let app = axum::Router::new()
@@ -191,10 +204,20 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
                 .await;
 
             if res.is_ok() {
+                info!("_STATUS_:READY|{port}");
                 println!("_STATUS_:READY|{port}");
                 break;
             }
         }
+    });
+
+    let _app = app2.clone();
+    tokio::spawn(async move {
+        _app.meta_cache_manager().launch_background_tasks().await;
+        _app.clone()
+            .instance_manager()
+            .launch_background_tasks()
+            .await;
     });
 
     axum::serve(listener, app.into_make_service())
