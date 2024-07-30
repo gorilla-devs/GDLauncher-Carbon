@@ -37,6 +37,7 @@
   "login.acceptable_use_policy": "Acceptable Use Policy",
   "login.login": "login",
   "login.logout": "logout",
+  "login.step_back": "Back",
   "login.code_expired_message": "The code has been expired",
   "login.before_expiring": "before the code expires",
   "login.enter_code_in_browser": "Enter the specified code on the browser page to complete the authorization",
