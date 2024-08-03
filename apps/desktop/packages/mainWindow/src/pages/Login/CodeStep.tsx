@@ -51,6 +51,7 @@ const CodeStep = (props: Props) => {
   const expiresAt = () => props.deviceCodeObject?.expiresAt;
   const expiresAtFormat = () => new Date(expiresAt() || "")?.getTime();
   const expiresAtMs = () => expiresAtFormat() - Date.now();
+
   const minutes = () => msToMinutes(expiresAtMs());
   const seconds = () => msToSeconds(expiresAtMs());
   const [countDown, setCountDown] = createSignal(
@@ -147,19 +148,8 @@ const CodeStep = (props: Props) => {
   const addNotification = createNotification();
 
   return (
-    <div class="flex flex-col justify-between items-center text-center gap-5 p-10">
+    <div class="relative flex flex-col justify-between items-center text-center">
       <GateAnimationRiveWrapper width={80} height={80} src={GateAnimation} />
-      <div class="absolute top-4 left-4">
-        <Button
-          type="secondary"
-          onClick={() => {
-            props.prevStep();
-          }}
-        >
-          <i class="i-ri:arrow-left-line w-4 h-4" />
-          <Trans key="login.step_back" />
-        </Button>
-      </div>
       <div class="absolute top-4 right-4">
         <Popover
           noTip
@@ -168,7 +158,7 @@ const CodeStep = (props: Props) => {
               <h3>
                 <Trans key="login.troubles_logging_in" />
               </h3>
-              <div class="text-md pb-8">
+              <div class="text-sm pb-8">
                 <Trans key="login.link_not_working_help" />
               </div>
               <div
@@ -198,38 +188,49 @@ const CodeStep = (props: Props) => {
       <div>
         <div class="flex flex-col justify-center items-center">
           <DeviceCode
-            disabled={expired()}
+            expired={expired()}
             value={userCode() || ""}
             id="login-link-btn"
-            onClick={() => {
-              window.copyToClipboard(userCode() || "");
-              addNotification({
-                name: "The code has been copied",
-                type: "success"
-              });
-            }}
+            handleRefresh={handleRefersh}
           />
           <Show when={expired()}>
-            <p class="mb-0 mt-2 text-red-500">
+            <p class="text-red-500 text-sm">
               <Trans key="login.code_expired_message" />
             </p>
           </Show>
         </div>
         <Show when={!expired()}>
-          <p class="mb-0 text-darkSlate-50 mt-4">
-            <span class="text-white mr-2">{countDown()}</span>
+          <p class="text-darkSlate-50 text-sm">
+            <span class="text-lightSlate-500 mr-1">{countDown()}</span>
             <Trans key="login.before_expiring" />
-          </p>
-          <p class="text-darkSlate-50 mb-0">
-            <Trans key="login.enter_code_in_browser" />
           </p>
         </Show>
       </div>
       <Show when={error()}>
         <p class="text-red-500 m-0">{error()}</p>
       </Show>
-      <Show when={loading()}>
-        <span class="mb-4 text-xs absolute text-darkSlate-100 bottom-1">
+      <div
+        class="flex flex-col justify-center items-center"
+        classList={{ "opacity-0": expired() }}
+      >
+        <p class="text-lightSlate-100 font-bold">
+          <Trans key="login.enter_code_in_browser" />
+        </p>
+        <Button
+          id="login-btn"
+          class="normal-case"
+          onClick={() => {
+            setLoading(true);
+            navigator.clipboard.writeText(userCode() || "");
+            window.openExternalLink(deviceCodeLink() || "");
+          }}
+        >
+          <Trans key="login.open_in_browser" />
+          <div class="text-md i-ri:external-link-fill" />
+        </Button>
+      </div>
+      <div class="flex flex-col gap-2" classList={{ "opacity-0": !loading() }}>
+        <span class="text-xs text-darkSlate-100">
           <Switch>
             <Match when={(routeData.status.data as any)?.pollingCode}>
               <Trans key="login.polling_microsoft_auth" />
@@ -248,35 +249,8 @@ const CodeStep = (props: Props) => {
             </Match>
           </Switch>
         </span>
-        <div class="w-full absolute overflow-hidden bottom-0">
-          <LoadingBar class="" />
-        </div>
-      </Show>
-      <Show when={!expired()}>
-        <Button
-          id="login-btn"
-          class="normal-case"
-          onClick={() => {
-            setLoading(true);
-            navigator.clipboard.writeText(userCode() || "");
-            window.openExternalLink(deviceCodeLink() || "");
-          }}
-        >
-          <Trans key="login.open_in_browser" />
-          <div class="text-md i-ri:external-link-fill" />
-        </Button>
-      </Show>
-      <Show when={expired()}>
-        <div
-          class="flex justify-between items-center gap-2 cursor-pointer"
-          onClick={() => handleRefersh()}
-        >
-          <span class="i-ri:refresh-line" />
-          <h3 class="m-0">
-            <Trans key="login.refresh" />
-          </h3>
-        </div>
-      </Show>
+        <LoadingBar />
+      </div>
     </div>
   );
 };

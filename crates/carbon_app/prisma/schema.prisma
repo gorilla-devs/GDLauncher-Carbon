@@ -17,6 +17,7 @@ model AppConfiguration {
   releaseChannel                  String
   lastAppVersion                  String?
   activeAccountUuid               String?
+  activeAccountUuidData           Account?  @relation("activeAccount", fields: [activeAccountUuid], references: [uuid])
   // Instances settings
   concurrentDownloads             Int       @default(10)
   downloadDependencies            Boolean   @default(true)
@@ -51,7 +52,8 @@ model AppConfiguration {
   metricsEnabledLastUpdate        DateTime? // should ask again after 12 months
   hasCompletedGDLAccountSetup     Boolean   @default(false)
   gdlAccountUuid                  String?
-  gdlAccount                      Account?  @relation(fields: [gdlAccountUuid], references: [uuid])
+  gdlAccount                      Account?  @relation("gdlAccount", fields: [gdlAccountUuid], references: [uuid])
+  gdlAccountStatus                Bytes?
 }
 
 model Java {
@@ -75,16 +77,17 @@ model JavaProfile {
 }
 
 model Account {
-  uuid             String             @id
-  username         String
+  uuid                          String             @id
+  username                      String
   // presence signifies a microsoft account
-  accessToken      String?
-  tokenExpires     DateTime?
-  msRefreshToken   String?
-  idToken          String?
-  lastUsed         DateTime
-  skinId           String?
-  AppConfiguration AppConfiguration[]
+  accessToken                   String?
+  tokenExpires                  DateTime?
+  msRefreshToken                String?
+  idToken                       String?
+  lastUsed                      DateTime
+  skinId                        String?
+  AppConfigurationActiveAccount AppConfiguration[] @relation("activeAccount")
+  AppConfigurationGdlAccount    AppConfiguration[] @relation("gdlAccount")
 }
 
 model Skin {

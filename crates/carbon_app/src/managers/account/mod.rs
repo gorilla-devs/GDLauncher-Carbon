@@ -5,10 +5,11 @@ use crate::{
     db::{self, read_filters::StringFilter},
     managers::account::{api::GetProfileError, enroll::InvalidateCtx},
 };
-use anyhow::ensure;
+use anyhow::{ensure, Context};
 use async_trait::async_trait;
 use axum::extract;
 use chrono::{FixedOffset, Utc};
+use gdl_account::{GDLAccountTask, GDLUser, RegisterAccountBody};
 use jwt::{Header, Token};
 use prisma_client_rust::{
     chrono::DateTime, prisma_errors::query_engine::RecordNotFound, Direction, QueryError,
@@ -37,6 +38,7 @@ use super::{AppInner, AppRef, ManagerRef};
 
 pub mod api;
 mod enroll;
+pub mod gdl_account;
 pub mod skin;
 
 pub(crate) struct AccountManager {
@@ -45,15 +47,19 @@ pub(crate) struct AccountManager {
     /// Account refreshing will be disabled until this time has passed
     refreshloop_sleep: Mutex<Option<Instant>>,
     skin_manager: SkinManager,
+
+    gdl_account_task: RwLock<GDLAccountTask>,
 }
 
 impl AccountManager {
-    pub fn new() -> Self {
+    pub fn new(client: reqwest_middleware::ClientWithMiddleware) -> Self {
         Self {
             currently_refreshing: RwLock::new(HashMap::new()),
             active_enrollment: RwLock::new(None),
             refreshloop_sleep: Mutex::new(None),
             skin_manager: SkinManager {},
+
+            gdl_account_task: RwLock::new(GDLAccountTask::new(client)),
         }
     }
 }
@@ -198,23 +204,68 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(Some(account.status))
     }
 
-    async fn set_gdl_account_uuid(self, uuid: Option<String>) -> anyhow::Result<()> {
-        // ensure the account exists
+    pub async fn get_gdl_account(self, uuid: String) -> anyhow::Result<Option<GDLUser>> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to get an account that does not exist"
+            ))?
+            .id_token
+        else {
+            bail!("attempted to get an account that does not exist");
+        };
 
-        // let Some(uuid) = uuid.as_ref() else {
-        //     self.get_account(uuid).await.map_err(|e| {
-        //         anyhow::anyhow!("failed to get account for setting gdl account uuid: {e}")
-        //     })?;
-        // };
+        let account = self.gdl_account_task.read().await;
+        Ok(account.get_account(id_token).await?)
+    }
 
-        // let account = self.app.prisma_client.app_configuration().update(
-        //     app_configuration::id::equals(0),
-        //     vec![app_configuration::gdl_account_uuid::set(uuid)],
-        // );
+    pub async fn register_gdl_account(
+        self,
+        uuid: String,
+        body: RegisterAccountBody,
+    ) -> anyhow::Result<GDLUser> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to get an account that does not exist"
+            ))?
+            .id_token
+        else {
+            bail!("attempted to get an account that does not exist");
+        };
 
-        // account.exec().await?;
+        let lock = self.gdl_account_task.write().await;
 
-        Ok(())
+        let user = lock
+            .register_account(body, id_token)
+            .await
+            .with_context(|| format!("failed to register account: {uuid}"))?;
+
+        Ok(user)
+    }
+
+    pub async fn wait_for_gdl_account_verification(self, uuid: String) -> anyhow::Result<GDLUser> {
+        let mut user = self
+            .get_gdl_account(uuid.clone())
+            .await?
+            .ok_or(anyhow::anyhow!(
+                "attempted to verify an account that does not exist"
+            ))?;
+
+        while !user.is_email_verified {
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            user = self.get_gdl_account(uuid.clone()).await?.ok_or(anyhow::anyhow!(
+                "attempted to verify an account that does not exist anymore but did previously exist when verification was requested"
+            ))?;
+        }
+
+        Ok(user)
     }
 
     /// Add or update an account
@@ -435,12 +486,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
     pub async fn delete_account(self, uuid: String) -> anyhow::Result<()> {
         use db::account::{OrderByParam, UniqueWhereParam};
 
-        let active_account = self
-            .app
-            .settings_manager()
-            .get_settings()
-            .await?
-            .active_account_uuid;
+        let settings = self.app.settings_manager().get_settings().await?;
+
+        let active_account = settings.active_account_uuid;
+        let active_gdl_account = settings.gdl_account_uuid;
 
         if let Some(active_account) = active_account {
             if active_account == uuid {
@@ -456,6 +505,16 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
                 self.set_active_uuid(next_account).await?;
             }
+        }
+
+        // Only need to reset has_completed_gdl_account_setup, as the actual gdl account will be deleted as SQL cascade
+        if let Some(gdl_account) = active_gdl_account {
+            self.app
+                .settings_manager()
+                .set(app_configuration::SetParam::SetHasCompletedGdlAccountSetup(
+                    false,
+                ))
+                .await?;
         }
 
         let result = self
@@ -551,7 +610,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     EnrollmentStatus::Complete(account) => {
                         let uuid = account.mc.profile.uuid.clone();
                         self.add_account(account.into()).await?;
-                        self.set_active_uuid(Some(uuid)).await?;
+                        self.set_active_uuid(Some(uuid.clone())).await?;
+
                         self.app.invalidate(ENROLL_GET_STATUS, None);
 
                         Ok(())

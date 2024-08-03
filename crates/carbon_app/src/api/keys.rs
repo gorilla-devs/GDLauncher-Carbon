@@ -46,6 +46,10 @@ keys! {
         ENROLL_FINALIZE                             = "enroll.finalize";
         REFRESH_ACCOUNT                             = "refreshAccount";
         GET_HEAD                                    = "getHead";
+
+        GET_GDL_ACCOUNT                             = "getGdlAccount";
+        REGISTER_GDL_ACCOUNT                        = "registerGdlAccount";
+        WAIT_FOR_GDL_ACCOUNT_VERIFICATION           = "waitForGdlAccountVerification";
     }
 
     java {

@@ -4,7 +4,13 @@ use reqwest::{Method, Request, Response, StatusCode};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware, Middleware, Next, Result};
 use task_local_extensions::Extensions;
 
-use crate::managers::UnsafeAppRef;
+use crate::{
+    db::{
+        http_cache::{SetParam, WhereParam},
+        read_filters::StringFilter,
+    },
+    managers::UnsafeAppRef,
+};
 
 pub fn new_client(app: UnsafeAppRef, client_builder: ClientBuilder) -> ClientWithMiddleware {
     client_builder.with(CacheMiddleware { app }).build()

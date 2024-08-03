@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use specta::Type;
 use thiserror::Error;
-use tracing::{info, trace};
+use tracing::{error, info, trace};
 
 use crate::error::request::{
     censor_error, MalformedResponseDetails, RequestContext, RequestError, RequestErrorDetails,
@@ -106,6 +106,8 @@ impl DeviceCode {
                         .await
                         .map_err(RequestError::from_error)?
                         .error;
+
+                    error!("Bad request error: {error}");
 
                     match &error as &str {
                         "authorization_pending" => continue,

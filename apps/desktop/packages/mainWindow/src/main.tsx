@@ -147,7 +147,7 @@ const TransWrapper = (props: TransWrapperProps) => {
     while (true) {
       let initialTime = Date.now();
 
-      const echo = await rspcContext.client.query(["echo", "something"]);
+      await rspcContext.client.query(["echo", "something"]);
 
       let elapsed = Date.now() - initialTime;
 

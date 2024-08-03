@@ -2,7 +2,7 @@ import { useRouteData } from "@solidjs/router";
 import { createEffect, createSignal, Show } from "solid-js";
 import { Trans } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
-import { Button, Dropdown } from "@gd/ui";
+import { Button, Collapsable, Dropdown } from "@gd/ui";
 import fetchData from "./auth.login.data";
 
 const GDLAccount = () => {
@@ -30,8 +30,7 @@ const GDLAccount = () => {
 
   return (
     <div class="flex flex-col h-full w-full text-center">
-      <h1>GDLauncher Account</h1>
-      <div className="w-full flex justify-center items-center">
+      <div class="w-full flex justify-center items-center">
         <Dropdown
           class="w-full"
           options={accounts.data?.map((v) => ({
@@ -42,67 +41,59 @@ const GDLAccount = () => {
           onChange={(v) => setSelectedAccount(v.key)}
         />
       </div>
-      <div class="flex-1 px-4 overflow-y-auto">
-        <h3 class="text-center font-bold">What is a GDLauncher account?</h3>
-        <p class="text-lightSlate-500 text-md">
-          A GDLauncher account is a way to save your settings, preferences,
-          instance backups and more across all your devices.
-        </p>
-        <h3 class="text-center font-bold">How does it work?</h3>
-        <p class="text-lightSlate-500 text-md">
-          A GDLauncher account is just an entry in our database that is linked
-          to your Microsoft account ID (
-          <span class="text-white font-bold">
-            {currentlySelectedAccount()?.username}
-            {" - "}
-            {currentlySelectedAccount()?.type.type === "microsoft"
-              ? currentlySelectedAccount()?.type.value.email
-              : currentlySelectedAccount()?.username}
-          </span>
-          ). We use your token to authenticate you, your password is NEVER
-          stored. (Learn more about how it works{" "}
-          <a
-            href="https://www.microsoft.com/en-us/security/business/security-101/what-is-oauth"
-            target="_blank"
-            class="text-primary-300"
-          >
-            here
-          </a>
-          )
-        </p>
-        <h3 class="text-center font-bold">
-          What if I lose access to my Microsoft account?
-        </h3>
-        <p class="text-lightSlate-500 text-md">
-          Since we don't store any info about you, there is currently no way to
-          recover your GDLauncher account in case you lose access to your
-          Microsoft account.
-        </p>
-
-        <div class="underline mt-8">See More Details</div>
-      </div>
-
-      <div class="flex justify-between items-center gap-4 w-auto p-4">
-        <Button
-          type="text"
-          onClick={() => {
-            settingsMutation.mutate({
-              hasCompletedGdlAccountSetup: {
-                Set: true
-              }
-            });
-          }}
+      <div class="flex-1 px-4">
+        <h2>FAQs</h2>
+        <Collapsable
+          defaultOpened={false}
+          title="What is a GDLauncher account?"
         >
-          Skip
-        </Button>
-        <Button
-          variant="primary"
-          // disabled={!acceptedTOS()}
-          // loading={loadingButton()}
-          onClick={async () => {}}
+          <p class="text-lightSlate-500 text-md">
+            A GDLauncher account is a way to save your settings, preferences,
+            instance backups and more across all your devices.
+          </p>
+        </Collapsable>
+        <Collapsable defaultOpened={false} title="How does it work?">
+          <p class="text-lightSlate-500 text-md">
+            A GDLauncher account is just an entry in our database that is linked
+            to your Microsoft account ID (
+            <span class="text-white font-bold">
+              {currentlySelectedAccount()?.username}
+              {" - "}
+              {currentlySelectedAccount()?.type.type === "microsoft"
+                ? currentlySelectedAccount()?.type.value.email
+                : currentlySelectedAccount()?.username}
+            </span>
+            ). We use your token to authenticate you, your password is NEVER
+            stored. (Learn more about how it works{" "}
+            <a
+              href="https://www.microsoft.com/en-us/security/business/security-101/what-is-oauth"
+              target="_blank"
+              class="text-primary-300"
+            >
+              here
+            </a>
+            )
+          </p>
+        </Collapsable>
+        <Collapsable
+          defaultOpened={false}
+          title="What if I lose access to my Microsoft account?"
         >
-          Create Account
-        </Button>
+          <p class="text-lightSlate-500 text-md">
+            Since we don't store any info about you, the only way to recover
+            your data in case you lose access to your Microsoft account is to
+            use a different recovery email (in the next step).
+          </p>
+        </Collapsable>
+        <Collapsable
+          defaultOpened={false}
+          title="What happens if I skip the account creation?"
+        >
+          <p class="text-lightSlate-500 text-md">
+            The GDL account creation is completely optional. If you do decide to
+            not create one, some features of the launcher might be unavailable.
+          </p>
+        </Collapsable>
       </div>
     </div>
   );

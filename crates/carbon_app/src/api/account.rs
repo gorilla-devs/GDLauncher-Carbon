@@ -11,6 +11,7 @@ use crate::api::router::router;
 use crate::domain::account as domain;
 use crate::error::FeError;
 use crate::managers::account::api::XboxError;
+use crate::managers::account::gdl_account::{GDLUser, RegisterAccountBody};
 use crate::managers::{account, App, AppInner};
 
 pub(super) fn mount() -> RouterBuilder<App> {
@@ -68,6 +69,28 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         query GET_HEAD[_, _uuid: String] { Ok(()) }
+
+        query GET_GDL_ACCOUNT[app, uuid: String] {
+            let gdl_user = app.account_manager().get_gdl_account(uuid).await?;
+
+            Ok(gdl_user.map(Into::<FEGDLAccount>::into))
+        }
+
+        mutation REGISTER_GDL_ACCOUNT[app, register_data: FERegisterAccount] {
+            let gdl_user = app.account_manager()
+                .register_gdl_account(register_data.uuid.clone(), register_data.into())
+                .await?;
+
+            Ok(Into::<FEGDLAccount>::into(gdl_user))
+        }
+
+        query WAIT_FOR_GDL_ACCOUNT_VERIFICATION[app, uuid: String] {
+            let gdl_user = app.account_manager()
+                .wait_for_gdl_account_verification(uuid)
+                .await?;
+
+            Ok(Into::<FEGDLAccount>::into(gdl_user))
+        }
     }
 }
 
@@ -254,5 +277,38 @@ impl From<account::EnrollmentError> for EnrollmentError {
             BE::EntitlementMissing => Self::NoGameOwnership,
             BE::GameProfileMissing => Self::NoGameProfile,
         }
+    }
+}
+
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FEGDLAccount {
+    email: String,
+    microsoft_oid: String,
+    microsoft_email: Option<String>,
+    is_email_verified: bool,
+}
+
+impl From<GDLUser> for FEGDLAccount {
+    fn from(value: GDLUser) -> Self {
+        Self {
+            email: value.email,
+            microsoft_oid: value.microsoft_oid,
+            microsoft_email: value.microsoft_email,
+            is_email_verified: value.is_email_verified,
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FERegisterAccount {
+    pub email: String,
+    pub uuid: String,
+}
+
+impl From<FERegisterAccount> for RegisterAccountBody {
+    fn from(value: FERegisterAccount) -> Self {
+        Self { email: value.email }
     }
 }

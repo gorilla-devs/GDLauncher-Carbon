@@ -5,10 +5,11 @@ type Props = {
   title?: string | JSX.Element;
   size?: "standard" | "small";
   noPadding?: boolean;
+  defaultOpened?: boolean;
 };
 
 const Collapsable = (props: Props) => {
-  const [opened, setOpened] = createSignal(true);
+  const [opened, setOpened] = createSignal(props.defaultOpened ?? true);
 
   return (
     <div class="w-full box-border flex flex-col py-2 overflow-hidden select-none max-w-full">
@@ -29,7 +30,7 @@ const Collapsable = (props: Props) => {
           }}
         />
         <p
-          class="m-0 text-darkSlate-100 flex items-center uppercase text-ellipsis overflow-hidden max-w-full"
+          class="m-0 text-darkSlate-100 flex items-center uppercase text-ellipsis overflow-hidden max-w-full text-left"
           classList={{
             "text-md": props.size !== "small",
             "text-xs": props.size === "small",

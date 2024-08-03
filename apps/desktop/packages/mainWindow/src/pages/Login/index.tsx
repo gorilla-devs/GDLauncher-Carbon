@@ -1,4 +1,4 @@
-import { Dropdown, createNotification } from "@gd/ui";
+import { Button, Dropdown, createNotification } from "@gd/ui";
 import {
   createSignal,
   Switch,
@@ -6,7 +6,9 @@ import {
   Show,
   createEffect,
   getOwner,
-  runWithOwner
+  runWithOwner,
+  onMount,
+  For
 } from "solid-js";
 import Auth from "./Auth";
 import CodeStep from "./CodeStep";
@@ -15,11 +17,14 @@ import { Navigate, useRouteData } from "@solidjs/router";
 import { Trans, supportedLanguages, useTransContext } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
 import TermsAndConditions from "./TermsAndConditions";
-import Logo from "/assets/images/gdlauncher_vertical_logo.svg";
+import Logo from "/assets/images/gdlauncher_wide_logo_blue.svg";
 import BackgroundVideo from "/assets/images/login_background.webm";
 import { handleStatus } from "@/utils/login";
 import { parseError } from "@/utils/helpers";
 import GDLAccount from "./GDLAccount";
+import GDLAccountCompletion from "./GDLAccountCompletion";
+import { useGDNavigate } from "@/managers/NavigationManager";
+import GDLAccountVerification from "./GDLAccountVerification";
 
 export type DeviceCodeObjectType = {
   userCode: string;
@@ -27,15 +32,47 @@ export type DeviceCodeObjectType = {
   expiresAt: string;
 };
 
+enum Steps {
+  TermsAndConditions = 1,
+  Auth = 2,
+  CodeStep = 3,
+  GDLAccount = 4,
+  GDLAccountCompletion = 5,
+  GDLAccountVerification = 6
+}
+
 export default function Login() {
+  const routeData: ReturnType<typeof fetchData> = useRouteData();
+
   const owner = getOwner();
-  const [step, setStep] = createSignal<number>(0);
+  const navigate = useGDNavigate();
+  const [step, setStep] = createSignal<Steps>(Steps.TermsAndConditions);
   const [deviceCodeObject, setDeviceCodeObject] =
     createSignal<DeviceCodeObjectType | null>(null);
+  const [loadingButton, setLoadingButton] = createSignal(false);
+  const activeUuid = rspc.createQuery(() => ({
+    queryKey: ["account.getActiveUuid"]
+  }));
+
+  const [recoveryEmail, setRecoveryEmail] = createSignal<string | null>(null);
+
+  const [acceptedTOS, setAcceptedTOS] = createSignal(
+    routeData.settings.data?.termsAndPrivacyAccepted
+  );
+  const [acceptedMetrics, setAcceptedMetrics] = createSignal(
+    routeData.settings.data?.metricsEnabled
+  );
+
+  const rspcContext = rspc.useContext();
+
+  const settingsMutation = rspc.createMutation(() => ({
+    mutationKey: ["settings.setSettings"]
+  }));
+  const [isBackButtonVisible, setIsBackButtonVisible] = createSignal(false);
+  createSignal(false);
 
   const [t, { changeLanguage }] = useTransContext();
 
-  const routeData: ReturnType<typeof fetchData> = useRouteData();
   const isAlreadyAuthenticated = () =>
     routeData?.activeUuid?.data &&
     routeData.accounts.data?.length! > 0 &&
@@ -48,13 +85,13 @@ export default function Login() {
   }));
 
   const nextStep = () => {
-    if (step() < 3) {
+    if (step() < Steps.GDLAccountVerification) {
       setStep((prev) => prev + 1);
     }
   };
 
   const prevStep = () => {
-    if (step() >= 0) {
+    if (step() >= Steps.TermsAndConditions) {
       setStep((prev) => prev - 1);
     }
   };
@@ -63,39 +100,207 @@ export default function Login() {
 
   createEffect(() => {
     handleStatus(routeData.status, {
-      onPolling: (info) => {
+      onPolling: async (info) => {
         setDeviceCodeObject({
           userCode: info.userCode,
           link: info.verificationUri,
           expiresAt: info.expiresAt
         });
-        if (routeData.status.data) setStep(2);
+        if (routeData.status.data) {
+          await setStep(Steps.CodeStep);
+          setLoadingButton(false);
+        }
       },
-      onError(error) {
+      async onError(error) {
         if (error)
           addNotification({
             name: parseError(error),
             type: "error"
           });
-        setStep(1);
+        await setStep(Steps.Auth);
+        setLoadingButton(false);
       },
-      onComplete() {
-        accountEnrollFinalizeMutation.mutate(undefined);
+      async onComplete() {
+        await accountEnrollFinalizeMutation.mutateAsync(undefined);
+
+        const uuid = await rspcContext.client.query(["account.getActiveUuid"]);
+
+        if (!uuid) {
+          throw new Error("No active uuid");
+        }
+
+        const userExists = await rspcContext.client.query([
+          "account.getGdlAccount",
+          uuid
+        ]);
+
+        if (userExists?.isEmailVerified) {
+          navigate("/library");
+        } else if (userExists && !userExists.isEmailVerified) {
+          setStep(Steps.GDLAccountVerification);
+        } else {
+          setStep(Steps.GDLAccount);
+        }
+
+        setLoadingButton(false);
       }
     });
   });
 
-  createEffect(() => {
+  onMount(async () => {
     if (
-      !routeData.settings.data?.hasCompletedGdlAccountSetup &&
-      routeData?.activeUuid?.data &&
-      routeData.accounts.data?.length! > 0
+      !routeData?.activeUuid?.data &&
+      routeData.accounts.data?.length! === 0
     ) {
-      setStep(3);
-    } else if (routeData.settings.data?.termsAndPrivacyAccepted) {
-      setStep(1);
+      if (routeData.settings.data?.termsAndPrivacyAccepted) {
+        setStep(Steps.Auth);
+      }
+
+      return;
+    }
+
+    if (
+      routeData.settings.data?.termsAndPrivacyAccepted &&
+      routeData.settings.data?.hasCompletedGdlAccountSetup
+    ) {
+      const uuid = routeData?.activeUuid?.data;
+
+      if (!uuid) {
+        throw new Error("No active uuid");
+      }
+
+      const gdlUser = await rspcContext.client.query([
+        "account.getGdlAccount",
+        uuid
+      ]);
+
+      if (gdlUser && !gdlUser?.isEmailVerified) {
+        setStep(Steps.GDLAccountVerification);
+        return;
+      }
+
+      navigate("/library");
+    } else if (
+      routeData.settings.data?.termsAndPrivacyAccepted &&
+      !routeData.settings.data?.hasCompletedGdlAccountSetup
+    ) {
+      setIsBackButtonVisible(true);
+
+      const uuid = routeData?.activeUuid?.data;
+
+      if (!uuid) {
+        throw new Error("No active uuid");
+      }
+
+      const userExists = await rspcContext.client.query([
+        "account.getGdlAccount",
+        uuid
+      ]);
+
+      if (userExists?.isEmailVerified) {
+        navigate("/library");
+      } else if (userExists && !userExists.isEmailVerified) {
+        setStep(Steps.GDLAccountVerification);
+      } else {
+        setStep(Steps.GDLAccount);
+      }
+    } else if (!routeData.settings.data?.termsAndPrivacyAccepted) {
+      setStep(Steps.TermsAndConditions);
     }
   });
+
+  let sidebarRef: HTMLDivElement | undefined = undefined;
+
+  createEffect(() => {
+    handleSidebarAnimation();
+  });
+
+  async function handleSidebarAnimation() {
+    if (sidebarRef) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
+      sidebarRef.animate(
+        [{ transform: "translateX(-100%)" }, { transform: "translateX(0)" }],
+        {
+          duration: 300,
+          easing: "cubic-bezier(0.175, 0.885, 0.32, 1)",
+          fill: "forwards"
+        }
+      );
+    }
+  }
+
+  let btnRef: HTMLDivElement | undefined = undefined;
+
+  function handleAnimationForward() {
+    if (btnRef) {
+      if (isBackButtonVisible()) return;
+
+      setIsBackButtonVisible(true);
+      btnRef.animate(
+        [
+          { width: "0", margin: "0" },
+          { width: "60%", margin: "0 1rem 0 0" }
+        ],
+        {
+          duration: 300,
+          easing: "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+          fill: "forwards"
+        }
+      );
+    }
+  }
+
+  function handleAnimationBackward() {
+    if (btnRef && isBackButtonVisible() && step() === Steps.Auth) {
+      setIsBackButtonVisible(false);
+
+      btnRef.animate(
+        [
+          { width: "60%", margin: "0 1rem 0 0" },
+          { width: "0", margin: "0" }
+        ],
+        {
+          duration: 300,
+          easing: "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+          fill: "forwards"
+        }
+      );
+    }
+  }
+
+  const accountEnrollCancelMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.enroll.cancel"]
+  }));
+
+  const accountEnrollBeginMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.enroll.begin"],
+
+    onError() {
+      retryLogin();
+    }
+  }));
+
+  const [retry, setRetry] = createSignal(0);
+
+  const retryLogin = () => {
+    while (retry() <= 3) {
+      if (!routeData.status.data) {
+        accountEnrollCancelMutation.mutate(undefined);
+      }
+      accountEnrollBeginMutation.mutate(undefined);
+      setRetry((prev) => prev + 1);
+    }
+    if (retry() > 3) {
+      addNotification({
+        name: "Something went wrong while logging in, try again!",
+        type: "error"
+      });
+      if (routeData.status.data) {
+        accountEnrollCancelMutation.mutate(undefined);
+      }
+    }
+  };
 
   return (
     <Switch>
@@ -103,105 +308,268 @@ export default function Login() {
         <Navigate href={"/library"} />
       </Match>
       <Match when={!isAlreadyAuthenticated()}>
-        <div
-          class="flex justify-center items-center w-full p-0 h-screen"
-          id="main-login-page"
-        >
-          <video
-            class="absolute flex justify-center items-center w-full p-0 h-screen object-cover"
-            src={BackgroundVideo}
-            autoplay
-            muted
-            loop
-            playsinline
-          />
+        <div class="flex w-full h-screen" id="main-login-page">
           <div
-            style={{
-              "mix-blend-mode": "hard-light"
-            }}
-            class="absolute left-0 right-0 bg-darkSlate-800 bottom-0 top-0 opacity-30"
-          />
-          <div class="fixed right-6 bottom-6">
-            <Dropdown
-              value={routeData.settings.data?.language}
-              options={Object.keys(supportedLanguages).map((lang) => ({
-                label: (
-                  <div class="whitespace-nowrap">
-                    {t(`languages:${lang}_native`)} ({t(`languages:${lang}`)})
-                  </div>
-                ),
-                key: lang
-              }))}
-              onChange={(lang) => {
-                runWithOwner(owner, () => {
-                  changeLanguage(lang.key as string);
-                });
-              }}
-              rounded
-            />
-          </div>
-          <div
-            class="flex items-center fixed bottom-6 gap-2 left-6 text-lightSlate-500 hover:text-lightSlate-50 transition-color duration-100 ease-in-out"
-            onClick={() => {
-              window.openExternalLink("https://discord.gdlauncher.com");
-            }}
+            ref={sidebarRef}
+            class="absolute -translate-x-full w-100 h-full flex flex-col items-center text-white rounded-md bg-darkSlate-800 z-1"
           >
-            <div class="i-ri:lifebuoy-fill w-4 h-4" />
-            <div>
-              <Trans key="get_support" />
+            <div class="flex justify-center h-30">
+              <img class="w-60" src={Logo} />
+            </div>
+            <div class="text-lg font-bold flex items-center justify-center gap-2 mb-4">
+              <Switch>
+                <Match when={step() === Steps.TermsAndConditions}>
+                  <Trans key="login.titles.we_value_privacy" />
+                </Match>
+                <Match when={step() === Steps.Auth}>
+                  <Trans key="login.titles.sign_in_with_microsoft" />
+                </Match>
+                <Match when={step() === Steps.CodeStep}>
+                  <i class="inline-block w-4 h-4 i-ri:microsoft-fill" />
+                  <Trans key="login.titles.microsoft_code_step" />
+                </Match>
+                <Match when={step() === Steps.GDLAccount}>
+                  <Trans key="login.titles.create_gdl_account" />
+                </Match>
+                <Match when={step() === Steps.GDLAccountCompletion}>
+                  <Trans key="login.titles.linked_microsoft_account" />
+                </Match>
+                <Match when={step() === Steps.GDLAccountVerification}>
+                  <Trans key="login.titles.gdl_account_verification" />
+                </Match>
+              </Switch>
+            </div>
+            <div class="flex flex-1 w-full h-auto overflow-y-auto">
+              <Switch>
+                <Match when={step() === Steps.TermsAndConditions}>
+                  <TermsAndConditions
+                    nextStep={nextStep}
+                    acceptedTOS={!!acceptedTOS()}
+                    setAcceptedTOS={setAcceptedTOS}
+                    acceptedMetrics={!!acceptedMetrics()}
+                    setAcceptedMetrics={setAcceptedMetrics}
+                  />
+                </Match>
+                <Match when={step() === Steps.Auth}>
+                  <Auth />
+                </Match>
+                <Match when={step() === Steps.CodeStep}>
+                  <CodeStep
+                    nextStep={nextStep}
+                    prevStep={prevStep}
+                    deviceCodeObject={deviceCodeObject()}
+                    setDeviceCodeObject={setDeviceCodeObject}
+                  />
+                </Match>
+                <Match when={step() === Steps.GDLAccount}>
+                  <GDLAccount />
+                </Match>
+                <Match when={step() === Steps.GDLAccountCompletion}>
+                  <GDLAccountCompletion
+                    nextStep={nextStep}
+                    prevStep={prevStep}
+                    recoveryEmail={recoveryEmail()}
+                    setRecoveryEmail={setRecoveryEmail}
+                  />
+                </Match>
+                <Match when={step() === Steps.GDLAccountVerification}>
+                  <GDLAccountVerification
+                    nextStep={nextStep}
+                    prevStep={prevStep}
+                  />
+                </Match>
+              </Switch>
+            </div>
+
+            <div class="w-full flex flex-col items-center p-4 box-border">
+              <div class="relative flex justify-center gap-2 mb-4">
+                <div class="absolute top-1/2 left-0 -translate-y-1/2 h-4 w-full rounded-lg overflow-hidden">
+                  <div
+                    class="absolute top-0 left-0 bg-darkSlate-400 h-4 w-full rounded-lg"
+                    style={{
+                      transform: `translateX(calc(-100% + ${(100 * step()) / 8 + "%"} + 0.5rem * ${step() - 1}))`,
+                      transition:
+                        "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)"
+                    }}
+                  />
+                </div>
+
+                <For each={new Array(6)}>
+                  {(_, i) => (
+                    <div
+                      class="z-1 h-6 w-4 flex justify-center items-center group"
+                      onClick={() => {
+                        if (
+                          i() + 1 < step() &&
+                          (step() > Steps.CodeStep
+                            ? i() + 1 > Steps.CodeStep
+                            : true)
+                        )
+                          setStep(i() + 1);
+                      }}
+                    >
+                      <div
+                        class="h-2 w-2 bg-lightSlate-900 rounded-full"
+                        classList={{
+                          "group-hover:bg-lightSlate-100":
+                            i() + 1 < step() &&
+                            (step() > Steps.CodeStep
+                              ? i() + 1 > Steps.CodeStep
+                              : true)
+                        }}
+                      />
+                    </div>
+                  )}
+                </For>
+              </div>
+
+              <div class="flex w-full box-border">
+                <div
+                  ref={btnRef}
+                  class="overflow-hidden"
+                  style={{
+                    width: step() === Steps.TermsAndConditions ? "0" : "60%",
+                    margin:
+                      step() === Steps.TermsAndConditions ? "0" : "0 1rem 0 0"
+                  }}
+                >
+                  <Button
+                    size="large"
+                    type="secondary"
+                    fullWidth
+                    onClick={() => {
+                      if (step() === Steps.GDLAccount) {
+                        navigate("/library");
+                      } else {
+                        handleAnimationBackward();
+                        prevStep();
+                      }
+                    }}
+                  >
+                    <Switch>
+                      <Match when={step() !== Steps.GDLAccount}>
+                        <i class="i-ri:arrow-left-line" />
+                        Back
+                      </Match>
+                      <Match when={step() === Steps.GDLAccount}>
+                        Skip
+                        <i class="i-ri:skip-forward-line" />
+                      </Match>
+                    </Switch>
+                  </Button>
+                </div>
+                <Button
+                  fullWidth
+                  variant="primary"
+                  size="large"
+                  disabled={
+                    !acceptedTOS() ||
+                    step() === Steps.CodeStep ||
+                    step() === Steps.GDLAccountVerification
+                  }
+                  loading={loadingButton()}
+                  onClick={async () => {
+                    handleAnimationForward();
+                    setLoadingButton(true);
+
+                    if (step() === Steps.TermsAndConditions) {
+                      try {
+                        await settingsMutation.mutateAsync({
+                          termsAndPrivacyAccepted: {
+                            Set: true
+                          },
+                          metricsEnabled: {
+                            Set: !!acceptedMetrics()
+                          }
+                        });
+                      } catch (err) {
+                        console.log(err);
+                        addNotification({
+                          name: "Error while accepting terms and conditions",
+                          content: "Check the console for more information.",
+                          type: "error"
+                        });
+                      }
+
+                      setLoadingButton(false);
+                      nextStep();
+                    } else if (step() === Steps.Auth) {
+                      if (!routeData.status.data) {
+                        await accountEnrollBeginMutation.mutateAsync(undefined);
+                      } else {
+                        await accountEnrollCancelMutation.mutateAsync(
+                          undefined
+                        );
+                        await accountEnrollBeginMutation.mutateAsync(undefined);
+                      }
+                    } else if (step() === Steps.GDLAccount) {
+                      await settingsMutation.mutateAsync({
+                        hasCompletedGdlAccountSetup: {
+                          Set: false
+                        }
+                      });
+                      setLoadingButton(false);
+                      nextStep();
+                    } else if (step() === Steps.GDLAccountCompletion) {
+                      const uuid = routeData?.activeUuid?.data;
+
+                      if (!uuid) {
+                        throw new Error("No active uuid");
+                      }
+
+                      const email = recoveryEmail();
+
+                      if (!email) {
+                        throw new Error("No recovery email");
+                      }
+
+                      const gdlUser = await rspcContext.client.mutation([
+                        "account.registerGdlAccount",
+                        {
+                          email,
+                          uuid
+                        }
+                      ]);
+
+                      console.log("GDL USER", gdlUser);
+
+                      nextStep();
+                    }
+                  }}
+                >
+                  <Switch>
+                    <Match when={step() === Steps.GDLAccountCompletion}>
+                      <Trans key="login.next" />
+                      <i class="i-ri:arrow-right-line" />
+                    </Match>
+                    <Match when={step() === Steps.Auth}>
+                      <i class="w-4 h-4 i-ri:microsoft-fill" />
+                      <Trans key="login.sign_in" />
+                    </Match>
+                    <Match when={step() !== Steps.Auth}>
+                      <Trans key="login.next" />
+                      <i class="i-ri:arrow-right-line" />
+                    </Match>
+                  </Switch>
+                </Button>
+              </div>
             </div>
           </div>
-          <div
-            class="flex flex-col items-center text-white relative justify-end rounded-2xl h-130 transition-transform duration-300 ease-in-out"
-            style={{
-              background: "rgba(29, 32, 40, 0.8)",
-              "justify-content": step() === 1 ? "flex-end" : "center"
-            }}
-            classList={{
-              "overflow-hidden": step() === 2,
-              "w-140": step() !== 0,
-              "max-w-160": step() === 0,
-              "scale-100": !isAlreadyAuthenticated(),
-              "scale-0": !!isAlreadyAuthenticated()
-            }}
-          >
-            <Show when={step() === 0}>
-              <div class="flex justify-center items-center flex-col left-0 mx-auto -mt-15">
-                <img class="w-30" src={Logo} />
-                <p class="text-darkSlate-50">
-                  {"v"}
-                  {__APP_VERSION__}
-                </p>
-              </div>
-            </Show>
-            <Show when={step() === 1}>
-              <div class="absolute right-0 flex justify-center items-center flex-col left-0 -top-15 m-auto">
-                <img class="w-30" src={Logo} />
-                <p class="text-darkSlate-50">
-                  {"v"}
-                  {__APP_VERSION__}
-                </p>
-              </div>
-            </Show>
-            <Switch>
-              <Match when={step() === 0}>
-                <TermsAndConditions nextStep={nextStep} />
-              </Match>
-              <Match when={step() === 1}>
-                <Auth />
-              </Match>
-              <Match when={step() === 2}>
-                <CodeStep
-                  nextStep={nextStep}
-                  prevStep={prevStep}
-                  deviceCodeObject={deviceCodeObject()}
-                  setDeviceCodeObject={setDeviceCodeObject}
-                />
-              </Match>
-              <Match when={step() === 3}>
-                <GDLAccount />
-              </Match>
-            </Switch>
+          <div class="flex-1">
+            <video
+              class="p-0 h-screen object-cover"
+              src={BackgroundVideo}
+              autoplay
+              muted
+              loop
+              playsinline
+            />
+            {/* <div
+              style={{
+                "mix-blend-mode": "hard-light"
+              }}
+              class="absolute left-0 right-0 bg-darkSlate-800 bottom-0 top-0 opacity-30"
+            /> */}
           </div>
         </div>
       </Match>

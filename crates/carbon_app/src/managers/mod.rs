@@ -116,7 +116,7 @@ mod app {
                     settings_manager: SettingsManager::new(runtime_path, http_client.clone()),
                     java_manager: JavaManager::new(),
                     minecraft_manager: MinecraftManager::new(),
-                    account_manager: AccountManager::new(),
+                    account_manager: AccountManager::new(http_client.clone()),
                     modplatforms_manager: ModplatformsManager::new(unsaferef),
                     download_manager: DownloadManager::new(),
                     instance_manager: InstanceManager::new(),
