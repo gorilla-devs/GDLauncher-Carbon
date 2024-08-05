@@ -1,6 +1,6 @@
 use super::ManagerRef;
 use std::sync::Arc;
-use sysinfo::{System, SystemExt};
+use sysinfo::System;
 use tokio::sync::Mutex;
 
 pub(crate) struct SystemInfoManager {
@@ -31,8 +31,11 @@ impl SystemInfoManager {
     }
 
     pub async fn get_os_version(&self) -> Option<String> {
-        let lock = self.system.lock().await;
-        lock.os_version()
+        let Some(os_version) = sysinfo::System::os_version() else {
+            return None;
+        };
+
+        Some(os_version)
     }
 }
 

@@ -751,11 +751,10 @@ mod test {
         // write meta zip
         let mut vec = Vec::<u8>::new();
         let mut zip = ZipWriter::new(Cursor::new(&mut vec));
-        let options = FileOptions::default().compression_method(CompressionMethod::Stored);
+        let options = FileOptions::<()>::default().compression_method(CompressionMethod::Stored);
         zip.start_file(path, options)?;
         zip.write_all(content.as_bytes())?;
         zip.finish()?;
-        drop(zip);
 
         // read meta zip
         let meta = parse_metadata(&mut Cursor::new(&vec));

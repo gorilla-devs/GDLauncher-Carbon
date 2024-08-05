@@ -8,7 +8,7 @@ use prisma_client_rust::raw;
 use ring::rand::SecureRandom;
 use rusqlite_migration::{Migrations, M};
 use serde::Deserialize;
-use sysinfo::{System, SystemExt};
+use sysinfo::System;
 use thiserror::Error;
 use tracing::{debug, error, instrument, trace};
 

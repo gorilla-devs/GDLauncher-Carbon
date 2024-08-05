@@ -1,7 +1,7 @@
 use std::io::Cursor;
 
 use anyhow::ensure;
-use image::{GenericImageView, ImageOutputFormat};
+use image::{GenericImageView, ImageFormat};
 use thiserror::Error;
 
 use crate::{
@@ -143,7 +143,7 @@ fn stitch_head(image: &[u8]) -> anyhow::Result<Vec<u8>> {
     );
 
     let mut output = Vec::<u8>::new();
-    target.write_to(&mut Cursor::new(&mut output), ImageOutputFormat::Png)?;
+    target.write_to(&mut Cursor::new(&mut output), ImageFormat::Png)?;
     Ok(output)
 }
 

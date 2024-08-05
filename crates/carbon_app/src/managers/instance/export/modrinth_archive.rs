@@ -146,7 +146,7 @@ pub async fn export_modrinth(
 
             let mut file_count = 0;
             super::zip_excluding(
-                ZipMode::<File>::Count(&mut file_count),
+                ZipMode::<File, ()>::Count(&mut file_count),
                 &basepath,
                 "overrides",
                 &filter,
@@ -192,7 +192,7 @@ pub async fn export_modrinth(
 
             let ziptask = tokio::task::spawn_blocking(move || {
                 let mut zip = zip::ZipWriter::new(File::create(send_path)?);
-                let options = zip::write::FileOptions::default();
+                let options = zip::write::FileOptions::<()>::default();
                 zip.start_file("modrinth.index.json", options)?;
                 zip.write_all(&serde_json::to_vec_pretty(&manifest)?)?;
 

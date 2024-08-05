@@ -21,7 +21,7 @@ jobs:
           node-version: "18.18.0"
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.75.0
+          toolchain: 1.80.0
           targets: aarch64-apple-darwin, x86_64-apple-darwin
           components: clippy, rustfmt
       - name: Prepare
@@ -80,7 +80,7 @@ jobs:
           node-version: "18.18.0"
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.75.0
+          toolchain: 1.80.0
           targets: x86_64-unknown-linux-gnu
           components: clippy, rustfmt
       - name: Prepare
@@ -139,7 +139,7 @@ jobs:
           node-version: "18.18.0"
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.75.0
+          toolchain: 1.80.0
           targets: x86_64-pc-windows-msvc
           components: clippy, rustfmt
       - name: Prepare

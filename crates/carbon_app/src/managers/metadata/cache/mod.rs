@@ -15,7 +15,7 @@ use std::usize;
 use anyhow::anyhow;
 use futures::join;
 use futures::Future;
-use image::ImageOutputFormat;
+use image::ImageFormat;
 use itertools::Itertools;
 use md5::Digest;
 use murmurhash32::Murmur2Digest;
@@ -1163,7 +1163,7 @@ fn scale_mod_image(image: &[u8]) -> anyhow::Result<Vec<u8>> {
     }
 
     let mut output = Vec::<u8>::new();
-    target.write_to(&mut Cursor::new(&mut output), ImageOutputFormat::Png)?;
+    target.write_to(&mut Cursor::new(&mut output), ImageFormat::Png)?;
     Ok(output)
 }
 

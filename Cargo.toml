@@ -23,8 +23,8 @@ incremental = true
 debug-assertions = true
 
 [workspace.dependencies]
-anyhow = { version = "1.0.81", features = ["backtrace"] }
-async-stream = "0.3.3"
+anyhow = { version = "1.0.86", features = ["backtrace"] }
+async-stream = "0.3.5"
 async-trait = "0.1.61"
 axum = "0.7.4"
 chrono = "0.4.23"
@@ -32,23 +32,23 @@ derive_more = "0.99.17"
 openssl = { version = "0.10", features = [
   "vendored",
 ] } # required to vendor openssl for steam deck
-directories = "4.0.1"
+directories = "5.0.1"
 dotenvy = "0.15.6"
-flate2 = "1.0.25"
+flate2 = "1.0.31"
 fs_extra = "1.3.0"
-futures = "0.3.25"
+futures = "0.3.30"
 httpdate = "1.0.2"
 hyper = "0.14.25"
-itertools = "0.12"
-image = { version = "0.24.5" }
-jsonwebtoken = "8.2.0"
+itertools = "0.13.0"
+image = { version = "0.25.2" }
+jsonwebtoken = "9.3.0"
 # libc = "0.2"
 md-5 = "0.10.5"
 carbon_scheduler = { git = "https://github.com/gorilla-devs/carbon_scheduler", rev = "4212ac32ca648ceb45e4d8c849360203f96c2be2" }
 murmurhash32 = { git = "https://github.com/gorilla-devs/murmurhash32", rev = "4dfdc49b727581bbdcad4a2315452a2c28db6093" }
 nom = "7"
 num_cpus = "1.16.0"
-opener = "0.7.0"
+opener = "0.7.1"
 prisma-client-rust = { git = "https://github.com/gorilla-devs/prisma-client-rust", rev = "f74daf611f5ce8c20351eb05014b9176df2f0939", features = [
   "sqlite-create-many",
   "sqlite",
@@ -59,7 +59,7 @@ prisma-client-rust-cli = { git = "https://github.com/gorilla-devs/prisma-client-
   "sqlite",
   "migrations",
 ], default_features = false }
-regex = "1.7.0"
+regex = "1.10.6"
 const_format = "0.2.32"
 reqwest = { version = "0.11.13", default-features = false, features = [
   "json",
@@ -72,26 +72,26 @@ reqwest-retry = "0.2.1"
 rspc = "0.2.0"
 specta = "1"
 rspc-axum = "0.1.1"
-serde = "1.0.197"
-serde_json = "1.0.114"
+serde = "1.0.204"
+serde_json = "1.0.122"
 daedalus = { git = "https://github.com/gorilla-devs/daedalus", rev = "b7fe9079fbac03bcbbcbd20a395b4a9c60971d3b" }
-sha1 = "0.10.5"
-sha2 = "0.10.6"
-tar = "0.4.38"
+sha1 = "0.10.6"
+sha2 = "0.10.8"
+tar = "0.4.41"
 strum_macros = "0.24.3"
 strum = "0.24.0"
-thiserror = "1.0.38"
+thiserror = "1.0.63"
 task-local-extensions = "0.1.4"
-tokio = "1.36.0"
-tokio-stream = "0.1.11"
-dunce = "1.0.4"
+tokio = "1.39.2"
+tokio-stream = "0.1.15"
+dunce = "1.0.5"
 toml = "0.7.3"
 tower-http = "0.5.2"
-hex = "0.4"
-tracing = "0.1.37"
-walkdir = "2.3"
-tracing-subscriber = { version = "0.3.17", features = ["ansi", "env-filter"] }
-tracing-appender = "0.2.2"
+hex = "0.4.3"
+tracing = "0.1.40"
+walkdir = "2.5.0"
+tracing-subscriber = { version = "0.3.18", features = ["ansi", "env-filter"] }
+tracing-appender = "0.2.3"
 # tracing-forest = { version = "0.1.5", features = [
 #   "smallvec",
 #   "chrono",
@@ -99,10 +99,10 @@ tracing-appender = "0.2.2"
 #   "serde",
 #   "env-filter",
 # ] }
-trash = "4.1.0"
-uuid = "1.2.2"
-winreg = "0.10.1"
-zip = "0.6.3"
+trash = "5.0.0"
+uuid = "1.10.0"
+winreg = "0.52.0"
+zip = "2.1.6"
 tempdir = "0.3.7"
 sentry = { version = "0.32.2", default-features = false, features = [
   "panic",
@@ -116,10 +116,10 @@ syn = "2.0.11"
 quote = "1.0.26"
 url = "2.3.1"
 serde_repr = "0.1"
-sysinfo = "0.29.0"
+sysinfo = "0.31.2"
 serde_qs = "0.12"
 markdown = "1.0.0-alpha.11"
-ring = "0.16.20"
+ring = "0.17.8"
 
 # dev dependencies
 assert2 = "0.3.11"

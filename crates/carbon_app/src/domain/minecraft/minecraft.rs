@@ -2,7 +2,6 @@ use daedalus::minecraft::{
     Argument, ArgumentValue, AssetsIndex, Download, Library, Os, OsRule, Rule, RuleAction,
 };
 use std::path::PathBuf;
-use sysinfo::SystemExt;
 
 use crate::domain::{
     java::JavaArch,
@@ -82,8 +81,7 @@ pub fn os_rule(rule: &OsRule, java_arch: &JavaArch) -> bool {
     }
 
     if let Some(version) = &rule.version {
-        let system = sysinfo::System::new();
-        let Some(os_version) = system.os_version() else {
+        let Some(os_version) = sysinfo::System::os_version() else {
             return true;
         };
 
