@@ -154,6 +154,7 @@ export default function Login() {
     ) {
       if (routeData.settings.data?.termsAndPrivacyAccepted) {
         setStep(Steps.Auth);
+        setIsBackButtonVisible(true);
       }
 
       return;
@@ -206,6 +207,10 @@ export default function Login() {
       }
     } else if (!routeData.settings.data?.termsAndPrivacyAccepted) {
       setStep(Steps.TermsAndConditions);
+    }
+
+    if (step() !== Steps.TermsAndConditions) {
+      setIsBackButtonVisible(true);
     }
   });
 
@@ -339,7 +344,7 @@ export default function Login() {
                 </Match>
               </Switch>
             </div>
-            <div class="flex flex-1 w-full h-auto overflow-y-auto">
+            <div class="flex flex-1 w-full h-auto overflow-y-auto px-4 box-border">
               <Switch>
                 <Match when={step() === Steps.TermsAndConditions}>
                   <TermsAndConditions
@@ -428,9 +433,8 @@ export default function Login() {
                   ref={btnRef}
                   class="overflow-hidden"
                   style={{
-                    width: step() === Steps.TermsAndConditions ? "0" : "60%",
-                    margin:
-                      step() === Steps.TermsAndConditions ? "0" : "0 1rem 0 0"
+                    width: !isBackButtonVisible() ? "0" : "60%",
+                    margin: !isBackButtonVisible() ? "0" : "0 1rem 0 0"
                   }}
                 >
                   <Button

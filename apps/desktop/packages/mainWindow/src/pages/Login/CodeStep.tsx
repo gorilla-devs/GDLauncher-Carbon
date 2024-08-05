@@ -31,6 +31,9 @@ interface Props {
 const CodeStep = (props: Props) => {
   const [error, setError] = createSignal<null | string>(null);
 
+  const [shouldShowRetryMessage, setShouldShowRetryMessage] =
+    createSignal(false);
+
   const accountEnrollCancelMutation = rspc.createMutation(() => ({
     mutationKey: ["account.enroll.cancel"],
     onError(error) {
@@ -154,7 +157,7 @@ const CodeStep = (props: Props) => {
         <Popover
           noTip
           content={
-            <div class="px-4 max-w-100 pb-6">
+            <div class="px-4 max-w-100 pb-6 text-sm">
               <h3>
                 <Trans key="login.troubles_logging_in" />
               </h3>
@@ -177,11 +180,11 @@ const CodeStep = (props: Props) => {
             </div>
           }
         >
-          <div class="flex items-center text-darkSlate-50 hover:text-lightSlate-50 transition-color duration-75">
+          <div class="flex items-center text-darkSlate-50 hover:text-lightSlate-50 transition-color duration-75 text-sm">
             <div>
               <Trans key="login.need_help" />
             </div>
-            <div class="ml-2 w-6 h-6 i-ri:question-fill" />
+            <div class="ml-2 w-4 h-4 i-ri:question-fill" />
           </div>
         </Popover>
       </div>
@@ -223,11 +226,26 @@ const CodeStep = (props: Props) => {
             setLoading(true);
             navigator.clipboard.writeText(userCode() || "");
             window.openExternalLink(deviceCodeLink() || "");
+
+            setTimeout(() => {
+              setShouldShowRetryMessage(true);
+            }, 10 * 1000);
           }}
         >
           <Trans key="login.open_in_browser" />
           <div class="text-md i-ri:external-link-fill" />
         </Button>
+        <p
+          class="text-sm text-yellow-500"
+          classList={{
+            "opacity-0":
+              !shouldShowRetryMessage() ||
+              !(routeData.status.data as any)?.pollingCode
+          }}
+        >
+          If you logged-in but this page doesn't update, please try again.
+          Sometimes microsoft servers don't respond as expected.
+        </p>
       </div>
       <div class="flex flex-col gap-2" classList={{ "opacity-0": !loading() }}>
         <span class="text-xs text-darkSlate-100">
