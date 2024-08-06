@@ -49,7 +49,7 @@ keys! {
 
         GET_GDL_ACCOUNT                             = "getGdlAccount";
         REGISTER_GDL_ACCOUNT                        = "registerGdlAccount";
-        WAIT_FOR_GDL_ACCOUNT_VERIFICATION           = "waitForGdlAccountVerification";
+        REMOVE_GDL_ACCOUNT                          = "removeGdlAccount";
     }
 
     java {

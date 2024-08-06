@@ -36,6 +36,7 @@
   "login.titles.microsoft_code_step": "Microsoft Device Token",
   "login.titles.linked_microsoft_account": "Linked Microsoft Account",
   "login.titles.create_gdl_account": "Create GDLauncher Account",
+  "login.titles.add_gdl_account": "Add GDLauncher Account",
   "login.titles.gdl_account_verification": "GDLauncher Account Verification",
   "login.sign_in": "Sign In",
   "login.sign_in_with_microsoft_text": "Sign in with your Microsoft Account. You need to own Minecraft to be able to log-in.",

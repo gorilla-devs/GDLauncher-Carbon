@@ -4,7 +4,7 @@ interface Props {
   nextStep: () => void;
   prevStep: () => void;
   recoveryEmail: string | null;
-  setRecoveryEmail: (value: string | null) => void;
+  setRecoveryEmail: (_: string | null) => void;
 }
 
 const GDLAccountCompletion = (props: Props) => {

@@ -1,40 +1,69 @@
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { rspc } from "@/utils/rspcClient";
-import { Input } from "@gd/ui";
-import { onMount } from "solid-js";
+import { Navigate } from "@solidjs/router";
+import { createEffect, Match, onCleanup, onMount, Switch } from "solid-js";
 
 interface Props {
   nextStep: () => void;
   prevStep: () => void;
+  activeUuid: string | null | undefined;
 }
 
 const GDLAccountVerification = (props: Props) => {
-  const rspcContext = rspc.useContext();
   const navigate = useGDNavigate();
 
-  onMount(async () => {
-    const activeUuid = await rspcContext.client.query([
-      "account.getActiveUuid"
-    ]);
+  const verified = rspc.createQuery(() => ({
+    queryKey: ["account.getGdlAccount", props.activeUuid!],
+    enabled: !!props.activeUuid
+  }));
 
-    if (!activeUuid) {
-      throw new Error("No active uuid");
-    }
+  function invalidateEmailVerification() {
+    verified.refetch();
+  }
 
-    const waitingForVerification = await rspcContext.client.query([
-      "account.waitForGdlAccountVerification",
-      activeUuid
-    ]);
+  let interval: ReturnType<typeof setInterval>;
 
-    if (waitingForVerification) {
-      navigate("/library");
+  createEffect(async () => {
+    if (props.activeUuid) {
+      if (interval) {
+        clearInterval(interval);
+      }
+
+      interval = setInterval(invalidateEmailVerification, 1000);
     }
   });
 
+  onCleanup(() => {
+    clearInterval(interval);
+  });
+
   return (
-    <div class="flex-1 w-full flex flex-col justify-between items-center text-center gap-5 p-10">
-      <h1>Waiting for verification</h1>
-    </div>
+    <>
+      <Switch>
+        <Match when={verified.data?.isEmailVerified}>
+          <Navigate href="/library" />
+        </Match>
+        <Match when={!verified.data?.isEmailVerified}>
+          <div class="flex-1 w-full text-center gap-5 flex flex-col justify-between items-center">
+            <div class="p-10">
+              <h1>Waiting for Verification</h1>
+              <h3 class="text-lightSlate-400 mt-12">
+                Check your email for a verification link
+              </h3>
+            </div>
+
+            <div
+              onClick={() => {
+                navigate("/library");
+              }}
+              class="underline text-lightSlate-400 hover:text-lightSlate-50 transition-all duration-100 ease-in-out"
+            >
+              Verify Later
+            </div>
+          </div>
+        </Match>
+      </Switch>
+    </>
   );
 };
 

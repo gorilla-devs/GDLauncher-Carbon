@@ -250,22 +250,20 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(user)
     }
 
-    pub async fn wait_for_gdl_account_verification(self, uuid: String) -> anyhow::Result<GDLUser> {
-        let mut user = self
-            .get_gdl_account(uuid.clone())
-            .await?
-            .ok_or(anyhow::anyhow!(
-                "attempted to verify an account that does not exist"
-            ))?;
+    pub async fn remove_gdl_account(self) -> anyhow::Result<()> {
+        use db::app_configuration::SetParam;
 
-        while !user.is_email_verified {
-            tokio::time::sleep(Duration::from_secs(2)).await;
-            user = self.get_gdl_account(uuid.clone()).await?.ok_or(anyhow::anyhow!(
-                "attempted to verify an account that does not exist anymore but did previously exist when verification was requested"
-            ))?;
-        }
+        self.app
+            .settings_manager()
+            .set(SetParam::SetHasCompletedGdlAccountSetup(false))
+            .await?;
 
-        Ok(user)
+        self.app
+            .settings_manager()
+            .set(SetParam::SetGdlAccountUuid(None))
+            .await?;
+
+        Ok(())
     }
 
     /// Add or update an account

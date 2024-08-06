@@ -229,7 +229,7 @@ const CodeStep = (props: Props) => {
 
             setTimeout(() => {
               setShouldShowRetryMessage(true);
-            }, 10 * 1000);
+            }, 15 * 1000);
           }}
         >
           <Trans key="login.open_in_browser" />

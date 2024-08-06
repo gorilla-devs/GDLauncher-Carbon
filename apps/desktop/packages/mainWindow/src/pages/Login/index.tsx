@@ -54,6 +54,19 @@ export default function Login() {
     queryKey: ["account.getActiveUuid"]
   }));
 
+  const gdlUser = rspc.createQuery(() => ({
+    queryKey: ["account.getGdlAccount", activeUuid.data!],
+    enabled: !!activeUuid.data
+  }));
+
+  createEffect((prev) => {
+    if (activeUuid.data && activeUuid.data !== prev) {
+      gdlUser.refetch();
+    }
+
+    return activeUuid.data;
+  });
+
   const [recoveryEmail, setRecoveryEmail] = createSignal<string | null>(null);
 
   const [acceptedTOS, setAcceptedTOS] = createSignal(
@@ -68,8 +81,12 @@ export default function Login() {
   const settingsMutation = rspc.createMutation(() => ({
     mutationKey: ["settings.setSettings"]
   }));
+
+  const deleteGDLAccountMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.removeGdlAccount"]
+  }));
+
   const [isBackButtonVisible, setIsBackButtonVisible] = createSignal(false);
-  createSignal(false);
 
   const [t, { changeLanguage }] = useTransContext();
 
@@ -122,96 +139,58 @@ export default function Login() {
       },
       async onComplete() {
         await accountEnrollFinalizeMutation.mutateAsync(undefined);
-
-        const uuid = await rspcContext.client.query(["account.getActiveUuid"]);
-
-        if (!uuid) {
-          throw new Error("No active uuid");
-        }
-
-        const userExists = await rspcContext.client.query([
-          "account.getGdlAccount",
-          uuid
-        ]);
-
-        if (userExists?.isEmailVerified) {
-          navigate("/library");
-        } else if (userExists && !userExists.isEmailVerified) {
-          setStep(Steps.GDLAccountVerification);
-        } else {
-          setStep(Steps.GDLAccount);
-        }
-
+        setStep(Steps.GDLAccount);
         setLoadingButton(false);
       }
     });
   });
 
   onMount(async () => {
-    if (
-      !routeData?.activeUuid?.data &&
-      routeData.accounts.data?.length! === 0
-    ) {
-      if (routeData.settings.data?.termsAndPrivacyAccepted) {
-        setStep(Steps.Auth);
-        setIsBackButtonVisible(true);
-      }
+    const activeUuid = await rspcContext.client.query([
+      "account.getActiveUuid"
+    ]);
 
+    const settings = await rspcContext.client.query(["settings.getSettings"]);
+
+    if (!settings.termsAndPrivacyAccepted) {
+      setStep(Steps.TermsAndConditions);
+      setIsBackButtonVisible(false);
       return;
     }
 
-    if (
-      routeData.settings.data?.termsAndPrivacyAccepted &&
-      routeData.settings.data?.hasCompletedGdlAccountSetup
-    ) {
-      const uuid = routeData?.activeUuid?.data;
+    const accounts = await rspcContext.client.query(["account.getAccounts"]);
 
-      if (!uuid) {
-        throw new Error("No active uuid");
-      }
+    if (!activeUuid || accounts.length === 0) {
+      setStep(Steps.Auth);
+      setIsBackButtonVisible(true);
+      return;
+    }
 
-      const gdlUser = await rspcContext.client.query([
-        "account.getGdlAccount",
-        uuid
-      ]);
+    const gdlUser = await rspcContext.client.query([
+      "account.getGdlAccount",
+      activeUuid
+    ]);
 
-      if (gdlUser && !gdlUser?.isEmailVerified) {
+    if (settings.hasCompletedGdlAccountSetup) {
+      if (gdlUser && !gdlUser.isEmailVerified) {
+        setRecoveryEmail(gdlUser.email);
         setStep(Steps.GDLAccountVerification);
+        setIsBackButtonVisible(true);
         return;
       }
 
+      // Should go to library if GDL account is already verified OR GDL account does not exist
       navigate("/library");
-    } else if (
-      routeData.settings.data?.termsAndPrivacyAccepted &&
-      !routeData.settings.data?.hasCompletedGdlAccountSetup
-    ) {
-      setIsBackButtonVisible(true);
-
-      const uuid = routeData?.activeUuid?.data;
-
-      if (!uuid) {
-        throw new Error("No active uuid");
+    } else if (!settings.hasCompletedGdlAccountSetup) {
+      if (gdlUser) {
+        setRecoveryEmail(gdlUser.email);
       }
 
-      const userExists = await rspcContext.client.query([
-        "account.getGdlAccount",
-        uuid
-      ]);
-
-      if (userExists?.isEmailVerified) {
-        navigate("/library");
-      } else if (userExists && !userExists.isEmailVerified) {
-        setStep(Steps.GDLAccountVerification);
-      } else {
-        setStep(Steps.GDLAccount);
-      }
-    } else if (!routeData.settings.data?.termsAndPrivacyAccepted) {
-      setStep(Steps.TermsAndConditions);
-    }
-
-    if (step() !== Steps.TermsAndConditions) {
       setIsBackButtonVisible(true);
+      setStep(Steps.GDLAccount);
     }
+
+    return;
   });
 
   let sidebarRef: HTMLDivElement | undefined = undefined;
@@ -334,7 +313,14 @@ export default function Login() {
                   <Trans key="login.titles.microsoft_code_step" />
                 </Match>
                 <Match when={step() === Steps.GDLAccount}>
-                  <Trans key="login.titles.create_gdl_account" />
+                  <Switch>
+                    <Match when={gdlUser.data}>
+                      <Trans key="login.titles.add_gdl_account" />
+                    </Match>
+                    <Match when={!gdlUser.data}>
+                      <Trans key="login.titles.create_gdl_account" />
+                    </Match>
+                  </Switch>
                 </Match>
                 <Match when={step() === Steps.GDLAccountCompletion}>
                   <Trans key="login.titles.linked_microsoft_account" />
@@ -367,7 +353,7 @@ export default function Login() {
                   />
                 </Match>
                 <Match when={step() === Steps.GDLAccount}>
-                  <GDLAccount />
+                  <GDLAccount activeUuid={activeUuid.data} />
                 </Match>
                 <Match when={step() === Steps.GDLAccountCompletion}>
                   <GDLAccountCompletion
@@ -381,6 +367,7 @@ export default function Login() {
                   <GDLAccountVerification
                     nextStep={nextStep}
                     prevStep={prevStep}
+                    activeUuid={activeUuid.data}
                   />
                 </Match>
               </Switch>
@@ -441,13 +428,16 @@ export default function Login() {
                     size="large"
                     type="secondary"
                     fullWidth
-                    onClick={() => {
+                    onClick={async () => {
                       if (step() === Steps.GDLAccount) {
+                        await deleteGDLAccountMutation.mutateAsync(undefined);
                         navigate("/library");
                       } else {
                         handleAnimationBackward();
                         prevStep();
                       }
+
+                      setLoadingButton(false);
                     }}
                   >
                     <Switch>
@@ -469,9 +459,12 @@ export default function Login() {
                   disabled={
                     !acceptedTOS() ||
                     step() === Steps.CodeStep ||
-                    step() === Steps.GDLAccountVerification
+                    step() === Steps.GDLAccountVerification ||
+                    (step() === Steps.GDLAccountCompletion && !recoveryEmail())
                   }
-                  loading={loadingButton()}
+                  loading={
+                    loadingButton() || step() === Steps.GDLAccountVerification
+                  }
                   onClick={async () => {
                     handleAnimationForward();
                     setLoadingButton(true);
@@ -527,17 +520,39 @@ export default function Login() {
                         throw new Error("No recovery email");
                       }
 
-                      const gdlUser = await rspcContext.client.mutation([
-                        "account.registerGdlAccount",
-                        {
-                          email,
+                      try {
+                        const existingGDLUser = await rspcContext.client.query([
+                          "account.getGdlAccount",
                           uuid
+                        ]);
+
+                        if (
+                          existingGDLUser &&
+                          existingGDLUser.isEmailVerified
+                        ) {
+                          navigate("/library");
+                        } else if (
+                          existingGDLUser &&
+                          !existingGDLUser.isEmailVerified
+                        ) {
+                          setRecoveryEmail(existingGDLUser.email);
+                          setStep(Steps.GDLAccountVerification);
+                        } else {
+                          const gdlUser = await rspcContext.client.mutation([
+                            "account.registerGdlAccount",
+                            {
+                              email,
+                              uuid
+                            }
+                          ]);
+
+                          console.log("GDL USER", gdlUser);
+                          nextStep();
                         }
-                      ]);
-
-                      console.log("GDL USER", gdlUser);
-
-                      nextStep();
+                      } catch (e) {
+                        setLoadingButton(false);
+                        console.error(e);
+                      }
                     }
                   }}
                 >
@@ -561,7 +576,7 @@ export default function Login() {
           </div>
           <div class="flex-1">
             <video
-              class="p-0 h-screen object-cover"
+              class="p-0 h-screen w-full object-cover"
               src={BackgroundVideo}
               autoplay
               muted

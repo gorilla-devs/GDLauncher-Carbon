@@ -84,12 +84,10 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok(Into::<FEGDLAccount>::into(gdl_user))
         }
 
-        query WAIT_FOR_GDL_ACCOUNT_VERIFICATION[app, uuid: String] {
-            let gdl_user = app.account_manager()
-                .wait_for_gdl_account_verification(uuid)
-                .await?;
-
-            Ok(Into::<FEGDLAccount>::into(gdl_user))
+        mutation REMOVE_GDL_ACCOUNT[app, _args: ()] {
+            app.account_manager()
+                .remove_gdl_account()
+                .await
         }
     }
 }
