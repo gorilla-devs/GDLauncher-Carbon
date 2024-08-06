@@ -9,7 +9,7 @@ use anyhow::{ensure, Context};
 use async_trait::async_trait;
 use axum::extract;
 use chrono::{FixedOffset, Utc};
-use gdl_account::{GDLAccountTask, GDLUser, RegisterAccountBody};
+use gdl_account::{GDLAccountTask, GDLUser, RegisterAccountBody, RequestNewVerificationTokenError};
 use jwt::{Header, Token};
 use prisma_client_rust::{
     chrono::DateTime, prisma_errors::query_engine::RecordNotFound, Direction, QueryError,
@@ -248,6 +248,31 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .with_context(|| format!("failed to register account: {uuid}"))?;
 
         Ok(user)
+    }
+
+    pub async fn request_new_verification_token(
+        self,
+        uuid: String,
+    ) -> Result<(), RequestNewVerificationTokenError> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await
+            .map_err(|e| RequestNewVerificationTokenError::RequestFailed(e))?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(RequestNewVerificationTokenError::RequestFailed(
+                anyhow::anyhow!("attempted to get an account that does not exist"),
+            ))?
+            .id_token
+        else {
+            return Err(RequestNewVerificationTokenError::RequestFailed(
+                anyhow::anyhow!("attempted to get an account that does not exist"),
+            ));
+        };
+
+        let lock = self.gdl_account_task.write().await;
+        lock.request_new_verification_token(id_token).await?;
+        Ok(())
     }
 
     pub async fn remove_gdl_account(self) -> anyhow::Result<()> {

@@ -4,6 +4,7 @@ use hyper::{
     HeaderMap, StatusCode,
 };
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::managers::GDL_API_BASE;
 
@@ -16,12 +17,21 @@ pub struct RegisterAccountBody {
     pub email: String,
 }
 
+#[derive(Error, Debug)]
+pub enum RequestNewVerificationTokenError {
+    #[error("Too many requests")]
+    TooManyRequests(u32),
+
+    #[error("request failed: {0}")]
+    RequestFailed(anyhow::Error),
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct GDLUser {
     pub email: String,
     pub microsoft_oid: String,
     pub microsoft_email: Option<String>,
-    pub is_email_verified: bool,
+    pub is_verified: bool,
 }
 
 impl GDLAccountTask {
@@ -76,6 +86,46 @@ impl GDLAccountTask {
         let user: GDLUser = resp.json().await?;
 
         Ok(Some(user))
+    }
+
+    pub async fn request_new_verification_token(
+        &self,
+        id_token: String,
+    ) -> Result<(), RequestNewVerificationTokenError> {
+        let url = format!("{}/v1/users/request-new-verification-token", GDL_API_BASE);
+        let authorization = format!("Bearer {}", id_token);
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, authorization.parse().unwrap());
+
+        let resp = self
+            .client
+            .post(url)
+            .headers(headers)
+            .send()
+            .await
+            .map_err(|err| RequestNewVerificationTokenError::RequestFailed(err.into()))?;
+
+        if resp.status() == StatusCode::TOO_MANY_REQUESTS {
+            let retry_after = resp
+                .headers()
+                .get("Retry-After")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<u32>().ok());
+
+            return Err(RequestNewVerificationTokenError::TooManyRequests(
+                retry_after.unwrap_or(0),
+            ));
+        }
+
+        let resp = resp
+            .error_for_status()
+            .map_err(|err| RequestNewVerificationTokenError::RequestFailed(err.into()))?;
+
+        resp.bytes()
+            .await
+            .map_err(|err| RequestNewVerificationTokenError::RequestFailed(err.into()))?;
+
+        Ok(())
     }
 
     pub async fn get_subscription_status(&self) {}

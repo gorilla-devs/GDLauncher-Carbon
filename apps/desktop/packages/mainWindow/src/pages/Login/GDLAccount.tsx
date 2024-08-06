@@ -42,7 +42,7 @@ const GDLAccount = (props: Props) => {
                 {currentlySelectedAccount()?.username}
                 {" - "}
                 {currentlySelectedAccount()?.type.type === "microsoft"
-                  ? currentlySelectedAccount()?.type.email
+                  ? currentlySelectedAccount()?.type.value.email
                   : currentlySelectedAccount()?.username}
               </span>
               ). We use your token to authenticate you, your password is NEVER

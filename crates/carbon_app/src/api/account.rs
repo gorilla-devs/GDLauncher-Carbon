@@ -11,7 +11,9 @@ use crate::api::router::router;
 use crate::domain::account as domain;
 use crate::error::FeError;
 use crate::managers::account::api::XboxError;
-use crate::managers::account::gdl_account::{GDLUser, RegisterAccountBody};
+use crate::managers::account::gdl_account::{
+    GDLUser, RegisterAccountBody, RequestNewVerificationTokenError,
+};
 use crate::managers::{account, App, AppInner};
 
 pub(super) fn mount() -> RouterBuilder<App> {
@@ -82,6 +84,14 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await?;
 
             Ok(Into::<FEGDLAccount>::into(gdl_user))
+        }
+
+        mutation REQUEST_NEW_VERIFICATION_TOKEN[app, uuid: String] {
+            let result = app.account_manager()
+                .request_new_verification_token(uuid)
+                .await;
+
+            Ok(FERequestNewVerificationTokenStatus::from(result))
         }
 
         mutation REMOVE_GDL_ACCOUNT[app, _args: ()] {
@@ -293,7 +303,7 @@ impl From<GDLUser> for FEGDLAccount {
             email: value.email,
             microsoft_oid: value.microsoft_oid,
             microsoft_email: value.microsoft_email,
-            is_email_verified: value.is_email_verified,
+            is_email_verified: value.is_verified,
         }
     }
 }
@@ -308,5 +318,25 @@ pub struct FERegisterAccount {
 impl From<FERegisterAccount> for RegisterAccountBody {
     fn from(value: FERegisterAccount) -> Self {
         Self { email: value.email }
+    }
+}
+
+#[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "status", content = "value")]
+pub enum FERequestNewVerificationTokenStatus {
+    Success,
+    Failed(Option<u32>),
+}
+
+impl From<Result<(), RequestNewVerificationTokenError>> for FERequestNewVerificationTokenStatus {
+    fn from(value: Result<(), RequestNewVerificationTokenError>) -> Self {
+        match value {
+            Ok(_) => Self::Success,
+            Err(RequestNewVerificationTokenError::TooManyRequests(cooldown)) => {
+                Self::Failed(Some(cooldown))
+            }
+            Err(RequestNewVerificationTokenError::RequestFailed(_)) => Self::Failed(None),
+        }
     }
 }

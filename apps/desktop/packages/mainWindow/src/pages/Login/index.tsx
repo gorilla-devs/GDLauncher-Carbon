@@ -139,6 +139,24 @@ export default function Login() {
       },
       async onComplete() {
         await accountEnrollFinalizeMutation.mutateAsync(undefined);
+
+        const activeUuid = await rspcContext.client.query([
+          "account.getActiveUuid"
+        ]);
+
+        if (!activeUuid) {
+          throw new Error("No active uuid");
+        }
+
+        const gdlUser = await rspcContext.client.query([
+          "account.getGdlAccount",
+          activeUuid
+        ]);
+
+        if (gdlUser?.email) {
+          setRecoveryEmail(gdlUser.email);
+        }
+
         setStep(Steps.GDLAccount);
         setLoadingButton(false);
       }
@@ -315,7 +333,7 @@ export default function Login() {
                 <Match when={step() === Steps.GDLAccount}>
                   <Switch>
                     <Match when={gdlUser.data}>
-                      <Trans key="login.titles.add_gdl_account" />
+                      <Trans key="login.titles.sync_gdl_account" />
                     </Match>
                     <Match when={!gdlUser.data}>
                       <Trans key="login.titles.create_gdl_account" />
@@ -558,8 +576,16 @@ export default function Login() {
                 >
                   <Switch>
                     <Match when={step() === Steps.GDLAccountCompletion}>
-                      <Trans key="login.next" />
-                      <i class="i-ri:arrow-right-line" />
+                      <Switch>
+                        <Match when={!gdlUser.data}>
+                          <Trans key="login.register" />
+                          <i class="i-ri:arrow-right-line" />
+                        </Match>
+                        <Match when={gdlUser.data}>
+                          <Trans key="login.continue" />
+                          <i class="i-ri:arrow-right-line" />
+                        </Match>
+                      </Switch>
                     </Match>
                     <Match when={step() === Steps.Auth}>
                       <i class="w-4 h-4 i-ri:microsoft-fill" />
