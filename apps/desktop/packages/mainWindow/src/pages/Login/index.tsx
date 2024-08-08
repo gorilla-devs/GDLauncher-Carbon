@@ -526,8 +526,6 @@ export default function Login() {
                           uuid
                         ]);
 
-                        console.log(existingGDLUser);
-
                         if (
                           existingGDLUser &&
                           existingGDLUser.isEmailVerified

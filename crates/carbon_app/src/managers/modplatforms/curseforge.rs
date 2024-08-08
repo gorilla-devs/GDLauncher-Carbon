@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{env, sync::Arc};
 
 use anyhow::bail;
 use reqwest_middleware::ClientWithMiddleware;
@@ -31,10 +31,11 @@ pub struct CurseForge {
 
 impl CurseForge {
     pub fn new(client: reqwest_middleware::ClientWithMiddleware) -> Self {
-        let base_url = format!("{GDL_API_BASE}/v1/curseforge/");
+        let curseforge_api_base = env!("CURSEFORGE_API_BASE", "missing curseforge env api base");
+
         Self {
             client,
-            base_url: base_url.parse().unwrap(),
+            base_url: curseforge_api_base.parse().unwrap(),
         }
     }
 

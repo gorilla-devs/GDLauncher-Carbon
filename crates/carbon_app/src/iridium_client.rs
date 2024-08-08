@@ -18,7 +18,7 @@ pub fn get_client() -> reqwest_middleware::ClientBuilder {
     impl Middleware for AddHeaderMiddleware {
         async fn handle(
             &self,
-            req: Request,
+            mut req: Request,
             _extensions: &mut task_local_extensions::Extensions,
             next: Next<'_>,
         ) -> reqwest_middleware::Result<Response> {
@@ -27,10 +27,24 @@ pub fn get_client() -> reqwest_middleware::ClientBuilder {
             let opt_auth = option_env!("GDL_AUTH");
 
             if req.url().host_str() == gdl_api_base_host.host_str() && opt_auth.is_some() {
-                let mut req = req;
                 req.headers_mut()
                     .insert("GDL-Auth", opt_auth.unwrap().parse().unwrap());
-                return next.run(req, _extensions).await;
+            }
+
+            let curseforge_api_base = url::Url::parse(env!(
+                "CURSEFORGE_API_BASE",
+                "missing curseforge env api base"
+            ))
+            .unwrap();
+
+            if req.url().host_str() == curseforge_api_base.host_str() {
+                req.headers_mut().insert(
+                    "X-API-Key",
+                    option_env!("CURSEFORGE_API_KEY").unwrap().parse().unwrap(),
+                );
+
+                req.headers_mut()
+                    .insert("Content-Type", "application/json".parse().unwrap());
             }
 
             // Continue with the modified request.
