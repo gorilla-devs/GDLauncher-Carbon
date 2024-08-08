@@ -109,6 +109,51 @@ export default function Login() {
     }
   };
 
+  let sidebarRef: HTMLDivElement | undefined = undefined;
+  let backgroundBlurRef: HTMLDivElement | undefined = undefined;
+  let welcomeToTextRef: HTMLDivElement | undefined = undefined;
+  let gdlauncherTextRef: HTMLDivElement | undefined = undefined;
+
+  function transitionToLibrary() {
+    if (backgroundBlurRef && routeData.settings.data?.isFirstLaunch) {
+      sidebarRef?.animate(
+        [{ transform: "translateX(0%)" }, { transform: "translateX(-100%)" }],
+        {
+          duration: 500,
+          easing: "linear",
+          fill: "forwards"
+        }
+      );
+
+      backgroundBlurRef.animate([{ opacity: 0 }, { opacity: 1 }], {
+        duration: 500,
+        delay: 350,
+        easing: "linear",
+        fill: "forwards"
+      });
+
+      welcomeToTextRef?.animate([{ opacity: 0 }, { opacity: 1 }], {
+        duration: 600,
+        delay: 1100,
+        easing: "linear",
+        fill: "forwards"
+      });
+
+      gdlauncherTextRef?.animate([{ opacity: 0 }, { opacity: 1 }], {
+        duration: 600,
+        delay: 2300,
+        easing: "linear",
+        fill: "forwards"
+      });
+
+      setTimeout(() => {
+        navigate("/library");
+      }, 5000);
+    } else {
+      navigate("/library");
+    }
+  }
+
   const addNotification = createNotification();
 
   createEffect(() => {
@@ -194,7 +239,7 @@ export default function Login() {
       }
 
       // Should go to library if GDL account is already verified OR GDL account does not exist
-      navigate("/library");
+      transitionToLibrary();
     } else if (!settings.hasCompletedGdlAccountSetup) {
       if (gdlUser) {
         setRecoveryEmail(gdlUser.email);
@@ -206,8 +251,6 @@ export default function Login() {
 
     return;
   });
-
-  let sidebarRef: HTMLDivElement | undefined = undefined;
 
   createEffect(() => {
     handleSidebarAnimation();
@@ -221,6 +264,7 @@ export default function Login() {
         [{ transform: "translateX(-100%)" }, { transform: "translateX(0)" }],
         {
           duration: 300,
+          delay: 200,
           easing: "cubic-bezier(0.175, 0.885, 0.32, 1)",
           fill: "forwards"
         }
@@ -382,6 +426,7 @@ export default function Login() {
                     nextStep={nextStep}
                     prevStep={prevStep}
                     activeUuid={activeUuid.data}
+                    transitionToLibrary={transitionToLibrary}
                   />
                 </Match>
               </Switch>
@@ -410,8 +455,10 @@ export default function Login() {
                           (step() > Steps.CodeStep
                             ? i() + 1 > Steps.CodeStep
                             : true)
-                        )
+                        ) {
+                          setLoadingButton(false);
                           setStep(i() + 1);
+                        }
                       }}
                     >
                       <div
@@ -445,7 +492,7 @@ export default function Login() {
                     onClick={async () => {
                       if (step() === Steps.GDLAccount) {
                         await deleteGDLAccountMutation.mutateAsync(undefined);
-                        navigate("/library");
+                        transitionToLibrary();
                       } else {
                         handleAnimationBackward();
                         prevStep();
@@ -530,7 +577,7 @@ export default function Login() {
                           existingGDLUser &&
                           existingGDLUser.isEmailVerified
                         ) {
-                          navigate("/library");
+                          transitionToLibrary();
                           return;
                         } else if (
                           existingGDLUser &&
@@ -574,7 +621,7 @@ export default function Login() {
                           existingGDLUser &&
                           existingGDLUser.isEmailVerified
                         ) {
-                          navigate("/library");
+                          transitionToLibrary();
                         } else if (
                           existingGDLUser &&
                           !existingGDLUser.isEmailVerified
@@ -632,7 +679,22 @@ export default function Login() {
               </div>
             </div>
           </div>
-          <div class="flex-1">
+          <div class="flex-1 w-full">
+            <div
+              ref={backgroundBlurRef}
+              class="absolute top-0 left-0 p-0 h-screen w-full opacity-0 bg-black/20"
+              style={{
+                "backdrop-filter": "blur(6px)"
+              }}
+            />
+            <div class="font-bold text-7xl leading-loose absolute top-0 left-0 p-0 h-screen w-full flex flex-col items-center justify-center">
+              <div ref={welcomeToTextRef} class="opacity-0">
+                Welcome To
+              </div>
+              <div ref={gdlauncherTextRef} class="opacity-0">
+                GDLauncher
+              </div>
+            </div>
             <video
               class="p-0 h-screen w-full object-cover"
               src={BackgroundVideo}

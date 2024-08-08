@@ -15,12 +15,16 @@ interface Props {
   nextStep: () => void;
   prevStep: () => void;
   activeUuid: string | null | undefined;
+  transitionToLibrary: () => void;
 }
 
 const GDLAccountVerification = (props: Props) => {
-  const navigate = useGDNavigate();
   const [cooldown, setCooldown] = createSignal(0);
   const [sentVisible, setSentVisible] = createSignal(false);
+
+  const settingsMutation = rspc.createMutation(() => ({
+    mutationKey: ["settings.setSettings"]
+  }));
 
   const verified = rspc.createQuery(() => ({
     queryKey: ["account.getGdlAccount", props.activeUuid!],
@@ -131,7 +135,12 @@ const GDLAccountVerification = (props: Props) => {
 
             <div
               onClick={() => {
-                navigate("/library");
+                settingsMutation.mutate({
+                  hasCompletedGdlAccountSetup: {
+                    Set: true
+                  }
+                });
+                props.transitionToLibrary?.();
               }}
               class="underline text-lightSlate-400 hover:text-lightSlate-50 transition-all duration-100 ease-in-out"
             >
