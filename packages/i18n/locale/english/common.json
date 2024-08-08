@@ -63,7 +63,7 @@
   "login.next": "Next",
   "login.prev": "Prev",
   "login.register": "Register",
-  "login.continue": "Continue",
+  "login.sync_gdl_account": "Sync GDL Account",
   "login.manage": "Manage",
   "login.we_value_privacy_title": "We Value Your Privacy",
   "instance_cancel": "Cancel",

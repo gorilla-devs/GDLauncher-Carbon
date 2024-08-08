@@ -80,6 +80,8 @@ const GDLAccountVerification = (props: Props) => {
                       );
 
                     if (status.status === "failed" && status.value) {
+                      setSentVisible(false);
+
                       clearInterval(cooldownInterval);
                       cooldownInterval = undefined;
 

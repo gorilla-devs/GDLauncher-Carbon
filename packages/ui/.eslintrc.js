@@ -12,7 +12,8 @@ module.exports = {
         endOfLine: "lf",
       },
     ],
-    "no-unused-vars": [
+    "no-unused-vars": "off",
+    "@typescript-eslint/no-unused-vars": [
       "error",
       {
         varsIgnorePattern: "^_",
@@ -21,7 +22,7 @@ module.exports = {
     ],
   },
   parser: "@typescript-eslint/parser",
-  plugins: ["solid", "prettier"],
+  plugins: ["@typescript-eslint", "solid", "prettier"],
   extends: [
     "eslint:recommended",
     "plugin:solid/typescript",

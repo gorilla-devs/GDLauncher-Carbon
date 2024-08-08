@@ -20,9 +20,10 @@ const GDLAccount = (props: Props) => {
   return (
     <Suspense>
       <div class="flex flex-col h-full w-full text-center">
-        <div class="text-sm text-lightSlate-700 mt-4">
-          *Only one GDLauncher account can be active at a time.
-        </div>
+        <h3 class="text-lightSlate-300">
+          Welcome Back {currentlySelectedAccount()?.username}
+        </h3>
+
         <div class="flex-1 px-4">
           <h2>FAQs</h2>
           <Collapsable

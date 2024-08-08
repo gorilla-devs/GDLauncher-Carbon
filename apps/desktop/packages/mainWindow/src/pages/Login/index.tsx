@@ -1,12 +1,9 @@
-import { Button, Dropdown, createNotification } from "@gd/ui";
+import { Button, createNotification } from "@gd/ui";
 import {
   createSignal,
   Switch,
   Match,
-  Show,
   createEffect,
-  getOwner,
-  runWithOwner,
   onMount,
   For
 } from "solid-js";
@@ -14,7 +11,7 @@ import Auth from "./Auth";
 import CodeStep from "./CodeStep";
 import fetchData from "./auth.login.data";
 import { Navigate, useRouteData } from "@solidjs/router";
-import { Trans, supportedLanguages, useTransContext } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
 import TermsAndConditions from "./TermsAndConditions";
 import Logo from "/assets/images/gdlauncher_wide_logo_blue.svg";
@@ -44,7 +41,6 @@ enum Steps {
 export default function Login() {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
-  const owner = getOwner();
   const navigate = useGDNavigate();
   const [step, setStep] = createSignal<Steps>(Steps.TermsAndConditions);
   const [deviceCodeObject, setDeviceCodeObject] =
@@ -397,7 +393,7 @@ export default function Login() {
                   <div
                     class="absolute top-0 left-0 bg-darkSlate-400 h-4 w-full rounded-lg"
                     style={{
-                      transform: `translateX(calc(-100% + ${(100 * step()) / 8 + "%"} + 0.5rem * ${step() - 1}))`,
+                      transform: `translateX(calc((-100% + ${(100 * step()) / 6}%) - ${(step() === Steps.TermsAndConditions ? 8 : 6) - step()}px)`,
                       transition:
                         "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)"
                     }}
@@ -518,6 +514,38 @@ export default function Login() {
                         await accountEnrollBeginMutation.mutateAsync(undefined);
                       }
                     } else if (step() === Steps.GDLAccount) {
+                      const uuid = routeData?.activeUuid?.data;
+
+                      if (!uuid) {
+                        throw new Error("No active uuid");
+                      }
+
+                      try {
+                        const existingGDLUser = await rspcContext.client.query([
+                          "account.getGdlAccount",
+                          uuid
+                        ]);
+
+                        console.log(existingGDLUser);
+
+                        if (
+                          existingGDLUser &&
+                          existingGDLUser.isEmailVerified
+                        ) {
+                          navigate("/library");
+                          return;
+                        } else if (
+                          existingGDLUser &&
+                          !existingGDLUser.isEmailVerified
+                        ) {
+                          setRecoveryEmail(existingGDLUser.email);
+                          setStep(Steps.GDLAccountVerification);
+                          return;
+                        }
+                      } catch (e) {
+                        console.error(e);
+                      }
+
                       await settingsMutation.mutateAsync({
                         hasCompletedGdlAccountSetup: {
                           Set: false
@@ -575,17 +603,23 @@ export default function Login() {
                   }}
                 >
                   <Switch>
-                    <Match when={step() === Steps.GDLAccountCompletion}>
-                      <Switch>
-                        <Match when={!gdlUser.data}>
-                          <Trans key="login.register" />
-                          <i class="i-ri:arrow-right-line" />
-                        </Match>
-                        <Match when={gdlUser.data}>
-                          <Trans key="login.continue" />
-                          <i class="i-ri:arrow-right-line" />
-                        </Match>
-                      </Switch>
+                    <Match
+                      when={
+                        step() === Steps.GDLAccountCompletion && !gdlUser.data
+                      }
+                    >
+                      <Trans key="login.register" />
+                      <i class="i-ri:arrow-right-line" />
+                    </Match>
+                    <Match
+                      when={
+                        step() === Steps.GDLAccount &&
+                        gdlUser.data &&
+                        gdlUser.data.isEmailVerified
+                      }
+                    >
+                      <Trans key="login.sync_gdl_account" />
+                      <i class="i-ri:arrow-right-line" />
                     </Match>
                     <Match when={step() === Steps.Auth}>
                       <i class="w-4 h-4 i-ri:microsoft-fill" />
