@@ -134,13 +134,13 @@ const GDLAccountVerification = (props: Props) => {
             </div>
 
             <div
-              onClick={() => {
+              onClick={async () => {
+                await props.transitionToLibrary?.();
                 settingsMutation.mutate({
                   hasCompletedGdlAccountSetup: {
                     Set: true
                   }
                 });
-                props.transitionToLibrary?.();
               }}
               class="underline text-lightSlate-400 hover:text-lightSlate-50 transition-all duration-100 ease-in-out"
             >

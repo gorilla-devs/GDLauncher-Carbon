@@ -10,7 +10,7 @@ pub fn get_client() -> reqwest_middleware::ClientBuilder {
     use reqwest::{Request, Response};
     use reqwest_middleware::{Middleware, Next};
 
-    use crate::managers::GDL_API_BASE;
+    use crate::managers::{modplatforms::modrinth::MODRINTH_API_BASE, GDL_API_BASE};
 
     struct AddHeaderMiddleware;
 
@@ -19,7 +19,7 @@ pub fn get_client() -> reqwest_middleware::ClientBuilder {
         async fn handle(
             &self,
             mut req: Request,
-            _extensions: &mut task_local_extensions::Extensions,
+            _extensions: &mut axum::http::Extensions,
             next: Next<'_>,
         ) -> reqwest_middleware::Result<Response> {
             let gdl_api_base_host = url::Url::parse(GDL_API_BASE).unwrap();
@@ -39,12 +39,25 @@ pub fn get_client() -> reqwest_middleware::ClientBuilder {
 
             if req.url().host_str() == curseforge_api_base.host_str() {
                 req.headers_mut().insert(
-                    "X-API-Key",
+                    "x-api-key",
                     option_env!("CURSEFORGE_API_KEY").unwrap().parse().unwrap(),
                 );
 
                 req.headers_mut()
                     .insert("Content-Type", "application/json".parse().unwrap());
+
+                req.headers_mut()
+                    .insert("Accept", "application/json".parse().unwrap());
+            }
+
+            let modrinth_api_base = url::Url::parse(MODRINTH_API_BASE).unwrap();
+
+            if req.url().host_str() == modrinth_api_base.host_str() {
+                req.headers_mut()
+                    .insert("Content-Type", "application/json".parse().unwrap());
+
+                req.headers_mut()
+                    .insert("Accept", "application/json".parse().unwrap());
             }
 
             // Continue with the modified request.

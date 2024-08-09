@@ -201,7 +201,7 @@ impl Modrinth {
         let versions = self
             .client
             .post(url.as_str())
-            .json(&hashes_query)
+            .body(reqwest::Body::from(serde_json::to_string(&hashes_query)?))
             .send()
             .await?
             .json_with_context_reporting("modrinth::get_versions_from_hash")

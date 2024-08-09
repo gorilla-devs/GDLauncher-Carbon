@@ -252,7 +252,8 @@ impl XboxAuth {
             let response = client
                 .post("https://user.auth.xboxlive.com/user/authenticate")
                 .header("Accept", "application/json")
-                .json(&json)
+                .header("Content-Type", "application/json")
+                .body(reqwest::Body::from(serde_json::to_string(&json)?))
                 .send()
                 .await
                 .with_context(|| format!("Failed to authenticate Xbox account"))?
@@ -282,7 +283,8 @@ impl XboxAuth {
         let response = client
             .post("https://xsts.auth.xboxlive.com/xsts/authorize")
             .header("Content-Type", "application/json")
-            .json(&json)
+            .header("Accept", "application/json")
+            .body(reqwest::Body::from(serde_json::to_string(&json)?))
             .send()
             .await
             .with_context(|| format!("Failed to get XSTS token"))?;
@@ -420,7 +422,8 @@ impl McAuth {
         let response = client
             .post("https://api.minecraftservices.com/authentication/login_with_xbox")
             .header("Accept", "application/json")
-            .json(&json)
+            .header("Content-Type", "application/json")
+            .body(reqwest::Body::from(serde_json::to_string(&json)?))
             .send()
             .await
             .with_context(|| format!("Failed to authenticate Minecraft account"))?

@@ -29,7 +29,7 @@ pub mod java;
 mod metadata;
 mod metrics;
 mod minecraft;
-mod modplatforms;
+pub mod modplatforms;
 mod prisma_client;
 pub mod rich_presence;
 mod settings;

@@ -50,7 +50,13 @@ impl TermsAndPrivacy {
             consented,
         };
 
-        let resp = self.http_client.post(&consent_url).json(&body).send().await;
+        let resp = self
+            .http_client
+            .post(&consent_url)
+            .body(reqwest::Body::from(serde_json::to_string(&body)?))
+            .header("Content-Type", "application/json")
+            .send()
+            .await;
 
         let accepted_sha = match resp {
             Ok(res) => {

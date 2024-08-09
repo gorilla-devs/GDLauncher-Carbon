@@ -102,7 +102,8 @@ impl ManagerRef<'_, MetricsManager> {
 
         self.client
             .post(endpoint)
-            .json(&serialized_event)
+            .body(reqwest::Body::from(serialized_event.to_string()))
+            .header("Content-Type", "application/json")
             .send()
             .await?;
 

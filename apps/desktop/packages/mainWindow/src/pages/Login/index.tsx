@@ -114,44 +114,48 @@ export default function Login() {
   let welcomeToTextRef: HTMLDivElement | undefined = undefined;
   let gdlauncherTextRef: HTMLDivElement | undefined = undefined;
 
-  function transitionToLibrary() {
-    if (backgroundBlurRef && routeData.settings.data?.isFirstLaunch) {
-      sidebarRef?.animate(
-        [{ transform: "translateX(0%)" }, { transform: "translateX(-100%)" }],
-        {
+  async function transitionToLibrary() {
+    return new Promise((resolve) => {
+      if (backgroundBlurRef && routeData.settings.data?.isFirstLaunch) {
+        sidebarRef?.animate(
+          [{ transform: "translateX(0%)" }, { transform: "translateX(-100%)" }],
+          {
+            duration: 500,
+            easing: "linear",
+            fill: "forwards"
+          }
+        );
+
+        backgroundBlurRef.animate([{ opacity: 0 }, { opacity: 1 }], {
           duration: 500,
+          delay: 350,
           easing: "linear",
           fill: "forwards"
-        }
-      );
+        });
 
-      backgroundBlurRef.animate([{ opacity: 0 }, { opacity: 1 }], {
-        duration: 500,
-        delay: 350,
-        easing: "linear",
-        fill: "forwards"
-      });
+        welcomeToTextRef?.animate([{ opacity: 0 }, { opacity: 1 }], {
+          duration: 600,
+          delay: 1100,
+          easing: "linear",
+          fill: "forwards"
+        });
 
-      welcomeToTextRef?.animate([{ opacity: 0 }, { opacity: 1 }], {
-        duration: 600,
-        delay: 1100,
-        easing: "linear",
-        fill: "forwards"
-      });
+        gdlauncherTextRef?.animate([{ opacity: 0 }, { opacity: 1 }], {
+          duration: 600,
+          delay: 2300,
+          easing: "linear",
+          fill: "forwards"
+        });
 
-      gdlauncherTextRef?.animate([{ opacity: 0 }, { opacity: 1 }], {
-        duration: 600,
-        delay: 2300,
-        easing: "linear",
-        fill: "forwards"
-      });
-
-      setTimeout(() => {
+        setTimeout(() => {
+          navigate("/library");
+          resolve(null);
+        }, 5000);
+      } else {
         navigate("/library");
-      }, 5000);
-    } else {
-      navigate("/library");
-    }
+        resolve(null);
+      }
+    });
   }
 
   const addNotification = createNotification();
