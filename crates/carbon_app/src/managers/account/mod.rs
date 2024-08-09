@@ -250,6 +250,29 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(user)
     }
 
+    pub async fn save_gdl_account(&self, uuid: String) -> anyhow::Result<()> {
+        use db::app_configuration::SetParam;
+        use db::app_configuration::UniqueWhereParam;
+
+        let Some(gdl_account) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+        else {
+            return Ok(());
+        };
+
+        self.app
+            .settings_manager()
+            .set(SetParam::SetGdlAccountUuid(Some(uuid.clone())))
+            .await?;
+
+        // TODO!: Should get status from the API
+
+        Ok(())
+    }
+
     pub async fn request_new_verification_token(
         self,
         uuid: String,
@@ -286,6 +309,11 @@ impl<'s> ManagerRef<'s, AccountManager> {
         self.app
             .settings_manager()
             .set(SetParam::SetGdlAccountUuid(None))
+            .await?;
+
+        self.app
+            .settings_manager()
+            .set(SetParam::SetGdlAccountStatus(None))
             .await?;
 
         Ok(())
@@ -530,14 +558,16 @@ impl<'s> ManagerRef<'s, AccountManager> {
             }
         }
 
-        // Only need to reset has_completed_gdl_account_setup, as the actual gdl account will be deleted as SQL cascade
-        if let Some(gdl_account) = active_gdl_account {
-            self.app
-                .settings_manager()
-                .set(app_configuration::SetParam::SetHasCompletedGdlAccountSetup(
-                    false,
-                ))
-                .await?;
+        let accounts = self.get_account_entries().await?;
+
+        match (active_gdl_account, accounts.len()) {
+            (Some(gdl_account), _) if gdl_account == uuid => {
+                self.remove_gdl_account().await?;
+            }
+            (_, 0) => {
+                self.remove_gdl_account().await?;
+            }
+            _ => {}
         }
 
         let result = self
