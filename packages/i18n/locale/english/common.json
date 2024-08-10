@@ -102,7 +102,7 @@
   "login.what_if_i_lose_access_to_my_microsoft_account": "What if I lose access to my Microsoft account?",
   "login.what_if_i_lose_access_to_my_microsoft_account_text": "Since we don't store any info about you, the only way to recover your data in case you lose access to your Microsoft account is to use a different recovery email (in the next step).",
   "login.what_happens_if_i_skip_the_account_creation": "What happens if I skip the account creation?",
-
+  "login.what_happens_if_i_skip_the_account_creation_text": "The GDL account creation is completely optional. If you do decide to not create one, some features of the launcher might be unavailable.",
   "recent_played": "Recent Played",
   "jump_back_in": "Jump Back In",
   "have_not_played_in_a_while": "Packs you haven't played in a while",
