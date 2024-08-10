@@ -119,7 +119,7 @@ const mapStatus = (status: AccountStatus | undefined) => {
 const mapTypeToIcon = (type: string) => {
   return (
     <Switch>
-      <Match when={type === "Microsoft"}>
+      <Match when={type === "microsoft"}>
         <div class="i-ri:microsoft-fill" />
       </Match>
     </Switch>
@@ -486,8 +486,8 @@ export const AccountsDropdown = (props: Props) => {
             <div class="flex flex-col justify-between">
               <h5 class="m-0 text-white">{(activeAccount() as Label)?.name}</h5>
               <div class="flex gap-1">
-                {mapTypeToIcon((activeAccount() as Label)?.type)}
-                <p class="m-0 text-xs">{(activeAccount() as Label)?.type}</p>
+                {mapTypeToIcon(activeAccount()?.type.type)}
+                <p class="m-0 text-xs">{activeAccount()?.type.type}</p>
               </div>
             </div>
           </div>

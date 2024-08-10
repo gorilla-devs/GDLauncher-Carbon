@@ -250,22 +250,13 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(user)
     }
 
-    pub async fn save_gdl_account(&self, uuid: String) -> anyhow::Result<()> {
+    pub async fn save_gdl_account(&self, uuid: Option<String>) -> anyhow::Result<()> {
         use db::app_configuration::SetParam;
         use db::app_configuration::UniqueWhereParam;
 
-        let Some(gdl_account) = self
-            .get_account_entries()
-            .await?
-            .into_iter()
-            .find(|account| account.uuid == uuid)
-        else {
-            return Ok(());
-        };
-
         self.app
             .settings_manager()
-            .set(SetParam::SetGdlAccountUuid(Some(uuid.clone())))
+            .set(SetParam::SetGdlAccountUuid(uuid))
             .await?;
 
         // TODO!: Should get status from the API
@@ -300,11 +291,6 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
     pub async fn remove_gdl_account(self) -> anyhow::Result<()> {
         use db::app_configuration::SetParam;
-
-        self.app
-            .settings_manager()
-            .set(SetParam::SetHasCompletedGdlAccountSetup(false))
-            .await?;
 
         self.app
             .settings_manager()

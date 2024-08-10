@@ -1,9 +1,7 @@
-import { useRouteData } from "@solidjs/router";
-import { createEffect, createSignal, Show, Suspense } from "solid-js";
+import { createEffect, Show, Suspense } from "solid-js";
 import { Trans } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
-import { Button, Collapsable, Dropdown } from "@gd/ui";
-import fetchData from "./auth.login.data";
+import { Collapsable } from "@gd/ui";
 
 type Props = {
   activeUuid: string | null | undefined;
@@ -22,6 +20,19 @@ const GDLAccount = (props: Props) => {
     enabled: !!props.activeUuid
   }));
 
+  const currentlySelectedAccountEmail = () => {
+    const account = currentlySelectedAccount();
+
+    if (!account) return "";
+
+    const email =
+      account.type.type === "microsoft"
+        ? account.type.value.email
+        : account.username;
+
+    return " - " + email;
+  };
+
   createEffect(() => {
     if (props.activeUuid) {
       gdlUser.refetch();
@@ -33,67 +44,66 @@ const GDLAccount = (props: Props) => {
       <div class="flex flex-col h-full w-full text-center">
         <Show when={gdlUser.data}>
           <div class="flex-1 px-4">
-            <h2>Welcome Back {currentlySelectedAccount()?.username}</h2>
+            <h2>
+              <Trans
+                key="login.welcome_back_name"
+                options={{
+                  name: currentlySelectedAccount()?.username
+                }}
+              />
+            </h2>
             <p class="text-lightSlate-500 text-md">
-              You can now use your GDLauncher account to log in to the launcher
-              and access your saved instances, settings and more.
+              <Trans key="login.gdlauncher_account_description" />
             </p>
           </div>
         </Show>
 
         <Show when={!gdlUser.data}>
           <div class="flex-1 px-4">
-            <h2>FAQs</h2>
+            <h2>
+              <Trans key="login.faqs" />
+            </h2>
             <Collapsable
               defaultOpened={false}
-              title="What is a GDLauncher account?"
+              title={<Trans key="login.what_is_a_gdlauncher_account" />}
             >
               <p class="text-lightSlate-500 text-md">
-                A GDLauncher account is a way to save your settings,
-                preferences, instance backups and more across all your devices.
+                <Trans key="login.what_is_a_gdlauncher_account_text" />
               </p>
             </Collapsable>
-            <Collapsable defaultOpened={false} title="How does it work?">
+            <Collapsable
+              defaultOpened={false}
+              title={<Trans key="login.how_does_it_work" />}
+            >
               <p class="text-lightSlate-500 text-md">
-                A GDLauncher account is just an entry in our database that is
-                linked to your Microsoft account ID (
-                <span class="text-white font-bold">
-                  {currentlySelectedAccount()?.username}
-                  {" - "}
-                  {currentlySelectedAccount()?.type.type === "microsoft"
-                    ? currentlySelectedAccount()?.type.value.email
-                    : currentlySelectedAccount()?.username}
-                </span>
-                ). We use your token to authenticate you, your password is NEVER
-                stored. (Learn more about how it works{" "}
-                <a
-                  href="https://www.microsoft.com/en-us/security/business/security-101/what-is-oauth"
-                  target="_blank"
-                  class="text-primary-300"
+                <Trans
+                  key="login.how_does_it_work_text"
+                  options={{
+                    account_id: `${currentlySelectedAccount()?.username}${currentlySelectedAccountEmail()}`
+                  }}
                 >
-                  here
-                </a>
-                )
+                  <span class="text-white font-bold" />
+                </Trans>
               </p>
             </Collapsable>
             <Collapsable
               defaultOpened={false}
-              title="What if I lose access to my Microsoft account?"
+              title={
+                <Trans key="login.what_if_i_lose_access_to_my_microsoft_account" />
+              }
             >
               <p class="text-lightSlate-500 text-md">
-                Since we don't store any info about you, the only way to recover
-                your data in case you lose access to your Microsoft account is
-                to use a different recovery email (in the next step).
+                <Trans key="login.what_if_i_lose_access_to_my_microsoft_account_text" />
               </p>
             </Collapsable>
             <Collapsable
               defaultOpened={false}
-              title="What happens if I skip the account creation?"
+              title={
+                <Trans key="login.what_happens_if_i_skip_the_account_creation" />
+              }
             >
               <p class="text-lightSlate-500 text-md">
-                The GDL account creation is completely optional. If you do
-                decide to not create one, some features of the launcher might be
-                unavailable.
+                <Trans key="login.what_happens_if_i_skip_the_account_creation_text" />
               </p>
             </Collapsable>
           </div>

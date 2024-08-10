@@ -99,6 +99,12 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .remove_gdl_account()
                 .await
         }
+
+        mutation SAVE_GDL_ACCOUNT[app, args: Option<String>] {
+            app.account_manager()
+                .save_gdl_account(args)
+                .await
+        }
     }
 }
 

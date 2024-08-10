@@ -51,6 +51,7 @@ keys! {
         REGISTER_GDL_ACCOUNT                        = "registerGdlAccount";
         REQUEST_NEW_VERIFICATION_TOKEN              = "requestNewVerificationToken";
         REMOVE_GDL_ACCOUNT                          = "removeGdlAccount";
+        SAVE_GDL_ACCOUNT                            = "saveGdlAccount";
     }
 
     java {

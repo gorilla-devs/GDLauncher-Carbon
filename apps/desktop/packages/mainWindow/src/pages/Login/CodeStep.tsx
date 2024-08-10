@@ -243,8 +243,7 @@ const CodeStep = (props: Props) => {
               !(routeData.status.data as any)?.pollingCode
           }}
         >
-          If you logged-in but this page doesn't update, please try again.
-          Sometimes microsoft servers don't respond as expected.
+          <Trans key="login.login_retry_message" />
         </p>
       </div>
       <div class="flex flex-col gap-2" classList={{ "opacity-0": !loading() }}>

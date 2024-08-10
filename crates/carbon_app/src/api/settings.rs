@@ -238,7 +238,6 @@ struct FESettings {
     metrics_enabled: bool,
     metrics_enabled_last_update: Option<chrono::DateTime<chrono::FixedOffset>>,
     random_user_uuid: String,
-    has_completed_gdl_account_setup: bool,
     gdl_account_id: Option<String>,
 }
 
@@ -299,7 +298,6 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             metrics_enabled: data.metrics_enabled,
             metrics_enabled_last_update: data.metrics_enabled_last_update,
             random_user_uuid: data.random_user_uuid,
-            has_completed_gdl_account_setup: data.has_completed_gdl_account_setup,
             gdl_account_id: data.gdl_account_uuid,
         })
     }
@@ -405,8 +403,6 @@ pub struct FESettingsUpdate {
     pub terms_and_privacy_accepted: Option<Set<bool>>,
     #[specta(optional)]
     pub metrics_enabled: Option<Set<bool>>,
-    #[specta(optional)]
-    pub has_completed_gdl_account_setup: Option<Set<bool>>,
     #[specta(optional)]
     pub gdl_account_id: Option<Set<Option<String>>>,
 }

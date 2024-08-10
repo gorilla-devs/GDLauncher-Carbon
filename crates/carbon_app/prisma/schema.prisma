@@ -50,7 +50,6 @@ model AppConfiguration {
   termsAndPrivacyAcceptedChecksum String? // Should ask again if this changes
   metricsEnabled                  Boolean   @default(false)
   metricsEnabledLastUpdate        DateTime? // should ask again after 12 months
-  hasCompletedGDLAccountSetup     Boolean   @default(false)
   gdlAccountUuid                  String?
   gdlAccount                      Account?  @relation("gdlAccount", fields: [gdlAccountUuid], references: [uuid])
   gdlAccountStatus                Bytes?

@@ -1,15 +1,8 @@
-import { useGDNavigate } from "@/managers/NavigationManager";
 import { convertSecondsToHumanTime } from "@/utils/helpers";
 import { rspc } from "@/utils/rspcClient";
+import { Trans } from "@gd/i18n";
 import { Navigate } from "@solidjs/router";
-import {
-  createEffect,
-  createSignal,
-  Match,
-  onCleanup,
-  onMount,
-  Switch
-} from "solid-js";
+import { createEffect, createSignal, Match, onCleanup, Switch } from "solid-js";
 
 interface Props {
   nextStep: () => void;
@@ -22,8 +15,8 @@ const GDLAccountVerification = (props: Props) => {
   const [cooldown, setCooldown] = createSignal(0);
   const [sentVisible, setSentVisible] = createSignal(false);
 
-  const settingsMutation = rspc.createMutation(() => ({
-    mutationKey: ["settings.setSettings"]
+  const saveGdlAccountMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.saveGdlAccount"]
   }));
 
   const verified = rspc.createQuery(() => ({
@@ -66,7 +59,9 @@ const GDLAccountVerification = (props: Props) => {
         <Match when={!verified.data?.isEmailVerified}>
           <div class="flex-1 w-full text-center gap-5 flex flex-col justify-between items-center">
             <div class="p-10">
-              <h1>Check your Email for a Verification Link</h1>
+              <h2>
+                <Trans key="login.check_your_email_for_a_verification_link" />
+              </h2>
               <div
                 onClick={async () => {
                   if (cooldownInterval) {
@@ -114,19 +109,23 @@ const GDLAccountVerification = (props: Props) => {
                   "text-lightSlate-900": !!cooldown()
                 }}
               >
-                Request a new verification link
+                <Trans key="login.request_a_new_verification_link" />
               </div>
               <div class="text-sm mt-2">
                 <Switch>
                   <Match when={sentVisible()}>
                     <div class="text-green-500">
-                      An email has been sent to your email address
+                      <Trans key="login.an_email_has_been_sent_to_your_email_address" />
                     </div>
                   </Match>
                   <Match when={cooldown()}>
                     <div class="text-lightSlate-500">
-                      You need to wait {convertSecondsToHumanTime(cooldown())}{" "}
-                      to request a new verification link.
+                      <Trans
+                        key="login.email_request_wait"
+                        options={{
+                          time: convertSecondsToHumanTime(cooldown())
+                        }}
+                      />
                     </div>
                   </Match>
                 </Switch>
@@ -136,15 +135,11 @@ const GDLAccountVerification = (props: Props) => {
             <div
               onClick={async () => {
                 await props.transitionToLibrary?.();
-                settingsMutation.mutate({
-                  hasCompletedGdlAccountSetup: {
-                    Set: true
-                  }
-                });
+                await saveGdlAccountMutation.mutateAsync(props.activeUuid!);
               }}
               class="underline text-lightSlate-400 hover:text-lightSlate-50 transition-all duration-100 ease-in-out"
             >
-              Verify Later
+              <Trans key="login.verify_later" />
             </div>
           </div>
         </Match>

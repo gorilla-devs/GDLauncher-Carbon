@@ -11,7 +11,7 @@ import Auth from "./Auth";
 import CodeStep from "./CodeStep";
 import fetchData from "./auth.login.data";
 import { Navigate, useRouteData } from "@solidjs/router";
-import { Trans, useTransContext } from "@gd/i18n";
+import { Trans } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
 import TermsAndConditions from "./TermsAndConditions";
 import Logo from "/assets/images/gdlauncher_wide_logo_blue.svg";
@@ -84,14 +84,16 @@ export default function Login() {
 
   const [isBackButtonVisible, setIsBackButtonVisible] = createSignal(false);
 
-  const [t, { changeLanguage }] = useTransContext();
+  const isGDLAccountSet = () =>
+    routeData.settings.data?.gdlAccountId ||
+    routeData.settings.data?.gdlAccountId === "";
 
   const isAlreadyAuthenticated = () =>
     routeData?.activeUuid?.data &&
     routeData.accounts.data?.length! > 0 &&
     routeData.settings.data?.termsAndPrivacyAccepted &&
     Boolean(routeData.settings.data?.metricsEnabledLastUpdate) &&
-    routeData.settings.data?.hasCompletedGdlAccountSetup;
+    isGDLAccountSet();
 
   const accountEnrollFinalizeMutation = rspc.createMutation(() => ({
     mutationKey: ["account.enroll.finalize"]
@@ -234,19 +236,14 @@ export default function Login() {
       activeUuid
     ]);
 
-    if (settings.hasCompletedGdlAccountSetup) {
+    if (isGDLAccountSet()) {
+      transitionToLibrary();
+    } else if (!isGDLAccountSet()) {
       if (gdlUser && !gdlUser.isEmailVerified) {
         setRecoveryEmail(gdlUser.email);
         setStep(Steps.GDLAccountVerification);
         setIsBackButtonVisible(true);
         return;
-      }
-
-      // Should go to library if GDL account is already verified OR GDL account does not exist
-      transitionToLibrary();
-    } else if (!settings.hasCompletedGdlAccountSetup) {
-      if (gdlUser) {
-        setRecoveryEmail(gdlUser.email);
       }
 
       setIsBackButtonVisible(true);
@@ -508,10 +505,10 @@ export default function Login() {
                     <Switch>
                       <Match when={step() !== Steps.GDLAccount}>
                         <i class="i-ri:arrow-left-line" />
-                        Back
+                        <Trans key="general.back" />
                       </Match>
                       <Match when={step() === Steps.GDLAccount}>
-                        Skip
+                        <Trans key="general.skip" />
                         <i class="i-ri:skip-forward-line" />
                       </Match>
                     </Switch>
@@ -595,11 +592,7 @@ export default function Login() {
                         console.error(e);
                       }
 
-                      await settingsMutation.mutateAsync({
-                        hasCompletedGdlAccountSetup: {
-                          Set: false
-                        }
-                      });
+                      await deleteGDLAccountMutation.mutateAsync(undefined);
                       setLoadingButton(false);
                       nextStep();
                     } else if (step() === Steps.GDLAccountCompletion) {
@@ -693,10 +686,10 @@ export default function Login() {
             />
             <div class="font-bold text-7xl leading-loose absolute top-0 left-0 p-0 h-screen w-full flex flex-col items-center justify-center">
               <div ref={welcomeToTextRef} class="opacity-0">
-                Welcome To
+                <Trans key="login.welcome_to" />
               </div>
               <div ref={gdlauncherTextRef} class="opacity-0">
-                GDLauncher
+                <Trans key="login.gdlauncher" />
               </div>
             </div>
             <video
