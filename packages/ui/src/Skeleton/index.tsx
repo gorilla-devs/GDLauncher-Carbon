@@ -47,6 +47,7 @@ Skeleton.instance = Instance;
 Skeleton.instances = () => {
   return (
     <div class="flex flex-col gap-4">
+      <div class="w-full h-10 rounded-lg bg-darkSlate-500" />
       <div class="flex gap-4">
         <For each={new Array(10)}>{() => <Instance />}</For>
       </div>
@@ -222,7 +223,7 @@ Skeleton.featuredHomeTile = () => {
   return (
     <div class="flex flex-col gap-4">
       <div class="flex gap-4">
-        <div class="w-24 h-16 rounded-lg bg-darkSlate-500" />
+        <div class="w-24 h-18 rounded-lg bg-darkSlate-500" />
         <div class="flex flex-col gap-2 mt-2 w-full">
           <div class="w-full h-6 rounded-full bg-darkSlate-500" />
           <div class="w-full h-4 rounded-full bg-darkSlate-500" />
@@ -230,8 +231,8 @@ Skeleton.featuredHomeTile = () => {
       </div>
       <div class="w-full h-26 rounded-xl bg-darkSlate-500" />
       <div class="flex justify-between">
-        <div class="w-30 h-10 rounded-full bg-darkSlate-500" />
-        <div class="w-30 h-10 rounded-full bg-darkSlate-500" />
+        <div class="w-26 h-12 rounded-md bg-darkSlate-500" />
+        <div class="w-26 h-12 rounded-md bg-darkSlate-500" />
       </div>
     </div>
   );

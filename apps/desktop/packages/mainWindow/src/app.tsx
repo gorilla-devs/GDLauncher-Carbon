@@ -77,9 +77,7 @@ const App = (props: Props) => {
     <div class="relative w-screen select-none">
       <div class="w-screen flex z-10 h-auto">
         <main class="relative flex-grow max-w-screen">
-          {/* <Suspense fallback={<></>}> */}
           <Route />
-          {/* </Suspense> */}
         </main>
       </div>
     </div>

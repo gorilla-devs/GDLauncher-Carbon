@@ -318,7 +318,9 @@ const HomeGrid = () => {
       </Show>
       <Switch>
         <Match when={routeData.instances.isLoading}>
-          <Skeleton.instances />
+          <div class="mt-8">
+            <Skeleton.instances />
+          </div>
         </Match>
         <Match
           when={
