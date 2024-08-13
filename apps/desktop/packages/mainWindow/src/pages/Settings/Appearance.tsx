@@ -12,7 +12,7 @@ import Title from "./components/Title";
 
 const Appearance = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
-  const themeName = () => routeData?.data?.data?.theme || "default";
+  const themeName = () => routeData?.data?.data?.theme || "main";
 
   const settingsMutation = rspc.createMutation(() => ({
     mutationKey: ["settings.setSettings"],

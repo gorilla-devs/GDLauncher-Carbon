@@ -9,7 +9,7 @@ import { createEffect } from "solid-js";
 import { rspc } from "./rspcClient";
 
 enum _Theme {
-  _Default = "default",
+  _Main = "main",
   _Light = "light",
   _PoisonGreen = "poison-green",
   _Dracula = "dracula"

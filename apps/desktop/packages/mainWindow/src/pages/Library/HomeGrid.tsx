@@ -579,7 +579,7 @@ const HomeGrid = () => {
                                     {
                                       duration: 250,
                                       delay:
-                                        200 +
+                                        500 +
                                         (j() * 60 +
                                           i() *
                                             150 *
