@@ -112,7 +112,7 @@ const ContextMenu = (props: ContextMenuProps) => {
       {props.children}
       <Show when={containerRef() == ContextMenu?.openMenu()}>
         <Portal mount={document.body}>
-          <div class="w-screen h-screen fixed top-0 left-0 backdrop-blur-[2px] z-50" />
+          <div class="w-screen h-screen fixed top-0 left-0 backdrop-blur-[2px] z-80" />
         </Portal>
       </Show>
       <Show when={containerRef() == ContextMenu?.openMenu()}>

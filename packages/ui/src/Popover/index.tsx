@@ -191,7 +191,7 @@ const Popover = (_props: Props) => {
               e.stopPropagation();
             }}
           >
-            <div class="relative z-20">{props.content}</div>
+            <div class="relative">{props.content}</div>
             <Show when={!props.noTip}>
               <div
                 class={`absolute w-4 h-4 rotate-45 z-10 ${props.color || ""}`}
