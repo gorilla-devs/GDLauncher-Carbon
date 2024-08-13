@@ -25,11 +25,10 @@ importers:
         version: 1.13.2
 
   apps/desktop:
-    dependencies:
+    devDependencies:
       '@formkit/auto-animate':
         specifier: ^0.8.2
         version: 0.8.2
-    devDependencies:
       '@gd/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -3606,7 +3605,7 @@ packages:
 
   /@formkit/auto-animate@0.8.2:
     resolution: {integrity: sha512-SwPWfeRa5veb1hOIBMdzI+73te5puUBHmqqaF1Bu7FjvxlYSz/kJcZKSa9Cg60zL0uRNeJL2SbRxV6Jp6Q1nFQ==}
-    dev: false
+    dev: true
 
   /@humanwhocodes/config-array@0.11.14:
     resolution: {integrity: sha512-3T8LkOmg45BV5FICb15QQMsyUSWrQ8AygVfC7ZG32zOalnqrilm018ZVCw0eapXux8FtA33q8PSRSstjee3jSg==}
@@ -5973,11 +5972,11 @@ packages:
       - supports-color
     dev: true
 
-  /@storybook/builder-vite@8.3.0-alpha.4(storybook@7.6.10)(typescript@5.3.3)(vite@4.5.2):
-    resolution: {integrity: sha512-kT8H97hNfPwQR2ArtDGBWfoD5XhDwcnoWdmcWz2Httdc5qrOH3n9p/ddh1IUmypvWS3GEGPyo7K493680E0YNg==}
+  /@storybook/builder-vite@8.3.0-alpha.5(storybook@7.6.10)(typescript@5.3.3)(vite@4.5.2):
+    resolution: {integrity: sha512-fAP7MEjTd+fzdhWhPQ7uNtfh2z68OKkoSvBHeWpaNpauSh7EFWTmRVATdz4bItGmK2na/FFHEayHPTnfQWkU0g==}
     peerDependencies:
       '@preact/preset-vite': '*'
-      storybook: ^8.3.0-alpha.4
+      storybook: ^8.3.0-alpha.5
       typescript: '>= 4.3.x'
       vite: ^4.0.0 || ^5.0.0
       vite-plugin-glimmerx: '*'
@@ -5989,7 +5988,7 @@ packages:
       vite-plugin-glimmerx:
         optional: true
     dependencies:
-      '@storybook/csf-plugin': 8.3.0-alpha.4(storybook@7.6.10)
+      '@storybook/csf-plugin': 8.3.0-alpha.5(storybook@7.6.10)
       '@types/find-cache-dir': 3.2.1
       browser-assert: 1.2.1
       es-module-lexer: 1.5.0
@@ -6214,10 +6213,10 @@ packages:
       - supports-color
     dev: true
 
-  /@storybook/csf-plugin@8.3.0-alpha.4(storybook@7.6.10):
-    resolution: {integrity: sha512-vOUrUu91brmZRja+N2M6J1ZuTyoNtXnniZHoBJCV10lZ/YIrtNiY0tiObOc6qleiUkNCUvAk3tUrSQtfdnfReA==}
+  /@storybook/csf-plugin@8.3.0-alpha.5(storybook@7.6.10):
+    resolution: {integrity: sha512-NgArxKGtrdeCTM7H0L3ppYpXRsxqUfaw5jGk2QykMqOFbrSfyVgKeL8iZPClFH6YjopYL1GtlziHLCL2Cju1JA==}
     peerDependencies:
-      storybook: ^8.3.0-alpha.4
+      storybook: ^8.3.0-alpha.5
     dependencies:
       storybook: 7.6.10
       unplugin: 1.6.0
@@ -15424,7 +15423,7 @@ packages:
     resolution: {integrity: sha512-dD+VMYC5fBBQNesVb+mjB0LOkZIf100SQFbjAt9/sDstNUvc5ce3yZwLYXzgcOc7jcSMkrBu/cZNRzEM4YIAyw==}
     engines: {node: ^14.18 || >=16}
     dependencies:
-      '@storybook/builder-vite': 8.3.0-alpha.4(storybook@7.6.10)(typescript@5.3.3)(vite@4.5.2)
+      '@storybook/builder-vite': 8.3.0-alpha.5(storybook@7.6.10)(typescript@5.3.3)(vite@4.5.2)
     transitivePeerDependencies:
       - '@preact/preset-vite'
       - storybook

@@ -21,6 +21,7 @@
     "release": "node scripts/releaseDraft.mjs"
   },
   "devDependencies": {
+    "@formkit/auto-animate": "^0.8.2",
     "@gd/config": "workspace:*",
     "@gd/core_module": "workspace:*",
     "@gd/i18n": "workspace:*",
@@ -72,8 +73,5 @@
   "env": {
     "//": "Used in build scripts",
     "PORT": 3344
-  },
-  "dependencies": {
-    "@formkit/auto-animate": "^0.8.2"
   }
 }

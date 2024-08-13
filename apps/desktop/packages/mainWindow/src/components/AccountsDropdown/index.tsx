@@ -413,9 +413,10 @@ export const AccountsDropdown = (props: Props) => {
         {props.label}
       </p>
       <button
-        class="flex items-center box-border group box-border justify-between py-2 px-4 min-h-10 font-semibold inline-flex rounded-lg w-auto"
+        class="flex items-center group box-border justify-between py-2 px-4 min-h-10 font-semibold rounded-lg w-auto"
         onClick={() => {
           if (props.disabled) return;
+
           setMenuOpened(!menuOpened());
         }}
         onBlur={() => {

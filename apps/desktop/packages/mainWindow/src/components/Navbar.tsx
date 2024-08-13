@@ -75,9 +75,7 @@ const AppNavbar = () => {
       <nav
         class="flex items-center bg-darkSlate-800 text-white px-5"
         style={{
-          height: "60px",
-          "view-transition-name": "navigation",
-          contain: "layout"
+          height: "60px"
         }}
       >
         <div class="flex items-center" style={{ width: "19rem" }}>
@@ -87,13 +85,7 @@ const AppNavbar = () => {
             onClick={() => navigate("/library")}
           />
         </div>
-        <div
-          class="flex text-white w-full items-center h-full list-none gap-6"
-          style={{
-            "view-transition-name": "navigation-tabs",
-            contain: "layout"
-          }}
-        >
+        <div class="flex text-white w-full items-center h-full list-none gap-6">
           <Tabs index={selectedIndex()}>
             <TabList aligment="between">
               <div class="flex gap-6 h-full">
