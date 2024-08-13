@@ -1,18 +1,17 @@
 import { Carousel, News, Skeleton } from "@gd/ui";
-import { useRouteData } from "@solidjs/router";
 import { For, Match, Show, Suspense, Switch, createResource } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
-import fetchData from "./library.data";
 import InstanceTile from "@/components/InstanceTile";
 import skull from "/assets/images/icons/skull.png";
 import DefaultImg from "/assets/images/default-instance-img.png";
 import UnstableCard from "@/components/UnstableCard";
 import FeaturedModpackTile from "./FeaturedModpackTile";
 import { initNews } from "@/utils/news";
+import { useGlobalStore } from "@/components/GlobalStoreContext";
 
 const HomeWithSidebar = () => {
   const [t] = useTransContext();
-  const routeData: ReturnType<typeof fetchData> = useRouteData();
+  const routeData = useGlobalStore();
 
   const newsInitializer = initNews();
 

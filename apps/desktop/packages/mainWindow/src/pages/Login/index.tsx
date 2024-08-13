@@ -115,14 +115,24 @@ export default function Login() {
   let backgroundBlurRef: HTMLDivElement | undefined = undefined;
   let welcomeToTextRef: HTMLDivElement | undefined = undefined;
   let gdlauncherTextRef: HTMLDivElement | undefined = undefined;
+  let videoRef: HTMLVideoElement | undefined = undefined;
 
   async function transitionToLibrary() {
     return new Promise((resolve) => {
-      if (backgroundBlurRef && routeData.settings.data?.isFirstLaunch) {
+      if (backgroundBlurRef) {
         sidebarRef?.animate(
           [{ transform: "translateX(0%)" }, { transform: "translateX(-100%)" }],
           {
             duration: 500,
+            easing: "linear",
+            fill: "forwards"
+          }
+        );
+
+        videoRef?.animate(
+          [{ transform: "translateX(15%)" }, { transform: "translateX(0%)" }],
+          {
+            duration: 300,
             easing: "linear",
             fill: "forwards"
           }
@@ -270,6 +280,16 @@ export default function Login() {
           fill: "forwards"
         }
       );
+
+      videoRef?.animate(
+        [{ transform: "translateX(0)" }, { transform: "translateX(15%)" }],
+        {
+          duration: 300,
+          delay: 200,
+          easing: "cubic-bezier(0.175, 0.885, 0.32, 1)",
+          fill: "forwards"
+        }
+      );
     }
   }
 
@@ -354,7 +374,7 @@ export default function Login() {
         <div class="flex w-full h-screen" id="main-login-page">
           <div
             ref={sidebarRef}
-            class="absolute -translate-x-full w-100 h-full flex flex-col items-center text-white rounded-md bg-darkSlate-800 z-1"
+            class="z-10 absolute -translate-x-full w-100 h-full flex flex-col items-center text-white rounded-md bg-darkSlate-800 z-1"
           >
             <div class="flex justify-center h-30">
               <img class="w-60" src={Logo} />
@@ -679,12 +699,12 @@ export default function Login() {
           <div class="flex-1 w-full">
             <div
               ref={backgroundBlurRef}
-              class="absolute top-0 left-0 p-0 h-screen w-full opacity-0 bg-black/20"
+              class="z-1 absolute top-0 left-0 p-0 h-screen w-full opacity-0 bg-black/20"
               style={{
                 "backdrop-filter": "blur(6px)"
               }}
             />
-            <div class="font-bold text-7xl leading-loose absolute top-0 left-0 p-0 h-screen w-full flex flex-col items-center justify-center">
+            <div class="z-1 font-bold text-7xl leading-loose absolute top-0 left-0 p-0 h-screen w-full flex flex-col items-center justify-center">
               <div ref={welcomeToTextRef} class="opacity-0">
                 <Trans key="login.welcome_to" />
               </div>
@@ -693,6 +713,7 @@ export default function Login() {
               </div>
             </div>
             <video
+              ref={videoRef}
               class="p-0 h-screen w-full object-cover"
               src={BackgroundVideo}
               autoplay

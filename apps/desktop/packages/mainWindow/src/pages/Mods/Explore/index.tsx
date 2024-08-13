@@ -37,7 +37,7 @@ const getTabIndexFromPath = (path: string) => {
   return 0;
 };
 
-const InfiniteScrollQueryWrapper = () => {
+const ModsInfiniteScrollQueryWrapper = () => {
   const params = useParams();
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
@@ -46,12 +46,12 @@ const InfiniteScrollQueryWrapper = () => {
       modId={params.id}
       modplatform={routeData.isCurseforge ? "curseforge" : "modrinth"}
     >
-      <Modpack />
+      <ModExplore />
     </InfiniteScrollVersionsQueryWrapper>
   );
 };
 
-const Modpack = () => {
+const ModExplore = () => {
   const navigate = useGDNavigate();
   const params = useParams();
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -340,4 +340,4 @@ const Modpack = () => {
   );
 };
 
-export default InfiniteScrollQueryWrapper;
+export default ModsInfiniteScrollQueryWrapper;

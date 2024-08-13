@@ -8,7 +8,6 @@ import {
   Skeleton,
   Slider
 } from "@gd/ui";
-import { useRouteData } from "@solidjs/router";
 import {
   For,
   Match,
@@ -17,10 +16,10 @@ import {
   createEffect,
   createMemo,
   createResource,
-  createSignal
+  createSignal,
+  onMount
 } from "solid-js";
 import { Trans, useTransContext } from "@gd/i18n";
-import fetchData from "./library.data";
 import InstanceTile from "@/components/InstanceTile";
 import skull from "/assets/images/icons/skull.png";
 import DefaultImg from "/assets/images/default-instance-img.png";
@@ -35,6 +34,7 @@ import {
 import { initNews } from "@/utils/news";
 import { rspc } from "@/utils/rspcClient";
 import { createStore, reconcile } from "solid-js/store";
+import { useGlobalStore } from "@/components/GlobalStoreContext";
 
 const NewsWrapper = () => {
   const newsInitializer = initNews();
@@ -42,7 +42,7 @@ const NewsWrapper = () => {
   const [news] = createResource(() => newsInitializer);
 
   return (
-    <div class="mt-8 flex gap-4">
+    <div class="flex gap-4">
       <div class="flex-1 flex-grow">
         <Switch>
           <Match when={news()?.length > 0}>
@@ -64,12 +64,14 @@ const NewsWrapper = () => {
   );
 };
 
+let initAnimationRan = false;
+
 const HomeGrid = () => {
   const [t] = useTransContext();
 
   const [filter, setFilter] = createSignal("");
 
-  const routeData: ReturnType<typeof fetchData> = useRouteData();
+  const globalStore = useGlobalStore();
 
   const [instancesTileSize, setInstancesTileSize] = createSignal(2);
 
@@ -82,7 +84,7 @@ const HomeGrid = () => {
   >([]);
 
   createEffect(() => {
-    setInstancesTileSize(routeData.settings.data?.instancesTileSize!);
+    setInstancesTileSize(globalStore.settings.data?.instancesTileSize!);
   });
 
   const settingsMutation = rspc.createMutation(() => ({
@@ -106,7 +108,7 @@ const HomeGrid = () => {
 
     const nameFilter = filter().replaceAll(" ", "").toLowerCase();
 
-    if (routeData.settings.data?.instancesGroupBy === "group") {
+    if (globalStore.settings.data?.instancesGroupBy === "group") {
       _groups["favorites"] = {
         id: -1,
         name: t("favorites"),
@@ -114,30 +116,34 @@ const HomeGrid = () => {
       };
     }
 
-    for (const instance of routeData.instances.data || []) {
+    for (const instance of globalStore.instances.data || []) {
       let groupId = null;
       let groupName = null;
 
       const validInstance =
         instance.status.status === "valid" ? instance.status.value : undefined;
 
-      if (routeData.settings.data?.instancesGroupBy === "group") {
-        const _groupName = routeData.groups.data?.find(
+      if (globalStore.settings.data?.instancesGroupBy === "group") {
+        const _groupName = globalStore.instanceGroups.data?.find(
           (group) => group.id === instance.group_id
         )?.name;
 
         groupName =
           _groupName === "localize➽default" ? t("default") : _groupName;
         groupId = instance.group_id;
-      } else if (routeData.settings.data?.instancesGroupBy === "gameVersion") {
+      } else if (
+        globalStore.settings.data?.instancesGroupBy === "gameVersion"
+      ) {
         if (instance.status.status === "valid") {
           groupName = validInstance?.mc_version;
         }
-      } else if (routeData.settings.data?.instancesGroupBy === "modloader") {
+      } else if (globalStore.settings.data?.instancesGroupBy === "modloader") {
         if (instance.status.status === "valid") {
           groupName = validInstance?.modloader || "vanilla";
         }
-      } else if (routeData.settings.data?.instancesGroupBy === "modplatform") {
+      } else if (
+        globalStore.settings.data?.instancesGroupBy === "modplatform"
+      ) {
         if (instance.status.status === "valid") {
           groupName = validInstance?.modpack?.type;
         }
@@ -159,7 +165,7 @@ const HomeGrid = () => {
         instance.name.toLowerCase().replaceAll(" ", "").includes(nameFilter)
       ) {
         if (
-          routeData.settings.data?.instancesGroupBy === "group" &&
+          globalStore.settings.data?.instancesGroupBy === "group" &&
           instance.favorite
         ) {
           _groups["favorites"].instances.push(instance);
@@ -173,19 +179,27 @@ const HomeGrid = () => {
       _groups[key].instances.sort((a, b) => {
         let comparisonResult = 0; // Default comparison result
 
-        if (routeData.settings.data?.instancesSortBy === "name") {
+        if (globalStore.settings.data?.instancesSortBy === "name") {
           comparisonResult = a.name.localeCompare(b.name);
-        } else if (routeData.settings.data?.instancesSortBy === "mostPlayed") {
+        } else if (
+          globalStore.settings.data?.instancesSortBy === "mostPlayed"
+        ) {
           comparisonResult = (a.seconds_played || 0) - (b.seconds_played || 0);
-        } else if (routeData.settings.data?.instancesSortBy === "lastPlayed") {
+        } else if (
+          globalStore.settings.data?.instancesSortBy === "lastPlayed"
+        ) {
           const aLastPlayed = a.last_played ? Date.parse(a.last_played) : 0;
           const bLastPlayed = b.last_played ? Date.parse(b.last_played) : 0;
           comparisonResult = aLastPlayed - bLastPlayed;
-        } else if (routeData.settings.data?.instancesSortBy === "lastUpdated") {
+        } else if (
+          globalStore.settings.data?.instancesSortBy === "lastUpdated"
+        ) {
           const aLastUpdated = a.date_updated ? Date.parse(a.date_updated) : 0;
           const bLastUpdated = b.date_updated ? Date.parse(b.date_updated) : 0;
           comparisonResult = aLastUpdated - bLastUpdated;
-        } else if (routeData.settings.data?.instancesSortBy === "gameVersion") {
+        } else if (
+          globalStore.settings.data?.instancesSortBy === "gameVersion"
+        ) {
           comparisonResult = (
             (a.status.value as ValidListInstance).mc_version || ""
           ).localeCompare(
@@ -193,14 +207,14 @@ const HomeGrid = () => {
             undefined,
             { numeric: true, sensitivity: "base" }
           );
-        } else if (routeData.settings.data?.instancesSortBy === "created") {
+        } else if (globalStore.settings.data?.instancesSortBy === "created") {
           const aCreated = a.date_created ? Date.parse(a.date_created) : 0;
           const bCreated = b.date_created ? Date.parse(b.date_created) : 0;
           comparisonResult = aCreated - bCreated;
         }
 
         // If descending order is selected, invert the comparison result
-        if (!routeData.settings.data?.instancesSortByAsc) {
+        if (!globalStore.settings.data?.instancesSortByAsc) {
           comparisonResult = -comparisonResult;
         }
 
@@ -219,9 +233,9 @@ const HomeGrid = () => {
   const iterableFilteredGroups = createMemo(() => {
     const iterable = Object.values(filteredGroups());
 
-    if (routeData.settings.data?.instancesGroupBy === "gameVersion") {
+    if (globalStore.settings.data?.instancesGroupBy === "gameVersion") {
       iterable.sort((a, b) => {
-        if (routeData.settings.data?.instancesGroupByAsc) {
+        if (globalStore.settings.data?.instancesGroupByAsc) {
           return a.name.localeCompare(b.name, undefined, {
             numeric: true,
             sensitivity: "base"
@@ -243,7 +257,7 @@ const HomeGrid = () => {
           return 1;
         }
 
-        if (routeData.settings.data?.instancesGroupByAsc) {
+        if (globalStore.settings.data?.instancesGroupByAsc) {
           return a.name.localeCompare(b.name);
         } else {
           return b.name.localeCompare(a.name);
@@ -313,19 +327,19 @@ const HomeGrid = () => {
   return (
     <div class="overflow-hidden p-6">
       <UnstableCard />
-      <Show when={routeData.settings.data?.showNews}>
+      <Show when={globalStore.settings.data?.showNews}>
         <NewsWrapper />
       </Show>
       <Switch>
-        <Match when={routeData.instances.isLoading}>
+        <Match when={globalStore.instances.isLoading}>
           <div class="mt-8">
             <Skeleton.instances />
           </div>
         </Match>
         <Match
           when={
-            routeData.instances?.data?.length === 0 &&
-            !routeData.instances.isLoading
+            globalStore.instances?.data?.length === 0 &&
+            !globalStore.instances.isLoading
           }
         >
           <div class="w-full h-full flex flex-col justify-center items-center mt-12">
@@ -337,8 +351,8 @@ const HomeGrid = () => {
         </Match>
         <Match
           when={
-            (routeData.instances?.data?.length || 0) > 0 &&
-            !routeData.instances.isLoading
+            (globalStore.instances?.data?.length || 0) > 0 &&
+            !globalStore.instances.isLoading
           }
         >
           <div>
@@ -394,7 +408,7 @@ const HomeGrid = () => {
                           OnRelease={(value) => {
                             if (
                               value ===
-                              routeData.settings.data?.instancesTileSize
+                              globalStore.settings.data?.instancesTileSize
                             ) {
                               return;
                             }
@@ -417,7 +431,7 @@ const HomeGrid = () => {
                           class="w-40"
                           options={sortByOptions}
                           icon={<div class="i-ri:price-tag-3-fill" />}
-                          value={routeData.settings.data?.instancesSortBy}
+                          value={globalStore.settings.data?.instancesSortBy}
                           onChange={(val) => {
                             settingsMutation.mutate({
                               instancesSortBy: {
@@ -430,14 +444,14 @@ const HomeGrid = () => {
                           class="w-6 h-6 text-darkSlate-50 hover:text-white"
                           classList={{
                             "i-ri:sort-alphabet-asc":
-                              routeData.settings.data?.instancesSortByAsc,
+                              globalStore.settings.data?.instancesSortByAsc,
                             "i-ri:sort-alphabet-desc":
-                              !routeData.settings.data?.instancesSortByAsc
+                              !globalStore.settings.data?.instancesSortByAsc
                           }}
                           onClick={() => {
                             settingsMutation.mutate({
                               instancesSortByAsc: {
-                                Set: !routeData.settings.data
+                                Set: !globalStore.settings.data
                                   ?.instancesSortByAsc
                               }
                             });
@@ -454,7 +468,7 @@ const HomeGrid = () => {
                           class="w-40"
                           options={groupByOptions}
                           icon={<div class="i-ri:price-tag-3-fill" />}
-                          value={routeData.settings.data?.instancesGroupBy}
+                          value={globalStore.settings.data?.instancesGroupBy}
                           onChange={(val) => {
                             settingsMutation.mutate({
                               instancesGroupBy: {
@@ -467,14 +481,14 @@ const HomeGrid = () => {
                           class="w-6 h-6 text-darkSlate-50 hover:text-white"
                           classList={{
                             "i-ri:sort-alphabet-asc":
-                              routeData.settings.data?.instancesGroupByAsc,
+                              globalStore.settings.data?.instancesGroupByAsc,
                             "i-ri:sort-alphabet-desc":
-                              !routeData.settings.data?.instancesGroupByAsc
+                              !globalStore.settings.data?.instancesGroupByAsc
                           }}
                           onClick={() => {
                             settingsMutation.mutate({
                               instancesGroupByAsc: {
-                                Set: !routeData.settings.data
+                                Set: !globalStore.settings.data
                                   ?.instancesGroupByAsc
                               }
                             });
@@ -518,43 +532,92 @@ const HomeGrid = () => {
             </div>
             <div class="mt-4">
               <For each={instances || []}>
-                {(group) => (
-                  <Show when={group.instances.length > 0}>
-                    <Collapsable
-                      noPadding
-                      title={
-                        <>
-                          {/* <img
+                {(group, i) => {
+                  // const [parent, setEnabled] = createAutoAnimate();
+
+                  return (
+                    <Show when={group.instances.length > 0}>
+                      <Collapsable
+                        noPadding
+                        title={
+                          <>
+                            {/* <img
                             class="w-6 h-6"
                             src={getCFModloaderIcon(key as CFFEModLoaderType)}
                           /> */}
-                          <span>{group.name}</span>
-                        </>
-                      }
-                      size="standard"
-                    >
-                      <div
-                        class="mt-4 flex flex-wrap gap-x-4"
-                        classList={{
-                          "gap-y-4": instancesTileSize() === 1,
-                          "gap-y-6": instancesTileSize() === 2,
-                          "gap-y-8": instancesTileSize() === 3,
-                          "gap-y-10": instancesTileSize() === 4,
-                          "gap-y-12": instancesTileSize() === 5
-                        }}
+                            <span>{group.name}</span>
+                          </>
+                        }
+                        size="standard"
                       >
-                        <For each={group.instances}>
-                          {(instance) => (
-                            <InstanceTile
-                              instance={instance}
-                              size={instancesTileSize() as any}
-                            />
-                          )}
-                        </For>
-                      </div>
-                    </Collapsable>
-                  </Show>
-                )}
+                        <div
+                          // ref={parent}
+                          class="mt-4 flex flex-wrap gap-x-4"
+                          classList={{
+                            "gap-y-4": instancesTileSize() === 1,
+                            "gap-y-6": instancesTileSize() === 2,
+                            "gap-y-8": instancesTileSize() === 3,
+                            "gap-y-10": instancesTileSize() === 4,
+                            "gap-y-12": instancesTileSize() === 5
+                          }}
+                        >
+                          <For each={group.instances}>
+                            {(instance, j) => {
+                              let ref: HTMLDivElement | undefined;
+
+                              onMount(() => {
+                                if (ref && !initAnimationRan) {
+                                  ref.animate(
+                                    [
+                                      {
+                                        opacity: 0
+                                      },
+                                      {
+                                        opacity: 1
+                                      }
+                                    ],
+                                    {
+                                      duration: 250,
+                                      delay:
+                                        200 +
+                                        (j() * 60 +
+                                          i() *
+                                            150 *
+                                            (instances[i() - 1].instances
+                                              .length -
+                                              1)),
+                                      easing: "linear",
+                                      fill: "forwards"
+                                    }
+                                  );
+                                }
+
+                                if (
+                                  i() === instances.length - 1 &&
+                                  j() === group.instances.length - 1
+                                ) {
+                                  initAnimationRan = true;
+                                }
+                              });
+
+                              return (
+                                <div
+                                  ref={ref}
+                                  classList={{ "opacity-0": !initAnimationRan }}
+                                >
+                                  <InstanceTile
+                                    instance={instance}
+                                    size={instancesTileSize() as any}
+                                  />
+                                </div>
+                              );
+                            }}
+                          </For>
+                        </div>
+                      </Collapsable>
+                    </Show>
+                  );
+                }}
               </For>
             </div>
           </div>

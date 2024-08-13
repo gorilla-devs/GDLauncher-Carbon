@@ -18,16 +18,9 @@ import {
 const HEXING_TALES_MODPACK_ID = 891604;
 
 const FeaturedModpackTile = () => {
-  const owner = getOwner();
   const navigate = useGDNavigate();
   const rspcContext = rspc.useContext();
-  const [loading, setLoading] = createSignal(false);
-  const [taskId, setTaskId] = createSignal<number | null>(null);
   const [shouldShow, setShouldShow] = createSignal(true);
-
-  const trackDownload = rspc.createMutation(() => ({
-    mutationKey: ["metrics.sendEvent"]
-  }));
 
   const [hexingTales] = createResource(() => {
     return rspcContext.client.query([
@@ -42,31 +35,6 @@ const FeaturedModpackTile = () => {
     queryKey: ["instance.getAllInstances"]
   }));
 
-  const prepareInstanceMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.prepareInstance"]
-  }));
-
-  const loadIconMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.loadIconUrl"]
-  }));
-
-  const createInstanceMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.createInstance"]
-  }));
-
-  const task = rspc.createQuery(() => ({
-    queryKey: ["vtask.getTask", taskId()]
-  }));
-
-  createEffect((prev) => {
-    if (taskId() && prev && !task.data) {
-      setLoading(false);
-      setTaskId(null);
-    }
-
-    return task.data;
-  });
-
   createEffect(() => {
     if (!instances.data) return;
 
@@ -74,8 +42,7 @@ const FeaturedModpackTile = () => {
       if (
         i.status.status === "valid" &&
         i.status.value.modpack?.type === "curseforge" &&
-        i.status.value.modpack?.value?.project_id === HEXING_TALES_MODPACK_ID &&
-        taskId() === null
+        i.status.value.modpack?.value?.project_id === HEXING_TALES_MODPACK_ID
       ) {
         setShouldShow(false);
         return;
@@ -88,24 +55,25 @@ const FeaturedModpackTile = () => {
   return (
     <Show when={shouldShow()}>
       <>
-        <div class="h-auto w-[1px] bg-darkSlate-400" />
-        <div class="w-70 h-auto">
-          <h3>
-            <Trans key="featured.try_featured_modpack">
-              {""}
-              <span class="text-primary-400" />
-              {""}
-            </Trans>
-          </h3>
+        <div class="h-24 w-[1px] bg-darkSlate-400" />
+        <div
+          class="w-70 h-24 relative hover:bg-darkSlate-700 duration-200 ease-in-out box-border rounded-md group overflow-hidden hover:outline outline-2 outline-darkSlate-500"
+          onClick={() => {
+            navigate(`/modpacks/${HEXING_TALES_MODPACK_ID}/curseforge`);
+          }}
+        >
+          <div class="absolute top-0 left-0 group-hover:-translate-y-full duration-200 ease-in-out">
+            <Trans key="featured.try_featured_modpack" />
+          </div>
           <Switch>
             <Match when={hexingTales()?.data}>
-              <div class="flex gap-4 items-center">
+              <div class="w-full h-full relative">
                 <img
                   src={hexingTales()?.data.logo?.url}
-                  class="w-16 h-16 rounded-lg"
+                  class="absolute left-0 bottom-0 w-16 h-16 rounded-lg duration-200 ease-in-out group-hover:scale-130 group-hover:translate-x-4 group-hover:-translate-y-4"
                 />
-                <div>
-                  <div class="text-xl font-bold">
+                <div class="absolute left-20 bottom-0 group-hover:opacity-0 duration-200 ease-in-out">
+                  <div class="text-xl font-bold text-nowrap">
                     {hexingTales()?.data.name}
                   </div>
                   <div class="text-sm text-darkSlate-50">
@@ -114,65 +82,10 @@ const FeaturedModpackTile = () => {
                     </For>
                   </div>
                 </div>
-              </div>
-              <p>{hexingTales()?.data.summary}</p>
-              <div class="flex justify-between w-full gap-4">
-                <Button
-                  loading={loading()}
-                  onClick={async () => {
-                    runWithOwner(owner, async () => {
-                      setLoading(true);
-                      trackDownload.mutate({
-                        data: {
-                          campaign_id: "featured_gdl_content",
-                          item_id: HEXING_TALES_MODPACK_ID.toString()
-                        },
-                        event_name: "featured_modpack_installed"
-                      });
 
-                      const creationObject = {
-                        type: "curseforge",
-                        value: {
-                          file_id: hexingTales()?.data.latestFiles[0].id,
-                          project_id: hexingTales()?.data.id
-                        }
-                      };
-
-                      const defaultGroup = await rspcContext.client.query([
-                        "instance.getDefaultGroup"
-                      ]);
-
-                      const imgUrl = hexingTales()?.data.logo?.thumbnailUrl;
-                      if (imgUrl) await loadIconMutation.mutateAsync(imgUrl);
-
-                      const instanceId =
-                        await createInstanceMutation.mutateAsync({
-                          group: defaultGroup,
-                          use_loaded_icon: true,
-                          notes: "",
-                          name: hexingTales()?.data.name!,
-                          version: {
-                            Modpack: creationObject as Modpack
-                          }
-                        });
-
-                      const taskId =
-                        await prepareInstanceMutation.mutateAsync(instanceId);
-
-                      setTaskId(taskId);
-                    });
-                  }}
-                >
-                  <Trans key="featured.download" />
-                </Button>
-                <Button
-                  type="secondary"
-                  onClick={() => {
-                    navigate(`/modpacks/${HEXING_TALES_MODPACK_ID}/curseforge`);
-                  }}
-                >
+                <div class="absolute left-40 top-1/2 -translate-y-1/2 translate-x-[150%] group-hover:translate-x-0 duration-200 ease-in-out">
                   <Trans key="featured.show_more" />
-                </Button>
+                </div>
               </div>
             </Match>
             <Match when={!hexingTales()?.data}>

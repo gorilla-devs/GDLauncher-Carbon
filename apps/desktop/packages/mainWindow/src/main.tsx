@@ -6,7 +6,6 @@ import {
   createSignal,
   ErrorBoundary,
   Match,
-  onMount,
   Show,
   Switch
 } from "solid-js";
@@ -22,6 +21,7 @@ import { NavigationManager } from "./managers/NavigationManager";
 // import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
 import RiveAppWapper from "./utils/RiveAppWrapper";
 import GDAnimation from "./gd_logo_animation.riv";
+import { GlobalStoreProvider } from "./components/GlobalStoreContext";
 
 render(
   () => {
@@ -221,13 +221,15 @@ const TransWrapper = (props: TransWrapperProps) => {
     <Show when={!settings.isInitialLoading && isI18nReady()}>
       <TransProvider instance={_i18nInstance}>
         <Router source={hashIntegration()}>
-          <NavigationManager>
-            <ContextMenuProvider>
-              <ModalProvider>
-                <App createInvalidateQuery={props.createInvalidateQuery} />
-              </ModalProvider>
-            </ContextMenuProvider>
-          </NavigationManager>
+          <GlobalStoreProvider>
+            <NavigationManager>
+              <ContextMenuProvider>
+                <ModalProvider>
+                  <App createInvalidateQuery={props.createInvalidateQuery} />
+                </ModalProvider>
+              </ContextMenuProvider>
+            </NavigationManager>
+          </GlobalStoreProvider>
         </Router>
       </TransProvider>
     </Show>

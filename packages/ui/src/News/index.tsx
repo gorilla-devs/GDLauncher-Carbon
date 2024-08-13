@@ -111,11 +111,11 @@ const News = (props: CarouselProps) => {
     });
 
     return (
-      <div ref={slidesRef} class="flex h-80">
+      <div ref={slidesRef} class="flex h-24">
         <For each={copiedSlides()}>
           {(slide) => (
             <div
-              class="flex-grow flex-shrink-0 inset-0 transform min-h-80 w-full flex justify-center items-center hidden box-border bg-no-repeat bg-center bg-cover"
+              class="flex-grow flex-shrink-0 inset-0 transform min-h-24 w-full flex justify-center items-center box-border bg-no-repeat bg-center bg-cover"
               style={{
                 "background-image": `url('${slide.image}'), url('${props.fallBackImg}')`,
               }}
@@ -123,19 +123,25 @@ const News = (props: CarouselProps) => {
               <div
                 class="absolute bottom-0 left-0 right-0 top-0"
                 style={{
-                  background:
-                    "linear-gradient(180deg, rgba(29, 32, 40, 0) 0%, rgb(var(--darkSlate-800)) 100%)",
+                  background: "rgba(29, 32, 40, 0.7)",
                 }}
               />
-              <div class="absolute bottom-10 left-5 flex flex-col select-none">
+              <div class="absolute bottom-4 left-0 px-5 flex flex-col select-none w-full box-border">
                 <div
-                  class="group flex gap-2 items-center cursor-pointer"
+                  class="group flex gap-2 items-center cursor-pointer w-full"
                   onClick={() => props.onSlideClick?.(slide)}
                 >
-                  <h2 class="m-0 group-hover:underline">{slide.title}</h2>
+                  <h2 class="m-0 group-hover:underline text-ellipsis overflow-hidden whitespace-nowrap w-full">
+                    {slide.title}
+                  </h2>
                   <div class="peer i-ri:external-link-line" />
                 </div>
-                <p class="mt-2 text-darkSlate-50">{slide.description}</p>
+                <h4
+                  class="mt-2 text-lightSlate-400 text-ellipsis overflow-hidden whitespace-nowrap w-full
+                "
+                >
+                  {slide.description}
+                </h4>
               </div>
             </div>
           )}
@@ -145,10 +151,10 @@ const News = (props: CarouselProps) => {
   };
 
   return (
-    <div class="h-80 bg-darkSlate-900 rounded-lg relative overflow-hidden relative">
+    <div class="h-24 bg-darkSlate-900 rounded-lg relative overflow-hidden group">
       <Show when={mergedProps.showArrows}>
         <div
-          class="h-7 w-7 bg-darkSlate-800 rounded-full absolute left-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40 "
+          class="h-7 w-7 opacity-0 group-hover:opacity-100 duration-200 ease-in-out bg-darkSlate-800 rounded-full absolute left-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40 "
           onClick={() => {
             if (isMoving()) return;
             changeSlide("left");
@@ -157,7 +163,7 @@ const News = (props: CarouselProps) => {
           <div class="i-ri:arrow-drop-left-line text-3xl text-white" />
         </div>
         <div
-          class="h-7 w-7 bg-darkSlate-800 rounded-full absolute right-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40"
+          class="h-7 w-7 opacity-0 group-hover:opacity-100 duration-200 ease-in-out bg-darkSlate-800 rounded-full absolute right-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40"
           onClick={() => {
             if (isMoving()) return;
             changeSlide("right");

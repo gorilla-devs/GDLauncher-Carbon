@@ -300,7 +300,9 @@ const Tile = (props: Props) => {
                   style={{
                     "background-image": props.img
                       ? `url("${props.img}")`
-                      : `url("${DefaultImg}")`
+                      : `url("${DefaultImg}")`,
+                    "view-transition-name": `instance-tile-image-${props.instance.id}`,
+                    contain: "layout"
                   }}
                 >
                   <Show when={props.isInvalid}>
@@ -342,7 +344,11 @@ const Tile = (props: Props) => {
                         !props.isRunning &&
                         !props.isDeleting
                     }}
-                    style={{ "pointer-events": "auto" }}
+                    style={{
+                      "pointer-events": "auto",
+                      "view-transition-name": `instance-tile-play-button-${props.instance.id}`,
+                      contain: "layout"
+                    }}
                     onClick={(e) => {
                       e.stopPropagation();
                       handlePlayClick();
@@ -442,6 +448,10 @@ const Tile = (props: Props) => {
                   "max-w-38": props.size === 2,
                   "max-w-20": props.size === 1
                 }}
+                style={{
+                  "view-transition-name": `instance-tile-title-${props.instance.id}`,
+                  contain: "layout"
+                }}
               >
                 <Tooltip
                   content={
@@ -456,7 +466,13 @@ const Tile = (props: Props) => {
               <Switch>
                 <Match when={!props.isLoading && !props.isPreparing}>
                   <div class="flex gap-2 justify-between text-lightGray-900">
-                    <span class="flex gap-1">
+                    <span
+                      class="flex gap-1"
+                      style={{
+                        "view-transition-name": `instance-tile-modloader-${props.instance.id}`,
+                        contain: "layout"
+                      }}
+                    >
                       <Show when={props.modloader}>
                         <img
                           class="w-4 h-4"

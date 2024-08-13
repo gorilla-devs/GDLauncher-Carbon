@@ -448,7 +448,9 @@ const Instance = () => {
                             params.id,
                             routeData.instanceDetails.data?.iconRevision
                           )}")`
-                        : `url("${DefaultImg}")`
+                        : `url("${DefaultImg}")`,
+                      "view-transition-name": `instance-tile-image-${params.id}`,
+                      contain: "layout"
                     }}
                   />
 
@@ -478,6 +480,10 @@ const Instance = () => {
                               e.preventDefault();
                               handleNameChange();
                             }
+                          }}
+                          style={{
+                            "view-transition-name": `instance-tile-title-${params.id}`,
+                            contain: "layout"
                           }}
                         >
                           {routeData.instanceDetails.data?.name}
@@ -524,7 +530,13 @@ const Instance = () => {
                       class="flex justify-between cursor-default flex-row"
                     >
                       <div class="flex flex-row gap-4 flex-wrap items-start mt-2 ml-2 text-lightGray-600">
-                        <div class="m-0 flex gap-2 items-center">
+                        <div
+                          class="m-0 flex gap-2 items-center"
+                          style={{
+                            "view-transition-name": `instance-tile-modloader-${params.id}`,
+                            contain: "layout"
+                          }}
+                        >
                           <For
                             each={routeData.instanceDetails.data?.modloaders}
                           >
@@ -572,6 +584,10 @@ const Instance = () => {
                           size="large"
                           variant={isRunning() && "red"}
                           loading={isPreparing() !== undefined}
+                          style={{
+                            "view-transition-name": `instance-tile-play-button-${params.id}`,
+                            contain: "layout"
+                          }}
                           onClick={() => {
                             if (isRunning()) {
                               killInstanceMutation.mutate(
