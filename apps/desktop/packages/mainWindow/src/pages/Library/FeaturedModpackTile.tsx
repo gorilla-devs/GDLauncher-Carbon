@@ -1,8 +1,7 @@
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { rspc } from "@/utils/rspcClient";
-import { Modpack } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { Button, Skeleton } from "@gd/ui";
+import { Skeleton } from "@gd/ui";
 import {
   For,
   Match,
@@ -10,9 +9,7 @@ import {
   Switch,
   createEffect,
   createResource,
-  createSignal,
-  getOwner,
-  runWithOwner
+  createSignal
 } from "solid-js";
 
 const HEXING_TALES_MODPACK_ID = 891604;
@@ -89,7 +86,11 @@ const FeaturedModpackTile = () => {
               </div>
             </Match>
             <Match when={!hexingTales()?.data}>
-              <Skeleton.featuredHomeTile />
+              <div class="relative w-full h-full">
+                <div class="absolute bottom-0 left-0 w-full">
+                  <Skeleton.featuredHomeTile />
+                </div>
+              </div>
             </Match>
           </Switch>
         </div>

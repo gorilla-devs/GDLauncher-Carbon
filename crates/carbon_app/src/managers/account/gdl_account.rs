@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 use hyper::{
-    header::{AUTHORIZATION, CONTENT_TYPE},
+    header::{InvalidHeaderValue, AUTHORIZATION, CONTENT_TYPE},
     HeaderMap, StatusCode,
 };
 use serde::{Deserialize, Serialize};
@@ -17,8 +17,22 @@ pub struct RegisterAccountBody {
     pub email: String,
 }
 
+#[derive(Serialize)]
+pub struct RequestEmailChangeBody {
+    pub new_email: String,
+}
+
 #[derive(Error, Debug)]
 pub enum RequestNewVerificationTokenError {
+    #[error("Too many requests")]
+    TooManyRequests(u32),
+
+    #[error("request failed: {0}")]
+    RequestFailed(anyhow::Error),
+}
+
+#[derive(Error, Debug)]
+pub enum RequestNewEmailChangeError {
     #[error("Too many requests")]
     TooManyRequests(u32),
 
@@ -124,6 +138,59 @@ impl GDLAccountTask {
         resp.bytes()
             .await
             .map_err(|err| RequestNewVerificationTokenError::RequestFailed(err.into()))?;
+
+        Ok(())
+    }
+
+    pub async fn request_email_change(
+        &self,
+        id_token: String,
+        email: String,
+    ) -> Result<(), RequestNewEmailChangeError> {
+        let body = serde_json::to_string(&RequestEmailChangeBody { new_email: email })
+            .map_err(|err| RequestNewEmailChangeError::RequestFailed(err.into()))?;
+
+        let url = format!("{}/v1/users/request-email-change", GDL_API_BASE);
+        let authorization = format!("Bearer {}", id_token);
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, authorization.parse().unwrap());
+        headers.insert(
+            CONTENT_TYPE,
+            "application/json"
+                .parse()
+                .map_err(|err: InvalidHeaderValue| {
+                    RequestNewEmailChangeError::RequestFailed(anyhow::anyhow!(err))
+                })?,
+        );
+
+        let resp = self
+            .client
+            .post(url)
+            .body(reqwest::Body::from(body))
+            .headers(headers)
+            .send()
+            .await
+            .map_err(|err| RequestNewEmailChangeError::RequestFailed(err.into()))?;
+
+        if resp.status() == StatusCode::TOO_MANY_REQUESTS {
+            let retry_after = resp
+                .headers()
+                .get("Retry-After")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<u32>().ok());
+
+            return Err(RequestNewEmailChangeError::TooManyRequests(
+                retry_after.unwrap_or(0),
+            ));
+        }
+
+        let resp = resp
+            .error_for_status()
+            .map_err(|err| RequestNewEmailChangeError::RequestFailed(err.into()))?;
+
+        resp.bytes()
+            .await
+            .map_err(|err| RequestNewEmailChangeError::RequestFailed(err.into()))?;
 
         Ok(())
     }

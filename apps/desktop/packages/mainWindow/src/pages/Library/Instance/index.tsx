@@ -470,7 +470,7 @@ const Instance = () => {
                           onInput={(e) => {
                             setNewName(e.target.innerHTML);
                           }}
-                          class="cursor-pointer z-10 m-0 border-box focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text"
+                          class="cursor-pointer z-10 m-0 border-box focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text min-h-10"
                           contentEditable={editableName()}
                           onFocusIn={() => {
                             setEditableName(true);
@@ -531,7 +531,7 @@ const Instance = () => {
                     >
                       <div class="flex flex-row gap-4 flex-wrap items-start mt-2 ml-2 text-lightGray-600">
                         <div
-                          class="m-0 flex gap-2 items-center"
+                          class="m-0 flex gap-2 items-center min-h-6"
                           style={{
                             "view-transition-name": `instance-tile-modloader-${params.id}`,
                             contain: "layout"

@@ -64,14 +64,14 @@ interface DropDownButtonProps {
 }
 
 const Dropdown = (props: Props) => {
-  const defaultValue = () =>
-    props.options?.find((option) => option.key === props.value) ||
-    props.options?.[0];
+  const incomingSelectedValue = () =>
+    props.options?.find((option) => option.key === props.value);
 
-  const [selectedValue, setSelectedValue] = createSignal<Option>(
+  const [selectedValue, setSelectedValue] = createSignal<Option | undefined>(
     // eslint-disable-next-line solid/reactivity
-    defaultValue() || props.placeholder
+    incomingSelectedValue()
   );
+
   const [menuOpened, setMenuOpened] = createSignal(false);
   const [focusIn, setFocusIn] = createSignal(false);
   const [buttonRef, setButtonRef] = createSignal<
@@ -80,7 +80,7 @@ const Dropdown = (props: Props) => {
   const [menuRef, setMenuRef] = createSignal<HTMLUListElement | undefined>();
 
   createEffect(() => {
-    setSelectedValue(defaultValue());
+    setSelectedValue(incomingSelectedValue());
   });
 
   const toggleMenu = () => {
@@ -109,7 +109,7 @@ const Dropdown = (props: Props) => {
   createEffect(() => {
     if (menuOpened() && menuRef() && selectedValue()) {
       const selectedOptionIndex = props.options.findIndex(
-        (option) => option.key === selectedValue().key
+        (option) => option.key === selectedValue()?.key
       );
 
       if (selectedOptionIndex !== -1) {
@@ -227,8 +227,8 @@ const Dropdown = (props: Props) => {
                   <li
                     class="first:rounded-t last:rounded-b hover:bg-darkSlate-800 py-2 px-4 block break-all text-darkSlate-50 no-underline w-full box-border"
                     classList={{
-                      "bg-darkSlate-700": selectedValue().key !== option.key,
-                      "bg-darkSlate-800": selectedValue().key === option.key,
+                      "bg-darkSlate-700": selectedValue()?.key !== option.key,
+                      "bg-darkSlate-800": selectedValue()?.key === option.key,
                     }}
                     onClick={(e) => {
                       e.preventDefault();

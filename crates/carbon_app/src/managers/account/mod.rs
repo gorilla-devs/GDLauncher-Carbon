@@ -9,7 +9,10 @@ use anyhow::{ensure, Context};
 use async_trait::async_trait;
 use axum::extract;
 use chrono::{FixedOffset, Utc};
-use gdl_account::{GDLAccountTask, GDLUser, RegisterAccountBody, RequestNewVerificationTokenError};
+use gdl_account::{
+    GDLAccountTask, GDLUser, RegisterAccountBody, RequestNewEmailChangeError,
+    RequestNewVerificationTokenError,
+};
 use jwt::{Header, Token};
 use prisma_client_rust::{
     chrono::DateTime, prisma_errors::query_engine::RecordNotFound, Direction, QueryError,
@@ -247,6 +250,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .await
             .with_context(|| format!("failed to register account: {uuid}"))?;
 
+        self.app
+            .invalidate(GET_GDL_ACCOUNT, Some(uuid.clone().into()));
+
         Ok(user)
     }
 
@@ -286,6 +292,36 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
         let lock = self.gdl_account_task.write().await;
         lock.request_new_verification_token(id_token).await?;
+        Ok(())
+    }
+
+    pub async fn request_email_change(
+        self,
+        uuid: String,
+        email: String,
+    ) -> Result<(), RequestNewEmailChangeError> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await
+            .map_err(|e| RequestNewEmailChangeError::RequestFailed(e))?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(RequestNewEmailChangeError::RequestFailed(anyhow::anyhow!(
+                "attempted to get an account that does not exist"
+            )))?
+            .id_token
+        else {
+            return Err(RequestNewEmailChangeError::RequestFailed(anyhow::anyhow!(
+                "attempted to get an account that does not exist"
+            )));
+        };
+
+        let lock = self.gdl_account_task.write().await;
+        lock.request_email_change(id_token, email).await?;
+
+        self.app
+            .invalidate(GET_GDL_ACCOUNT, Some(uuid.clone().into()));
+
         Ok(())
     }
 

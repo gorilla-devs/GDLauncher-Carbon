@@ -12,7 +12,7 @@ use crate::domain::account as domain;
 use crate::error::FeError;
 use crate::managers::account::api::XboxError;
 use crate::managers::account::gdl_account::{
-    GDLUser, RegisterAccountBody, RequestNewVerificationTokenError,
+    GDLUser, RegisterAccountBody, RequestNewEmailChangeError, RequestNewVerificationTokenError,
 };
 use crate::managers::{account, App, AppInner};
 
@@ -104,6 +104,14 @@ pub(super) fn mount() -> RouterBuilder<App> {
             app.account_manager()
                 .save_gdl_account(args)
                 .await
+        }
+
+        mutation REQUEST_EMAIL_CHANGE[app, args: FERequestEmailChange] {
+            let result = app.account_manager()
+                .request_email_change(args.uuid, args.email)
+                .await;
+
+            Ok(FERequestNewEmailChangeStatus::from(result))
         }
     }
 }
@@ -343,6 +351,32 @@ impl From<Result<(), RequestNewVerificationTokenError>> for FERequestNewVerifica
                 Self::Failed(Some(cooldown))
             }
             Err(RequestNewVerificationTokenError::RequestFailed(_)) => Self::Failed(None),
+        }
+    }
+}
+
+#[derive(Type, Debug, Deserialize)]
+pub struct FERequestEmailChange {
+    pub email: String,
+    pub uuid: String,
+}
+
+#[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "status", content = "value")]
+pub enum FERequestNewEmailChangeStatus {
+    Success,
+    Failed(Option<u32>),
+}
+
+impl From<Result<(), RequestNewEmailChangeError>> for FERequestNewEmailChangeStatus {
+    fn from(value: Result<(), RequestNewEmailChangeError>) -> Self {
+        match value {
+            Ok(_) => Self::Success,
+            Err(RequestNewEmailChangeError::TooManyRequests(cooldown)) => {
+                Self::Failed(Some(cooldown))
+            }
+            Err(RequestNewEmailChangeError::RequestFailed(_)) => Self::Failed(None),
         }
     }
 }

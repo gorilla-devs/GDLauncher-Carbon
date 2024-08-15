@@ -71,7 +71,7 @@ Skeleton.instances = () => {
 };
 
 Skeleton.news = () => {
-  return <div class="w-full h-80 rounded-lg bg-darkSlate-500 mb-5" />;
+  return <div class="w-full h-24 rounded-lg bg-darkSlate-500 mb-5" />;
 };
 
 const Modpack = () => {
@@ -221,18 +221,13 @@ Skeleton.explorer = () => {
 
 Skeleton.featuredHomeTile = () => {
   return (
-    <div class="flex flex-col gap-4">
-      <div class="flex gap-4">
-        <div class="w-24 h-18 rounded-lg bg-darkSlate-500" />
-        <div class="flex flex-col gap-2 mt-2 w-full">
-          <div class="w-full h-6 rounded-full bg-darkSlate-500" />
-          <div class="w-full h-4 rounded-full bg-darkSlate-500" />
+    <div class="flex flex-col gap-4 w-full">
+      <div class="flex gap-4 h-fit w-full items-end">
+        <div class="w-16 h-16 rounded-lg bg-darkSlate-500" />
+        <div class="flex flex-col gap-2 h-full">
+          <div class="w-30 h-6 rounded-full bg-darkSlate-500" />
+          <div class="w-20 h-4 rounded-full bg-darkSlate-500" />
         </div>
-      </div>
-      <div class="w-full h-26 rounded-xl bg-darkSlate-500" />
-      <div class="flex justify-between">
-        <div class="w-26 h-12 rounded-md bg-darkSlate-500" />
-        <div class="w-26 h-12 rounded-md bg-darkSlate-500" />
       </div>
     </div>
   );

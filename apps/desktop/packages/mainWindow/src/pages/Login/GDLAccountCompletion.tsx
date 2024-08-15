@@ -1,11 +1,14 @@
+import { convertSecondsToHumanTime } from "@/utils/helpers";
 import { Trans, useTransContext } from "@gd/i18n";
 import { Input } from "@gd/ui";
+import { Show } from "solid-js";
 
 interface Props {
   nextStep: () => void;
   prevStep: () => void;
   recoveryEmail: string | null;
   setRecoveryEmail: (_: string | null) => void;
+  cooldown: number;
 }
 
 const GDLAccountCompletion = (props: Props) => {
@@ -21,10 +24,21 @@ const GDLAccountCompletion = (props: Props) => {
           placeholder={t("login.recovery_email")}
           class="w-full"
           value={props.recoveryEmail || ""}
+          disabled={!!props.cooldown}
           onSearch={(value) => {
             props.setRecoveryEmail(value);
           }}
         />
+        <Show when={props.cooldown}>
+          <div class="text-sm text-lightSlate-500">
+            <Trans
+              key="login.new_email_request_wait"
+              options={{
+                time: convertSecondsToHumanTime(props.cooldown)
+              }}
+            />
+          </div>
+        </Show>
         <div class="text-sm text-lightSlate-500">
           <Trans key="login.recovery_email_description" />
         </div>

@@ -28,8 +28,23 @@ const GDLAccountVerification = (props: Props) => {
     mutationKey: ["account.requestNewVerificationToken"]
   }));
 
-  function invalidateEmailVerification() {
-    verified.refetch();
+  let latest = Symbol();
+
+  async function invalidateEmailVerification() {
+    const currSymbol = Symbol();
+
+    latest = currSymbol;
+    const res = await verified.refetch();
+
+    if (currSymbol !== latest) {
+      return;
+    }
+
+    if (res.data?.isEmailVerified) {
+      await rspc.createMutation(() => ({
+        mutationKey: ["account.saveGdlAccount"]
+      }));
+    }
   }
 
   let interval: ReturnType<typeof setInterval>;
@@ -59,9 +74,12 @@ const GDLAccountVerification = (props: Props) => {
         <Match when={!verified.data?.isEmailVerified}>
           <div class="flex-1 w-full text-center gap-5 flex flex-col justify-between items-center">
             <div class="p-10">
-              <h2>
+              <div class="text-2xl font-bold">
                 <Trans key="login.check_your_email_for_a_verification_link" />
-              </h2>
+              </div>
+              <div class="pt-4 pb-10 text-lightSlate-600">
+                ({verified.data?.email})
+              </div>
               <div
                 onClick={async () => {
                   if (cooldownInterval) {

@@ -61,7 +61,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     FEModdedManifestLoaderVersion[]
   >([]);
   const [chosenLoaderVersion, setChosenLoaderVersion] = createSignal(
-    instanceData()?.modloaderVersion || ""
+    instanceData()?.modloaderVersion || undefined
   );
   const [mcVersion, setMcVersion] = createSignal(
     instanceData()?.mcVersion || ""
@@ -158,6 +158,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
       )?.loaders;
 
       setLoaderVersions(versions || []);
+      setChosenLoaderVersion(versions?.[0]?.id);
     } else {
       setLoaderVersions([]);
     }
@@ -170,6 +171,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
       )?.loaders;
 
       setLoaderVersions(versions || []);
+      setChosenLoaderVersion(versions?.[0]?.id);
     } else if (!loader()) {
       setLoaderVersions([]);
     }
@@ -191,6 +193,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
           : [];
 
       setLoaderVersions(versions || []);
+      setChosenLoaderVersion(versions?.[0]?.id);
     } else if (!loader()) {
       setLoaderVersions([]);
     }
@@ -212,6 +215,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
           : [];
 
       setLoaderVersions(versions || []);
+      setChosenLoaderVersion(versions?.[0]?.id);
     } else if (!loader()) {
       setLoaderVersions([]);
     }
@@ -244,6 +248,10 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     else if (isFabric()) setMappedMcVersions(fabricMappedVersions);
     else if (isQuilt()) setMappedMcVersions(quiltMappedVersions);
     else setMappedMcVersions(filteredData);
+
+    if (!mcVersion() || !mappedMcVersions().find((v) => v.id === mcVersion())) {
+      setMcVersion(mappedMcVersions()[0].id);
+    }
   });
 
   const modloaders: {
@@ -705,7 +713,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                     bgColorClass="bg-darkSlate-800"
                     containerClass="w-full"
                     class="w-full"
-                    value={chosenLoaderVersion() || loaderVersions()[0].id}
+                    value={chosenLoaderVersion()}
                     placement="bottom"
                     onChange={(l) => {
                       const key = l.key as string;
@@ -717,7 +725,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 </Match>
                 <Match when={loaderVersions().length === 0}>
                   <Dropdown
-                    disabled={true}
+                    disabled
                     options={[{ label: "No elements", key: "none" }]}
                     bgColorClass="bg-darkSlate-800"
                     containerClass="w-full"

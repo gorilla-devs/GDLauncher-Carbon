@@ -50,6 +50,7 @@ keys! {
         GET_GDL_ACCOUNT                             = "getGdlAccount";
         REGISTER_GDL_ACCOUNT                        = "registerGdlAccount";
         REQUEST_NEW_VERIFICATION_TOKEN              = "requestNewVerificationToken";
+        REQUEST_EMAIL_CHANGE                        = "requestEmailChange";
         REMOVE_GDL_ACCOUNT                          = "removeGdlAccount";
         SAVE_GDL_ACCOUNT                            = "saveGdlAccount";
     }

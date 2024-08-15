@@ -314,10 +314,30 @@ const Tile = (props: Props) => {
                   <div class="absolute z-10 text-2xl i-ri:alert-fill text-yellow-500 top-1 right-1" />
                 </Show>
                 <Show when={props.failError}>
-                  <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-60 from-30% w-full h-full rounded-2xl" />
-                  <div class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-60 w-full h-full rounded-2xl" />
-                  <div class="i-ri:alert-fill absolute left-0 right-0 top-0 m-auto z-10 text-4xl text-red-500 bottom-20" />
-                  <div class="mt-10 z-70 text-center">
+                  <div
+                    class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-60 from-30% w-full h-full rounded-2xl"
+                    style={{
+                      "view-transition-name": `instance-tile-1-error-${props.instance.id}`
+                    }}
+                  />
+                  <div
+                    class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-60 w-full h-full rounded-2xl"
+                    style={{
+                      "view-transition-name": `instance-tile-2-error-${props.instance.id}`
+                    }}
+                  />
+                  <div
+                    class="i-ri:alert-fill absolute left-0 right-0 top-0 m-auto z-10 text-4xl text-red-500 bottom-20"
+                    style={{
+                      "view-transition-name": `instance-tile-3-error-${props.instance.id}`
+                    }}
+                  />
+                  <div
+                    class="w-full absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-70 text-center mt-5"
+                    style={{
+                      "view-transition-name": `instance-tile-4-error-${props.instance.id}`
+                    }}
+                  >
                     <div class="text-3xl font-bold">
                       <Trans key="error" />
                     </div>

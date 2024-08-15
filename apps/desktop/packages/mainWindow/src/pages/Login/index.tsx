@@ -55,6 +55,10 @@ export default function Login() {
     enabled: !!activeUuid.data
   }));
 
+  const saveGdlAccountMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.saveGdlAccount"]
+  }));
+
   createEffect((prev) => {
     if (activeUuid.data && activeUuid.data !== prev) {
       gdlUser.refetch();
@@ -72,6 +76,10 @@ export default function Login() {
     routeData.settings.data?.metricsEnabled
   );
 
+  const [cooldown, setCooldown] = createSignal(0);
+
+  let cooldownInterval: ReturnType<typeof setInterval> | undefined;
+
   const rspcContext = rspc.useContext();
 
   const settingsMutation = rspc.createMutation(() => ({
@@ -80,6 +88,10 @@ export default function Login() {
 
   const deleteGDLAccountMutation = rspc.createMutation(() => ({
     mutationKey: ["account.removeGdlAccount"]
+  }));
+
+  const requestEmailChangeMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.requestEmailChange"]
   }));
 
   const [isBackButtonVisible, setIsBackButtonVisible] = createSignal(false);
@@ -119,7 +131,7 @@ export default function Login() {
 
   async function transitionToLibrary() {
     return new Promise((resolve) => {
-      if (backgroundBlurRef) {
+      if (backgroundBlurRef && routeData.settings.data?.isFirstLaunch) {
         sidebarRef?.animate(
           [{ transform: "translateX(0%)" }, { transform: "translateX(-100%)" }],
           {
@@ -440,6 +452,7 @@ export default function Login() {
                     prevStep={prevStep}
                     recoveryEmail={recoveryEmail()}
                     setRecoveryEmail={setRecoveryEmail}
+                    cooldown={cooldown()}
                   />
                 </Match>
                 <Match when={step() === Steps.GDLAccountVerification}>
@@ -599,6 +612,8 @@ export default function Login() {
                           existingGDLUser.isEmailVerified
                         ) {
                           transitionToLibrary();
+                          await saveGdlAccountMutation.mutateAsync(uuid);
+
                           return;
                         } else if (
                           existingGDLUser &&
@@ -636,6 +651,51 @@ export default function Login() {
 
                         if (
                           existingGDLUser &&
+                          existingGDLUser.email &&
+                          existingGDLUser.email !== recoveryEmail()
+                        ) {
+                          try {
+                            const result =
+                              await requestEmailChangeMutation.mutateAsync({
+                                uuid,
+                                // button is disabled if the email is the same as the recovery email or is empty
+                                email: recoveryEmail()!
+                              });
+
+                            if (result.status === "success") {
+                              setStep(Steps.GDLAccountVerification);
+                              setLoadingButton(false);
+                            } else if (
+                              result.status === "failed" &&
+                              result.value
+                            ) {
+                              clearInterval(cooldownInterval);
+                              cooldownInterval = undefined;
+
+                              setLoadingButton(false);
+                              setCooldown(result.value);
+                              setRecoveryEmail(existingGDLUser.email);
+
+                              cooldownInterval = setInterval(() => {
+                                setCooldown((prev) => prev - 1);
+
+                                if (cooldown() <= 0) {
+                                  setCooldown(0);
+                                  clearInterval(cooldownInterval);
+                                  cooldownInterval = undefined;
+                                }
+                              }, 1000);
+                            }
+                          } catch (e) {
+                            console.error(e);
+                            addNotification({
+                              name: "Error while requesting email change",
+                              content: (e as any).message,
+                              type: "error"
+                            });
+                          }
+                        } else if (
+                          existingGDLUser &&
                           existingGDLUser.isEmailVerified
                         ) {
                           transitionToLibrary();
@@ -671,6 +731,16 @@ export default function Login() {
                       }
                     >
                       <Trans key="login.register" />
+                      <i class="i-ri:arrow-right-line" />
+                    </Match>
+                    <Match
+                      when={
+                        step() === Steps.GDLAccountCompletion &&
+                        gdlUser.data &&
+                        gdlUser.data.email !== recoveryEmail()
+                      }
+                    >
+                      <Trans key="login.request_email_change" />
                       <i class="i-ri:arrow-right-line" />
                     </Match>
                     <Match
