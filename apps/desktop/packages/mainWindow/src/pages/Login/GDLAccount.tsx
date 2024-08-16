@@ -1,5 +1,5 @@
 import { createEffect, Show, Suspense } from "solid-js";
-import { Trans } from "@gd/i18n";
+import { Trans, useTransContext } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
 import { Collapsable } from "@gd/ui";
 
@@ -8,6 +8,8 @@ type Props = {
 };
 
 const GDLAccount = (props: Props) => {
+  const [t] = useTransContext();
+
   const accounts = rspc.createQuery(() => ({
     queryKey: ["account.getAccounts"]
   }));
@@ -65,7 +67,7 @@ const GDLAccount = (props: Props) => {
             </h2>
             <Collapsable
               defaultOpened={false}
-              title={<Trans key="login.what_is_a_gdlauncher_account" />}
+              title={t("login.what_is_a_gdlauncher_account")}
             >
               <p class="text-lightSlate-500 text-md">
                 <Trans key="login.what_is_a_gdlauncher_account_text" />
@@ -73,7 +75,7 @@ const GDLAccount = (props: Props) => {
             </Collapsable>
             <Collapsable
               defaultOpened={false}
-              title={<Trans key="login.how_does_it_work" />}
+              title={t("login.how_does_it_work")}
             >
               <p class="text-lightSlate-500 text-md">
                 <Trans
@@ -82,15 +84,15 @@ const GDLAccount = (props: Props) => {
                     account_id: `${currentlySelectedAccount()?.username}${currentlySelectedAccountEmail()}`
                   }}
                 >
+                  {""}
                   <span class="text-white font-bold" />
+                  {""}
                 </Trans>
               </p>
             </Collapsable>
             <Collapsable
               defaultOpened={false}
-              title={
-                <Trans key="login.what_if_i_lose_access_to_my_microsoft_account" />
-              }
+              title={t("login.what_if_i_lose_access_to_my_microsoft_account")}
             >
               <p class="text-lightSlate-500 text-md">
                 <Trans key="login.what_if_i_lose_access_to_my_microsoft_account_text" />
@@ -98,9 +100,7 @@ const GDLAccount = (props: Props) => {
             </Collapsable>
             <Collapsable
               defaultOpened={false}
-              title={
-                <Trans key="login.what_happens_if_i_skip_the_account_creation" />
-              }
+              title={t("login.what_happens_if_i_skip_the_account_creation")}
             >
               <p class="text-lightSlate-500 text-md">
                 <Trans key="login.what_happens_if_i_skip_the_account_creation_text" />

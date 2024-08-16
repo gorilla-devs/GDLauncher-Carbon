@@ -140,6 +140,9 @@ importers:
       fs-extra:
         specifier: ^11.2.0
         version: 11.2.0
+      html-parse-string:
+        specifier: ^0.0.9
+        version: 0.0.9
       jsdom:
         specifier: ^22.1.0
         version: 22.1.0
@@ -280,20 +283,20 @@ importers:
   packages/i18n:
     devDependencies:
       '@mbarzda/solid-i18next':
-        specifier: ^1.2.2
-        version: 1.4.1(html-parse-string@0.0.9)(i18next@23.7.18)(solid-js@1.8.15)
+        specifier: ^1.4.1
+        version: 1.4.1(html-parse-string@0.0.9)(i18next@23.13.0)(solid-js@1.8.15)
       html-parse-string:
         specifier: ^0.0.9
         version: 0.0.9
       i18next:
-        specifier: ^23.2.6
-        version: 23.7.18
+        specifier: ^23.13.0
+        version: 23.13.0
       i18next-icu:
         specifier: ^2.3.0
-        version: 2.3.0(intl-messageformat@10.5.10)
+        version: 2.3.0(intl-messageformat@10.5.14)
       intl-messageformat:
-        specifier: ^10.5.0
-        version: 10.5.10
+        specifier: ^10.5.14
+        version: 10.5.14
 
   packages/ui:
     devDependencies:
@@ -3569,8 +3572,8 @@ packages:
     resolution: {integrity: sha512-lZY64hVXrnkt/+5jRfm0uMiRv+lmrIdnATAnDj1SPqebmI2UDf3KC9p4rOkIYsBOjOsD6seJ82GIQE067DSvWw==}
     dev: false
 
-  /@formatjs/ecma402-abstract@1.18.2:
-    resolution: {integrity: sha512-+QoPW4csYALsQIl8GbN14igZzDbuwzcpWrku9nyMXlaqAlwRBgl5V+p0vWMGFqHOw37czNXaP/lEk4wbLgcmtA==}
+  /@formatjs/ecma402-abstract@2.0.0:
+    resolution: {integrity: sha512-rRqXOqdFmk7RYvj4khklyqzcfQl9vEL/usogncBHRZfZBDOwMGuSRNFl02fu5KGHXdbinju+YXyuR+Nk8xlr/g==}
     dependencies:
       '@formatjs/intl-localematcher': 0.5.4
       tslib: 2.6.2
@@ -3582,18 +3585,18 @@ packages:
       tslib: 2.6.2
     dev: true
 
-  /@formatjs/icu-messageformat-parser@2.7.5:
-    resolution: {integrity: sha512-zCB53HdGDibh6/2ISEN3TGsFQruQ6gGKMFV94qHNyVrs0tNO6ncKhV0vq0n3Ydz8ipIQ2GaYAvfCoimNOVvKqA==}
+  /@formatjs/icu-messageformat-parser@2.7.8:
+    resolution: {integrity: sha512-nBZJYmhpcSX0WeJ5SDYUkZ42AgR3xiyhNCsQweFx3cz/ULJjym8bHAzWKvG5e2+1XO98dBYC0fWeeAECAVSwLA==}
     dependencies:
-      '@formatjs/ecma402-abstract': 1.18.2
-      '@formatjs/icu-skeleton-parser': 1.7.2
+      '@formatjs/ecma402-abstract': 2.0.0
+      '@formatjs/icu-skeleton-parser': 1.8.2
       tslib: 2.6.2
     dev: true
 
-  /@formatjs/icu-skeleton-parser@1.7.2:
-    resolution: {integrity: sha512-nlIXVv280bjGW3ail5Np1+xgGKBnMhwQQIivgbk9xX0af8ESQO+y2VW9TOY7mCrs3WH786uVpZlLimXAlXH7SA==}
+  /@formatjs/icu-skeleton-parser@1.8.2:
+    resolution: {integrity: sha512-k4ERKgw7aKGWJZgTarIcNEmvyTVD9FYh0mTrrBMHZ1b8hUu6iOJ4SzsZlo3UNAvHYa+PnvntIwRPt1/vy4nA9Q==}
     dependencies:
-      '@formatjs/ecma402-abstract': 1.18.2
+      '@formatjs/ecma402-abstract': 2.0.0
       tslib: 2.6.2
     dev: true
 
@@ -4008,7 +4011,7 @@ packages:
       - supports-color
     dev: true
 
-  /@mbarzda/solid-i18next@1.4.1(html-parse-string@0.0.9)(i18next@23.7.18)(solid-js@1.8.15):
+  /@mbarzda/solid-i18next@1.4.1(html-parse-string@0.0.9)(i18next@23.13.0)(solid-js@1.8.15):
     resolution: {integrity: sha512-QC/mrD9aMibcjuSNpdr9uky+JNupVedOB2CLNYJrFrZCMyY8+HXK3q1Lda+P2WoNBWToS+6BCwbB1D9sKBCXSQ==}
     peerDependencies:
       html-parse-string: <=1.x
@@ -4019,7 +4022,7 @@ packages:
         optional: true
     dependencies:
       html-parse-string: 0.0.9
-      i18next: 23.7.18
+      i18next: 23.13.0
       solid-js: 1.8.15
     dev: true
 
@@ -5972,11 +5975,11 @@ packages:
       - supports-color
     dev: true
 
-  /@storybook/builder-vite@8.3.0-alpha.5(storybook@7.6.10)(typescript@5.3.3)(vite@4.5.2):
-    resolution: {integrity: sha512-fAP7MEjTd+fzdhWhPQ7uNtfh2z68OKkoSvBHeWpaNpauSh7EFWTmRVATdz4bItGmK2na/FFHEayHPTnfQWkU0g==}
+  /@storybook/builder-vite@8.3.0-alpha.6(storybook@7.6.10)(typescript@5.3.3)(vite@4.5.2):
+    resolution: {integrity: sha512-r8O+6hRBNCql6f5NykbDUr5U/clNeDRJoBF+FpWkpQT9dXFoYor54u6JMEJmseHPdmiJemhiIZ0xo54ktWUJLg==}
     peerDependencies:
       '@preact/preset-vite': '*'
-      storybook: ^8.3.0-alpha.5
+      storybook: ^8.3.0-alpha.6
       typescript: '>= 4.3.x'
       vite: ^4.0.0 || ^5.0.0
       vite-plugin-glimmerx: '*'
@@ -5988,7 +5991,7 @@ packages:
       vite-plugin-glimmerx:
         optional: true
     dependencies:
-      '@storybook/csf-plugin': 8.3.0-alpha.5(storybook@7.6.10)
+      '@storybook/csf-plugin': 8.3.0-alpha.6(storybook@7.6.10)
       '@types/find-cache-dir': 3.2.1
       browser-assert: 1.2.1
       es-module-lexer: 1.5.0
@@ -6213,10 +6216,10 @@ packages:
       - supports-color
     dev: true
 
-  /@storybook/csf-plugin@8.3.0-alpha.5(storybook@7.6.10):
-    resolution: {integrity: sha512-NgArxKGtrdeCTM7H0L3ppYpXRsxqUfaw5jGk2QykMqOFbrSfyVgKeL8iZPClFH6YjopYL1GtlziHLCL2Cju1JA==}
+  /@storybook/csf-plugin@8.3.0-alpha.6(storybook@7.6.10):
+    resolution: {integrity: sha512-zGJ3qaF/Zx1EQZr5blS611vBzR0U+EwFjs7qwl0gYYrV+TSTCCZpIP6v7jDtpJ8vF2QVeem7iXreERi0L5Y8sQ==}
     peerDependencies:
-      storybook: ^8.3.0-alpha.5
+      storybook: ^8.3.0-alpha.6
     dependencies:
       storybook: 7.6.10
       unplugin: 1.6.0
@@ -11322,16 +11325,16 @@ packages:
     resolution: {integrity: sha512-AXcZb6vzzrFAUE61HnN4mpLqd/cSIwNQjtNWR0euPm6y0iqx3G4gOXaIDdtdDwZmhwe82LA6+zinmW4UBWVePQ==}
     engines: {node: '>=16.17.0'}
 
-  /i18next-icu@2.3.0(intl-messageformat@10.5.10):
+  /i18next-icu@2.3.0(intl-messageformat@10.5.14):
     resolution: {integrity: sha512-x+j7kd5nDJCfbU53uwsMfXD7ALPu5uv0bqjAMQ5nVvXRoj1L7gkmswKtM3XDWYo4YUHf1jznlhSdPyy0xEwU+Q==}
     peerDependencies:
       intl-messageformat: ^10.3.3
     dependencies:
-      intl-messageformat: 10.5.10
+      intl-messageformat: 10.5.14
     dev: true
 
-  /i18next@23.7.18:
-    resolution: {integrity: sha512-b9N2KjRCYQNlUvE1Kc83g8knyUkL5NiZQOp9BsTR/v/LXk6Fzz+doOzTg2/826XK28mCgBkYLNAtixjE58qpCw==}
+  /i18next@23.13.0:
+    resolution: {integrity: sha512-B+g0/KTKmN3+NeMKPljQxdrih6Q6lyDF5O2e/Ofd0JQsTLojJD/BSTTN04iw6OVc0yBiHeypu5hoBNV6ag44Zw==}
     dependencies:
       '@babel/runtime': 7.23.8
     dev: true
@@ -11441,12 +11444,12 @@ packages:
       side-channel: 1.0.4
     dev: true
 
-  /intl-messageformat@10.5.10:
-    resolution: {integrity: sha512-3yzwX6t/my9WRtNiqP05r+/UkpWxwstQiwaHAiuHmDRt7ykzWJ+nceOVjNLZYYWGiSltY+C+Likd8OIVkASepw==}
+  /intl-messageformat@10.5.14:
+    resolution: {integrity: sha512-IjC6sI0X7YRjjyVH9aUgdftcmZK7WXdHeil4KwbjDnRWjnVitKpAx3rr6t6di1joFp5188VqKcobOPA6mCLG/w==}
     dependencies:
-      '@formatjs/ecma402-abstract': 1.18.2
+      '@formatjs/ecma402-abstract': 2.0.0
       '@formatjs/fast-memoize': 2.2.0
-      '@formatjs/icu-messageformat-parser': 2.7.5
+      '@formatjs/icu-messageformat-parser': 2.7.8
       tslib: 2.6.2
     dev: true
 
@@ -15423,7 +15426,7 @@ packages:
     resolution: {integrity: sha512-dD+VMYC5fBBQNesVb+mjB0LOkZIf100SQFbjAt9/sDstNUvc5ce3yZwLYXzgcOc7jcSMkrBu/cZNRzEM4YIAyw==}
     engines: {node: ^14.18 || >=16}
     dependencies:
-      '@storybook/builder-vite': 8.3.0-alpha.5(storybook@7.6.10)(typescript@5.3.3)(vite@4.5.2)
+      '@storybook/builder-vite': 8.3.0-alpha.6(storybook@7.6.10)(typescript@5.3.3)(vite@4.5.2)
     transitivePeerDependencies:
       - '@preact/preset-vite'
       - storybook
