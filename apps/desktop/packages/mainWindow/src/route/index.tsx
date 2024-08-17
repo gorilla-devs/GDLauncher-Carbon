@@ -178,6 +178,10 @@ export const routes: RouteDefinition[] = [
             component: lazy(() => import("@/pages/Settings/General"))
           },
           {
+            path: "/accounts",
+            component: lazy(() => import("@/pages/Settings/Accounts"))
+          },
+          {
             path: "/language",
             component: lazy(() => import("@/pages/Settings/Language"))
           },

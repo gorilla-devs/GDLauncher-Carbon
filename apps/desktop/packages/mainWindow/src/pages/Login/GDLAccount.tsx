@@ -18,7 +18,7 @@ const GDLAccount = (props: Props) => {
     accounts.data?.find((v) => v.uuid === props.activeUuid);
 
   const gdlUser = rspc.createQuery(() => ({
-    queryKey: ["account.getGdlAccount", props.activeUuid!],
+    queryKey: ["account.getRemoteGdlAccount", props.activeUuid!],
     enabled: !!props.activeUuid
   }));
 

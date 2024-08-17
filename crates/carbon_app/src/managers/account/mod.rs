@@ -1,3 +1,4 @@
+use crate::api::keys::settings::GET_SETTINGS;
 use crate::db::app_configuration;
 use crate::domain::account::*;
 use crate::{
@@ -207,7 +208,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(Some(account.status))
     }
 
-    pub async fn get_gdl_account(self, uuid: String) -> anyhow::Result<Option<GDLUser>> {
+    pub async fn get_remote_gdl_account(self, uuid: String) -> anyhow::Result<Option<GDLUser>> {
         let Some(id_token) = self
             .get_account_entries()
             .await?
@@ -223,6 +224,29 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
         let account = self.gdl_account_task.read().await;
         Ok(account.get_account(id_token).await?)
+    }
+
+    pub async fn request_gdl_account_deletion(self, uuid: String) -> anyhow::Result<()> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to request a gdl account deletion for an account that does not exist"
+            ))?
+            .id_token
+        else {
+            bail!("attempted to get an account that does not exist");
+        };
+
+        self.gdl_account_task
+            .write()
+            .await
+            .request_deletion(id_token)
+            .await?;
+
+        Ok(())
     }
 
     pub async fn register_gdl_account(
@@ -251,7 +275,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .with_context(|| format!("failed to register account: {uuid}"))?;
 
         self.app
-            .invalidate(GET_GDL_ACCOUNT, Some(uuid.clone().into()));
+            .invalidate(GET_REMOTE_GDL_ACCOUNT, Some(uuid.clone().into()));
 
         Ok(user)
     }
@@ -265,9 +289,44 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .set(SetParam::SetGdlAccountUuid(uuid))
             .await?;
 
+        self.app.invalidate(GET_GDL_ACCOUNT, None);
+        self.app.invalidate(GET_SETTINGS, None);
+
         // TODO!: Should get status from the API
 
         Ok(())
+    }
+
+    pub async fn get_gdl_account(self) -> anyhow::Result<Option<GDLUser>> {
+        let saved_gdl_account_uuid = self
+            .app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .gdl_account_uuid;
+
+        let Some(saved_gdl_account_uuid) = saved_gdl_account_uuid else {
+            return Ok(None);
+        };
+
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == saved_gdl_account_uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to get a gdl account that does not exist"
+            ))?
+            .id_token
+        else {
+            bail!("attempted to get an account that does not exist");
+        };
+
+        self.gdl_account_task
+            .read()
+            .await
+            .get_account(id_token)
+            .await
     }
 
     pub async fn request_new_verification_token(
@@ -319,8 +378,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
         let lock = self.gdl_account_task.write().await;
         lock.request_email_change(id_token, email).await?;
 
+        self.app.invalidate(GET_GDL_ACCOUNT, None);
+
         self.app
-            .invalidate(GET_GDL_ACCOUNT, Some(uuid.clone().into()));
+            .invalidate(GET_REMOTE_GDL_ACCOUNT, Some(uuid.clone().into()));
 
         Ok(())
     }
@@ -337,6 +398,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .settings_manager()
             .set(SetParam::SetGdlAccountStatus(None))
             .await?;
+
+        self.app.invalidate(GET_GDL_ACCOUNT, None);
+        self.app.invalidate(GET_SETTINGS, None);
 
         Ok(())
     }

@@ -20,7 +20,7 @@ const GDLAccountVerification = (props: Props) => {
   }));
 
   const verified = rspc.createQuery(() => ({
-    queryKey: ["account.getGdlAccount", props.activeUuid!],
+    queryKey: ["account.getRemoteGdlAccount", props.activeUuid!],
     enabled: !!props.activeUuid
   }));
 

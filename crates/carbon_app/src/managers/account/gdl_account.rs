@@ -195,5 +195,24 @@ impl GDLAccountTask {
         Ok(())
     }
 
+    pub async fn request_deletion(&self, id_token: String) -> anyhow::Result<()> {
+        let url = format!("{}/v1/users/request-account-deletion", GDL_API_BASE);
+
+        let authorization = format!("Bearer {}", id_token);
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, authorization.parse().unwrap());
+
+        self.client
+            .post(url)
+            .headers(headers)
+            .send()
+            .await
+            .map_err(|err| anyhow::anyhow!("failed to request account deletion {}", err))?
+            .error_for_status()
+            .map_err(|err| anyhow::anyhow!("failed to request account deletion: {}", err))?;
+
+        Ok(())
+    }
+
     pub async fn get_subscription_status(&self) {}
 }

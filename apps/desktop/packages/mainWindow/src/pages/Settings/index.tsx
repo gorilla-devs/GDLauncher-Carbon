@@ -17,13 +17,18 @@ const settings: Array<settingsItem> = [
     path: "/settings"
   },
   {
+    name: "Accounts",
+    icon: "i-ri:account-box-fill",
+    path: "/settings/accounts"
+  },
+  {
     name: "Language",
-    icon: "i-ri:global-line",
+    icon: "i-ri:global-fill",
     path: "/settings/language"
   },
   {
     name: "Appearance",
-    icon: "i-ri:brush-line",
+    icon: "i-ri:brush-fill",
     path: "/settings/appearance"
   },
   {
@@ -38,7 +43,7 @@ const settings: Array<settingsItem> = [
   },
   {
     name: "Privacy",
-    icon: "i-ri:shield-keyhole-line",
+    icon: "i-ri:shield-keyhole-fill",
     path: "/settings/privacy"
   },
   {

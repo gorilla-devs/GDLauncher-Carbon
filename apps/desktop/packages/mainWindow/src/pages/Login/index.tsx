@@ -22,6 +22,7 @@ import GDLAccount from "./GDLAccount";
 import GDLAccountCompletion from "./GDLAccountCompletion";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import GDLAccountVerification from "./GDLAccountVerification";
+import { useGlobalStore } from "@/components/GlobalStoreContext";
 
 export type DeviceCodeObjectType = {
   userCode: string;
@@ -41,6 +42,8 @@ enum Steps {
 export default function Login() {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
+  const globalStore = useGlobalStore();
+
   const navigate = useGDNavigate();
   const [step, setStep] = createSignal<Steps>(Steps.TermsAndConditions);
   const [deviceCodeObject, setDeviceCodeObject] =
@@ -51,7 +54,7 @@ export default function Login() {
   }));
 
   const gdlUser = rspc.createQuery(() => ({
-    queryKey: ["account.getGdlAccount", activeUuid.data!],
+    queryKey: ["account.getRemoteGdlAccount", activeUuid.data!],
     enabled: !!activeUuid.data
   }));
 
@@ -70,10 +73,10 @@ export default function Login() {
   const [recoveryEmail, setRecoveryEmail] = createSignal<string | null>(null);
 
   const [acceptedTOS, setAcceptedTOS] = createSignal(
-    routeData.settings.data?.termsAndPrivacyAccepted
+    globalStore.settings.data?.termsAndPrivacyAccepted
   );
   const [acceptedMetrics, setAcceptedMetrics] = createSignal(
-    routeData.settings.data?.metricsEnabled
+    globalStore.settings.data?.metricsEnabled
   );
 
   const [cooldown, setCooldown] = createSignal(0);
@@ -97,14 +100,18 @@ export default function Login() {
   const [isBackButtonVisible, setIsBackButtonVisible] = createSignal(false);
 
   const isGDLAccountSet = () =>
-    routeData.settings.data?.gdlAccountId ||
-    routeData.settings.data?.gdlAccountId === "";
+    globalStore.settings.data?.gdlAccountId ||
+    globalStore.settings.data?.gdlAccountId === "";
+
+  createEffect(() => {
+    console.log("IS GDL ACCOUNT SET", isGDLAccountSet());
+  });
 
   const isAlreadyAuthenticated = () =>
-    routeData?.activeUuid?.data &&
-    routeData.accounts.data?.length! > 0 &&
-    routeData.settings.data?.termsAndPrivacyAccepted &&
-    Boolean(routeData.settings.data?.metricsEnabledLastUpdate) &&
+    globalStore?.currentlySelectedAccountUuid?.data &&
+    globalStore.accounts.data?.length! > 0 &&
+    globalStore.settings.data?.termsAndPrivacyAccepted &&
+    Boolean(globalStore.settings.data?.metricsEnabledLastUpdate) &&
     isGDLAccountSet();
 
   const accountEnrollFinalizeMutation = rspc.createMutation(() => ({
@@ -131,7 +138,7 @@ export default function Login() {
 
   async function transitionToLibrary() {
     return new Promise((resolve) => {
-      if (backgroundBlurRef && routeData.settings.data?.isFirstLaunch) {
+      if (backgroundBlurRef && globalStore.settings.data?.isFirstLaunch) {
         sidebarRef?.animate(
           [{ transform: "translateX(0%)" }, { transform: "translateX(-100%)" }],
           {
@@ -218,7 +225,7 @@ export default function Login() {
         }
 
         const gdlUser = await rspcContext.client.query([
-          "account.getGdlAccount",
+          "account.getRemoteGdlAccount",
           activeUuid
         ]);
 
@@ -254,7 +261,7 @@ export default function Login() {
     }
 
     const gdlUser = await rspcContext.client.query([
-      "account.getGdlAccount",
+      "account.getRemoteGdlAccount",
       activeUuid
     ]);
 
@@ -595,7 +602,8 @@ export default function Login() {
                         await accountEnrollBeginMutation.mutateAsync(undefined);
                       }
                     } else if (step() === Steps.GDLAccount) {
-                      const uuid = routeData?.activeUuid?.data;
+                      const uuid =
+                        globalStore?.currentlySelectedAccountUuid?.data;
 
                       if (!uuid) {
                         throw new Error("No active uuid");
@@ -603,7 +611,7 @@ export default function Login() {
 
                       try {
                         const existingGDLUser = await rspcContext.client.query([
-                          "account.getGdlAccount",
+                          "account.getRemoteGdlAccount",
                           uuid
                         ]);
 
@@ -631,7 +639,8 @@ export default function Login() {
                       setLoadingButton(false);
                       nextStep();
                     } else if (step() === Steps.GDLAccountCompletion) {
-                      const uuid = routeData?.activeUuid?.data;
+                      const uuid =
+                        globalStore?.currentlySelectedAccountUuid?.data;
 
                       if (!uuid) {
                         throw new Error("No active uuid");
@@ -645,7 +654,7 @@ export default function Login() {
 
                       try {
                         const existingGDLUser = await rspcContext.client.query([
-                          "account.getGdlAccount",
+                          "account.getRemoteGdlAccount",
                           uuid
                         ]);
 

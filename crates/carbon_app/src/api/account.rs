@@ -72,8 +72,14 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         query GET_HEAD[_, _uuid: String] { Ok(()) }
 
-        query GET_GDL_ACCOUNT[app, uuid: String] {
-            let gdl_user = app.account_manager().get_gdl_account(uuid).await?;
+        query GET_REMOTE_GDL_ACCOUNT[app, uuid: String] {
+            let gdl_user = app.account_manager().get_remote_gdl_account(uuid).await?;
+
+            Ok(gdl_user.map(Into::<FEGDLAccount>::into))
+        }
+
+        query GET_GDL_ACCOUNT[app, args: ()] {
+            let gdl_user = app.account_manager().get_gdl_account().await?;
 
             Ok(gdl_user.map(Into::<FEGDLAccount>::into))
         }
