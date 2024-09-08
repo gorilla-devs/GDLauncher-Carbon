@@ -98,5 +98,9 @@
   "custom_profiles": "Custom Profiles",
   "profile_used_in_mc_versions": "This profile is used in the following Minecraft versions",
   "this_instance_requires": "This instance requires",
-  "add_new_profile": "Add New Profile"
+  "add_new_profile": "Add New Profile",
+  "documents_title": "Documents",
+  "documents_text": "Below you can find some legal documents relevant to the usage of this application.",
+  "privacy_policy": "Privacy Policy",
+  "terms_of_service": "Terms of Service"
 }

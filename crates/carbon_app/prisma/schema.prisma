@@ -51,7 +51,6 @@ model AppConfiguration {
   metricsEnabled                  Boolean   @default(false)
   metricsEnabledLastUpdate        DateTime? // should ask again after 12 months
   gdlAccountUuid                  String?
-  gdlAccount                      Account?  @relation("gdlAccount", fields: [gdlAccountUuid], references: [uuid])
   gdlAccountStatus                Bytes?
 }
 
@@ -86,7 +85,6 @@ model Account {
   lastUsed                      DateTime
   skinId                        String?
   AppConfigurationActiveAccount AppConfiguration[] @relation("activeAccount")
-  AppConfigurationGdlAccount    AppConfiguration[] @relation("gdlAccount")
 }
 
 model Skin {

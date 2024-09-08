@@ -520,7 +520,7 @@ export default function Login() {
                     fullWidth
                     onClick={async () => {
                       if (step() === Steps.GDLAccount) {
-                        await deleteGDLAccountMutation.mutateAsync(undefined);
+                        await saveGdlAccountMutation.mutateAsync("");
                         transitionToLibrary();
                       } else {
                         handleAnimationBackward();
@@ -703,15 +703,6 @@ export default function Login() {
                           setRecoveryEmail(existingGDLUser.email);
                           setStep(Steps.GDLAccountVerification);
                         } else {
-                          const gdlUser = await rspcContext.client.mutation([
-                            "account.registerGdlAccount",
-                            {
-                              email,
-                              uuid
-                            }
-                          ]);
-
-                          console.log("GDL USER", gdlUser);
                           nextStep();
                         }
                       } catch (e) {

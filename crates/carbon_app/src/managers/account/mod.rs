@@ -327,6 +327,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
             return Ok(None);
         };
 
+        if saved_gdl_account_uuid.is_empty() {
+            return Ok(None);
+        }
+
         let Some(id_token) = self
             .get_account_entries()
             .await?

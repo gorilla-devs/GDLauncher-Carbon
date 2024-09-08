@@ -1,6 +1,6 @@
 import { Trans, useTransContext } from "@gd/i18n";
-import { Button, Input, Tooltip } from "@gd/ui";
-import { port, rspc } from "@/utils/rspcClient";
+import { Button, Tooltip } from "@gd/ui";
+import { rspc } from "@/utils/rspcClient";
 import PageTitle from "./components/PageTitle";
 import Row from "./components/Row";
 import Title from "./components/Title";

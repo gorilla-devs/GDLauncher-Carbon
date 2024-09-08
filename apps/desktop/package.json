@@ -13,7 +13,7 @@
     "dev": "node scripts/watch.mjs",
     "test": "playwright test",
     "build-vite": "node scripts/build.mjs",
-    "patch-version": "node scripts/monkeypatchVersion.cjs",
+    "patch-version": "node scripts/monkeypatchVersion.mjs",
     "build-electron": "cross-env-shell DEBUG=electron-builder ow-electron-builder --config .electron-builder.config.cjs",
     "build": "pnpm patch-version && pnpm build-vite && pnpm build-electron",
     "clean": "node scripts/cleanReleaseFolder.mjs",

@@ -86,7 +86,7 @@ pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClie
         ))),
         M::up(include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240809193232_gdl_accounts/migration.sql"
+            "/prisma/migrations/20240908194422_gdl_accounts/migration.sql"
         ))),
     ];
 
