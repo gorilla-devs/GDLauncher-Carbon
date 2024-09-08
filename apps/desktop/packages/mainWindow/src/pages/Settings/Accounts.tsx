@@ -123,7 +123,7 @@ const Accounts = () => {
                         removeGDLAccountMutation.mutate(undefined);
                       }}
                     >
-                      LOG OUT
+                      <Trans key="settings:log_out_gdl_account" />
                     </Button>
                   </div>
                   <Show when={!globalStore?.gdlAccount.data?.isEmailVerified}>
@@ -234,7 +234,7 @@ const Accounts = () => {
                       navigate("/");
                     }}
                   >
-                    ADD GDL ACCOUNT
+                    <Trans key="settings:add_gdl_account" />
                   </Button>
                 </div>
               </Match>

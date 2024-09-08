@@ -53,6 +53,8 @@
   "request_account_deletion_description": "Deleting your GDLauncher account is a permanent action and cannot be undone. You will lose access to all your saved data.",
   "request_account_deletion": "Request Deletion",
   "cannot_request_deletion_for_time": "Wait {{time}} before requesting again",
+  "add_gdl_account": "Add GDLauncher Account",
+  "log_out_gdl_account": "Log Out GDLauncher Account",
   "appearance": "Appearance",
   "default_themes_title": "Default Themes",
   "default_themes_text": "You can select one of the default themes for the launcher.",
