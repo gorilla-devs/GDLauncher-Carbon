@@ -15,22 +15,22 @@ import {
   isSidebarOpened,
   toggleSidebar
 } from "@/utils/sidebar";
-import { useLocation, useRouteData } from "@solidjs/router";
+import { useLocation } from "@solidjs/router";
 import { getInstanceIdFromPath, setLastInstanceOpened } from "@/utils/routes";
 import { Trans, useTransContext } from "@gd/i18n";
-import fetchData from "@/pages/Library/library.data";
 import { createStore, reconcile } from "solid-js/store";
 import { InstancesStore } from "@/utils/instances";
 import InstanceTile from "../InstanceTile";
 import skull from "/assets/images/icons/skull.png";
 import { CFFEModLoaderType } from "@gd/core_module/bindings";
+import { useGlobalStore } from "../GlobalStoreContext";
 
 const Sidebar = () => {
   const location = useLocation();
   const [t] = useTransContext();
 
   const instanceId = () => getInstanceIdFromPath(location.pathname);
-  const routeData: ReturnType<typeof fetchData> = useRouteData();
+  const routeData = useGlobalStore();
   const [instances, setInstances] = createStore<InstancesStore>({});
   const [filter, setFilter] = createSignal("");
 

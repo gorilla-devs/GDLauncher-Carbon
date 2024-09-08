@@ -8,7 +8,7 @@ export type Procedures = {
         { key: "account.getActiveUuid", input: never, result: string | null } | 
         { key: "account.getGdlAccount", input: never, result: FEGDLAccount | null } | 
         { key: "account.getHead", input: string, result: null } | 
-        { key: "account.getRemoteGdlAccount", input: string, result: FEGDLAccount | null } | 
+        { key: "account.peekGdlAccount", input: string, result: FEGDLAccount | null } | 
         { key: "echo", input: string, result: string } | 
         { key: "getAppVersion", input: never, result: string } | 
         { key: "instance.explore", input: ExploreQuery, result: ExploreEntry[] } | 
@@ -74,6 +74,7 @@ export type Procedures = {
         { key: "account.registerGdlAccount", input: FERegisterAccount, result: FEGDLAccount } | 
         { key: "account.removeGdlAccount", input: never, result: null } | 
         { key: "account.requestEmailChange", input: FERequestEmailChange, result: FERequestNewEmailChangeStatus } | 
+        { key: "account.requestGdlAccountDeletion", input: string, result: FERequestDeletionStatus } | 
         { key: "account.requestNewVerificationToken", input: string, result: FERequestNewVerificationTokenStatus } | 
         { key: "account.saveGdlAccount", input: string | null, result: null } | 
         { key: "account.setActiveUuid", input: string | null, result: null } | 
@@ -117,10 +118,6 @@ export type Procedures = {
     subscriptions: never
 };
 
-export type FERegisterAccount = { email: string; uuid: string }
-
-export type AccountStatus = "ok" | "expired" | "refreshing" | "invalid"
-
 export type ListGroup = { id: FEGroupId; name: string }
 
 export type ModSources = { channels: ModChannelWithUsage[]; platform_blacklist: ModPlatform[] }
@@ -155,6 +152,8 @@ export type FESettingsUpdate = { theme?: Set<string> | null; language?: Set<stri
 
 export type FEManagedJavaArchMap = { [key: FEManagedJavaArch]: FEManagedJavaVersion[] }
 
+export type AccountEntry = { username: string; uuid: string; lastUsed: string; type: AccountType }
+
 export type MRFETeamMember = { team_id: string; user: MRFEUser; role: string; ordering: string | null }
 
 export type ExportTarget = "Curseforge" | "Modrinth"
@@ -181,15 +180,11 @@ export type GameLogEntry = { id: GameLogId; instance_id: FEInstanceId; active: b
 
 export type ModpackInfo = { modpack: Modpack; locked: boolean }
 
-export type FERequestEmailChange = { email: string; uuid: string }
-
 export type CFFEFilesParameters = { body: CFFEFilesParametersBody }
 
 export type MRFEUserRole = "developer" | "moderator" | "admin"
 
 export type GameVersion = { Standard: StandardVersion }
-
-export type AccountEntry = { username: string; uuid: string; lastUsed: string; type: AccountType }
 
 export type Modpack = { type: "curseforge"; value: CurseforgeModpack } | { type: "modrinth"; value: ModrinthModpack }
 
@@ -263,7 +258,7 @@ export type ImportEntity = "LegacyGDLauncher" | "MRPack" | "Modrinth" | "CurseFo
 
 export type ImportableInstance = { filename: string; instance_name: string }
 
-export type FERequestNewVerificationTokenStatus = { status: "success" } | { status: "failed"; value: number | null }
+export type EnrollmentStatus = "refreshingMSAuth" | "requestingCode" | { pollingCode: DeviceCode } | "mcLogin" | "xboxAuth" | "mcentitlements" | "mcProfile" | { complete: AccountEntry } | { failed: EnrollmentError }
 
 export type FEUnifiedModSortIndex = { curseForge: CFFEModSearchSortField } | { modrinth: MRFESearchIndex }
 
@@ -275,7 +270,11 @@ export type InstallMod = { instance_id: FEInstanceId; mod_source: ModSource; ins
 
 export type MRFEAdditionalFileType = "requiredResourcePack" | "optionalResourcePack"
 
+export type DeviceCode = { userCode: string; verificationUri: string; expiresAt: string }
+
 export type ExportArgs = { instance_id: FEInstanceId; target: ExportTarget; save_path: string; self_contained_addons_bundling: boolean; filter: ExportEntry }
+
+export type FERequestNewEmailChangeStatus = { status: "success" } | { status: "failed"; value: number | null }
 
 export type FEJavaComponent = { id: string; path: string; version: string; type: FEJavaComponentType; isValid: boolean }
 
@@ -301,11 +300,13 @@ export type MRFEProject = { slug: string; title: string; description: string; ca
 
 export type MRFECategoriesResponse = MRFECategory[]
 
-export type EnrollmentError = "deviceCodeExpired" | { xboxAccount: XboxError } | "noGameOwnership" | "noGameProfile"
+export type FERequestNewVerificationTokenStatus = { status: "success" } | { status: "failed"; value: number | null }
 
 export type ModPlatform = "Curseforge" | "Modrinth"
 
 export type InstanceMod = { instance_id: FEInstanceId; mod_id: string }
+
+export type FERequestDeletionStatus = "success" | { failed: number | null }
 
 export type CFFECategory = { id: number; name: string; slug: string; url: string; iconUrl: string | null; dateModified: string; isClass: boolean | null; classId: number | null; parentCategoryId: number | null; displayIndex: number | null }
 
@@ -314,6 +315,8 @@ export type ExploreQuery = { instance_id: FEInstanceId; path: string[] }
 export type MoveGroup = { group: FEGroupId; before: FEGroupId | null }
 
 export type ModLoader = { type_: FEInstanceModloaderType; version: string }
+
+export type FERequestEmailChange = { email: string; uuid: string }
 
 export type CreateInstance = { group: FEGroupId; name: string; use_loaded_icon: boolean; version: CreateInstanceVersion; notes: string }
 
@@ -339,7 +342,7 @@ export type MRFERequestedVersionStatus = "listed" | "archived" | "draft" | "unli
 
 export type ValidListInstance = { mc_version: string | null; modloader: FEInstanceModloaderType | null; modpack: Modpack | null; state: LaunchState }
 
-export type AccountType = { type: "microsoft"; value: { email: string | null } } | { type: "offline" }
+export type FEGDLAccount = { email: string; microsoftOid: string; microsoftEmail: string | null; isEmailVerified: boolean; hasPendingVerification: boolean; verificationTimeout: number | null; hasPendingDeletionRequest: boolean; deletionTimeout: number | null; emailChangeTimeout: number | null }
 
 export type ChangeModpack = { instance: FEInstanceId; modpack: Modpack }
 
@@ -386,13 +389,13 @@ export type FESearchAPI = "curseforge" | "modrinth"
 
 export type MRFEVersionID = string
 
-export type FERequestNewEmailChangeStatus = { status: "success" } | { status: "failed"; value: number | null }
-
 export type MRFECategory = { icon: string; name: string; project_type: MRFEProjectType; header: string }
 
 export type FEJavaOverride = { Profile: string | null } | { Path: string | null }
 
 export type CFFEHashAlgo = "sha1" | "md5"
+
+export type FERegisterAccount = { email: string; uuid: string }
 
 export type FEModSearchResponse = { data: CFFEMod[]; pagination: CFFEPagination | null }
 
@@ -405,8 +408,6 @@ export type StandardVersion = { release: string; modloaders: ModLoader[] }
 export type CFFEModFileChangelogParameters = { modId: number; fileId: number }
 
 export type CreateInstanceVersion = { Version: GameVersion } | { Modpack: Modpack }
-
-export type FEGDLAccount = { email: string; microsoftOid: string; microsoftEmail: string | null; isEmailVerified: boolean }
 
 export type CFFEClassId = "mods" | "resourcePacks" | "modpacks" | "customizations" | "bukkitPlugins" | "worlds" | "addons" | "shaders" | { other: number }
 
@@ -446,7 +447,7 @@ export type CFFEFileIndex = { gameVersion: string; fileId: number; filename: str
 
 export type DuplicateInstance = { instance: FEInstanceId; new_name: string }
 
-export type EnrollmentStatus = "refreshingMSAuth" | "requestingCode" | { pollingCode: DeviceCode } | "mcLogin" | "xboxAuth" | "mcentitlements" | "mcProfile" | { complete: AccountEntry } | { failed: EnrollmentError }
+export type AccountType = { type: "microsoft"; value: { email: string | null } } | { type: "offline" }
 
 export type MRFEProjectType = "mod" | "shader" | "modpack" | "resourcepack" | "plugin" | "project" | "datapack"
 
@@ -468,13 +469,13 @@ export type InstanceDetails = { name: string; favorite: boolean; version: string
 
 export type MRFESearchFacetAnd = MRFESearchFacetOr[]
 
-export type DeviceCode = { userCode: string; verificationUri: string; expiresAt: string }
-
 export type CFFEModStatus = "new" | "changesRequired" | "underSoftReview" | "approved" | "rejected" | "changesMade" | "inactive" | "abandoned" | "deleted" | "underReview"
 
 export type CFFEFileRelationType = "embeddedLibrary" | "optionalDependency" | "requiredDependency" | "tool" | "incompatible" | "include"
 
 export type MRFELoader = { icon: string; name: MRFELoaderType; supported_project_types: MRFEProjectType[] }
+
+export type EnrollmentError = "deviceCodeExpired" | { xboxAccount: XboxError } | "noGameOwnership" | "noGameProfile"
 
 export type InstanceFolder = "Root" | "Data" | "Mods" | "Configs" | "Screenshots" | "Saves" | "Logs" | "CrashReports" | "ResourcePacks" | "TexturePacks" | "ShaderPacks"
 
@@ -525,6 +526,8 @@ export type FEManagedJavaArch = "x64" | "x86" | "arm32" | "arm64"
 export type FEManagedJavaSetupArgs = { os: FEManagedJavaOs; arch: FEManagedJavaArch; vendor: FEVendor; id: string }
 
 export type FEUnifiedModLoaderType = "forge" | "neoforge" | "fabric" | "quilt" | "liteloader" | "unknown" | "cauldron" | "bukkit" | "bungeecord" | "canvas" | "datapack" | "folia" | "iris" | "minecraft" | "modloader" | "optifine" | "paper" | "purpur" | "rift" | "spigot" | "sponge" | "vanilla" | "velocity" | "waterfall"
+
+export type AccountStatus = "ok" | "expired" | "refreshing" | "invalid"
 
 export type ManifestVersion = { id: string; type: McType }
 

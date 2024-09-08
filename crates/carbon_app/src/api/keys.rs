@@ -47,7 +47,7 @@ keys! {
         REFRESH_ACCOUNT                             = "refreshAccount";
         GET_HEAD                                    = "getHead";
 
-        GET_REMOTE_GDL_ACCOUNT                      = "getRemoteGdlAccount";
+        PEEK_GDL_ACCOUNT                            = "peekGdlAccount";
         GET_GDL_ACCOUNT                             = "getGdlAccount";
         REGISTER_GDL_ACCOUNT                        = "registerGdlAccount";
         REQUEST_NEW_VERIFICATION_TOKEN              = "requestNewVerificationToken";

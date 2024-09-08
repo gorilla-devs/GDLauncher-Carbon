@@ -112,6 +112,10 @@ const defaultModals = {
   changelogs: {
     component: lazy(() => import("./modals/Changelogs")),
     title: "Welcome to a new version of GDLauncher!"
+  },
+  confirmGDLAccountDeletion: {
+    component: lazy(() => import("./modals/ConfirmGDLAccountDeletion")),
+    title: "Confirm Account Deletion"
   }
 };
 

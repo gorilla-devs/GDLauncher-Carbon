@@ -40,12 +40,26 @@ pub enum RequestNewEmailChangeError {
     RequestFailed(anyhow::Error),
 }
 
+#[derive(Error, Debug)]
+pub enum RequestGDLAccountDeletionError {
+    #[error("Too many requests")]
+    TooManyRequests(u32),
+
+    #[error("request failed: {0}")]
+    RequestFailed(anyhow::Error),
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct GDLUser {
     pub email: String,
     pub microsoft_oid: String,
     pub microsoft_email: Option<String>,
     pub is_verified: bool,
+    pub has_pending_verification: bool,
+    pub verification_timeout: Option<i64>,
+    pub has_pending_deletion_request: bool,
+    pub deletion_timeout: Option<i64>,
+    pub email_change_timeout: Option<i64>,
 }
 
 impl GDLAccountTask {
@@ -195,21 +209,43 @@ impl GDLAccountTask {
         Ok(())
     }
 
-    pub async fn request_deletion(&self, id_token: String) -> anyhow::Result<()> {
+    pub async fn request_deletion(
+        &self,
+        id_token: String,
+    ) -> Result<(), RequestGDLAccountDeletionError> {
         let url = format!("{}/v1/users/request-account-deletion", GDL_API_BASE);
 
         let authorization = format!("Bearer {}", id_token);
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, authorization.parse().unwrap());
 
-        self.client
+        let resp = self
+            .client
             .post(url)
             .headers(headers)
             .send()
             .await
-            .map_err(|err| anyhow::anyhow!("failed to request account deletion {}", err))?
+            .map_err(|err| RequestGDLAccountDeletionError::RequestFailed(err.into()))?;
+
+        if resp.status() == StatusCode::TOO_MANY_REQUESTS {
+            let retry_after = resp
+                .headers()
+                .get("Retry-After")
+                .and_then(|v| v.to_str().ok())
+                .and_then(|v| v.parse::<u32>().ok());
+
+            return Err(RequestGDLAccountDeletionError::TooManyRequests(
+                retry_after.unwrap_or(0),
+            ));
+        }
+
+        let resp = resp
             .error_for_status()
-            .map_err(|err| anyhow::anyhow!("failed to request account deletion: {}", err))?;
+            .map_err(|err| RequestGDLAccountDeletionError::RequestFailed(err.into()))?;
+
+        resp.bytes()
+            .await
+            .map_err(|err| RequestGDLAccountDeletionError::RequestFailed(err.into()))?;
 
         Ok(())
     }

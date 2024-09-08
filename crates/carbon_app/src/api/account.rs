@@ -12,7 +12,8 @@ use crate::domain::account as domain;
 use crate::error::FeError;
 use crate::managers::account::api::XboxError;
 use crate::managers::account::gdl_account::{
-    GDLUser, RegisterAccountBody, RequestNewEmailChangeError, RequestNewVerificationTokenError,
+    GDLUser, RegisterAccountBody, RequestGDLAccountDeletionError, RequestNewEmailChangeError,
+    RequestNewVerificationTokenError,
 };
 use crate::managers::{account, App, AppInner};
 
@@ -72,8 +73,8 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         query GET_HEAD[_, _uuid: String] { Ok(()) }
 
-        query GET_REMOTE_GDL_ACCOUNT[app, uuid: String] {
-            let gdl_user = app.account_manager().get_remote_gdl_account(uuid).await?;
+        query PEEK_GDL_ACCOUNT[app, uuid: String] {
+            let gdl_user = app.account_manager().peek_gdl_account(uuid).await?;
 
             Ok(gdl_user.map(Into::<FEGDLAccount>::into))
         }
@@ -118,6 +119,14 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await;
 
             Ok(FERequestNewEmailChangeStatus::from(result))
+        }
+
+        mutation REQUEST_GDL_ACCOUNT_DELETION[app, uuid: String] {
+            let result = app.account_manager()
+                .request_gdl_account_deletion(uuid)
+                .await;
+
+            Ok(FERequestDeletionStatus::from(result))
         }
     }
 }
@@ -315,6 +324,11 @@ struct FEGDLAccount {
     microsoft_oid: String,
     microsoft_email: Option<String>,
     is_email_verified: bool,
+    has_pending_verification: bool,
+    verification_timeout: Option<u32>,
+    has_pending_deletion_request: bool,
+    deletion_timeout: Option<u32>,
+    email_change_timeout: Option<u32>,
 }
 
 impl From<GDLUser> for FEGDLAccount {
@@ -324,6 +338,11 @@ impl From<GDLUser> for FEGDLAccount {
             microsoft_oid: value.microsoft_oid,
             microsoft_email: value.microsoft_email,
             is_email_verified: value.is_verified,
+            has_pending_verification: value.has_pending_verification,
+            verification_timeout: value.verification_timeout.map(|v| v as u32),
+            has_pending_deletion_request: value.has_pending_deletion_request,
+            deletion_timeout: value.deletion_timeout.map(|v| v as u32),
+            email_change_timeout: value.email_change_timeout.map(|v| v as u32),
         }
     }
 }
@@ -383,6 +402,26 @@ impl From<Result<(), RequestNewEmailChangeError>> for FERequestNewEmailChangeSta
                 Self::Failed(Some(cooldown))
             }
             Err(RequestNewEmailChangeError::RequestFailed(_)) => Self::Failed(None),
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+
+pub enum FERequestDeletionStatus {
+    Success,
+    Failed(Option<u32>),
+}
+
+impl From<Result<(), RequestGDLAccountDeletionError>> for FERequestDeletionStatus {
+    fn from(value: Result<(), RequestGDLAccountDeletionError>) -> Self {
+        match value {
+            Ok(_) => Self::Success,
+            Err(RequestGDLAccountDeletionError::TooManyRequests(cooldown)) => {
+                Self::Failed(Some(cooldown))
+            }
+            Err(RequestGDLAccountDeletionError::RequestFailed(_)) => Self::Failed(None),
         }
     }
 }

@@ -102,7 +102,7 @@ const getVariant = (
       [`${
         !isDisabled && !backgroundColor ? `bg-${variant}-500` : "bg-[#1D2028]"
       }`]: true,
-      [`${!isDisabled && !backgroundColor ? `hover:bg-${variant}-300` : ""}`]:
+      [`${!isDisabled && !backgroundColor ? `hover:bg-${variant}-700` : ""}`]:
         true,
       // "filter brightness-75": isDisabled,
       "text-[#404759]": isDisabled,

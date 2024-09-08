@@ -42,7 +42,11 @@ const unocssConfig = {
   ],
   rules: [],
   // rules: [["scrollbar-gutter", { "scrollbar-gutter": "stable" }]],
-  safelist,
+  safelist: [
+    ...safelist,
+    ...Object.keys(theme.colors).map((v) => `bg-${v}-500`),
+    ...Object.keys(theme.colors).map((v) => `hover:bg-${v}-700`),
+  ],
   theme,
   transformers: [transformerDirectives()],
 } as unknown;

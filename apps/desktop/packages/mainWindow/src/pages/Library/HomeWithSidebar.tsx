@@ -25,9 +25,9 @@ const HomeWithSidebar = () => {
           <div class="flex gap-4">
             <div class="flex-1 flex-grow">
               <Switch>
-                <Match when={news().length > 0}>
+                <Match when={(news()?.length || 0) > 0}>
                   <News
-                    slides={news()}
+                    slides={news()!}
                     onClick={(news) => {
                       window.openExternalLink(news.url || "");
                     }}

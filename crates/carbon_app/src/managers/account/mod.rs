@@ -11,8 +11,8 @@ use async_trait::async_trait;
 use axum::extract;
 use chrono::{FixedOffset, Utc};
 use gdl_account::{
-    GDLAccountTask, GDLUser, RegisterAccountBody, RequestNewEmailChangeError,
-    RequestNewVerificationTokenError,
+    GDLAccountTask, GDLUser, RegisterAccountBody, RequestGDLAccountDeletionError,
+    RequestNewEmailChangeError, RequestNewVerificationTokenError,
 };
 use jwt::{Header, Token};
 use prisma_client_rust::{
@@ -208,7 +208,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(Some(account.status))
     }
 
-    pub async fn get_remote_gdl_account(self, uuid: String) -> anyhow::Result<Option<GDLUser>> {
+    pub async fn peek_gdl_account(self, uuid: String) -> anyhow::Result<Option<GDLUser>> {
         let Some(id_token) = self
             .get_account_entries()
             .await?
@@ -226,25 +226,42 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(account.get_account(id_token).await?)
     }
 
-    pub async fn request_gdl_account_deletion(self, uuid: String) -> anyhow::Result<()> {
+    pub async fn request_gdl_account_deletion(
+        self,
+        uuid: String,
+    ) -> Result<(), RequestGDLAccountDeletionError> {
         let Some(id_token) = self
             .get_account_entries()
-            .await?
+            .await
+            .map_err(|e| RequestGDLAccountDeletionError::RequestFailed(e))?
             .into_iter()
             .find(|account| account.uuid == uuid)
-            .ok_or(anyhow::anyhow!(
-                "attempted to request a gdl account deletion for an account that does not exist"
+            .ok_or(RequestGDLAccountDeletionError::RequestFailed(
+                anyhow::anyhow!(
+                    "attempted to request a gdl account deletion for an account that does not exist"
+                ),
             ))?
             .id_token
         else {
-            bail!("attempted to get an account that does not exist");
+            return Err(RequestGDLAccountDeletionError::RequestFailed(
+                anyhow::anyhow!("attempted to get an account that does not exist"),
+            ));
         };
 
-        self.gdl_account_task
+        let deletion = self
+            .gdl_account_task
             .write()
             .await
             .request_deletion(id_token)
-            .await?;
+            .await
+            .with_context(|| format!("failed to request account deletion: {}", uuid))
+            .map_err(|e| RequestGDLAccountDeletionError::RequestFailed(e));
+
+        self.app
+            .invalidate(PEEK_GDL_ACCOUNT, Some(uuid.clone().into()));
+        self.app.invalidate(GET_GDL_ACCOUNT, None);
+
+        deletion?;
 
         Ok(())
     }
@@ -275,7 +292,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .with_context(|| format!("failed to register account: {uuid}"))?;
 
         self.app
-            .invalidate(GET_REMOTE_GDL_ACCOUNT, Some(uuid.clone().into()));
+            .invalidate(PEEK_GDL_ACCOUNT, Some(uuid.clone().into()));
+        self.app.invalidate(GET_GDL_ACCOUNT, None);
 
         Ok(user)
     }
@@ -350,7 +368,14 @@ impl<'s> ManagerRef<'s, AccountManager> {
         };
 
         let lock = self.gdl_account_task.write().await;
-        lock.request_new_verification_token(id_token).await?;
+        let request = lock.request_new_verification_token(id_token).await;
+
+        self.app
+            .invalidate(PEEK_GDL_ACCOUNT, Some(uuid.clone().into()));
+        self.app.invalidate(GET_GDL_ACCOUNT, None);
+
+        request?;
+
         Ok(())
     }
 
@@ -376,12 +401,13 @@ impl<'s> ManagerRef<'s, AccountManager> {
         };
 
         let lock = self.gdl_account_task.write().await;
-        lock.request_email_change(id_token, email).await?;
-
-        self.app.invalidate(GET_GDL_ACCOUNT, None);
+        let request = lock.request_email_change(id_token, email).await;
 
         self.app
-            .invalidate(GET_REMOTE_GDL_ACCOUNT, Some(uuid.clone().into()));
+            .invalidate(PEEK_GDL_ACCOUNT, Some(uuid.clone().into()));
+        self.app.invalidate(GET_GDL_ACCOUNT, None);
+
+        request?;
 
         Ok(())
     }

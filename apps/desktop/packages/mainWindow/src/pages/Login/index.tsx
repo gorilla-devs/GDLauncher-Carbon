@@ -54,7 +54,7 @@ export default function Login() {
   }));
 
   const gdlUser = rspc.createQuery(() => ({
-    queryKey: ["account.getRemoteGdlAccount", activeUuid.data!],
+    queryKey: ["account.peekGdlAccount", activeUuid.data!],
     enabled: !!activeUuid.data
   }));
 
@@ -225,7 +225,7 @@ export default function Login() {
         }
 
         const gdlUser = await rspcContext.client.query([
-          "account.getRemoteGdlAccount",
+          "account.peekGdlAccount",
           activeUuid
         ]);
 
@@ -260,21 +260,9 @@ export default function Login() {
       return;
     }
 
-    const gdlUser = await rspcContext.client.query([
-      "account.getRemoteGdlAccount",
-      activeUuid
-    ]);
-
     if (isGDLAccountSet()) {
       transitionToLibrary();
     } else if (!isGDLAccountSet()) {
-      if (gdlUser && !gdlUser.isEmailVerified) {
-        setRecoveryEmail(gdlUser.email);
-        setStep(Steps.GDLAccountVerification);
-        setIsBackButtonVisible(true);
-        return;
-      }
-
       setIsBackButtonVisible(true);
       setStep(Steps.GDLAccount);
     }
@@ -611,7 +599,7 @@ export default function Login() {
 
                       try {
                         const existingGDLUser = await rspcContext.client.query([
-                          "account.getRemoteGdlAccount",
+                          "account.peekGdlAccount",
                           uuid
                         ]);
 
@@ -654,7 +642,7 @@ export default function Login() {
 
                       try {
                         const existingGDLUser = await rspcContext.client.query([
-                          "account.getRemoteGdlAccount",
+                          "account.peekGdlAccount",
                           uuid
                         ]);
 
@@ -752,13 +740,7 @@ export default function Login() {
                       <Trans key="login.request_email_change" />
                       <i class="i-ri:arrow-right-line" />
                     </Match>
-                    <Match
-                      when={
-                        step() === Steps.GDLAccount &&
-                        gdlUser.data &&
-                        gdlUser.data.isEmailVerified
-                      }
-                    >
+                    <Match when={step() === Steps.GDLAccount && gdlUser.data}>
                       <Trans key="login.sync_gdl_account" />
                       <i class="i-ri:arrow-right-line" />
                     </Match>
