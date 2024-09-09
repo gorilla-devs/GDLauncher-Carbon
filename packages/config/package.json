@@ -20,9 +20,9 @@
     "@typescript-eslint/eslint-plugin": "^8.4.0",
     "@unocss/preset-icons": "^0.60.4",
     "@unocss/preset-wind": "^0.60.4",
-    "eslint": "^9.10.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-prettier": "^5.2.1",
+    "eslint": "^8.31.0",
+    "eslint-config-prettier": "^8.8.0",
+    "eslint-plugin-prettier": "^4.2.1",
     "typescript": "^5.2.0",
     "unocss": "^0.60.4",
     "unocss-preset-scrollbar-hide": "^1.0.1"
