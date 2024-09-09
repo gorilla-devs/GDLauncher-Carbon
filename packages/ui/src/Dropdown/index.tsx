@@ -65,7 +65,9 @@ interface DropDownButtonProps {
 
 const Dropdown = (props: Props) => {
   const incomingSelectedValue = () =>
-    props.options?.find((option) => option.key === props.value);
+    props.value
+      ? props.options?.find((option) => option.key === props.value)
+      : props.options[0];
 
   const [selectedValue, setSelectedValue] = createSignal<Option | undefined>(
     // eslint-disable-next-line solid/reactivity

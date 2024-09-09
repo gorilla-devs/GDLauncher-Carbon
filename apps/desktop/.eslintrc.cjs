@@ -8,6 +8,7 @@ module.exports = {
   rules: {
     "prettier/prettier": ["error", { endOfLine: "lf", trailingComma: "none" }],
     "solid/reactivity": "off",
+    "no-unused-vars": "off",
     "@typescript-eslint/no-unused-vars": [
       "error",
       {

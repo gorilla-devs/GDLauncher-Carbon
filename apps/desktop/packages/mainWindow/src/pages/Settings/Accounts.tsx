@@ -242,6 +242,13 @@ const Accounts = () => {
           </div>
         </Row>
       </RowsContainer>
+      <RowsContainer>
+        <Row forceContentBelow>
+          <Title>
+            <Trans key="settings:gdl_account_title" />
+          </Title>
+        </Row>
+      </RowsContainer>
     </>
   );
 };

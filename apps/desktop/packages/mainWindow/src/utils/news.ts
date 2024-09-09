@@ -10,7 +10,7 @@ export interface NewsItem {
 export const initNews = async () => {
   try {
     const resp = await fetch(NEWS_URL);
-    const textData = await resp.text(); 
+    const textData = await resp.text();
 
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(textData, "text/xml");
@@ -30,7 +30,7 @@ export const initNews = async () => {
       newsArr.push({ title, description, image: fullImageUrl, url });
     });
     // News isn't published that often, showing 20 (the previous) would result in old news.
-    return newsArr.slice(0, 6); 
+    return newsArr.slice(0, 6);
   } catch (err) {
     console.error(err);
   }

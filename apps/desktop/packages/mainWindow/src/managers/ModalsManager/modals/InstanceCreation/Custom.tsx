@@ -158,7 +158,14 @@ const Custom = (props: Pick<ModalProps, "data">) => {
       )?.loaders;
 
       setLoaderVersions(versions || []);
-      setChosenLoaderVersion(versions?.[0]?.id);
+      if (instanceData()?.modloader !== "forge") {
+        setChosenLoaderVersion(versions?.[0]?.id);
+      } else if (
+        instanceData()?.modloader === "forge" &&
+        instanceData()?.modloaderVersion
+      ) {
+        setChosenLoaderVersion(instanceData()?.modloaderVersion);
+      }
     } else {
       setLoaderVersions([]);
     }
@@ -171,7 +178,15 @@ const Custom = (props: Pick<ModalProps, "data">) => {
       )?.loaders;
 
       setLoaderVersions(versions || []);
-      setChosenLoaderVersion(versions?.[0]?.id);
+
+      if (instanceData()?.modloader !== "neoforge") {
+        setChosenLoaderVersion(versions?.[0]?.id);
+      } else if (
+        instanceData()?.modloader === "neoforge" &&
+        instanceData()?.modloaderVersion
+      ) {
+        setChosenLoaderVersion(instanceData()?.modloaderVersion);
+      }
     } else if (!loader()) {
       setLoaderVersions([]);
     }
@@ -193,7 +208,15 @@ const Custom = (props: Pick<ModalProps, "data">) => {
           : [];
 
       setLoaderVersions(versions || []);
-      setChosenLoaderVersion(versions?.[0]?.id);
+
+      if (instanceData()?.modloader !== "fabric") {
+        setChosenLoaderVersion(versions?.[0]?.id);
+      } else if (
+        instanceData()?.modloader === "fabric" &&
+        instanceData()?.modloaderVersion
+      ) {
+        setChosenLoaderVersion(instanceData()?.modloaderVersion);
+      }
     } else if (!loader()) {
       setLoaderVersions([]);
     }
@@ -215,7 +238,15 @@ const Custom = (props: Pick<ModalProps, "data">) => {
           : [];
 
       setLoaderVersions(versions || []);
-      setChosenLoaderVersion(versions?.[0]?.id);
+
+      if (instanceData()?.modloader !== "quilt") {
+        setChosenLoaderVersion(versions?.[0]?.id);
+      } else if (
+        instanceData()?.modloader === "quilt" &&
+        instanceData()?.modloaderVersion
+      ) {
+        setChosenLoaderVersion(instanceData()?.modloaderVersion);
+      }
     } else if (!loader()) {
       setLoaderVersions([]);
     }

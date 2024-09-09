@@ -129,7 +129,6 @@ const ModpackBrowser = () => {
                       sortIndex: sortIndex
                     });
                   }}
-                  value={0}
                   rounded
                 />
               </div>

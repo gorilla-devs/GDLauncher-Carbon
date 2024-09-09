@@ -76,7 +76,7 @@ const ExportCheckboxParent = () => {
   return (
     <>
       <div class="flex items-center gap-2 pt-2">
-        <div class="w-6 h-6 "></div>
+        <div class="w-6 h-6 " />
         <Checkbox
           onChange={handleSelectAll}
           checked={allSelected()}
