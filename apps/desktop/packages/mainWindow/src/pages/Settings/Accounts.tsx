@@ -91,7 +91,7 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
     accessorFn: (row) => row.status,
     id: "status",
     cell: (info) => (
-      <div>
+      <div class="flex justify-center items-center">
         <Switch>
           <Match when={info.getValue() === "ok"}>
             <div class="w-4 h-4 i-ri:check-fill text-green-500" />
