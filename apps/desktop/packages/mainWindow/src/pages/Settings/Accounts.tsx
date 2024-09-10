@@ -84,7 +84,24 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
   {
     accessorFn: (row) => row.status,
     id: "status",
-    cell: (info) => info.getValue(),
+    cell: (info) => (
+      <div>
+        <Switch>
+          <Match when={info.getValue() === "ok"}>
+            <div class="w-4 h-4 i-ri:check-fill text-green-500" />
+          </Match>
+          <Match when={info.getValue() === "expired"}>
+            <div class="w-4 h-4 i-ri:alert-fill text-yellow-500" />
+          </Match>
+          <Match when={info.getValue() === "refreshing"}>
+            <div class="w-4 h-4 i-ri:refresh-line text-yellow-500" />
+          </Match>
+          <Match when={info.getValue() === "invalid"}>
+            <div class="w-4 h-4 i-ri:close-line text-red-500" />
+          </Match>
+        </Switch>
+      </div>
+    ),
     header: () => <span>Status</span>
   },
   {
@@ -371,8 +388,6 @@ const Accounts = () => {
                           "hover:text-white":
                             cell.column.columnDef.id === "username" ||
                             cell.column.columnDef.id === "uuid",
-                          "hover:text-red-500":
-                            cell.column.columnDef.id === "actions",
                           "border-l-1": i() !== 0
                         }}
                         onClick={() => {
@@ -399,21 +414,33 @@ const Accounts = () => {
                       >
                         <Switch>
                           <Match when={cell.column.columnDef.id === "actions"}>
-                            <div class="flex gap-4 items-center justify-center">
-                              <div
-                                class="i-ri:delete-bin-2-fill"
-                                onClick={async () => {
-                                  const accountsLength =
-                                    globalStore.accounts.data?.length;
-                                  await deleteAccountMutation.mutateAsync(
-                                    (row.original as AccountEntry).uuid
-                                  );
+                            <div class="flex gap-4 items-center justify-center w-full">
+                              <Show when={row.original.status !== "ok"}>
+                                <div class="w-full text-yellow-500 hover:text-yellow-200">
+                                  <div
+                                    class="w-4 h-4 i-ri:refresh-line"
+                                    onClick={async () => {
+                                      navigate("/?addMicrosoftAccount=true");
+                                    }}
+                                  />
+                                </div>
+                              </Show>
+                              <div class="w-full flex justify-center items-center hover:text-red-500">
+                                <div
+                                  class="w-4 h-4 i-ri:delete-bin-2-fill"
+                                  onClick={async () => {
+                                    const accountsLength =
+                                      globalStore.accounts.data?.length;
+                                    await deleteAccountMutation.mutateAsync(
+                                      (row.original as AccountEntry).uuid
+                                    );
 
-                                  if (accountsLength === 1) {
-                                    navigate("/");
-                                  }
-                                }}
-                              />
+                                    if (accountsLength === 1) {
+                                      navigate("/");
+                                    }
+                                  }}
+                                />
+                              </div>
                             </div>
                           </Match>
                           <Match
@@ -424,7 +451,7 @@ const Accounts = () => {
                             }
                           >
                             <div class="flex items-center justify-center">
-                              <div class="w-6 h-6 text-white i-ri:check-fill" />
+                              <div class="w-4 h-4 text-white i-ri:checkbox-circle-fill" />
                             </div>
                           </Match>
                           <Match
@@ -435,7 +462,7 @@ const Accounts = () => {
                             }
                           >
                             <div class="flex items-center justify-center opacity-0 group-hover/internal:opacity-100 duration-100 ease-in-out">
-                              <div class="w-6 h-6 text-darkSlate-300 i-ri:check-fill" />
+                              <div class="w-4 h-4 text-darkSlate-300 i-ri:checkbox-circle-fill" />
                             </div>
                           </Match>
                           <Match
