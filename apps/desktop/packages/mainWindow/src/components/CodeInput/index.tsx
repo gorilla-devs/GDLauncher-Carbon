@@ -1,3 +1,4 @@
+import { Trans } from "@gd/i18n";
 import { createEffect, createSignal } from "solid-js";
 
 interface Props {
