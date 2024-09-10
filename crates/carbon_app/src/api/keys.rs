@@ -38,7 +38,6 @@ keys! {
         GET_ACTIVE_UUID                             = "getActiveUuid";
         SET_ACTIVE_UUID                             = "setActiveUuid";
         GET_ACCOUNTS                                = "getAccounts";
-        GET_ACCOUNT_STATUS                          = "getAccountStatus";
         DELETE_ACCOUNT                              = "deleteAccount";
         ENROLL_BEGIN                                = "enroll.begin";
         ENROLL_CANCEL                               = "enroll.cancel";

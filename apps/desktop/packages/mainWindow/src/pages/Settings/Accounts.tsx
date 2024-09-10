@@ -54,6 +54,12 @@ const GDLAccountRowItem = (props: {
 
 const defaultColumns: ColumnDef<AccountEntry>[] = [
   {
+    accessorFn: () => <></>,
+    id: "active",
+    cell: (info) => info.getValue(),
+    header: () => <span>Active</span>
+  },
+  {
     accessorFn: (row) => row.username,
     id: "username",
     cell: (info) => (
@@ -62,7 +68,9 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
           src={`http://127.0.0.1:${port}/account/headImage?uuid=${info.row.original.uuid}`}
           class="w-8 h-8 rounded-md"
         />
-        {info.row.original.username}
+        <div class="truncate max-w-50 2xl:max-w-100">
+          {info.row.original.username}
+        </div>
       </div>
     ),
     header: () => <span>Username</span>
@@ -74,13 +82,25 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
     header: () => <span>Type</span>
   },
   {
+    accessorFn: (row) => row.status,
+    id: "status",
+    cell: (info) => info.getValue(),
+    header: () => <span>Status</span>
+  },
+  {
     accessorFn: (row) => row.uuid,
     id: "uuid",
-    cell: (info) => info.getValue(),
+    cell: (info) => (
+      <div>
+        <div class="truncate max-w-50 2xl:max-w-100">
+          {info.getValue() as string}
+        </div>
+      </div>
+    ),
     header: () => <span>UUID</span>
   },
   {
-    accessorFn: (row) => <></>,
+    accessorFn: () => <></>,
     id: "actions",
     cell: (info) => info.getValue(),
     header: () => <span>Actions</span>
@@ -105,6 +125,10 @@ const Accounts = () => {
 
   const deleteAccountMutation = rspc.createMutation(() => ({
     mutationKey: ["account.deleteAccount"]
+  }));
+
+  const setActiveAccountMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.setActiveUuid"]
   }));
 
   const validGDLUser = () =>
@@ -342,9 +366,26 @@ const Accounts = () => {
                   <For each={row.getVisibleCells()}>
                     {(cell, i) => (
                       <td
-                        class={`group/internal text-lightSlate-300 hover:text-white relative p-4 border-0 border-transparent group-hover/external:border-darkSlate-500 border-solid ${i() !== 0 ? "border-l-1" : ""}`}
+                        class="group/internal text-lightSlate-300 relative p-4 border-0 border-transparent group-hover/external:border-darkSlate-500 border-solid"
+                        classList={{
+                          "hover:text-white":
+                            cell.column.columnDef.id === "username" ||
+                            cell.column.columnDef.id === "uuid",
+                          "hover:text-red-500":
+                            cell.column.columnDef.id === "actions",
+                          "border-l-1": i() !== 0
+                        }}
                         onClick={() => {
-                          if (cell.column.columnDef.id !== "actions") {
+                          if (
+                            cell.column.columnDef.id === "active" &&
+                            row.original.uuid !==
+                              globalStore.currentlySelectedAccountUuid.data
+                          ) {
+                            setActiveAccountMutation.mutate(row.original.uuid);
+                          } else if (
+                            cell.column.columnDef.id === "uuid" ||
+                            cell.column.columnDef.id === "username"
+                          ) {
                             navigator.clipboard.writeText(
                               cell.getValue() as string
                             );
@@ -356,29 +397,58 @@ const Accounts = () => {
                           }
                         }}
                       >
-                        <Show when={cell.column.columnDef.id === "actions"}>
-                          <div class="flex gap-4 items-center">
-                            <div
-                              class="i-ri:delete-bin-2-fill"
-                              onClick={async () => {
-                                const accountsLength =
-                                  globalStore.accounts.data?.length;
-                                await deleteAccountMutation.mutateAsync(
-                                  (row.original as AccountEntry).uuid
-                                );
+                        <Switch>
+                          <Match when={cell.column.columnDef.id === "actions"}>
+                            <div class="flex gap-4 items-center justify-center">
+                              <div
+                                class="i-ri:delete-bin-2-fill"
+                                onClick={async () => {
+                                  const accountsLength =
+                                    globalStore.accounts.data?.length;
+                                  await deleteAccountMutation.mutateAsync(
+                                    (row.original as AccountEntry).uuid
+                                  );
 
-                                if (accountsLength === 1) {
-                                  navigate("/");
-                                }
-                              }}
-                            />
-                          </div>
-                        </Show>
-                        <Show when={cell.column.columnDef.id !== "actions"}>
-                          <div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover/internal:opacity-100 duration-100 ease-in-out">
-                            <div class="i-ri:clipboard-fill text-white" />
-                          </div>
-                        </Show>
+                                  if (accountsLength === 1) {
+                                    navigate("/");
+                                  }
+                                }}
+                              />
+                            </div>
+                          </Match>
+                          <Match
+                            when={
+                              cell.column.columnDef.id === "active" &&
+                              row.original.uuid ===
+                                globalStore.currentlySelectedAccountUuid.data
+                            }
+                          >
+                            <div class="flex items-center justify-center">
+                              <div class="w-6 h-6 text-white i-ri:check-fill" />
+                            </div>
+                          </Match>
+                          <Match
+                            when={
+                              cell.column.columnDef.id === "active" &&
+                              row.original.uuid !==
+                                globalStore.currentlySelectedAccountUuid.data
+                            }
+                          >
+                            <div class="flex items-center justify-center opacity-0 group-hover/internal:opacity-100 duration-100 ease-in-out">
+                              <div class="w-6 h-6 text-darkSlate-300 i-ri:check-fill" />
+                            </div>
+                          </Match>
+                          <Match
+                            when={
+                              cell.column.columnDef.id === "username" ||
+                              cell.column.columnDef.id === "uuid"
+                            }
+                          >
+                            <div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover/internal:opacity-100 duration-100 ease-in-out">
+                              <div class="i-ri:clipboard-fill text-white" />
+                            </div>
+                          </Match>
+                        </Switch>
                         {flexRender(
                           cell.column.columnDef.cell,
                           cell.getContext()

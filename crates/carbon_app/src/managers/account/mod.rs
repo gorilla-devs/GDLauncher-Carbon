@@ -144,26 +144,16 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .await?)
     }
 
-    pub async fn get_account_list(self) -> anyhow::Result<Vec<Account>> {
+    pub async fn get_account_list(self) -> anyhow::Result<Vec<AccountWithStatus>> {
         let accounts = self.get_account_entries().await?;
 
         Ok(accounts
             .into_iter()
             .map(|account| {
-                let type_ = match (&account.access_token, &account.id_token) {
-                    (None, _) => AccountType::Offline,
-                    (Some(_), id_token) => AccountType::Microsoft {
-                        email: extract_email(id_token.as_ref()),
-                    },
-                };
+                let account = FullAccount::try_from(account).unwrap();
+                let account = AccountWithStatus::from(account);
 
-                Account {
-                    username: account.username,
-                    uuid: account.uuid,
-                    last_used: account.last_used.into(),
-                    type_,
-                    skin_id: account.skin_id,
-                }
+                account
             })
             .collect())
     }
@@ -491,8 +481,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 .exec()
                 .await?;
 
-            self.app
-                .invalidate(GET_ACCOUNT_STATUS, Some(account.uuid.into()));
+            self.app.invalidate(GET_ACCOUNTS, Some(account.uuid.into()));
         } else {
             let set_params = match account.type_ {
                 FullAccountType::Offline => Vec::new(),
@@ -649,7 +638,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         refreshing.insert(uuid.clone(), enrollment);
         drop(refreshing);
 
-        self.app.invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
+        self.app.invalidate(GET_ACCOUNTS, Some(uuid.into()));
 
         Ok(())
     }
@@ -703,7 +692,6 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 info!("Deleted account {uuid}");
 
                 self.app.invalidate(GET_ACCOUNTS, None);
-                self.app.invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
 
                 Ok(())
             }
@@ -857,8 +845,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     .exec()
                     .await?;
 
-                self.app
-                    .invalidate(GET_ACCOUNT_STATUS, Some(uuid.clone().into()));
+                self.app.invalidate(GET_ACCOUNTS, None);
                 return Ok(());
             }
             Ok(Err(GetProfileError::GameProfileMissing)) => {

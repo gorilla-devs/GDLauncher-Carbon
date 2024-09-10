@@ -36,11 +36,6 @@ pub(super) fn mount() -> RouterBuilder<App> {
                .collect::<Vec<_>>())
         }
 
-        query GET_ACCOUNT_STATUS[app, uuid: String] {
-            Ok(app.account_manager().get_account_status(uuid).await?
-                .map(AccountStatus::from))
-        }
-
         mutation DELETE_ACCOUNT[app, uuid: String] {
             app.account_manager().delete_account(uuid).await
         }
@@ -158,6 +153,7 @@ struct AccountEntry {
     uuid: String,
     last_used: DateTime<Utc>,
     type_: AccountType,
+    status: AccountStatus,
 }
 
 #[derive(Type, Serialize)]
@@ -218,13 +214,14 @@ enum EnrollmentError {
     NoGameProfile,
 }
 
-impl From<domain::Account> for AccountEntry {
-    fn from(value: domain::Account) -> Self {
+impl From<domain::AccountWithStatus> for AccountEntry {
+    fn from(value: domain::AccountWithStatus) -> Self {
         Self {
-            username: value.username,
-            uuid: value.uuid,
-            type_: value.type_.into(),
-            last_used: value.last_used,
+            username: value.account.username,
+            uuid: value.account.uuid,
+            type_: value.account.type_.into(),
+            last_used: value.account.last_used,
+            status: value.status.into(),
         }
     }
 }
@@ -285,7 +282,7 @@ impl From<&account::EnrollmentStatus> for Result<EnrollmentStatus, FeError> {
                 // this is bad, but it used to be far worse
                 let account: account::FullAccount = account.clone().into();
                 let account: domain::AccountWithStatus = account.into();
-                account.account.into()
+                account.into()
             }),
             BE::Failed(e) => Api::Failed(EnrollmentError::from(
                 e.as_ref().map_err(FeError::from_anyhow)?.clone(),
