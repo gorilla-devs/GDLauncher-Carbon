@@ -5,7 +5,11 @@ import { useRouteData } from "@solidjs/router";
 import { For } from "solid-js";
 import fetchData from "./settings.general.data";
 import LoadingError from "@/components/LoadingError";
-import { getAvailableThemes, getThemeColor } from "@/utils/theme";
+import {
+  applyThemeByName,
+  getAvailableThemes,
+  getThemeColor
+} from "@/utils/theme";
 import PageTitle from "./components/PageTitle";
 import Row from "./components/Row";
 import Title from "./components/Title";
@@ -54,6 +58,12 @@ const Appearance = () => {
                             Set: theme
                           }
                         });
+                      }}
+                      onMouseEnter={() => {
+                        applyThemeByName(theme);
+                      }}
+                      onMouseLeave={() => {
+                        applyThemeByName(themeName());
                       }}
                     >
                       <div

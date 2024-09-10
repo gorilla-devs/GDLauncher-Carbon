@@ -21,30 +21,35 @@ const initThemes = () => {
   }));
   const themeName = () => theme.data?.theme;
   createEffect(() => {
-    if (!themeName()) {
-      applyTheme(mainTheme);
-      return;
-    }
-    switch (themeName()) {
-      case _Theme._Light: {
-        applyTheme(lightTheme);
-        break;
-      }
-      case _Theme._PoisonGreen: {
-        applyTheme(poisonGreen);
-        break;
-      }
-      case _Theme._Dracula: {
-        applyTheme(dracula);
-        break;
-      }
-      default: {
-        applyTheme(mainTheme);
-        break;
-      }
-    }
+    applyThemeByName(themeName());
   });
 };
+
+export function applyThemeByName(themeName: string | undefined) {
+  if (!themeName) {
+    applyTheme(mainTheme);
+    return;
+  }
+
+  switch (themeName) {
+    case _Theme._Light: {
+      applyTheme(lightTheme);
+      break;
+    }
+    case _Theme._PoisonGreen: {
+      applyTheme(poisonGreen);
+      break;
+    }
+    case _Theme._Dracula: {
+      applyTheme(dracula);
+      break;
+    }
+    default: {
+      applyTheme(mainTheme);
+      break;
+    }
+  }
+}
 
 export function applyTheme(theme: UITheme) {
   // Inject theme
@@ -55,6 +60,7 @@ export function applyTheme(theme: UITheme) {
     );
   }
 }
+
 export function getAvailableThemes(): string[] {
   return Object.values(_Theme);
 }

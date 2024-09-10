@@ -64,6 +64,7 @@ const VersionRow = (props: Props) => {
         type: "success"
       });
     } catch (err) {
+      console.log(err);
       setLoading(false);
       addNotification({
         name: "Error while creating instance",

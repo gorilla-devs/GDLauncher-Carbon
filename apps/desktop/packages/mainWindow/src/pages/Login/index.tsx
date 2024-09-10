@@ -10,7 +10,7 @@ import {
 import Auth from "./Auth";
 import CodeStep from "./CodeStep";
 import fetchData from "./auth.login.data";
-import { Navigate, useRouteData } from "@solidjs/router";
+import { useRouteData, useSearchParams } from "@solidjs/router";
 import { Trans } from "@gd/i18n";
 import { rspc } from "@/utils/rspcClient";
 import TermsAndConditions from "./TermsAndConditions";
@@ -41,6 +41,7 @@ enum Steps {
 
 export default function Login() {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
+  const [searchParams] = useSearchParams();
 
   const globalStore = useGlobalStore();
 
@@ -106,13 +107,6 @@ export default function Login() {
   createEffect(() => {
     console.log("IS GDL ACCOUNT SET", isGDLAccountSet());
   });
-
-  const isAlreadyAuthenticated = () =>
-    globalStore?.currentlySelectedAccountUuid?.data &&
-    globalStore.accounts.data?.length! > 0 &&
-    globalStore.settings.data?.termsAndPrivacyAccepted &&
-    Boolean(globalStore.settings.data?.metricsEnabledLastUpdate) &&
-    isGDLAccountSet();
 
   const accountEnrollFinalizeMutation = rspc.createMutation(() => ({
     mutationKey: ["account.enroll.finalize"]
@@ -224,13 +218,28 @@ export default function Login() {
           throw new Error("No active uuid");
         }
 
-        const gdlUser = await rspcContext.client.query([
+        const settings = await rspcContext.client.query([
+          "settings.getSettings"
+        ]);
+
+        console.log(settings);
+
+        // Already has GDL account
+        if (
+          settings.gdlAccountId !== null &&
+          settings.gdlAccountId !== undefined
+        ) {
+          transitionToLibrary();
+          return;
+        }
+
+        const gdlUserPeek = await rspcContext.client.query([
           "account.peekGdlAccount",
           activeUuid
         ]);
 
-        if (gdlUser?.email) {
-          setRecoveryEmail(gdlUser.email);
+        if (gdlUserPeek?.email) {
+          setRecoveryEmail(gdlUserPeek.email);
         }
 
         setStep(Steps.GDLAccount);
@@ -246,7 +255,10 @@ export default function Login() {
 
     const settings = await rspcContext.client.query(["settings.getSettings"]);
 
-    if (!settings.termsAndPrivacyAccepted) {
+    if (
+      !settings.termsAndPrivacyAccepted ||
+      !globalStore.settings.data?.metricsEnabledLastUpdate
+    ) {
       setStep(Steps.TermsAndConditions);
       setIsBackButtonVisible(false);
       return;
@@ -254,7 +266,11 @@ export default function Login() {
 
     const accounts = await rspcContext.client.query(["account.getAccounts"]);
 
-    if (!activeUuid || accounts.length === 0) {
+    if (
+      !activeUuid ||
+      accounts.length === 0 ||
+      searchParams.addMicrosoftAccount
+    ) {
       setStep(Steps.Auth);
       setIsBackButtonVisible(true);
       return;
@@ -373,415 +389,407 @@ export default function Login() {
   };
 
   return (
-    <Switch>
-      <Match when={isAlreadyAuthenticated()}>
-        <Navigate href={"/library"} />
-      </Match>
-      <Match when={!isAlreadyAuthenticated()}>
-        <div class="flex w-full h-screen" id="main-login-page">
-          <div
-            ref={sidebarRef}
-            class="z-10 absolute -translate-x-full w-100 h-full flex flex-col items-center text-white rounded-md bg-darkSlate-800 z-1"
-          >
-            <div class="flex justify-center h-30">
-              <img class="w-60" src={Logo} />
-            </div>
-            <div class="text-lg font-bold flex items-center justify-center gap-2 mb-4">
+    <div class="flex w-full h-screen" id="main-login-page">
+      <div
+        ref={sidebarRef}
+        class="z-10 absolute -translate-x-full w-100 h-full flex flex-col items-center text-white rounded-md bg-darkSlate-800 z-1"
+      >
+        <div class="flex justify-center h-30">
+          <img class="w-60" src={Logo} />
+        </div>
+        <div class="text-lg font-bold flex items-center justify-center gap-2 mb-4">
+          <Switch>
+            <Match when={step() === Steps.TermsAndConditions}>
+              <Trans key="login.titles.we_value_privacy" />
+            </Match>
+            <Match when={step() === Steps.Auth}>
+              <Trans key="login.titles.sign_in_with_microsoft" />
+            </Match>
+            <Match when={step() === Steps.CodeStep}>
+              <i class="inline-block w-4 h-4 i-ri:microsoft-fill" />
+              <Trans key="login.titles.microsoft_code_step" />
+            </Match>
+            <Match when={step() === Steps.GDLAccount}>
               <Switch>
-                <Match when={step() === Steps.TermsAndConditions}>
-                  <Trans key="login.titles.we_value_privacy" />
+                <Match when={gdlUser.data}>
+                  <Trans key="login.titles.sync_gdl_account" />
                 </Match>
-                <Match when={step() === Steps.Auth}>
-                  <Trans key="login.titles.sign_in_with_microsoft" />
-                </Match>
-                <Match when={step() === Steps.CodeStep}>
-                  <i class="inline-block w-4 h-4 i-ri:microsoft-fill" />
-                  <Trans key="login.titles.microsoft_code_step" />
-                </Match>
-                <Match when={step() === Steps.GDLAccount}>
-                  <Switch>
-                    <Match when={gdlUser.data}>
-                      <Trans key="login.titles.sync_gdl_account" />
-                    </Match>
-                    <Match when={!gdlUser.data}>
-                      <Trans key="login.titles.create_gdl_account" />
-                    </Match>
-                  </Switch>
-                </Match>
-                <Match when={step() === Steps.GDLAccountCompletion}>
-                  <Trans key="login.titles.linked_microsoft_account" />
-                </Match>
-                <Match when={step() === Steps.GDLAccountVerification}>
-                  <Trans key="login.titles.gdl_account_verification" />
+                <Match when={!gdlUser.data}>
+                  <Trans key="login.titles.create_gdl_account" />
                 </Match>
               </Switch>
+            </Match>
+            <Match when={step() === Steps.GDLAccountCompletion}>
+              <Trans key="login.titles.linked_microsoft_account" />
+            </Match>
+            <Match when={step() === Steps.GDLAccountVerification}>
+              <Trans key="login.titles.gdl_account_verification" />
+            </Match>
+          </Switch>
+        </div>
+        <div class="flex flex-1 w-full h-auto overflow-y-auto px-4 box-border">
+          <Switch>
+            <Match when={step() === Steps.TermsAndConditions}>
+              <TermsAndConditions
+                nextStep={nextStep}
+                acceptedTOS={!!acceptedTOS()}
+                setAcceptedTOS={setAcceptedTOS}
+                acceptedMetrics={!!acceptedMetrics()}
+                setAcceptedMetrics={setAcceptedMetrics}
+              />
+            </Match>
+            <Match when={step() === Steps.Auth}>
+              <Auth />
+            </Match>
+            <Match when={step() === Steps.CodeStep}>
+              <CodeStep
+                nextStep={nextStep}
+                prevStep={prevStep}
+                deviceCodeObject={deviceCodeObject()}
+                setDeviceCodeObject={setDeviceCodeObject}
+              />
+            </Match>
+            <Match when={step() === Steps.GDLAccount}>
+              <GDLAccount activeUuid={activeUuid.data} />
+            </Match>
+            <Match when={step() === Steps.GDLAccountCompletion}>
+              <GDLAccountCompletion
+                nextStep={nextStep}
+                prevStep={prevStep}
+                recoveryEmail={recoveryEmail()}
+                setRecoveryEmail={setRecoveryEmail}
+                cooldown={cooldown()}
+              />
+            </Match>
+            <Match when={step() === Steps.GDLAccountVerification}>
+              <GDLAccountVerification
+                nextStep={nextStep}
+                prevStep={prevStep}
+                activeUuid={activeUuid.data}
+                transitionToLibrary={transitionToLibrary}
+              />
+            </Match>
+          </Switch>
+        </div>
+
+        <div class="w-full flex flex-col items-center p-4 box-border">
+          <div class="relative flex justify-center gap-2 mb-4">
+            <div class="absolute top-1/2 left-0 -translate-y-1/2 h-4 w-full rounded-lg overflow-hidden">
+              <div
+                class="absolute top-0 left-0 bg-darkSlate-400 h-4 w-full rounded-lg"
+                style={{
+                  transform: `translateX(calc((-100% + ${(100 * step()) / 6}%) - ${(step() === Steps.TermsAndConditions ? 8 : 6) - step()}px)`,
+                  transition:
+                    "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)"
+                }}
+              />
             </div>
-            <div class="flex flex-1 w-full h-auto overflow-y-auto px-4 box-border">
-              <Switch>
-                <Match when={step() === Steps.TermsAndConditions}>
-                  <TermsAndConditions
-                    nextStep={nextStep}
-                    acceptedTOS={!!acceptedTOS()}
-                    setAcceptedTOS={setAcceptedTOS}
-                    acceptedMetrics={!!acceptedMetrics()}
-                    setAcceptedMetrics={setAcceptedMetrics}
-                  />
-                </Match>
-                <Match when={step() === Steps.Auth}>
-                  <Auth />
-                </Match>
-                <Match when={step() === Steps.CodeStep}>
-                  <CodeStep
-                    nextStep={nextStep}
-                    prevStep={prevStep}
-                    deviceCodeObject={deviceCodeObject()}
-                    setDeviceCodeObject={setDeviceCodeObject}
-                  />
-                </Match>
-                <Match when={step() === Steps.GDLAccount}>
-                  <GDLAccount activeUuid={activeUuid.data} />
-                </Match>
-                <Match when={step() === Steps.GDLAccountCompletion}>
-                  <GDLAccountCompletion
-                    nextStep={nextStep}
-                    prevStep={prevStep}
-                    recoveryEmail={recoveryEmail()}
-                    setRecoveryEmail={setRecoveryEmail}
-                    cooldown={cooldown()}
-                  />
-                </Match>
-                <Match when={step() === Steps.GDLAccountVerification}>
-                  <GDLAccountVerification
-                    nextStep={nextStep}
-                    prevStep={prevStep}
-                    activeUuid={activeUuid.data}
-                    transitionToLibrary={transitionToLibrary}
-                  />
-                </Match>
-              </Switch>
-            </div>
 
-            <div class="w-full flex flex-col items-center p-4 box-border">
-              <div class="relative flex justify-center gap-2 mb-4">
-                <div class="absolute top-1/2 left-0 -translate-y-1/2 h-4 w-full rounded-lg overflow-hidden">
-                  <div
-                    class="absolute top-0 left-0 bg-darkSlate-400 h-4 w-full rounded-lg"
-                    style={{
-                      transform: `translateX(calc((-100% + ${(100 * step()) / 6}%) - ${(step() === Steps.TermsAndConditions ? 8 : 6) - step()}px)`,
-                      transition:
-                        "transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)"
-                    }}
-                  />
-                </div>
-
-                <For each={new Array(6)}>
-                  {(_, i) => (
-                    <div
-                      class="z-1 h-6 w-4 flex justify-center items-center group"
-                      onClick={() => {
-                        if (
-                          i() + 1 < step() &&
-                          (step() > Steps.CodeStep
-                            ? i() + 1 > Steps.CodeStep
-                            : true)
-                        ) {
-                          setLoadingButton(false);
-                          setStep(i() + 1);
-                        }
-                      }}
-                    >
-                      <div
-                        class="h-2 w-2 bg-lightSlate-900 rounded-full"
-                        classList={{
-                          "group-hover:bg-lightSlate-100":
-                            i() + 1 < step() &&
-                            (step() > Steps.CodeStep
-                              ? i() + 1 > Steps.CodeStep
-                              : true)
-                        }}
-                      />
-                    </div>
-                  )}
-                </For>
-              </div>
-
-              <div class="flex w-full box-border">
+            <For each={new Array(6)}>
+              {(_, i) => (
                 <div
-                  ref={btnRef}
-                  class="overflow-hidden"
-                  style={{
-                    width: !isBackButtonVisible() ? "0" : "60%",
-                    margin: !isBackButtonVisible() ? "0" : "0 1rem 0 0"
-                  }}
-                >
-                  <Button
-                    size="large"
-                    type="secondary"
-                    fullWidth
-                    onClick={async () => {
-                      if (step() === Steps.GDLAccount) {
-                        await saveGdlAccountMutation.mutateAsync("");
-                        transitionToLibrary();
-                      } else {
-                        handleAnimationBackward();
-                        prevStep();
-                      }
-
+                  class="z-1 h-6 w-4 flex justify-center items-center group"
+                  onClick={() => {
+                    if (
+                      i() + 1 < step() &&
+                      (step() > Steps.CodeStep
+                        ? i() + 1 > Steps.CodeStep
+                        : true)
+                    ) {
                       setLoadingButton(false);
-                    }}
-                  >
-                    <Switch>
-                      <Match when={step() !== Steps.GDLAccount}>
-                        <i class="i-ri:arrow-left-line" />
-                        <Trans key="general.back" />
-                      </Match>
-                      <Match when={step() === Steps.GDLAccount}>
-                        <Trans key="general.skip" />
-                        <i class="i-ri:skip-forward-line" />
-                      </Match>
-                    </Switch>
-                  </Button>
-                </div>
-                <Button
-                  fullWidth
-                  variant="primary"
-                  size="large"
-                  disabled={
-                    !acceptedTOS() ||
-                    step() === Steps.CodeStep ||
-                    step() === Steps.GDLAccountVerification ||
-                    (step() === Steps.GDLAccountCompletion && !recoveryEmail())
-                  }
-                  loading={
-                    loadingButton() || step() === Steps.GDLAccountVerification
-                  }
-                  onClick={async () => {
-                    handleAnimationForward();
-                    setLoadingButton(true);
-
-                    if (step() === Steps.TermsAndConditions) {
-                      try {
-                        await settingsMutation.mutateAsync({
-                          termsAndPrivacyAccepted: {
-                            Set: true
-                          },
-                          metricsEnabled: {
-                            Set: !!acceptedMetrics()
-                          }
-                        });
-                      } catch (err) {
-                        console.log(err);
-                        addNotification({
-                          name: "Error while accepting terms and conditions",
-                          content: "Check the console for more information.",
-                          type: "error"
-                        });
-                      }
-
-                      setLoadingButton(false);
-                      nextStep();
-                    } else if (step() === Steps.Auth) {
-                      if (!routeData.status.data) {
-                        await accountEnrollBeginMutation.mutateAsync(undefined);
-                      } else {
-                        await accountEnrollCancelMutation.mutateAsync(
-                          undefined
-                        );
-                        await accountEnrollBeginMutation.mutateAsync(undefined);
-                      }
-                    } else if (step() === Steps.GDLAccount) {
-                      const uuid =
-                        globalStore?.currentlySelectedAccountUuid?.data;
-
-                      if (!uuid) {
-                        throw new Error("No active uuid");
-                      }
-
-                      try {
-                        const existingGDLUser = await rspcContext.client.query([
-                          "account.peekGdlAccount",
-                          uuid
-                        ]);
-
-                        if (
-                          existingGDLUser &&
-                          existingGDLUser.isEmailVerified
-                        ) {
-                          transitionToLibrary();
-                          await saveGdlAccountMutation.mutateAsync(uuid);
-
-                          return;
-                        } else if (
-                          existingGDLUser &&
-                          !existingGDLUser.isEmailVerified
-                        ) {
-                          setRecoveryEmail(existingGDLUser.email);
-                          setStep(Steps.GDLAccountVerification);
-                          return;
-                        }
-                      } catch (e) {
-                        console.error(e);
-                      }
-
-                      await deleteGDLAccountMutation.mutateAsync(undefined);
-                      setLoadingButton(false);
-                      nextStep();
-                    } else if (step() === Steps.GDLAccountCompletion) {
-                      const uuid =
-                        globalStore?.currentlySelectedAccountUuid?.data;
-
-                      if (!uuid) {
-                        throw new Error("No active uuid");
-                      }
-
-                      const email = recoveryEmail();
-
-                      if (!email) {
-                        throw new Error("No recovery email");
-                      }
-
-                      try {
-                        const existingGDLUser = await rspcContext.client.query([
-                          "account.peekGdlAccount",
-                          uuid
-                        ]);
-
-                        if (
-                          existingGDLUser &&
-                          existingGDLUser.email &&
-                          existingGDLUser.email !== recoveryEmail()
-                        ) {
-                          try {
-                            const result =
-                              await requestEmailChangeMutation.mutateAsync({
-                                uuid,
-                                // button is disabled if the email is the same as the recovery email or is empty
-                                email: recoveryEmail()!
-                              });
-
-                            if (result.status === "success") {
-                              setStep(Steps.GDLAccountVerification);
-                              setLoadingButton(false);
-                            } else if (
-                              result.status === "failed" &&
-                              result.value
-                            ) {
-                              clearInterval(cooldownInterval);
-                              cooldownInterval = undefined;
-
-                              setLoadingButton(false);
-                              setCooldown(result.value);
-                              setRecoveryEmail(existingGDLUser.email);
-
-                              cooldownInterval = setInterval(() => {
-                                setCooldown((prev) => prev - 1);
-
-                                if (cooldown() <= 0) {
-                                  setCooldown(0);
-                                  clearInterval(cooldownInterval);
-                                  cooldownInterval = undefined;
-                                }
-                              }, 1000);
-                            }
-                          } catch (e) {
-                            console.error(e);
-                            addNotification({
-                              name: "Error while requesting email change",
-                              content: (e as any).message,
-                              type: "error"
-                            });
-                          }
-                        } else if (
-                          existingGDLUser &&
-                          existingGDLUser.isEmailVerified
-                        ) {
-                          transitionToLibrary();
-                        } else if (
-                          existingGDLUser &&
-                          !existingGDLUser.isEmailVerified
-                        ) {
-                          setRecoveryEmail(existingGDLUser.email);
-                          setStep(Steps.GDLAccountVerification);
-                        } else {
-                          nextStep();
-                        }
-                      } catch (e) {
-                        setLoadingButton(false);
-                        console.error(e);
-                      }
+                      setStep(i() + 1);
                     }
                   }}
                 >
-                  <Switch>
-                    <Match
-                      when={
-                        step() === Steps.GDLAccountCompletion && !gdlUser.data
-                      }
-                    >
-                      <Trans key="login.register" />
-                      <i class="i-ri:arrow-right-line" />
-                    </Match>
-                    <Match
-                      when={
-                        step() === Steps.GDLAccountCompletion &&
-                        gdlUser.data &&
-                        gdlUser.data.email !== recoveryEmail()
-                      }
-                    >
-                      <Trans key="login.request_email_change" />
-                      <i class="i-ri:arrow-right-line" />
-                    </Match>
-                    <Match when={step() === Steps.GDLAccount && gdlUser.data}>
-                      <Trans key="login.sync_gdl_account" />
-                      <i class="i-ri:arrow-right-line" />
-                    </Match>
-                    <Match when={step() === Steps.Auth}>
-                      <i class="w-4 h-4 i-ri:microsoft-fill" />
-                      <Trans key="login.sign_in" />
-                    </Match>
-                    <Match when={step() !== Steps.Auth}>
-                      <Trans key="login.next" />
-                      <i class="i-ri:arrow-right-line" />
-                    </Match>
-                  </Switch>
-                </Button>
-              </div>
-            </div>
+                  <div
+                    class="h-2 w-2 bg-lightSlate-900 rounded-full"
+                    classList={{
+                      "group-hover:bg-lightSlate-100":
+                        i() + 1 < step() &&
+                        (step() > Steps.CodeStep
+                          ? i() + 1 > Steps.CodeStep
+                          : true)
+                    }}
+                  />
+                </div>
+              )}
+            </For>
           </div>
-          <div class="flex-1 w-full">
+
+          <div class="flex w-full box-border">
             <div
-              ref={backgroundBlurRef}
-              class="z-1 absolute top-0 left-0 p-0 h-screen w-full opacity-0 bg-black/20"
+              ref={btnRef}
+              class="overflow-hidden"
               style={{
-                "backdrop-filter": "blur(6px)"
+                width: !isBackButtonVisible() ? "0" : "60%",
+                margin: !isBackButtonVisible() ? "0" : "0 1rem 0 0"
               }}
-            />
-            <div class="z-1 font-bold text-7xl leading-loose absolute top-0 left-0 p-0 h-screen w-full flex flex-col items-center justify-center">
-              <div ref={welcomeToTextRef} class="opacity-0">
-                <Trans key="login.welcome_to" />
-              </div>
-              <div ref={gdlauncherTextRef} class="opacity-0">
-                <Trans key="login.gdlauncher" />
-              </div>
+            >
+              <Button
+                size="large"
+                type="secondary"
+                fullWidth
+                onClick={async () => {
+                  if (step() === Steps.GDLAccount) {
+                    await saveGdlAccountMutation.mutateAsync("");
+                    transitionToLibrary();
+                  } else if (
+                    (step() === Steps.Auth || step() === Steps.CodeStep) &&
+                    globalStore.accounts.data?.length !== 0
+                  ) {
+                    navigate("/settings/accounts");
+                  } else {
+                    handleAnimationBackward();
+                    prevStep();
+                  }
+
+                  setLoadingButton(false);
+                }}
+              >
+                <Switch>
+                  <Match
+                    when={
+                      step() === Steps.GDLAccount ||
+                      ((step() === Steps.Auth || step() === Steps.CodeStep) &&
+                        globalStore.accounts.data?.length !== 0)
+                    }
+                  >
+                    <Trans key="general.skip" />
+                    <i class="i-ri:skip-forward-line" />
+                  </Match>
+                  <Match when={step() !== Steps.GDLAccount}>
+                    <i class="i-ri:arrow-left-line" />
+                    <Trans key="general.back" />
+                  </Match>
+                </Switch>
+              </Button>
             </div>
-            <video
-              ref={videoRef}
-              class="p-0 h-screen w-full object-cover"
-              src={BackgroundVideo}
-              autoplay
-              muted
-              loop
-              playsinline
-            />
-            {/* <div
+            <Button
+              fullWidth
+              variant="primary"
+              size="large"
+              disabled={
+                !acceptedTOS() ||
+                step() === Steps.CodeStep ||
+                step() === Steps.GDLAccountVerification ||
+                (step() === Steps.GDLAccountCompletion && !recoveryEmail())
+              }
+              loading={
+                loadingButton() || step() === Steps.GDLAccountVerification
+              }
+              onClick={async () => {
+                handleAnimationForward();
+                setLoadingButton(true);
+
+                if (step() === Steps.TermsAndConditions) {
+                  try {
+                    await settingsMutation.mutateAsync({
+                      termsAndPrivacyAccepted: {
+                        Set: true
+                      },
+                      metricsEnabled: {
+                        Set: !!acceptedMetrics()
+                      }
+                    });
+                  } catch (err) {
+                    console.log(err);
+                    addNotification({
+                      name: "Error while accepting terms and conditions",
+                      content: "Check the console for more information.",
+                      type: "error"
+                    });
+                  }
+
+                  setLoadingButton(false);
+                  nextStep();
+                } else if (step() === Steps.Auth) {
+                  if (!routeData.status.data) {
+                    await accountEnrollBeginMutation.mutateAsync(undefined);
+                  } else {
+                    await accountEnrollCancelMutation.mutateAsync(undefined);
+                    await accountEnrollBeginMutation.mutateAsync(undefined);
+                  }
+                } else if (step() === Steps.GDLAccount) {
+                  const uuid = globalStore?.currentlySelectedAccountUuid?.data;
+
+                  if (!uuid) {
+                    throw new Error("No active uuid");
+                  }
+
+                  try {
+                    const existingGDLUser = await rspcContext.client.query([
+                      "account.peekGdlAccount",
+                      uuid
+                    ]);
+
+                    if (existingGDLUser && existingGDLUser.isEmailVerified) {
+                      transitionToLibrary();
+                      await saveGdlAccountMutation.mutateAsync(uuid);
+
+                      return;
+                    } else if (
+                      existingGDLUser &&
+                      !existingGDLUser.isEmailVerified
+                    ) {
+                      setRecoveryEmail(existingGDLUser.email);
+                      setStep(Steps.GDLAccountVerification);
+                      return;
+                    }
+                  } catch (e) {
+                    console.error(e);
+                  }
+
+                  await deleteGDLAccountMutation.mutateAsync(undefined);
+                  setLoadingButton(false);
+                  nextStep();
+                } else if (step() === Steps.GDLAccountCompletion) {
+                  const uuid = globalStore?.currentlySelectedAccountUuid?.data;
+
+                  if (!uuid) {
+                    throw new Error("No active uuid");
+                  }
+
+                  const email = recoveryEmail();
+
+                  if (!email) {
+                    throw new Error("No recovery email");
+                  }
+
+                  try {
+                    const existingGDLUser = await rspcContext.client.query([
+                      "account.peekGdlAccount",
+                      uuid
+                    ]);
+
+                    if (
+                      existingGDLUser &&
+                      existingGDLUser.email &&
+                      existingGDLUser.email !== recoveryEmail()
+                    ) {
+                      try {
+                        const result =
+                          await requestEmailChangeMutation.mutateAsync({
+                            uuid,
+                            // button is disabled if the email is the same as the recovery email or is empty
+                            email: recoveryEmail()!
+                          });
+
+                        if (result.status === "success") {
+                          setStep(Steps.GDLAccountVerification);
+                          setLoadingButton(false);
+                        } else if (result.status === "failed" && result.value) {
+                          clearInterval(cooldownInterval);
+                          cooldownInterval = undefined;
+
+                          setLoadingButton(false);
+                          setCooldown(result.value);
+                          setRecoveryEmail(existingGDLUser.email);
+
+                          cooldownInterval = setInterval(() => {
+                            setCooldown((prev) => prev - 1);
+
+                            if (cooldown() <= 0) {
+                              setCooldown(0);
+                              clearInterval(cooldownInterval);
+                              cooldownInterval = undefined;
+                            }
+                          }, 1000);
+                        }
+                      } catch (e) {
+                        console.error(e);
+                        addNotification({
+                          name: "Error while requesting email change",
+                          content: (e as any).message,
+                          type: "error"
+                        });
+                      }
+                    } else if (
+                      existingGDLUser &&
+                      existingGDLUser.isEmailVerified
+                    ) {
+                      transitionToLibrary();
+                    } else if (
+                      existingGDLUser &&
+                      !existingGDLUser.isEmailVerified
+                    ) {
+                      setRecoveryEmail(existingGDLUser.email);
+                      setStep(Steps.GDLAccountVerification);
+                    } else {
+                      nextStep();
+                    }
+                  } catch (e) {
+                    setLoadingButton(false);
+                    console.error(e);
+                  }
+                }
+              }}
+            >
+              <Switch>
+                <Match
+                  when={step() === Steps.GDLAccountCompletion && !gdlUser.data}
+                >
+                  <Trans key="login.register" />
+                  <i class="i-ri:arrow-right-line" />
+                </Match>
+                <Match
+                  when={
+                    step() === Steps.GDLAccountCompletion &&
+                    gdlUser.data &&
+                    gdlUser.data.email !== recoveryEmail()
+                  }
+                >
+                  <Trans key="login.request_email_change" />
+                  <i class="i-ri:arrow-right-line" />
+                </Match>
+                <Match when={step() === Steps.GDLAccount && gdlUser.data}>
+                  <Trans key="login.sync_gdl_account" />
+                  <i class="i-ri:arrow-right-line" />
+                </Match>
+                <Match when={step() === Steps.Auth}>
+                  <i class="w-4 h-4 i-ri:microsoft-fill" />
+                  <Trans key="login.sign_in" />
+                </Match>
+                <Match when={step() !== Steps.Auth}>
+                  <Trans key="login.next" />
+                  <i class="i-ri:arrow-right-line" />
+                </Match>
+              </Switch>
+            </Button>
+          </div>
+        </div>
+      </div>
+      <div class="flex-1 w-full">
+        <div
+          ref={backgroundBlurRef}
+          class="z-1 absolute top-0 left-0 p-0 h-screen w-full opacity-0 bg-black/20"
+          style={{
+            "backdrop-filter": "blur(6px)"
+          }}
+        />
+        <div class="z-1 font-bold text-7xl leading-loose absolute top-0 left-0 p-0 h-screen w-full flex flex-col items-center justify-center">
+          <div ref={welcomeToTextRef} class="opacity-0">
+            <Trans key="login.welcome_to" />
+          </div>
+          <div ref={gdlauncherTextRef} class="opacity-0">
+            <Trans key="login.gdlauncher" />
+          </div>
+        </div>
+        <video
+          ref={videoRef}
+          class="p-0 h-screen w-full object-cover"
+          src={BackgroundVideo}
+          autoplay
+          muted
+          loop
+          playsinline
+        />
+        {/* <div
               style={{
                 "mix-blend-mode": "hard-light"
               }}
               class="absolute left-0 right-0 bg-darkSlate-800 bottom-0 top-0 opacity-30"
             /> */}
-          </div>
-        </div>
-      </Match>
-    </Switch>
+      </div>
+    </div>
   );
 }

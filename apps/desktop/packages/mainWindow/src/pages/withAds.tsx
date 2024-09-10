@@ -13,6 +13,7 @@ import adSize from "@/utils/adhelper";
 import { Trans } from "@gd/i18n";
 import { useModal } from "@/managers/ModalsManager";
 import { BisectBanner } from "@/components/BisectBanner";
+import backgroundImage from "/assets/images/gdlauncher_pattern.svg";
 
 function withAdsLayout() {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -58,7 +59,12 @@ function withAdsLayout() {
   return (
     <>
       <AppNavbar />
-      <div class="flex w-screen z-10 h-auto">
+      <div
+        class="flex w-screen z-10 h-auto"
+        style={{
+          "background-image": `url("${backgroundImage}")`
+        }}
+      >
         <main class="relative flex-grow">
           <div class="flex justify-end h-[calc(100vh-60px)]">
             <div
@@ -70,7 +76,7 @@ function withAdsLayout() {
             </div>
             <div class="flex flex-col justify-between h-[calc(100vh-100px)]">
               <div
-                class="bg-darkSlate-800 py-4"
+                class="py-4"
                 style={{
                   width: `${adSize.width}px`,
                   height: `${adSize.height}px`

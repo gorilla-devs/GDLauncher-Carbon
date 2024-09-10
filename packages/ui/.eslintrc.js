@@ -18,6 +18,7 @@ module.exports = {
       {
         varsIgnorePattern: "^_",
         argsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_",
       },
     ],
   },

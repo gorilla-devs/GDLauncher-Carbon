@@ -101,7 +101,7 @@ export const streamToJson = async function* (
               startIndex + jsonString.length
             );
             startIndex = 0;
-          } catch (err) {
+          } catch (_) {
             // If parsing failed, continue accumulating more strings
             startIndex++;
           }

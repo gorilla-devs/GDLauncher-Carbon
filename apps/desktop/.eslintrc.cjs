@@ -13,7 +13,8 @@ module.exports = {
       "error",
       {
         varsIgnorePattern: "^_",
-        argsIgnorePattern: "^_"
+        argsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_"
       }
     ]
   },

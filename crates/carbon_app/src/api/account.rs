@@ -12,8 +12,8 @@ use crate::domain::account as domain;
 use crate::error::FeError;
 use crate::managers::account::api::XboxError;
 use crate::managers::account::gdl_account::{
-    GDLUser, RegisterAccountBody, RequestGDLAccountDeletionError, RequestNewEmailChangeError,
-    RequestNewVerificationTokenError,
+    GDLAccountStatus, GDLUser, RegisterAccountBody, RequestGDLAccountDeletionError,
+    RequestNewEmailChangeError, RequestNewVerificationTokenError,
 };
 use crate::managers::{account, App, AppInner};
 
@@ -82,7 +82,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
         query GET_GDL_ACCOUNT[app, args: ()] {
             let gdl_user = app.account_manager().get_gdl_account().await?;
 
-            Ok(gdl_user.map(Into::<FEGDLAccount>::into))
+            Ok(Into::<FEGDLAccountStatus>::into(gdl_user))
         }
 
         mutation REGISTER_GDL_ACCOUNT[app, register_data: FERegisterAccount] {
@@ -313,6 +313,25 @@ impl From<account::EnrollmentError> for EnrollmentError {
             BE::XboxError(e) => Self::XboxAccount(e),
             BE::EntitlementMissing => Self::NoGameOwnership,
             BE::GameProfileMissing => Self::NoGameProfile,
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "status", content = "value")]
+pub enum FEGDLAccountStatus {
+    Valid(FEGDLAccount),
+    Skipped,
+    Unset,
+}
+
+impl From<GDLAccountStatus> for FEGDLAccountStatus {
+    fn from(value: GDLAccountStatus) -> Self {
+        match value {
+            GDLAccountStatus::Valid(value) => Self::Valid(value.into()),
+            GDLAccountStatus::Skipped => Self::Skipped,
+            GDLAccountStatus::Unset => Self::Unset,
         }
     }
 }

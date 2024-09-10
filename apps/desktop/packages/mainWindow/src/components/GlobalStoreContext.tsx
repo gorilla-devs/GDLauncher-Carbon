@@ -2,6 +2,7 @@ import { rspc } from "@/utils/rspcClient";
 import {
   AccountEntry,
   FEGDLAccount,
+  FEGDLAccountStatus,
   FESettings,
   ListGroup,
   ListInstance
@@ -17,7 +18,7 @@ type Context = {
   accounts: CreateQueryResult<AccountEntry[], RSPCError>;
   currentlySelectedAccount: () => AccountEntry | null;
   currentlySelectedAccountUuid: CreateQueryResult<string | null, RSPCError>;
-  gdlAccount: CreateQueryResult<FEGDLAccount | null, RSPCError>;
+  gdlAccount: CreateQueryResult<FEGDLAccountStatus | null, RSPCError>;
 };
 
 const GlobalStoreContext = createContext();

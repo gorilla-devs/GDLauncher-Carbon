@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use axum::extract;
 use chrono::{FixedOffset, Utc};
 use gdl_account::{
-    GDLAccountTask, GDLUser, RegisterAccountBody, RequestGDLAccountDeletionError,
+    GDLAccountStatus, GDLAccountTask, GDLUser, RegisterAccountBody, RequestGDLAccountDeletionError,
     RequestNewEmailChangeError, RequestNewVerificationTokenError,
 };
 use jwt::{Header, Token};
@@ -315,7 +315,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(())
     }
 
-    pub async fn get_gdl_account(self) -> anyhow::Result<Option<GDLUser>> {
+    pub async fn get_gdl_account(self) -> anyhow::Result<GDLAccountStatus> {
         let saved_gdl_account_uuid = self
             .app
             .settings_manager()
@@ -324,11 +324,11 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .gdl_account_uuid;
 
         let Some(saved_gdl_account_uuid) = saved_gdl_account_uuid else {
-            return Ok(None);
+            return Ok(GDLAccountStatus::Unset);
         };
 
         if saved_gdl_account_uuid.is_empty() {
-            return Ok(None);
+            return Ok(GDLAccountStatus::Skipped);
         }
 
         let Some(id_token) = self
@@ -344,11 +344,15 @@ impl<'s> ManagerRef<'s, AccountManager> {
             bail!("attempted to get an account that does not exist");
         };
 
-        self.gdl_account_task
+        let user = self
+            .gdl_account_task
             .read()
             .await
             .get_account(id_token)
-            .await
+            .await?
+            .ok_or_else(|| anyhow!("attempted to get an account that does not exist"))?;
+
+        Ok(GDLAccountStatus::Valid(user))
     }
 
     pub async fn request_new_verification_token(

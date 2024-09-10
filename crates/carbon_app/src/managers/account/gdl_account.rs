@@ -50,6 +50,13 @@ pub enum RequestGDLAccountDeletionError {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
+pub enum GDLAccountStatus {
+    Valid(GDLUser),
+    Skipped,
+    Unset,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
 pub struct GDLUser {
     pub email: String,
     pub microsoft_oid: String,

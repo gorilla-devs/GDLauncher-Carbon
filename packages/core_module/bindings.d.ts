@@ -6,7 +6,7 @@ export type Procedures = {
         { key: "account.getAccountStatus", input: string, result: AccountStatus | null } | 
         { key: "account.getAccounts", input: never, result: AccountEntry[] } | 
         { key: "account.getActiveUuid", input: never, result: string | null } | 
-        { key: "account.getGdlAccount", input: never, result: FEGDLAccount | null } | 
+        { key: "account.getGdlAccount", input: never, result: FEGDLAccountStatus } | 
         { key: "account.getHead", input: string, result: null } | 
         { key: "account.peekGdlAccount", input: string, result: FEGDLAccount | null } | 
         { key: "echo", input: string, result: string } | 
@@ -168,6 +168,8 @@ export type FEManagedJavaOsMap = { [key: FEManagedJavaOs]: FEManagedJavaArchMap 
 
 export type GameResolution = { type: "Standard"; value: [number, number] } | { type: "Custom"; value: [number, number] }
 
+export type FERequestNewEmailChangeStatus = { status: "success" } | { status: "failed"; value: number | null }
+
 export type FEInstanceModloaderType = "neoforge" | "forge" | "fabric" | "quilt"
 
 export type ListInstanceStatus = { status: "valid"; value: ValidListInstance } | { status: "invalid"; value: InvalidListInstance }
@@ -177,6 +179,8 @@ export type FullImportScanStatus = { scanning: boolean; status: ImportScanStatus
 export type MRFEVersionIDs = string[]
 
 export type GameLogEntry = { id: GameLogId; instance_id: FEInstanceId; active: boolean }
+
+export type FERequestNewVerificationTokenStatus = { status: "success" } | { status: "failed"; value: number | null }
 
 export type ModpackInfo = { modpack: Modpack; locked: boolean }
 
@@ -274,8 +278,6 @@ export type DeviceCode = { userCode: string; verificationUri: string; expiresAt:
 
 export type ExportArgs = { instance_id: FEInstanceId; target: ExportTarget; save_path: string; self_contained_addons_bundling: boolean; filter: ExportEntry }
 
-export type FERequestNewEmailChangeStatus = { status: "success" } | { status: "failed"; value: number | null }
-
 export type FEJavaComponent = { id: string; path: string; version: string; type: FEJavaComponentType; isValid: boolean }
 
 export type CFFEModSearchSortField = "featured" | "popularity" | "lastUpdated" | "name" | "author" | "totalDownloads" | "category" | "gameVersion"
@@ -300,13 +302,9 @@ export type MRFEProject = { slug: string; title: string; description: string; ca
 
 export type MRFECategoriesResponse = MRFECategory[]
 
-export type FERequestNewVerificationTokenStatus = { status: "success" } | { status: "failed"; value: number | null }
-
 export type ModPlatform = "Curseforge" | "Modrinth"
 
 export type InstanceMod = { instance_id: FEInstanceId; mod_id: string }
-
-export type FERequestDeletionStatus = "success" | { failed: number | null }
 
 export type CFFECategory = { id: number; name: string; slug: string; url: string; iconUrl: string | null; dateModified: string; isClass: boolean | null; classId: number | null; parentCategoryId: number | null; displayIndex: number | null }
 
@@ -315,8 +313,6 @@ export type ExploreQuery = { instance_id: FEInstanceId; path: string[] }
 export type MoveGroup = { group: FEGroupId; before: FEGroupId | null }
 
 export type ModLoader = { type_: FEInstanceModloaderType; version: string }
-
-export type FERequestEmailChange = { email: string; uuid: string }
 
 export type CreateInstance = { group: FEGroupId; name: string; use_loaded_icon: boolean; version: CreateInstanceVersion; notes: string }
 
@@ -340,9 +336,9 @@ export type MRFELicense = { id: string; name: string; url: string | null }
 
 export type MRFERequestedVersionStatus = "listed" | "archived" | "draft" | "unlisted"
 
-export type ValidListInstance = { mc_version: string | null; modloader: FEInstanceModloaderType | null; modpack: Modpack | null; state: LaunchState }
+export type FERegisterAccount = { email: string; uuid: string }
 
-export type FEGDLAccount = { email: string; microsoftOid: string; microsoftEmail: string | null; isEmailVerified: boolean; hasPendingVerification: boolean; verificationTimeout: number | null; hasPendingDeletionRequest: boolean; deletionTimeout: number | null; emailChangeTimeout: number | null }
+export type ValidListInstance = { mc_version: string | null; modloader: FEInstanceModloaderType | null; modpack: Modpack | null; state: LaunchState }
 
 export type ChangeModpack = { instance: FEInstanceId; modpack: Modpack }
 
@@ -394,8 +390,6 @@ export type MRFECategory = { icon: string; name: string; project_type: MRFEProje
 export type FEJavaOverride = { Profile: string | null } | { Path: string | null }
 
 export type CFFEHashAlgo = "sha1" | "md5"
-
-export type FERegisterAccount = { email: string; uuid: string }
 
 export type FEModSearchResponse = { data: CFFEMod[]; pagination: CFFEPagination | null }
 
@@ -457,6 +451,8 @@ export type MoveInstanceTarget = { BeforeInstance: FEInstanceId } | { BeginningO
 
 export type MRFELoadersResponse = MRFELoader[]
 
+export type FEGDLAccountStatus = { status: "valid"; value: FEGDLAccount } | { status: "skipped" } | { status: "unset" }
+
 export type MoveInstance = { instance: FEInstanceId; target: MoveInstanceTarget }
 
 export type FECategoriesResponse = { data: CFFECategory[]; pagination: CFFEPagination | null }
@@ -499,6 +495,8 @@ export type CFFEModLinks = { websiteUrl: string | null; wikiUrl: string | null; 
 
 export type FEJavaComponentType = "local" | "managed" | "custom"
 
+export type FEGDLAccount = { email: string; microsoftOid: string; microsoftEmail: string | null; isEmailVerified: boolean; hasPendingVerification: boolean; verificationTimeout: number | null; hasPendingDeletionRequest: boolean; deletionTimeout: number | null; emailChangeTimeout: number | null }
+
 export type FEModsResponse = { data: CFFEMod[]; pagination: CFFEPagination | null }
 
 export type CFFEModFilesParameters = { modId: number; query: CFFEModFilesParametersQuery }
@@ -525,7 +523,11 @@ export type FEManagedJavaArch = "x64" | "x86" | "arm32" | "arm64"
 
 export type FEManagedJavaSetupArgs = { os: FEManagedJavaOs; arch: FEManagedJavaArch; vendor: FEVendor; id: string }
 
+export type FERequestDeletionStatus = "success" | { failed: number | null }
+
 export type FEUnifiedModLoaderType = "forge" | "neoforge" | "fabric" | "quilt" | "liteloader" | "unknown" | "cauldron" | "bukkit" | "bungeecord" | "canvas" | "datapack" | "folia" | "iris" | "minecraft" | "modloader" | "optifine" | "paper" | "purpur" | "rift" | "spigot" | "sponge" | "vanilla" | "velocity" | "waterfall"
+
+export type FERequestEmailChange = { email: string; uuid: string }
 
 export type AccountStatus = "ok" | "expired" | "refreshing" | "invalid"
 

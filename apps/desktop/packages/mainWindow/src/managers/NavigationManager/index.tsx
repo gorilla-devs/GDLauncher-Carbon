@@ -21,8 +21,6 @@ export const NavigationManager = (props: { children: JSX.Element }) => {
   const navigate = useNavigate();
 
   const manager = (path: string | number, options?: NavigateOptions) => {
-    console.log("NAVIGATE", path);
-
     if (typeof path == "number") {
       if ((document as any).startViewTransition) {
         (document as any).startViewTransition(() => {
