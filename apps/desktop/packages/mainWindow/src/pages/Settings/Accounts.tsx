@@ -18,12 +18,6 @@ import { convertSecondsToHumanTime } from "@/utils/helpers";
 import { useModal } from "@/managers/ModalsManager";
 import { AccountEntry } from "@gd/core_module/bindings";
 
-const GDLAccountRow = (props: { children: JSX.Element }) => {
-  return (
-    <div class="flex items-center justify-between gap-4">{props.children}</div>
-  );
-};
-
 const GDLAccountRowItem = (props: {
   title?: string;
   value?: string | null | undefined;
@@ -57,7 +51,11 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
     accessorFn: () => <></>,
     id: "active",
     cell: (info) => info.getValue(),
-    header: () => <span>Active</span>
+    header: () => (
+      <span>
+        <Trans key="settings:active" />
+      </span>
+    )
   },
   {
     accessorFn: (row) => row.username,
@@ -73,13 +71,21 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
         </div>
       </div>
     ),
-    header: () => <span>Username</span>
+    header: () => (
+      <span>
+        <Trans key="settings:username" />
+      </span>
+    )
   },
   {
     accessorFn: (row) => row.type.type,
     id: "type",
     cell: (info) => info.getValue(),
-    header: () => <span>Type</span>
+    header: () => (
+      <span>
+        <Trans key="settings:type" />
+      </span>
+    )
   },
   {
     accessorFn: (row) => row.status,
@@ -102,7 +108,11 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
         </Switch>
       </div>
     ),
-    header: () => <span>Status</span>
+    header: () => (
+      <span>
+        <Trans key="settings:status" />
+      </span>
+    )
   },
   {
     accessorFn: (row) => row.uuid,
@@ -114,13 +124,21 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
         </div>
       </div>
     ),
-    header: () => <span>UUID</span>
+    header: () => (
+      <span>
+        <Trans key="settings:uuid" />
+      </span>
+    )
   },
   {
     accessorFn: () => <></>,
     id: "actions",
     cell: (info) => info.getValue(),
-    header: () => <span>Actions</span>
+    header: () => (
+      <span>
+        <Trans key="settings:actions" />
+      </span>
+    )
   }
 ];
 

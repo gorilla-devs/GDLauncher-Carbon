@@ -1,7 +1,6 @@
 import { rspc } from "@/utils/rspcClient";
 import {
   AccountEntry,
-  FEGDLAccount,
   FEGDLAccountStatus,
   FESettings,
   ListGroup,
