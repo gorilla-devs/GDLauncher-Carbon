@@ -4,6 +4,10 @@ const additionalStyles = `
   html, body {
     font-size: 15px;
   }
+
+  * {
+    border-radius: 0 !important;
+  }
 `;
 
 const pixelato: Theme = {
