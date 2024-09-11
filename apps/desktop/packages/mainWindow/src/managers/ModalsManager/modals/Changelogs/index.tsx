@@ -127,18 +127,10 @@ const Changelogs = (props: ModalProps) => {
       noHeader={props.noHeader}
       title={props?.title}
       noPadding
-      height="min-h-130 h-1/3"
+      height="h-150"
       width="w-130"
     >
       <div class="w-full h-full overflow-auto px-5 pb-5 box-border">
-        {/* <div class="relative flex items-center justify-center my-4">
-          <img src={GDLauncherWideLogo} class="w-80" />
-          <div class="absolute -top-3 left-43 font-bold">
-            {"v"}
-            {__APP_VERSION__}
-          </div>
-        </div> */}
-
         <h2>
           <Trans
             key="changelogs.whats_new_in"

@@ -10,28 +10,68 @@ export type Changelog = {
 };
 
 const changelogs: Changelog = {
-  new: [],
+  new: [
+    {
+      title: "GDL accounts are now live.",
+      description:
+        "A GDL account is just an entry in our database that is linked to a Microsoft account ID (UUID). We use your token to authenticate you, your password is NEVER stored. Having a GDL account will give you access to somw new features."
+    },
+    {
+      title: "Redesigned the whole authentication flow.",
+      description:
+        "It now features a more user-friendly interface, better error handling, and a better UX overall."
+    },
+    {
+      title: "Reworked theming system.",
+      description:
+        "It now features 3 hand-picked themes. Custom themes are on the way as well."
+    },
+    {
+      title:
+        "As part of the GDL accounts, we also redesigned the accounts management system.",
+      description:
+        'We added an "Accounts" tab in the settings to easily manage your accounts, as well as your GDL account.'
+    }
+  ],
   fixed: [
     {
-      title: "New database migration system.",
+      title: "Fixed instance names with precomposed UNICODE characters.",
       description:
-        "Our previous system was hanging for some users. We have now implemented a new system that should be more reliable and faster."
+        "You can now use any character in instance names, including japanese characters, emoji, and any other unicode characters."
     },
     {
-      title: "Fixed import status stalling.",
-      description: "The progress should now update correctly."
+      title:
+        "Fixed a bug where an instance modloader version would not be updated when changing the modloader."
     },
     {
-      title: 'Hid the "unknown" modloader.',
-      description:
-        "We use it internally to map unknown modloaders but should not be exposed in the UI."
+      title:
+        "Fixed microphone not being allowed to be used in instances on MacOS."
     }
   ],
   improved: [
     {
-      title: "The versions are now selectable in the mods browser.",
+      title: "Instances searchbar is now sticky."
+    },
+    {
+      title: "Updated dependencies & toolchain.",
       description:
-        "It will still preselect the correct game version, but you'll be able to override it manually."
+        "This basically means more stability and performance, as well as less bugs and security issues."
+    },
+    {
+      title: "Added a small transition when switching between pages."
+    },
+    {
+      title:
+        "Internal technical change that should improve performance across pages in some cases."
+    },
+    {
+      title: "Added many micro-transitions",
+      description: "to various parts of the app, like the instances page."
+    },
+    {
+      title: "Redesigned news component.",
+      description:
+        "It now takes up less space, and accomodates for a smaller featured tile. While it's static for now, we're working on a dynamic featured tile."
     }
   ]
 };

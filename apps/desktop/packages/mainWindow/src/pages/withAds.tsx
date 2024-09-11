@@ -61,7 +61,7 @@ function withAdsLayout() {
       <div
         class="flex w-screen z-10 h-auto"
         style={{
-          "background-image": "var(--ads-sidebar-background)"
+          background: "var(--ads-sidebar-background)"
         }}
       >
         <main class="relative flex-grow">

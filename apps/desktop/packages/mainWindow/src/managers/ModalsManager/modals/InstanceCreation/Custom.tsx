@@ -512,7 +512,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             <span
               class={`px-3 flex text-lightSlate-400 items-center gap-2 text-xl`}
             >
-              About
+              <Trans key="general.about" />
             </span>
             <div
               class={`flex-1 border-t-1 border-lightSlate-400 border-solid`}
@@ -719,7 +719,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             <span
               class={`px-3 flex text-lightSlate-400 items-center gap-2 text-xl`}
             >
-              Modloader
+              <Trans key="general.modloader" />
             </span>
             <div
               class={`flex-1 border-t-1 border-lightSlate-400 border-solid`}
