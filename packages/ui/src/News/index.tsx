@@ -160,7 +160,7 @@ const News = (props: CarouselProps) => {
             changeSlide("left");
           }}
         >
-          <div class="i-ri:arrow-drop-left-line text-3xl text-white" />
+          <div class="i-ri:arrow-drop-left-line text-3xl text-lightSlate-50" />
         </div>
         <div
           class="h-7 w-7 opacity-0 group-hover:opacity-100 duration-200 ease-in-out bg-darkSlate-800 rounded-full absolute right-5 top-1/2 -translate-y-1/2 flex justify-center items-center cursor-pointer z-40"
@@ -169,7 +169,7 @@ const News = (props: CarouselProps) => {
             changeSlide("right");
           }}
         >
-          <div class="i-ri:arrow-drop-right-line text-3xl text-white" />
+          <div class="i-ri:arrow-drop-right-line text-3xl text-lightSlate-50" />
         </div>
       </Show>
       <Show when={mergedProps.showIndicators}>

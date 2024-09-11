@@ -15,7 +15,7 @@ const SelfContainedArchive = () => {
       <div class="flex items-center gap-2">
         <div>{t("instance.self_contained_addons_bundling")}</div>
         <Tooltip content={t("instance.self_contained_addons_bundling_tooltip")}>
-          <div class="text-2xl text-darkSlate-400 duration-100 ease-in-out cursor-pointer i-ri:information-fill transition-color hover:text-white" />
+          <div class="text-2xl text-darkSlate-400 duration-100 ease-in-out cursor-pointer i-ri:information-fill transition-color hover:text-lightSlate-50" />
         </Tooltip>
       </div>
       <Switch

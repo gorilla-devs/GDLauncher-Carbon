@@ -34,7 +34,7 @@ const SiderbarWrapper = (props: Props) => {
       classList={{
         "p-5": !props.noPadding
       }}
-      class="h-full bg-darkSlate-800 relative text-white box-border overflow-hidden transition-all ease-in-out duration-100 flex-none"
+      class="h-full bg-darkSlate-800 relative text-lightSlate-50 box-border overflow-hidden transition-all ease-in-out duration-100 flex-none"
     >
       <Show when={mergedProps.collapsable}>
         <div

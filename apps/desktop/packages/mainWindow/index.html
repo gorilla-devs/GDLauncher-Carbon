@@ -89,6 +89,15 @@
           url("/assets/fonts/monocraft-bold.ttf") format("truetype");
       }
 
+      @font-face {
+        font-family: "W95FA";
+        font-style: normal;
+        font-weight: normal;
+        src:
+          local("W95FA"),
+          url("/assets/fonts/w95fa.woff2") format("woff2");
+      }
+
       * {
         font-family: var(--font);
       }
@@ -163,6 +172,69 @@
           return true;
         };
       }
+    </script>
+    <script>
+      function ensureAdVisibility() {
+        const adContainer = document.querySelector(
+          "main > div > div:nth-child(2)"
+        );
+
+        if (adContainer) {
+          // Create a style element if it doesn't exist
+          let style = document.getElementById("ad-visibility-style");
+          if (!style) {
+            style = document.createElement("style");
+            style.id = "ad-visibility-style";
+            document.head.appendChild(style);
+          }
+
+          style.textContent = `
+            main > div > div:nth-child(2) {
+              display: flex !important;
+              flex-direction: column !important;
+              justify-content: center !important;
+              visibility: visible !important;
+              opacity: 1 !important;
+              width: auto !important;
+              height: calc(100vh-100px) !important;
+              position: static !important;
+              transform: none !important;
+              clip: auto !important;
+              clip-path: none !important;
+              max-height: none !important;
+              overflow: visible !important;
+              pointer-events: auto !important;
+            }
+          `;
+
+          if (!document.body.contains(adContainer)) {
+            const parent = document.querySelector("main > div");
+            if (parent) {
+              parent.appendChild(adContainer);
+            }
+          }
+
+          const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+              if (
+                mutation.type === "attributes" &&
+                mutation.attributeName === "style"
+              ) {
+                adContainer.removeAttribute("style");
+              }
+            });
+          });
+
+          observer.observe(adContainer, { attributes: true });
+        }
+      }
+
+      // // Run the check periodically
+      // setInterval(ensureAdVisibility, 1000);
+
+      // // Also run the check when the page loads and when it's resized
+      // window.addEventListener("load", ensureAdVisibility);
+      // window.addEventListener("resize", ensureAdVisibility);
     </script>
   </head>
   <body style="margin: 0; padding: 0; overflow: hidden" spellcheck="false">

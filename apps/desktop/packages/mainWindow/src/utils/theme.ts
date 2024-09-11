@@ -1,10 +1,11 @@
-import { mainTheme, Theme as UITheme, pixelato } from "@gd/ui";
+import { mainTheme, Theme as UITheme, pixelato, win95 } from "@gd/ui";
 import { createEffect } from "solid-js";
 import { rspc } from "./rspcClient";
 
 enum _Theme {
   _Main = "main",
-  _Pixelato = "pixelato"
+  _Pixelato = "pixelato",
+  _Win95 = "win95"
 }
 
 const initThemes = () => {
@@ -26,6 +27,10 @@ export function applyThemeByName(themeName: string | undefined) {
   switch (themeName) {
     case _Theme._Pixelato: {
       applyTheme(pixelato);
+      break;
+    }
+    case _Theme._Win95: {
+      applyTheme(win95);
       break;
     }
     default: {
@@ -65,6 +70,9 @@ export function getThemeColor(themeName: string, color: keyof UITheme): string {
   switch (themeName) {
     case _Theme._Pixelato: {
       return `rgb(${pixelato[color]})`;
+    }
+    case _Theme._Win95: {
+      return `rgb(${win95[color]})`;
     }
     default: {
       return `rgb(${mainTheme[color]})`;

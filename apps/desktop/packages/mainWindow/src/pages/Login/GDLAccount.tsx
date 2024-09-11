@@ -85,7 +85,7 @@ const GDLAccount = (props: Props) => {
                   }}
                 >
                   {""}
-                  <span class="text-white font-bold" />
+                  <span class="text-lightSlate-50 font-bold" />
                   {""}
                 </Trans>
               </p>

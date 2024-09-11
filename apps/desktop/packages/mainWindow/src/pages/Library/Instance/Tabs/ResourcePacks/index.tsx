@@ -198,7 +198,7 @@ const ResourcePacks = () => {
                 }}
               />
             </div>
-            <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
+            <div class="flex items-center gap-2 cursor-pointer hover:text-lightSlate-50 transition duration-100 ease-in-out">
               <span class="i-ri:folder-open-fill text-2xl" />
               <Trans
                 key="instance.open_resource_packs_folder"
@@ -207,7 +207,7 @@ const ResourcePacks = () => {
                 }}
               />
             </div>
-            <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
+            <div class="flex items-center gap-2 cursor-pointer hover:text-lightSlate-50 transition duration-100 ease-in-out">
               <span class="text-2xl i-ri:forbid-line" />
               <Trans
                 key="instance.disable_resource_pack"
@@ -216,7 +216,7 @@ const ResourcePacks = () => {
                 }}
               />
             </div>
-            <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
+            <div class="flex items-center gap-2 cursor-pointer hover:text-lightSlate-50 transition duration-100 ease-in-out">
               <span class="i-ri:delete-bin-2-fill text-2xl" />
               <Trans
                 key="instance.delete_resource_pack"

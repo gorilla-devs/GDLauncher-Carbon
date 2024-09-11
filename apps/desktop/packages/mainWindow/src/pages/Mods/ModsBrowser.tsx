@@ -151,7 +151,7 @@ const ModsBrowser = () => {
                       type="outline"
                       size="small"
                       icon={
-                        <i class="text-darkSlate-50 cursor-pointer hover:text-white transition i-ri:arrow-left-s-line transition-colors" />
+                        <i class="text-darkSlate-50 cursor-pointer hover:text-lightSlate-50 transition i-ri:arrow-left-s-line transition-colors" />
                       }
                     >
                       <Trans key="instance.go_to_installed_mods" />
@@ -170,7 +170,7 @@ const ModsBrowser = () => {
                     <h2 class="m-0">{instanceDetails.data?.name}</h2>
                   </div>
                   <i
-                    class="w-5 h-5 i-ri:close-fill text-darkSlate-50 cursor-pointer hover:text-white transition-colors"
+                    class="w-5 h-5 i-ri:close-fill text-darkSlate-50 cursor-pointer hover:text-lightSlate-50 transition-colors"
                     onClick={() => {
                       setSearchParams({
                         instanceId: undefined

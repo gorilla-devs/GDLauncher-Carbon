@@ -269,7 +269,6 @@ const Tile = (props: Props) => {
           >
             <div
               class="flex justify-center flex-col relative select-none group items-start hover:-translate-y-2 duration-200 ease-in-out"
-              style={{ "pointer-events": "auto" }}
               onClick={(e) => {
                 e.stopPropagation();
                 if (
@@ -420,13 +419,13 @@ const Tile = (props: Props) => {
                     }}
                   />
                   <div
-                    class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-50 from-30% w-full h-full rounded-2xl"
+                    class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-darkSlate-900 opacity-50 from-30% w-full h-full rounded-2xl"
                     style={{
                       "view-transition-name": `instance-tile-loading-2-${props.instance.id}`
                     }}
                   />
                   <div
-                    class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-50 w-full h-full rounded-2xl"
+                    class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-darkSlate-900 opacity-50 w-full h-full rounded-2xl"
                     style={{
                       "view-transition-name": `instance-tile-loading-3-${props.instance.id}`
                     }}
@@ -462,7 +461,7 @@ const Tile = (props: Props) => {
                   }}
                 >
                   <div
-                    class="text-white"
+                    class="text-lightSlate-50"
                     classList={{
                       "i-ri:play-fill": !props.isRunning,
                       "i-ri:stop-fill text-xl": props.isRunning
@@ -482,7 +481,7 @@ const Tile = (props: Props) => {
               <h4
                 class="text-ellipsis whitespace-nowrap mt-2 mb-1"
                 classList={{
-                  "text-white":
+                  "text-lightSlate-50":
                     !props.isLoading && !isInQueue() && !props.isDeleting,
                   "text-lightGray-900":
                     props.isLoading || isInQueue() || props.isDeleting,
@@ -530,7 +529,7 @@ const Tile = (props: Props) => {
                   </div>
                 </Match>
                 <Match when={props.isLoading}>
-                  <p class="m-0 text-center text-lightGray-900">
+                  <p class="m-0 text-center text-lightSlate-50">
                     {Math.round(props.downloaded || 0)}MB/
                     {Math.round(props.totalDownload || 0)}MB
                   </p>

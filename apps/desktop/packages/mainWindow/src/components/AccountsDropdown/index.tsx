@@ -406,7 +406,7 @@ export const AccountsDropdown = (props: Props) => {
       <p
         class="mt-0 mb-2 font-bold"
         classList={{
-          "text-white": !props.disabled,
+          "text-lightSlate-50": !props.disabled,
           "text-darkSlate-50": props.disabled
         }}
       >
@@ -426,7 +426,7 @@ export const AccountsDropdown = (props: Props) => {
         }}
         classList={{
           "border-0": true,
-          "text-darkSlate-50 hover:text-white": !props.disabled,
+          "text-darkSlate-50 hover:text-lightSlate-50": !props.disabled,
           rounded: true,
           "bg-darkSlate-700": true
         }}
@@ -441,7 +441,7 @@ export const AccountsDropdown = (props: Props) => {
           <p
             class="m-0 lg:block overflow-hidden justify-center w-full text-ellipsis align-middle leading-loose hidden"
             classList={{
-              "text-darkSlate-50 hover:text-white group-hover:text-white":
+              "text-darkSlate-50 hover:text-lightSlate-50 group-hover:text-lightSlate-50":
                 !props.disabled,
               "text-darkSlate-500": props.disabled
             }}
@@ -453,7 +453,7 @@ export const AccountsDropdown = (props: Props) => {
         <span
           class="text-3xl ease-in-out duration-100 i-ri:arrow-drop-down-line"
           classList={{
-            "text-darkSlate-50 group-hover:text-white": !props.disabled,
+            "text-darkSlate-50 group-hover:text-lightSlate-50": !props.disabled,
             "text-darkSlate-500": props.disabled
           }}
         />
@@ -485,7 +485,9 @@ export const AccountsDropdown = (props: Props) => {
               class="rounded-md h-10 w-10 mr-2"
             />
             <div class="flex flex-col justify-between">
-              <h5 class="m-0 text-white">{(activeAccount() as Label)?.name}</h5>
+              <h5 class="m-0 text-lightSlate-50">
+                {(activeAccount() as Label)?.name}
+              </h5>
               <div class="flex gap-1">
                 {mapTypeToIcon(activeAccount()?.type.type)}
                 <p class="m-0 text-xs">{activeAccount()?.type.type}</p>
@@ -493,7 +495,7 @@ export const AccountsDropdown = (props: Props) => {
             </div>
           </div>
           <div class="flex items-center gap-3">
-            <h5 class="m-0 text-white">
+            <h5 class="m-0 text-lightSlate-50">
               <Trans
                 key="uuid"
                 options={{
@@ -523,7 +525,7 @@ export const AccountsDropdown = (props: Props) => {
                       class="w-10 h-10 rounded-md mr-2 grayscale"
                     />
                     <div class="flex flex-col justify-between">
-                      <h5 class="m-0 text-white">
+                      <h5 class="m-0 text-lightSlate-50">
                         {(option.label as Label).name}
                       </h5>
                       <div class="m-0">
@@ -584,7 +586,7 @@ export const AccountsDropdown = (props: Props) => {
                   class="text-darkSlate-50 ease-in-out transition i-ri:add-circle-fill h-4 w-4"
                   classList={{
                     "text-darkSlate-500": !!enrollmentInProgress(),
-                    "group-hover:text-white": !enrollmentInProgress(),
+                    "group-hover:text-lightSlate-50": !enrollmentInProgress(),
                     "cursor-not-allowed": !!enrollmentInProgress()
                   }}
                 />
@@ -598,7 +600,7 @@ export const AccountsDropdown = (props: Props) => {
                     class="m-0"
                     classList={{
                       "text-darkSlate-500": !!enrollmentInProgress(),
-                      "group-hover:text-white": !enrollmentInProgress()
+                      "group-hover:text-lightSlate-50": !enrollmentInProgress()
                     }}
                     onClick={() => {
                       if (!loadingAuthorization()) {
@@ -639,15 +641,15 @@ export const AccountsDropdown = (props: Props) => {
                       }
                     }}
                   >
-                    <div class="transition ease-in-out text-sm hover:text-white i-ri:external-link-fill" />
+                    <div class="transition ease-in-out text-sm hover:text-lightSlate-50 i-ri:external-link-fill" />
                   </div>
 
                   <div class="flex gap-1 items-center text-xs">
-                    <span class="font-bold text-white">
+                    <span class="font-bold text-lightSlate-50">
                       {loginDeviceCode()?.userCode}
                     </span>
                     <div
-                      class="cursor-pointer text-darkSlate-50 hover:text-white transition ease-in-out i-ri:file-copy-fill"
+                      class="cursor-pointer text-darkSlate-50 hover:text-lightSlate-50 transition ease-in-out i-ri:file-copy-fill"
                       onClick={() => {
                         if (loginDeviceCode()?.userCode) {
                           navigator.clipboard.writeText(

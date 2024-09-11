@@ -325,7 +325,7 @@ const HomeGrid = () => {
   ];
 
   return (
-    <div class="overflow-hidden p-6">
+    <div class="p-6">
       <UnstableCard />
       <Show when={globalStore.settings.data?.showNews}>
         <NewsWrapper />
@@ -356,7 +356,7 @@ const HomeGrid = () => {
           }
         >
           <div>
-            <div class="flex items-center gap-4 mt-8">
+            <div class="flex items-center gap-4 mt-8 sticky top-0 z-30 py-4 bg-darkSlate-800">
               <Input
                 ref={inputRef}
                 placeholder={t("general.search")}
@@ -441,7 +441,7 @@ const HomeGrid = () => {
                           }}
                         />
                         <div
-                          class="w-6 h-6 text-darkSlate-50 hover:text-white"
+                          class="w-6 h-6 text-darkSlate-50 hover:text-lightSlate-50"
                           classList={{
                             "i-ri:sort-alphabet-asc":
                               globalStore.settings.data?.instancesSortByAsc,
@@ -478,7 +478,7 @@ const HomeGrid = () => {
                           }}
                         />
                         <div
-                          class="w-6 h-6 text-darkSlate-50 hover:text-white"
+                          class="w-6 h-6 text-darkSlate-50 hover:text-lightSlate-50"
                           classList={{
                             "i-ri:sort-alphabet-asc":
                               globalStore.settings.data?.instancesGroupByAsc,
@@ -498,7 +498,7 @@ const HomeGrid = () => {
                     </div>
                     <div class="flex justify-end">
                       <span
-                        class="text-darkSlate-50 hover:text-white mt-4"
+                        class="text-darkSlate-50 hover:text-lightSlate-50 mt-4"
                         onClick={() => {
                           settingsMutation.mutate({
                             instancesSortBy: {

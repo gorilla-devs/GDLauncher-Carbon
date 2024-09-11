@@ -10,7 +10,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
       height="h-120"
       width="w-160"
     >
-      <div class="flex flex-col justify-between h-full overflow-y-auto text-white">
+      <div class="flex flex-col justify-between h-full overflow-y-auto text-lightSlate-50">
         <p>
           <Trans key="ads.paragraph-1" />
         </p>

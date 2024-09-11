@@ -403,7 +403,7 @@ const Accounts = () => {
                       <td
                         class="group/internal text-lightSlate-300 relative p-4 border-0 border-transparent group-hover/external:border-darkSlate-500 border-solid"
                         classList={{
-                          "hover:text-white":
+                          "hover:text-lightSlate-50":
                             cell.column.columnDef.id === "username" ||
                             cell.column.columnDef.id === "uuid",
                           "border-l-1": i() !== 0
@@ -469,7 +469,7 @@ const Accounts = () => {
                             }
                           >
                             <div class="flex items-center justify-center">
-                              <div class="w-4 h-4 text-white i-ri:checkbox-circle-fill" />
+                              <div class="w-4 h-4 text-lightSlate-50 i-ri:checkbox-circle-fill" />
                             </div>
                           </Match>
                           <Match
@@ -490,7 +490,7 @@ const Accounts = () => {
                             }
                           >
                             <div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover/internal:opacity-100 duration-100 ease-in-out">
-                              <div class="i-ri:clipboard-fill text-white" />
+                              <div class="i-ri:clipboard-fill text-lightSlate-50" />
                             </div>
                           </Match>
                         </Switch>

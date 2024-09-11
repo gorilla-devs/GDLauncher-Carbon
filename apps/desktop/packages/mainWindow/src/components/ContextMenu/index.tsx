@@ -129,7 +129,7 @@ const ContextMenu = (props: ContextMenuProps) => {
                   class="flex items-center cursor-pointer w-full gap-1 px-3 h-8 hover:bg-darkSlate-700 py-1"
                   classList={{
                     "hover:text-red-600 text-red-500": item.id === "delete",
-                    "hover:text-white text-darkGray-50": !item.id
+                    "hover:text-lightSlate-50 text-darkGray-50": !item.id
                   }}
                   onClick={item.action}
                 >

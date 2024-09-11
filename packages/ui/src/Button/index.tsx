@@ -92,7 +92,7 @@ const getVariant = (
     "border-solid": true,
     "scale-x-100": isLoading,
     "p-0": isLoading,
-    "text-white": !isDisabled,
+    "text-lightSlate-50": !isDisabled,
     "flex-row-reverse": iconRight,
   };
 
@@ -120,7 +120,7 @@ const getVariant = (
     outline: {
       ...commonStyle,
       "border-1": true,
-      "text-white": !isDisabled,
+      "text-lightSlate-50": !isDisabled,
       "text-darkSlate-500": isDisabled,
       "border-white": !isDisabled,
       "border-darkSlate-500": isDisabled,
@@ -150,7 +150,7 @@ const getVariant = (
     text: {
       ...commonStyle,
       "bg-transparent": true,
-      "text-white": true,
+      "text-lightSlate-50": true,
       "hover:bg-darkSlate-900": true,
       "border-0": true,
     },

@@ -392,7 +392,7 @@ export default function Login() {
     <div class="flex w-full h-screen" id="main-login-page">
       <div
         ref={sidebarRef}
-        class="z-10 absolute -translate-x-full w-100 h-full flex flex-col items-center text-white rounded-md bg-darkSlate-800 z-1"
+        class="z-10 absolute -translate-x-full w-100 h-full flex flex-col items-center text-lightSlate-50 rounded-md bg-darkSlate-800 z-1"
       >
         <div class="flex justify-center h-30">
           <img class="w-60" src={Logo} />

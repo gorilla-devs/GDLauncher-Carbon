@@ -101,7 +101,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
                   class="bg-darkSlate-900 rounded-lg shadow-md p-4 text-darkSlate-100 border-darkSlate-700 border-solid border-1 shadow-darkSlate-90 w-110"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div class="text-white font-bold mb-4 text-xl">
+                  <div class="text-lightSlate-50 font-bold mb-4 text-xl">
                     <Trans
                       key="addons_versions.technical_info_for"
                       options={{
@@ -163,9 +163,9 @@ const RowContainer = (props: Props & AdditionalProps) => {
               color="bg-darkSlate-900"
             >
               <div
-                class="duration-100 ease-in-out cursor-pointer hover:text-white text-2xl text-darkSlate-500 i-ri:information-fill transition-color"
+                class="duration-100 ease-in-out cursor-pointer hover:text-lightSlate-50 text-2xl text-darkSlate-500 i-ri:information-fill transition-color"
                 classList={{
-                  "text-white": isHoveringInfoCard()
+                  "text-lightSlate-50": isHoveringInfoCard()
                 }}
               />
             </Popover>

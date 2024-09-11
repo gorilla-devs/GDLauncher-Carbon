@@ -73,7 +73,7 @@ const AppNavbar = () => {
   return (
     <Show when={!isLogin()}>
       <nav
-        class="flex items-center bg-darkSlate-800 text-white px-5"
+        class="flex items-center bg-darkSlate-800 text-lightSlate-50 px-5"
         style={{
           height: "60px"
         }}
@@ -85,7 +85,7 @@ const AppNavbar = () => {
             onClick={() => navigate("/library")}
           />
         </div>
-        <div class="flex text-white w-full items-center h-full list-none gap-6">
+        <div class="flex text-lightSlate-50 w-full items-center h-full list-none gap-6">
           <Tabs index={selectedIndex()}>
             <TabList aligment="between">
               <For each={NAVBAR_ROUTES}>
@@ -151,7 +151,8 @@ const AppNavbar = () => {
                     <div
                       class="text-2xl i-ri:settings-3-fill"
                       classList={{
-                        "text-white": !!isSettings() || !!isSettingsNested()
+                        "text-lightSlate-50":
+                          !!isSettings() || !!isSettingsNested()
                       }}
                     />
                   </Tab>

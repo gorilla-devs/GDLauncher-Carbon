@@ -549,7 +549,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 <Match when={bgPreview()}>
                   <div class="absolute top-0 right-0 pb-2 pl-2 bg-darkSlate-700 rounded-bl-2xl">
                     <div
-                      class="text-white transition-all duration-100 ease-in-out text-lg i-ri:close-circle-fill hover:color-red-500"
+                      class="text-lightSlate-50 transition-all duration-100 ease-in-out text-lg i-ri:close-circle-fill hover:color-red-500"
                       onClick={(e) => {
                         e.preventDefault();
                         setBgPreview(null);
@@ -729,11 +729,11 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             <For each={modloaders}>
               {(modloader) => (
                 <div
-                  class="px-3 py-2 bg-darkSlate-800 rounded-lg cursor-pointer border-box text-darkSlate-50 hover:text-white"
+                  class="px-3 py-2 bg-darkSlate-800 rounded-lg cursor-pointer border-box text-darkSlate-50 hover:text-lightSlate-50"
                   classList={{
                     "border-2 border-solid border-transparent":
                       loader() !== modloader.key,
-                    "border-2 border-solid border-primary-500 text-white":
+                    "border-2 border-solid border-primary-500 text-lightSlate-50":
                       loader() === modloader.key
                   }}
                   onClick={() => {

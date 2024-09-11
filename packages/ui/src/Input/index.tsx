@@ -111,7 +111,9 @@ function Input(props: Props) {
   let errorClasses = local.error
     ? "border-2 border-solid border-red-500"
     : "border-0 border-transparent hover:border-darkSlate-500 active:border-darkSlate-500";
-  let disabledClasses = local.disabled ? "text-darkSlate-300" : "text-white";
+  let disabledClasses = local.disabled
+    ? "text-darkSlate-300"
+    : "text-lightSlate-50";
   let inputColorClasses = local.inputColor
     ? local.inputColor
     : "bg-darkSlate-600";

@@ -54,7 +54,7 @@ const NewsLetter = () => {
       class="flex flex-col gap-2 flex-1 items-start justify-start"
       id="newsletter"
     >
-      <span class="text-white font-medium pb-4">Newsletter</span>
+      <span class="text-lightSlate-50 font-medium pb-4">Newsletter</span>
       <input
         type="email"
         placeholder="Email"
@@ -65,7 +65,7 @@ const NewsLetter = () => {
         }}
         id="newsletter-email"
         name="email"
-        class="bg-darkgd px-2 py-1 border-bluegd-500 border-[1px] rounded-md text-white outline-none"
+        class="bg-darkgd px-2 py-1 border-bluegd-500 border-[1px] rounded-md text-lightSlate-50 outline-none"
       />
       <Show when={error()}>
         <div class="text-red-400">{error()}</div>

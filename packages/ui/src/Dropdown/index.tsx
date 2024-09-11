@@ -157,7 +157,7 @@ const Dropdown = (props: Props) => {
           classList={{
             "border-0": !props.error,
             "border-2 border-solid border-red-500": !!props.error,
-            "text-darkSlate-50 hover:text-white":
+            "text-darkSlate-50 hover:text-lightSlate-50":
               !props.disabled && !props.error && !props.textColorClass,
             "text-darkSlate-500": !!props.error && !props.textColorClass,
             "rounded-full": props.rounded,
@@ -181,8 +181,8 @@ const Dropdown = (props: Props) => {
             <div
               class="w-[calc(100%-2rem)] flex justify-between"
               classList={{
-                "text-white": !!props.error,
-                "text-darkSlate-50 hover:text-white group-hover:text-white":
+                "text-lightSlate-50": !!props.error,
+                "text-darkSlate-50 hover:text-lightSlate-50 group-hover:text-lightSlate-50":
                   !props.disabled && !props.error && !props.textColorClass,
                 "text-darkSlate-500":
                   props.disabled && !props.textColorClass && !props.btnDropdown,
@@ -194,12 +194,12 @@ const Dropdown = (props: Props) => {
           <div
             class="i-ri:arrow-drop-down-line w-8 h-8 ease-in-out duration-100"
             classList={{
-              "text-darkSlate-50 group-hover:text-white":
+              "text-darkSlate-50 group-hover:text-lightSlate-50":
                 !props.disabled &&
                 !props.error &&
                 !props.btnDropdown &&
                 !props.textColorClass,
-              "text-white":
+              "text-lightSlate-50":
                 !!props.error ||
                 (props.btnDropdown && !props.textColorClass && !props.disabled),
               "text-darkSlate-500": props.disabled,

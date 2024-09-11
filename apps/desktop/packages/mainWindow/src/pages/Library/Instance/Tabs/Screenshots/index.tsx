@@ -127,7 +127,7 @@ const Screenshots = () => {
                 }}
               />
             </div>
-            <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
+            <div class="flex items-center gap-2 cursor-pointer hover:text-lightSlate-50 transition duration-100 ease-in-out">
               <span class="i-ri:folder-open-fill text-2xl" />
               <Trans
                 key="instance.open_screenshots_folder"
@@ -136,7 +136,7 @@ const Screenshots = () => {
                 }}
               />
             </div>
-            <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
+            <div class="flex items-center gap-2 cursor-pointer hover:text-lightSlate-50 transition duration-100 ease-in-out">
               <span class="i-ri:forbid-line text-2xl" />
               <Trans
                 key="instance.disable_screenshot"
@@ -145,7 +145,7 @@ const Screenshots = () => {
                 }}
               />
             </div>
-            <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
+            <div class="flex items-center gap-2 cursor-pointer hover:text-lightSlate-50 transition duration-100 ease-in-out">
               <span class="i-ri:delete-bin-2-fill text-2xl" />
               <Trans
                 key="instance.delete_screenshot"

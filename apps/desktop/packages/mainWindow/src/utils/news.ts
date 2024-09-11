@@ -1,36 +1,74 @@
-import { NEWS_URL } from "./constants";
+import { MOJANG_API, NEWS_URL } from "@/constants";
 
 export interface NewsItem {
   title: string;
-  description: string;
-  image: string;
+  category: string;
+  date: string;
+  text: string;
+  playPageImage: PlayPageImage;
+  newsPageImage: NewsPageImage;
+  readMoreLink: string;
+  newsType: string[];
+  id: string;
+  tag?: string;
+  cardBorder?: boolean;
+  highlight?: Highlight;
+}
+
+export interface PlayPageImage {
+  title: string;
   url: string;
 }
+
+export interface NewsPageImage {
+  title: string;
+  url: string;
+  dimensions: Dimensions;
+}
+
+export interface Dimensions {
+  width: number;
+  height: number;
+}
+
+export interface Highlight {
+  image: Image;
+  iconImage: IconImage;
+  platforms: string[];
+  entitlements: any[];
+  title: string;
+  description: string;
+  until: string;
+  playGame?: string;
+  readMoreLink?: string;
+}
+
+export interface Image {
+  url: string;
+  title: string;
+}
+
+export interface IconImage {}
 
 export const initNews = async () => {
   try {
     const resp = await fetch(NEWS_URL);
-    const textData = await resp.text();
 
-    const parser = new DOMParser();
-    const xmlDoc = parser.parseFromString(textData, "text/xml");
+    const data = await resp.json();
 
-    const items = xmlDoc.querySelectorAll("item");
-    const newsArr: NewsItem[] = [];
+    const filteredNews = data.entries.filter(
+      (entry: NewsItem) => entry.tag === "News"
+    );
 
-    items.forEach((item) => {
-      const title = item.querySelector("title")?.textContent || "";
-      const description = item.querySelector("description")?.textContent || "";
-      const imageUrl = item.querySelector("imageURL")?.textContent || "";
-      const url = item.querySelector("link")?.textContent || "";
+    const newsArr =
+      filteredNews?.map((newsEntry: NewsItem) => ({
+        title: newsEntry.title,
+        description: newsEntry.text,
+        image: `${MOJANG_API}${newsEntry.newsPageImage.url}`,
+        url: newsEntry.readMoreLink
+      })) || [];
 
-      // Construct the full image URL
-      const fullImageUrl = `https://www.minecraft.net${imageUrl}`;
-
-      newsArr.push({ title, description, image: fullImageUrl, url });
-    });
-    // News isn't published that often, showing 20 (the previous) would result in old news.
-    return newsArr.slice(0, 6);
+    return newsArr.splice(0, 20);
   } catch (err) {
     console.error(err);
   }

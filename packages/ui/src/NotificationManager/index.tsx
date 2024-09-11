@@ -226,7 +226,7 @@ const NotificationsProvider = (props: Props) => {
           <For each={Object.values(notifications)}>
             {(notification) => (
               <div
-                class="relative w-100 h-26 min-h-26 items-center bg-darkSlate-900 flex justify-between px-4 py-4 text-white rounded-lg shadow-md shadow-darkSlate-900"
+                class="relative w-100 h-26 min-h-26 items-center bg-darkSlate-900 flex justify-between px-4 py-4 text-lightSlate-50 rounded-lg shadow-md shadow-darkSlate-900"
                 style={{
                   transition: "all 0.3s ease-in-out",
                   animation: `.2s ease-in-out ${

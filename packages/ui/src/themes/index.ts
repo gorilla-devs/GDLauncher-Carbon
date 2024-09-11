@@ -97,3 +97,4 @@ type Theme = {
 export type { Theme };
 export { mainTheme } from "./main";
 export { pixelato } from "./pixelato";
+export { win95 } from "./win95";

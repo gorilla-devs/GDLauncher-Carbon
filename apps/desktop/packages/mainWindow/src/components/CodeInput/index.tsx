@@ -45,7 +45,7 @@ export const DeviceCode = (props: Props) => {
   });
 
   return (
-    <div class="relative h-13 flex justify-center items-center text-white font-bold gap-2 rounded-md bg-darkSlate-900 opacity-100 w-54 font-ubuntu border-solid border-1 border-lightSlate-900 overflow-hidden">
+    <div class="relative h-13 flex justify-center items-center text-lightSlate-50 font-bold gap-2 rounded-md bg-darkSlate-900 opacity-100 w-54 font-ubuntu border-solid border-1 border-lightSlate-900 overflow-hidden">
       <div
         ref={animateDivRef}
         class="z-1 absolute w-full h-full top-0 left-0 bg-green-500 flex justify-center items-center opacity-0 text-sm"

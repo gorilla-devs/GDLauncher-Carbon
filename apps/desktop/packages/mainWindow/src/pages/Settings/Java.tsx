@@ -78,7 +78,7 @@ const Java = () => {
         label: (
           <div class="w-full flex flex-col gap-2">
             <div class="flex justify-between">
-              <div class="text-white">{java.version}</div>
+              <div class="text-lightSlate-50">{java.version}</div>
               <div>{java.type}</div>
             </div>
             <div class="w-full text-left">
@@ -292,7 +292,7 @@ const Java = () => {
                                       <div class="flex flex-col gap-2 w-full flex-1 min-w-0">
                                         <div class="flex justify-between">
                                           <div class="flex items-center gap-2">
-                                            <div class="text-white flex items-center gap-2">
+                                            <div class="text-lightSlate-50 flex items-center gap-2">
                                               <div>{java.version}</div>
                                               <Switch>
                                                 <Match when={java.isValid}>

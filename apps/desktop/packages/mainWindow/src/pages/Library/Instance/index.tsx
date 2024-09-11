@@ -500,14 +500,14 @@ const Instance = () => {
                         classList={{ "bg-darkSlate-800 pl-2": editableName() }}
                       >
                         <div
-                          class="cursor-pointer ease-in-out z-10 transition text-white text-3xl i-ri:check-fill duration-50 hover:text-green-500"
+                          class="cursor-pointer ease-in-out z-10 transition text-lightSlate-50 text-3xl i-ri:check-fill duration-50 hover:text-green-500"
                           classList={{
                             hidden: !editableName()
                           }}
                           onClick={() => handleNameChange()}
                         />
                         <div
-                          class="cursor-pointer ease-in-out text-white transition text-3xl duration-50 z-10 i-ri:close-fill hover:text-red-500"
+                          class="cursor-pointer ease-in-out text-lightSlate-50 transition text-3xl duration-50 z-10 i-ri:close-fill hover:text-red-500"
                           classList={{
                             hidden: !editableName()
                           }}

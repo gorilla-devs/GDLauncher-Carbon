@@ -91,7 +91,9 @@ const Section = (props: SectionProps) => {
                       "pb-4": index() !== list().length - 1
                     }}
                   >
-                    <span class="text-white font-bold">{item.title}</span>
+                    <span class="text-lightSlate-50 font-bold">
+                      {item.title}
+                    </span>
                     <Show when={item.description}>
                       &nbsp;
                       <span class="text-lightSlate-500">

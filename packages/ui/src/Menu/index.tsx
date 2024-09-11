@@ -138,7 +138,7 @@ const ContextMenu = (props: ContextMenuProps) => {
                     "opacity-20": item.disabled === true,
                     "hover:text-red-600 text-red-500":
                       item.id === "delete" && !item.disabled,
-                    "hover:text-white text-darkGray-50":
+                    "hover:text-lightSlate-50 text-darkGray-50":
                       !item.id && !item.disabled,
                   }}
                   onClick={item.disabled === true ? undefined : item.action}

@@ -55,7 +55,7 @@ const JavaPathAutoComplete = (props: Props) => {
         label: (
           <div class="w-full flex flex-col gap-2">
             <div class="flex justify-between">
-              <div class="text-white">{java.version}</div>
+              <div class="text-lightSlate-50">{java.version}</div>
               <div>{java.type}</div>
             </div>
             <Tooltip content={java.path}>
