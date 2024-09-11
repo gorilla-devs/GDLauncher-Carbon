@@ -13,7 +13,6 @@ import adSize from "@/utils/adhelper";
 import { Trans } from "@gd/i18n";
 import { useModal } from "@/managers/ModalsManager";
 import { BisectBanner } from "@/components/BisectBanner";
-import backgroundImage from "/assets/images/gdlauncher_pattern.svg";
 
 function withAdsLayout() {
   const routeData: ReturnType<typeof fetchData> = useRouteData();
@@ -62,7 +61,7 @@ function withAdsLayout() {
       <div
         class="flex w-screen z-10 h-auto"
         style={{
-          "background-image": `url("${backgroundImage}")`
+          "background-image": "var(--ads-sidebar-background)"
         }}
       >
         <main class="relative flex-grow">

@@ -88,28 +88,26 @@ const AppNavbar = () => {
         <div class="flex text-white w-full items-center h-full list-none gap-6">
           <Tabs index={selectedIndex()}>
             <TabList aligment="between">
-              <div class="flex gap-6 h-full">
-                <For each={NAVBAR_ROUTES}>
-                  {(route) => {
-                    return (
-                      <Tab
-                        onClick={() =>
-                          navigate(route.path, {
-                            getLastInstance: true
-                          })
-                        }
-                      >
-                        <div class="flex items-center gap-2">
-                          <Show when={route.icon}>
-                            <i class={"w-5 h-5 " + route.icon} />
-                          </Show>
-                          <div class="no-underline">{route.label}</div>
-                        </div>
-                      </Tab>
-                    );
-                  }}
-                </For>
-              </div>
+              <For each={NAVBAR_ROUTES}>
+                {(route) => {
+                  return (
+                    <Tab
+                      onClick={() =>
+                        navigate(route.path, {
+                          getLastInstance: true
+                        })
+                      }
+                    >
+                      <div class="flex items-center gap-2">
+                        <Show when={route.icon}>
+                          <i class={"w-5 h-5 " + route.icon} />
+                        </Show>
+                        <div class="no-underline">{route.label}</div>
+                      </div>
+                    </Tab>
+                  );
+                }}
+              </For>
               <Spacing class="hidden w-full lg:block" />
               <Tab ignored noPadding>
                 <Button

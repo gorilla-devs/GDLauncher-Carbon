@@ -665,19 +665,17 @@ const Instance = () => {
                 >
                   <Tabs index={selectedIndex()}>
                     <TabList>
-                      <div class="flex gap-6 h-full">
-                        <For each={instancePages()}>
-                          {(page: InstancePage) => (
-                            <Tab
-                              onClick={() => {
-                                navigate(page.path);
-                              }}
-                            >
-                              {page.label}
-                            </Tab>
-                          )}
-                        </For>
-                      </div>
+                      <For each={instancePages()}>
+                        {(page: InstancePage) => (
+                          <Tab
+                            onClick={() => {
+                              navigate(page.path);
+                            }}
+                          >
+                            {page.label}
+                          </Tab>
+                        )}
+                      </For>
                     </TabList>
                   </Tabs>
                 </div>

@@ -88,10 +88,12 @@ type Theme = {
   "brands-twitchPurpleLight": string;
   "brands-twitchWhite": string;
   "brands-twitchBlack": string;
+
+  font: string;
+  "ads-sidebar-background": string;
+  "additional-styles": string;
 };
 
 export type { Theme };
 export { mainTheme } from "./main";
-export { dracula } from "./dracula";
-export { lightTheme } from "./light";
-export { poisonGreen } from "./poison-green";
+export { pixelato } from "./pixelato";

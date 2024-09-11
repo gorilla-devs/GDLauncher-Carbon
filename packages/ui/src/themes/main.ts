@@ -1,5 +1,11 @@
 import { Theme } from ".";
 
+const additionalStyles = `
+  html, body {
+    font-size: 16px;
+  }
+`;
+
 const mainTheme: Theme = {
   accent: "62 133 208",
   primary: "43 107 177",
@@ -89,6 +95,10 @@ const mainTheme: Theme = {
   "brands-twitchPurpleLight": "185 163 227",
   "brands-twitchWhite": "241 241 241",
   "brands-twitchBlack": "38 38 38",
+
+  font: "Ubuntu",
+  "ads-sidebar-background": "url(/assets/images/gdlauncher_pattern.svg)",
+  "additional-styles": additionalStyles,
 };
 
 export { mainTheme };

@@ -525,9 +525,6 @@ const Tile = (props: Props) => {
                           )}
                         />
                       </Show>
-                      <Show when={props.size !== 1}>
-                        <p class="m-0">{props.modloader?.toString()}</p>
-                      </Show>
                     </span>
                     <p class="m-0">{props.version}</p>
                   </div>

@@ -53,8 +53,44 @@
           url("/assets/fonts/ubuntu-bold-webfont.woff2") format("woff2");
       }
 
+      @font-face {
+        font-family: "Monocraft";
+        font-style: normal;
+        font-weight: 300;
+        src:
+          local("Monocraft"),
+          url("/assets/fonts/monocraft-light.ttf") format("truetype");
+      }
+
+      @font-face {
+        font-family: "Monocraft";
+        font-style: normal;
+        font-weight: 400;
+        src:
+          local("Monocraft"),
+          url("/assets/fonts/monocraft.ttf") format("truetype");
+      }
+
+      @font-face {
+        font-family: "Monocraft";
+        font-style: normal;
+        font-weight: 500;
+        src:
+          local("Monocraft"),
+          url("/assets/fonts/monocraft-semibold.ttf") format("truetype");
+      }
+
+      @font-face {
+        font-family: "Monocraft";
+        font-style: normal;
+        font-weight: 600;
+        src:
+          local("Monocraft"),
+          url("/assets/fonts/monocraft-bold.ttf") format("truetype");
+      }
+
       * {
-        font-family: "Ubuntu";
+        font-family: var(--font);
       }
 
       html,

@@ -1,18 +1,10 @@
-import {
-  mainTheme,
-  lightTheme,
-  Theme as UITheme,
-  poisonGreen,
-  dracula
-} from "@gd/ui";
+import { mainTheme, Theme as UITheme, pixelato } from "@gd/ui";
 import { createEffect } from "solid-js";
 import { rspc } from "./rspcClient";
 
 enum _Theme {
   _Main = "main",
-  _Light = "light",
-  _PoisonGreen = "poison-green",
-  _Dracula = "dracula"
+  _Pixelato = "pixelato"
 }
 
 const initThemes = () => {
@@ -32,16 +24,8 @@ export function applyThemeByName(themeName: string | undefined) {
   }
 
   switch (themeName) {
-    case _Theme._Light: {
-      applyTheme(lightTheme);
-      break;
-    }
-    case _Theme._PoisonGreen: {
-      applyTheme(poisonGreen);
-      break;
-    }
-    case _Theme._Dracula: {
-      applyTheme(dracula);
+    case _Theme._Pixelato: {
+      applyTheme(pixelato);
       break;
     }
     default: {
@@ -54,6 +38,18 @@ export function applyThemeByName(themeName: string | undefined) {
 export function applyTheme(theme: UITheme) {
   // Inject theme
   for (const key in theme) {
+    if (key === "additional-styles") {
+      if (document.getElementById(key)) {
+        document.getElementById(key)?.remove();
+      }
+
+      const style = document.createElement("style");
+      style.setAttribute("id", key);
+      style.innerHTML = theme[key as keyof UITheme];
+      document.head.appendChild(style);
+      continue;
+    }
+
     document.documentElement.style.setProperty(
       `--${key}`,
       theme[key as keyof UITheme]
@@ -67,14 +63,8 @@ export function getAvailableThemes(): string[] {
 
 export function getThemeColor(themeName: string, color: keyof UITheme): string {
   switch (themeName) {
-    case _Theme._Light: {
-      return `rgb(${lightTheme[color]})`;
-    }
-    case _Theme._PoisonGreen: {
-      return `rgb(${poisonGreen[color]})`;
-    }
-    case _Theme._Dracula: {
-      return `rgb(${dracula[color]})`;
+    case _Theme._Pixelato: {
+      return `rgb(${pixelato[color]})`;
     }
     default: {
       return `rgb(${mainTheme[color]})`;

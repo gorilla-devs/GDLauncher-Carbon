@@ -19,7 +19,7 @@ const InstanceCreation = (props: ModalProps) => {
       title={props?.title}
       noPadding={true}
     >
-      <div class="flex flex-col justify-between w-120 h-full">
+      <div class="flex flex-col justify-between w-140 h-full">
         <Switch>
           <Match when={data()?.id !== undefined && data()?.id !== null}>
             <Custom data={data()} />

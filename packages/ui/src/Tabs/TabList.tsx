@@ -19,8 +19,6 @@ const TabList = (props: Props) => {
 
   const getPositionPx = (index: number) => {
     const filteredTabs = tabs()?.slice(0, index);
-    const gap = tabsContext?.gap?.() ?? 24;
-
     if (index < 0 || index > tabs()?.length) return 0;
 
     let dimension = 0;
@@ -30,15 +28,15 @@ const TabList = (props: Props) => {
 
       if (tabsContext?.orientation() === "horizontal") {
         if (isSpacing) {
-          if (isSpacing) dimension += (tab as SpacingTab).space + gap;
+          if (isSpacing) dimension += (tab as SpacingTab).space;
         } else {
-          dimension += (tab as TabType).ref.offsetWidth + gap;
+          dimension += (tab as TabType).ref.offsetWidth;
         }
       } else {
         if (isSpacing) {
-          if (isSpacing) dimension += (tab as SpacingTab).space + gap;
+          if (isSpacing) dimension += (tab as SpacingTab).space;
         } else {
-          dimension += (tab as TabType).ref.offsetHeight + gap;
+          dimension += (tab as TabType).ref.offsetHeight;
         }
       }
     }
@@ -88,7 +86,7 @@ const TabList = (props: Props) => {
               "justify-between": props.aligment === "between",
             }}
             style={{
-              gap: tabsContext?.gap?.()?.toString(),
+              gap: tabsContext?.gap?.()?.toString() + "rem",
             }}
           >
             {props.children}
@@ -110,14 +108,18 @@ const TabList = (props: Props) => {
                       }),
                   ...(tabsContext?.orientation() === "horizontal"
                     ? {
-                        transform: `translateX(${getPositionPx(
+                        transform: `translateX(calc(${getPositionPx(
                           currentIndex()
-                        )}px)`,
+                        )}px + (${
+                          tabsContext?.gap?.() ?? 1.5
+                        }rem * ${currentIndex()})))`,
                       }
                     : {
-                        transform: `translateY(${getPositionPx(
+                        transform: `translateY(calc(${getPositionPx(
                           currentIndex()
-                        )}px)`,
+                        )}px+ (${
+                          tabsContext?.gap?.() ?? 1.5
+                        }rem * ${currentIndex()})))`,
                       }),
                 }}
               />
@@ -134,7 +136,7 @@ const TabList = (props: Props) => {
               "justify-between": props.aligment === "between",
             }}
             style={{
-              gap: tabsContext?.gap?.()?.toString(),
+              gap: (tabsContext?.gap?.()?.toString() ?? 1.5) + "rem",
             }}
           >
             {props.children}
@@ -149,7 +151,7 @@ const TabList = (props: Props) => {
               "justify-between": props.aligment === "between",
             }}
             style={{
-              gap: tabsContext?.gap?.()?.toString(),
+              gap: (tabsContext?.gap?.()?.toString() ?? 1.5) + "rem",
             }}
           >
             {props.children}
