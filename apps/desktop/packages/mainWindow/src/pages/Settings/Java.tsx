@@ -314,7 +314,7 @@ const Java = () => {
                                             >
                                               <div class="h-2/3 w-px bg-darkSlate-400 mr-2" />
                                               <Popover
-                                                content={
+                                                content={() => (
                                                   <div class="p-4">
                                                     <h3>
                                                       <Trans key="settings:used_in_the_following_profiles" />
@@ -331,7 +331,7 @@ const Java = () => {
                                                       </For>
                                                     </ul>
                                                   </div>
-                                                }
+                                                )}
                                               >
                                                 <div class="text-sm underline">
                                                   <Trans
@@ -464,7 +464,7 @@ const Java = () => {
                                   </Show>
                                   <Show when={profile.isSystem}>
                                     <Popover
-                                      content={
+                                      content={() => (
                                         <div class="p-4 flex flex-col gap-8 max-w-100 h-auto">
                                           <div>
                                             <Trans key="settings:profile_used_in_mc_versions" />
@@ -485,7 +485,7 @@ const Java = () => {
                                             </For>
                                           </div>
                                         </div>
-                                      }
+                                      )}
                                     >
                                       <div class="i-ri:information-fill text-lg text-lightSlate-800 hover:text-lightSlate-100 ease-in-out duration-100 transition-color" />
                                     </Popover>

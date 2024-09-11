@@ -156,7 +156,7 @@ const CodeStep = (props: Props) => {
       <div class="absolute top-4 right-4">
         <Popover
           noTip
-          content={
+          content={() => (
             <div class="px-4 max-w-100 pb-6 text-sm">
               <h3>
                 <Trans key="login.troubles_logging_in" />
@@ -178,7 +178,7 @@ const CodeStep = (props: Props) => {
                 <div>{deviceCodeLink()}</div>
               </div>
             </div>
-          }
+          )}
         >
           <div class="flex items-center text-darkSlate-50 hover:text-lightSlate-50 transition-color duration-75 text-sm">
             <div>

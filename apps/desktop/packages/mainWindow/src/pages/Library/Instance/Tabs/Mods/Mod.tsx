@@ -482,7 +482,7 @@ const Mod = (props: Props) => {
               noTip
               onOpen={() => setIsHoveringInfoCard(true)}
               onClose={() => setIsHoveringInfoCard(false)}
-              content={
+              content={() => (
                 <div
                   class="p-4 text-darkSlate-100 bg-darkSlate-900 rounded-lg border-darkSlate-700 border-solid border-1 shadow-md shadow-darkSlate-90 w-110"
                   onClick={(e) => e.stopPropagation()}
@@ -688,7 +688,7 @@ const Mod = (props: Props) => {
                     </Show>
                   </div>
                 </div>
-              }
+              )}
               trigger="click"
               placement="left-end"
               color="bg-darkSlate-900"
@@ -708,7 +708,7 @@ const Mod = (props: Props) => {
               onOpen={() => setIsHoveringOptionsCard(true)}
               onClose={() => setIsHoveringOptionsCard(false)}
               trigger="click"
-              content={
+              content={() => (
                 <>
                   <Show when={!props.isInstanceLocked}>
                     <div
@@ -764,7 +764,7 @@ const Mod = (props: Props) => {
                     <Trans key="instance.locked_cannot_apply_changes" />
                   </Show>
                 </>
-              }
+              )}
               placement="left-end"
               color="bg-darkSlate-900"
             >

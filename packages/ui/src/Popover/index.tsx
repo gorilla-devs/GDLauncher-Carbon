@@ -21,7 +21,7 @@ import {
 
 type Props = {
   children: JSX.Element;
-  content: JSX.Element | string | number;
+  content: (close: () => void) => JSX.Element | string | number;
   trigger?: "click" | "hover";
   placement?: Placement;
   color?: string;
@@ -136,18 +136,20 @@ const Popover = (_props: Props) => {
   });
 
   const position = useFloating(elementRef, PopoverRef, {
-    placement: props.placement || "top",
+    ...(props.placement && { placement: props.placement }),
     middleware: [
       offset(10),
       shift(),
       hide(),
       size(),
-      autoPlacement({
-        padding: {
-          top: 0,
-          right: 200,
-        },
-      }),
+      !props.placement
+        ? autoPlacement({
+            padding: {
+              top: 0,
+              right: 200,
+            },
+          })
+        : undefined,
     ],
     whileElementsMounted: (reference, floating, update) =>
       autoUpdate(reference, floating, update, {
@@ -191,7 +193,7 @@ const Popover = (_props: Props) => {
               e.stopPropagation();
             }}
           >
-            <div class="relative">{props.content}</div>
+            <div class="relative">{props.content(close)}</div>
             <Show when={!props.noTip}>
               <div
                 class={`absolute w-4 h-4 rotate-45 z-10 ${props.color || ""}`}

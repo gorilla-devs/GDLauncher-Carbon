@@ -146,7 +146,7 @@ const ModRow = (props: ModRowProps) => {
           <Popover
             noPadding
             noTip
-            content={
+            content={() => (
               <OverviewPopover
                 data={props}
                 modrinthCategories={props.modrinthCategories?.filter(
@@ -154,7 +154,7 @@ const ModRow = (props: ModRowProps) => {
                     category.project_type.includes(props.type.toLowerCase())
                 )}
               />
-            }
+            )}
             placement="right-start"
             color="bg-darkSlate-900"
           >

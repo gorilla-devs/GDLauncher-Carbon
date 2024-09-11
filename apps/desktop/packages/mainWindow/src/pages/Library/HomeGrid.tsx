@@ -356,7 +356,7 @@ const HomeGrid = () => {
           }
         >
           <div>
-            <div class="flex items-center gap-4 mt-8 sticky top-0 z-30 py-4 bg-darkSlate-800">
+            <div class="flex items-center gap-4 mt-8 sticky top-0 z-90 py-4 bg-darkSlate-800">
               <Input
                 ref={inputRef}
                 placeholder={t("general.search")}
@@ -384,7 +384,7 @@ const HomeGrid = () => {
                 trigger="click"
                 noTip
                 noPadding
-                content={
+                content={() => (
                   <div class="w-100 flex flex-col gap-y-6 h-auto p-4">
                     <div class="text-2xl mb-4">
                       <Trans key="general.instances_filters" />
@@ -523,7 +523,7 @@ const HomeGrid = () => {
                       </span>
                     </div>
                   </div>
-                }
+                )}
               >
                 <Button type="secondary" size="small">
                   <i class="w-4 h-4 i-ri:filter-fill" />

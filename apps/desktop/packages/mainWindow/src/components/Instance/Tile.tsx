@@ -226,7 +226,7 @@ const Tile = (props: Props) => {
       <Match when={mergedProps.variant === "default"}>
         <ContextMenu menuItems={menuItems()}>
           <Popover
-            content={
+            content={() =>
               props.failError ? (
                 <div class="p-4 border-solid border-white b-1">
                   <div class="text-xl pb-4 w-full flex justify-between">

@@ -96,7 +96,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
               noTip
               onOpen={() => setIsHoveringInfoCard(true)}
               onClose={() => setIsHoveringInfoCard(false)}
-              content={
+              content={() => (
                 <div
                   class="bg-darkSlate-900 rounded-lg shadow-md p-4 text-darkSlate-100 border-darkSlate-700 border-solid border-1 shadow-darkSlate-90 w-110"
                   onClick={(e) => e.stopPropagation()}
@@ -157,7 +157,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
                     </div>
                   </div>
                 </div>
-              }
+              )}
               trigger="click"
               placement="left-end"
               color="bg-darkSlate-900"

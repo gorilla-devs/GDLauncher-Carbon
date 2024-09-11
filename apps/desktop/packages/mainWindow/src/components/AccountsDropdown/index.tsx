@@ -7,7 +7,7 @@ import {
   strToMs
 } from "@/utils/helpers";
 import { handleStatus } from "@/utils/login";
-import { queryClient, rspc } from "@/utils/rspcClient";
+import { port, queryClient, rspc } from "@/utils/rspcClient";
 import {
   AccountEntry,
   AccountStatus,
@@ -15,10 +15,11 @@ import {
   DeviceCode
 } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { Spinner, createNotification } from "@gd/ui";
+import { Button, Popover, Spinner, createNotification } from "@gd/ui";
 import { useRouteData } from "@solidjs/router";
 import { createSignal, For, Show, Switch, Match, createEffect } from "solid-js";
 import CopyIcon from "../CopyIcon";
+import { useGlobalStore } from "../GlobalStoreContext";
 
 export type Label = {
   name: string;
@@ -116,6 +117,7 @@ const mapStatus = (status: AccountStatus | undefined) => {
     </Switch>
   );
 };
+
 const mapTypeToIcon = (type: string) => {
   return (
     <Switch>
@@ -127,582 +129,99 @@ const mapTypeToIcon = (type: string) => {
 };
 
 export const AccountsDropdown = (props: Props) => {
-  const activeAccount = () =>
-    props.accounts.find((option) => option.key === props.value)?.label ||
-    props.accounts[0]?.label;
-
-  const [menuOpened, setMenuOpened] = createSignal(false);
-  const [addAccountStarting, setAddAccountStarting] = createSignal(false);
-  const [loginDeviceCode, setLoginDeviceCode] = createSignal<DeviceCode | null>(
-    null
-  );
-  const [focusIn, setFocusIn] = createSignal(false);
-  const [enrollmentInProgress, setEnrollmentInProgress] = createSignal(false);
-  const [loadingAuthorization, setLoadingAuthorization] = createSignal(false);
-  const [expired, setExpired] = createSignal(false);
-  const expiresAt = () => loginDeviceCode()?.expiresAt;
-  const expiresAtFormat = () => strToMs(expiresAt() || "");
-  const expiresAtMs = () => expiresAtFormat() - Date.now();
-  const minutes = () => msToMinutes(expiresAtMs());
-  const seconds = () => msToSeconds(expiresAtMs());
-  const [countDown, setCountDown] = createSignal(
-    // eslint-disable-next-line solid/reactivity
-    `${minutes()}:${parseTwoDigitNumber(seconds())}`
-  );
-
-  let menuRef: undefined | HTMLDivElement;
-
+  const globalStore = useGlobalStore();
   const navigate = useGDNavigate();
 
-  const addNotification = createNotification();
-
-  const routeData = useRouteData<typeof fetchData>();
-
-  let interval: ReturnType<typeof setTimeout>;
-
-  const resetCountDown = () => {
-    setExpired(false);
-    if (!isNaN(minutes()) && !isNaN(seconds())) {
-      setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
-    }
-  };
-
-  const updateExpireTime = () => {
-    if (minutes() <= 0 && seconds() <= 0) {
-      setExpired(true);
-    } else {
-      resetCountDown();
-    }
-  };
-
-  createEffect(() => {
-    if (expired()) {
-      if (enrollmentInProgress()) accountEnrollCancelMutation.mutate(undefined);
-      clearInterval(interval);
-      if (!isNaN(minutes()) && !isNaN(seconds())) {
-        setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`);
-      }
-    } else {
-      interval = setInterval(() => {
-        updateExpireTime();
-      }, 1000);
-    }
-  });
-
-  const filteredOptions = () =>
-    props.accounts.filter(
-      (option) => option.key !== (activeAccount() as Label)?.uuid
-    );
-
-  const setActiveUUIDMutation = rspc.createMutation(() => ({
-    mutationKey: ["account.setActiveUuid"],
-    onMutate: async (
-      uuid
-    ): Promise<{ previousActiveUUID: string } | undefined> => {
-      await queryClient.cancelQueries({ queryKey: ["account.setActiveUuid"] });
-
-      const previousActiveUUID: string | undefined = queryClient.getQueryData([
-        "account.setActiveUuid"
-      ]);
-
-      queryClient.setQueryData(["account.setActiveUuid", null], uuid);
-
-      if (previousActiveUUID) return { previousActiveUUID };
-    },
-    onError: (
-      error,
-      _variables,
-      context: { previousActiveUUID: string } | undefined
-    ) => {
-      addNotification({
-        name: error.message,
-        type: "error"
-      });
-
-      if (context?.previousActiveUUID) {
-        queryClient.setQueryData(
-          ["account.setActiveUuid"],
-          context.previousActiveUUID
-        );
-      }
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["account.setActiveUuid"] });
-    }
+  const setActiveAccountMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.setActiveUuid"]
   }));
 
-  const accountEnrollCancelMutation = rspc.createMutation(() => ({
-    mutationKey: ["account.enroll.cancel"],
-    onError(error) {
-      addNotification({
-        name: error.message,
-        type: "error"
-      });
-      setLoginDeviceCode(null);
-      setAddAccountStarting(false);
-    },
-    onMutate() {
-      setLoadingAuthorization(false);
-      setEnrollmentInProgress(false);
-      setLoginDeviceCode(null);
-      setAddAccountStarting(false);
-    }
-  }));
-
-  const accountEnrollBeginMutation = rspc.createMutation(() => ({
-    mutationKey: ["account.enroll.begin"],
-    onMutate() {
-      setAddAccountStarting(true);
-    },
-    onError(error) {
-      if (enrollmentInProgress()) accountEnrollCancelMutation.mutate(undefined);
-      setAddAccountStarting(false);
-      addNotification({
-        name: error.message,
-        type: "error"
-      });
-    }
-  }));
-
-  const accountEnrollFinalizeMutation = rspc.createMutation(() => ({
-    mutationKey: ["account.enroll.finalize"],
-    onError(error) {
-      addNotification({
-        name: error.message,
-        type: "error"
-      });
-    },
-    onMutate() {
-      setLoadingAuthorization(false);
-      setEnrollmentInProgress(false);
-    }
-  }));
-
-  const deleteAccountMutation = rspc.createMutation(() => ({
-    mutationKey: ["account.deleteAccount"],
-    onMutate: async (
-      uuid
-    ): Promise<
-      | { previousAccounts: AccountEntry[]; previousActiveUUID: string }
-      | undefined
-    > => {
-      await queryClient.cancelQueries({ queryKey: ["account.getAccounts"] });
-      await queryClient.cancelQueries({ queryKey: ["account.getActiveUuid"] });
-
-      const previousAccounts: AccountEntry[] | undefined =
-        queryClient.getQueryData(["account.getAccounts"]);
-
-      const previousActiveUUID: string | undefined = queryClient.getQueryData([
-        "account.getActiveUuid"
-      ]);
-
-      queryClient.setQueryData(["account.getActiveUuid"], null);
-
-      queryClient.setQueryData(
-        ["account.getAccounts", null],
-        (old: AccountEntry[] | undefined) => {
-          const filteredAccounts = old?.filter(
-            (account) => account.uuid !== uuid
-          );
-
-          if (filteredAccounts) return filteredAccounts;
-        }
-      );
-
-      if (previousAccounts && previousActiveUUID)
-        return { previousAccounts, previousActiveUUID };
-    },
-    onError: (
-      error,
-      _variables,
-      context:
-        | { previousAccounts: AccountEntry[]; previousActiveUUID: string }
-        | undefined
-    ) => {
-      if (routeData.accounts.data?.length === 0) {
-        navigate("/");
-      } else {
-        addNotification({
-          name: error.message,
-          type: "error"
-        });
-
-        if (context?.previousAccounts) {
-          queryClient.setQueryData(
-            ["account.getAccounts"],
-            context.previousAccounts
-          );
-        }
-        if (context?.previousActiveUUID) {
-          queryClient.setQueryData(
-            ["account.getActiveUuid"],
-            context.previousActiveUUID
-          );
-        }
-      }
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["account.getAccounts"] });
-    },
-    onSuccess() {
-      if (routeData.accounts.data?.length === 0) {
-        navigate("/");
-      }
-    }
-  }));
-
-  const reset = () => {
-    setEnrollmentInProgress(false);
-    setLoadingAuthorization(false);
-    setLoginDeviceCode(null);
-    setAddAccountStarting(false);
-    setExpired(false);
-  };
-
-  createEffect(() => {
-    if (routeData.accounts.data?.length === 0) navigate("/");
-  });
-
-  createEffect(() => {
-    if (routeData.status.isSuccess && !routeData.status.data && expired()) {
-      reset();
-    }
-
-    handleStatus(routeData.status, {
-      onPolling: (info) => {
-        setEnrollmentInProgress(true);
-        setLoginDeviceCode(info);
-      },
-      onFail(error) {
-        reset();
-        accountEnrollCancelMutation.mutate(undefined);
-        if (error)
-          addNotification({
-            name: "Could not add account",
-            content: error.toString(),
-            type: "error"
-          });
-      },
-      onError(error) {
-        reset();
-        if (error)
-          addNotification({
-            name: error?.message,
-            type: "error"
-          });
-      },
-      onComplete() {
-        setLoadingAuthorization(false);
-        if (enrollmentInProgress()) {
-          accountEnrollFinalizeMutation.mutate(undefined);
-        }
-        reset();
-      }
-    });
-  });
+  const validGDLUser = () =>
+    globalStore.gdlAccount.data?.status === "valid"
+      ? globalStore.gdlAccount.data?.value
+      : undefined;
 
   return (
-    <div class="relative inline-block" id={props.id}>
-      <p
-        class="mt-0 mb-2 font-bold"
-        classList={{
-          "text-lightSlate-50": !props.disabled,
-          "text-darkSlate-50": props.disabled
-        }}
-      >
-        {props.label}
-      </p>
-      <button
-        class="flex items-center group box-border justify-between py-2 px-4 min-h-10 font-semibold rounded-lg w-auto"
-        onClick={() => {
-          if (props.disabled) return;
-
-          setMenuOpened(!menuOpened());
-        }}
-        onBlur={() => {
-          if (!focusIn()) {
-            setMenuOpened(false);
-          }
-        }}
-        classList={{
-          "border-0": true,
-          "text-darkSlate-50 hover:text-lightSlate-50": !props.disabled,
-          rounded: true,
-          "bg-darkSlate-700": true
-        }}
-      >
-        <div class="flex gap-2 items-center">
-          <Show when={(activeAccount() as Label)?.icon}>
-            <img
-              src={(activeAccount() as Label)?.icon}
-              class="w-5 h-5 rounded-md"
-            />
-          </Show>
-          <p
-            class="m-0 lg:block overflow-hidden justify-center w-full text-ellipsis align-middle leading-loose hidden"
-            classList={{
-              "text-darkSlate-50 hover:text-lightSlate-50 group-hover:text-lightSlate-50":
-                !props.disabled,
-              "text-darkSlate-500": props.disabled
-            }}
-          >
-            {(activeAccount() as Label)?.name}
-          </p>
-        </div>
-
-        <span
-          class="text-3xl ease-in-out duration-100 i-ri:arrow-drop-down-line"
-          classList={{
-            "text-darkSlate-50 group-hover:text-lightSlate-50": !props.disabled,
-            "text-darkSlate-500": props.disabled
-          }}
-        />
-      </button>
-      <div
-        ref={menuRef}
-        tabindex="0"
-        class="rounded-md px-4 w-auto absolute right-0 flex-col text-darkSlate-50 pb-2 mt-1 z-[101] min-w-80 pt-3 bg-darkSlate-900"
-        onMouseLeave={() => {
-          setFocusIn(false);
-        }}
-        onMouseEnter={() => {
-          setFocusIn(true);
-        }}
-        onClick={() => menuRef?.focus()}
-        onBlur={() => {
-          setFocusIn(false);
-          setMenuOpened(false);
-        }}
-        classList={{
-          flex: menuOpened(),
-          hidden: !menuOpened()
-        }}
-      >
-        <div class="w-full flex flex-col mb-4">
-          <div class="flex w-full mb-4">
-            <img
-              src={(activeAccount() as Label)?.icon}
-              class="rounded-md h-10 w-10 mr-2"
-            />
-            <div class="flex flex-col justify-between">
-              <h5 class="m-0 text-lightSlate-50">
-                {(activeAccount() as Label)?.name}
-              </h5>
-              <div class="flex gap-1">
-                {mapTypeToIcon(activeAccount()?.type.type)}
-                <p class="m-0 text-xs">{activeAccount()?.type.type}</p>
-              </div>
-            </div>
+    <Popover
+      placement="bottom"
+      color="bg-transparent"
+      noTip
+      trigger="click"
+      content={(close) => (
+        <div class="flex flex-col gap-2">
+          <div class="bg-darkSlate-700 w-50 h-auto p-2 rounded-lg mr-2">
+            GDLauncher account
           </div>
-          <div class="flex items-center gap-3">
-            <h5 class="m-0 text-lightSlate-50">
-              <Trans
-                key="uuid"
-                options={{
-                  defaultValue: "UUID"
-                }}
-              />
-            </h5>
-            <div class="flex items-center gap-1">
-              <div class="flex gap-1">
-                <p class="m-0 text-xs">{(activeAccount() as Label)?.uuid}</p>
-              </div>
-              <CopyIcon text={(activeAccount() as Label)?.uuid} />
-            </div>
-          </div>
-        </div>
-        <Show when={filteredOptions().length > 0}>
-          <hr class="w-full border-darkSlate-50 opacity-20 mb-0" />
-        </Show>
-        <ul class="text-darkSlate-50 m-0 w-full list-none p-0 shadow-md shadow-darkSlate-900">
-          <For each={filteredOptions()}>
-            {(option) => {
-              return (
-                <li class="text-darkSlate-50 flex items-center justify-between min-h-10 no-underline first:rounded-t last:rounded-b block whitespace-no-wrap my-2">
-                  <div class="flex gap-2">
-                    <img
-                      src={(option.label as Label)?.icon}
-                      class="w-10 h-10 rounded-md mr-2 grayscale"
-                    />
-                    <div class="flex flex-col justify-between">
-                      <h5 class="m-0 text-lightSlate-50">
-                        {(option.label as Label).name}
-                      </h5>
-                      <div class="m-0">
-                        {mapStatus((option.label as Label).status)}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="flex gap-3">
-                    <div
-                      class="cursor-pointer i-ri:delete-bin-7-fill hover:bg-red"
-                      onClick={() => {
-                        deleteAccountMutation.mutate(
-                          (option.label as Label).uuid
-                        );
-                      }}
-                    />
-                    <p
-                      class="m-0 cursor-pointer hover:text-blue"
-                      onClick={() => {
-                        setActiveUUIDMutation.mutate(
-                          (option.label as Label).uuid
-                        );
-                      }}
-                    >
-                      <Trans
-                        key="switch_account"
-                        options={{
-                          defaultValue: "Switch"
-                        }}
-                      />
-                    </p>
-                  </div>
-                </li>
-              );
-            }}
-          </For>
-        </ul>
-        <hr class="w-full border-darkSlate-50 opacity-20 mt-0" />
-        <div class="flex flex-col">
-          <div
-            class="flex py-2 justify-between group gap-3"
-            classList={{
-              "flex-col": !!enrollmentInProgress(),
-              "min-h-10": !!enrollmentInProgress(),
-              "items-start": !!enrollmentInProgress()
-            }}
-          >
-            <div class="flex justify-between w-full">
-              <div
-                class="flex gap-3 items-center"
-                classList={{
-                  "cursor-not-allowed": !!enrollmentInProgress(),
-                  "cursor-pointer": !enrollmentInProgress()
-                }}
-              >
+          <div class="bg-darkSlate-700 w-50 h-auto p-2 rounded-lg mr-2">
+            <For each={globalStore.accounts.data || []}>
+              {(account) => (
                 <div
-                  class="text-darkSlate-50 ease-in-out transition i-ri:add-circle-fill h-4 w-4"
+                  class="flex items-center gap-4 p-4 hover:bg-darkSlate-600 rounded-lg"
                   classList={{
-                    "text-darkSlate-500": !!enrollmentInProgress(),
-                    "group-hover:text-lightSlate-50": !enrollmentInProgress(),
-                    "cursor-not-allowed": !!enrollmentInProgress()
+                    "bg-darkSlate-600":
+                      account.uuid ===
+                      globalStore.currentlySelectedAccountUuid.data
                   }}
-                />
-                <span
-                  class="text-darkSlate-50 transition ease-in-out select-none"
-                  classList={{
-                    "cursor-not-allowed": !!enrollmentInProgress()
+                  onClick={() => {
+                    setActiveAccountMutation.mutate(account.uuid);
                   }}
                 >
-                  <p
-                    class="m-0"
-                    classList={{
-                      "text-darkSlate-500": !!enrollmentInProgress(),
-                      "group-hover:text-lightSlate-50": !enrollmentInProgress()
-                    }}
-                    onClick={() => {
-                      if (!loadingAuthorization()) {
-                        if (!enrollmentInProgress()) {
-                          accountEnrollBeginMutation.mutate(undefined);
-                        } else {
-                          accountEnrollCancelMutation.mutate(undefined);
-                          accountEnrollBeginMutation.mutate(undefined);
-                        }
-                        setLoadingAuthorization(true);
-                      }
-                    }}
-                  >
-                    <Trans
-                      key="add_account"
-                      options={{
-                        defaultValue: "Add Account"
-                      }}
-                    />
-                  </p>
-                </span>
-              </div>
-              <Show when={addAccountStarting() && !loginDeviceCode()}>
-                <Spinner />
-              </Show>
-            </div>
-            <Show when={enrollmentInProgress() && !expired() && expiresAt()}>
-              <div class="flex gap-3 items-center justify-between w-full">
-                <div class="flex items-center gap-4">
-                  <div
-                    class="w-5 h-5 rounded-full flex items-center cursor-pointer justify-center"
-                    onClick={() => {
-                      if (loginDeviceCode()?.verificationUri) {
-                        setLoadingAuthorization(true);
-                        window.openExternalLink(
-                          (loginDeviceCode() as DeviceCode).verificationUri
-                        );
-                      }
-                    }}
-                  >
-                    <div class="transition ease-in-out text-sm hover:text-lightSlate-50 i-ri:external-link-fill" />
-                  </div>
-
-                  <div class="flex gap-1 items-center text-xs">
-                    <span class="font-bold text-lightSlate-50">
-                      {loginDeviceCode()?.userCode}
-                    </span>
-                    <div
-                      class="cursor-pointer text-darkSlate-50 hover:text-lightSlate-50 transition ease-in-out i-ri:file-copy-fill"
-                      onClick={() => {
-                        if (loginDeviceCode()?.userCode) {
-                          navigator.clipboard.writeText(
-                            (loginDeviceCode() as DeviceCode).userCode
-                          );
-                        }
-                        addNotification({
-                          name: "Copied to clipboard",
-                          type: "success"
-                        });
-                      }}
-                    />
-                  </div>
-                  <div class="text-xs">{countDown()}</div>
-                </div>
-                <div class="flex gap-3">
-                  <Show when={loadingAuthorization()}>
-                    <Spinner />
-                  </Show>
-                  <div
-                    class="text-sm cursor-pointer i-ri:close-fill hover:text-red"
-                    onClick={() => {
-                      if (enrollmentInProgress()) {
-                        accountEnrollCancelMutation.mutate(undefined);
-                      }
-                    }}
+                  <img
+                    src={`http://127.0.0.1:${port}/account/headImage?uuid=${account.uuid}`}
+                    class="w-6 h-6 rounded-md"
                   />
+                  <div class="truncate max-w-30">{account.username}</div>
                 </div>
-              </div>
-            </Show>
-          </div>
-          <div
-            class="flex gap-3 py-2 items-center"
-            classList={{
-              "text-darkSlate-500": !!enrollmentInProgress(),
-              "color-red cursor-pointer": !enrollmentInProgress()
-            }}
-            onClick={() => {
-              if (enrollmentInProgress()) return;
-              deleteAccountMutation.mutate((activeAccount() as Label)?.uuid);
-            }}
-          >
-            <div class="h-4 w-4 i-ri:logout-box-fill" />
+              )}
+            </For>
 
-            <Trans
-              key="account_log_out"
-              options={{
-                defaultValue: "Log out"
+            <hr class="w-full border-darkSlate-50 opacity-20 my-4" />
+            <Button
+              type="outline"
+              class="flex items-center justify-center gap-4 mb-2"
+              onClick={() => {
+                if (props.disabled) return;
+                navigate("/settings/accounts");
+                close();
               }}
-            />
+            >
+              <div
+                class="text-2xl i-ri:settings-line pointer-events-auto"
+                classList={{
+                  "text-lightSlate-50": !!props.disabled,
+                  "hover:text-lightSlate-100 duration-100 ease-in-out":
+                    !!props.disabled
+                }}
+              />
+              <div>
+                <Trans key="settings:manage_accounts" />
+              </div>
+            </Button>
+          </div>
+        </div>
+      )}
+    >
+      <div class="bg-darkSlate-700 p-4 rounded-lg">
+        <div class="flex gap-4 items-center">
+          <img
+            src={`http://127.0.0.1:${port}/account/headImage?uuid=${
+              globalStore.accounts.data?.find(
+                (account) =>
+                  account.uuid === globalStore.currentlySelectedAccountUuid.data
+              )?.uuid
+            }`}
+            class="w-6 h-6 rounded-md"
+          />
+          <div class="truncate max-w-30">
+            {
+              globalStore.accounts.data?.find(
+                (account) =>
+                  account.uuid === globalStore.currentlySelectedAccountUuid.data
+              )?.username
+            }
           </div>
         </div>
       </div>
-    </div>
+    </Popover>
   );
 };
