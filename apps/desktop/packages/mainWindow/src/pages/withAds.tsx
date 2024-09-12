@@ -105,7 +105,6 @@ function withAdsLayout() {
                 </div>
               </div>
             </div>
-            <div class="absolute top-0 left-0 right-0 bottom-0 bg-image-gdlauncher_pattern.svg -z-10" />
           </div>
         </main>
       </div>

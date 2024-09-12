@@ -141,18 +141,116 @@ export const AccountsDropdown = (props: Props) => {
       ? globalStore.gdlAccount.data?.value
       : undefined;
 
+  let gdlAccountRef: HTMLDivElement;
+  let mcAccountsRef: HTMLDivElement;
+
   return (
     <Popover
       placement="bottom"
       color="bg-transparent"
       noTip
+      noShadow
       trigger="click"
+      onOpen={() => {
+        if (gdlAccountRef) {
+          gdlAccountRef.animate(
+            [
+              {
+                opacity: 0
+              },
+              {
+                opacity: 1
+              }
+            ],
+            {
+              duration: 500,
+              easing: "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+              fill: "forwards"
+            }
+          );
+        }
+
+        if (mcAccountsRef) {
+          mcAccountsRef.animate(
+            [
+              {
+                opacity: 0
+              },
+              {
+                opacity: 1
+              }
+            ],
+            {
+              duration: 500,
+              easing: "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+              fill: "forwards",
+              delay: 100
+            }
+          );
+        }
+      }}
       content={(close) => (
         <div class="flex flex-col gap-2">
-          <div class="bg-darkSlate-700 w-50 h-auto p-2 rounded-lg mr-2">
-            GDLauncher account
+          <div
+            class="bg-darkSlate-700 w-70 h-auto p-2 rounded-lg mr-2 opacity-0 shadow-lg shadow-darkSlate-900 transition-opacity"
+            ref={gdlAccountRef}
+          >
+            <div class="p-4 text-xl flex items-center gap-4">
+              <img src="/assets/images/gdlauncher_logo.svg" class="w-6 h-6" />
+              <div>
+                <Trans key="GDLauncher_account" />
+              </div>
+            </div>
+            <hr class="w-full border-darkSlate-50 opacity-20" />
+            <Switch
+              fallback={
+                <div class="flex items-center gap-4 p-4 rounded-lg">
+                  <div class="w-6 h-6 rounded-md bg-darkSlate-600" />
+                  <div>
+                    <Trans key="No_account_synced" />
+                  </div>
+                </div>
+              }
+            >
+              <Match when={validGDLUser()}>
+                <div class="flex items-center gap-4 p-4 rounded-lg">
+                  <img
+                    src={`http://127.0.0.1:${port}/account/headImage?uuid=${
+                      globalStore.accounts.data?.find(
+                        (account) =>
+                          account.uuid ===
+                          globalStore.settings.data?.gdlAccountId
+                      )?.uuid
+                    }`}
+                    class="w-6 h-6 rounded-md"
+                  />
+                  <div class="truncate max-w-30">
+                    {
+                      globalStore.accounts.data?.find(
+                        (account) =>
+                          account.uuid ===
+                          globalStore.settings.data?.gdlAccountId
+                      )?.username
+                    }
+                  </div>
+                </div>
+              </Match>
+            </Switch>
           </div>
-          <div class="bg-darkSlate-700 w-50 h-auto p-2 rounded-lg mr-2">
+          <div
+            class="bg-darkSlate-700 w-70 h-auto p-2 rounded-lg mr-2 opacity-0 shadow-lg shadow-darkSlate-900 transition-opacity"
+            ref={mcAccountsRef}
+          >
+            <div class="p-4 text-xl flex items-center gap-4">
+              <img
+                src="/assets/images/default-instance-img.png"
+                class="w-6 h-6"
+              />
+              <div>
+                <Trans key="Minecraft_accounts" />
+              </div>
+            </div>
+            <hr class="w-full border-darkSlate-50 opacity-20" />
             <For each={globalStore.accounts.data || []}>
               {(account) => (
                 <div
@@ -179,6 +277,7 @@ export const AccountsDropdown = (props: Props) => {
             <Button
               type="outline"
               class="flex items-center justify-center gap-4 mb-2"
+              fullWidth
               onClick={() => {
                 if (props.disabled) return;
                 navigate("/settings/accounts");
@@ -220,6 +319,7 @@ export const AccountsDropdown = (props: Props) => {
               )?.username
             }
           </div>
+          <div class="w-4 h-4 i-ri:arrow-down-s-line" />
         </div>
       </div>
     </Popover>

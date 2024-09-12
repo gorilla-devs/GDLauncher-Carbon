@@ -240,7 +240,7 @@ const Accounts = () => {
                     </Button>
                   </div>
                   <Show when={!validGDLUser()?.isEmailVerified}>
-                    <div class="flex items-center justify-between outline outline-yellow-500 text-yellow-500 p-4 rounded-md mb-4">
+                    <div class="flex items-center gap-8 justify-between outline outline-yellow-500 text-yellow-500 p-4 rounded-md mb-4">
                       <div class="flex items-center gap-4">
                         <i class="block w-6 h-6 i-ri:alert-fill" />
                         <Trans key="settings:gdl_account_not_verified" />

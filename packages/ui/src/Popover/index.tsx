@@ -30,6 +30,7 @@ type Props = {
   opened?: boolean;
   onOpen?: () => void;
   onClose?: () => void;
+  noShadow?: boolean;
 };
 
 type Point = { x: number; y: number };
@@ -175,9 +176,9 @@ const Popover = (_props: Props) => {
               setSsHoveringCard(false);
             }}
             ref={setPopoverRef}
-            class={`rounded-lg will-change z-100 ${
-              props.color || ""
-            } shadow-lg shadow-darkSlate-900`}
+            class={`rounded-lg will-change z-100 ${props.color || ""} ${
+              props.noShadow ? "" : "shadow-lg shadow-darkSlate-900"
+            }`}
             style={{
               position: "absolute",
               top: `${position.y ?? 0}px`,
