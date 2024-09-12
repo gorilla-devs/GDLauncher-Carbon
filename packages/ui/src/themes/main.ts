@@ -97,7 +97,7 @@ const mainTheme: Theme = {
   "brands-twitchBlack": "38 38 38",
 
   font: "Ubuntu",
-  "ads-sidebar-background": "url(/assets/images/gdlauncher_pattern.svg)",
+  "ads-sidebar-background": "url(./assets/images/gdlauncher_pattern.svg)",
   "additional-styles": additionalStyles,
 };
 

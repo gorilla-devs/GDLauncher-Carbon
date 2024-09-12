@@ -39,9 +39,9 @@ const GDLAccountRowItem = (props: {
         </Show>
         {props.children}
       </div>
-      <Show when={props.onEdit}>
+      {/* <Show when={props.onEdit}>
         <div class="text-md underline">EDIT</div>
-      </Show>
+      </Show> */}
     </div>
   );
 };

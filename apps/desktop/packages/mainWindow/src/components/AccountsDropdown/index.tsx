@@ -5,6 +5,8 @@ import { AccountStatus, AccountType } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Popover } from "@gd/ui";
 import { For, Switch, Match } from "solid-js";
+import gdlLogo from "/assets/images/gdlauncher_logo.svg";
+import defaultInstanceImg from "/assets/images/default-instance-img.png";
 import { useGlobalStore } from "../GlobalStoreContext";
 
 export type Label = {
@@ -101,7 +103,7 @@ export const AccountsDropdown = (props: Props) => {
             ref={gdlAccountRef}
           >
             <div class="p-4 text-xl flex items-center gap-4">
-              <img src="/assets/images/gdlauncher_logo.svg" class="w-6 h-6" />
+              <img src={gdlLogo} class="w-6 h-6" />
               <div>
                 <Trans key="GDLauncher_account" />
               </div>
@@ -147,10 +149,7 @@ export const AccountsDropdown = (props: Props) => {
             ref={mcAccountsRef}
           >
             <div class="p-4 text-xl flex items-center gap-4">
-              <img
-                src="/assets/images/default-instance-img.png"
-                class="w-6 h-6"
-              />
+              <img src={defaultInstanceImg} class="w-6 h-6" />
               <div>
                 <Trans key="Minecraft_accounts" />
               </div>

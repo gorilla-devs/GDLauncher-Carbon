@@ -40,7 +40,7 @@ export default defineConfig({
     }),
     solidPlugin()
   ],
-  assetsInclude: "**/*.riv",
+  assetsInclude: ["**/*.riv"],
   envDir: resolve(__dirname, "../../../../"),
   define: {
     __APP_VERSION__: JSON.stringify(appVersion)

@@ -85,6 +85,7 @@ function Settings() {
         </div>
         <div class="pt-4 h-1 w-1" />
         <Outlet />
+        <div class="pb-4 h-1 w-1" />
       </ContentWrapper>
     </>
   );

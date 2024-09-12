@@ -101,7 +101,7 @@ const pixelato: Theme = {
   "brands-twitchBlack": "38 38 38",
 
   font: "Monocraft",
-  "ads-sidebar-background": "url(/assets/images/sidebar-bg.png)",
+  "ads-sidebar-background": "url(./assets/images/sidebar-bg.png)",
   "additional-styles": additionalStyles,
 };
 
