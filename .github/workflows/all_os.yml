@@ -66,6 +66,7 @@ jobs:
         run: pnpm test
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: playwright-report
           path: apps/desktop/playwright-report
@@ -128,6 +129,7 @@ jobs:
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
         run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test
       - name: Upload Playwright report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
@@ -202,6 +204,7 @@ jobs:
         run: pnpm test
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: playwright-report
           path: apps/desktop/playwright-report
