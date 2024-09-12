@@ -117,7 +117,9 @@ const skipIntroAnimation = fss.existsSync(getPatchedUserData());
 
 app.setPath("userData", getPatchedUserData());
 
-Object.assign(console, log.functions);
+if (!process.env.IS_TEST_ENV) {
+  Object.assign(console, log.functions);
+}
 
 log.transports.file.resolvePathFn = (variables) =>
   path.join(getPatchedUserData(), variables.fileName!);
