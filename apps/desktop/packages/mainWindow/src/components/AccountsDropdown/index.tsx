@@ -1,24 +1,10 @@
 import { useGDNavigate } from "@/managers/NavigationManager";
-import fetchData from "@/pages/app.data";
-import {
-  msToMinutes,
-  msToSeconds,
-  parseTwoDigitNumber,
-  strToMs
-} from "@/utils/helpers";
-import { handleStatus } from "@/utils/login";
-import { port, queryClient, rspc } from "@/utils/rspcClient";
-import {
-  AccountEntry,
-  AccountStatus,
-  AccountType,
-  DeviceCode
-} from "@gd/core_module/bindings";
+
+import { port, rspc } from "@/utils/rspcClient";
+import { AccountStatus, AccountType } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
-import { Button, Popover, Spinner, createNotification } from "@gd/ui";
-import { useRouteData } from "@solidjs/router";
-import { createSignal, For, Show, Switch, Match, createEffect } from "solid-js";
-import CopyIcon from "../CopyIcon";
+import { Button, Popover } from "@gd/ui";
+import { For, Switch, Match } from "solid-js";
 import { useGlobalStore } from "../GlobalStoreContext";
 
 export type Label = {
@@ -45,87 +31,6 @@ export type Props = {
   disabled?: boolean;
   label?: string;
   id?: string;
-};
-
-const mapStatus = (status: AccountStatus | undefined) => {
-  return (
-    <Switch
-      fallback={
-        <div class="flex items-center gap-2">
-          <div class="rounded-full w-3 h-3 text-yellow i-ri:alert-fill" />
-          <p class="m-0 text-xs">
-            <Trans
-              key="account_invalid"
-              options={{
-                defaultValue: "invalid"
-              }}
-            />
-          </p>
-        </div>
-      }
-    >
-      <Match when={status === "invalid"}>
-        <div class="flex gap-2 items-center">
-          <div class="w-3 h-3 rounded-full text-yellow i-ri:alert-fill" />
-          <p class="m-0 text-xs">
-            <Trans
-              key="account_invalid"
-              options={{
-                defaultValue: "invalid"
-              }}
-            />
-          </p>
-        </div>
-      </Match>
-      <Match when={status === "ok"}>
-        <div class="flex gap-2 items-center">
-          <div class="w-3 h-3 rounded-full bg-green" />
-          <p class="m-0 text-xs">
-            <Trans
-              key="account_online"
-              options={{
-                defaultValue: "online"
-              }}
-            />
-          </p>
-        </div>
-      </Match>
-      <Match when={status === "expired"}>
-        <div class="flex gap-2 items-center">
-          <div class="w-3 h-3 rounded-full bg-red" />
-          <p class="m-0 text-xs">
-            <Trans
-              key="account_expired"
-              options={{
-                defaultValue: "Expired"
-              }}
-            />
-          </p>
-        </div>
-      </Match>
-      <Match when={status === "refreshing"}>
-        <div class="flex flex gap-2 items-center">
-          <div class="i-ri:refresh-line" />
-          <Trans
-            key="account_refreshing"
-            options={{
-              defaultValue: "Refresh"
-            }}
-          />
-        </div>
-      </Match>
-    </Switch>
-  );
-};
-
-const mapTypeToIcon = (type: string) => {
-  return (
-    <Switch>
-      <Match when={type === "microsoft"}>
-        <div class="i-ri:microsoft-fill" />
-      </Match>
-    </Switch>
-  );
 };
 
 export const AccountsDropdown = (props: Props) => {
