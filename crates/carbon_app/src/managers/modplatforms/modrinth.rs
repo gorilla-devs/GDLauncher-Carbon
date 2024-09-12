@@ -367,9 +367,12 @@ pub fn convert_standard_version_to_mr_version(
 mod test {
     use tracing_test::traced_test;
 
-    use crate::domain::modplatforms::modrinth::{
-        search::{SearchFacet, SearchIndex},
-        version::HashAlgorithm,
+    use crate::{
+        domain::modplatforms::modrinth::{
+            search::{SearchFacet, SearchIndex},
+            version::HashAlgorithm,
+        },
+        iridium_client,
     };
 
     #[tokio::test]
@@ -377,8 +380,7 @@ mod test {
     async fn test_search_no_query() {
         use super::*;
 
-        let client = reqwest::Client::builder().build().unwrap();
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let client = iridium_client::get_client().build();
         let modrinth = Modrinth::new(client);
 
         let search_params = ProjectSearchParameters {
@@ -399,8 +401,7 @@ mod test {
     async fn test_search_with_query() -> anyhow::Result<()> {
         use super::*;
 
-        let client = reqwest::Client::builder().build().unwrap();
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let client = iridium_client::get_client().build();
         let modrinth = Modrinth::new(client);
 
         let facets = vec![
@@ -436,8 +437,7 @@ mod test {
     async fn test_fetch_categories() {
         use super::*;
 
-        let client = reqwest::Client::builder().build().unwrap();
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let client = iridium_client::get_client().build();
         let modrinth = Modrinth::new(client);
 
         let results = modrinth.get_categories().await.unwrap();
@@ -450,8 +450,7 @@ mod test {
     async fn test_fetch_loaders() {
         use super::*;
 
-        let client = reqwest::Client::builder().build().unwrap();
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let client = iridium_client::get_client().build();
         let modrinth = Modrinth::new(client);
 
         let results = modrinth.get_loaders().await.unwrap();
@@ -463,9 +462,7 @@ mod test {
     #[traced_test]
     async fn test_get_project() -> anyhow::Result<()> {
         use super::*;
-
-        let client = reqwest::Client::builder().build()?;
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let client = iridium_client::get_client().build();
         let modrinth = Modrinth::new(client);
 
         let result = modrinth
@@ -481,9 +478,7 @@ mod test {
     #[traced_test]
     async fn test_get_project_versions() -> anyhow::Result<()> {
         use super::*;
-
-        let client = reqwest::Client::builder().build()?;
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let client = iridium_client::get_client().build();
         let modrinth = Modrinth::new(client);
 
         let results = modrinth
@@ -504,9 +499,7 @@ mod test {
     #[traced_test]
     async fn test_get_project_team() -> anyhow::Result<()> {
         use super::*;
-
-        let client = reqwest::Client::builder().build()?;
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let client = iridium_client::get_client().build();
         let modrinth = Modrinth::new(client);
 
         let results = modrinth
@@ -521,9 +514,7 @@ mod test {
     #[traced_test]
     async fn test_get_team() -> anyhow::Result<()> {
         use super::*;
-
-        let client = reqwest::Client::builder().build()?;
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let client = iridium_client::get_client().build();
         let modrinth = Modrinth::new(client);
 
         let results = modrinth.get_team(TeamID("SfcwZ8an".to_string())).await?;
@@ -536,9 +527,7 @@ mod test {
     #[traced_test]
     async fn test_get_teams() -> anyhow::Result<()> {
         use super::*;
-
-        let client = reqwest::Client::builder().build()?;
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let client = iridium_client::get_client().build();
         let modrinth = Modrinth::new(client);
 
         let results = modrinth
@@ -555,9 +544,7 @@ mod test {
     #[traced_test]
     async fn test_get_version() -> anyhow::Result<()> {
         use super::*;
-
-        let client = reqwest::Client::builder().build()?;
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let client = iridium_client::get_client().build();
         let modrinth = Modrinth::new(client);
 
         let result = modrinth
@@ -574,8 +561,7 @@ mod test {
     async fn test_get_versions_from_hash() -> anyhow::Result<()> {
         use super::*;
 
-        let client = reqwest::Client::builder().build()?;
-        let client = reqwest_middleware::ClientBuilder::new(client).build();
+        let client = iridium_client::get_client().build();
         let modrinth = Modrinth::new(client);
 
         let results = modrinth
