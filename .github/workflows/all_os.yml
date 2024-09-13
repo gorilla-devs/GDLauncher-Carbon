@@ -68,8 +68,8 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: apps/desktop/
-          path: apps/desktop/apps/desktop/
+          name: playwright-report
+          path: ./GDLauncher/apps/desktop/playwright-report/
   ubuntu_x64:
     defaults:
       run:
@@ -134,8 +134,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: apps/desktop/
-          path: "**/"
+          name: playwright-report
+          path: ./GDLauncher/apps/desktop/playwright-report/
   windows_x64:
     defaults:
       run:
@@ -208,5 +208,5 @@ jobs:
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: apps/desktop/
-          path: apps/desktop/apps/desktop/
+          name: playwright-report
+          path: ./GDLauncher/apps/desktop/playwright-report/
