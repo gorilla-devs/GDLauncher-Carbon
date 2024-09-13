@@ -11,7 +11,7 @@
   "main": "dist/main/index.cjs",
   "scripts": {
     "dev": "node scripts/watch.mjs",
-    "test": "playwright test",
+    "test": "DEBUG=pw:browser playwright test",
     "build-vite": "node scripts/build.mjs",
     "patch-version": "node scripts/monkeypatchVersion.mjs",
     "build-electron": "cross-env-shell DEBUG=electron-builder ow-electron-builder --config .electron-builder.config.cjs",
