@@ -125,9 +125,9 @@ jobs:
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           GDL_AUTH: ${{ secrets.GDL_AUTH }}
-          CURSEFORGE_API_KEY: ${{ vars.CURSEFORGE_API_KEY }}
+          CURSEFORGE_API_KEY: ${{ vars.CURSEFORGE_API_KEY }}v
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
-        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test
+        run: Xvfb -ac :99 -screen 0 1280x1024x16 & export DISPLAY=:99  && pnpm test
       - name: list files
         run: ls -la
       - name: Upload Playwright report
