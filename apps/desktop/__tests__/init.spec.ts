@@ -85,16 +85,11 @@ test.describe("Init Tests", () => {
     // set the CI environment variable to true
     process.env.CI = "e2e";
 
-    try {
-      electronApp = await electron.launch({
-        args: ["--no-sandbox", "--disable-gpu-sandbox"],
-        executablePath: await getBinaryPath(),
-        env: { ...process.env, IS_TEST_ENV: true } as any
-      });
-    } catch (e) {
-      console.error(e);
-      throw e;
-    }
+    electronApp = await electron.launch({
+      args: [],
+      executablePath: await getBinaryPath(),
+      env: { ...process.env, IS_TEST_ENV: true } as any
+    });
 
     page = await electronApp.firstWindow();
 
