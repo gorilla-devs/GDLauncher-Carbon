@@ -119,7 +119,6 @@ jobs:
       - name: Test
         env:
           DISPLAY: ":99"
-          XAUTHORITY: "/root/.Xauthority"
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
@@ -132,7 +131,6 @@ jobs:
         run: |
           Xvfb :99 -screen 0 1920x1080x24 &
           sleep 3
-          sudo touch /root/.Xauthority
           xauth generate $DISPLAY . trusted
           xauth add $DISPLAY . $(xxd -l 16 -p /dev/urandom)
           pnpm test
