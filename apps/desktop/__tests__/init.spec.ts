@@ -88,7 +88,7 @@ test.describe("Init Tests", () => {
     electronApp = await electron.launch({
       args: [],
       executablePath: await getBinaryPath(),
-      env: { ...process.env, IS_TEST_ENV: true } as any
+      env: { ...process.env, DISPLAY: ":10.0" } as any
     });
 
     page = await electronApp.firstWindow();

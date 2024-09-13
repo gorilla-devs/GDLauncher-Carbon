@@ -117,7 +117,7 @@ const skipIntroAnimation = fss.existsSync(getPatchedUserData());
 
 app.setPath("userData", getPatchedUserData());
 
-if (!process.env.IS_TEST_ENV) {
+if (!process.env.CI) {
   Object.assign(console, log.functions);
 }
 
