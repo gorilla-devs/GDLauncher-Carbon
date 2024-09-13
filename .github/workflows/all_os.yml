@@ -130,7 +130,7 @@ jobs:
           CURSEFORGE_API_KEY: ${{ vars.CURSEFORGE_API_KEY }}v
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
         run: |
-          Xvfb :99 -screen 0 1920x1080x24
+          Xvfb :99 -screen 0 1920x1080x24 &
           sleep 3
           touch $HOME/.Xauthority
           xauth generate $DISPLAY . trusted
