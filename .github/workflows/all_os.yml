@@ -118,7 +118,7 @@ jobs:
         run: rm -rf target
       - name: Test
         env:
-          DISPLAY: ":99"
+          DISPLAY: ":1"
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
@@ -129,7 +129,7 @@ jobs:
           CURSEFORGE_API_KEY: ${{ vars.CURSEFORGE_API_KEY }}v
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
         run: |
-          Xvfb -ac :99 -screen 0 1280x1024x16 & export DISPLAY=:99
+          Xvfb -ac :1 -screen 0 1280x1024x16 & export DISPLAY=:1
           pnpm test
       - name: Upload Playwright report
         if: always()
