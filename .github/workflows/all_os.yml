@@ -128,9 +128,7 @@ jobs:
           GDL_AUTH: ${{ secrets.GDL_AUTH }}
           CURSEFORGE_API_KEY: ${{ vars.CURSEFORGE_API_KEY }}v
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
-        run: |
-          Xvfb -ac :1 -screen 0 1280x1024x16 & export DISPLAY=:1
-          pnpm test
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
