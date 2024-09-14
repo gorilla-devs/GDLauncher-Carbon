@@ -57,7 +57,7 @@
     "@sentry/cli": "^2.31.0",
     "cross-env": "^7.0.3",
     "semver": "^7.6.0",
-    "turbo": "^2.0.14"
+    "turbo": "^1.13.2"
   },
   "engines": {
     "pnpm": ">=8.15.0",
