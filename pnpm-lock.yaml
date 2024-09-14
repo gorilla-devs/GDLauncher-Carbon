@@ -116,9 +116,6 @@ importers:
       electron-notarize:
         specifier: ^1.2.2
         version: 1.2.2
-      electron-playwright-helpers:
-        specifier: ^1.7.1
-        version: 1.7.1
       electron-updater:
         specifier: ^6.3.2
         version: 6.3.2
@@ -153,8 +150,8 @@ importers:
         specifier: ^9.0.3
         version: 9.1.6
       playwright:
-        specifier: ^1.43.1
-        version: 1.43.1
+        specifier: ^1.47.1
+        version: 1.47.1
       prettier:
         specifier: ^3.0.3
         version: 3.2.4
@@ -10059,12 +10056,6 @@ packages:
       - supports-color
     dev: true
 
-  /electron-playwright-helpers@1.7.1:
-    resolution: {integrity: sha512-S9mo7LfpERgub2WIuYVPpib4XKFeAqBP+mxYf5Bv7E0B5GUB+LUbSj6Fpu39h18Ar635Nf9nQYTmypjuvaYJng==}
-    dependencies:
-      '@electron/asar': 3.2.8
-    dev: true
-
   /electron-publish@24.13.1:
     resolution: {integrity: sha512-2ZgdEqJ8e9D17Hwp5LEq5mLQPjqU3lv/IALvgp+4W8VeNhryfGhYEQC/PgDPMrnWUp+l60Ou5SJLsu+k4mhQ8A==}
     dependencies:
@@ -14515,26 +14506,10 @@ packages:
       pathe: 1.1.2
     dev: true
 
-  /playwright-core@1.43.1:
-    resolution: {integrity: sha512-EI36Mto2Vrx6VF7rm708qSnesVQKbxEWvPrfA1IPY6HgczBplDx7ENtx+K2n4kJ41sLLkuGfmb0ZLSSXlDhqPg==}
-    engines: {node: '>=16'}
-    hasBin: true
-    dev: true
-
   /playwright-core@1.47.1:
     resolution: {integrity: sha512-i1iyJdLftqtt51mEk6AhYFaAJCDx0xQ/O5NU8EKaWFgMjItPVma542Nh/Aq8aLCjIJSzjaiEQGW/nyqLkGF1OQ==}
     engines: {node: '>=18'}
     hasBin: true
-    dev: true
-
-  /playwright@1.43.1:
-    resolution: {integrity: sha512-V7SoH0ai2kNt1Md9E3Gwas5B9m8KR2GVvwZnAI6Pg0m3sh7UvgiYhRrhsziCmqMJNouPckiOhk8T+9bSAK0VIA==}
-    engines: {node: '>=16'}
-    hasBin: true
-    dependencies:
-      playwright-core: 1.43.1
-    optionalDependencies:
-      fsevents: 2.3.2
     dev: true
 
   /playwright@1.47.1:

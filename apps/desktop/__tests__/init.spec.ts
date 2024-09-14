@@ -1,12 +1,5 @@
 import { expect, test } from "@playwright/test";
 import fs from "fs";
-// import {
-//   clickMenuItemById,
-//   ipcMainCallFirstListener,
-//   ipcRendererCallFirstListener,
-//   ipcMainInvokeHandler,
-//   ipcRendererInvoke,
-// } from "electron-playwright-helpers";
 import path from "path";
 import { ElectronApplication, Page, _electron as electron } from "playwright";
 import { getActualUrl } from "./tests_helpers.js";
