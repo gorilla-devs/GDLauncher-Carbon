@@ -1,11 +1,3 @@
-#[cfg(feature = "production")]
-#[inline(always)]
-pub fn get_client() -> reqwest_middleware::ClientBuilder {
-    iridium::get_client()
-}
-
-#[cfg(not(feature = "production"))]
-#[inline(always)]
 pub fn get_client() -> reqwest_middleware::ClientBuilder {
     use reqwest::{Request, Response};
     use reqwest_middleware::{Middleware, Next};
