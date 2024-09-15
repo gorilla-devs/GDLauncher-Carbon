@@ -1,0 +1,42 @@
+---
+import Header from "../components/Header.astro";
+import "../styles/HomeStyle.css";
+import NewsLetterAction from "../components/Newsletter";
+---
+
+<style>
+  body {
+    font-family: "Ubuntu", sans-serif;
+    background-image: linear-gradient(
+        rgba(23, 29, 39, 0.3),
+        rgba(23, 29, 39, 0.3)
+      ),
+      url("../assets/patern.svg");
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-color: rgba(29, 32, 40, 1);
+  }
+</style>
+
+<main class="flex flex-col min-h-screen">
+  <Header />
+  <div
+    class="flex-1 flex items-center justify-center flex-col gap-6 text-center"
+  >
+    <div class="flex flex-col gap-2">
+      <h1 class="text-white text-7xl font-semibold">
+        Subscribe to keep updated
+      </h1>
+      <h1 class="text-white text-7xl font-semibold">
+        about the <span
+          class="text-yellow-500 inline-block underline -rotate-12 hover:rotate-0 transition-transform"
+          >NEW</span
+        > GDLauncher
+      </h1>
+    </div>
+    <p class="text-white text-2xl font-sans font-extralight">
+      Subscribe and keep yourself updated about GDLauncher news!
+    </p>
+    <NewsLetterAction client:only />
+  </div>
+</main>
