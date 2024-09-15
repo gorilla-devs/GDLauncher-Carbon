@@ -46,7 +46,7 @@ jobs:
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           GDL_AUTH: ${{ secrets.GDL_AUTH }}
-          CURSEFORGE_API_KEY: ${{ vars.CURSEFORGE_API_KEY }}
+          CURSEFORGE_API_KEY: '${{ vars.CURSEFORGE_API_KEY }}'
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
       - name: Lint
         run: pnpm lint
@@ -61,7 +61,7 @@ jobs:
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           GDL_AUTH: ${{ secrets.GDL_AUTH }}
-          CURSEFORGE_API_KEY: ${{ vars.CURSEFORGE_API_KEY }}
+          CURSEFORGE_API_KEY: '${{ vars.CURSEFORGE_API_KEY }}'
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
         run: pnpm test
       - name: Upload Playwright report
@@ -110,7 +110,7 @@ jobs:
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           GDL_AUTH: ${{ secrets.GDL_AUTH }}
-          CURSEFORGE_API_KEY: ${{ vars.CURSEFORGE_API_KEY }}
+          CURSEFORGE_API_KEY: '${{ vars.CURSEFORGE_API_KEY }}'
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
       - name: Lint
         run: pnpm lint
@@ -126,7 +126,7 @@ jobs:
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           GDL_AUTH: ${{ secrets.GDL_AUTH }}
-          CURSEFORGE_API_KEY: ${{ vars.CURSEFORGE_API_KEY }}v
+          CURSEFORGE_API_KEY: '${{ vars.CURSEFORGE_API_KEY }}'
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
         run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test
       - name: Upload Playwright report
@@ -186,7 +186,7 @@ jobs:
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           GDL_AUTH: ${{ secrets.GDL_AUTH }}
-          CURSEFORGE_API_KEY: ${{ vars.CURSEFORGE_API_KEY }}
+          CURSEFORGE_API_KEY: '${{ vars.CURSEFORGE_API_KEY }}'
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
           CARGO_NET_GIT_FETCH_WITH_CLI: true
       - name: Lint
@@ -205,7 +205,7 @@ jobs:
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           GDL_AUTH: ${{ secrets.GDL_AUTH }}
-          CURSEFORGE_API_KEY: ${{ vars.CURSEFORGE_API_KEY }}
+          CURSEFORGE_API_KEY: '${{ vars.CURSEFORGE_API_KEY }}'
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: pnpm test
