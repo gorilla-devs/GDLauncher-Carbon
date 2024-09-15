@@ -42,10 +42,10 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@overwolf/ow-electron':
-        specifier: ^28.2.5
-        version: 28.3.7
+        specifier: ^28.3.8
+        version: 28.3.8
       '@overwolf/ow-electron-builder':
-        specifier: ^24.13.4
+        specifier: ^24.13.8
         version: 24.13.8(electron-builder-squirrel-windows@24.13.3)
       '@playwright/test':
         specifier: ^1.47.1
@@ -4498,8 +4498,8 @@ packages:
       - supports-color
     dev: true
 
-  /@overwolf/ow-electron@28.3.7:
-    resolution: {integrity: sha512-KEfb4z85jx4IJ1QQj9nUz2aVTZaoSG50NMhVkTcKrOwn/tzvQksgzsvS5VNEQHI6cWHwB8sOJvO/eCG2iwMHrQ==}
+  /@overwolf/ow-electron@28.3.8:
+    resolution: {integrity: sha512-VPpE6zTGJSPOMmftvXKY5gC2NjPPnF2vb1QTt1byJNczcvbV8IyXtUIacPR234sgK11BdRnnEaVNOYJxYOefvw==}
     engines: {node: '>= 10.17.0'}
     hasBin: true
     requiresBuild: true
@@ -14857,7 +14857,7 @@ packages:
     engines: {node: '>=8.16.0'}
     dependencies:
       '@types/mime-types': 2.1.4
-      debug: 4.3.4
+      debug: 4.3.7
       extract-zip: 1.7.0
       https-proxy-agent: 4.0.0
       mime: 2.6.0
