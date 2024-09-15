@@ -158,7 +158,7 @@ export const AccountsDropdown = (props: Props) => {
             <For each={globalStore.accounts.data || []}>
               {(account) => (
                 <div
-                  class="flex items-center gap-4 p-4 hover:bg-darkSlate-600 rounded-lg"
+                  class="flex justify-between items-center gap-4 p-4 hover:bg-darkSlate-600 rounded-lg"
                   classList={{
                     "bg-darkSlate-600":
                       account.uuid ===
@@ -168,11 +168,37 @@ export const AccountsDropdown = (props: Props) => {
                     setActiveAccountMutation.mutate(account.uuid);
                   }}
                 >
-                  <img
-                    src={`http://127.0.0.1:${port}/account/headImage?uuid=${account.uuid}`}
-                    class="w-6 h-6 rounded-md"
-                  />
-                  <div class="truncate max-w-30">{account.username}</div>
+                  <div class="flex items-center gap-4">
+                    <img
+                      src={`http://127.0.0.1:${port}/account/headImage?uuid=${account.uuid}`}
+                      class="w-6 h-6 rounded-md"
+                    />
+                    <div class="truncate max-w-30">{account.username}</div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <Switch>
+                      <Match when={account.type.type === "microsoft"}>
+                        <div class="w-4 h-4 i-ri:microsoft-fill" />
+                      </Match>
+                      <Match when={account.type.type === "offline"}>
+                        <div class="w-4 h-4 i-ri:computer-line" />
+                      </Match>
+                    </Switch>
+                    <Switch>
+                      <Match when={account.status === "ok"}>
+                        <div class="w-4 h-4 text-green-500 i-ri:check-fill" />
+                      </Match>
+                      <Match when={account.status === "expired"}>
+                        <div class="w-4 h-4 text-yellow-500 i-ri:alert-fill" />
+                      </Match>
+                      <Match when={account.status === "refreshing"}>
+                        <div class="w-4 h-4 text-yellow-500 i-ri:loader-4-fill" />
+                      </Match>
+                      <Match when={account.status === "invalid"}>
+                        <div class="w-4 h-4 text-red-500 i-ri:close-fill" />
+                      </Match>
+                    </Switch>
+                  </div>
                 </div>
               )}
             </For>
