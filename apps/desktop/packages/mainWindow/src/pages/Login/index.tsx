@@ -5,7 +5,8 @@ import {
   Match,
   createEffect,
   onMount,
-  For
+  For,
+  Show
 } from "solid-js";
 import Auth from "./Auth";
 import CodeStep from "./CodeStep";
@@ -50,9 +51,7 @@ export default function Login() {
   const [deviceCodeObject, setDeviceCodeObject] =
     createSignal<DeviceCodeObjectType | null>(null);
   const [loadingButton, setLoadingButton] = createSignal(false);
-  const activeUuid = rspc.createQuery(() => ({
-    queryKey: ["account.getActiveUuid"]
-  }));
+  const activeUuid = globalStore.currentlySelectedAccountUuid;
 
   const gdlUser = rspc.createQuery(() => ({
     queryKey: ["account.peekGdlAccount", activeUuid.data!],
@@ -103,10 +102,6 @@ export default function Login() {
   const isGDLAccountSet = () =>
     globalStore.settings.data?.gdlAccountId ||
     globalStore.settings.data?.gdlAccountId === "";
-
-  createEffect(() => {
-    console.log("IS GDL ACCOUNT SET", isGDLAccountSet());
-  });
 
   const accountEnrollFinalizeMutation = rspc.createMutation(() => ({
     mutationKey: ["account.enroll.finalize"]
@@ -400,7 +395,16 @@ export default function Login() {
         <div class="text-lg font-bold flex items-center justify-center gap-2 mb-4">
           <Switch>
             <Match when={step() === Steps.TermsAndConditions}>
-              <Trans key="login.titles.we_value_privacy" />
+              <div>
+                <div>
+                  <Trans key="login.titles.we_value_privacy" />
+                </div>
+                <Show when={activeUuid?.data}>
+                  <div>
+                    <Trans key="login.renew" />
+                  </div>
+                </Show>
+              </div>
             </Match>
             <Match when={step() === Steps.Auth}>
               <Trans key="login.titles.sign_in_with_microsoft" />
@@ -494,7 +498,10 @@ export default function Login() {
                       i() + 1 < step() &&
                       (step() > Steps.CodeStep
                         ? i() + 1 > Steps.CodeStep
-                        : true)
+                        : step() > Steps.Auth &&
+                            searchParams.addMicrosoftAccount
+                          ? true
+                          : false)
                     ) {
                       setLoadingButton(false);
                       setStep(i() + 1);
@@ -508,7 +515,10 @@ export default function Login() {
                         i() + 1 < step() &&
                         (step() > Steps.CodeStep
                           ? i() + 1 > Steps.CodeStep
-                          : true)
+                          : step() >= Steps.Auth &&
+                              searchParams.addMicrosoftAccount
+                            ? false
+                            : true)
                     }}
                   />
                 </div>
@@ -601,7 +611,12 @@ export default function Login() {
                   }
 
                   setLoadingButton(false);
-                  nextStep();
+
+                  if (!searchParams.addMicrosoftAccount && activeUuid.data) {
+                    navigate("/library");
+                  } else {
+                    nextStep();
+                  }
                 } else if (step() === Steps.Auth) {
                   if (!routeData.status.data) {
                     await accountEnrollBeginMutation.mutateAsync(undefined);
@@ -748,6 +763,11 @@ export default function Login() {
                 <Match when={step() === Steps.Auth}>
                   <i class="w-4 h-4 i-ri:microsoft-fill" />
                   <Trans key="login.sign_in" />
+                </Match>
+                <Match
+                  when={step() === Steps.TermsAndConditions && activeUuid.data}
+                >
+                  <Trans key="instance_confirm" />
                 </Match>
                 <Match when={step() !== Steps.Auth}>
                   <Trans key="login.next" />

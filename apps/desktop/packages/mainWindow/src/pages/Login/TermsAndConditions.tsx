@@ -1,6 +1,8 @@
 import { Trans } from "@gd/i18n";
 import { Checkbox } from "@gd/ui";
 import { useModal } from "@/managers/ModalsManager";
+import { useGlobalStore } from "@/components/GlobalStoreContext";
+import { Show } from "solid-js";
 
 type Props = {
   nextStep: () => void;
@@ -12,10 +14,16 @@ type Props = {
 
 const TermsAndConditions = (props: Props) => {
   const modalsContext = useModal();
+  const accountsLength = useGlobalStore().currentlySelectedAccount();
 
   return (
-    <div class="flex-1 flex overflow-y-auto flex-col justify-between text-left gap-4 leading-5 p-4 text-lightSlate-900">
-      <div>
+    <div class="flex-1 flex flex-col justify-between text-left gap-4 leading-5 p-4 text-lightSlate-900">
+      <div class="flex flex-col gap-2 overflow-y-auto">
+        <Show when={accountsLength}>
+          <div>
+            <Trans key="login.we_value_privacy_text_renew" />
+          </div>
+        </Show>
         <div>
           <Trans key="login.we_value_privacy_text1" />
         </div>
