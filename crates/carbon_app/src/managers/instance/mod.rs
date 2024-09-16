@@ -1,14 +1,7 @@
-use std::collections::HashSet;
-use std::ffi::{OsStr, OsString};
-use std::fmt::Display;
-
-use std::sync::Arc;
-use std::time::Duration;
-use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
-
 use crate::api::keys::instance::*;
 use crate::api::translation::Translation;
 use crate::db::read_filters::StringFilter;
+use crate::db::{self, read_filters::IntFilter};
 use crate::domain::instance::info::{GameVersion, InstanceIcon, Modpack};
 use crate::domain::java::{SystemJavaProfileName, SYSTEM_JAVA_PROFILE_NAME_PREFIX};
 use crate::domain::modplatforms::curseforge::filters::{ModFileParameters, ModParameters};
@@ -21,20 +14,24 @@ use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::{DateTime, Utc};
 use daedalus::minecraft::MinecraftJavaProfile;
+use db::instance::Data as CachedInstance;
 use fs_extra::dir::CopyOptions;
 use futures::future::BoxFuture;
 use futures::{join, Future};
-
 use prisma_client_rust::Direction;
 use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
 use specta::Type;
+use std::collections::HashSet;
+use std::ffi::{OsStr, OsString};
+use std::fmt::Display;
+use std::sync::Arc;
+use std::time::Duration;
+use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 use thiserror::Error;
 use tokio::sync::{watch, Mutex, MutexGuard, RwLock};
 use tracing::{info, trace};
-
-use crate::db::{self, read_filters::IntFilter};
-use db::instance::Data as CachedInstance;
+use unicode_segmentation::UnicodeSegmentation;
 
 use self::export::InstanceExportManager;
 use self::importer::InstanceImportManager;
@@ -817,7 +814,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // trim whitespace (including windows does not end with ' ' requirement)
         let name = name.trim();
         // max 28 character name. this gives us 3 digets for numbers to use as discriminators
-        let name = name.chars().take(28).collect::<String>();
+        let name = name.graphemes(true).take(28).collect::<String>();
 
         // sanitize any illegal filenames
         let mut name = match ILLEGAL_NAMES.contains(&(&name.to_lowercase() as &str)) {
@@ -2046,6 +2043,7 @@ mod test {
 
     use super::domain;
     use prisma_client_rust::Direction;
+    use unicode_segmentation::UnicodeSegmentation;
 
     use crate::{
         db::{self, read_filters::IntFilter, PrismaClient},
@@ -2742,9 +2740,8 @@ mod test {
         assert_eq!(instance_name, "Cozy Cottage 𝘸𝘪𝘵𝘩 𝘴𝘢𝘶𝘤𝘦 🧂");
 
         // Although the following two strings look the same, they are not.
-        // Different filesystems handle it differently.
-        // Treatment of Unicode canoncal decomposition among operating systems - Efstratios Rappos
-        // (https://arxiv.org/pdf/1711.10481)
+        // Different filesystems handle it differently
+
         let e_with_1_byte = "é"; // precomposed (U+00E9)
         let e_with_2_bytes = "é"; // decomposed (U+0065 U+0301)
 
@@ -2791,6 +2788,43 @@ mod test {
         };
 
         assert_eq!(instance_name, comparison);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_next_folder_long_input() -> anyhow::Result<()> {
+        let app = crate::setup_managers_for_test().await;
+        let default_group_id = app.instance_manager().get_default_group().await?;
+        let default_group = &app.instance_manager().list_groups().await?[0];
+
+        let e_with_2_bytes = "é"; // decomposed (U+0065 U+0301)
+
+        // long string should be truncated with graphemes and not code points
+        let mut long_string = String::new();
+        for _ in 0..100 {
+            long_string.push_str(e_with_2_bytes);
+        }
+
+        let (instance_name, _) = app.instance_manager().next_folder(&*long_string).await?;
+
+        app.instance_manager()
+            .create_instance(
+                default_group_id,
+                instance_name.clone(),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.7.10"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+
+        assert_eq!(instance_name.graphemes(true).count(), 28);
+        assert_eq!(instance_name.len(), 84); // 3 bytes * 28 allowed graphemes
 
         Ok(())
     }
