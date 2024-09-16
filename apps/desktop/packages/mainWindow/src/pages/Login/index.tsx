@@ -500,8 +500,8 @@ export default function Login() {
                         ? i() + 1 > Steps.CodeStep
                         : step() > Steps.Auth &&
                             searchParams.addMicrosoftAccount
-                          ? true
-                          : false)
+                          ? false
+                          : true)
                     ) {
                       setLoadingButton(false);
                       setStep(i() + 1);
