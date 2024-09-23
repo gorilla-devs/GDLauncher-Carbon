@@ -42,8 +42,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@overwolf/ow-electron':
-        specifier: ^28.3.8
-        version: 28.3.8
+        specifier: ^31.4.0
+        version: 31.4.0
       '@overwolf/ow-electron-builder':
         specifier: ^24.13.8
         version: 24.13.8(electron-builder-squirrel-windows@24.13.3)
@@ -117,8 +117,8 @@ importers:
         specifier: ^1.2.2
         version: 1.2.2
       electron-updater:
-        specifier: ^6.3.2
-        version: 6.3.2
+        specifier: ^6.3.7
+        version: 6.3.7
       eslint:
         specifier: ^8.31.0
         version: 8.57.0
@@ -1365,7 +1365,7 @@ packages:
       '@babel/traverse': 7.25.6
       '@babel/types': 7.25.6
       convert-source-map: 2.0.0
-      debug: 4.3.4
+      debug: 4.3.7
       gensync: 1.0.0-beta.2
       json5: 2.2.3
       semver: 6.3.1
@@ -4498,8 +4498,8 @@ packages:
       - supports-color
     dev: true
 
-  /@overwolf/ow-electron@28.3.8:
-    resolution: {integrity: sha512-VPpE6zTGJSPOMmftvXKY5gC2NjPPnF2vb1QTt1byJNczcvbV8IyXtUIacPR234sgK11BdRnnEaVNOYJxYOefvw==}
+  /@overwolf/ow-electron@31.4.0:
+    resolution: {integrity: sha512-dzzPu5dTFu6pnoiMhmy40xQM1oYlLR4wma7bPV+/3dCPM1DiA1tNVIEkwkMiVdwNkA8bOkQMoB5Nacu3++DMvw==}
     engines: {node: '>= 10.17.0'}
     hasBin: true
     requiresBuild: true
@@ -7419,7 +7419,7 @@ packages:
     dependencies:
       '@typescript-eslint/types': 8.4.0
       '@typescript-eslint/visitor-keys': 8.4.0
-      debug: 4.3.4
+      debug: 4.3.7
       fast-glob: 3.3.2
       is-glob: 4.0.3
       minimatch: 9.0.4
@@ -8867,11 +8867,11 @@ packages:
       - supports-color
     dev: true
 
-  /builder-util-runtime@9.2.5:
-    resolution: {integrity: sha512-HjIDfhvqx/8B3TDN4GbABQcgpewTU4LMRTQPkVpKYV3lsuxEJoIfvg09GyWTNmfVNSUAYf+fbTN//JX4TH20pg==}
+  /builder-util-runtime@9.2.8:
+    resolution: {integrity: sha512-zsrY5P0qFy51NoulD0PUpwL/XkO42ndI6QSgK0pMFRE6e/R8hsajGdybMGpdGW00PPCqv7QvbxMOvXr3qkV9ww==}
     engines: {node: '>=12.0.0'}
     dependencies:
-      debug: 4.3.4
+      debug: 4.3.7
       sax: 1.3.0
     transitivePeerDependencies:
       - supports-color
@@ -9004,7 +9004,7 @@ packages:
   /capnp-ts@0.7.0:
     resolution: {integrity: sha512-XKxXAC3HVPv7r674zP0VC3RTXz+/JKhfyw94ljvF80yynK6VkTnqE3jMuN8b3dUVmmc43TjyxjW4KTsmB3c86g==}
     dependencies:
-      debug: 4.3.4
+      debug: 4.3.7
       tslib: 2.6.2
     transitivePeerDependencies:
       - supports-color
@@ -10077,16 +10077,16 @@ packages:
     resolution: {integrity: sha512-1OfuVACu+zKlmjsNdcJuVQuVE61sZOLbNM4JAQ1Rvh6EOj0/EUKhMJjRH73InPlXSh8HIJk1cVZ8pyOV/FMdUQ==}
     dev: true
 
-  /electron-updater@6.3.2:
-    resolution: {integrity: sha512-bEpuZ1IRnMtvZZaWeYi9ocX90Cnk+/impZ/08r6GQkfOMqECtKC2IjvxHcDk2VpWO8QZzK0+MUNaBiO81CGvQQ==}
+  /electron-updater@6.3.7:
+    resolution: {integrity: sha512-pCX7f1vAWsje5KVbMak4Xfy+rq/J4pFsfHhmwsPfdiX1cHsjCEJAwTxI6YyE6pb61VS/pWdOACc9ElD7aZDTUg==}
     dependencies:
-      builder-util-runtime: 9.2.5
+      builder-util-runtime: 9.2.8
       fs-extra: 10.1.0
       js-yaml: 4.1.0
       lazy-val: 1.0.5
       lodash.escaperegexp: 4.1.2
       lodash.isequal: 4.5.0
-      semver: 7.6.0
+      semver: 7.6.3
       tiny-typed-emitter: 2.1.0
     transitivePeerDependencies:
       - supports-color
@@ -10309,7 +10309,7 @@ packages:
     peerDependencies:
       esbuild: '>=0.12 <1'
     dependencies:
-      debug: 4.3.4
+      debug: 4.3.7
       esbuild: 0.18.20
     transitivePeerDependencies:
       - supports-color
@@ -15642,6 +15642,12 @@ packages:
     dependencies:
       lru-cache: 6.0.0
 
+  /semver@7.6.3:
+    resolution: {integrity: sha512-oVekP1cKtI+CTDvHWYFUcMtsK/00wmAEfyqKfNdARm8u1wNVhSgaX7A8d4UuIlUI5e84iEwOhs7ZPYRmzU9U6A==}
+    engines: {node: '>=10'}
+    hasBin: true
+    dev: true
+
   /send@0.18.0:
     resolution: {integrity: sha512-qqWzuOjSFOuqPjFe4NOsMLafToQQwBSOEpS+FwEt3A2V3vKubTquT3vmLTQpFgMXp8AlFWFuP1qKaJZOtPpVXg==}
     engines: {node: '>= 0.8.0'}
@@ -16218,6 +16224,7 @@ packages:
 
   /string_decoder@1.3.0:
     resolution: {integrity: sha512-hkRX8U1WjJFd8LsDJ2yQ/wWWxaopEsABU1XfkM8A+j0+85JAGppt16cr1Whg6KIbb4okU6Mql6BOj+uup/wKeA==}
+    requiresBuild: true
     dependencies:
       safe-buffer: 5.2.1
 

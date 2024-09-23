@@ -17,6 +17,10 @@ heroImage: https://cdn.gdl.gg/articles/gdlauncher-carbon-out-now/thumbnail.jpg
 
 I am so incredibly excited to announce that GDLauncher Carbon is now officially released, and it's available for download! [You can download it here](https://gdlauncher.com).
 
+# What is GDLauncher Carbon
+
+GDLauncher Carbon is a new version of GDLauncher, built with a modern tech stack and a fresh design. It's a complete rewrite of the old version, with many new features and improvements, and it's designed to be more user-friendly and efficient than the old version and address most of the architectural issues that were present in the old version.
+
 It's been a long journey, and we've worked incredibly hard to make this happen. We've rewritten the entire app from the ground up, using a new tech stack, and we've added a ton of new features, with many more on the way.
 
 We've also fully redesigned the UI and UX to make it more user-friendly and modern, while still trying to keep the same look and feel as the old version.
