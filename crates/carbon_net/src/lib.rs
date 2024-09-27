@@ -222,7 +222,6 @@ impl DownloadOptions {
 #[derive(Default)]
 pub struct DownloadOptionsBuilder {
     concurrency: Option<usize>,
-    bandwidth_limit: Option<u64>,
     cancel_token: Option<CancellationToken>,
     only_validate: Option<bool>,
     deep_check: Option<bool>,
@@ -233,11 +232,6 @@ pub struct DownloadOptionsBuilder {
 impl DownloadOptionsBuilder {
     pub fn concurrency(mut self, concurrency: usize) -> Self {
         self.concurrency = Some(concurrency);
-        self
-    }
-
-    pub fn bandwidth_limit(mut self, bandwidth_limit: u64) -> Self {
-        self.bandwidth_limit = Some(bandwidth_limit);
         self
     }
 
@@ -285,6 +279,7 @@ pub async fn download_multiple(
 ) -> Result<bool, DownloadError> {
     let client = create_client(&options);
     let semaphore = Arc::new(Semaphore::new(options.concurrency));
+    // only one file with the same path can be downloaded concurrently to avoid race conditions
     let file_path_lock = Arc::new(FilePathLock::new());
 
     info!("Starting processing of {} files", files.len());
@@ -350,8 +345,8 @@ fn create_download_tasks(
             let client = client.clone();
             let options = options.clone();
             let file = file.clone();
-            let downloaded_size = Arc::clone(total_downloaded_size);
-            let current_count = Arc::clone(current_files_count);
+            let total_downloaded_size = Arc::clone(total_downloaded_size);
+            let current_files_count = Arc::clone(current_files_count);
             let file_path_lock = Arc::clone(file_path_lock);
 
             tokio::spawn(async move {
@@ -360,8 +355,8 @@ fn create_download_tasks(
                     file,
                     options,
                     client,
-                    &downloaded_size,
-                    &current_count,
+                    &total_downloaded_size,
+                    &current_files_count,
                     total_files_size,
                     total_files_count,
                     &file_path_lock,
@@ -443,7 +438,9 @@ async fn download_file(
     total_files_count: u64,
     file_path_lock: &FilePathLock,
 ) -> Result<(), DownloadError> {
+    // This only locks for the acquisition of the file lock
     let file_lock = file_path_lock.lock(&downloadable.path).await;
+    // acquire the lock for the file so no other file with the same path can be downloaded concurrently
     let _guard = file_lock.lock().await;
 
     let file_processed_bytes = AtomicU64::new(0);
@@ -699,6 +696,7 @@ async fn prepare_download(
         .ok_or(DownloadError::CannotCreateDirectory(
             part_file_path.to_string_lossy().to_string(),
         ))?;
+
     tokio::fs::create_dir_all(parent_dir).await?;
 
     let mut file = File::options()
