@@ -15,6 +15,8 @@ fn generate_logs_filters() -> String {
         "hyper::proto::h1::io=warn",
         "hyper::proto::h1::decode=warn",
         "quaint::connector::metrics=warn",
+        "hyper_util::client::legacy::pool=warn",
+        "hyper_util::client::legacy::connect::http=warn",
         "hyper::client::connect::http=warn",
         "hyper::client::connect::dns=warn",
         "quaint::pooled::manager=warn",

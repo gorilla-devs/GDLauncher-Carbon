@@ -44,7 +44,7 @@ pub enum DownloadError {
     #[error("Cancelled")]
     Cancelled,
     #[error("File not found")]
-    FileNotFound,
+    FileNotFound(String),
     #[error("Size mismatch")]
     SizeMismatch { expected: u64, actual: u64 },
     #[error("Checksum mismatch")]
@@ -312,6 +312,7 @@ pub async fn download_multiple(
 
     process_download_tasks(
         tasks,
+        options.only_validate,
         &options.progress_sender,
         total_files_count,
         &total_downloaded_size,
@@ -565,12 +566,24 @@ async fn download_file(
                     Ok(())
                 }
                 Err(e) => {
+                    error!(
+                        "Error downloading file {} - {}: {:?}",
+                        part_file_path.to_string_lossy().to_string(),
+                        downloadable.path.to_string_lossy().to_string(),
+                        e
+                    );
                     remove_file(&part_file_path).await?;
                     Err(e)
                 }
             }
         }
         Err(e) => {
+            error!(
+                "Error downloading file {} - {}: {:?}",
+                part_file_path.to_string_lossy().to_string(),
+                downloadable.path.to_string_lossy().to_string(),
+                e
+            );
             remove_file(&part_file_path).await?;
             Err(e)
         }
@@ -804,17 +817,21 @@ async fn download_content(
 #[instrument(skip(tasks, progress_sender, downloaded_size))]
 async fn process_download_tasks(
     tasks: Vec<tokio::task::JoinHandle<Result<(), DownloadError>>>,
+    only_validate: bool,
     progress_sender: &Option<tokio::sync::watch::Sender<Progress>>,
     total_count: u64,
     downloaded_size: &AtomicU64,
     total_size: u64,
 ) -> Result<bool, DownloadError> {
-    let mut download_required = false;
-
     for task in tasks {
         match task.await? {
-            Ok(_) => {
-                download_required = true;
+            Ok(_) => {}
+            Err(
+                DownloadError::SizeMismatch { .. }
+                | DownloadError::ChecksumMismatch { .. }
+                | DownloadError::FileNotFound(_),
+            ) if only_validate => {
+                return Ok(true);
             }
             Err(e) => {
                 error!("File processing failed: {:?}", e);
@@ -834,7 +851,7 @@ async fn process_download_tasks(
     }
 
     info!("All files processed");
-    Ok(download_required)
+    Ok(false)
 }
 
 #[instrument(skip(expected_checksum))]
@@ -845,7 +862,9 @@ async fn validate_file(
     deep_check: bool,
 ) -> Result<(), DownloadError> {
     if !path.exists() {
-        return Err(DownloadError::FileNotFound);
+        return Err(DownloadError::FileNotFound(
+            path.to_string_lossy().to_string(),
+        ));
     }
 
     let metadata = tokio::fs::metadata(path).await?;
