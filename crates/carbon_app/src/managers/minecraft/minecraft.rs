@@ -799,7 +799,7 @@ mod tests {
     };
 
     use super::*;
-    use carbon_net::Progress;
+    use carbon_net::{DownloadOptions, Progress};
     use chrono::Utc;
     use tokio::io::AsyncWriteExt;
 
@@ -947,9 +947,12 @@ mod tests {
         }
         let progress = tokio::sync::watch::channel(Progress::new());
 
-        carbon_net::download_multiple(&downloadables[..], Some(progress.0), 10, true, false)
-            .await
-            .unwrap();
+        carbon_net::download_multiple(
+            &downloadables[..],
+            DownloadOptions::builder().concurrency(10).build(),
+        )
+        .await
+        .unwrap();
 
         extract_natives(runtime_path, &version, &lwjgl_group, &JavaArch::X86_64)
             .await

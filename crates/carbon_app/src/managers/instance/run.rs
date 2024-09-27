@@ -34,6 +34,7 @@ use crate::{
     },
 };
 use anyhow::{anyhow, bail, Context};
+use carbon_net::DownloadOptions;
 use chrono::{DateTime, Local, Utc};
 use futures::Future;
 use itertools::Itertools;
@@ -618,12 +619,13 @@ impl ManagerRef<'_, InstanceManager> {
                         .await?
                         .concurrent_downloads;
 
-                    carbon_net::download_multiple(
-                        &downloads[..],
-                        Some(progress_watch_tx),
-                        concurrency as usize,
-                        deep_check,
-                        false,
+                    carbon_net::download_multiple(&downloads[..],
+                        DownloadOptions::builder().concurrency(concurrency as usize)
+                        .progress_sender(
+                            progress_watch_tx
+                        )
+                        .deep_check(deep_check)
+                        .build(),
                     )
                     .await
                     .with_context(|| {
@@ -1224,12 +1226,15 @@ impl ManagerRef<'_, InstanceManager> {
 
                 let download_required = carbon_net::download_multiple(
                     &downloads[..],
-                    Some(progress_watch_tx),
-                    concurrency as usize,
-                    deep_check,
-                    true,
+                    DownloadOptions::builder().concurrency(concurrency as usize)
+                    .progress_sender(
+                        progress_watch_tx
+                    )
+                    .deep_check(deep_check)
+                    .only_validate(true)
+                    .build(),
                 )
-                .await
+                 .await
                 .with_context(|| {
                     format!(
                         "Failed to verify instance files for instance {instance_id}"
@@ -1270,10 +1275,12 @@ impl ManagerRef<'_, InstanceManager> {
 
                     carbon_net::download_multiple(
                         &downloads[..],
-                        Some(progress_watch_tx),
-                        concurrency as usize,
-                        deep_check,
-                        false,
+                        DownloadOptions::builder().concurrency(concurrency as usize)
+                        .deep_check(deep_check)
+                        .progress_sender(
+                            progress_watch_tx
+                        )
+                        .build(),
                     )
                     .await
                     .with_context(|| {

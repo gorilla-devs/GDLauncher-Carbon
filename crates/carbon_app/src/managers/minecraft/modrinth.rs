@@ -3,7 +3,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
 use anyhow::Context;
-use carbon_net::{Downloadable, Progress};
+use carbon_net::{DownloadOptions, Downloadable, Progress};
 use tokio::task::spawn_blocking;
 
 use crate::domain::runtime_path::InstancePath;
@@ -149,14 +149,17 @@ pub async fn download_mrpack(
         Ok::<_, anyhow::Error>(progress_percentage_sender)
     });
 
-    carbon_net::download_file(&file_downloadable, Some(download_progress_sender))
-        .await
-        .with_context(|| {
-            format!(
-                "Failed to download modrinth modpack from url: {}",
-                mrpack_file.url
-            )
-        })?;
+    carbon_net::download_multiple(
+        &[file_downloadable],
+        DownloadOptions::builder().concurrency(1).build(),
+    )
+    .await
+    .with_context(|| {
+        format!(
+            "Failed to download modrinth modpack from url: {}",
+            mrpack_file.url
+        )
+    })?;
 
     file.try_rename_or_move(target_path).await?;
     Ok(())

@@ -20,4 +20,11 @@ futures = { workspace = true }
 reqwest-middleware = { workspace = true }
 reqwest-retry = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 hex = { workspace = true }
+governor = { workspace = true }
+
+[dev-dependencies]
+mockito = { workspace = true }
+mockall = { workspace = true }
+tempfile = { workspace = true }

@@ -6,7 +6,7 @@ use std::sync::Arc;
 use anyhow::Context;
 use itertools::Itertools;
 
-use carbon_net::{Downloadable, Progress};
+use carbon_net::{DownloadOptions, Downloadable, Progress};
 use tokio::task::spawn_blocking;
 use tracing::trace;
 
@@ -86,14 +86,17 @@ pub async fn download_modpack_zip(
         Ok::<_, anyhow::Error>(progress_percentage_sender)
     });
 
-    carbon_net::download_file(&file_downloadable, Some(download_progress_sender))
-        .await
-        .with_context(|| {
-            format!(
-                "Failed to download curseforge modpack zip: {:?}",
-                cf_addon.download_url
-            )
-        })?;
+    carbon_net::download_multiple(
+        &[file_downloadable],
+        DownloadOptions::builder().concurrency(1).build(),
+    )
+    .await
+    .with_context(|| {
+        format!(
+            "Failed to download curseforge modpack zip: {:?}",
+            cf_addon.download_url
+        )
+    })?;
 
     file.try_rename_or_move(target_path).await?;
     Ok(())
