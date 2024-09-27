@@ -1582,7 +1582,7 @@ mod tests {
 
         let mock = server
             .mock("GET", "/test.txt")
-            // .match_header("range", "bytes=7-")
+            .match_header("range", "bytes=7-")
             .with_status(206)
             .with_header("content-range", "bytes 7-13/13")
             .with_body("World!")
