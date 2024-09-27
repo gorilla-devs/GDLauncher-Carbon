@@ -17,6 +17,8 @@ fn generate_logs_filters() -> String {
         "quaint::connector::metrics=warn",
         "hyper_util::client::legacy::pool=warn",
         "hyper_util::client::legacy::connect::http=warn",
+        "hyper_util::client::legacy::connect::dns=warn",
+        "reqwest::async_impl::client=warn",
         "hyper::client::connect::http=warn",
         "hyper::client::connect::dns=warn",
         "quaint::pooled::manager=warn",

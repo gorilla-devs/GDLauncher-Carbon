@@ -282,12 +282,16 @@ pub async fn download_multiple(
     // only one file with the same path can be downloaded concurrently to avoid race conditions
     let file_path_lock = Arc::new(FilePathLock::new());
 
-    info!("Starting processing of {} files", files.len());
-
     let total_files_size: u64 = files.iter().filter_map(|f| f.size).sum();
     let total_downloaded_size = Arc::new(AtomicU64::new(0));
     let total_files_count = files.len() as u64;
     let current_files_count = Arc::new(AtomicU64::new(0));
+
+    info!(
+        "Starting processing of {} files - {} MB",
+        files.len(),
+        total_files_size / 1024 / 1024
+    );
 
     if let Some(sender) = &options.progress_sender {
         let _ = sender.send(Progress {
@@ -315,7 +319,6 @@ pub async fn download_multiple(
         options.only_validate,
         &options.progress_sender,
         total_files_count,
-        &total_downloaded_size,
         total_files_size,
     )
     .await
@@ -376,7 +379,7 @@ fn create_download_tasks(
     file_path_lock
 ))]
 async fn process_file(
-    file: Downloadable,
+    downloadable: Downloadable,
     options: DownloadOptions,
     client: ClientWithMiddleware,
     total_downloaded_size: &AtomicU64,
@@ -385,7 +388,13 @@ async fn process_file(
     total_files_count: u64,
     file_path_lock: &FilePathLock,
 ) -> Result<(), DownloadError> {
-    let validation = validate_file(&file.path, file.size, &file.checksum, options.deep_check).await;
+    let validation = validate_file(
+        &downloadable.path,
+        downloadable.size,
+        &downloadable.checksum,
+        options.deep_check,
+    )
+    .await;
 
     match validation {
         Err(err) if options.only_validate => {
@@ -393,7 +402,7 @@ async fn process_file(
         }
         Err(_) => {
             download_file(
-                file,
+                downloadable,
                 options,
                 client,
                 total_downloaded_size,
@@ -405,7 +414,7 @@ async fn process_file(
             .await
         }
         Ok(_) => {
-            if let Some(size) = file.size {
+            if let Some(size) = downloadable.size {
                 total_downloaded_size.fetch_add(size, Ordering::SeqCst);
             }
             current_files_count.fetch_add(1, Ordering::SeqCst);
@@ -618,7 +627,7 @@ async fn _download_file(
         total_downloaded_size,
         file_processed_bytes,
         total_files_size,
-        current_count.load(Ordering::SeqCst),
+        current_count,
         total_files_count,
     )
     .await?;
@@ -780,7 +789,7 @@ async fn download_content(
     total_downloaded_size: &AtomicU64,
     file_processed_bytes: &AtomicU64,
     total_size: u64,
-    current_files_count: u64,
+    current_files_count: &AtomicU64,
     total_count: u64,
 ) -> Result<(), DownloadError> {
     while let Some(chunk) = response.chunk().await? {
@@ -795,18 +804,15 @@ async fn download_content(
             hasher.update(&chunk);
         }
 
-        let total_downloaded = total_downloaded_size
-            .fetch_add(chunk.len() as u64, Ordering::SeqCst)
-            + chunk.len() as u64;
-
+        total_downloaded_size.fetch_add(chunk.len() as u64, Ordering::SeqCst);
         file_processed_bytes.fetch_add(chunk.len() as u64, Ordering::SeqCst);
 
         if let Some(sender) = &options.progress_sender {
             let _ = sender.send(Progress {
                 total_count,
-                current_count: current_files_count,
+                current_count: current_files_count.load(Ordering::SeqCst),
                 total_size,
-                current_size: total_downloaded,
+                current_size: total_downloaded_size.load(Ordering::SeqCst),
             });
         }
     }
@@ -814,13 +820,12 @@ async fn download_content(
     Ok(())
 }
 
-#[instrument(skip(tasks, progress_sender, downloaded_size))]
+#[instrument(skip(tasks, progress_sender))]
 async fn process_download_tasks(
     tasks: Vec<tokio::task::JoinHandle<Result<(), DownloadError>>>,
     only_validate: bool,
     progress_sender: &Option<tokio::sync::watch::Sender<Progress>>,
     total_count: u64,
-    downloaded_size: &AtomicU64,
     total_size: u64,
 ) -> Result<bool, DownloadError> {
     for task in tasks {
@@ -846,7 +851,7 @@ async fn process_download_tasks(
             total_count,
             current_count: total_count,
             total_size,
-            current_size: downloaded_size.load(Ordering::SeqCst),
+            current_size: total_size,
         });
     }
 
@@ -1275,6 +1280,8 @@ mod tests {
             tokio::select! {
                 _ = progress_rx.changed() => {
                     let progress = progress_rx.borrow().clone();
+
+                    println!("{:#?}", progress);
 
                     if progress.current_size == 0 && last_progress.current_size == 13 && !has_reset {
                         has_reset = true;
