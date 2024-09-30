@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::Context;
-use carbon_net::{Downloadable, Progress};
+use carbon_net::{DownloadOptions, Downloadable, Progress};
 use serde::Deserialize;
 use strum::IntoEnumIterator;
 use tokio::{
@@ -76,7 +76,14 @@ impl Managed for AzulZulu {
         });
 
         let result = {
-            carbon_net::download_file(&downloadable, Some(p_sender)).await?;
+            carbon_net::download_multiple(
+                &[downloadable.clone()],
+                DownloadOptions::builder()
+                    .concurrency(1)
+                    .progress_sender(p_sender)
+                    .build(),
+            )
+            .await?;
 
             trace!("Download complete");
 

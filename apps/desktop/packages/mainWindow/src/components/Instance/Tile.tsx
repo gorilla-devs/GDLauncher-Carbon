@@ -290,6 +290,10 @@ const Tile = (props: Props) => {
                   "h-38 w-38": props.size === 2,
                   "h-20 w-20": props.size === 1
                 }}
+                style={{
+                  "view-transition-name": `instance-tile-image-container-${props.instance.id}`,
+                  contain: "layout"
+                }}
               >
                 <div
                   class="flex justify-center relative items-center rounded-2xl overflow-hidden h-full w-full bg-cover bg-center group-hover:scale-120 duration-200 ease-in-out"
@@ -415,19 +419,22 @@ const Tile = (props: Props) => {
                   <div
                     class="absolute top-0 bottom-0 left-0 right-0 backdrop-blur-sm z-11"
                     style={{
-                      "view-transition-name": `instance-tile-loading-1-${props.instance.id}`
+                      "view-transition-name": `instance-tile-loading-1-${props.instance.id}`,
+                      contain: "layout"
                     }}
                   />
                   <div
                     class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-darkSlate-900 opacity-50 from-30% w-full h-full rounded-2xl"
                     style={{
-                      "view-transition-name": `instance-tile-loading-2-${props.instance.id}`
+                      "view-transition-name": `instance-tile-loading-2-${props.instance.id}`,
+                      contain: "layout"
                     }}
                   />
                   <div
                     class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-darkSlate-900 opacity-50 w-full h-full rounded-2xl"
                     style={{
-                      "view-transition-name": `instance-tile-loading-3-${props.instance.id}`
+                      "view-transition-name": `instance-tile-loading-3-${props.instance.id}`,
+                      contain: "layout"
                     }}
                   />
                 </Show>
@@ -528,8 +535,14 @@ const Tile = (props: Props) => {
                     <p class="m-0">{props.version}</p>
                   </div>
                 </Match>
-                <Match when={props.isLoading}>
-                  <p class="m-0 text-center text-lightSlate-50">
+                <Match
+                  when={
+                    props.isLoading &&
+                    props.downloaded !== 0 &&
+                    props.totalDownload !== 0
+                  }
+                >
+                  <p class="m-0 text-center text-lightSlate-50 text-sm">
                     {Math.round(props.downloaded || 0)}MB/
                     {Math.round(props.totalDownload || 0)}MB
                   </p>

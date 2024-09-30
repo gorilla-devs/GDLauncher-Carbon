@@ -34,6 +34,7 @@ use crate::{
     },
 };
 use anyhow::{anyhow, bail, Context};
+use carbon_net::DownloadOptions;
 use chrono::{DateTime, Local, Utc};
 use futures::Future;
 use itertools::Itertools;
@@ -270,7 +271,7 @@ impl ManagerRef<'_, InstanceManager> {
                         task.subtask(Translation::InstanceTaskLaunchDownloadModpack),
                         task.subtask(Translation::InstanceTaskLaunchDownloadModpackFiles),
                         task.subtask(Translation::InstanceTaskLaunchExtractModpackFiles),
-                        task.subtask(Translation::InstanceTaskLaunchDownloadAddonMetadata),
+                        task.subtask(Translation::InstanceTaskLaunchRequestAddonMetadata),
                     )),
                     false => None,
                 };
@@ -287,8 +288,11 @@ impl ManagerRef<'_, InstanceManager> {
                 let t_scan_files = task.subtask(Translation::InstanceTaskLaunchCheckingFiles);
                 t_scan_files.set_weight(5.0);
 
-                let t_generating_packinfo =
-                    task.subtask(Translation::InstanceTaskGeneratingPackInfo);
+                let t_generating_packinfo = task.subtask(Translation::InstanceTaskGeneratingPackInfo);
+
+                let t_request_modloader_info = task.subtask(Translation::InstanceTaskRequestModloaderInfo);
+
+                let t_request_minecraft_files = task.subtask(Translation::InstanceTaskRequestMinecraftFiles);
 
                 let t_fill_cache = task.subtask(Translation::InstanceTaskFillCache);
 
@@ -329,12 +333,12 @@ impl ManagerRef<'_, InstanceManager> {
                 if let Some((
                     t_request,
                     t_download_packfile,
-                    t_download_files,
+                    t_download_modpack_files,
                     t_extract_files,
                     t_addon_metadata,
                 )) = t_modpack
                 {
-                    let mut downloads = Vec::new();
+                    let mut modpack_downloads = Vec::new();
 
                     let cffile_path = setup_path.join("curseforge");
                     let mrfile_path = setup_path.join("modrinth");
@@ -384,6 +388,8 @@ impl ManagerRef<'_, InstanceManager> {
                             let (modpack_progress_tx, mut modpack_progress_rx) =
                                 tokio::sync::watch::channel(UpdateValue::<(u64, u64)>::new((0, 0)));
 
+
+                            t_download_packfile.start_opaque();
                             tokio::spawn(async move {
                                 while modpack_progress_rx.changed().await.is_ok() {
                                     {
@@ -398,7 +404,7 @@ impl ManagerRef<'_, InstanceManager> {
                                     tokio::time::sleep(Duration::from_millis(200)).await;
                                 }
 
-                                t_download_packfile.complete_download();
+                                t_download_packfile.complete_opaque();
                             });
 
                             curseforge::download_modpack_zip(
@@ -433,6 +439,7 @@ impl ManagerRef<'_, InstanceManager> {
                             let (modpack_progress_tx, mut modpack_progress_rx) =
                                 tokio::sync::watch::channel(UpdateValue::<(u64, u64)>::new((0, 0)));
 
+                            t_download_packfile.start_opaque();
                             tokio::spawn(async move {
                                 while modpack_progress_rx.changed().await.is_ok() {
                                     {
@@ -447,7 +454,7 @@ impl ManagerRef<'_, InstanceManager> {
                                     tokio::time::sleep(Duration::from_millis(200)).await;
                                 }
 
-                                t_download_packfile.complete_download();
+                                t_download_packfile.complete_opaque();
                             });
 
                             modrinth::download_mrpack(
@@ -515,7 +522,7 @@ impl ManagerRef<'_, InstanceManager> {
                             for (downloadable, skip) in modpack_info.downloadables {
                                 match skip {
                                     Some(skippath) => skipped_mods.push(skippath),
-                                    None => downloads.push(downloadable),
+                                    None => modpack_downloads.push(downloadable),
                                 }
                             }
 
@@ -555,6 +562,9 @@ impl ManagerRef<'_, InstanceManager> {
 
                                     tokio::time::sleep(Duration::from_millis(200)).await;
                                 }
+
+                                t_addon_metadata.complete_opaque();
+                                t_extract_files.complete_opaque();
                             });
 
                             let modpack_info = modrinth::prepare_modpack_from_mrpack(
@@ -572,7 +582,7 @@ impl ManagerRef<'_, InstanceManager> {
                             for (downloadable, skip) in modpack_info.downloadables {
                                 match skip {
                                     Some(skippath) => skipped_mods.push(skippath),
-                                    None => downloads.push(downloadable),
+                                    None => modpack_downloads.push(downloadable),
                                 }
                             }
 
@@ -592,14 +602,14 @@ impl ManagerRef<'_, InstanceManager> {
                     let (progress_watch_tx, mut progress_watch_rx) =
                         tokio::sync::watch::channel(carbon_net::Progress::new());
 
-                    t_download_files.start_opaque();
+                    t_download_modpack_files.start_opaque();
 
                     // dropped when the sender is dropped
                     tokio::spawn(async move {
                         while progress_watch_rx.changed().await.is_ok() {
                             {
                                 let progress = progress_watch_rx.borrow();
-                                t_download_files.update_download(
+                                t_download_modpack_files.update_download(
                                     progress.current_size as u32,
                                     progress.total_size as u32,
                                     false,
@@ -609,7 +619,7 @@ impl ManagerRef<'_, InstanceManager> {
                             tokio::time::sleep(Duration::from_millis(200)).await;
                         }
 
-                        t_download_files.complete_download();
+                        t_download_modpack_files.complete_opaque();
                     });
 
                     let concurrency = app
@@ -619,11 +629,13 @@ impl ManagerRef<'_, InstanceManager> {
                         .concurrent_downloads;
 
                     carbon_net::download_multiple(
-                        &downloads[..],
-                        Some(progress_watch_tx),
-                        concurrency as usize,
-                        deep_check,
-                        false,
+                        &modpack_downloads[..],
+                        DownloadOptions::builder().concurrency(concurrency as usize)
+                        .progress_sender(
+                            progress_watch_tx
+                        )
+                        .deep_check(deep_check)
+                        .build(),
                     )
                     .await
                     .with_context(|| {
@@ -863,7 +875,7 @@ impl ManagerRef<'_, InstanceManager> {
                     None => bail!("Instance has no associated game version and cannot be launched"),
                 };
 
-                t_request_version_info.update_items(0, 2);
+                t_request_version_info.start_opaque();
 
                 let mut version_info = app
                     .minecraft_manager()
@@ -880,7 +892,7 @@ impl ManagerRef<'_, InstanceManager> {
                 .await
                 .map_err(|e| anyhow::anyhow!("Error getting lwjgl meta: {:?}", e))?;
 
-                t_request_version_info.update_items(1, 2);
+                t_request_version_info.complete_opaque();
 
                 let java_profile = daedalus::minecraft::MinecraftJavaProfile::try_from(
                     version_info
@@ -1036,7 +1048,7 @@ impl ManagerRef<'_, InstanceManager> {
                                         let step = progress_watch_rx.borrow();
 
                                         if !started && !matches!(*step, Step::Idle) {
-                                            t_download_java.set_weight(10.0);
+                                            t_download_java.set_weight(30.0);
                                             t_extract_java.set_weight(3.0);
                                             started = true;
                                         }
@@ -1050,7 +1062,7 @@ impl ManagerRef<'_, InstanceManager> {
                                                 ),
                                             Step::Extracting(count, total) => {
                                                 if !dl_completed {
-                                                    t_download_java.complete_download();
+                                                    t_download_java.complete_opaque();
                                                     dl_completed = true;
                                                 }
 
@@ -1059,8 +1071,8 @@ impl ManagerRef<'_, InstanceManager> {
                                             }
 
                                             Step::Done => {
-                                                t_download_java.complete_download();
-                                                t_extract_java.complete_items();
+                                                t_download_java.complete_opaque();
+                                                t_extract_java.complete_opaque();
                                             }
 
                                             Step::Idle => {}
@@ -1087,6 +1099,8 @@ impl ManagerRef<'_, InstanceManager> {
                         }
                     }
                 };
+
+                t_request_modloader_info.start_opaque();
 
                 for modloader in version.modloaders.iter() {
                     match modloader {
@@ -1187,13 +1201,17 @@ impl ManagerRef<'_, InstanceManager> {
                     }
                 }
 
-                t_request_version_info.update_items(2, 2);
+                t_request_modloader_info.complete_opaque();
+
+                t_request_minecraft_files.start_opaque();
 
                 downloads.extend(
                     app.minecraft_manager()
                         .get_all_version_info_files(version_info.clone(), &java.arch)
                         .await?,
                 );
+
+                t_request_minecraft_files.complete_opaque();
 
                 let concurrency = app
                     .settings_manager()
@@ -1204,7 +1222,7 @@ impl ManagerRef<'_, InstanceManager> {
                 let (progress_watch_tx, mut progress_watch_rx) =
                 tokio::sync::watch::channel(carbon_net::Progress::new());
 
-                // dropped when the sender is dropped
+                t_scan_files.start_opaque();
                 tokio::spawn(async move {
                     while progress_watch_rx.changed().await.is_ok() {
                         {
@@ -1219,17 +1237,20 @@ impl ManagerRef<'_, InstanceManager> {
                         tokio::time::sleep(Duration::from_millis(200)).await;
                     }
 
-                    t_scan_files.complete_download();
+                    t_scan_files.complete_opaque();
                 });
 
                 let download_required = carbon_net::download_multiple(
                     &downloads[..],
-                    Some(progress_watch_tx),
-                    concurrency as usize,
-                    deep_check,
-                    true,
+                    DownloadOptions::builder().concurrency(concurrency as usize)
+                    .progress_sender(
+                        progress_watch_tx
+                    )
+                    .deep_check(deep_check)
+                    .only_validate(true)
+                    .build(),
                 )
-                .await
+                 .await
                 .with_context(|| {
                     format!(
                         "Failed to verify instance files for instance {instance_id}"
@@ -1237,9 +1258,6 @@ impl ManagerRef<'_, InstanceManager> {
                 })?;
 
                 if download_required {
-                    let wait_task = task.subtask(Translation::InstanceTaskLaunchWaitDownloadFiles);
-                    wait_task.set_weight(0.0);
-
                     let _lock = instance_manager
                         .persistence_manager
                         .instance_download_lock
@@ -1250,7 +1268,7 @@ impl ManagerRef<'_, InstanceManager> {
                     let (progress_watch_tx, mut progress_watch_rx) =
                         tokio::sync::watch::channel(carbon_net::Progress::new());
 
-                    // dropped when the sender is dropped
+                    t_download_files.start_opaque();
                     tokio::spawn(async move {
                         while progress_watch_rx.changed().await.is_ok() {
                             {
@@ -1265,15 +1283,17 @@ impl ManagerRef<'_, InstanceManager> {
                             tokio::time::sleep(Duration::from_millis(200)).await;
                         }
 
-                        t_download_files.complete_download();
+                        t_download_files.complete_opaque();
                     });
 
                     carbon_net::download_multiple(
                         &downloads[..],
-                        Some(progress_watch_tx),
-                        concurrency as usize,
-                        deep_check,
-                        false,
+                        DownloadOptions::builder().concurrency(concurrency as usize)
+                        .deep_check(deep_check)
+                        .progress_sender(
+                            progress_watch_tx
+                        )
+                        .build(),
                     )
                     .await
                     .with_context(|| {
@@ -1329,6 +1349,11 @@ impl ManagerRef<'_, InstanceManager> {
                     t_fill_cache.complete_opaque();
 
                     trace!("queued metadata caching");
+                }
+
+                if !download_required {
+                    t_extract_natives.set_weight(10.0);
+                    t_reconstruct_assets.set_weight(10.0);
                 }
 
                 t_extract_natives.start_opaque();
