@@ -455,11 +455,17 @@ async fn download_file(
 
     let file_processed_bytes = AtomicU64::new(0);
 
+    let progress = options.progress_sender.as_ref();
+
     let (part_file_path, mut file, headers, mut hasher, was_resumed) = prepare_download(
         &downloadable,
         false,
         total_downloaded_size,
         &file_processed_bytes,
+        current_files_count,
+        total_files_size,
+        total_files_count,
+        progress,
     )
     .await?;
 
@@ -480,7 +486,14 @@ async fn download_file(
     )
     .await;
 
-    let progress = options.progress_sender.as_ref();
+    if let Some(sender) = progress {
+        let _ = sender.send(Progress {
+            total_count: total_files_count,
+            current_count: current_files_count.load(Ordering::SeqCst),
+            total_size: total_files_size,
+            current_size: total_downloaded_size.load(Ordering::SeqCst),
+        });
+    }
 
     match outcome {
         Ok(()) => {
@@ -532,6 +545,10 @@ async fn download_file(
                 true,
                 total_downloaded_size,
                 &file_processed_bytes,
+                current_files_count,
+                total_files_size,
+                total_files_count,
+                progress,
             )
             .await?;
 
@@ -681,8 +698,12 @@ async fn remove_file(path: &Path) -> Result<(), DownloadError> {
 async fn prepare_download(
     downloadable: &Downloadable,
     force_overwrite: bool,
-    downloaded_size: &AtomicU64,
+    total_downloaded_size: &AtomicU64,
     file_processed_bytes: &AtomicU64,
+    current_files_count: &AtomicU64,
+    total_files_size: u64,
+    total_files_count: u64,
+    progress: Option<&Sender<Progress>>,
 ) -> Result<
     (
         PathBuf,
@@ -753,9 +774,18 @@ async fn prepare_download(
                 hasher.update(&buf[..bytes_read]);
             }
             processed_bytes += bytes_read as u64;
+
+            if let Some(progress) = progress {
+                let _ = progress.send(Progress {
+                    total_count: total_files_count,
+                    current_count: current_files_count.load(Ordering::SeqCst),
+                    total_size: total_files_size,
+                    current_size: total_downloaded_size.load(Ordering::SeqCst),
+                });
+            }
         }
 
-        downloaded_size.fetch_add(processed_bytes, Ordering::SeqCst);
+        total_downloaded_size.fetch_add(processed_bytes, Ordering::SeqCst);
         file_processed_bytes.fetch_add(processed_bytes, Ordering::SeqCst);
 
         headers.insert(
