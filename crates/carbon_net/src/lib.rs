@@ -509,6 +509,8 @@ async fn download_file(
         Err(DownloadError::ChecksumMismatch { .. }) | Err(DownloadError::SizeMismatch { .. })
             if was_resumed =>
         {
+            tracing::warn!("Download was resumed, but checksum or size mismatched");
+
             total_downloaded_size.fetch_sub(
                 file_processed_bytes.load(Ordering::SeqCst),
                 Ordering::SeqCst,
@@ -937,8 +939,10 @@ mod tests {
     use tokio::fs::File;
     use tokio::io::AsyncWriteExt;
     use tokio::sync::watch;
+    use tracing_test::traced_test;
 
     #[tokio::test]
+    #[traced_test]
     async fn test_download_success() {
         let mut server = mockito::Server::new_async().await;
         let mock_url = server.url();
@@ -998,6 +1002,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test]
     async fn test_download_network_error() {
         let mut server = mockito::Server::new_async().await;
         let mock_url = server.url();
@@ -1031,6 +1036,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test]
     async fn test_download_cancellation() {
         let mut server = mockito::Server::new_async().await;
         let mock_url = server.url();
@@ -1080,6 +1086,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test]
     async fn test_download_multiple_concurrent_with_same_name_and_path() {
         let mut server = mockito::Server::new_async().await;
         let mock_url = server.url();
@@ -1121,6 +1128,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test]
     async fn test_validate_file_success() {
         let temp_dir = tempdir().unwrap();
         let file_path = temp_dir.path().join("test.txt");
@@ -1139,6 +1147,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test]
     async fn test_validate_file_size_mismatch() {
         let temp_dir = tempdir().unwrap();
         let file_path = temp_dir.path().join("test.txt");
@@ -1152,6 +1161,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test]
     async fn test_validate_file_checksum_mismatch() {
         let temp_dir = tempdir().unwrap();
         let file_path = temp_dir.path().join("test.txt");
@@ -1170,6 +1180,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test]
     async fn test_download_file_resume() {
         let mut server = mockito::Server::new_async().await;
         let mock_url = server.url();
@@ -1217,6 +1228,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test]
     async fn test_download_file_resume_corrupted_part() {
         let mut server = mockito::Server::new_async().await;
         let mock_url = server.url();
@@ -1315,6 +1327,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test]
     async fn test_download_multiple_concurrent() {
         let mut server = mockito::Server::new_async().await;
         let mock_url = server.url();
@@ -1399,6 +1412,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test]
     async fn test_download_file_non_200_status() {
         let mut server = mockito::Server::new_async().await;
         let mock_url = server.url();
@@ -1432,6 +1446,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test]
     async fn test_download_file_with_redirect() {
         let mut server = mockito::Server::new_async().await;
         let mock_url = server.url();
@@ -1474,6 +1489,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test]
     async fn test_download_large_file() {
         let mut server = mockito::Server::new_async().await;
         let mock_url = server.url();
@@ -1512,6 +1528,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test]
     async fn test_download_multiple_with_progress() {
         let mut server = mockito::Server::new_async().await;
         let mock_url = server.url();
@@ -1600,6 +1617,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test]
     async fn test_download_with_progress_and_resume() {
         let mut server = mockito::Server::new_async().await;
         let mock_url = server.url();
@@ -1665,6 +1683,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[traced_test]
     async fn test_download_cancellation_with_progress() {
         let mut server = mockito::Server::new_async().await;
         let mock_url = server.url();

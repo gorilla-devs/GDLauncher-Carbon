@@ -28,3 +28,4 @@ governor = { workspace = true }
 mockito = { workspace = true }
 mockall = { workspace = true }
 tempfile = { workspace = true }
+tracing-test = { workspace = true }
