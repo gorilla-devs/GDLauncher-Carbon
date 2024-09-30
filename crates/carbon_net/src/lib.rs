@@ -419,12 +419,15 @@ async fn process_file(
             }
             current_files_count.fetch_add(1, Ordering::SeqCst);
             if let Some(sender) = &options.progress_sender {
-                let _ = sender.send(Progress {
+                let progress = Progress {
                     total_count: total_files_count,
                     current_count: current_files_count.load(Ordering::SeqCst),
                     total_size: total_files_size,
                     current_size: total_downloaded_size.load(Ordering::SeqCst),
-                });
+                };
+
+                tracing::trace!("Sending progress update {:?}", progress);
+                let _ = sender.send(progress);
             }
             return Ok(());
         }
@@ -776,12 +779,14 @@ async fn prepare_download(
             processed_bytes += bytes_read as u64;
 
             if let Some(progress) = progress {
-                let _ = progress.send(Progress {
+                let _progress = Progress {
                     total_count: total_files_count,
                     current_count: current_files_count.load(Ordering::SeqCst),
                     total_size: total_files_size,
                     current_size: total_downloaded_size.load(Ordering::SeqCst),
-                });
+                };
+                tracing::trace!("Sending progress update {:?}", _progress);
+                let _ = progress.send(_progress);
             }
         }
 
@@ -840,12 +845,14 @@ async fn download_content(
         file_processed_bytes.fetch_add(chunk.len() as u64, Ordering::SeqCst);
 
         if let Some(sender) = &options.progress_sender {
-            let _ = sender.send(Progress {
+            let progress = Progress {
                 total_count,
                 current_count: current_files_count.load(Ordering::SeqCst),
                 total_size,
                 current_size: total_downloaded_size.load(Ordering::SeqCst),
-            });
+            };
+            tracing::trace!("Sending progress update {:?}", _progress);
+            let _ = sender.send(progress);
         }
     }
 
@@ -879,12 +886,15 @@ async fn process_download_tasks(
 
     // Send final progress update
     if let Some(sender) = progress_sender {
-        let _ = sender.send(Progress {
+        let progress = Progress {
             total_count,
             current_count: total_count,
             total_size,
             current_size: total_size,
-        });
+        };
+
+        tracing::trace!("Sending progress update {:?}", progress);
+        let _ = sender.send(progress);
     }
 
     info!("All files processed");
