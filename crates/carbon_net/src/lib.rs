@@ -851,7 +851,7 @@ async fn download_content(
                 total_size,
                 current_size: total_downloaded_size.load(Ordering::SeqCst),
             };
-            tracing::trace!("Sending progress update {:?}", _progress);
+            tracing::trace!("Sending progress update {:?}", progress);
             let _ = sender.send(progress);
         }
     }
