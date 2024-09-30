@@ -354,15 +354,15 @@ const Tile = (props: Props) => {
                   }
                 >
                   <div
-                    class="absolute top-0 left-0 flex flex-col justify-center items-center z-70 w-full h-full gap-2"
+                    class="absolute top-0 left-0 flex flex-col justify-center items-center z-70 w-full h-full gap-2 p-2 box-border"
                     style={{
                       "view-transition-name": `instance-tile-progress-text-${props.instance.id}`
                     }}
                   >
-                    <h3 class="text-center opacity-50 m-0 text-3xl">
+                    <h3 class="text-center m-0 text-3xl">
                       {Math.round(props.percentage as number)}%
                     </h3>
-                    <div class="h-10">
+                    <div class="h-10 text-lightSlate-300">
                       <For each={props.subTasks}>
                         {(subTask) => (
                           <div

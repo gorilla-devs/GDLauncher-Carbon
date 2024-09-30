@@ -657,6 +657,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "carbon_vtask"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "mockall",
+ "tempfile",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "cc"
 version = "1.1.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
