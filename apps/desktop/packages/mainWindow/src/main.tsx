@@ -141,32 +141,6 @@ const _i18nInstance = i18n.use(icu).createInstance();
 
 const TransWrapper = (props: TransWrapperProps) => {
   const [isI18nReady, setIsI18nReady] = createSignal(false);
-  // const rspcContext = rspc.useContext();
-
-  // onMount(async () => {
-  //   while (true) {
-  //     let initialTime = Date.now();
-
-  //     await rspcContext.client.query(["echo", "something"]);
-
-  //     let elapsed = Date.now() - initialTime;
-
-  //     console.log("rspc latency (ms)", elapsed);
-
-  //     await new Promise((resolve) => setTimeout(resolve, 200));
-  //   }
-  // });
-
-  const trackPageView = rspc.createMutation(() => ({
-    mutationKey: "metrics.sendEvent"
-  }));
-
-  window.addEventListener("hashchange", () => {
-    trackPageView.mutate({
-      event_name: "page_view",
-      data: window.location.hash
-    });
-  });
 
   const settings = rspc.createQuery(() => ({
     queryKey: ["settings.getSettings"]

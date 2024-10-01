@@ -63,6 +63,7 @@
     "jsdom": "^22.1.0",
     "marked": "^9.0.3",
     "playwright": "^1.47.1",
+    "posthog-js": "^1.166.1",
     "prettier": "^3.0.3",
     "sanitize-html": "^2.11.0",
     "solid-js": "^1.8.15",

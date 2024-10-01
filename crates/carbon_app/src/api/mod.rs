@@ -16,7 +16,6 @@ pub mod instance;
 mod java;
 pub mod keys;
 mod mc;
-mod metrics;
 mod modplatforms;
 pub mod router;
 pub mod settings;
@@ -57,7 +56,6 @@ pub fn build_rspc_router() -> RouterBuilder<App> {
         .merge(keys::instance::GROUP_PREFIX, instance::mount())
         .merge(keys::modplatforms::GROUP_PREFIX, modplatforms::mount())
         .merge(keys::settings::GROUP_PREFIX, settings::mount())
-        .merge(keys::metrics::GROUP_PREFIX, metrics::mount())
         .merge(keys::systeminfo::GROUP_PREFIX, system_info::mount())
 }
 

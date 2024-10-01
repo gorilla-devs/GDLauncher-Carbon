@@ -2,10 +2,9 @@ import { ModalProps } from "../../";
 import ModalLayout from "../../ModalLayout";
 
 import { Trans } from "@gd/i18n";
-import { For, Match, Show, Switch, onMount } from "solid-js";
+import { For, Match, Show, Switch } from "solid-js";
 import changelogs, { Changelog } from "./changelogs";
 import { Button } from "@gd/ui";
-import { rspc } from "@/utils/rspcClient";
 
 type SectionProps = {
   type: keyof Changelog;
@@ -112,16 +111,6 @@ const Section = (props: SectionProps) => {
 };
 
 const Changelogs = (props: ModalProps) => {
-  const sendEvent = rspc.createMutation(() => ({
-    mutationKey: ["metrics.sendEvent"]
-  }));
-
-  onMount(() => {
-    sendEvent.mutate({
-      event_name: "changelog_viewed"
-    });
-  });
-
   return (
     <ModalLayout
       noHeader={props.noHeader}
@@ -151,10 +140,6 @@ const Changelogs = (props: ModalProps) => {
           <Button
             backgroundColor="bg-brands-twitchPurpleDark"
             onClick={() => {
-              sendEvent.mutate({
-                event_name: "changelog_twitch_button_clicked"
-              });
-
               window.open("https://twitch.tv/blarfoon", "_blank");
             }}
           >
