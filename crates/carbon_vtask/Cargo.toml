@@ -11,6 +11,8 @@ crate-type = ["lib"]
 anyhow = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
 
 [dev-dependencies]
 mockall = { workspace = true }

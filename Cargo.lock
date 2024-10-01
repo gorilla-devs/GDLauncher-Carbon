@@ -683,6 +683,8 @@ name = "carbon_vtask"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "futures",
  "mockall",
  "tempfile",
  "tokio",
