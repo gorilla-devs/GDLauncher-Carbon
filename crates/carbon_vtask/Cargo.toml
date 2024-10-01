@@ -1,0 +1,19 @@
+[package]
+name = "carbon_vtask"
+version = "0.1.0"
+edition = "2021"
+author = "GorillaDevs Inc."
+
+[lib]
+crate-type = ["lib"]
+
+[dependencies]
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+
+[dev-dependencies]
+mockall = { workspace = true }
+tempfile = { workspace = true }

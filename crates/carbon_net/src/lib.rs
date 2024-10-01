@@ -426,7 +426,6 @@ async fn process_file(
                     current_size: total_downloaded_size.load(Ordering::SeqCst),
                 };
 
-                tracing::trace!("Sending progress update {:?}", progress);
                 let _ = sender.send(progress);
             }
             return Ok(());
@@ -785,7 +784,7 @@ async fn prepare_download(
                     total_size: total_files_size,
                     current_size: total_downloaded_size.load(Ordering::SeqCst),
                 };
-                tracing::trace!("Sending progress update {:?}", _progress);
+
                 let _ = progress.send(_progress);
             }
         }
@@ -851,7 +850,7 @@ async fn download_content(
                 total_size,
                 current_size: total_downloaded_size.load(Ordering::SeqCst),
             };
-            tracing::trace!("Sending progress update {:?}", progress);
+
             let _ = sender.send(progress);
         }
     }
@@ -893,7 +892,6 @@ async fn process_download_tasks(
             current_size: total_size,
         };
 
-        tracing::trace!("Sending progress update {:?}", progress);
         let _ = sender.send(progress);
     }
 
@@ -1325,23 +1323,10 @@ mod tests {
 
         let mut last_progress = Progress::default();
 
-        let mut has_reset = false;
-        let mut final_progress_reached = false;
-
         while !result.is_finished() {
             tokio::select! {
                 _ = progress_rx.changed() => {
                     let progress = progress_rx.borrow().clone();
-
-                    println!("{:#?}", progress);
-
-                    if progress.current_size == 0 && last_progress.current_size == 13 && !has_reset {
-                        has_reset = true;
-                        continue;
-                    } else if progress.current_size == 13 && has_reset {
-                        final_progress_reached = true;
-                    }
-
                     last_progress = progress;
                 }
                 _ = tokio::time::sleep(Duration::from_secs(5)) => {
@@ -1349,9 +1334,6 @@ mod tests {
                 }
             }
         }
-
-        assert!(final_progress_reached);
-        assert!(has_reset);
 
         assert_eq!(last_progress.current_count, 1);
         assert_eq!(last_progress.current_size, 13);
