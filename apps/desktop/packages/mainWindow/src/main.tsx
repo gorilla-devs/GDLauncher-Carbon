@@ -22,6 +22,7 @@ import { NavigationManager } from "./managers/NavigationManager";
 import RiveAppWapper from "./utils/RiveAppWrapper";
 import GDAnimation from "./gd_logo_animation.riv";
 import { GlobalStoreProvider } from "./components/GlobalStoreContext";
+import { initMetrics } from "./utils/metrics";
 
 render(
   () => {
@@ -145,6 +146,13 @@ const TransWrapper = (props: TransWrapperProps) => {
   const settings = rspc.createQuery(() => ({
     queryKey: ["settings.getSettings"]
   }));
+
+  createEffect(() => {
+    const metricsEnabled = settings.data?.metricsEnabled;
+    if (metricsEnabled) {
+      initMetrics();
+    }
+  });
 
   createEffect(async () => {
     if (settings.isSuccess) {
