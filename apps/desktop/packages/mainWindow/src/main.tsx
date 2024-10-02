@@ -36,7 +36,10 @@ render(
           port = convertedPort;
         } else {
           if (coreModule.logs) {
-            console.error("CoreModule errored", coreModule);
+            console.error(
+              "CoreModule errored",
+              JSON.stringify(coreModule, null, 2)
+            );
             window.fatalError(coreModule.logs, "CoreModule");
           } else {
             console.error("CoreModule errored with no logs", coreModule);
