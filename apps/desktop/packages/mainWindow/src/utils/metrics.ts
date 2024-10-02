@@ -1,9 +1,10 @@
 import posthog from "posthog-js";
 import { MetricEvent } from "./metricEvents";
+import { FEOperatingSystem } from "@gd/core_module/bindings";
 
 let isMetricsInitialized = false;
 
-export function initMetrics() {
+export async function initMetrics(os: FEOperatingSystem, randomUserId: string) {
   if (isMetricsInitialized) {
     return;
   }
@@ -18,14 +19,31 @@ export function initMetrics() {
   posthog.init(import.meta.env.VITE_POSTHOG_KEY, {
     api_host: "https://eu.i.posthog.com",
     person_profiles: "identified_only",
-    capture_heatmaps: true,
+    persistence: "memory",
+    capture_heatmaps: false,
     autocapture: false,
     disable_session_recording: true,
-    enable_heatmaps: true,
+    enable_heatmaps: false,
     capture_pageview: false,
+    session_idle_timeout_seconds: 60 * 3,
     loaded: (posthog) => {
       if (process.env.NODE_ENV === "development") posthog.debug();
-    }
+    },
+    get_device_id: () => randomUserId
+  });
+
+  posthog.register_once({
+    $initial_os: os.os,
+    $initial_os_version: os.os_version,
+    $initial_browser: "GDLauncher",
+    $initial_browser_version: __APP_VERSION__
+  });
+
+  posthog.register({
+    $os: os.os,
+    $os_version: os.os_version,
+    $browser: "GDLauncher",
+    $browser_version: __APP_VERSION__
   });
 
   function getPatchedUrl() {

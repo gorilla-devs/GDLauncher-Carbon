@@ -142,15 +142,25 @@ const _i18nInstance = i18n.use(icu).createInstance();
 
 const TransWrapper = (props: TransWrapperProps) => {
   const [isI18nReady, setIsI18nReady] = createSignal(false);
+  const rspcContext = rspc.useContext();
 
   const settings = rspc.createQuery(() => ({
     queryKey: ["settings.getSettings"]
   }));
 
-  createEffect(() => {
-    const metricsEnabled = settings.data?.metricsEnabled;
-    if (metricsEnabled) {
-      initMetrics();
+  createEffect(async () => {
+    try {
+      const metricsEnabled = settings.data?.metricsEnabled;
+      if (metricsEnabled) {
+        const os = await rspcContext.client.query(["getOs"]);
+        const settings = await rspcContext.client.query([
+          "settings.getSettings"
+        ]);
+
+        initMetrics(os, settings.randomUserUuid);
+      }
+    } catch (e) {
+      console.error(e);
     }
   });
 

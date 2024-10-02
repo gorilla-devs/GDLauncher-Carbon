@@ -10,6 +10,7 @@ export type Procedures = {
         { key: "account.peekGdlAccount", input: string, result: FEGDLAccount | null } | 
         { key: "echo", input: string, result: string } | 
         { key: "getAppVersion", input: never, result: string } | 
+        { key: "getOs", input: never, result: FEOperatingSystem } | 
         { key: "instance.explore", input: ExploreQuery, result: ExploreEntry[] } | 
         { key: "instance.findModUpdate", input: UpdateMod, result: RemoteVersion | null } | 
         { key: "instance.getAllInstances", input: never, result: ListInstance[] } | 
@@ -140,8 +141,6 @@ export type MRFEVersion = { name: string; version_number: string; changelog: str
 
 export type CFFESortableGameVersion = { gameVersionName: string; gameVersionPadded: string; gameVersion: string; gameVersionReleaseDate: string; gameVersionTypeId: number | null }
 
-export type Set<T> = { Set: T }
-
 export type FEGDLAccountStatus = { status: "valid"; value: FEGDLAccount } | { status: "skipped" } | { status: "unset" }
 
 export type FELauncherActionOnGameLaunch = "quitApp" | "closeWindow" | "minimizeWindow" | "hideWindow" | "none"
@@ -163,6 +162,8 @@ export type AccountType = { type: "microsoft"; value: { email: string | null } }
 export type FEModdedManifestVersion = { id: string; stable: boolean; loaders: FEModdedManifestLoaderVersion[] }
 
 export type CFFEFileHash = { value: string; algo: CFFEHashAlgo }
+
+export type FEOperatingSystem = { os: string; os_version: string }
 
 export type FEManagedJavaOsMap = { [key: FEManagedJavaOs]: FEManagedJavaArchMap }
 
@@ -305,6 +306,8 @@ export type ExploreQuery = { instance_id: FEInstanceId; path: string[] }
 export type MoveGroup = { group: FEGroupId; before: FEGroupId | null }
 
 export type ModLoader = { type_: FEInstanceModloaderType; version: string }
+
+export type Set<T> = { Set: T }
 
 export type CreateInstance = { group: FEGroupId; name: string; use_loaded_icon: boolean; version: CreateInstanceVersion; notes: string }
 
