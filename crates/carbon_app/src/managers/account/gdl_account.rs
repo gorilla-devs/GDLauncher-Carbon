@@ -6,10 +6,9 @@ use hyper::{
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::managers::GDL_API_BASE;
-
 pub struct GDLAccountTask {
     client: reqwest_middleware::ClientWithMiddleware,
+    base_api: String,
 }
 
 #[derive(Serialize)]
@@ -70,8 +69,8 @@ pub struct GDLUser {
 }
 
 impl GDLAccountTask {
-    pub fn new(client: reqwest_middleware::ClientWithMiddleware) -> Self {
-        Self { client }
+    pub fn new(client: reqwest_middleware::ClientWithMiddleware, base_api: String) -> Self {
+        Self { client, base_api }
     }
 
     pub async fn register_account(
@@ -79,7 +78,7 @@ impl GDLAccountTask {
         body: RegisterAccountBody,
         id_token: String,
     ) -> anyhow::Result<GDLUser> {
-        let url = format!("{}/v1/users/sign-up", GDL_API_BASE);
+        let url = format!("{}/v1/users/sign-up", self.base_api);
 
         let authorization = format!("Bearer {}", id_token);
 
@@ -105,7 +104,7 @@ impl GDLAccountTask {
     }
 
     pub async fn get_account(&self, id_token: String) -> anyhow::Result<Option<GDLUser>> {
-        let url = format!("{}/v1/users/user", GDL_API_BASE);
+        let url = format!("{}/v1/users/user", self.base_api);
         let authorization = format!("Bearer {}", id_token);
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, authorization.parse().unwrap());
@@ -127,7 +126,7 @@ impl GDLAccountTask {
         &self,
         id_token: String,
     ) -> Result<(), RequestNewVerificationTokenError> {
-        let url = format!("{}/v1/users/request-new-verification-token", GDL_API_BASE);
+        let url = format!("{}/v1/users/request-new-verification-token", self.base_api);
         let authorization = format!("Bearer {}", id_token);
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, authorization.parse().unwrap());
@@ -171,7 +170,7 @@ impl GDLAccountTask {
         let body = serde_json::to_string(&RequestEmailChangeBody { new_email: email })
             .map_err(|err| RequestNewEmailChangeError::RequestFailed(err.into()))?;
 
-        let url = format!("{}/v1/users/request-email-change", GDL_API_BASE);
+        let url = format!("{}/v1/users/request-email-change", self.base_api);
         let authorization = format!("Bearer {}", id_token);
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, authorization.parse().unwrap());
@@ -220,7 +219,7 @@ impl GDLAccountTask {
         &self,
         id_token: String,
     ) -> Result<(), RequestGDLAccountDeletionError> {
-        let url = format!("{}/v1/users/request-account-deletion", GDL_API_BASE);
+        let url = format!("{}/v1/users/request-account-deletion", self.base_api);
 
         let authorization = format!("Bearer {}", id_token);
         let mut headers = HeaderMap::new();

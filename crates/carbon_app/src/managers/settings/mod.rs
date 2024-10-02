@@ -23,10 +23,14 @@ pub(crate) struct SettingsManager {
 }
 
 impl SettingsManager {
-    pub fn new(runtime_path: PathBuf, http_client: ClientWithMiddleware) -> Self {
+    pub fn new(
+        runtime_path: PathBuf,
+        http_client: ClientWithMiddleware,
+        gdl_base_api_url: String,
+    ) -> Self {
         Self {
             runtime_path: runtime_path::RuntimePath::new(runtime_path),
-            terms_and_privacy: TermsAndPrivacy::new(http_client),
+            terms_and_privacy: TermsAndPrivacy::new(http_client, gdl_base_api_url),
         }
     }
 }

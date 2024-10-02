@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use crate::{
     app_version::APP_VERSION,
     db::{self, app_configuration, PrismaClient},
@@ -8,6 +6,7 @@ use prisma_client_rust::raw;
 use ring::rand::SecureRandom;
 use rusqlite_migration::{Migrations, M};
 use serde::Deserialize;
+use std::path::PathBuf;
 use sysinfo::System;
 use thiserror::Error;
 use tracing::{debug, error, instrument, trace};
@@ -31,7 +30,10 @@ pub enum DatabaseError {
 }
 
 #[instrument]
-pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClient, anyhow::Error> {
+pub(super) async fn load_and_migrate(
+    runtime_path: PathBuf,
+    gdl_base_api: String,
+) -> Result<PrismaClient, anyhow::Error> {
     let runtime_path = dunce::simplified(&runtime_path);
 
     let db_uri = format!(
@@ -159,7 +161,7 @@ pub(super) async fn load_and_migrate(runtime_path: PathBuf) -> Result<PrismaClie
         .await
         .unwrap();
 
-    seed_init_db(&db_client).await?;
+    seed_init_db(&db_client, gdl_base_api).await?;
 
     Ok(db_client)
 }
@@ -176,7 +178,7 @@ async fn find_appropriate_default_xmx() -> i32 {
     }
 }
 
-async fn seed_init_db(db_client: &PrismaClient) -> Result<(), anyhow::Error> {
+async fn seed_init_db(db_client: &PrismaClient, gdl_base_api: String) -> Result<(), anyhow::Error> {
     let release_channel = match APP_VERSION {
         v if v.contains("alpha") => "alpha",
         v if v.contains("beta") => "beta",
@@ -245,7 +247,7 @@ async fn seed_init_db(db_client: &PrismaClient) -> Result<(), anyhow::Error> {
         .map(|last_update| last_update < chrono::Utc::now() - chrono::Duration::days(365))
         .unwrap_or(true);
 
-    let latest_tos_privacy_checksum = TermsAndPrivacy::get_latest_consent_sha()
+    let latest_tos_privacy_checksum = TermsAndPrivacy::get_latest_consent_sha(gdl_base_api)
         .await
         .map_err(DatabaseError::TermsAndPrivacy);
 

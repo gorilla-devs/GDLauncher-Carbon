@@ -56,14 +56,14 @@ pub(crate) struct AccountManager {
 }
 
 impl AccountManager {
-    pub fn new(client: reqwest_middleware::ClientWithMiddleware) -> Self {
+    pub fn new(client: reqwest_middleware::ClientWithMiddleware, gdl_base_api: String) -> Self {
         Self {
             currently_refreshing: RwLock::new(HashMap::new()),
             active_enrollment: RwLock::new(None),
             refreshloop_sleep: Mutex::new(None),
             skin_manager: SkinManager {},
 
-            gdl_account_task: RwLock::new(GDLAccountTask::new(client)),
+            gdl_account_task: RwLock::new(GDLAccountTask::new(client, gdl_base_api)),
         }
     }
 }

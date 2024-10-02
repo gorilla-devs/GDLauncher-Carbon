@@ -6,8 +6,6 @@ use serde::Serialize;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::managers::GDL_API_BASE;
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ConsentType {
@@ -17,11 +15,15 @@ pub enum ConsentType {
 
 pub struct TermsAndPrivacy {
     http_client: ClientWithMiddleware,
+    gdl_base_api: String,
 }
 
 impl TermsAndPrivacy {
-    pub fn new(http_client: ClientWithMiddleware) -> Self {
-        Self { http_client }
+    pub fn new(http_client: ClientWithMiddleware, gdl_base_api: String) -> Self {
+        Self {
+            http_client,
+            gdl_base_api,
+        }
     }
 
     #[tracing::instrument(skip(self, secret))]
@@ -42,7 +44,7 @@ impl TermsAndPrivacy {
             pub consented: bool,
         }
 
-        let consent_url = format!("{}/v1/record_consent", GDL_API_BASE);
+        let consent_url = format!("{}/v1/record_consent", self.gdl_base_api);
         let body = Body {
             secret,
             user_id,
@@ -84,7 +86,7 @@ impl TermsAndPrivacy {
     pub async fn fetch_terms_of_service_body(&self) -> anyhow::Result<String> {
         let response = self
             .http_client
-            .get(format!("{}/v1/terms_of_service_md", GDL_API_BASE,))
+            .get(format!("{}/v1/terms_of_service_md", self.gdl_base_api))
             .send()
             .await?
             .text()
@@ -96,7 +98,7 @@ impl TermsAndPrivacy {
     pub async fn fetch_privacy_statement_body(&self) -> anyhow::Result<String> {
         let response = self
             .http_client
-            .get(format!("{}/v1/privacy_statement_md", GDL_API_BASE,))
+            .get(format!("{}/v1/privacy_statement_md", self.gdl_base_api))
             .send()
             .await?
             .text()
@@ -105,10 +107,10 @@ impl TermsAndPrivacy {
         Ok(parse_markdown_document(&response))
     }
 
-    pub async fn get_latest_consent_sha() -> anyhow::Result<String> {
-        let client = crate::iridium_client::get_client().build();
+    pub async fn get_latest_consent_sha(gdl_base_api: String) -> anyhow::Result<String> {
+        let client = crate::iridium_client::get_client(gdl_base_api.clone()).build();
 
-        let url = format!("{}/v1/latest_consent_checksum", GDL_API_BASE);
+        let url = format!("{}/v1/latest_consent_checksum", gdl_base_api);
 
         let latest_consent_sha = client.get(&url).send().await?.text().await?;
 
