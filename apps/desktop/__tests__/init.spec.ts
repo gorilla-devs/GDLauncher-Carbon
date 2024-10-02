@@ -88,7 +88,7 @@ test.describe("Init Tests", () => {
 
     // capture errors
     page.on("pageerror", (error) => {
-      console.error(error);
+      console.error(JSON.stringify(error, null, 2));
       expect(error).toBeNull();
     });
     // capture console messages

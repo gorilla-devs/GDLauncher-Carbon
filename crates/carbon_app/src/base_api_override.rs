@@ -20,5 +20,5 @@ pub(crate) async fn get_base_api_override() -> String {
         }
     }
 
-    base_api.expect("Runtime path not found")
+    base_api.expect("GDL base api is not set")
 }
