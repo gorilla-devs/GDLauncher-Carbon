@@ -231,7 +231,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                     <div
                       style={{ "z-index": `${index() + 1}` }}
                       onMouseDown={(e) => e.stopPropagation()}
-                      class="duration-100 ease-in-out animate-enterScaleIn"
+                      class="duration-100 ease-in-out animate-enterWithOpacityChange"
                     >
                       <Dynamic
                         component={ModalComponent}

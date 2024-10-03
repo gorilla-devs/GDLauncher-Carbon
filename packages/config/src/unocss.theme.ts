@@ -145,8 +145,7 @@ const theme = {
     keyframes: {
       loadingbar:
         "{ 0% { transform: translateX(0) scaleX(0); } 40% { transform: translateX(0) scaleX(0.4); } 100% { transform: translateX(100%) scaleX(0.5); } }",
-      enterScaleIn:
-        "{ 0% { transform: scale(.9); opacity: 0 } 100% { transform: scale(1); opacity: 1 } }",
+      enterWithOpacityChange: "{ 0% { opacity: 0 } 100% { opacity: 1 } }",
       scaleBounce:
         "{ 0% { transform: scale(1); } 50% { transform: scale(0); } 70% { transform: scale(1); } 85% { transform: scale(1.2); } 100% { transform: scale(1); } }",
       wiggle:
@@ -155,17 +154,17 @@ const theme = {
 
     durations: {
       loadingbar: "1s",
-      enterScaleIn: "200ms",
+      enterWithOpacityChange: "200ms",
       scaleBounce: "600ms",
       wiggle: "300ms",
     },
     timingFns: {
       loadingbar: "linear",
-      enterScaleIn: "ease-in-out",
+      enterWithOpacityChange: "ease-in-out",
       scaleBounce: "cubic-bezier(0.68, -0.55, 0.265, 1.55)",
       wiggles: "ease-in-out",
     },
-    counts: { loadingbar: "infinite" },
+    counts: { loadingbar: "infinite", enterWithOpacityChange: "forwards" },
   },
   screens: {
     xs: { max: "800px" }, // For the condition width <= 800
