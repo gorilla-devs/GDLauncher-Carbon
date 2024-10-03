@@ -291,6 +291,10 @@ impl ManagerRef<'_, InstanceManager> {
 
                 let t_request_minecraft_files = task.subtask(Translation::InstanceTaskRequestMinecraftFiles);
 
+                let t_download_java = task.subtask(Translation::InstanceTaskLaunchDownloadJava);
+
+            let t_extract_java = task.subtask(Translation::InstanceTaskLaunchExtractJava);
+
                 let t_fill_cache = task.subtask(Translation::InstanceTaskFillCache);
 
                 let t_extract_natives = task.subtask(Translation::InstanceTaskLaunchExtractNatives);
@@ -1037,12 +1041,6 @@ impl ManagerRef<'_, InstanceManager> {
                                         "No usable java found and auto manage java is disabled"
                                     );
                                 }
-
-                                let t_download_java =
-                                    task.subtask(Translation::InstanceTaskLaunchDownloadJava);
-
-                                let t_extract_java =
-                                    task.subtask(Translation::InstanceTaskLaunchExtractJava);
 
                                 let (progress_watch_tx, mut progress_watch_rx) =
                                     watch::channel(Step::Idle);
