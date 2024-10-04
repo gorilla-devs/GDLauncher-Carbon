@@ -54,7 +54,10 @@ const FeaturedModpackTile = () => {
       <>
         <div class="h-24 w-[1px] bg-darkSlate-400" />
         <div
-          class="w-70 h-24 relative hover:bg-darkSlate-700 duration-200 ease-in-out box-border rounded-md group overflow-hidden hover:outline outline-2 outline-darkSlate-500"
+          class="w-70 h-24 relative duration-200 ease-in-out box-border rounded-md overflow-hidden outline-2 outline-darkSlate-500"
+          classList={{
+            "group hover:outline hover:bg-darkSlate-700": !!hexingTales()?.data
+          }}
           onClick={() => {
             navigate(`/modpacks/${HEXING_TALES_MODPACK_ID}/curseforge`);
           }}
