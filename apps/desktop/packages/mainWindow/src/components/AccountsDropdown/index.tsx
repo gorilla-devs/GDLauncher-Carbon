@@ -4,7 +4,7 @@ import { port, rspc } from "@/utils/rspcClient";
 import { AccountStatus, AccountType } from "@gd/core_module/bindings";
 import { Trans } from "@gd/i18n";
 import { Button, Popover } from "@gd/ui";
-import { For, Switch, Match } from "solid-js";
+import { For, Switch, Match, createSignal } from "solid-js";
 import gdlLogo from "/assets/images/gdlauncher_logo.svg";
 import defaultInstanceImg from "/assets/images/default-instance-img.png";
 import { useGlobalStore } from "../GlobalStoreContext";
@@ -38,6 +38,7 @@ export type Props = {
 export const AccountsDropdown = (props: Props) => {
   const globalStore = useGlobalStore();
   const navigate = useGDNavigate();
+  const [showAccountsDropdown, setShowAccountsDropdown] = createSignal(false);
 
   const setActiveAccountMutation = rspc.createMutation(() => ({
     mutationKey: ["account.setActiveUuid"]
@@ -59,6 +60,8 @@ export const AccountsDropdown = (props: Props) => {
       noShadow
       trigger="click"
       onOpen={() => {
+        setShowAccountsDropdown(true);
+
         if (gdlAccountRef) {
           gdlAccountRef.animate(
             [
@@ -95,6 +98,9 @@ export const AccountsDropdown = (props: Props) => {
             }
           );
         }
+      }}
+      onClose={() => {
+        setShowAccountsDropdown(false);
       }}
       content={(close) => (
         <div class="flex flex-col gap-2">
@@ -230,7 +236,12 @@ export const AccountsDropdown = (props: Props) => {
         </div>
       )}
     >
-      <div class="bg-darkSlate-700 p-4 rounded-lg">
+      <div
+        class="hover:bg-darkSlate-700 p-4 rounded-lg transition-all duration-100 ease-in-out"
+        classList={{
+          "bg-darkSlate-700": showAccountsDropdown()
+        }}
+      >
         <div class="flex gap-4 items-center">
           <img
             src={`http://127.0.0.1:${port}/account/headImage?uuid=${
