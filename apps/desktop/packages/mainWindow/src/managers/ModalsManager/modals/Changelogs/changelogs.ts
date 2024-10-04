@@ -72,6 +72,11 @@ const changelogs: Changelog = {
       title: "Redesigned news component.",
       description:
         "It now takes up less space, and accomodates for a smaller featured tile. While it's static for now, we're working on a dynamic featured tile."
+    },
+    {
+      title: "Improve network download performance",
+      description:
+        "We've made some changes to the way we download files, which should improve performance and, more importantly, make them more reliable."
     }
   ]
 };
