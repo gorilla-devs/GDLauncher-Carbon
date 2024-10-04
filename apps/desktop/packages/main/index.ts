@@ -150,6 +150,8 @@ const allowMultipleInstances = validateArgument(
   "--gdl_allow_multiple_instances"
 );
 
+const overrideBaseApi = validateArgument("--gdl_override_base_api");
+
 if (!allowMultipleInstances) {
   if (!app.requestSingleInstanceLock()) {
     app.quit();
@@ -242,20 +244,22 @@ const loadCoreModule: CoreModule = () =>
     let coreModule: ChildProcessWithoutNullStreams | null = null;
     let logs: Log[] = [];
 
+    const args = ["--runtime_path", CURRENT_RUNTIME_PATH!];
+
+    if (overrideBaseApi?.value) {
+      args.push("--base_api", overrideBaseApi.value!);
+    }
+
     try {
-      coreModule = spawn(
-        coreModulePath,
-        ["--runtime_path", CURRENT_RUNTIME_PATH!],
-        {
-          shell: false,
-          detached: false,
-          stdio: "pipe",
-          env: {
-            ...process.env,
-            RUST_BACKTRACE: "full"
-          }
+      coreModule = spawn(coreModulePath, args, {
+        shell: false,
+        detached: false,
+        stdio: "pipe",
+        env: {
+          ...process.env,
+          RUST_BACKTRACE: "full"
         }
-      );
+      });
     } catch (err) {
       console.error(`[CORE] Spawn error: ${err}`);
 
