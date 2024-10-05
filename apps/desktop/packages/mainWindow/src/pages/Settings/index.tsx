@@ -1,4 +1,4 @@
-import { Outlet } from "@solidjs/router";
+import { Outlet, useLocation } from "@solidjs/router";
 import ContentWrapper from "@/components/ContentWrapper";
 import { Tab, TabList, Tabs } from "@gd/ui";
 import { For } from "solid-js";
@@ -54,13 +54,19 @@ const settings: Array<settingsItem> = [
 ];
 
 function Settings() {
+  const location = useLocation();
   const navigate = useGDNavigate();
 
   return (
     <>
       <ContentWrapper>
         <div class="w-full box-border sticky top-0 z-50">
-          <Tabs orientation="horizontal">
+          <Tabs
+            orientation="horizontal"
+            defaultIndex={settings.findIndex(
+              (item) => item.path === location.pathname
+            )}
+          >
             <div class="h-26">
               <TabList>
                 <For each={settings}>
