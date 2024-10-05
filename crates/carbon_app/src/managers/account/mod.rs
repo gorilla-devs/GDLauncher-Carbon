@@ -657,7 +657,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     .app
                     .prisma_client
                     .account()
-                    .find_first(Vec::new())
+                    .find_first(vec![db::account::uuid::not(uuid.clone())])
                     .order_by(OrderByParam::LastUsed(Direction::Desc))
                     .exec()
                     .await?

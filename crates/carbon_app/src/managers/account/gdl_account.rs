@@ -111,7 +111,7 @@ impl GDLAccountTask {
 
         let resp = self.client.get(url).headers(headers).send().await?;
 
-        if resp.status() == StatusCode::NO_CONTENT {
+        if resp.status() == StatusCode::IM_A_TEAPOT {
             return Ok(None);
         }
 

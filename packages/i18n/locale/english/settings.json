@@ -53,7 +53,7 @@
   "request_account_deletion_description": "Deleting your GDLauncher account is a permanent action and cannot be undone. You will lose access to all your saved data.",
   "request_account_deletion": "Request Deletion",
   "cannot_request_deletion_for_time": "Wait {{time}} before requesting again",
-  "add_gdl_account": "Add GDLauncher Account",
+  "add_gdl_account": "Add GDLauncher Account ({{accountName}})",
   "log_out_gdl_account": "Log Out GDLauncher Account",
   "minecraft_accounts": "Minecraft Accounts",
   "uuid": "UUID",
