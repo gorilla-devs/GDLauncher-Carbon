@@ -178,22 +178,26 @@ if (!disableSentry) {
   }
 }
 
-const disableGPU = validateArgument("--disable-gpu");
+function maybeDisableGPU(override: boolean) {
+  const disableGPU = validateArgument("--disable-gpu") || override;
 
-if (disableGPU) {
-  app.commandLine.appendSwitch("no-sandbox");
-  app.commandLine.appendSwitch("disable-gpu");
-  app.commandLine.appendSwitch("disable-software-rasterizer");
-  app.commandLine.appendSwitch("disable-gpu-compositing");
-  app.commandLine.appendSwitch("disable-gpu-rasterization");
-  app.commandLine.appendSwitch("disable-gpu-sandbox");
-  app.commandLine.appendSwitch("--no-sandbox");
+  if (disableGPU) {
+    app.commandLine.appendSwitch("no-sandbox");
+    app.commandLine.appendSwitch("disable-gpu");
+    app.commandLine.appendSwitch("disable-software-rasterizer");
+    app.commandLine.appendSwitch("disable-gpu-compositing");
+    app.commandLine.appendSwitch("disable-gpu-rasterization");
+    app.commandLine.appendSwitch("disable-gpu-sandbox");
+    app.commandLine.appendSwitch("--no-sandbox");
+  }
+
+  // Disable GPU Acceleration for Windows 7
+  if (disableGPU || (release().startsWith("6.1") && platform() === "win32")) {
+    app.disableHardwareAcceleration();
+  }
 }
 
-// Disable GPU Acceleration for Windows 7
-if (disableGPU || (release().startsWith("6.1") && platform() === "win32")) {
-  app.disableHardwareAcceleration();
-}
+maybeDisableGPU(false);
 
 export type Log = {
   type: "info" | "error";
@@ -367,6 +371,11 @@ const loadCoreModule: CoreModule = () =>
         } else if (row.startsWith("_SHOW_APP_CLOSE_WARNING_:")) {
           const rightPart = row.split(":")[1];
           showAppCloseWarning = rightPart === "true";
+        } else if (row.startsWith("_POTATO_PC_MODE_:")) {
+          const rightPart = row.split(":")[1];
+          if (rightPart === "true") {
+            maybeDisableGPU(true);
+          }
         }
       }
       console.log(`[CORE] Message: ${dataString}`);
