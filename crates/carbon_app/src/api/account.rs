@@ -319,6 +319,7 @@ impl From<account::EnrollmentError> for EnrollmentError {
 #[serde(tag = "status", content = "value")]
 pub enum FEGDLAccountStatus {
     Valid(FEGDLAccount),
+    Invalid,
     Skipped,
     Unset,
 }
@@ -327,6 +328,7 @@ impl From<GDLAccountStatus> for FEGDLAccountStatus {
     fn from(value: GDLAccountStatus) -> Self {
         match value {
             GDLAccountStatus::Valid(value) => Self::Valid(value.into()),
+            GDLAccountStatus::Invalid => Self::Invalid,
             GDLAccountStatus::Skipped => Self::Skipped,
             GDLAccountStatus::Unset => Self::Unset,
         }

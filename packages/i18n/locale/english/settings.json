@@ -43,6 +43,7 @@
   "gdl_account_title": "GDLauncher Account",
   "gdl_account_synced": "GDL Account Synced",
   "gdl_account_not_synced": "GDL Account Not Synced",
+  "gdl_account_error": "GDL Account Error",
   "gdl_account_not_verified": "GDL account not verified. Make sure to verify it to get access to all features. Check your recovery email.",
   "recovery_email": "Recovery Email",
   "microsoft_username": "Microsoft Username",

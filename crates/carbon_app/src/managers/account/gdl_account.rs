@@ -51,6 +51,7 @@ pub enum RequestGDLAccountDeletionError {
 #[derive(Clone, Serialize, Deserialize)]
 pub enum GDLAccountStatus {
     Valid(GDLUser),
+    Invalid,
     Skipped,
     Unset,
 }

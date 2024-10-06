@@ -171,6 +171,9 @@ const Accounts = () => {
       ? globalStore.gdlAccount.data?.value
       : undefined;
 
+  const invalidGDLUser = () =>
+    globalStore.gdlAccount.data?.status === "invalid";
+
   const deleteAccountContent = () => {
     if (validGDLUser()?.deletionTimeout) {
       return (
@@ -239,7 +242,9 @@ const Accounts = () => {
                       <Trans key="settings:log_out_gdl_account" />
                     </Button>
                   </div>
-                  <Show when={!validGDLUser()?.isEmailVerified}>
+                  <Show
+                    when={validGDLUser() && !validGDLUser()?.isEmailVerified}
+                  >
                     <div class="flex items-center gap-8 justify-between outline outline-yellow-500 text-yellow-500 p-4 rounded-md mb-4">
                       <div class="flex items-center gap-4">
                         <i class="block w-6 h-6 i-ri:alert-fill" />
@@ -332,7 +337,7 @@ const Accounts = () => {
                   </Tooltip>
                 </div>
               </Match>
-              <Match when={!validGDLUser()}>
+              <Match when={!validGDLUser() && !invalidGDLUser()}>
                 <div class="flex gap-2 items-center justify-between">
                   <div class="text-red-400 text-xl">
                     <Trans key="settings:gdl_account_not_synced" />
@@ -355,6 +360,22 @@ const Accounts = () => {
                         )?.username
                       }}
                     />
+                  </Button>
+                </div>
+              </Match>
+              <Match when={invalidGDLUser()}>
+                <div class="flex gap-2 items-center justify-between">
+                  <div class="text-yellow-400 text-xl">
+                    <Trans key="settings:gdl_account_error" />
+                  </div>
+
+                  <Button
+                    type="outline"
+                    onClick={() => {
+                      removeGDLAccountMutation.mutate(undefined);
+                    }}
+                  >
+                    <Trans key="settings:log_out_gdl_account" />
                   </Button>
                 </div>
               </Match>

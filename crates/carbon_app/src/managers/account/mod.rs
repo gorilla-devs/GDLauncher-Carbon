@@ -334,13 +334,15 @@ impl<'s> ManagerRef<'s, AccountManager> {
             bail!("attempted to get an account that does not exist");
         };
 
-        let user = self
+        let Some(user) = self
             .gdl_account_task
             .read()
             .await
             .get_account(id_token)
             .await?
-            .ok_or_else(|| anyhow!("attempted to get an account that does not exist"))?;
+        else {
+            return Ok(GDLAccountStatus::Invalid);
+        };
 
         Ok(GDLAccountStatus::Valid(user))
     }
