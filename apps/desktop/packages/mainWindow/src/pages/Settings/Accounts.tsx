@@ -158,7 +158,7 @@ const Accounts = () => {
     mutationKey: ["account.requestNewVerificationToken"]
   }));
 
-  const deleteAccountMutation = rspc.createMutation(() => ({
+  const removeAccountMutation = rspc.createMutation(() => ({
     mutationKey: ["account.deleteAccount"]
   }));
 
@@ -456,11 +456,30 @@ const Accounts = () => {
                                 <div
                                   class="w-4 h-4 i-ri:delete-bin-2-fill"
                                   onClick={async () => {
+                                    const gdlAccountUuid =
+                                      globalStore.settings.data?.gdlAccountId;
                                     const accountsLength =
                                       globalStore.accounts.data?.length;
-                                    await deleteAccountMutation.mutateAsync(
-                                      (row.original as AccountEntry).uuid
-                                    );
+
+                                    if (
+                                      gdlAccountUuid &&
+                                      gdlAccountUuid ===
+                                        (row.original as AccountEntry).uuid
+                                    ) {
+                                      modalsContext?.openModal(
+                                        {
+                                          name: "confirmMsWithGDLAccountRemoval"
+                                        },
+                                        {
+                                          uuid: (row.original as AccountEntry)
+                                            .uuid
+                                        }
+                                      );
+                                    } else {
+                                      await removeAccountMutation.mutateAsync(
+                                        (row.original as AccountEntry).uuid
+                                      );
+                                    }
 
                                     if (accountsLength === 1) {
                                       navigate("/");

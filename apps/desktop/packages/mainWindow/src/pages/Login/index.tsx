@@ -97,6 +97,10 @@ export default function Login() {
     mutationKey: ["account.requestEmailChange"]
   }));
 
+  const registerGdlAccountMutation = rspc.createMutation(() => ({
+    mutationKey: ["account.registerGdlAccount"]
+  }));
+
   const [isBackButtonVisible, setIsBackButtonVisible] = createSignal(false);
 
   const isGDLAccountSet = () =>
@@ -730,6 +734,13 @@ export default function Login() {
                       setRecoveryEmail(existingGDLUser.email);
                       setStep(Steps.GDLAccountVerification);
                     } else {
+                      await registerGdlAccountMutation.mutateAsync({
+                        email: recoveryEmail()!,
+                        uuid
+                      });
+
+                      await saveGdlAccountMutation.mutateAsync(uuid);
+
                       nextStep();
                     }
                   } catch (e) {

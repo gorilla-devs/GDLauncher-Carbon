@@ -116,6 +116,10 @@ const defaultModals = {
   confirmGDLAccountDeletion: {
     component: lazy(() => import("./modals/ConfirmGDLAccountDeletion")),
     title: "Confirm Account Deletion"
+  },
+  confirmMsWithGDLAccountRemoval: {
+    component: lazy(() => import("./modals/ConfirmMsWithGDLAccountRemoval")),
+    title: "Confirm Account Removal"
   }
 };
 
