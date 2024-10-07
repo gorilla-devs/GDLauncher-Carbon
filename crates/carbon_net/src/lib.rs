@@ -1,17 +1,13 @@
-use md5::digest::generic_array::ArrayLength;
-use md5::digest::OutputSizeUser;
 use md5::Digest as Md5Digest;
 use md5::Md5;
 use reqwest::Client;
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
-use sha1::Digest as Sha1Digest;
 use sha1::Sha1;
-use sha2::{Digest as Sha2Digest, Sha256};
+use sha2::Sha256;
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::fmt::Display;
-use std::ops::Add;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::{
     path::{Path, PathBuf},

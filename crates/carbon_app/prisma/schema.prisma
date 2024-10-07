@@ -27,6 +27,7 @@ model AppConfiguration {
   instancesSortBy                 String    @default("name")
   instancesSortByAsc              Boolean   @default(true)
   showNews                        Boolean   @default(true)
+  showFeatured                    Boolean   @default(true)
   // Other settings
   deletionThroughRecycleBin       Boolean   @default(true)
   gameResolution                  String?

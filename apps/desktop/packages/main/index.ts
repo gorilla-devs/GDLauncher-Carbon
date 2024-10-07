@@ -866,7 +866,7 @@ app.on("open-url", (event, url) => {
 const LOOP_TIMEOUT = 4000;
 
 // keep event loop busy until potato pc mode is set or timeout is reached
-if (!isPotatoPcModeSet) {
+if (!isPotatoPcModeSet && !import.meta.env.DEV) {
   let timeEnd = Date.now();
   while (!isPotatoPcModeSet && timeEnd - timeStart < LOOP_TIMEOUT) {
     timeEnd = Date.now();
