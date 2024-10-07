@@ -31,6 +31,9 @@ import initAutoUpdater from "./autoUpdater";
 import "./appMenu";
 import { FELauncherActionOnGameLaunch } from "@gd/core_module/bindings";
 
+const timeStart = Date.now();
+let isPotatoPcModeSet = false;
+
 export const RUNTIME_PATH_OVERRIDE_NAME = "runtime_path_override";
 const RUNTIME_PATH_DEFAULT_NAME = "data";
 
@@ -179,6 +182,11 @@ if (!disableSentry) {
 }
 
 function maybeDisableGPU(override: boolean) {
+  if (app.isReady()) {
+    console.error("App is ready, cannot disable GPU");
+    return;
+  }
+
   const disableGPU = validateArgument("--disable-gpu") || override;
 
   if (disableGPU) {
@@ -372,6 +380,7 @@ const loadCoreModule: CoreModule = () =>
           const rightPart = row.split(":")[1];
           showAppCloseWarning = rightPart === "true";
         } else if (row.startsWith("_POTATO_PC_MODE_:")) {
+          isPotatoPcModeSet = true;
           const rightPart = row.split(":")[1];
           if (rightPart === "true") {
             maybeDisableGPU(true);
@@ -853,3 +862,16 @@ app.on("render-process-gone", (event, webContents, detailed) => {
 app.on("open-url", (event, url) => {
   dialog.showErrorBox("Welcome Back", `You arrived from: ${url}`);
 });
+
+const LOOP_TIMEOUT = 4000;
+
+// keep event loop busy until potato pc mode is set or timeout is reached
+if (!isPotatoPcModeSet) {
+  let timeEnd = Date.now();
+  while (!isPotatoPcModeSet && timeEnd - timeStart < LOOP_TIMEOUT) {
+    timeEnd = Date.now();
+  }
+
+  // DO NOT REMOVE THIS CONSOLE LOG as V8 optimizes the loop away
+  console.log("First event loop tick done in ", timeEnd - timeStart);
+}
