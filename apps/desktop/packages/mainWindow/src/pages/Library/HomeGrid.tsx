@@ -359,7 +359,7 @@ const HomeGrid = () => {
             <div class="flex items-center gap-4 mt-8 sticky top-0 z-90 py-4 bg-darkSlate-800">
               <Input
                 ref={inputRef}
-                placeholder={t("general.search")}
+                placeholder={t("search_instances")}
                 value={filter()}
                 class="w-full rounded-full"
                 onInput={(e) => setFilter(e.target.value)}
