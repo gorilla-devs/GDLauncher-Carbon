@@ -533,8 +533,6 @@ const HomeGrid = () => {
             <div class="mt-4">
               <For each={instances || []}>
                 {(group, i) => {
-                  // const [parent, setEnabled] = createAutoAnimate();
-
                   return (
                     <Show when={group.instances.length > 0}>
                       <Collapsable
@@ -551,7 +549,6 @@ const HomeGrid = () => {
                         size="standard"
                       >
                         <div
-                          // ref={parent}
                           class="mt-4 flex flex-wrap gap-x-4"
                           classList={{
                             "gap-y-4": instancesTileSize() === 1,
@@ -572,7 +569,7 @@ const HomeGrid = () => {
                                   0
                                 );
 
-                              const baseDelay = 500;
+                              const baseDelay = 300;
 
                               const groupDelay =
                                 i() * 60 + 60 * instancesCountInPreviousGroups;
@@ -607,7 +604,9 @@ const HomeGrid = () => {
                                   i() === instances.length - 1 &&
                                   j() === group.instances.length - 1
                                 ) {
-                                  initAnimationRan = true;
+                                  requestAnimationFrame(() => {
+                                    initAnimationRan = true;
+                                  });
                                 }
                               });
 
