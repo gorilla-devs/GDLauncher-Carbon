@@ -101,6 +101,7 @@ assert2 = { workspace = true }
 tempdir = { workspace = true }
 flowtest = { workspace = true }
 tracing-test = { workspace = true }
+mockito = { workspace = true }
 
 [features]
 production = ["iridium"]

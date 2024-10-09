@@ -566,6 +566,7 @@ dependencies = [
  "jwt",
  "markdown",
  "md-5",
+ "mockito",
  "murmurhash32",
  "nom",
  "num_cpus",

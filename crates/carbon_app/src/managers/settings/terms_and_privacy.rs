@@ -107,16 +107,22 @@ impl TermsAndPrivacy {
         Ok(parse_markdown_document(&response))
     }
 
+    #[tracing::instrument]
     pub async fn get_latest_consent_sha(gdl_base_api: String) -> anyhow::Result<String> {
         let client = crate::iridium_client::get_client(gdl_base_api.clone()).build();
 
         let url = format!("{}/v1/latest_consent_checksum", gdl_base_api);
 
-        let latest_consent_sha = client.get(&url).send().await?.text().await?;
+        let latest_consent_sha = client.get(&url).send().await?;
 
-        tracing::info!("Latest consent sha: {}", latest_consent_sha);
+        if latest_consent_sha.status() != 200 {
+            return Err(anyhow::anyhow!(
+                "Failed to fetch latest consent sha: {}",
+                latest_consent_sha.status()
+            ));
+        }
 
-        Ok(latest_consent_sha)
+        Ok(latest_consent_sha.text().await?)
     }
 }
 

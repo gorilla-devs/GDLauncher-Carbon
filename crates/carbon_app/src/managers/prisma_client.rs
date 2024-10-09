@@ -310,3 +310,186 @@ async fn seed_init_db(db_client: &PrismaClient, gdl_base_api: String) -> Result<
 
     Ok(())
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_migrate_tos_privacy_should_reset_status_200() {
+        let mut server = mockito::Server::new_async().await;
+        let mock_url = server.url();
+
+        let mock = server
+            .mock("GET", "/v1/latest_consent_checksum")
+            .with_status(200)
+            .with_body("1234567890")
+            .expect(1)
+            .create_async()
+            .await;
+
+        let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
+        let temp_path = dunce::canonicalize(temp_dir.into_path()).unwrap();
+
+        let db_client = load_and_migrate(temp_path.clone(), mock_url.to_string())
+            .await
+            .unwrap();
+
+        db_client
+            .app_configuration()
+            .update(
+                db::app_configuration::id::equals(0),
+                vec![
+                    db::app_configuration::terms_and_privacy_accepted_checksum::set(Some(
+                        "something else".to_string(),
+                    )),
+                ],
+            )
+            .exec()
+            .await
+            .unwrap();
+
+        drop(db_client);
+
+        let db_client = load_and_migrate(temp_path, mock_url.to_string())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            db_client
+                .app_configuration()
+                .find_unique(db::app_configuration::id::equals(0))
+                .exec()
+                .await
+                .unwrap()
+                .unwrap()
+                .terms_and_privacy_accepted_checksum,
+            None
+        );
+    }
+
+    #[tokio::test]
+    async fn test_migrate_tos_privacy_should_not_reset_status_500() {
+        let mut server_500 = mockito::Server::new_async().await;
+        let mock_url_500 = server_500.url();
+        let mut server_200 = mockito::Server::new_async().await;
+        let mock_url_200 = server_200.url();
+
+        server_500
+            .mock("GET", "/v1/latest_consent_checksum")
+            .with_status(500)
+            .with_body("1234567890")
+            .expect(1)
+            .create_async()
+            .await;
+
+        server_200
+            .mock("GET", "/v1/latest_consent_checksum")
+            .with_status(200)
+            .with_body("1234567890")
+            .expect(1)
+            .create_async()
+            .await;
+
+        let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
+        let temp_path = dunce::canonicalize(temp_dir.into_path()).unwrap();
+
+        let db_client = load_and_migrate(temp_path.clone(), mock_url_200)
+            .await
+            .unwrap();
+
+        db_client
+            .app_configuration()
+            .update(
+                db::app_configuration::id::equals(0),
+                vec![
+                    db::app_configuration::terms_and_privacy_accepted_checksum::set(Some(
+                        "something else".to_string(),
+                    )),
+                ],
+            )
+            .exec()
+            .await
+            .unwrap();
+
+        drop(db_client);
+
+        // Since it's a 500 we should not reset the status
+        let db_client = load_and_migrate(temp_path, mock_url_500).await.unwrap();
+
+        assert_eq!(
+            db_client
+                .app_configuration()
+                .find_unique(db::app_configuration::id::equals(0))
+                .exec()
+                .await
+                .unwrap()
+                .unwrap()
+                .terms_and_privacy_accepted_checksum,
+            Some("something else".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_metrics_consent_too_old() {
+        let mut server = mockito::Server::new_async().await;
+        let mock_url = server.url();
+
+        let mock = server
+            .mock("GET", "/v1/latest_consent_checksum")
+            .with_status(200)
+            .with_body("1234567890")
+            .expect(1)
+            .create_async()
+            .await;
+
+        let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
+        let temp_path = dunce::canonicalize(temp_dir.into_path()).unwrap();
+
+        let db_client = load_and_migrate(temp_path.clone(), mock_url.to_string())
+            .await
+            .unwrap();
+
+        db_client
+            .app_configuration()
+            .update(
+                db::app_configuration::id::equals(0),
+                vec![db::app_configuration::metrics_enabled_last_update::set(
+                    Some((chrono::Utc::now() - chrono::Duration::days(366)).into()),
+                )],
+            )
+            .exec()
+            .await
+            .unwrap();
+
+        drop(db_client);
+
+        let db_client = load_and_migrate(temp_path, mock_url.to_string())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            db_client
+                .app_configuration()
+                .find_unique(db::app_configuration::id::equals(0))
+                .exec()
+                .await
+                .unwrap()
+                .unwrap()
+                .metrics_enabled,
+            false
+        );
+
+        assert_eq!(
+            db_client
+                .app_configuration()
+                .find_unique(db::app_configuration::id::equals(0))
+                .exec()
+                .await
+                .unwrap()
+                .unwrap()
+                .metrics_enabled_last_update,
+            None
+        );
+    }
+}
