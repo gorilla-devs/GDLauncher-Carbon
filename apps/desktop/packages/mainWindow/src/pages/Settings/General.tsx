@@ -220,19 +220,6 @@ const General = () => {
           </RightHandSide>
         </Row>
         <Row>
-          <Title description={<Trans key="settings:instance_sorting_text" />}>
-            <Trans key="settings:instance_sorting_title" />
-          </Title>
-          <RightHandSide>
-            <Dropdown
-              options={[
-                { label: "Alphabetical", key: "alphabetical" },
-                { label: "Creation Date", key: "creation" }
-              ]}
-            />
-          </RightHandSide>
-        </Row>
-        <Row>
           <Title
             description={
               <Trans
