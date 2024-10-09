@@ -220,22 +220,8 @@ const General = () => {
           </RightHandSide>
         </Row>
         <Row>
-          <Title
-            description={
-              <Trans
-                key="settings:show_news_text"
-                options={{
-                  defaultValue: "Show or hide the news"
-                }}
-              />
-            }
-          >
-            <Trans
-              key="settings:show_news_title"
-              options={{
-                defaultValue: "Show news"
-              }}
-            />
+          <Title description={<Trans key="settings:show_news_text" />}>
+            <Trans key="settings:show_news_title" />
           </Title>
           <RightHandSide>
             <Switch

@@ -42,6 +42,7 @@ type Props = {
   failError?: string;
   onClick?: (_e: MouseEvent) => void;
   size: 1 | 2 | 3 | 4 | 5;
+  shouldSetViewTransition: boolean;
 };
 
 const Tile = (props: Props) => {
@@ -301,10 +302,14 @@ const Tile = (props: Props) => {
                     "h-38 w-38": props.size === 2,
                     "h-20 w-20": props.size === 1
                   }}
-                  style={{
-                    "view-transition-name": `instance-tile-image-container-${props.instance.id}`,
-                    contain: "layout"
-                  }}
+                  style={
+                    props.shouldSetViewTransition
+                      ? {
+                          "view-transition-name": `instance-tile-image-container`,
+                          contain: "layout"
+                        }
+                      : {}
+                  }
                 >
                   <div
                     class="flex justify-center relative items-center rounded-2xl overflow-hidden h-full w-full bg-cover bg-center group-hover:scale-120 transition-all duration-300 ease-in-out"
@@ -315,8 +320,12 @@ const Tile = (props: Props) => {
                       "background-image": props.img
                         ? `url("${props.img}")`
                         : `url("${DefaultImg}")`,
-                      "view-transition-name": `instance-tile-image-${props.instance.id}`,
-                      contain: "layout"
+                      ...(props.shouldSetViewTransition
+                        ? {
+                            "view-transition-name": `instance-tile-image`,
+                            contain: "layout"
+                          }
+                        : {})
                     }}
                   />
                   <Show when={props.isInvalid}>
@@ -330,27 +339,43 @@ const Tile = (props: Props) => {
                   <Show when={props.failError}>
                     <div
                       class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-60 from-30% w-full h-full rounded-2xl"
-                      style={{
-                        "view-transition-name": `instance-tile-1-error-${props.instance.id}`
-                      }}
+                      style={
+                        props.shouldSetViewTransition
+                          ? {
+                              "view-transition-name": `instance-tile-1-error`
+                            }
+                          : {}
+                      }
                     />
                     <div
                       class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-60 w-full h-full rounded-2xl"
-                      style={{
-                        "view-transition-name": `instance-tile-2-error-${props.instance.id}`
-                      }}
+                      style={
+                        props.shouldSetViewTransition
+                          ? {
+                              "view-transition-name": `instance-tile-2-error`
+                            }
+                          : {}
+                      }
                     />
                     <div
                       class="i-ri:alert-fill absolute left-0 right-0 top-0 m-auto z-10 text-4xl text-red-500 bottom-20"
-                      style={{
-                        "view-transition-name": `instance-tile-3-error-${props.instance.id}`
-                      }}
+                      style={
+                        props.shouldSetViewTransition
+                          ? {
+                              "view-transition-name": `instance-tile-3-error`
+                            }
+                          : {}
+                      }
                     />
                     <div
                       class="w-full absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-70 text-center mt-5"
-                      style={{
-                        "view-transition-name": `instance-tile-4-error-${props.instance.id}`
-                      }}
+                      style={
+                        props.shouldSetViewTransition
+                          ? {
+                              "view-transition-name": `instance-tile-4-error`
+                            }
+                          : {}
+                      }
                     >
                       <div class="text-3xl font-bold">
                         <Trans key="error" />
@@ -370,9 +395,13 @@ const Tile = (props: Props) => {
                   >
                     <div
                       class="absolute top-0 left-0 flex flex-col justify-center items-center z-70 w-full h-full gap-2 p-2 box-border opacity-0 animate-enterWithOpacityChange"
-                      style={{
-                        "view-transition-name": `instance-tile-progress-text-${props.instance.id}`
-                      }}
+                      style={
+                        props.shouldSetViewTransition
+                          ? {
+                              "view-transition-name": `instance-tile-progress-text`
+                            }
+                          : {}
+                      }
                     >
                       <h3 class="text-center m-0 text-3xl">
                         {Math.round(props.percentage as number)}%
@@ -414,9 +443,13 @@ const Tile = (props: Props) => {
                   <Show when={validInstance()?.modpack}>
                     <div
                       class="z-20 absolute flex justify-center items-center border-1 border-solid border-darkSlate-600 bg-darkSlate-900 rounded-lg p-2 top-2 right-2"
-                      style={{
-                        "view-transition-name": `instance-tile-modplatform-${props.instance.id}`
-                      }}
+                      style={
+                        props.shouldSetViewTransition
+                          ? {
+                              "view-transition-name": `instance-tile-modplatform`
+                            }
+                          : {}
+                      }
                     >
                       <img
                         class="w-4 h-4"
@@ -431,24 +464,36 @@ const Tile = (props: Props) => {
                   >
                     <div
                       class="absolute top-0 bottom-0 left-0 right-0 backdrop-blur-sm z-11"
-                      style={{
-                        "view-transition-name": `instance-tile-loading-1-${props.instance.id}`,
-                        contain: "layout"
-                      }}
+                      style={
+                        props.shouldSetViewTransition
+                          ? {
+                              "view-transition-name": `instance-tile-loading-1`,
+                              contain: "layout"
+                            }
+                          : {}
+                      }
                     />
                     <div
                       class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-darkSlate-900 opacity-50 from-30% w-full h-full rounded-2xl"
-                      style={{
-                        "view-transition-name": `instance-tile-loading-2-${props.instance.id}`,
-                        contain: "layout"
-                      }}
+                      style={
+                        props.shouldSetViewTransition
+                          ? {
+                              "view-transition-name": `instance-tile-loading-2`,
+                              contain: "layout"
+                            }
+                          : {}
+                      }
                     />
                     <div
                       class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-darkSlate-900 opacity-50 w-full h-full rounded-2xl"
-                      style={{
-                        "view-transition-name": `instance-tile-loading-3-${props.instance.id}`,
-                        contain: "layout"
-                      }}
+                      style={
+                        props.shouldSetViewTransition
+                          ? {
+                              "view-transition-name": `instance-tile-loading-3`,
+                              contain: "layout"
+                            }
+                          : {}
+                      }
                     />
                   </Show>
                   <div
@@ -472,10 +517,14 @@ const Tile = (props: Props) => {
                         !props.isRunning &&
                         !props.isDeleting
                     }}
-                    style={{
-                      "view-transition-name": `instance-tile-play-button-${props.instance.id}`,
-                      contain: "layout"
-                    }}
+                    style={
+                      props.shouldSetViewTransition
+                        ? {
+                            "view-transition-name": `instance-tile-play-button`,
+                            contain: "layout"
+                          }
+                        : {}
+                    }
                     onClick={(e) => {
                       e.stopPropagation();
                       handlePlayClick();
@@ -505,10 +554,14 @@ const Tile = (props: Props) => {
                   "max-w-38": props.size === 2,
                   "max-w-20": props.size === 1
                 }}
-                style={{
-                  "view-transition-name": `instance-tile-title-${props.instance.id}`,
-                  contain: "layout"
-                }}
+                style={
+                  props.shouldSetViewTransition
+                    ? {
+                        "view-transition-name": `instance-tile-title`,
+                        contain: "layout"
+                      }
+                    : {}
+                }
               >
                 <Tooltip
                   content={
@@ -525,10 +578,14 @@ const Tile = (props: Props) => {
                   <div class="flex gap-2 justify-between text-lightGray-900">
                     <span
                       class="flex gap-1"
-                      style={{
-                        "view-transition-name": `instance-tile-modloader-${props.instance.id}`,
-                        contain: "layout"
-                      }}
+                      style={
+                        props.shouldSetViewTransition
+                          ? {
+                              "view-transition-name": `instance-tile-modloader`,
+                              contain: "layout"
+                            }
+                          : {}
+                      }
                     >
                       <Show when={props.modloader}>
                         <img

@@ -449,7 +449,7 @@ const Instance = () => {
                             routeData.instanceDetails.data?.iconRevision
                           )}")`
                         : `url("${DefaultImg}")`,
-                      "view-transition-name": `instance-tile-image-${params.id}`,
+                      "view-transition-name": `instance-tile-image`,
                       contain: "layout"
                     }}
                   />
@@ -482,7 +482,7 @@ const Instance = () => {
                             }
                           }}
                           style={{
-                            "view-transition-name": `instance-tile-title-${params.id}`,
+                            "view-transition-name": `instance-tile-title`,
                             contain: "layout"
                           }}
                         >
@@ -533,7 +533,7 @@ const Instance = () => {
                         <div
                           class="m-0 flex gap-2 items-center min-h-6"
                           style={{
-                            "view-transition-name": `instance-tile-modloader-${params.id}`,
+                            "view-transition-name": `instance-tile-modloader`,
                             contain: "layout"
                           }}
                         >
@@ -585,7 +585,7 @@ const Instance = () => {
                           variant={isRunning() && "red"}
                           loading={isPreparing() !== undefined}
                           style={{
-                            "view-transition-name": `instance-tile-play-button-${params.id}`,
+                            "view-transition-name": `instance-tile-play-button`,
                             contain: "layout"
                           }}
                           onClick={() => {

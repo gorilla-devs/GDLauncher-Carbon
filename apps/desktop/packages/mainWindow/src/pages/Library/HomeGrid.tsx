@@ -565,6 +565,24 @@ const HomeGrid = () => {
                             {(instance, j) => {
                               let ref: HTMLDivElement | undefined;
 
+                              const instancesCountInPreviousGroups = instances
+                                .slice(0, i())
+                                .reduce(
+                                  (acc, group) => acc + group.instances.length,
+                                  0
+                                );
+
+                              const baseDelay = 500;
+
+                              const groupDelay =
+                                i() * 60 + 60 * instancesCountInPreviousGroups;
+
+                              const instanceDelay = j() * 60;
+                              instanceDelay;
+
+                              const totalDelay =
+                                baseDelay + groupDelay + instanceDelay;
+
                               onMount(() => {
                                 if (ref && !initAnimationRan) {
                                   ref.animate(
@@ -578,14 +596,7 @@ const HomeGrid = () => {
                                     ],
                                     {
                                       duration: 250,
-                                      delay:
-                                        500 +
-                                        (j() * 60 +
-                                          i() *
-                                            150 *
-                                            (instances[i() - 1].instances
-                                              .length -
-                                              1)),
+                                      delay: totalDelay,
                                       easing: "linear",
                                       fill: "forwards"
                                     }
@@ -607,6 +618,7 @@ const HomeGrid = () => {
                                 >
                                   <InstanceTile
                                     instance={instance}
+                                    identifier={`${group.id?.toString() || group.name} - ${instance.id}`}
                                     size={instancesTileSize() as any}
                                   />
                                 </div>

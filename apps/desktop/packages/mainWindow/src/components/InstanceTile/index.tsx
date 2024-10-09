@@ -20,9 +20,14 @@ type InstanceDownloadProgress = {
   subTasks: FESubtask[] | undefined;
 };
 
+let [clickedInstanceId, setClickedInstanceId] = createSignal<
+  string | undefined
+>(undefined);
+
 const InstanceTile = (props: {
   instance: ListInstance;
   isSidebarOpened?: boolean;
+  identifier: string;
   selected?: boolean;
   size: 1 | 2 | 3 | 4 | 5;
 }) => {
@@ -121,7 +126,14 @@ const InstanceTile = (props: {
 
   return (
     <Tile
-      onClick={() => navigate(`/library/${props.instance.id}`)}
+      onClick={() => {
+        setClickedInstanceId(props.identifier);
+
+        requestAnimationFrame(() => {
+          navigate(`/library/${props.instance.id}`);
+        });
+      }}
+      shouldSetViewTransition={clickedInstanceId() === props.identifier}
       instance={props.instance}
       modloader={modloader()}
       version={validInstance()?.mc_version}
