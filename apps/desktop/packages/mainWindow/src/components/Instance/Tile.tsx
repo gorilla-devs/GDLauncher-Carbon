@@ -20,6 +20,7 @@ import {
   setPayload
 } from "@/managers/ModalsManager/modals/InstanceExport";
 import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/atoms/ExportCheckboxParent";
+import { setClickedInstanceId } from "../InstanceTile";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
 
@@ -40,6 +41,7 @@ type Props = {
   isDeleting?: boolean;
   subTasks?: FESubtask[] | undefined;
   failError?: string;
+  identifier: string;
   onClick?: (_e: MouseEvent) => void;
   size: 1 | 2 | 3 | 4 | 5;
   shouldSetViewTransition: boolean;
@@ -99,7 +101,10 @@ const Tile = (props: Props) => {
   };
 
   const handleSettings = () => {
-    navigate(`/library/${props.instance.id}/settings`);
+    setClickedInstanceId(props.identifier);
+    requestAnimationFrame(() => {
+      navigate(`/library/${props.instance.id}/settings`);
+    });
   };
 
   const validInstance = () =>

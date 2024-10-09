@@ -20,7 +20,7 @@ type InstanceDownloadProgress = {
   subTasks: FESubtask[] | undefined;
 };
 
-let [clickedInstanceId, setClickedInstanceId] = createSignal<
+export let [clickedInstanceId, setClickedInstanceId] = createSignal<
   string | undefined
 >(undefined);
 
@@ -134,6 +134,7 @@ const InstanceTile = (props: {
         });
       }}
       shouldSetViewTransition={clickedInstanceId() === props.identifier}
+      identifier={props.identifier}
       instance={props.instance}
       modloader={modloader()}
       version={validInstance()?.mc_version}

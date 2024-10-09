@@ -32,6 +32,7 @@ import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { getInstanceImageUrl } from "@/utils/instances";
 import { setInstanceId, instanceId as _instanceId } from "@/utils/browser";
+import { setClickedInstanceId } from "@/components/InstanceTile";
 
 const ModsBrowser = () => {
   const [t] = useTransContext();
@@ -146,6 +147,8 @@ const ModsBrowser = () => {
                   <div class="flex gap-4 z-10 items-center">
                     <Button
                       onClick={() => {
+                        // TODO: pass the proper identifier, but we don't have it here
+                        setClickedInstanceId(undefined);
                         navigate(`/library/${instanceId()}/mods`);
                       }}
                       type="outline"

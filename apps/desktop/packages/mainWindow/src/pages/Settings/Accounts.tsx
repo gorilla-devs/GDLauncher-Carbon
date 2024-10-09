@@ -409,7 +409,7 @@ const Accounts = () => {
                   <For each={headerGroup.headers}>
                     {(header, i) => (
                       <th
-                        class={`font-bold text-lightSlate-900 border-0 border-darkSlate-500 border-solid ${i() !== 0 ? "border-l-1" : ""}`}
+                        class={`text-lightSlate-900 border-0 border-darkSlate-500 border-solid ${i() !== 0 ? "border-l-1" : ""}`}
                       >
                         {header.isPlaceholder
                           ? null
@@ -431,7 +431,7 @@ const Accounts = () => {
                   <For each={row.getVisibleCells()}>
                     {(cell, i) => (
                       <td
-                        class="group/internal text-lightSlate-300 relative p-4 border-0 border-transparent group-hover/external:border-darkSlate-500 border-solid"
+                        class="group/internal text-lightSlate-300 relative py-2 px-4 border-0 border-transparent group-hover/external:border-darkSlate-500 border-solid"
                         classList={{
                           "hover:text-lightSlate-50":
                             cell.column.columnDef.id === "username" ||
