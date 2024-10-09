@@ -95,7 +95,11 @@ const HomeWithSidebar = () => {
                     >
                       {(instance) => (
                         <Suspense fallback={<Skeleton.instance />}>
-                          <InstanceTile size={2} instance={instance} />
+                          <InstanceTile
+                            size={2}
+                            instance={instance}
+                            identifier="" // TODO: pass the proper identifier, but we don't have it here
+                          />
                         </Suspense>
                       )}
                     </For>
@@ -129,7 +133,11 @@ const HomeWithSidebar = () => {
                     >
                       {(instance) => (
                         <Suspense fallback={<Skeleton.instance />}>
-                          <InstanceTile size={2} instance={instance} />
+                          <InstanceTile
+                            size={2}
+                            instance={instance}
+                            identifier="" // TODO: pass the proper identifier, but we don't have it here
+                          />
                         </Suspense>
                       )}
                     </For>

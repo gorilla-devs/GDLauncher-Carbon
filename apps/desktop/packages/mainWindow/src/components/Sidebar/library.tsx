@@ -153,6 +153,7 @@ const Sidebar = () => {
                     <InstanceTile
                       size={2}
                       instance={instance}
+                      identifier="" // TODO: pass the proper identifier, but we don't have it here
                       isSidebarOpened={isSidebarOpened()}
                       selected={instanceId() === instance.id.toString()}
                     />
@@ -189,6 +190,7 @@ const Sidebar = () => {
                       <InstanceTile
                         size={2}
                         instance={instance}
+                        identifier="" // TODO: pass the proper identifier, but we don't have it here
                         isSidebarOpened={isSidebarOpened()}
                         selected={instanceId() === instance.id.toString()}
                       />
