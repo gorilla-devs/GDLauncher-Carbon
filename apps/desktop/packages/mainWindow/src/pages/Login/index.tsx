@@ -248,14 +248,16 @@ export default function Login() {
   });
 
   onMount(async () => {
+    requestAnimationFrame(() => {
+      handleSidebarAnimation();
+    });
+
     const activeUuid = await rspcContext.client.query([
       "account.getActiveUuid"
     ]);
 
-    const settings = await rspcContext.client.query(["settings.getSettings"]);
-
     if (
-      !settings.termsAndPrivacyAccepted ||
+      !globalStore.settings.data?.termsAndPrivacyAccepted ||
       !globalStore.settings.data?.metricsEnabledLastUpdate
     ) {
       setStep(Steps.TermsAndConditions);
@@ -283,10 +285,6 @@ export default function Login() {
     }
 
     return;
-  });
-
-  createEffect(() => {
-    handleSidebarAnimation();
   });
 
   async function handleSidebarAnimation() {
