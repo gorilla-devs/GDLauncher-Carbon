@@ -135,7 +135,7 @@ const RuntimePath = () => {
                 size="small"
                 backgroundColor={
                   isPathValid() === "potentially_valid"
-                    ? "bg-yellow-400"
+                    ? "bg-yellow-900"
                     : undefined
                 }
                 disabled={
