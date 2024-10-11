@@ -1,9 +1,10 @@
 import { ModalProps, useModal } from "..";
 import ModalLayout from "../ModalLayout";
-import { Button } from "@gd/ui";
+import { Button, Progressbar } from "@gd/ui";
 import { Trans } from "@gd/i18n";
 import { Show, createResource } from "solid-js";
 import { Portal } from "solid-js/web";
+import { RTprogress, RTsetProgress } from "@/utils/runtimePathProgress";
 
 const ConfirmChangeRuntimePath = (props: ModalProps) => {
   const modalsContext = useModal();
@@ -53,7 +54,10 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
               disabled={props.data.isChangingRuntimePath()}
               onClick={async () => {
                 props.data.setIsChangingRuntimePath(true);
+
                 await window.changeRuntimePath(props.data.runtimePath);
+                RTsetProgress(undefined);
+
                 props.data.setIsChangingRuntimePath(false);
                 modalsContext?.closeModal();
               }}
@@ -72,6 +76,28 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
             </div>
             <div class="mt-4">
               <Trans key="settings:do_not_close_app" />
+              <div
+                class="mt-4 text-lightSlate-400"
+                classList={{
+                  "opacity-0": RTprogress() === undefined
+                }}
+              >
+                <div>
+                  {RTprogress()?.current} / {RTprogress()?.total}
+                </div>
+                <div>{RTprogress()?.currentName}</div>
+
+                <div class="w-full">
+                  <Progressbar
+                    color="bg-primary-400"
+                    percentage={
+                      RTprogress()
+                        ? (RTprogress()!.current * 100) / RTprogress()!.total
+                        : 0
+                    }
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </Portal>

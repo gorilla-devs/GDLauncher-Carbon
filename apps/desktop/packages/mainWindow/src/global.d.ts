@@ -57,6 +57,9 @@ declare global {
     getInitialRuntimePath: () => Promise<string>;
     getRuntimePath: () => Promise<string>;
     changeRuntimePath: (newPath: string | null) => Promise<void>;
+    changeRuntimePathProgress: (
+      cb: (event: Electron.IpcRendererEvent, ...args: any[]) => void
+    ) => void;
     validateRuntimePath: (newPath: string | null) => Promise<boolean>;
     skipIntroAnimation: boolean;
     closeWindow: () => void;

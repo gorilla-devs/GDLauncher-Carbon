@@ -19,6 +19,7 @@ import path, { join, resolve } from "path";
 import fs from "fs/promises";
 import fss from "fs";
 import fse from "fs-extra";
+import glob from "glob";
 import type { ChildProcessWithoutNullStreams } from "child_process";
 import { spawn } from "child_process";
 import crypto from "crypto";
@@ -670,6 +671,12 @@ ipcMain.handle("getRuntimePath", async () => {
 });
 
 ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
+  type Progress = {
+    currentName: string;
+    current: number;
+    total: number;
+  };
+
   if (newPath === CURRENT_RUNTIME_PATH) {
     return;
   }
@@ -690,17 +697,38 @@ ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
     // No op
   }
 
-  // TODO: Copy with progress
-  await fse.copy(CURRENT_RUNTIME_PATH!, newPath, {
-    overwrite: true,
-    errorOnExist: false
+  const files = await glob("**/*", {
+    cwd: CURRENT_RUNTIME_PATH!,
+    nodir: true,
+    dot: true,
+    stat: false,
+    ignore: ["**/.DS_Store", RUNTIME_PATH_OVERRIDE_NAME]
   });
 
-  await fs.writeFile(runtimeOverridePath, newPath);
+  const total = files.length;
 
-  await fse.remove(CURRENT_RUNTIME_PATH!);
+  for (let i = 0; i < total; i++) {
+    const file = files[i];
 
-  // TODO: with a bit of work we can change the RTPath without actually restarting the app
+    win?.webContents.send("changeRuntimePathProgress", {
+      currentName: path.basename(file),
+      current: i,
+      total
+    } satisfies Progress);
+
+    await fse.copy(
+      path.join(CURRENT_RUNTIME_PATH!, file),
+      path.join(newPath, file),
+      {
+        overwrite: true,
+        errorOnExist: false,
+        recursive: true
+      }
+    );
+  }
+
+  await fse.writeFile(runtimeOverridePath, newPath);
+
   app.relaunch();
   app.exit();
 });
