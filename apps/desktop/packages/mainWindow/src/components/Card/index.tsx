@@ -47,7 +47,7 @@ const Card = (props: Props) => {
         <img src={getIcon(props.icon || "vanilla")} class="h-10 w-10" />
       </div>
       <div>
-        <p class="m-0 text-white font-bold text-xl whitespace-nowrap">
+        <p class="m-0 text-lightSlate-50 font-bold text-xl whitespace-nowrap">
           {mergedProps.text}
         </p>
         <h5 class="m-0 text-darkSlate-50 font-medium uppercase">

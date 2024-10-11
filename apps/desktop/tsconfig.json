@@ -26,9 +26,9 @@
     "./packages/**/*.ts",
     "./packages/**/*.d.ts",
     "./packages/mainWindow/src/env.d.ts",
-    "packages/preload/vite.config.cjs",
-    "./packages/mainWindow/vite.config.cjs",
-    "packages/main/vite.config.cjs"
+    "packages/preload/vite.config.mjs",
+    "packages/mainWindow/vite.config.mjs",
+    "packages/main/vite.config.mjs"
   ],
   "exclude": ["./dist/**/*", "node_modules/**/*"]
 }

@@ -218,6 +218,7 @@ struct FESettings {
     launcher_action_on_game_launch: FELauncherActionOnGameLaunch,
     show_app_close_warning: bool,
     show_news: bool,
+    show_featured: bool,
     instances_sort_by: InstancesSortBy,
     instances_sort_by_asc: bool,
     instances_group_by: InstancesGroupBy,
@@ -238,6 +239,7 @@ struct FESettings {
     metrics_enabled: bool,
     metrics_enabled_last_update: Option<chrono::DateTime<chrono::FixedOffset>>,
     random_user_uuid: String,
+    gdl_account_id: Option<String>,
 }
 
 impl TryFrom<crate::db::app_configuration::Data> for FESettings {
@@ -254,6 +256,7 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             concurrent_downloads: data.concurrent_downloads,
             download_dependencies: data.download_dependencies,
             show_news: data.show_news,
+            show_featured: data.show_featured,
             instances_sort_by: data.instances_sort_by.try_into()?,
             instances_sort_by_asc: data.instances_sort_by_asc,
             instances_group_by: data.instances_group_by.try_into()?,
@@ -297,6 +300,7 @@ impl TryFrom<crate::db::app_configuration::Data> for FESettings {
             metrics_enabled: data.metrics_enabled,
             metrics_enabled_last_update: data.metrics_enabled_last_update,
             random_user_uuid: data.random_user_uuid,
+            gdl_account_id: data.gdl_account_uuid,
         })
     }
 }
@@ -374,6 +378,8 @@ pub struct FESettingsUpdate {
     #[specta(optional)]
     pub show_news: Option<Set<bool>>,
     #[specta(optional)]
+    pub show_featured: Option<Set<bool>>,
+    #[specta(optional)]
     pub xmx: Option<Set<i32>>,
     #[specta(optional)]
     pub xms: Option<Set<i32>>,
@@ -401,4 +407,6 @@ pub struct FESettingsUpdate {
     pub terms_and_privacy_accepted: Option<Set<bool>>,
     #[specta(optional)]
     pub metrics_enabled: Option<Set<bool>>,
+    #[specta(optional)]
+    pub gdl_account_id: Option<Set<Option<String>>>,
 }

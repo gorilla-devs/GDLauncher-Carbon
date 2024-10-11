@@ -1,20 +1,23 @@
 {
   "name": "@gd/i18n",
   "main": "./index.ts",
+  "type": "module",
   "exports": {
     ".": {
-      "import": "./index.ts"
+      "import": "./dist/index.js"
     },
-    "./supportedLanguages.json": {
-      "import": "./supportedLanguages.json",
-      "default": "./supportedLanguages.json"
-    }
+    "./tsconfig.json": "./tsconfig.json"
+  },
+  "scripts": {
+    "dev": "tsc -p . -m esnext",
+    "build": "tsc -p . -m esnext && node noop.js",
+    "lint": "tsc -p . -m esnext --noEmit"
   },
   "devDependencies": {
-    "@mbarzda/solid-i18next": "^1.2.2",
+    "@mbarzda/solid-i18next": "^1.4.1",
     "html-parse-string": "^0.0.9",
-    "i18next": "^23.2.6",
+    "i18next": "^23.13.0",
     "i18next-icu": "^2.3.0",
-    "intl-messageformat": "^10.5.0"
+    "intl-messageformat": "^10.5.14"
   }
 }

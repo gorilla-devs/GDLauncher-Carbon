@@ -32,6 +32,7 @@ import DefaultImg from "/assets/images/default-instance-img.png";
 import { useGDNavigate } from "@/managers/NavigationManager";
 import { getInstanceImageUrl } from "@/utils/instances";
 import { setInstanceId, instanceId as _instanceId } from "@/utils/browser";
+import { setClickedInstanceId } from "@/components/InstanceTile";
 
 const ModsBrowser = () => {
   const [t] = useTransContext();
@@ -146,12 +147,14 @@ const ModsBrowser = () => {
                   <div class="flex gap-4 z-10 items-center">
                     <Button
                       onClick={() => {
+                        // TODO: pass the proper identifier, but we don't have it here
+                        setClickedInstanceId(undefined);
                         navigate(`/library/${instanceId()}/mods`);
                       }}
                       type="outline"
                       size="small"
                       icon={
-                        <i class="text-darkSlate-50 cursor-pointer hover:text-white transition i-ri:arrow-left-s-line transition-colors" />
+                        <i class="text-darkSlate-50 cursor-pointer hover:text-lightSlate-50 transition i-ri:arrow-left-s-line transition-colors" />
                       }
                     >
                       <Trans key="instance.go_to_installed_mods" />
@@ -170,7 +173,7 @@ const ModsBrowser = () => {
                     <h2 class="m-0">{instanceDetails.data?.name}</h2>
                   </div>
                   <i
-                    class="w-5 h-5 i-ri:close-fill text-darkSlate-50 cursor-pointer hover:text-white transition-colors"
+                    class="w-5 h-5 i-ri:close-fill text-darkSlate-50 cursor-pointer hover:text-lightSlate-50 transition-colors"
                     onClick={() => {
                       setSearchParams({
                         instanceId: undefined

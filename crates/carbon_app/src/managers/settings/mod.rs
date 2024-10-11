@@ -23,10 +23,14 @@ pub(crate) struct SettingsManager {
 }
 
 impl SettingsManager {
-    pub fn new(runtime_path: PathBuf, http_client: ClientWithMiddleware) -> Self {
+    pub fn new(
+        runtime_path: PathBuf,
+        http_client: ClientWithMiddleware,
+        gdl_base_api_url: String,
+    ) -> Self {
         Self {
             runtime_path: runtime_path::RuntimePath::new(runtime_path),
-            terms_and_privacy: TermsAndPrivacy::new(http_client),
+            terms_and_privacy: TermsAndPrivacy::new(http_client, gdl_base_api_url),
         }
     }
 }
@@ -148,6 +152,13 @@ impl ManagerRef<'_, SettingsManager> {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
                 vec![app_configuration::show_news::set(show_news.inner())],
+            ));
+        }
+
+        if let Some(show_featured) = incoming_settings.show_featured {
+            queries.push(self.app.prisma_client.app_configuration().update(
+                app_configuration::id::equals(0),
+                vec![app_configuration::show_featured::set(show_featured.inner())],
             ));
         }
 

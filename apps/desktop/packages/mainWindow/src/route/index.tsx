@@ -11,32 +11,41 @@ import ModpackVersionsData from "@/pages/Modpacks/modpack.versions";
 import ModVersionsData from "@/pages/Mods/mods.versions";
 import ModpackScreenshotsData from "@/pages/Modpacks/modpack.screenshots";
 import InstanceData from "@/pages/Library/Instance/instance.data";
-import LibraryData from "@/pages/Library/library.data";
+import Login from "@/pages/Login";
+import withAdsLayout from "@/pages/withAds";
+import Library from "@/pages/Library";
+import Home from "@/pages/Library/Home";
+import Instance from "@/pages/Library/Instance";
+import ModpacksLayout from "@/pages/Modpacks";
+import ModpackBrowser from "@/pages/Modpacks/ModpacksBrowser";
+import ModsBrowser from "@/pages/Mods/ModsBrowser";
+import ModsInfiniteScrollQueryWrapper from "@/pages/Mods/Explore";
+import ModpacksInfiniteScrollQueryWrapper from "@/pages/Modpacks/Explore";
+import ModsLayout from "@/pages/Mods";
 /* Defining the routes for the application. */
 
 export const routes: RouteDefinition[] = [
   {
     path: "/",
-    component: lazy(() => import("@/pages/Login")),
+    component: Login,
     data: LoginData
   },
   {
     path: "/",
-    component: lazy(() => import("@/pages/withAds")),
+    component: withAdsLayout,
     data: AppData,
     children: [
       {
         path: "/library",
-        component: lazy(() => import("@/pages/Library")),
-        data: LibraryData,
+        component: Library,
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Library/Home"))
+            component: Home
           },
           {
             path: "/:id",
-            component: lazy(() => import("@/pages/Library/Instance")),
+            component: Instance,
             data: InstanceData,
             children: [
               {
@@ -87,29 +96,29 @@ export const routes: RouteDefinition[] = [
       },
       {
         path: "/modpacks",
-        component: lazy(() => import("@/pages/Modpacks")),
+        component: ModpacksLayout,
         data: ModpackBrowserData,
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Modpacks/ModpacksBrowser"))
+            component: ModpackBrowser
           }
         ]
       },
       {
         path: "/mods",
-        component: lazy(() => import("@/pages/Mods")),
+        component: ModsLayout,
         data: ModsBrowserData,
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Mods/ModsBrowser"))
+            component: ModsBrowser
           }
         ]
       },
       {
         path: "/mods/:id/:platform",
-        component: lazy(() => import("@/pages/Mods/Explore")),
+        component: ModsInfiniteScrollQueryWrapper,
         data: ModpackData,
         children: [
           {
@@ -134,7 +143,7 @@ export const routes: RouteDefinition[] = [
       },
       {
         path: "/modpacks/:id/:platform",
-        component: lazy(() => import("@/pages/Modpacks/Explore")),
+        component: ModpacksInfiniteScrollQueryWrapper,
         data: ModpackData,
         children: [
           {
@@ -167,6 +176,10 @@ export const routes: RouteDefinition[] = [
           {
             path: "/",
             component: lazy(() => import("@/pages/Settings/General"))
+          },
+          {
+            path: "/accounts",
+            component: lazy(() => import("@/pages/Settings/Accounts"))
           },
           {
             path: "/language",

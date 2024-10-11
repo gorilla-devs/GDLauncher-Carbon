@@ -177,7 +177,7 @@ const SingleEntity = (props: {
             <div class="flex gap-2">
               <Show when={entityDefaultPath.data}>
                 <Tooltip content={<Trans key="tooltip.reset" />}>
-                  <div class="flex items-center justify-center p-2 bg-darkSlate-800 rounded-lg text-darkSlate-50 hover:text-white">
+                  <div class="flex items-center justify-center p-2 bg-darkSlate-800 rounded-lg text-darkSlate-50 hover:text-lightSlate-50">
                     <div
                       onClick={async () => {
                         setPath(entityDefaultPath.data!);
@@ -189,7 +189,7 @@ const SingleEntity = (props: {
               </Show>
               <Show when={props.entity.selection_type === "directory"}>
                 <Tooltip content={<Trans key="instance.select_path" />}>
-                  <div class="flex items-center justify-center p-2 bg-darkSlate-800 rounded-lg text-darkSlate-50 hover:text-white">
+                  <div class="flex items-center justify-center p-2 bg-darkSlate-800 rounded-lg text-darkSlate-50 hover:text-lightSlate-50">
                     <div
                       onClick={async () => {
                         const result = await window.openFileDialog({
@@ -211,7 +211,7 @@ const SingleEntity = (props: {
               </Show>
               <Show when={props.entity.selection_type === "file"}>
                 <Tooltip content={<Trans key="instance.select_zip" />}>
-                  <div class="flex items-center justify-center p-2 bg-darkSlate-800 rounded-lg text-darkSlate-50 hover:text-white">
+                  <div class="flex items-center justify-center p-2 bg-darkSlate-800 rounded-lg text-darkSlate-50 hover:text-lightSlate-50">
                     <div
                       onClick={async () => {
                         const result = await window.openFileDialog({

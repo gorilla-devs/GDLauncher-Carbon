@@ -185,7 +185,7 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use carbon_net::Progress;
+    use carbon_net::{DownloadOptions, Progress};
     use chrono::Utc;
 
     use crate::managers::{
@@ -295,9 +295,12 @@ mod tests {
             .await
             .unwrap();
 
-        carbon_net::download_multiple(&vanilla_files[..], Some(progress.0), 10, true, false)
-            .await
-            .unwrap();
+        carbon_net::download_multiple(
+            &vanilla_files[..],
+            DownloadOptions::builder().concurrency(10).build(),
+        )
+        .await
+        .unwrap();
 
         extract_natives(
             runtime_path,

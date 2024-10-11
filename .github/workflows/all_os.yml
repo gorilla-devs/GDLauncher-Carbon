@@ -18,10 +18,10 @@ jobs:
           path: GDLauncher
       - uses: actions/setup-node@v3
         with:
-          node-version: "18.17.0"
+          node-version: "18.18.0"
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.75.0
+          toolchain: 1.80.0
           targets: aarch64-apple-darwin, x86_64-apple-darwin
           components: clippy, rustfmt
       - name: Prepare
@@ -46,6 +46,8 @@ jobs:
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           GDL_AUTH: ${{ secrets.GDL_AUTH }}
+          CURSEFORGE_API_KEY: "${{ vars.CURSEFORGE_API_KEY }}"
+          CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
       - name: Lint
         run: pnpm lint
       - name: Clear target before tests to avoid folder getting too big
@@ -59,12 +61,15 @@ jobs:
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           GDL_AUTH: ${{ secrets.GDL_AUTH }}
+          CURSEFORGE_API_KEY: "${{ vars.CURSEFORGE_API_KEY }}"
+          CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
         run: pnpm test
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: playwright-report
-          path: apps/desktop/playwright-report
+          name: playwright-report-linux
+          path: ./GDLauncher/apps/desktop/playwright-report/
   ubuntu_x64:
     defaults:
       run:
@@ -77,10 +82,10 @@ jobs:
           path: GDLauncher
       - uses: actions/setup-node@v3
         with:
-          node-version: "18.17.0"
+          node-version: "18.18.0"
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.75.0
+          toolchain: 1.80.0
           targets: x86_64-unknown-linux-gnu
           components: clippy, rustfmt
       - name: Prepare
@@ -105,12 +110,15 @@ jobs:
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           GDL_AUTH: ${{ secrets.GDL_AUTH }}
+          CURSEFORGE_API_KEY: "${{ vars.CURSEFORGE_API_KEY }}"
+          CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
       - name: Lint
         run: pnpm lint
       - name: Clear target before tests to avoid folder getting too big
         run: rm -rf target
       - name: Test
         env:
+          DISPLAY: ":1"
           CARGO_INCREMENTAL: 0
           BASE_API: ${{ vars.BASE_API }}
           MS_AUTH_CLIENT_ID: ${{ vars.MS_AUTH_CLIENT_ID }}
@@ -118,12 +126,21 @@ jobs:
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           GDL_AUTH: ${{ secrets.GDL_AUTH }}
+          CURSEFORGE_API_KEY: "${{ vars.CURSEFORGE_API_KEY }}"
+          CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
         run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test
       - name: Upload Playwright report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: apps/desktop/playwright-report
+          path: ./GDLauncher/apps/desktop/playwright-report/
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-mac
+          path: ./GDLauncher/apps/desktop/playwright-report/
   windows_x64:
     defaults:
       run:
@@ -136,10 +153,10 @@ jobs:
           path: GDLauncher
       - uses: actions/setup-node@v3
         with:
-          node-version: "18.17.0"
+          node-version: "18.18.0"
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.75.0
+          toolchain: 1.80.0
           targets: x86_64-pc-windows-msvc
           components: clippy, rustfmt
       - name: Prepare
@@ -169,6 +186,8 @@ jobs:
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           GDL_AUTH: ${{ secrets.GDL_AUTH }}
+          CURSEFORGE_API_KEY: "${{ vars.CURSEFORGE_API_KEY }}"
+          CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
           CARGO_NET_GIT_FETCH_WITH_CLI: true
       - name: Lint
         shell: bash
@@ -186,10 +205,13 @@ jobs:
           META_BASE_URL: ${{ vars.META_BASE_URL }}
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           GDL_AUTH: ${{ secrets.GDL_AUTH }}
+          CURSEFORGE_API_KEY: "${{ vars.CURSEFORGE_API_KEY }}"
+          CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
           CARGO_NET_GIT_FETCH_WITH_CLI: true
         run: pnpm test
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: playwright-report
-          path: apps/desktop/playwright-report
+          name: playwright-report-win
+          path: ./GDLauncher/apps/desktop/playwright-report/

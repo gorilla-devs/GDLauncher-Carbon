@@ -10,7 +10,13 @@ import {
 import { Spinner } from "../Spinner";
 
 type Size = "small" | "medium" | "large";
-type Type = "primary" | "secondary" | "glow" | "outline" | "transparent";
+type Type =
+  | "primary"
+  | "secondary"
+  | "glow"
+  | "outline"
+  | "transparent"
+  | "text";
 
 interface Props
   extends Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "type"> {
@@ -29,6 +35,7 @@ interface Props
   percentage?: number;
   variant?: string;
   cursor?: string;
+  fullWidth?: boolean;
 }
 
 const getVariant = (
@@ -42,7 +49,8 @@ const getVariant = (
   variant: string,
   cursor: string | undefined,
   textColor?: string,
-  backgroundColor?: string
+  backgroundColor?: string,
+  fullWidth?: boolean
 ) => {
   const isLarge = size === "large";
   const isMedium = size === "medium";
@@ -59,19 +67,20 @@ const getVariant = (
     "duration-100": true,
     "ease-in-out": true,
     "font-main": true,
-    "max-w-max": !isLoading,
+    "max-w-max": !isLoading && !fullWidth,
+    "w-full": fullWidth,
     "font-bold": true,
     flex: true,
     "justify-center": true,
     "items-center": true,
     "gap-2": true,
     relative: true,
-    "py-4 px-8": isLarge && !isLoading && !rounded,
-    "py-3 px-5": isMedium && !isLoading && !rounded,
-    "py-2 px-4": isSmall && !isLoading && !rounded,
-    "p-4": isLarge && !isLoading && rounded,
-    "p-3": isMedium && !isLoading && rounded,
-    "p-2": isSmall && !isLoading && rounded,
+    "py-4 px-8": isLarge && !rounded,
+    "py-3 px-5": isMedium && !rounded,
+    "py-2 px-4": isSmall && !rounded,
+    "p-4": isLarge && rounded,
+    "p-3": isMedium && rounded,
+    "p-2": isSmall && rounded,
     "h-12": isLarge,
     "h-11": isMedium,
     "h-9": isSmall,
@@ -83,7 +92,7 @@ const getVariant = (
     "border-solid": true,
     "scale-x-100": isLoading,
     "p-0": isLoading,
-    "text-white": !isDisabled,
+    "text-lightSlate-50": !isDisabled,
     "flex-row-reverse": iconRight,
   };
 
@@ -93,7 +102,7 @@ const getVariant = (
       [`${
         !isDisabled && !backgroundColor ? `bg-${variant}-500` : "bg-[#1D2028]"
       }`]: true,
-      [`${!isDisabled && !backgroundColor ? `hover:bg-${variant}-300` : ""}`]:
+      [`${!isDisabled && !backgroundColor ? `hover:bg-${variant}-700` : ""}`]:
         true,
       // "filter brightness-75": isDisabled,
       "text-[#404759]": isDisabled,
@@ -111,7 +120,7 @@ const getVariant = (
     outline: {
       ...commonStyle,
       "border-1": true,
-      "text-white": !isDisabled,
+      "text-lightSlate-50": !isDisabled,
       "text-darkSlate-500": isDisabled,
       "border-white": !isDisabled,
       "border-darkSlate-500": isDisabled,
@@ -123,7 +132,7 @@ const getVariant = (
     glow: {
       ...commonStyle,
       [`bg-${variant}-500`]: !isDisabled,
-      [`drop-shadow-[0_0px_12px_var(--${variant}-500)]`]: !isDisabled,
+      [`drop-shadow-[0_0px_12px_rgb(var(--${variant}-500))]`]: !isDisabled,
       "bg-[#404759]": isDisabled,
       "text-[#8A8B8F]": isDisabled,
       "border-0": true,
@@ -137,6 +146,13 @@ const getVariant = (
       "border-transparent": true,
       "hover:border-1": !isDisabled,
       "hover:border-white": !isDisabled,
+    },
+    text: {
+      ...commonStyle,
+      "bg-transparent": true,
+      "text-lightSlate-50": true,
+      "hover:bg-darkSlate-900": true,
+      "border-0": true,
     },
   };
 
@@ -209,7 +225,8 @@ function Button(props: Props) {
           props.variant || "primary",
           props.cursor,
           props.textColor,
-          props.backgroundColor
+          props.backgroundColor,
+          props.fullWidth
         ),
         ...props.classList,
       }}

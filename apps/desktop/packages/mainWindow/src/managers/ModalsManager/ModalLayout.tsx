@@ -46,7 +46,7 @@ const ModalLayout = (props: Props) => {
           <div class="flex items-center justify-between bg-darkSlate-800 px-5 box-border h-12 rounded-t-2xl">
             <h3>{props.title}</h3>
             <div
-              class="h-5 w-5 cursor-pointer text-darkSlate-300 i-ri:close-fill hover:text-lightSlate-100 duration-100 ease-in-out"
+              class="h-5 w-5 text-darkSlate-300 i-ri:close-fill hover:text-lightSlate-100 duration-100 ease-in-out"
               onClick={() => {
                 if (!props.preventClose) {
                   navigate(location.pathname);

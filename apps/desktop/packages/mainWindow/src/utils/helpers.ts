@@ -16,7 +16,7 @@ export const strToMs = (string: string) => {
   return new Date(string)?.getTime();
 };
 
-export const convertSecondsToHumanTime = (seconds: number) => {
+export const convertSecondsToHumanTime = (seconds: number): string => {
   const timeUnits = [
     { name: "year", length: 60 * 60 * 24 * 365 },
     { name: "month", length: 60 * 60 * 24 * 30 },
@@ -28,20 +28,30 @@ export const convertSecondsToHumanTime = (seconds: number) => {
   ];
 
   let remainingSeconds = seconds;
+  let result: string[] = [];
 
-  // Loop over time units
-  for (let i = 0; i < timeUnits.length; i++) {
-    const timeUnit = timeUnits[i];
+  for (const timeUnit of timeUnits) {
     const timeValue = Math.floor(remainingSeconds / timeUnit.length);
 
-    if (timeValue >= 1) {
+    if (timeValue > 0) {
       remainingSeconds = remainingSeconds % timeUnit.length;
       const unit = timeValue > 1 ? timeUnit.name + "s" : timeUnit.name;
-      return `${timeValue} ${unit}`; // Return the largest unit with a value >= 1
+      result.push(`${timeValue} ${unit}`);
     }
   }
 
-  return "0 seconds";
+  if (result.length === 0) {
+    return "0 seconds";
+  }
+
+  if (result.length === 1) {
+    return result[0];
+  } else if (result.length === 2) {
+    return result.join(" and ");
+  } else {
+    const lastPart = result.pop();
+    return result.join(", ") + ", and " + lastPart;
+  }
 };
 
 export const blobToBase64 = (
@@ -91,7 +101,7 @@ export const streamToJson = async function* (
               startIndex + jsonString.length
             );
             startIndex = 0;
-          } catch (err) {
+          } catch (_) {
             // If parsing failed, continue accumulating more strings
             startIndex++;
           }

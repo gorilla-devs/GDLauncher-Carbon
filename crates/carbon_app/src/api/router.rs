@@ -61,5 +61,5 @@ pub(crate) use router;
 pub(crate) use router_rt_helper;
 
 #[derive(Display)]
-#[display(fmt = "endpoint {_0}")]
+#[display("endpoint {_0}")]
 pub struct Endpoint(pub &'static str);

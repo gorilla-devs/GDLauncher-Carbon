@@ -2,28 +2,29 @@
   "name": "@gd/config",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "type": "module",
   "exports": {
     ".": {
-      "require": "./dist/index.js"
+      "import": "./dist/index.js"
     },
     "./tsconfig.json": "./tsconfig.json"
   },
   "scripts": {
-    "dev": "tsc -p . -m commonjs",
-    "build": "tsc -p . -m commonjs && node noop.js",
-    "lint": "tsc -p . -m commonjs --noEmit"
+    "dev": "tsc -p . -m esnext",
+    "build": "tsc -p . -m esnext && node noop.js",
+    "lint": "tsc -p . -m esnext --noEmit"
   },
   "devDependencies": {
     "@gd/i18n": "workspace:*",
     "@iconify/json": "^2.2.82",
-    "@typescript-eslint/eslint-plugin": "^5.59.11",
-    "@unocss/preset-icons": "^0.53.1",
-    "@unocss/preset-wind": "^0.53.1",
-    "eslint": "^8.43.0",
+    "@typescript-eslint/eslint-plugin": "^8.4.0",
+    "@unocss/preset-icons": "^0.62.3",
+    "@unocss/preset-wind": "^0.62.3",
+    "eslint": "^8.31.0",
     "eslint-config-prettier": "^8.8.0",
     "eslint-plugin-prettier": "^4.2.1",
     "typescript": "^5.2.0",
-    "unocss": "^0.53.1",
+    "unocss": "^0.62.3",
     "unocss-preset-scrollbar-hide": "^1.0.1"
   }
 }

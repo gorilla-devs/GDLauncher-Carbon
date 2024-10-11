@@ -7,23 +7,27 @@ module.exports = {
   overrides: [],
   rules: {
     "prettier/prettier": ["error", { endOfLine: "lf", trailingComma: "none" }],
-    "no-unused-vars": [
+    "solid/reactivity": "off",
+    "no-unused-vars": "off",
+    "@typescript-eslint/no-unused-vars": [
       "error",
-      { varsIgnorePattern: "^_", argsIgnorePattern: "^_" }
-    ],
-    "solid/reactivity": "off"
+      {
+        varsIgnorePattern: "^_",
+        argsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_"
+      }
+    ]
   },
   globals: {
     __APP_VERSION__: "readonly"
   },
   parser: "@typescript-eslint/parser",
-  plugins: ["i18next", "solid", "prettier"],
+  plugins: ["@typescript-eslint", "i18next", "solid", "prettier"],
   extends: [
     "eslint:recommended",
     "plugin:solid/typescript",
     "plugin:i18next/recommended",
-    "prettier",
-    "@unocss"
+    "prettier"
   ],
   ignorePatterns: ["dist/**/*", "node_modules/**/*"]
 };

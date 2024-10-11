@@ -71,10 +71,10 @@ const Tab = (_props: Props) => {
           tabsContext?.orientation() === "horizontal",
         "cursor-pointer": !props.noPointer,
         "flex flex-col justify-center": props.noPadding,
-        "text-white": tabsContext?.isSelectedIndex(index()),
-        "text-darkSlate-50": !tabsContext?.isSelectedIndex(index()),
+        "text-lightSlate-50": tabsContext?.isSelectedIndex(index()),
+        "text-lightSlate-800": !tabsContext?.isSelectedIndex(index()),
       }}
-      class="bg-darkSlate-800 hover:text-white flex items-center"
+      class="bg-darkSlate-800 hover:text-lightSlate-50 flex items-center"
       ref={(el) => {
         ref = el;
       }}
@@ -87,7 +87,7 @@ const Tab = (_props: Props) => {
       <Switch>
         <Match when={tabsContext?.variant() === "underline"}>
           <div
-            class={`hover:text-white transition-colors font-500 capitalize flex items-center h-full ${
+            class={`hover:text-lightSlate-50 transition-colors font-500 capitalize flex items-center h-full ${
               tabsContext?.paddingX?.() || ""
             } ${tabsContext?.paddingY?.() || ""}`}
             classList={{
@@ -107,7 +107,7 @@ const Tab = (_props: Props) => {
         </Match>
         <Match when={tabsContext?.variant() === "block"}>
           <div
-            class={`flex gap-1 hover:text-white justify-center items-center flex-1 h-full cursor-pointer rounded-xl font-500 capitalize box-border ${
+            class={`flex gap-1 hover:text-lightSlate-50 justify-center items-center flex-1 h-full cursor-pointer rounded-xl font-500 capitalize box-border ${
               tabsContext?.paddingX?.() || ""
             } ${tabsContext?.paddingY?.() || ""}`}
             classList={{
@@ -123,9 +123,8 @@ const Tab = (_props: Props) => {
               "py-2":
                 tabsContext?.orientation() === "vertical" &&
                 !tabsContext?.paddingY?.(),
-              "text-white bg-darkSlate-800": tabsContext?.isSelectedIndex(
-                index()
-              ),
+              "text-lightSlate-50 bg-darkSlate-800":
+                tabsContext?.isSelectedIndex(index()),
               "text-darkSlate-50": !tabsContext?.isSelectedIndex(index()),
             }}
           >
@@ -134,13 +133,13 @@ const Tab = (_props: Props) => {
         </Match>
         <Match when={tabsContext?.variant() === "traditional"}>
           <div
-            class={`flex gap-1 hover:text-white justify-center items-center bg-darkSlate-800 flex-1 h-full font-500 capitalize box-border rounded-t-xl ${
+            class={`flex gap-1 hover:text-lightSlate-50 justify-center items-center bg-darkSlate-800 flex-1 h-full font-500 capitalize box-border rounded-t-xl ${
               tabsContext?.paddingX?.() || ""
             } ${tabsContext?.paddingY?.() || ""}`}
             classList={{
               "px-2": !tabsContext?.paddingX?.(),
-              "text-white": tabsContext?.isSelectedIndex(index()),
-              "text-darkSlate-50": !tabsContext?.isSelectedIndex(index()),
+              "text-lightSlate-50": tabsContext?.isSelectedIndex(index()),
+              "text-lightSlate-800": !tabsContext?.isSelectedIndex(index()),
               "bg-darkSlate-700": tabsContext?.isSelectedIndex(index()),
             }}
           >

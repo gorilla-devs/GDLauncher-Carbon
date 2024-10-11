@@ -64,14 +64,16 @@ interface DropDownButtonProps {
 }
 
 const Dropdown = (props: Props) => {
-  const defaultValue = () =>
-    props.options?.find((option) => option.key === props.value) ||
-    props.options?.[0];
+  const incomingSelectedValue = () =>
+    props.value
+      ? props.options?.find((option) => option.key === props.value)
+      : props.options[0];
 
-  const [selectedValue, setSelectedValue] = createSignal<Option>(
+  const [selectedValue, setSelectedValue] = createSignal<Option | undefined>(
     // eslint-disable-next-line solid/reactivity
-    defaultValue() || props.placeholder
+    incomingSelectedValue()
   );
+
   const [menuOpened, setMenuOpened] = createSignal(false);
   const [focusIn, setFocusIn] = createSignal(false);
   const [buttonRef, setButtonRef] = createSignal<
@@ -80,7 +82,7 @@ const Dropdown = (props: Props) => {
   const [menuRef, setMenuRef] = createSignal<HTMLUListElement | undefined>();
 
   createEffect(() => {
-    setSelectedValue(defaultValue());
+    setSelectedValue(incomingSelectedValue());
   });
 
   const toggleMenu = () => {
@@ -109,7 +111,7 @@ const Dropdown = (props: Props) => {
   createEffect(() => {
     if (menuOpened() && menuRef() && selectedValue()) {
       const selectedOptionIndex = props.options.findIndex(
-        (option) => option.key === selectedValue().key
+        (option) => option.key === selectedValue()?.key
       );
 
       if (selectedOptionIndex !== -1) {
@@ -155,7 +157,7 @@ const Dropdown = (props: Props) => {
           classList={{
             "border-0": !props.error,
             "border-2 border-solid border-red-500": !!props.error,
-            "text-darkSlate-50 hover:text-white":
+            "text-darkSlate-50 hover:text-lightSlate-50":
               !props.disabled && !props.error && !props.textColorClass,
             "text-darkSlate-500": !!props.error && !props.textColorClass,
             "rounded-full": props.rounded,
@@ -179,8 +181,8 @@ const Dropdown = (props: Props) => {
             <div
               class="w-[calc(100%-2rem)] flex justify-between"
               classList={{
-                "text-white": !!props.error,
-                "text-darkSlate-50 hover:text-white group-hover:text-white":
+                "text-lightSlate-50": !!props.error,
+                "text-darkSlate-50 hover:text-lightSlate-50 group-hover:text-lightSlate-50":
                   !props.disabled && !props.error && !props.textColorClass,
                 "text-darkSlate-500":
                   props.disabled && !props.textColorClass && !props.btnDropdown,
@@ -192,12 +194,12 @@ const Dropdown = (props: Props) => {
           <div
             class="i-ri:arrow-drop-down-line w-8 h-8 ease-in-out duration-100"
             classList={{
-              "text-darkSlate-50 group-hover:text-white":
+              "text-darkSlate-50 group-hover:text-lightSlate-50":
                 !props.disabled &&
                 !props.error &&
                 !props.btnDropdown &&
                 !props.textColorClass,
-              "text-white":
+              "text-lightSlate-50":
                 !!props.error ||
                 (props.btnDropdown && !props.textColorClass && !props.disabled),
               "text-darkSlate-500": props.disabled,
@@ -227,8 +229,8 @@ const Dropdown = (props: Props) => {
                   <li
                     class="first:rounded-t last:rounded-b hover:bg-darkSlate-800 py-2 px-4 block break-all text-darkSlate-50 no-underline w-full box-border"
                     classList={{
-                      "bg-darkSlate-700": selectedValue().key !== option.key,
-                      "bg-darkSlate-800": selectedValue().key === option.key,
+                      "bg-darkSlate-700": selectedValue()?.key !== option.key,
+                      "bg-darkSlate-800": selectedValue()?.key === option.key,
                     }}
                     onClick={(e) => {
                       e.preventDefault();

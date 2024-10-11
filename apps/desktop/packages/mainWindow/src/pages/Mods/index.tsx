@@ -3,7 +3,7 @@ import { Outlet } from "@solidjs/router";
 import ContentWrapper from "@/components/ModpackBrowserWrapper";
 import InfiniteScrollModsLayout from "@/components/InfiniteScrollModsQueryWrapper";
 
-function ModpacksLayout() {
+function ModsLayout() {
   return (
     <div class="flex w-full h-full">
       <InfiniteScrollModsLayout type="mod">
@@ -18,4 +18,4 @@ function ModpacksLayout() {
   );
 }
 
-export default ModpacksLayout;
+export default ModsLayout;

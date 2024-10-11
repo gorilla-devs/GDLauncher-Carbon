@@ -1,7 +1,6 @@
 import { Trans } from "@gd/i18n";
 import { Checkbox } from "@gd/ui";
 import { For, Show, createEffect } from "solid-js";
-import screenshot1 from "/assets/images/screenshot-1.jpg";
 import pictureImage from "/assets/images/icons/picture.png";
 import { createStore } from "solid-js/store";
 import { format } from "date-fns";
@@ -12,30 +11,30 @@ type ScreenshotsType = {
 };
 
 const screenshots: ScreenshotsType[] = [
-  {
-    img: screenshot1,
-    date: "2023-01-31T09:20:53.513Z"
-  },
-  {
-    img: screenshot1,
-    date: "2023-01-31T09:20:53.513Z"
-  },
-  {
-    img: screenshot1,
-    date: "2023-01-28T09:20:53.513Z"
-  },
-  {
-    img: screenshot1,
-    date: "2023-01-29T09:20:53.513Z"
-  },
-  {
-    img: screenshot1,
-    date: "2023-01-30T09:20:53.513Z"
-  },
-  {
-    img: screenshot1,
-    date: "2023-01-29T09:20:53.513Z"
-  }
+  // {
+  //   img: screenshot1,
+  //   date: "2023-01-31T09:20:53.513Z"
+  // },
+  // {
+  //   img: screenshot1,
+  //   date: "2023-01-31T09:20:53.513Z"
+  // },
+  // {
+  //   img: screenshot1,
+  //   date: "2023-01-28T09:20:53.513Z"
+  // },
+  // {
+  //   img: screenshot1,
+  //   date: "2023-01-29T09:20:53.513Z"
+  // },
+  // {
+  //   img: screenshot1,
+  //   date: "2023-01-30T09:20:53.513Z"
+  // },
+  // {
+  //   img: screenshot1,
+  //   date: "2023-01-29T09:20:53.513Z"
+  // }
 ];
 
 const NoMods = () => {
@@ -128,7 +127,7 @@ const Screenshots = () => {
                 }}
               />
             </div>
-            <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
+            <div class="flex items-center gap-2 cursor-pointer hover:text-lightSlate-50 transition duration-100 ease-in-out">
               <span class="i-ri:folder-open-fill text-2xl" />
               <Trans
                 key="instance.open_screenshots_folder"
@@ -137,7 +136,7 @@ const Screenshots = () => {
                 }}
               />
             </div>
-            <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
+            <div class="flex items-center gap-2 cursor-pointer hover:text-lightSlate-50 transition duration-100 ease-in-out">
               <span class="i-ri:forbid-line text-2xl" />
               <Trans
                 key="instance.disable_screenshot"
@@ -146,7 +145,7 @@ const Screenshots = () => {
                 }}
               />
             </div>
-            <div class="flex items-center gap-2 cursor-pointer hover:text-white transition duration-100 ease-in-out">
+            <div class="flex items-center gap-2 cursor-pointer hover:text-lightSlate-50 transition duration-100 ease-in-out">
               <span class="i-ri:delete-bin-2-fill text-2xl" />
               <Trans
                 key="instance.delete_screenshot"

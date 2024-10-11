@@ -11,15 +11,15 @@ pub struct ModplatformsManager {
 }
 
 impl ModplatformsManager {
-    pub fn new(unsafeappref: UnsafeAppRef) -> Self {
+    pub fn new(unsafeappref: UnsafeAppRef, gdl_base_api: String) -> Self {
         Self {
             curseforge: curseforge::CurseForge::new(cache_middleware::new_client(
                 unsafeappref.clone(),
-                get_client(),
+                get_client(gdl_base_api.clone()),
             )),
             modrinth: modrinth::Modrinth::new(cache_middleware::new_client(
                 unsafeappref,
-                get_client(),
+                get_client(gdl_base_api),
             )),
         }
     }

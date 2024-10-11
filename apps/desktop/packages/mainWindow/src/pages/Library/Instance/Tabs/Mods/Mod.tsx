@@ -482,12 +482,12 @@ const Mod = (props: Props) => {
               noTip
               onOpen={() => setIsHoveringInfoCard(true)}
               onClose={() => setIsHoveringInfoCard(false)}
-              content={
+              content={() => (
                 <div
                   class="p-4 text-darkSlate-100 bg-darkSlate-900 rounded-lg border-darkSlate-700 border-solid border-1 shadow-md shadow-darkSlate-90 w-110"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div class="text-xl text-white font-bold mb-4">
+                  <div class="text-xl text-lightSlate-50 font-bold mb-4">
                     <Trans
                       key="instance.mods_technical_info_for"
                       options={{
@@ -516,7 +516,7 @@ const Mod = (props: Props) => {
                     </div>
 
                     <Show when={props.mod.metadata}>
-                      <div class="text-xl text-white mt-4">
+                      <div class="text-xl text-lightSlate-50 mt-4">
                         <Trans key="instance.local_metadata" />
                       </div>
                       <div class="flex justify-between w-full text-sm">
@@ -585,7 +585,7 @@ const Mod = (props: Props) => {
 
                     <Show when={props.mod.curseforge}>
                       <div class="flex items-center justify-between text-xl mt-4">
-                        <div class="flex items-center text-white">
+                        <div class="flex items-center text-lightSlate-50">
                           <Trans key="instance.curseforge" />
                           <img src={CurseforgeLogo} class="w-4 h-4 ml-2" />
                         </div>
@@ -638,7 +638,7 @@ const Mod = (props: Props) => {
 
                     <Show when={props.mod.modrinth}>
                       <div class="flex items-center justify-between text-xl mt-4">
-                        <div class="flex items-center text-white">
+                        <div class="flex items-center text-lightSlate-50">
                           <Trans key="instance.modrinth" />
                           <img src={ModrinthLogo} class="w-4 h-4 ml-2" />
                         </div>
@@ -688,15 +688,15 @@ const Mod = (props: Props) => {
                     </Show>
                   </div>
                 </div>
-              }
+              )}
               trigger="click"
               placement="left-end"
               color="bg-darkSlate-900"
             >
               <div
-                class="text-2xl text-darkSlate-500 duration-100 ease-in-out cursor-pointer i-ri:information-fill transition-color hover:text-white"
+                class="text-2xl text-darkSlate-500 duration-100 ease-in-out cursor-pointer i-ri:information-fill transition-color hover:text-lightSlate-50"
                 classList={{
-                  "text-white": isHoveringInfoCard()
+                  "text-lightSlate-50": isHoveringInfoCard()
                 }}
               />
             </Popover>
@@ -708,14 +708,14 @@ const Mod = (props: Props) => {
               onOpen={() => setIsHoveringOptionsCard(true)}
               onClose={() => setIsHoveringOptionsCard(false)}
               trigger="click"
-              content={
+              content={() => (
                 <>
                   <Show when={!props.isInstanceLocked}>
                     <div
                       class="flex flex-col text-darkSlate-100 bg-darkSlate-900 rounded-lg border-darkSlate-700 border-solid border-1 shadow-md shadow-darkSlate-90"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <div class="p-4 text-md text-white font-bold max-w-50 truncate whitespace-nowrap">
+                      <div class="p-4 text-md text-lightSlate-50 font-bold max-w-50 truncate whitespace-nowrap">
                         {props.mod.curseforge?.name ||
                           props.mod.metadata?.name ||
                           props.mod.filename}
@@ -764,14 +764,14 @@ const Mod = (props: Props) => {
                     <Trans key="instance.locked_cannot_apply_changes" />
                   </Show>
                 </>
-              }
+              )}
               placement="left-end"
               color="bg-darkSlate-900"
             >
               <div
-                class="text-2xl text-darkSlate-500 duration-100 ease-in-out cursor-pointer transition-color hover:text-white i-ri:more-2-fill"
+                class="text-2xl text-darkSlate-500 duration-100 ease-in-out cursor-pointer transition-color hover:text-lightSlate-50 i-ri:more-2-fill"
                 classList={{
-                  "text-white": isHoveringOptionsCard()
+                  "text-lightSlate-50": isHoveringOptionsCard()
                 }}
               />
             </Popover>

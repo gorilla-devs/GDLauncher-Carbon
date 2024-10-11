@@ -27,9 +27,8 @@ pub mod download;
 pub mod instance;
 pub mod java;
 mod metadata;
-mod metrics;
 mod minecraft;
-mod modplatforms;
+pub mod modplatforms;
 mod prisma_client;
 pub mod rich_presence;
 mod settings;
@@ -44,17 +43,20 @@ pub enum AppError {
     ManagerNotFound(String),
 }
 
-pub const GDL_API_BASE: &str = env!("BASE_API");
-
 mod app {
     use sentry::capture_error;
     use tracing::error;
 
     use crate::{cache_middleware, domain, iridium_client::get_client};
 
+    use self::java::{
+        discovery::{Discovery, RealDiscovery},
+        java_checker::RealJavaChecker,
+    };
+
     use super::{
-        java::JavaManager, metadata::cache::MetaCacheManager, metrics::MetricsManager,
-        modplatforms::ModplatformsManager, system_info::SystemInfoManager, *,
+        java::JavaManager, metadata::cache::MetaCacheManager, modplatforms::ModplatformsManager,
+        system_info::SystemInfoManager, *,
     };
 
     pub struct AppInner {
@@ -66,7 +68,6 @@ mod app {
         download_manager: DownloadManager,
         pub(crate) instance_manager: InstanceManager,
         meta_cache_manager: MetaCacheManager,
-        pub(crate) metrics_manager: MetricsManager,
         pub(crate) modplatforms_manager: ModplatformsManager,
         pub(crate) reqwest_client: reqwest_middleware::ClientWithMiddleware,
         pub(crate) prisma_client: Arc<PrismaClient>,
@@ -90,36 +91,41 @@ mod app {
         pub async fn new(
             invalidation_channel: broadcast::Sender<InvalidationEvent>,
             runtime_path: PathBuf,
+            gdl_base_api: String,
         ) -> App {
-            let db_client = match prisma_client::load_and_migrate(runtime_path.clone()).await {
-                Ok(client) => Arc::new(client),
-                Err(e) => {
-                    error!("Database migration failed: {}", e);
-                    panic!("Database migration failed: {}", e);
-                }
-            };
+            let db_client =
+                match prisma_client::load_and_migrate(runtime_path.clone(), gdl_base_api.clone())
+                    .await
+                {
+                    Ok(client) => Arc::new(client),
+                    Err(e) => {
+                        error!("Database migration failed: {}", e);
+                        panic!("Database migration failed: {}", e);
+                    }
+                };
 
             let app = Arc::new(UnsafeCell::new(MaybeUninit::<AppInner>::uninit()));
             let unsaferef = UnsafeAppRef(Arc::downgrade(&app));
 
-            let http_client = cache_middleware::new_client(unsaferef.clone(), get_client());
+            let http_client =
+                cache_middleware::new_client(unsaferef.clone(), get_client(gdl_base_api.clone()));
 
             let app = unsafe {
                 let inner = Arc::into_raw(app);
 
                 (*inner).get().write(MaybeUninit::new(AppInner {
-                    settings_manager: SettingsManager::new(runtime_path, http_client.clone()),
+                    settings_manager: SettingsManager::new(
+                        runtime_path,
+                        http_client.clone(),
+                        gdl_base_api.clone(),
+                    ),
                     java_manager: JavaManager::new(),
                     minecraft_manager: MinecraftManager::new(),
-                    account_manager: AccountManager::new(),
-                    modplatforms_manager: ModplatformsManager::new(unsaferef),
+                    account_manager: AccountManager::new(http_client.clone(), gdl_base_api.clone()),
+                    modplatforms_manager: ModplatformsManager::new(unsaferef, gdl_base_api.clone()),
                     download_manager: DownloadManager::new(),
                     instance_manager: InstanceManager::new(),
                     meta_cache_manager: MetaCacheManager::new(),
-                    metrics_manager: MetricsManager::new(
-                        Arc::clone(&db_client),
-                        http_client.clone(),
-                    ),
                     invalidation_channel,
                     reqwest_client: http_client.clone(),
                     prisma_client: Arc::clone(&db_client),
@@ -152,6 +158,7 @@ mod app {
                     Ok(settings) => {
                         let show_app_close_warning = settings.show_app_close_warning;
                         println!("_SHOW_APP_CLOSE_WARNING_:{}", show_app_close_warning);
+                        println!("_POTATO_PC_MODE_:{}", settings.reduced_motion);
                     }
                     Err(e) => {
                         error!("Error getting settings: {e}");
@@ -168,19 +175,14 @@ mod app {
             let http_client = http_client.clone();
             tokio::spawn(async move {
                 let _ = http_client
-                    .get(format!("{}/v1/announcement", GDL_API_BASE))
+                    .get(format!("{}/v1/announcement", gdl_base_api))
                     .send()
-                    .await;
-                let _ = _app
-                    .metrics_manager()
-                    .track_event(domain::metrics::Event::LauncherStarted)
                     .await;
             });
 
             app
         }
 
-        manager_getter!(metrics_manager: MetricsManager);
         manager_getter!(modplatforms_manager: ModplatformsManager);
         manager_getter!(settings_manager: SettingsManager);
         manager_getter!(java_manager: JavaManager);

@@ -1,3 +1,4 @@
+import { useGlobalStore } from "@/components/GlobalStoreContext";
 import {
   getInstanceIdFromPath,
   isLibraryPath,
@@ -19,9 +20,21 @@ export const [lastPathVisited, setLastPathVisited] = createSignal("/");
 
 export const NavigationManager = (props: { children: JSX.Element }) => {
   const navigate = useNavigate();
+  const globalstore = useGlobalStore();
+
+  const shouldTransition = () =>
+    !globalstore.settings.data?.reducedMotion &&
+    (document as any).startViewTransition;
+
   const manager = (path: string | number, options?: NavigateOptions) => {
     if (typeof path == "number") {
-      navigate(path);
+      if (shouldTransition()) {
+        (document as any).startViewTransition(() => {
+          navigate(path);
+        });
+      } else {
+        navigate(path);
+      }
       return;
     }
 
@@ -32,10 +45,22 @@ export const NavigationManager = (props: { children: JSX.Element }) => {
       if (instanceId === undefined) return;
       const route = `/library/${instanceId as string}/${parameters || ""}`;
       setLastPathVisited(route);
-      navigate(route);
+      if (shouldTransition()) {
+        (document as any).startViewTransition(() => {
+          navigate(route);
+        });
+      } else {
+        navigate(route);
+      }
     } else {
       setLastPathVisited(path);
-      navigate(path, { replace: options?.replace });
+      if (shouldTransition()) {
+        (document as any).startViewTransition(() => {
+          navigate(path, { replace: options?.replace });
+        });
+      } else {
+        navigate(path, { replace: options?.replace });
+      }
     }
   };
 

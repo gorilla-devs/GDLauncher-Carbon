@@ -1,5 +1,5 @@
 import { loadLanguageFiles, useTransContext } from "@gd/i18n";
-import { queryClient, rspc } from "./rspcClient";
+import { rspc } from "./rspcClient";
 
 /**
  * Change the language of the app
@@ -20,10 +20,7 @@ export default async function changeLanguage(lang: string) {
   const [_, { changeLanguage, addResources }] = useTransContext();
 
   const settingsMutation = rspc.createMutation(() => ({
-    mutationKey: ["settings.setSettings"],
-    onMutate: (newSettings) => {
-      queryClient.setQueryData(["settings.getSettings"], newSettings);
-    }
+    mutationKey: ["settings.setSettings"]
   }));
 
   const resources = await loadLanguageFiles(lang);

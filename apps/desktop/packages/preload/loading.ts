@@ -38,14 +38,14 @@ function useLoading() {
       let fontSize = isString ? "1.3rem" : "1rem";
 
       const errorText = `
-      <div style="font-size: ${fontSize}; font-weight: 300; background: var(--darkSlate-900); height: 40%; overflow-y: auto; padding: 16px; text-align: left; margin: 16px; border-radius: 8px; overflow-wrap: break-word;">
+      <div style="font-size: ${fontSize}; font-weight: 300; background: rgb(var(--darkSlate-900)); height: 40%; overflow-y: auto; padding: 16px; text-align: left; margin: 16px; border-radius: 8px; overflow-wrap: break-word;">
         ${error}
       </div>`;
 
       oDiv.innerHTML = `
       <div>
         <div style="margin-top: 2rem;">
-          <span style="color: var(--primary-400); font-weight: 800;">GDLauncher</span> couldn't launch
+          <span style="color: rgb(var(--primary-400)); font-weight: 800;">GDLauncher</span> couldn't launch
         </div>
         <div style="font-size: 1rem; margin-top: 16px; margin-bottom: 16px; display: flex; justify-content: center; gap: 2rem;">
           <div>Cannot load module "${moduleName}"</div>

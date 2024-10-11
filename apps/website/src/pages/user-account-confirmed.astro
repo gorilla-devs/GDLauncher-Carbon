@@ -1,0 +1,57 @@
+---
+import BaseHead from "../components/BaseHead.astro";
+import Footer from "../components/Footer.astro";
+import "@fontsource/ubuntu";
+import { SITE_DESCRIPTION } from "../consts";
+import "../styles/HomeStyle.css";
+import Header from "../components/Header.astro";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <BaseHead
+      title={"GDLauncher Account Confirmed"}
+      description={SITE_DESCRIPTION}
+    />
+    <style>
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        font-family: "Ubuntu", sans-serif;
+        background-color: rgba(29, 32, 40, 1);
+        overflow-x: hidden;
+      }
+      .background {
+        background-image: linear-gradient(
+            rgba(23, 29, 39, 0.3),
+            rgba(23, 29, 39, 0.3)
+          ),
+          url("../assets/bg.svg");
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-color: rgba(29, 32, 40, 1);
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="min-h-screen background flex flex-col relative">
+      <Header />
+
+      <div
+        class="w-full flex flex-col gap-8 justify-center items-center text-lightSlate-50 p-24"
+      >
+        <div class="font-bold text-3xl">
+          Your GDLauncher account has been successfully verified!
+        </div>
+        <div class="text-lg">
+          You can now close this window and return to the launcher.
+        </div>
+      </div>
+    </div>
+
+    <Footer />
+  </body>
+</html>

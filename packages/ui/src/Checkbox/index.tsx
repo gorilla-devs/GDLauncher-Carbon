@@ -19,13 +19,13 @@ function Checkbox(props: Props) {
 
   const getBackgroundColor = () => {
     if (!checked() && props.indeterminate) {
-      return "rgba(209, 213, 219, 0.2)"; // bg-light-300 with 20% opacity
+      return "bg-light-300/20";
     } else if (checked() && !props.disabled) {
-      return "rgba(43, 107, 177, 1.0)"; // bg-primary-500 with 100% opacity
+      return "bg-primary-500";
     } else if (!checked()) {
-      return "rgba(64, 71, 89, 1.0)"; // bg-darkSlate-500 with 100% opacity
+      return "bg-darkSlate-500";
     }
-    return "hsla(224, 16%, 10%, 1)"; // bg-darkSlate-900 with 100% opacity
+    return "bg-darkSlate-900";
   };
 
   return (
@@ -46,16 +46,13 @@ function Checkbox(props: Props) {
           isHovered() && !props.disabled
             ? "border-darkSlate-300 border-solid border"
             : ""
-        }`}
-        style={{
-          "background-color": getBackgroundColor(),
-        }}
+        } ${getBackgroundColor()}`}
       >
         <Show when={checked()}>
           <div
-            class="i-ri:check-line text-white animate-bounce-scale"
+            class="i-ri:check-line text-lightSlate-50 animate-bounce-scale"
             classList={{
-              "text-white": !props.disabled,
+              "text-lightSlate-50": !props.disabled,
               "text-darkSlate-500": props.disabled,
             }}
           />

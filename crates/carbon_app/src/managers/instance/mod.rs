@@ -1,14 +1,19 @@
-use std::collections::HashSet;
-use std::ffi::{OsStr, OsString};
-use std::fmt::Display;
-
-use std::sync::Arc;
-use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
-
+use self::export::InstanceExportManager;
+use self::importer::InstanceImportManager;
+use self::log::GameLog;
+use self::run::{LaunchState, PersistenceManager};
+use super::metadata::cache;
+use super::modplatforms::curseforge::CurseForge;
+use super::vtask::{TaskState, VisualTask};
+use super::ManagerRef;
 use crate::api::keys::instance::*;
 use crate::api::translation::Translation;
 use crate::db::read_filters::StringFilter;
+use crate::db::{self, read_filters::IntFilter};
 use crate::domain::instance::info::{GameVersion, InstanceIcon, Modpack};
+use crate::domain::instance::{
+    self as domain, GameLogId, GroupId, InstanceFolder, InstanceId, InstanceModpackInfo,
+};
 use crate::domain::java::{SystemJavaProfileName, SYSTEM_JAVA_PROFILE_NAME_PREFIX};
 use crate::domain::modplatforms::curseforge::filters::{ModFileParameters, ModParameters};
 use crate::domain::modplatforms::modrinth::search::{ProjectID, VersionID};
@@ -20,35 +25,28 @@ use anyhow::bail;
 use anyhow::{anyhow, Context};
 use chrono::{DateTime, Utc};
 use daedalus::minecraft::MinecraftJavaProfile;
+use db::instance::Data as CachedInstance;
+use domain::info;
 use fs_extra::dir::CopyOptions;
 use futures::future::BoxFuture;
 use futures::{join, Future};
-
 use prisma_client_rust::Direction;
 use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
 use specta::Type;
+use std::collections::HashSet;
+use std::ffi::{OsStr, OsString};
+use std::fmt::Display;
+#[cfg(windows)]
+use std::os::windows::ffi::OsStrExt;
+use std::path::Path;
+use std::sync::Arc;
+use std::time::Duration;
+use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 use thiserror::Error;
 use tokio::sync::{watch, Mutex, MutexGuard, RwLock};
 use tracing::{info, trace};
-
-use crate::db::{self, read_filters::IntFilter};
-use db::instance::Data as CachedInstance;
-
-use self::export::InstanceExportManager;
-use self::importer::InstanceImportManager;
-use self::log::GameLog;
-use self::run::{LaunchState, PersistenceManager};
-
-use super::metadata::cache;
-use super::modplatforms::curseforge::CurseForge;
-use super::vtask::{TaskState, VisualTask};
-use super::ManagerRef;
-
-use crate::domain::instance::{
-    self as domain, GameLogId, GroupId, InstanceFolder, InstanceId, InstanceModpackInfo,
-};
-use domain::info;
+use unicode_segmentation::UnicodeSegmentation;
 
 pub mod explore;
 pub mod export;
@@ -104,6 +102,54 @@ impl InstanceManager {
     }
 }
 
+const MAX_PATH: usize = if cfg!(windows) { 260 } else { 4096 };
+const ILLEGAL_CHARS: &[char] = &['/', ':', '\\', '<', '>', '*', '|', '"', '?', '^'];
+const ILLEGAL_NAMES: &[&str] = &[
+    "con", "prn", "aux", "clock$", "nul", "com1", "com2", "com3", "com4", "com5", "com6", "com7",
+    "com8", "com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+];
+
+fn sanitize_name(name: &str) -> String {
+    let mut sanitized = name.trim().to_string();
+
+    if ILLEGAL_NAMES.contains(&(&name.to_lowercase() as &str)) {
+        sanitized = format!("_{}", sanitized);
+    }
+
+    if sanitized.starts_with('.') || sanitized.starts_with('~') {
+        sanitized.replace_range(0..1, "_");
+    }
+
+    if sanitized.ends_with('.') || sanitized.ends_with('~') {
+        sanitized.replace_range(sanitized.len() - 1.., "_");
+    }
+
+    sanitized
+        .chars()
+        .map(|c| if ILLEGAL_CHARS.contains(&c) { '_' } else { c })
+        .collect()
+}
+
+fn truncate_name(name: &str, instance_path: &Path) -> String {
+    let available_length = MAX_PATH - 3 /* for discriminators */ - 1 /* for _ the separator */ - 1 /* for final null character (on windows) */ - path_length(instance_path);
+    name.graphemes(true)
+        .take_while(|g| {
+            let new_len = path_length(&instance_path.join(g));
+            new_len <= available_length
+        })
+        .collect()
+}
+
+#[cfg(windows)]
+fn path_length(path: &Path) -> usize {
+    path.as_os_str().encode_wide().count()
+}
+
+#[cfg(not(windows))]
+fn path_length(path: &Path) -> usize {
+    path.as_os_str().len()
+}
+
 impl<'s> ManagerRef<'s, InstanceManager> {
     pub async fn launch_background_tasks(self) {
         let _ = self.scan_instances().await;
@@ -127,6 +173,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .to_path();
 
         let mut stream = tokio::fs::read_dir(instance_path).await?;
+
+        let updates_semaphore = Arc::new(tokio::sync::Semaphore::new(20));
 
         while let Some(dir) = stream.next_entry().await? {
             let path = dir.path();
@@ -186,7 +234,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .await;
 
             let app = self.app.clone();
+            let updates_semaphore = Arc::clone(&updates_semaphore);
             tokio::task::spawn(async move {
+                let _permit = updates_semaphore.acquire().await.unwrap();
+
+                trace!("Instance modpack update for {instance_id}",);
+
                 // ignore errors
                 let (_, _) = join!(
                     app.instance_manager()
@@ -194,6 +247,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     app.instance_manager()
                         .check_modrinth_modpack_updates(instance_id),
                 );
+
+                tokio::time::sleep(Duration::from_millis(10)).await;
             });
         }
 
@@ -779,94 +834,43 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
-    async fn next_folder(self, name: &str) -> anyhow::Result<(String, PathBuf)> {
+    fn next_folder(&self, name: &str) -> anyhow::Result<(String, PathBuf)> {
         if name.is_empty() {
             bail!("Attempted to find an instance directory name for an unnamed instance");
         }
 
-        #[rustfmt::skip]
-        const ILLEGAL_CHARS: &[char] = &[
-            // linux / windows / macos
-            '/',
-            // macos / windows
-            ':',
-            // ntfs
-            '\\', '<', '>', '*', '|', '"', '?',
-            // FAT
-            '^',
-        ];
-
-        #[rustfmt::skip]
-        const ILLEGAL_NAMES: &[&str] = &[
-            // windows
-            "con", "prn", "aux", "clock$", "nul",
-            "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8", "com9",
-            "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
-        ];
-
-        // trim whitespace (including windows does not end with ' ' requirement)
-        let name = name.trim();
-        // max 28 character name. this gives us 3 digets for numbers to use as discriminators
-        let name = &name[0..usize::min(name.len(), 28)];
-
-        // sanitize any illegal filenames
-        let mut name = match ILLEGAL_NAMES.contains(&(&name.to_lowercase() as &str)) {
-            true => format!("_{name}"),
-            false => name.to_string(),
-        };
-
-        // stop us from making hidden files on macos/linux ('~' disallowed for sanity)
-        if name.starts_with('.') || name.starts_with('~') {
-            name.replace_range(0..1, "_");
-        }
-
-        // '.' disallowed when ending filenames on windows ('~' disallowed for sanity)
-        if name.ends_with('.') || name.ends_with('~') {
-            name.replace_range(name.len() - 1..name.len(), "_");
-        }
-
-        let mut sanitized_name = name
-            .chars()
-            .map(|c| match ILLEGAL_CHARS.contains(&c) {
-                true => '_',
-                false => c,
-            })
-            .collect::<String>();
-
-        let mut instance_path = self
+        let mut sanitized_name = sanitize_name(name);
+        let instance_path = self
             .app
             .settings_manager()
             .runtime_path
             .get_instances()
             .to_path();
 
-        // cant conflict with anything if it dosen't exist
         if !instance_path.exists() {
-            instance_path.push(&sanitized_name);
-            return Ok((sanitized_name, instance_path));
+            return Ok((sanitized_name.clone(), instance_path.join(&sanitized_name)));
         }
 
         if !instance_path.is_dir() {
-            bail!("GDL instances path is not a directory. Please move the file blocking it.")
+            bail!("GDL instances path is not a directory. Please move the file blocking it.");
         }
 
-        let base_length = sanitized_name.len();
+        sanitized_name = truncate_name(&sanitized_name, &instance_path);
 
-        for i in 1..1000 {
-            // at this point sanitized_name can't be '..' or '.' or have any other escapes in it
-            instance_path.push(&sanitized_name);
+        for i in 0..1000 {
+            let current_name = if i == 0 {
+                sanitized_name.clone()
+            } else {
+                format!("{}{}", sanitized_name, i)
+            };
 
-            if !instance_path.exists() {
-                return Ok((sanitized_name, instance_path));
+            let full_path = instance_path.join(&current_name);
+            if !full_path.exists() {
+                return Ok((current_name, full_path));
             }
-
-            instance_path.pop();
-
-            sanitized_name.truncate(base_length);
-            sanitized_name.push_str(&i.to_string());
         }
 
-        bail!("unable to sanitize instance name")
+        bail!("Unable to create a unique folder name after 1000 attempts")
     }
 
     pub async fn load_icon(self, icon: PathBuf) -> anyhow::Result<(String, Vec<u8>)> {
@@ -1037,7 +1041,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         trace!("Locking path_lock");
         let path_lock = self.path_lock.lock().await;
-        let (shortpath, path) = self.next_folder(&name).await?;
+        let (shortpath, path) = self.next_folder(&name)?;
 
         tmpdir
             .try_rename_or_move(&path)
@@ -1239,7 +1243,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         if let Some(name) = update.name {
             if !name_matches {
                 let _lock = self.path_lock.lock().await;
-                let (new_shortpath, new_path) = self.next_folder(&name).await?;
+                let (new_shortpath, new_path) = self.next_folder(&name)?;
                 tokio::fs::rename(path.clone(), new_path.clone()).await?;
                 *shortpath = new_shortpath.clone();
 
@@ -1424,7 +1428,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .group_id;
 
         let mut new_info = instance.data()?.config.clone();
-        let (new_shortpath, new_path) = self.next_folder(&instance.shortpath).await?;
+        let (new_shortpath, new_path) = self.next_folder(&instance.shortpath)?;
         new_info.name = name;
 
         let path = self
@@ -2036,6 +2040,7 @@ mod test {
 
     use super::domain;
     use prisma_client_rust::Direction;
+    use unicode_segmentation::UnicodeSegmentation;
 
     use crate::{
         db::{self, read_filters::IntFilter, PrismaClient},
@@ -2638,6 +2643,205 @@ mod test {
                 .len(),
             1
         );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_next_folder_ascii() -> anyhow::Result<()> {
+        let mut app = crate::setup_managers_for_test().await;
+
+        let (instance_name, _) = app.instance_manager().next_folder("some_instance")?;
+
+        let default_group_id = app.instance_manager().get_default_group().await?;
+        let default_group = &app.instance_manager().list_groups().await?[0];
+        app.instance_manager()
+            .create_instance(
+                default_group_id,
+                instance_name.clone(),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.7.10"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+
+        assert_eq!(instance_name, "some_instance");
+
+        let (instance_name, _) = app.instance_manager().next_folder("some_instance")?;
+
+        app.instance_manager()
+            .create_instance(
+                default_group_id,
+                instance_name.clone(),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.7.10"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+
+        assert_eq!(instance_name, "some_instance1");
+
+        let (instance_name, _) = app.instance_manager().next_folder("some_instance")?;
+
+        app.instance_manager()
+            .create_instance(
+                default_group_id,
+                instance_name.clone(),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.7.10"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+
+        assert_eq!(instance_name, "some_instance2");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn text_next_folder_basic_unicode() -> anyhow::Result<()> {
+        let mut app = crate::setup_managers_for_test().await;
+
+        let default_group_id = app.instance_manager().get_default_group().await?;
+        let default_group = &app.instance_manager().list_groups().await?[0];
+
+        let (instance_name, _) = app.instance_manager().next_folder("ɀɃɏɔɮ˞˳̸")?;
+
+        app.instance_manager()
+            .create_instance(
+                default_group_id,
+                instance_name.clone(),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.7.10"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+
+        assert_eq!(instance_name, "ɀɃɏɔɮ˞˳̸");
+
+        let (instance_name, _) = app
+            .instance_manager()
+            .next_folder("Cozy Cottage 𝘸𝘪𝘵𝘩 𝘴𝘢𝘶𝘤𝘦 🧂")?;
+
+        assert_eq!(instance_name, "Cozy Cottage 𝘸𝘪𝘵𝘩 𝘴𝘢𝘶𝘤𝘦 🧂");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_next_folder_unicode() -> anyhow::Result<()> {
+        let mut app = crate::setup_managers_for_test().await;
+
+        let default_group_id = app.instance_manager().get_default_group().await?;
+        let default_group = &app.instance_manager().list_groups().await?[0];
+
+        // Although the following two strings look the same, they are not.
+        // Different filesystems handle it differently
+
+        let e_with_1_byte = "é"; // precomposed (U+00E9)
+        let e_with_2_bytes = "é"; // decomposed (U+0065 U+0301)
+
+        let (instance_name, _) = app.instance_manager().next_folder(e_with_1_byte)?;
+
+        app.instance_manager()
+            .create_instance(
+                default_group_id,
+                instance_name.clone(),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.7.10"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+
+        assert_eq!(instance_name, e_with_1_byte);
+
+        let (instance_name, _) = app.instance_manager().next_folder(e_with_2_bytes)?;
+
+        app.instance_manager()
+            .create_instance(
+                default_group_id,
+                instance_name.clone(),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.7.10"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+
+        let comparison = if std::env::consts::OS == "macos" {
+            format!("{}{}", e_with_2_bytes, "1") // macos saves as decomposed
+        } else {
+            e_with_2_bytes.to_string()
+        };
+
+        assert_eq!(instance_name, comparison);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[ignore = "TODO: fix"]
+    async fn test_next_folder_long_input() -> anyhow::Result<()> {
+        let app = crate::setup_managers_for_test().await;
+        let default_group_id = app.instance_manager().get_default_group().await?;
+        let default_group = &app.instance_manager().list_groups().await?[0];
+
+        let e_with_2_bytes = "é"; // decomposed (U+0065 U+0301)
+
+        // long string should be truncated with graphemes and not code points
+        let mut long_string = String::new();
+        for _ in 0..100 {
+            long_string.push_str(e_with_2_bytes);
+        }
+
+        let (instance_name, _) = app.instance_manager().next_folder(&*long_string)?;
+
+        app.instance_manager()
+            .create_instance(
+                default_group_id,
+                instance_name.clone(),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.7.10"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+
+        assert_eq!(instance_name.graphemes(true).count(), 28);
+        assert_eq!(instance_name.len(), 84); // UTF8 3 bytes * 28 allowed graphemes
 
         Ok(())
     }

@@ -38,7 +38,6 @@ keys! {
         GET_ACTIVE_UUID                             = "getActiveUuid";
         SET_ACTIVE_UUID                             = "setActiveUuid";
         GET_ACCOUNTS                                = "getAccounts";
-        GET_ACCOUNT_STATUS                          = "getAccountStatus";
         DELETE_ACCOUNT                              = "deleteAccount";
         ENROLL_BEGIN                                = "enroll.begin";
         ENROLL_CANCEL                               = "enroll.cancel";
@@ -46,6 +45,15 @@ keys! {
         ENROLL_FINALIZE                             = "enroll.finalize";
         REFRESH_ACCOUNT                             = "refreshAccount";
         GET_HEAD                                    = "getHead";
+
+        PEEK_GDL_ACCOUNT                            = "peekGdlAccount";
+        GET_GDL_ACCOUNT                             = "getGdlAccount";
+        REGISTER_GDL_ACCOUNT                        = "registerGdlAccount";
+        REQUEST_NEW_VERIFICATION_TOKEN              = "requestNewVerificationToken";
+        REQUEST_EMAIL_CHANGE                        = "requestEmailChange";
+        REMOVE_GDL_ACCOUNT                          = "removeGdlAccount";
+        SAVE_GDL_ACCOUNT                            = "saveGdlAccount";
+        REQUEST_GDL_ACCOUNT_DELETION                = "requestGdlAccountDeletion";
     }
 
     java {
@@ -127,11 +135,6 @@ keys! {
         SET_SETTINGS                                = "setSettings";
         GET_TERMS_OF_SERVICE_BODY                   = "getTermsOfServiceBody";
         GET_PRIVACY_STATEMENT_BODY                  = "getPrivacyStatementBody";
-    }
-
-    metrics {
-        SEND_EVENT                                  = "sendEvent";
-        SEND_PAGEVIEW                               = "sendPageview";
     }
 
     systeminfo {

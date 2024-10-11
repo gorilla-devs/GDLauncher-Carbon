@@ -297,7 +297,7 @@ function Slider(props: Props) {
                   }),
             }}
             classList={{
-              "after:content-[] after:rounded-full after:absolute after:top-1/2 after:left-1/2 after:-translate-1/2 hover:after:shadow-[0_0_0_6px_var(--accent)] after:w-4 after:h-4 after:transition-shadow after:bg-darkSlate-800 after:ease-in-out after:duration-100 after:absolute after:top-1/2 after:left-1/2 after:-translate-1/2 after:shadow-[0_0_0_6px_var(--accent)] after:w-4 after:h-4 after:transition-shadow after:bg-darkSlate-800 after:ease-in-out after:duration-100 after:z-0 z-10":
+              "after:content-[] after:rounded-full after:absolute after:top-1/2 after:left-1/2 after:-translate-1/2 hover:after:shadow-[0_0_0_6px_rgb(var(--accent))] after:w-4 after:h-4 after:transition-shadow after:bg-darkSlate-800 after:ease-in-out after:duration-100 after:absolute after:top-1/2 after:left-1/2 after:-translate-1/2 after:shadow-[0_0_0_6px_rgb(var(--accent))] after:w-4 after:h-4 after:transition-shadow after:bg-darkSlate-800 after:ease-in-out after:duration-100 after:z-0 z-10":
                 showTooptip(),
               "-top-2": !props.vertical,
               "-left-2": props.vertical,

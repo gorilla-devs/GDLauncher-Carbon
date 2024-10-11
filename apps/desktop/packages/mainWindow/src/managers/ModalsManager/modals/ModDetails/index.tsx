@@ -193,12 +193,7 @@ const ModDetails = (props: ModalProps) => {
                       size="small"
                       type="transparent"
                     >
-                      <Trans
-                        key="instance.step_back"
-                        options={{
-                          defaultValue: "Back"
-                        }}
-                      />
+                      <Trans key="instance.step_back" />
                     </Button>
                   </div>
                   <div class="flex justify-center sticky px-4 z-20 bg-gradient-to-t h-24 top-52 from-darkSlate-800 from-10%">
@@ -259,12 +254,7 @@ const ModDetails = (props: ModalProps) => {
                       size="small"
                       type="secondary"
                     >
-                      <Trans
-                        key="instance.step_back"
-                        options={{
-                          defaultValue: "Back"
-                        }}
-                      />
+                      <Trans key="instance.step_back" />
                     </Button>
                   </Show>
                   <Show when={isSticky()}>

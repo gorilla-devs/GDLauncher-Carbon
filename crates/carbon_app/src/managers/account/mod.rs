@@ -1,20 +1,29 @@
+use crate::api::keys::settings::GET_SETTINGS;
+use crate::db::app_configuration;
 use crate::domain::account::*;
 use crate::{
     api::keys::account::*,
     db::{self, read_filters::StringFilter},
     managers::account::{api::GetProfileError, enroll::InvalidateCtx},
 };
-use anyhow::ensure;
+use anyhow::{ensure, Context};
 use async_trait::async_trait;
+use axum::extract;
 use chrono::{FixedOffset, Utc};
+use gdl_account::{
+    GDLAccountStatus, GDLAccountTask, GDLUser, RegisterAccountBody, RequestGDLAccountDeletionError,
+    RequestNewEmailChangeError, RequestNewVerificationTokenError,
+};
+use jwt::{Header, Token};
 use prisma_client_rust::{
     chrono::DateTime, prisma_errors::query_engine::RecordNotFound, Direction, QueryError,
 };
 use reqwest::Client;
 use reqwest_middleware::ClientBuilder;
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
+use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     mem,
     sync::{Arc, Weak},
     time::{Duration, Instant},
@@ -33,6 +42,7 @@ use super::{AppInner, AppRef, ManagerRef};
 
 pub mod api;
 mod enroll;
+pub mod gdl_account;
 pub mod skin;
 
 pub(crate) struct AccountManager {
@@ -41,15 +51,19 @@ pub(crate) struct AccountManager {
     /// Account refreshing will be disabled until this time has passed
     refreshloop_sleep: Mutex<Option<Instant>>,
     skin_manager: SkinManager,
+
+    gdl_account_task: RwLock<GDLAccountTask>,
 }
 
 impl AccountManager {
-    pub fn new() -> Self {
+    pub fn new(client: reqwest_middleware::ClientWithMiddleware, gdl_base_api: String) -> Self {
         Self {
             currently_refreshing: RwLock::new(HashMap::new()),
             active_enrollment: RwLock::new(None),
             refreshloop_sleep: Mutex::new(None),
             skin_manager: SkinManager {},
+
+            gdl_account_task: RwLock::new(GDLAccountTask::new(client, gdl_base_api)),
         }
     }
 }
@@ -130,24 +144,16 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .await?)
     }
 
-    pub async fn get_account_list(self) -> anyhow::Result<Vec<Account>> {
+    pub async fn get_account_list(self) -> anyhow::Result<Vec<AccountWithStatus>> {
         let accounts = self.get_account_entries().await?;
 
         Ok(accounts
             .into_iter()
             .map(|account| {
-                let type_ = match &account.access_token {
-                    None => AccountType::Offline,
-                    Some(_) => AccountType::Microsoft,
-                };
+                let account = FullAccount::try_from(account).unwrap();
+                let account = AccountWithStatus::from(account);
 
-                Account {
-                    username: account.username,
-                    uuid: account.uuid,
-                    last_used: account.last_used.into(),
-                    type_,
-                    skin_id: account.skin_id,
-                }
+                account
             })
             .collect())
     }
@@ -177,7 +183,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             return Ok(None);
         };
 
-        if let AccountType::Microsoft = &account.account.type_ {
+        if let AccountType::Microsoft { .. } = &account.account.type_ {
             let refreshing = self
                 .currently_refreshing
                 .read()
@@ -190,6 +196,239 @@ impl<'s> ManagerRef<'s, AccountManager> {
         }
 
         Ok(Some(account.status))
+    }
+
+    pub async fn peek_gdl_account(self, uuid: String) -> anyhow::Result<Option<GDLUser>> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to get an account that does not exist"
+            ))?
+            .id_token
+        else {
+            bail!("attempted to get an account that does not exist");
+        };
+
+        let account = self.gdl_account_task.read().await;
+        Ok(account.get_account(id_token).await?)
+    }
+
+    pub async fn request_gdl_account_deletion(
+        self,
+        uuid: String,
+    ) -> Result<(), RequestGDLAccountDeletionError> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await
+            .map_err(|e| RequestGDLAccountDeletionError::RequestFailed(e))?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(RequestGDLAccountDeletionError::RequestFailed(
+                anyhow::anyhow!(
+                    "attempted to request a gdl account deletion for an account that does not exist"
+                ),
+            ))?
+            .id_token
+        else {
+            return Err(RequestGDLAccountDeletionError::RequestFailed(
+                anyhow::anyhow!("attempted to get an account that does not exist"),
+            ));
+        };
+
+        let deletion = self
+            .gdl_account_task
+            .write()
+            .await
+            .request_deletion(id_token)
+            .await
+            .with_context(|| format!("failed to request account deletion: {}", uuid))
+            .map_err(|e| RequestGDLAccountDeletionError::RequestFailed(e));
+
+        self.app
+            .invalidate(PEEK_GDL_ACCOUNT, Some(uuid.clone().into()));
+        self.app.invalidate(GET_GDL_ACCOUNT, None);
+
+        deletion?;
+
+        Ok(())
+    }
+
+    pub async fn register_gdl_account(
+        self,
+        uuid: String,
+        body: RegisterAccountBody,
+    ) -> anyhow::Result<GDLUser> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to get an account that does not exist"
+            ))?
+            .id_token
+        else {
+            bail!("attempted to get an account that does not exist");
+        };
+
+        let lock = self.gdl_account_task.write().await;
+
+        let user = lock
+            .register_account(body, id_token)
+            .await
+            .with_context(|| format!("failed to register account: {uuid}"))?;
+
+        self.app
+            .invalidate(PEEK_GDL_ACCOUNT, Some(uuid.clone().into()));
+        self.app.invalidate(GET_GDL_ACCOUNT, None);
+
+        Ok(user)
+    }
+
+    pub async fn save_gdl_account(&self, uuid: Option<String>) -> anyhow::Result<()> {
+        use db::app_configuration::SetParam;
+        use db::app_configuration::UniqueWhereParam;
+
+        self.app
+            .settings_manager()
+            .set(SetParam::SetGdlAccountUuid(uuid))
+            .await?;
+
+        self.app.invalidate(GET_GDL_ACCOUNT, None);
+        self.app.invalidate(GET_SETTINGS, None);
+
+        // TODO!: Should get status from the API
+
+        Ok(())
+    }
+
+    pub async fn get_gdl_account(self) -> anyhow::Result<GDLAccountStatus> {
+        let saved_gdl_account_uuid = self
+            .app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .gdl_account_uuid;
+
+        let Some(saved_gdl_account_uuid) = saved_gdl_account_uuid else {
+            return Ok(GDLAccountStatus::Unset);
+        };
+
+        if saved_gdl_account_uuid.is_empty() {
+            return Ok(GDLAccountStatus::Skipped);
+        }
+
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == saved_gdl_account_uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to get a gdl account that does not exist"
+            ))?
+            .id_token
+        else {
+            bail!("attempted to get an account that does not exist");
+        };
+
+        let Some(user) = self
+            .gdl_account_task
+            .read()
+            .await
+            .get_account(id_token)
+            .await?
+        else {
+            return Ok(GDLAccountStatus::Invalid);
+        };
+
+        Ok(GDLAccountStatus::Valid(user))
+    }
+
+    pub async fn request_new_verification_token(
+        self,
+        uuid: String,
+    ) -> Result<(), RequestNewVerificationTokenError> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await
+            .map_err(|e| RequestNewVerificationTokenError::RequestFailed(e))?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(RequestNewVerificationTokenError::RequestFailed(
+                anyhow::anyhow!("attempted to get an account that does not exist"),
+            ))?
+            .id_token
+        else {
+            return Err(RequestNewVerificationTokenError::RequestFailed(
+                anyhow::anyhow!("attempted to get an account that does not exist"),
+            ));
+        };
+
+        let lock = self.gdl_account_task.write().await;
+        let request = lock.request_new_verification_token(id_token).await;
+
+        self.app
+            .invalidate(PEEK_GDL_ACCOUNT, Some(uuid.clone().into()));
+        self.app.invalidate(GET_GDL_ACCOUNT, None);
+
+        request?;
+
+        Ok(())
+    }
+
+    pub async fn request_email_change(
+        self,
+        uuid: String,
+        email: String,
+    ) -> Result<(), RequestNewEmailChangeError> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await
+            .map_err(|e| RequestNewEmailChangeError::RequestFailed(e))?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(RequestNewEmailChangeError::RequestFailed(anyhow::anyhow!(
+                "attempted to get an account that does not exist"
+            )))?
+            .id_token
+        else {
+            return Err(RequestNewEmailChangeError::RequestFailed(anyhow::anyhow!(
+                "attempted to get an account that does not exist"
+            )));
+        };
+
+        let lock = self.gdl_account_task.write().await;
+        let request = lock.request_email_change(id_token, email).await;
+
+        self.app
+            .invalidate(PEEK_GDL_ACCOUNT, Some(uuid.clone().into()));
+        self.app.invalidate(GET_GDL_ACCOUNT, None);
+
+        request?;
+
+        Ok(())
+    }
+
+    pub async fn remove_gdl_account(self) -> anyhow::Result<()> {
+        use db::app_configuration::SetParam;
+
+        self.app
+            .settings_manager()
+            .set(SetParam::SetGdlAccountUuid(None))
+            .await?;
+
+        self.app
+            .settings_manager()
+            .set(SetParam::SetGdlAccountStatus(None))
+            .await?;
+
+        self.app.invalidate(GET_GDL_ACCOUNT, None);
+        self.app.invalidate(GET_SETTINGS, None);
+
+        Ok(())
     }
 
     /// Add or update an account
@@ -219,6 +458,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     refresh_token,
                     token_expires,
                     id_token,
+                    email,
                     skin_id,
                 } => set_params.extend([
                     SetParam::SetAccessToken(Some(access_token)),
@@ -243,8 +483,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 .exec()
                 .await?;
 
-            self.app
-                .invalidate(GET_ACCOUNT_STATUS, Some(account.uuid.into()));
+            self.app.invalidate(GET_ACCOUNTS, Some(account.uuid.into()));
         } else {
             let set_params = match account.type_ {
                 FullAccountType::Offline => Vec::new(),
@@ -253,6 +492,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     refresh_token,
                     token_expires,
                     id_token,
+                    email,
                     skin_id,
                 } => vec![
                     SetParam::SetAccessToken(Some(access_token)),
@@ -368,6 +608,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                                     access_token: access_token.clone(),
                                     refresh_token: None,
                                     id_token: None,
+                                    email: None,
                                     token_expires: token_expires.clone(),
                                     skin_id: skin_id.clone(),
                                 },
@@ -399,7 +640,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         refreshing.insert(uuid.clone(), enrollment);
         drop(refreshing);
 
-        self.app.invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
+        self.app.invalidate(GET_ACCOUNTS, Some(uuid.into()));
 
         Ok(())
     }
@@ -407,12 +648,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
     pub async fn delete_account(self, uuid: String) -> anyhow::Result<()> {
         use db::account::{OrderByParam, UniqueWhereParam};
 
-        let active_account = self
-            .app
-            .settings_manager()
-            .get_settings()
-            .await?
-            .active_account_uuid;
+        let settings = self.app.settings_manager().get_settings().await?;
+
+        let active_account = settings.active_account_uuid;
+        let active_gdl_account = settings.gdl_account_uuid;
 
         if let Some(active_account) = active_account {
             if active_account == uuid {
@@ -420,7 +659,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     .app
                     .prisma_client
                     .account()
-                    .find_first(Vec::new())
+                    .find_first(vec![db::account::uuid::not(uuid.clone())])
                     .order_by(OrderByParam::LastUsed(Direction::Desc))
                     .exec()
                     .await?
@@ -428,6 +667,18 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
                 self.set_active_uuid(next_account).await?;
             }
+        }
+
+        let accounts = self.get_account_entries().await?;
+
+        match (active_gdl_account, accounts.len()) {
+            (Some(gdl_account), _) if gdl_account == uuid => {
+                self.remove_gdl_account().await?;
+            }
+            (_, 0) => {
+                self.remove_gdl_account().await?;
+            }
+            _ => {}
         }
 
         let result = self
@@ -443,7 +694,6 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 info!("Deleted account {uuid}");
 
                 self.app.invalidate(GET_ACCOUNTS, None);
-                self.app.invalidate(GET_ACCOUNT_STATUS, Some(uuid.into()));
 
                 Ok(())
             }
@@ -523,7 +773,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     EnrollmentStatus::Complete(account) => {
                         let uuid = account.mc.profile.uuid.clone();
                         self.add_account(account.into()).await?;
-                        self.set_active_uuid(Some(uuid)).await?;
+                        self.set_active_uuid(Some(uuid.clone())).await?;
+
                         self.app.invalidate(ENROLL_GET_STATUS, None);
 
                         Ok(())
@@ -596,8 +847,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     .exec()
                     .await?;
 
-                self.app
-                    .invalidate(GET_ACCOUNT_STATUS, Some(uuid.clone().into()));
+                self.app.invalidate(GET_ACCOUNTS, None);
                 return Ok(());
             }
             Ok(Err(GetProfileError::GameProfileMissing)) => {
@@ -846,16 +1096,29 @@ pub struct FullAccount {
     pub last_used: DateTime<FixedOffset>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum FullAccountType {
     Offline,
     Microsoft {
         access_token: String,
         refresh_token: Option<String>,
         id_token: Option<String>,
+        email: Option<String>,
         token_expires: DateTime<Utc>,
         skin_id: Option<String>,
     },
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct Claims {
+    email: Option<String>,
+}
+
+fn extract_email(token: Option<&String>) -> Option<String> {
+    token.and_then(|token| {
+        let claims: Result<Token<Header, Claims, _>, _> = jwt::Token::parse_unverified(&*token);
+        claims.ok().and_then(|claims| claims.claims().email.clone())
+    })
 }
 
 /*impl From<FullAccount> for db::account::Data {
@@ -887,6 +1150,7 @@ impl TryFrom<db::account::Data> for FullAccount {
         Ok(Self {
             type_: match value.access_token {
                 Some(access_token) => FullAccountType::Microsoft {
+                    email: extract_email(value.id_token.as_ref()),
                     access_token,
                     refresh_token: value.ms_refresh_token,
                     id_token: value.id_token,
@@ -914,8 +1178,8 @@ impl From<FullAccount> for AccountWithStatus {
                 username: value.username,
                 uuid: value.uuid,
                 last_used: value.last_used.into(),
-                type_: match value.type_ {
-                    FullAccountType::Microsoft { .. } => AccountType::Microsoft,
+                type_: match value.type_.clone() {
+                    FullAccountType::Microsoft { email, .. } => AccountType::Microsoft { email },
                     FullAccountType::Offline => AccountType::Offline,
                 },
                 skin_id: match &value.type_ {
@@ -928,12 +1192,14 @@ impl From<FullAccount> for AccountWithStatus {
                     refresh_token: None,
                     ..
                 }
-                | FullAccountType::Microsoft { id_token: None, .. } => AccountStatus::Invalid,
+                | FullAccountType::Microsoft { id_token: None, .. }
+                | FullAccountType::Microsoft { email: None, .. } => AccountStatus::Invalid,
                 FullAccountType::Microsoft {
                     access_token,
                     token_expires,
                     refresh_token: Some(_),
                     id_token: Some(_),
+                    email: Some(_),
                     skin_id: _,
                 } => match Utc::now() > DateTime::<Utc>::from(token_expires) {
                     true => AccountStatus::Expired,
@@ -955,7 +1221,8 @@ impl From<api::FullAccount> for FullAccount {
             type_: FullAccountType::Microsoft {
                 access_token: value.mc.auth.access_token,
                 refresh_token: Some(value.ms.refresh_token),
-                id_token: Some(value.ms.id_token),
+                id_token: Some(value.ms.id_token.clone()),
+                email: extract_email(Some(&value.ms.id_token)),
                 token_expires: DateTime::<Utc>::from(value.mc.auth.expires_at),
                 skin_id: value.mc.profile.skin.map(|skin| skin.id),
             },

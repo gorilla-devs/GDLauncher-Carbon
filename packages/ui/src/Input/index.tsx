@@ -97,26 +97,28 @@ function Input(props: Props) {
     }
   });
 
-  let inputBaseClasses = `h-full w-full box-border py-2 rounded-md placeholder:text-darkSlate-400 outline-none focus-viible:outline-none ${
+  let inputBaseClasses = `h-full w-full box-border py-2 rounded-md placeholder:text-darkSlate-400 outline-none ${
     local.inputClass || ""
   }`;
   if (local.icon) {
     inputBaseClasses += ` ${
       local.inputColor ? local.inputColor : "bg-darkSlate-700"
-    } focus-visible:outline-none focus-visible:border-0`;
+    }`;
   } else {
-    inputBaseClasses += ` px-4 focus-visible:outline-darkSlate-500`;
+    inputBaseClasses += ` px-4`;
   }
 
   let errorClasses = local.error
     ? "border-2 border-solid border-red-500"
     : "border-0 border-transparent hover:border-darkSlate-500 active:border-darkSlate-500";
-  let disabledClasses = local.disabled ? "text-darkSlate-300" : "text-white";
+  let disabledClasses = local.disabled
+    ? "text-darkSlate-300"
+    : "text-lightSlate-50";
   let inputColorClasses = local.inputColor
     ? local.inputColor
     : "bg-darkSlate-600";
 
-  let containerClasses = `h-10 gap-2 box-border transition-all duration-100 rounded-md ease-in-out ${
+  let containerClasses = `outline-none  has-[:focus-visible]:outline-darkSlate-500 hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-darkSlate-500 h-10 gap-2 box-border transition-all duration-100 rounded-md ease-in-out ${
     local.class || ""
   }`;
   if (local.icon) {

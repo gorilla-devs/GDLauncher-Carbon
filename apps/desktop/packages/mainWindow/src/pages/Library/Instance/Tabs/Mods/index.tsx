@@ -150,7 +150,7 @@ const Mods = () => {
       >
         <div class="flex items-center h-full">
           <div
-            class="flex items-center text-darkSlate-50 hover:text-white h-full px-6 mr-2"
+            class="flex items-center text-darkSlate-50 hover:text-lightSlate-50 h-full px-6 mr-2"
             onClick={() => setSelectedModsMap(reconcile({}))}
           >
             <div class="text-2xl i-ri:close-fill" />
@@ -328,7 +328,7 @@ const Mods = () => {
               rounded
             /> */}
             {/* <div
-              class="flex items-center gap-2 cursor-pointer duration-100 ease-in-out transition hover:text-white text-darkSlate-50"
+              class="flex items-center gap-2 cursor-pointer duration-100 ease-in-out transition hover:text-lightSlate-50 text-darkSlate-50"
               onClick={() => {
                 openFolderMutation.mutate({
                   folder: "Mods",
@@ -410,7 +410,7 @@ const Mods = () => {
               class="max-w-38 text-ellipsis overflow-hidden"
             >
               <div
-                class="flex items-center gap-2 cursor-pointer duration-100 ease-in-out transition hover:text-white text-darkSlate-50"
+                class="flex items-center gap-2 cursor-pointer duration-100 ease-in-out transition hover:text-lightSlate-50 text-darkSlate-50"
                 onClick={() => {
                   openFolderMutation.mutate({
                     folder: "Mods",

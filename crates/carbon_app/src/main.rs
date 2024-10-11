@@ -9,7 +9,6 @@ use crate::managers::{
     },
     App, AppInner,
 };
-
 use serde_json::Value;
 use std::{path::PathBuf, sync::Arc};
 use tokio::net::TcpListener;
@@ -27,6 +26,7 @@ mod livenesstracker;
 pub mod managers;
 mod platform;
 // mod pprocess_keepalive;
+mod base_api_override;
 mod logger;
 mod once_send;
 mod runtime_path_override;
@@ -82,7 +82,7 @@ pub fn main() {
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .max_blocking_threads(100)
+        .max_blocking_threads(256)
         .build()
         .unwrap()
         .block_on(async {
@@ -97,6 +97,7 @@ pub fn main() {
 
             info!("Initializing runtime path");
             let runtime_path = runtime_path_override::get_runtime_path_override().await;
+            let base_api_override = base_api_override::get_base_api_override().await;
 
             let _guard = logger::setup_logger(&runtime_path).await;
 
@@ -109,17 +110,27 @@ pub fn main() {
             info!("Runtime path: {}", runtime_path.display());
 
             info!("Scanning ports");
+
+            let init_time = std::time::Instant::now();
+
             let listener = if cfg!(debug_assertions) {
                 TcpListener::bind("127.0.0.1:4650").await.unwrap()
             } else {
                 get_available_port().await
             };
 
-            start_router(runtime_path, listener).await;
+            info!(
+                "Found port: {:?} in {:?}",
+                listener.local_addr(),
+                init_time.elapsed()
+            );
+
+            start_router(runtime_path, base_api_override, listener).await;
         });
 }
 
 async fn get_available_port() -> TcpListener {
+    info!("Scanning for available port");
     for port in 1025..65535 {
         let conn = TcpListener::bind(format!("127.0.0.1:{port}")).await;
         match conn {
@@ -128,10 +139,12 @@ async fn get_available_port() -> TcpListener {
         }
     }
 
+    info!("No available port found");
+
     panic!("No available port found");
 }
 
-async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
+async fn start_router(runtime_path: PathBuf, base_api_override: String, listener: TcpListener) {
     info!("Starting router");
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(1000);
 
@@ -143,7 +156,7 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
         .allow_headers(Any)
         .allow_origin(Any);
 
-    let app = AppInner::new(invalidation_sender, runtime_path).await;
+    let app = AppInner::new(invalidation_sender, runtime_path, base_api_override).await;
 
     let auto_manage_java_system_profiles = app
         .settings_manager()
@@ -159,9 +172,10 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
         &RealJavaChecker,
     )
     .await
-    .unwrap();
+    .expect("Failed to scan and sync java system profiles");
 
     let app1 = app.clone();
+    let app2 = app.clone();
     let rspc_axum_router: axum::Router<Arc<AppInner>> = rspc_axum::endpoint(router, move || app);
 
     let app = axum::Router::new()
@@ -191,10 +205,20 @@ async fn start_router(runtime_path: PathBuf, listener: TcpListener) {
                 .await;
 
             if res.is_ok() {
+                info!("_STATUS_:READY|{port}");
                 println!("_STATUS_:READY|{port}");
                 break;
             }
         }
+    });
+
+    let _app = app2.clone();
+    tokio::spawn(async move {
+        _app.meta_cache_manager().launch_background_tasks().await;
+        _app.clone()
+            .instance_manager()
+            .launch_background_tasks()
+            .await;
     });
 
     axum::serve(listener, app.into_make_service())
@@ -214,7 +238,12 @@ struct TestEnv {
 impl TestEnv {
     async fn restart_in_place(&mut self) {
         let (invalidation_sender, _) = tokio::sync::broadcast::channel(200);
-        self.app = AppInner::new(invalidation_sender, self.tmpdir.clone()).await;
+        self.app = AppInner::new(
+            invalidation_sender,
+            self.tmpdir.clone(),
+            env!("BASE_API").to_string(),
+        )
+        .await;
     }
 }
 
@@ -246,7 +275,7 @@ async fn setup_managers_for_test() -> TestEnv {
         tmpdir: temp_path.clone(),
         // log_guard,
         invalidation_recv,
-        app: AppInner::new(invalidation_sender, temp_path).await,
+        app: AppInner::new(invalidation_sender, temp_path, env!("BASE_API").to_string()).await,
     }
 }
 
@@ -295,7 +324,12 @@ mod test {
         let port = &tcp_listener.local_addr().unwrap().port();
         let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
         let server = tokio::spawn(async move {
-            super::start_router(temp_dir.into_path(), tcp_listener).await;
+            super::start_router(
+                temp_dir.into_path(),
+                env!("BASE_API").to_string(),
+                tcp_listener,
+            )
+            .await;
         });
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 

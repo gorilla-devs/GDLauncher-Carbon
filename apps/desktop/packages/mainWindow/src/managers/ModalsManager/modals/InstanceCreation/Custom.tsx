@@ -61,7 +61,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     FEModdedManifestLoaderVersion[]
   >([]);
   const [chosenLoaderVersion, setChosenLoaderVersion] = createSignal(
-    instanceData()?.modloaderVersion || ""
+    instanceData()?.modloaderVersion || undefined
   );
   const [mcVersion, setMcVersion] = createSignal(
     instanceData()?.mcVersion || ""
@@ -158,6 +158,14 @@ const Custom = (props: Pick<ModalProps, "data">) => {
       )?.loaders;
 
       setLoaderVersions(versions || []);
+      if (instanceData()?.modloader !== "forge") {
+        setChosenLoaderVersion(versions?.[0]?.id);
+      } else if (
+        instanceData()?.modloader === "forge" &&
+        instanceData()?.modloaderVersion
+      ) {
+        setChosenLoaderVersion(instanceData()?.modloaderVersion);
+      }
     } else {
       setLoaderVersions([]);
     }
@@ -170,6 +178,15 @@ const Custom = (props: Pick<ModalProps, "data">) => {
       )?.loaders;
 
       setLoaderVersions(versions || []);
+
+      if (instanceData()?.modloader !== "neoforge") {
+        setChosenLoaderVersion(versions?.[0]?.id);
+      } else if (
+        instanceData()?.modloader === "neoforge" &&
+        instanceData()?.modloaderVersion
+      ) {
+        setChosenLoaderVersion(instanceData()?.modloaderVersion);
+      }
     } else if (!loader()) {
       setLoaderVersions([]);
     }
@@ -191,6 +208,15 @@ const Custom = (props: Pick<ModalProps, "data">) => {
           : [];
 
       setLoaderVersions(versions || []);
+
+      if (instanceData()?.modloader !== "fabric") {
+        setChosenLoaderVersion(versions?.[0]?.id);
+      } else if (
+        instanceData()?.modloader === "fabric" &&
+        instanceData()?.modloaderVersion
+      ) {
+        setChosenLoaderVersion(instanceData()?.modloaderVersion);
+      }
     } else if (!loader()) {
       setLoaderVersions([]);
     }
@@ -212,6 +238,15 @@ const Custom = (props: Pick<ModalProps, "data">) => {
           : [];
 
       setLoaderVersions(versions || []);
+
+      if (instanceData()?.modloader !== "quilt") {
+        setChosenLoaderVersion(versions?.[0]?.id);
+      } else if (
+        instanceData()?.modloader === "quilt" &&
+        instanceData()?.modloaderVersion
+      ) {
+        setChosenLoaderVersion(instanceData()?.modloaderVersion);
+      }
     } else if (!loader()) {
       setLoaderVersions([]);
     }
@@ -244,6 +279,10 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     else if (isFabric()) setMappedMcVersions(fabricMappedVersions);
     else if (isQuilt()) setMappedMcVersions(quiltMappedVersions);
     else setMappedMcVersions(filteredData);
+
+    if (!mcVersion() || !mappedMcVersions().find((v) => v.id === mcVersion())) {
+      setMcVersion(mappedMcVersions()[0].id);
+    }
   });
 
   const modloaders: {
@@ -463,9 +502,22 @@ const Custom = (props: Pick<ModalProps, "data">) => {
   });
 
   return (
-    <div class="flex flex-col justify-between scrollbar-hide h-full w-120 overflow-y-scroll">
+    <div class="flex flex-col justify-between h-full w-full">
       <div class="flex flex-col justify-between gap-4 h-full p-5">
-        <span class="flex flex-col justify-between gap-4">
+        <div class="flex flex-col justify-between gap-4">
+          <div class="flex items-center w-full">
+            <div
+              class={`flex-1 border-t-1 border-lightSlate-400 border-solid`}
+            />
+            <span
+              class={`px-3 flex text-lightSlate-400 items-center gap-2 text-xl`}
+            >
+              <Trans key="general.about" />
+            </span>
+            <div
+              class={`flex-1 border-t-1 border-lightSlate-400 border-solid`}
+            />
+          </div>
           <div class="flex gap-4 w-full">
             <div
               class="relative flex justify-center items-center bg-darkSlate-900 cursor-pointer bg-center bg-cover h-20 rounded-xl w-20"
@@ -497,7 +549,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 <Match when={bgPreview()}>
                   <div class="absolute top-0 right-0 pb-2 pl-2 bg-darkSlate-700 rounded-bl-2xl">
                     <div
-                      class="text-white transition-all duration-100 ease-in-out text-lg i-ri:close-circle-fill hover:color-red-500"
+                      class="text-lightSlate-50 transition-all duration-100 ease-in-out text-lg i-ri:close-circle-fill hover:color-red-500"
                       onClick={(e) => {
                         e.preventDefault();
                         setBgPreview(null);
@@ -508,11 +560,12 @@ const Custom = (props: Pick<ModalProps, "data">) => {
               </Switch>
             </div>
             <div class="flex-1">
-              <h5 class="mt-0 mb-2">
+              <div class="mt-0 mb-2 text-sm">
                 <Trans key="instance.instance_name" />
-              </h5>
-              <div class="flex gap-4 items-center">
+              </div>
+              <div class="flex gap-4 items-center flex-1 w-full">
                 <Input
+                  class="w-full"
                   required
                   placeholder={t("instance.new_instance")}
                   inputColor="bg-darkSlate-800"
@@ -529,45 +582,50 @@ const Custom = (props: Pick<ModalProps, "data">) => {
               </div>
             </div>
           </div>
-          <div class="flex gap-2">
-            <For each={modloaders}>
-              {(modloader) => (
-                <div
-                  class="px-3 py-2 bg-darkSlate-800 rounded-lg cursor-pointer border-box"
-                  classList={{
-                    "border-2 border-solid border-transparent":
-                      loader() !== modloader.key,
-                    "border-2 border-solid border-primary-500":
-                      loader() === modloader.key
-                  }}
-                  onClick={() => {
-                    if (modloader.key === "forge") {
-                      forgeVersionsQuery.refetch();
-                    } else if (modloader.key === "neoforge") {
-                      neoForgeVersionsQuery.refetch();
-                    } else if (modloader.key === "fabric") {
-                      fabricVersionsQuery.refetch();
-                    } else if (modloader.key === "quilt") {
-                      quiltVersionsQuery.refetch();
-                    }
-
-                    setLoader(
-                      !modloader.key
-                        ? undefined
-                        : (modloader.key as CFFEModLoaderType)
-                    );
-                  }}
-                >
-                  {modloader.label}
-                </div>
-              )}
-            </For>
+          <div class="flex items-center w-full">
+            <div
+              class={`flex-1 border-t-1 border-lightSlate-400 border-solid`}
+            />
+            <span
+              class={`px-3 flex text-lightSlate-400 items-center gap-2 text-xl`}
+            >
+              <Trans key="instance.instance_mc_version" />
+            </span>
+            <div
+              class={`flex-1 border-t-1 border-lightSlate-400 border-solid`}
+            />
           </div>
           <div>
-            <h5 class="mt-0 mb-2">
-              <Trans key="instance.instance_mc_version" />
-            </h5>
-            <div>
+            <div class="flex gap-6 w-full items-center">
+              <div class="flex flex-col gap-2 mt-2 min-w-24">
+                <div class="flex gap-2 items-center">
+                  <Checkbox
+                    checked={snapshotVersionFilter()}
+                    onChange={(e) => setSnapshotVersionFilter(e)}
+                  />
+                  <h6 class="m-0 flex items-center">
+                    <Trans key="instance.instance_version_snapshot" />
+                  </h6>
+                </div>
+                <div class="flex gap-2">
+                  <Checkbox
+                    checked={oldAlphaVersionFilter()}
+                    onChange={(e) => setOldAlphaVersionFilter(e)}
+                  />
+                  <h6 class="m-0 flex items-center">
+                    <Trans key="instance.instance_version_old_alpha" />
+                  </h6>
+                </div>
+                <div class="flex gap-2">
+                  <Checkbox
+                    checked={oldBetaVersionFilter()}
+                    onChange={(e) => setOldBetaVersionFilter(e)}
+                  />
+                  <h6 class="m-0 flex items-center">
+                    <Trans key="instance.instance_version_old_beta" />
+                  </h6>
+                </div>
+              </div>
               <Dropdown
                 disabled={Boolean(
                   ((forgeVersionsQuery.isFetching ||
@@ -652,36 +710,54 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                   }
                 }}
               />
-              <div class="flex gap-4 mt-2">
-                <div class="flex gap-2 items-center">
-                  <Checkbox
-                    checked={snapshotVersionFilter()}
-                    onChange={(e) => setSnapshotVersionFilter(e)}
-                  />
-                  <h6 class="m-0 flex items-center">
-                    <Trans key="instance.instance_version_snapshot" />
-                  </h6>
-                </div>
-                <div class="flex gap-2">
-                  <Checkbox
-                    checked={oldAlphaVersionFilter()}
-                    onChange={(e) => setOldAlphaVersionFilter(e)}
-                  />
-                  <h6 class="m-0 flex items-center">
-                    <Trans key="instance.instance_version_old_alpha" />
-                  </h6>
-                </div>
-                <div class="flex gap-2">
-                  <Checkbox
-                    checked={oldBetaVersionFilter()}
-                    onChange={(e) => setOldBetaVersionFilter(e)}
-                  />
-                  <h6 class="m-0 flex items-center">
-                    <Trans key="instance.instance_version_old_beta" />
-                  </h6>
-                </div>
-              </div>
             </div>
+          </div>
+          <div class="flex items-center w-full">
+            <div
+              class={`flex-1 border-t-1 border-lightSlate-400 border-solid`}
+            />
+            <span
+              class={`px-3 flex text-lightSlate-400 items-center gap-2 text-xl`}
+            >
+              <Trans key="general.modloader" />
+            </span>
+            <div
+              class={`flex-1 border-t-1 border-lightSlate-400 border-solid`}
+            />
+          </div>
+          <div class="flex gap-2 w-full justify-center">
+            <For each={modloaders}>
+              {(modloader) => (
+                <div
+                  class="px-3 py-2 bg-darkSlate-800 rounded-lg cursor-pointer border-box text-darkSlate-50 hover:text-lightSlate-50"
+                  classList={{
+                    "border-2 border-solid border-transparent":
+                      loader() !== modloader.key,
+                    "border-2 border-solid border-primary-500 text-lightSlate-50":
+                      loader() === modloader.key
+                  }}
+                  onClick={() => {
+                    if (modloader.key === "forge") {
+                      forgeVersionsQuery.refetch();
+                    } else if (modloader.key === "neoforge") {
+                      neoForgeVersionsQuery.refetch();
+                    } else if (modloader.key === "fabric") {
+                      fabricVersionsQuery.refetch();
+                    } else if (modloader.key === "quilt") {
+                      quiltVersionsQuery.refetch();
+                    }
+
+                    setLoader(
+                      !modloader.key
+                        ? undefined
+                        : (modloader.key as CFFEModLoaderType)
+                    );
+                  }}
+                >
+                  {modloader.label}
+                </div>
+              )}
+            </For>
           </div>
           <Show when={loader()}>
             <div>
@@ -705,7 +781,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                     bgColorClass="bg-darkSlate-800"
                     containerClass="w-full"
                     class="w-full"
-                    value={chosenLoaderVersion() || loaderVersions()[0].id}
+                    value={chosenLoaderVersion()}
                     placement="bottom"
                     onChange={(l) => {
                       const key = l.key as string;
@@ -717,7 +793,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 </Match>
                 <Match when={loaderVersions().length === 0}>
                   <Dropdown
-                    disabled={true}
+                    disabled
                     options={[{ label: "No elements", key: "none" }]}
                     bgColorClass="bg-darkSlate-800"
                     containerClass="w-full"
@@ -729,7 +805,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
               </Switch>
             </div>
           </Show>
-        </span>
+        </div>
         <div class="flex w-full justify-between">
           <Button
             type="secondary"

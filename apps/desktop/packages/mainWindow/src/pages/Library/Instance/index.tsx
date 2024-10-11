@@ -448,7 +448,9 @@ const Instance = () => {
                             params.id,
                             routeData.instanceDetails.data?.iconRevision
                           )}")`
-                        : `url("${DefaultImg}")`
+                        : `url("${DefaultImg}")`,
+                      "view-transition-name": `instance-tile-image`,
+                      contain: "layout"
                     }}
                   />
 
@@ -468,7 +470,7 @@ const Instance = () => {
                           onInput={(e) => {
                             setNewName(e.target.innerHTML);
                           }}
-                          class="cursor-pointer z-10 m-0 border-box focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text"
+                          class="cursor-pointer z-10 m-0 border-box focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text min-h-10"
                           contentEditable={editableName()}
                           onFocusIn={() => {
                             setEditableName(true);
@@ -478,6 +480,10 @@ const Instance = () => {
                               e.preventDefault();
                               handleNameChange();
                             }
+                          }}
+                          style={{
+                            "view-transition-name": `instance-tile-title`,
+                            contain: "layout"
                           }}
                         >
                           {routeData.instanceDetails.data?.name}
@@ -494,14 +500,14 @@ const Instance = () => {
                         classList={{ "bg-darkSlate-800 pl-2": editableName() }}
                       >
                         <div
-                          class="cursor-pointer ease-in-out z-10 transition text-white text-3xl i-ri:check-fill duration-50 hover:text-green-500"
+                          class="cursor-pointer ease-in-out z-10 transition text-lightSlate-50 text-3xl i-ri:check-fill duration-50 hover:text-green-500"
                           classList={{
                             hidden: !editableName()
                           }}
                           onClick={() => handleNameChange()}
                         />
                         <div
-                          class="cursor-pointer ease-in-out text-white transition text-3xl duration-50 z-10 i-ri:close-fill hover:text-red-500"
+                          class="cursor-pointer ease-in-out text-lightSlate-50 transition text-3xl duration-50 z-10 i-ri:close-fill hover:text-red-500"
                           classList={{
                             hidden: !editableName()
                           }}
@@ -524,7 +530,13 @@ const Instance = () => {
                       class="flex justify-between cursor-default flex-row"
                     >
                       <div class="flex flex-row gap-4 flex-wrap items-start mt-2 ml-2 text-lightGray-600">
-                        <div class="m-0 flex gap-2 items-center">
+                        <div
+                          class="m-0 flex gap-2 items-center min-h-6"
+                          style={{
+                            "view-transition-name": `instance-tile-modloader`,
+                            contain: "layout"
+                          }}
+                        >
                           <For
                             each={routeData.instanceDetails.data?.modloaders}
                           >
@@ -572,6 +584,10 @@ const Instance = () => {
                           size="large"
                           variant={isRunning() && "red"}
                           loading={isPreparing() !== undefined}
+                          style={{
+                            "view-transition-name": `instance-tile-play-button`,
+                            contain: "layout"
+                          }}
                           onClick={() => {
                             if (isRunning()) {
                               killInstanceMutation.mutate(
@@ -649,19 +665,17 @@ const Instance = () => {
                 >
                   <Tabs index={selectedIndex()}>
                     <TabList>
-                      <div class="flex gap-6 h-full">
-                        <For each={instancePages()}>
-                          {(page: InstancePage) => (
-                            <Tab
-                              onClick={() => {
-                                navigate(page.path);
-                              }}
-                            >
-                              {page.label}
-                            </Tab>
-                          )}
-                        </For>
-                      </div>
+                      <For each={instancePages()}>
+                        {(page: InstancePage) => (
+                          <Tab
+                            onClick={() => {
+                              navigate(page.path);
+                            }}
+                          >
+                            {page.label}
+                          </Tab>
+                        )}
+                      </For>
                     </TabList>
                   </Tabs>
                 </div>

@@ -135,7 +135,7 @@ const Overview = () => {
                     class="h-13 w-13 rounded-lg"
                     src={`http://127.0.0.1:${port}/instance/modpackIcon?instance_id=${params.id}`}
                   />
-                  <div class="text-white whitespace-nowrap">
+                  <div class="text-lightSlate-50 whitespace-nowrap">
                     <div class="text-lg font-bold">
                       {routeData.modpackInfo.data?.name}
                     </div>

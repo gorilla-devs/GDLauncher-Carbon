@@ -1,12 +1,5 @@
 import { expect, test } from "@playwright/test";
 import fs from "fs";
-// import {
-//   clickMenuItemById,
-//   ipcMainCallFirstListener,
-//   ipcRendererCallFirstListener,
-//   ipcMainInvokeHandler,
-//   ipcRendererInvoke,
-// } from "electron-playwright-helpers";
 import path from "path";
 import { ElectronApplication, Page, _electron as electron } from "playwright";
 import { getActualUrl } from "./tests_helpers.js";
@@ -84,6 +77,7 @@ test.describe("Init Tests", () => {
 
     // set the CI environment variable to true
     process.env.CI = "e2e";
+
     electronApp = await electron.launch({
       args: [],
       executablePath: await getBinaryPath(),
@@ -94,7 +88,7 @@ test.describe("Init Tests", () => {
 
     // capture errors
     page.on("pageerror", (error) => {
-      console.error(error);
+      console.error(JSON.stringify(error, null, 2));
       expect(error).toBeNull();
     });
     // capture console messages

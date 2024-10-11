@@ -2,10 +2,9 @@ import { ModalProps } from "../../";
 import ModalLayout from "../../ModalLayout";
 
 import { Trans } from "@gd/i18n";
-import { For, Match, Show, Switch, onMount } from "solid-js";
+import { For, Match, Show, Switch } from "solid-js";
 import changelogs, { Changelog } from "./changelogs";
 import { Button } from "@gd/ui";
-import { rspc } from "@/utils/rspcClient";
 
 type SectionProps = {
   type: keyof Changelog;
@@ -91,7 +90,9 @@ const Section = (props: SectionProps) => {
                       "pb-4": index() !== list().length - 1
                     }}
                   >
-                    <span class="text-white font-bold">{item.title}</span>
+                    <span class="text-lightSlate-50 font-bold">
+                      {item.title}
+                    </span>
                     <Show when={item.description}>
                       &nbsp;
                       <span class="text-lightSlate-500">
@@ -110,33 +111,15 @@ const Section = (props: SectionProps) => {
 };
 
 const Changelogs = (props: ModalProps) => {
-  const sendEvent = rspc.createMutation(() => ({
-    mutationKey: ["metrics.sendEvent"]
-  }));
-
-  onMount(() => {
-    sendEvent.mutate({
-      event_name: "changelog_viewed"
-    });
-  });
-
   return (
     <ModalLayout
       noHeader={props.noHeader}
       title={props?.title}
       noPadding
-      height="min-h-130 h-1/3"
+      height="h-150"
       width="w-130"
     >
       <div class="w-full h-full overflow-auto px-5 pb-5 box-border">
-        {/* <div class="relative flex items-center justify-center my-4">
-          <img src={GDLauncherWideLogo} class="w-80" />
-          <div class="absolute -top-3 left-43 font-bold">
-            {"v"}
-            {__APP_VERSION__}
-          </div>
-        </div> */}
-
         <h2>
           <Trans
             key="changelogs.whats_new_in"
@@ -157,10 +140,6 @@ const Changelogs = (props: ModalProps) => {
           <Button
             backgroundColor="bg-brands-twitchPurpleDark"
             onClick={() => {
-              sendEvent.mutate({
-                event_name: "changelog_twitch_button_clicked"
-              });
-
               window.open("https://twitch.tv/blarfoon", "_blank");
             }}
           >

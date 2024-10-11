@@ -149,10 +149,22 @@ impl ModplatformCacher for ModrinthModCacher {
                 let mpm = app.modplatforms_manager();
                 let combined_version_futures = combined_versions_list
                     .chunks(1000) // ~13 chars per version, 1000 worked fine at time of testing
-                    .map(|chunk| {
-                        mpm.modrinth.get_versions(VersionIDs {
-                            ids: chunk.to_vec(),
-                        })
+                    .map(|chunk| async {
+                        let mcm = app.meta_cache_manager();
+                        let semaphore = mcm
+                            .targets_semaphore
+                            .acquire()
+                            .await
+                            .expect("the target semaphore is never closed");
+
+                        let resp = mpm
+                            .modrinth
+                            .get_versions(VersionIDs {
+                                ids: chunk.to_vec(),
+                            })
+                            .await;
+
+                        resp
                     });
 
                 let combined_versions_response =

@@ -112,7 +112,7 @@ const ContextMenu = (props: ContextMenuProps) => {
       {props.children}
       <Show when={containerRef() == ContextMenu?.openMenu()}>
         <Portal mount={document.body}>
-          <div class="w-screen h-screen fixed top-0 left-0 backdrop-blur-[2px] z-50" />
+          <div class="w-screen h-screen fixed top-0 left-0 backdrop-blur-[2px] z-80" />
         </Portal>
       </Show>
       <Show when={containerRef() == ContextMenu?.openMenu()}>
@@ -138,7 +138,7 @@ const ContextMenu = (props: ContextMenuProps) => {
                     "opacity-20": item.disabled === true,
                     "hover:text-red-600 text-red-500":
                       item.id === "delete" && !item.disabled,
-                    "hover:text-white text-darkGray-50":
+                    "hover:text-lightSlate-50 text-darkGray-50":
                       !item.id && !item.disabled,
                   }}
                   onClick={item.disabled === true ? undefined : item.action}

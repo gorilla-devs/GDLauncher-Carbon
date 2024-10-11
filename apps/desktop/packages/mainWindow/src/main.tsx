@@ -21,6 +21,8 @@ import { NavigationManager } from "./managers/NavigationManager";
 // import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
 import RiveAppWapper from "./utils/RiveAppWrapper";
 import GDAnimation from "./gd_logo_animation.riv";
+import { GlobalStoreProvider } from "./components/GlobalStoreContext";
+import { initMetrics } from "./utils/metrics";
 
 render(
   () => {
@@ -34,7 +36,10 @@ render(
           port = convertedPort;
         } else {
           if (coreModule.logs) {
-            console.error("CoreModule errored", coreModule);
+            console.error(
+              "CoreModule errored",
+              JSON.stringify(coreModule, null, 2)
+            );
             window.fatalError(coreModule.logs, "CoreModule");
           } else {
             console.error("CoreModule errored with no logs", coreModule);
@@ -140,20 +145,27 @@ const _i18nInstance = i18n.use(icu).createInstance();
 
 const TransWrapper = (props: TransWrapperProps) => {
   const [isI18nReady, setIsI18nReady] = createSignal(false);
-  const trackPageView = rspc.createMutation(() => ({
-    mutationKey: "metrics.sendEvent"
-  }));
-
-  window.addEventListener("hashchange", () => {
-    trackPageView.mutate({
-      event_name: "page_view",
-      data: window.location.hash
-    });
-  });
+  const rspcContext = rspc.useContext();
 
   const settings = rspc.createQuery(() => ({
     queryKey: ["settings.getSettings"]
   }));
+
+  createEffect(async () => {
+    try {
+      const metricsEnabled = settings.data?.metricsEnabled;
+      if (metricsEnabled) {
+        const os = await rspcContext.client.query(["getOs"]);
+        const settings = await rspcContext.client.query([
+          "settings.getSettings"
+        ]);
+
+        initMetrics(os, settings.randomUserUuid);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  });
 
   createEffect(async () => {
     if (settings.isSuccess) {
@@ -204,13 +216,15 @@ const TransWrapper = (props: TransWrapperProps) => {
     <Show when={!settings.isInitialLoading && isI18nReady()}>
       <TransProvider instance={_i18nInstance}>
         <Router source={hashIntegration()}>
-          <NavigationManager>
-            <ContextMenuProvider>
-              <ModalProvider>
-                <App createInvalidateQuery={props.createInvalidateQuery} />
-              </ModalProvider>
-            </ContextMenuProvider>
-          </NavigationManager>
+          <GlobalStoreProvider>
+            <NavigationManager>
+              <ContextMenuProvider>
+                <ModalProvider>
+                  <App createInvalidateQuery={props.createInvalidateQuery} />
+                </ModalProvider>
+              </ContextMenuProvider>
+            </NavigationManager>
+          </GlobalStoreProvider>
         </Router>
       </TransProvider>
     </Show>

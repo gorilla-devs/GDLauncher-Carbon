@@ -1,4 +1,6 @@
-import supportedLanguages from "./supportedLanguages.json";
+export const supportedLanguages = {
+    "english": "united-states"
+};
 
 type NamespacesMap = {
   [key: string]: Object;
@@ -29,4 +31,3 @@ export { TransProvider, Trans, useTransContext } from "@mbarzda/solid-i18next";
 export { default as i18n } from "i18next";
 export { default as icu } from "i18next-icu";
 export { loadLanguageFiles };
-export { supportedLanguages };

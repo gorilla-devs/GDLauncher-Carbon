@@ -39,12 +39,7 @@ const ManualStep = (props: StepsProps) => {
               props.nextStep?.("intro");
             }}
           >
-            <Trans
-              key="java.step_back"
-              options={{
-                defaultValue: "Back"
-              }}
-            />
+            <Trans key="java.step_back" />
           </Button>
           <Button
             rounded

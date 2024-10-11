@@ -11,6 +11,10 @@ use crate::api::router::router;
 use crate::domain::account as domain;
 use crate::error::FeError;
 use crate::managers::account::api::XboxError;
+use crate::managers::account::gdl_account::{
+    GDLAccountStatus, GDLUser, RegisterAccountBody, RequestGDLAccountDeletionError,
+    RequestNewEmailChangeError, RequestNewVerificationTokenError,
+};
 use crate::managers::{account, App, AppInner};
 
 pub(super) fn mount() -> RouterBuilder<App> {
@@ -30,11 +34,6 @@ pub(super) fn mount() -> RouterBuilder<App> {
                .into_iter()
                .map(AccountEntry::from)
                .collect::<Vec<_>>())
-        }
-
-        query GET_ACCOUNT_STATUS[app, uuid: String] {
-            Ok(app.account_manager().get_account_status(uuid).await?
-                .map(AccountStatus::from))
         }
 
         mutation DELETE_ACCOUNT[app, uuid: String] {
@@ -68,6 +67,62 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         query GET_HEAD[_, _uuid: String] { Ok(()) }
+
+        query PEEK_GDL_ACCOUNT[app, uuid: String] {
+            let gdl_user = app.account_manager().peek_gdl_account(uuid).await?;
+
+            Ok(gdl_user.map(Into::<FEGDLAccount>::into))
+        }
+
+        query GET_GDL_ACCOUNT[app, args: ()] {
+            let gdl_user = app.account_manager().get_gdl_account().await?;
+
+            Ok(Into::<FEGDLAccountStatus>::into(gdl_user))
+        }
+
+        mutation REGISTER_GDL_ACCOUNT[app, register_data: FERegisterAccount] {
+            let gdl_user = app.account_manager()
+                .register_gdl_account(register_data.uuid.clone(), register_data.into())
+                .await?;
+
+            Ok(Into::<FEGDLAccount>::into(gdl_user))
+        }
+
+        mutation REQUEST_NEW_VERIFICATION_TOKEN[app, uuid: String] {
+            let result = app.account_manager()
+                .request_new_verification_token(uuid)
+                .await;
+
+            Ok(FERequestNewVerificationTokenStatus::from(result))
+        }
+
+        mutation REMOVE_GDL_ACCOUNT[app, _args: ()] {
+            app.account_manager()
+                .remove_gdl_account()
+                .await
+        }
+
+        mutation SAVE_GDL_ACCOUNT[app, args: Option<String>] {
+            app.account_manager()
+                .save_gdl_account(args)
+                .await
+        }
+
+        mutation REQUEST_EMAIL_CHANGE[app, args: FERequestEmailChange] {
+            let result = app.account_manager()
+                .request_email_change(args.uuid, args.email)
+                .await;
+
+            Ok(FERequestNewEmailChangeStatus::from(result))
+        }
+
+        mutation REQUEST_GDL_ACCOUNT_DELETION[app, uuid: String] {
+            let result = app.account_manager()
+                .request_gdl_account_deletion(uuid)
+                .await;
+
+            Ok(FERequestDeletionStatus::from(result))
+        }
     }
 }
 
@@ -98,12 +153,14 @@ struct AccountEntry {
     uuid: String,
     last_used: DateTime<Utc>,
     type_: AccountType,
+    status: AccountStatus,
 }
 
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]
+#[serde(tag = "type", content = "value")]
 enum AccountType {
-    Microsoft,
+    Microsoft { email: Option<String> },
     Offline,
 }
 
@@ -157,13 +214,14 @@ enum EnrollmentError {
     NoGameProfile,
 }
 
-impl From<domain::Account> for AccountEntry {
-    fn from(value: domain::Account) -> Self {
+impl From<domain::AccountWithStatus> for AccountEntry {
+    fn from(value: domain::AccountWithStatus) -> Self {
         Self {
-            username: value.username,
-            uuid: value.uuid,
-            type_: value.type_.into(),
-            last_used: value.last_used,
+            username: value.account.username,
+            uuid: value.account.uuid,
+            type_: value.account.type_.into(),
+            last_used: value.account.last_used,
+            status: value.status.into(),
         }
     }
 }
@@ -171,7 +229,7 @@ impl From<domain::Account> for AccountEntry {
 impl From<domain::AccountType> for AccountType {
     fn from(value: domain::AccountType) -> Self {
         match value {
-            domain::AccountType::Microsoft => Self::Microsoft,
+            domain::AccountType::Microsoft { email } => Self::Microsoft { email },
             domain::AccountType::Offline => Self::Offline,
         }
     }
@@ -224,7 +282,7 @@ impl From<&account::EnrollmentStatus> for Result<EnrollmentStatus, FeError> {
                 // this is bad, but it used to be far worse
                 let account: account::FullAccount = account.clone().into();
                 let account: domain::AccountWithStatus = account.into();
-                account.account.into()
+                account.into()
             }),
             BE::Failed(e) => Api::Failed(EnrollmentError::from(
                 e.as_ref().map_err(FeError::from_anyhow)?.clone(),
@@ -252,6 +310,136 @@ impl From<account::EnrollmentError> for EnrollmentError {
             BE::XboxError(e) => Self::XboxAccount(e),
             BE::EntitlementMissing => Self::NoGameOwnership,
             BE::GameProfileMissing => Self::NoGameProfile,
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "status", content = "value")]
+pub enum FEGDLAccountStatus {
+    Valid(FEGDLAccount),
+    Invalid,
+    Skipped,
+    Unset,
+}
+
+impl From<GDLAccountStatus> for FEGDLAccountStatus {
+    fn from(value: GDLAccountStatus) -> Self {
+        match value {
+            GDLAccountStatus::Valid(value) => Self::Valid(value.into()),
+            GDLAccountStatus::Invalid => Self::Invalid,
+            GDLAccountStatus::Skipped => Self::Skipped,
+            GDLAccountStatus::Unset => Self::Unset,
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct FEGDLAccount {
+    email: String,
+    microsoft_oid: String,
+    microsoft_email: Option<String>,
+    is_email_verified: bool,
+    has_pending_verification: bool,
+    verification_timeout: Option<u32>,
+    has_pending_deletion_request: bool,
+    deletion_timeout: Option<u32>,
+    email_change_timeout: Option<u32>,
+}
+
+impl From<GDLUser> for FEGDLAccount {
+    fn from(value: GDLUser) -> Self {
+        Self {
+            email: value.email,
+            microsoft_oid: value.microsoft_oid,
+            microsoft_email: value.microsoft_email,
+            is_email_verified: value.is_verified,
+            has_pending_verification: value.has_pending_verification,
+            verification_timeout: value.verification_timeout.map(|v| v as u32),
+            has_pending_deletion_request: value.has_pending_deletion_request,
+            deletion_timeout: value.deletion_timeout.map(|v| v as u32),
+            email_change_timeout: value.email_change_timeout.map(|v| v as u32),
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FERegisterAccount {
+    pub email: String,
+    pub uuid: String,
+}
+
+impl From<FERegisterAccount> for RegisterAccountBody {
+    fn from(value: FERegisterAccount) -> Self {
+        Self { email: value.email }
+    }
+}
+
+#[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "status", content = "value")]
+pub enum FERequestNewVerificationTokenStatus {
+    Success,
+    Failed(Option<u32>),
+}
+
+impl From<Result<(), RequestNewVerificationTokenError>> for FERequestNewVerificationTokenStatus {
+    fn from(value: Result<(), RequestNewVerificationTokenError>) -> Self {
+        match value {
+            Ok(_) => Self::Success,
+            Err(RequestNewVerificationTokenError::TooManyRequests(cooldown)) => {
+                Self::Failed(Some(cooldown))
+            }
+            Err(RequestNewVerificationTokenError::RequestFailed(_)) => Self::Failed(None),
+        }
+    }
+}
+
+#[derive(Type, Debug, Deserialize)]
+pub struct FERequestEmailChange {
+    pub email: String,
+    pub uuid: String,
+}
+
+#[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "status", content = "value")]
+pub enum FERequestNewEmailChangeStatus {
+    Success,
+    Failed(Option<u32>),
+}
+
+impl From<Result<(), RequestNewEmailChangeError>> for FERequestNewEmailChangeStatus {
+    fn from(value: Result<(), RequestNewEmailChangeError>) -> Self {
+        match value {
+            Ok(_) => Self::Success,
+            Err(RequestNewEmailChangeError::TooManyRequests(cooldown)) => {
+                Self::Failed(Some(cooldown))
+            }
+            Err(RequestNewEmailChangeError::RequestFailed(_)) => Self::Failed(None),
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+
+pub enum FERequestDeletionStatus {
+    Success,
+    Failed(Option<u32>),
+}
+
+impl From<Result<(), RequestGDLAccountDeletionError>> for FERequestDeletionStatus {
+    fn from(value: Result<(), RequestGDLAccountDeletionError>) -> Self {
+        match value {
+            Ok(_) => Self::Success,
+            Err(RequestGDLAccountDeletionError::TooManyRequests(cooldown)) => {
+                Self::Failed(Some(cooldown))
+            }
+            Err(RequestGDLAccountDeletionError::RequestFailed(_)) => Self::Failed(None),
         }
     }
 }

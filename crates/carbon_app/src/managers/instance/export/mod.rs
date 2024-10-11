@@ -6,7 +6,10 @@ use std::{
 
 use itertools::Itertools;
 use tokio::sync::mpsc;
-use zip::{write::FileOptions, ZipWriter};
+use zip::{
+    write::{FileOptionExtension, FileOptions},
+    ZipWriter,
+};
 
 use crate::{
     domain::{
@@ -62,19 +65,19 @@ impl ManagerRef<'_, InstanceExportManager> {
     }
 }
 
-enum ZipMode<'a, W: io::Write + io::Seek> {
+enum ZipMode<'a, W: io::Write + io::Seek, T: FileOptionExtension + Clone> {
     Count(&'a mut u32),
-    Create(&'a mut ZipWriter<W>, FileOptions, mpsc::Sender<()>),
+    Create(&'a mut ZipWriter<W>, FileOptions<'a, T>, mpsc::Sender<()>),
 }
 
-fn zip_excluding<W: io::Write + io::Seek>(
-    mut mode: ZipMode<W>,
+fn zip_excluding<W: io::Write + io::Seek, T: FileOptionExtension + Clone>(
+    mut mode: ZipMode<W, T>,
     base_path: &Path,
     prefix: &str,
     filter: &ExportEntry,
 ) -> anyhow::Result<()> {
-    fn walk_recursive<W: io::Write + io::Seek>(
-        mode: &mut ZipMode<W>,
+    fn walk_recursive<W: io::Write + io::Seek, T: FileOptionExtension + Clone>(
+        mode: &mut ZipMode<W, T>,
         path: &Path,
         prefix: &str,
         relpath: &[&str],
@@ -105,7 +108,7 @@ fn zip_excluding<W: io::Write + io::Seek>(
                         **counter += 1;
                     }
                     ZipMode::Create(zip, options, notify) => {
-                        zip.start_file(pathstr, *options)?;
+                        zip.start_file(pathstr, options.clone())?;
                         io::copy(&mut File::open(entry.path())?, zip)?;
                         let _ = notify.blocking_send(());
                     }

@@ -121,6 +121,13 @@ impl ModplatformCacher for CurseforgeModCacher {
 
                 let mpm = app.modplatforms_manager();
                 let mod_responses = fp_response.exact_matches.iter().map(|m| async {
+                    let mcm = app.meta_cache_manager();
+                    let semaphore = mcm
+                        .targets_semaphore
+                        .acquire()
+                        .await
+                        .expect("the target semaphore is never closed");
+
                     let cfmod = mpm
                         .curseforge
                         .get_mod(ModParameters {

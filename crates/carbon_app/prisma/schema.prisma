@@ -17,6 +17,7 @@ model AppConfiguration {
   releaseChannel                  String
   lastAppVersion                  String?
   activeAccountUuid               String?
+  activeAccountUuidData           Account?  @relation("activeAccount", fields: [activeAccountUuid], references: [uuid])
   // Instances settings
   concurrentDownloads             Int       @default(10)
   downloadDependencies            Boolean   @default(true)
@@ -26,6 +27,7 @@ model AppConfiguration {
   instancesSortBy                 String    @default("name")
   instancesSortByAsc              Boolean   @default(true)
   showNews                        Boolean   @default(true)
+  showFeatured                    Boolean   @default(true)
   // Other settings
   deletionThroughRecycleBin       Boolean   @default(true)
   gameResolution                  String?
@@ -49,6 +51,8 @@ model AppConfiguration {
   termsAndPrivacyAcceptedChecksum String? // Should ask again if this changes
   metricsEnabled                  Boolean   @default(false)
   metricsEnabledLastUpdate        DateTime? // should ask again after 12 months
+  gdlAccountUuid                  String?
+  gdlAccountStatus                Bytes?
 }
 
 model Java {
@@ -72,15 +76,16 @@ model JavaProfile {
 }
 
 model Account {
-  uuid           String    @id
-  username       String
+  uuid                          String             @id
+  username                      String
   // presence signifies a microsoft account
-  accessToken    String?
-  tokenExpires   DateTime?
-  msRefreshToken String?
-  idToken        String?
-  lastUsed       DateTime
-  skinId         String?
+  accessToken                   String?
+  tokenExpires                  DateTime?
+  msRefreshToken                String?
+  idToken                       String?
+  lastUsed                      DateTime
+  skinId                        String?
+  AppConfigurationActiveAccount AppConfiguration[] @relation("activeAccount")
 }
 
 model Skin {

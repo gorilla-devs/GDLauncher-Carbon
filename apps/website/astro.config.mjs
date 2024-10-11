@@ -20,6 +20,12 @@ const downloadLinks = yamlfiles
       `https://cdn-raw.gdl.gg/launcher/${val.path.includes("zip") ? val.path.replace("zip", "dmg") : val.path}`,
   );
 
+const excludedPages = [
+  "user-account-confirmed/",
+  "user-deletion-confirmed/",
+  "newsletter/confirm/",
+];
+
 // https://astro.build/config
 export default defineConfig({
   output: "hybrid",
@@ -29,7 +35,10 @@ export default defineConfig({
     tailwind(),
     mdx(),
     sitemap({
-      filter: (page) => page !== "https://gdlauncher.com/newsletter/confirm/",
+      filter: (page) =>
+        !excludedPages.find(
+          (excludedPage) => `https://gdlauncher.com/${excludedPage}` === page,
+        ),
     }),
     solidJs(),
   ],

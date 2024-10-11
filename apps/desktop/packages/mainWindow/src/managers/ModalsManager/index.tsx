@@ -112,6 +112,14 @@ const defaultModals = {
   changelogs: {
     component: lazy(() => import("./modals/Changelogs")),
     title: "Welcome to a new version of GDLauncher!"
+  },
+  confirmGDLAccountDeletion: {
+    component: lazy(() => import("./modals/ConfirmGDLAccountDeletion")),
+    title: "Confirm Account Deletion"
+  },
+  confirmMsWithGDLAccountRemoval: {
+    component: lazy(() => import("./modals/ConfirmMsWithGDLAccountRemoval")),
+    title: "Confirm Account Removal"
   }
 };
 
@@ -227,7 +235,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                     <div
                       style={{ "z-index": `${index() + 1}` }}
                       onMouseDown={(e) => e.stopPropagation()}
-                      class="duration-100 ease-in-out animate-enterScaleIn"
+                      class="duration-100 ease-in-out animate-enterWithOpacityChange"
                     >
                       <Dynamic
                         component={ModalComponent}
@@ -240,7 +248,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                   </div>
 
                   <div
-                    class="h-screen duration-100 ease-in-out text-white place-items-center z-999 origin-center bg-darkSlate-900 opacity-80"
+                    class="h-screen duration-100 ease-in-out text-lightSlate-50 place-items-center z-999 origin-center bg-darkSlate-900 opacity-80"
                     style={{
                       width: `${adSize.width}px`
                     }}

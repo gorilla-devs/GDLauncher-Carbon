@@ -31,6 +31,9 @@ import initAutoUpdater from "./autoUpdater";
 import "./appMenu";
 import { FELauncherActionOnGameLaunch } from "@gd/core_module/bindings";
 
+const timeStart = Date.now();
+let isPotatoPcModeSet = false;
+
 export const RUNTIME_PATH_OVERRIDE_NAME = "runtime_path_override";
 const RUNTIME_PATH_DEFAULT_NAME = "data";
 
@@ -117,7 +120,9 @@ const skipIntroAnimation = fss.existsSync(getPatchedUserData());
 
 app.setPath("userData", getPatchedUserData());
 
-Object.assign(console, log.functions);
+if (!process.env.CI) {
+  Object.assign(console, log.functions);
+}
 
 log.transports.file.resolvePathFn = (variables) =>
   path.join(getPatchedUserData(), variables.fileName!);
@@ -148,6 +153,8 @@ const allowMultipleInstances = validateArgument(
   "--gdl_allow_multiple_instances"
 );
 
+const overrideBaseApi = validateArgument("--gdl_override_base_api");
+
 if (!allowMultipleInstances) {
   if (!app.requestSingleInstanceLock()) {
     app.quit();
@@ -174,22 +181,31 @@ if (!disableSentry) {
   }
 }
 
-const disableGPU = validateArgument("--disable-gpu");
+function maybeDisableGPU(override: boolean) {
+  if (app.isReady()) {
+    console.error("App is ready, cannot disable GPU");
+    return;
+  }
 
-if (disableGPU) {
-  app.commandLine.appendSwitch("no-sandbox");
-  app.commandLine.appendSwitch("disable-gpu");
-  app.commandLine.appendSwitch("disable-software-rasterizer");
-  app.commandLine.appendSwitch("disable-gpu-compositing");
-  app.commandLine.appendSwitch("disable-gpu-rasterization");
-  app.commandLine.appendSwitch("disable-gpu-sandbox");
-  app.commandLine.appendSwitch("--no-sandbox");
+  const disableGPU = validateArgument("--disable-gpu") || override;
+
+  if (disableGPU) {
+    app.commandLine.appendSwitch("no-sandbox");
+    app.commandLine.appendSwitch("disable-gpu");
+    app.commandLine.appendSwitch("disable-software-rasterizer");
+    app.commandLine.appendSwitch("disable-gpu-compositing");
+    app.commandLine.appendSwitch("disable-gpu-rasterization");
+    app.commandLine.appendSwitch("disable-gpu-sandbox");
+    app.commandLine.appendSwitch("--no-sandbox");
+  }
+
+  // Disable GPU Acceleration for Windows 7
+  if (disableGPU || (release().startsWith("6.1") && platform() === "win32")) {
+    app.disableHardwareAcceleration();
+  }
 }
 
-// Disable GPU Acceleration for Windows 7
-if (disableGPU || (release().startsWith("6.1") && platform() === "win32")) {
-  app.disableHardwareAcceleration();
-}
+maybeDisableGPU(false);
 
 export type Log = {
   type: "info" | "error";
@@ -240,20 +256,22 @@ const loadCoreModule: CoreModule = () =>
     let coreModule: ChildProcessWithoutNullStreams | null = null;
     let logs: Log[] = [];
 
+    const args = ["--runtime_path", CURRENT_RUNTIME_PATH!];
+
+    if (overrideBaseApi?.value) {
+      args.push("--base_api", overrideBaseApi.value!);
+    }
+
     try {
-      coreModule = spawn(
-        coreModulePath,
-        ["--runtime_path", CURRENT_RUNTIME_PATH!],
-        {
-          shell: false,
-          detached: false,
-          stdio: "pipe",
-          env: {
-            ...process.env,
-            RUST_BACKTRACE: "full"
-          }
+      coreModule = spawn(coreModulePath, args, {
+        shell: false,
+        detached: false,
+        stdio: "pipe",
+        env: {
+          ...process.env,
+          RUST_BACKTRACE: "full"
         }
-      );
+      });
     } catch (err) {
       console.error(`[CORE] Spawn error: ${err}`);
 
@@ -361,6 +379,12 @@ const loadCoreModule: CoreModule = () =>
         } else if (row.startsWith("_SHOW_APP_CLOSE_WARNING_:")) {
           const rightPart = row.split(":")[1];
           showAppCloseWarning = rightPart === "true";
+        } else if (row.startsWith("_POTATO_PC_MODE_:")) {
+          isPotatoPcModeSet = true;
+          const rightPart = row.split(":")[1];
+          if (rightPart === "true") {
+            maybeDisableGPU(true);
+          }
         }
       }
       console.log(`[CORE] Message: ${dataString}`);
@@ -622,7 +646,10 @@ ipcMain.handle("openFolder", async (_, path) => {
 
 ipcMain.handle("openCMPWindow", async () => {
   // @ts-ignore
-  app.overwolf.openCMPWindow();
+  if (app.overwolf.openCMPWindow) {
+    // @ts-ignore
+    app.overwolf.openCMPWindow();
+  }
 });
 
 ipcMain.handle("closeWindow", async () => {
@@ -835,3 +862,16 @@ app.on("render-process-gone", (event, webContents, detailed) => {
 app.on("open-url", (event, url) => {
   dialog.showErrorBox("Welcome Back", `You arrived from: ${url}`);
 });
+
+const LOOP_TIMEOUT = 4000;
+
+// keep event loop busy until potato pc mode is set or timeout is reached
+if (!isPotatoPcModeSet && !import.meta.env.DEV) {
+  let timeEnd = Date.now();
+  while (!isPotatoPcModeSet && timeEnd - timeStart < LOOP_TIMEOUT) {
+    timeEnd = Date.now();
+  }
+
+  // DO NOT REMOVE THIS CONSOLE LOG as V8 optimizes the loop away
+  console.log("First event loop tick done in ", timeEnd - timeStart);
+}

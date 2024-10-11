@@ -31,6 +31,7 @@ const BeginImportStep = (props: {
 
         setState([...state(), "success"]);
       } catch (error) {
+        console.error(error);
         setState([...state(), "error"]);
         continue;
       }

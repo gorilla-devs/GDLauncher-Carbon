@@ -1,5 +1,5 @@
 use anyhow::{bail, Context};
-use carbon_net::{Checksum, Downloadable};
+use carbon_net::{Checksum, DownloadOptions, Downloadable};
 use std::{ops::Deref, pin::Pin, sync::Arc, time::Duration};
 use tokio::{sync::Mutex, task::AbortHandle};
 
@@ -417,15 +417,15 @@ impl Installer {
                 return Ok(());
             }
 
-            {
-                let mut lock = self.rollback_context.lock().await;
-                *lock = Some(InstallerRollbackContext {
-                    inner: Arc::clone(&self.inner),
-                    processed_deps: Arc::new(Mutex::new(processed_deps)),
-                    instance_id,
-                    app: Arc::clone(app),
-                })
-            }
+            let mut lock = self.rollback_context.lock().await;
+            *lock = Some(InstallerRollbackContext {
+                inner: Arc::clone(&self.inner),
+                processed_deps: Arc::new(Mutex::new(processed_deps)),
+                instance_id,
+                app: Arc::clone(app),
+            });
+
+            drop(lock);
 
             if let Some(dep_error) = dep_error {
                 self.rollback(Some(&dep_error)).await;
@@ -482,14 +482,14 @@ impl Installer {
                                 t_download_file.complete_download();
                             });
 
-                            carbon_net::download_file(downloadable, Some(progress_watch_tx))
-                                .await
-                                .with_context(|| {
-                                    format!(
-                                        "Failed to download addon file for `{:?}`",
-                                        downloadable
-                                    )
-                                })?;
+                            carbon_net::download_multiple(
+                                &[downloadable.clone()],
+                                DownloadOptions::builder().concurrency(1).build(),
+                            )
+                            .await
+                            .with_context(|| {
+                                format!("Failed to download addon file for `{:?}`", downloadable)
+                            })?;
                         }
 
                         if let Some(id) = replaces_mod_id {
@@ -513,12 +513,15 @@ impl Installer {
                     match r {
                         Ok(()) => {}
                         Err(e) => {
+                            tracing::error!({ error = ?e }, "Error installing dependency");
+
                             let rollback_lock = rollback_context.lock().await;
-                            rollback_lock
-                                .as_ref()
-                                .expect("valid rollback context in spawned task")
-                                .rollback(Some(&e))
-                                .await;
+
+                            if let Some(rollback_lock) = rollback_lock.as_ref() {
+                                rollback_lock.rollback(Some(&e)).await;
+                            } else {
+                                tracing::error!("Invalid rollback context in spawned task");
+                            }
 
                             let parent_task = parent_task.lock().await;
                             parent_task.clone().fail(e).await

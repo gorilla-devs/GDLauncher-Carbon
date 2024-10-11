@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{env, sync::Arc};
 
 use anyhow::bail;
 use reqwest_middleware::ClientWithMiddleware;
@@ -21,7 +21,7 @@ use crate::{
         },
     },
     error::request::GoodJsonRequestError,
-    managers::{AppInner, GDL_API_BASE},
+    managers::AppInner,
 };
 
 pub struct CurseForge {
@@ -31,10 +31,11 @@ pub struct CurseForge {
 
 impl CurseForge {
     pub fn new(client: reqwest_middleware::ClientWithMiddleware) -> Self {
-        let base_url = format!("{GDL_API_BASE}/v1/curseforge/");
+        let curseforge_api_base = env!("CURSEFORGE_API_BASE", "missing curseforge env api base");
+
         Self {
             client,
-            base_url: base_url.parse().unwrap(),
+            base_url: curseforge_api_base.parse().unwrap(),
         }
     }
 
@@ -515,7 +516,7 @@ mod test {
     async fn test_search_no_query() {
         use super::*;
 
-        let client = crate::iridium_client::get_client().build();
+        let client = crate::iridium_client::get_client(env!("BASE_API").to_string()).build();
         let curseforge = CurseForge::new(client);
 
         let search_params = ModSearchParameters {
@@ -544,7 +545,7 @@ mod test {
     async fn test_search_with_query() {
         use super::*;
 
-        let client = crate::iridium_client::get_client().build();
+        let client = crate::iridium_client::get_client(env!("BASE_API").to_string()).build();
         let curseforge = CurseForge::new(client);
 
         let search_params = ModSearchParameters {
@@ -573,7 +574,7 @@ mod test {
     async fn test_get_mod() {
         use super::*;
 
-        let client = crate::iridium_client::get_client().build();
+        let client = crate::iridium_client::get_client(env!("BASE_API").to_string()).build();
         let curseforge = CurseForge::new(client);
 
         let mod_id = 389615;
@@ -586,7 +587,7 @@ mod test {
     async fn test_get_mod_description() {
         use super::*;
 
-        let client = crate::iridium_client::get_client().build();
+        let client = crate::iridium_client::get_client(env!("BASE_API").to_string()).build();
         let curseforge = CurseForge::new(client);
 
         let mod_id = 389615;
@@ -602,7 +603,7 @@ mod test {
     async fn test_get_mod_file() {
         use super::*;
 
-        let client = crate::iridium_client::get_client().build();
+        let client = crate::iridium_client::get_client(env!("BASE_API").to_string()).build();
         let curseforge = CurseForge::new(client);
 
         let mod_id = 389615;
@@ -619,7 +620,7 @@ mod test {
     async fn test_get_mod_files() {
         use super::*;
 
-        let client = crate::iridium_client::get_client().build();
+        let client = crate::iridium_client::get_client(env!("BASE_API").to_string()).build();
         let curseforge = CurseForge::new(client);
 
         let mod_id = 389615;
@@ -644,7 +645,7 @@ mod test {
     async fn test_get_mod_file_changelog() {
         use super::*;
 
-        let client = crate::iridium_client::get_client().build();
+        let client = crate::iridium_client::get_client(env!("BASE_API").to_string()).build();
         let curseforge = CurseForge::new(client);
 
         let mod_id = 389615;

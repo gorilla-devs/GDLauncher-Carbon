@@ -1,23 +1,22 @@
 ::-webkit-scrollbar {
-  width: 15px;
-  height: 15px;
+  width: 13px;
 }
 
 ::-webkit-scrollbar-track {
-  background-color: var(--darkSlate-800);
+  background-color: rgb(var(--darkSlate-800));
   border-radius: 10px;
   padding: 3px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: var(--lightGray-800);
-  border: 5px solid var(--darkSlate-800);
+  background-color: rgb(var(--lightGray-800));
+  border: 5px solid rgb(var(--darkSlate-800));
   width: 5px;
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: var(--lightGray-700);
+  background-color: rgb(var(--lightGray-900));
 }
 
 .potato-pc *,
@@ -61,4 +60,33 @@ a {
   to {
     opacity: 0;
   }
+}
+
+.instance-tile-spinning {
+  background-image: linear-gradient(to right, transparent, transparent),
+    conic-gradient(
+      from var(--instance-tile-angle),
+      rgb(var(--primary)) 0deg 90deg,
+      transparent 90deg 180deg,
+      transparent 180deg 270deg,
+      transparent 270deg 360deg
+    );
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+@keyframes rotate {
+  to {
+    --instance-tile-angle: 360deg;
+  }
+}
+
+.instance-tile-spinning {
+  animation: rotate 4s linear infinite;
+}
+
+@property --instance-tile-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
 }

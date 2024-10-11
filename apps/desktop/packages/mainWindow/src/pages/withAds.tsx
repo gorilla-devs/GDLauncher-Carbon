@@ -58,7 +58,12 @@ function withAdsLayout() {
   return (
     <>
       <AppNavbar />
-      <div class="flex w-screen z-10 h-auto">
+      <div
+        class="flex w-screen z-10 h-auto"
+        style={{
+          background: "var(--ads-sidebar-background)"
+        }}
+      >
         <main class="relative flex-grow">
           <div class="flex justify-end h-[calc(100vh-60px)]">
             <div
@@ -70,7 +75,7 @@ function withAdsLayout() {
             </div>
             <div class="flex flex-col justify-between h-[calc(100vh-100px)]">
               <div
-                class="bg-darkSlate-800 py-4"
+                class="py-4"
                 style={{
                   width: `${adSize.width}px`,
                   height: `${adSize.height}px`
@@ -100,7 +105,6 @@ function withAdsLayout() {
                 </div>
               </div>
             </div>
-            <div class="absolute top-0 left-0 right-0 bottom-0 bg-image-gdlauncher_pattern.svg -z-10" />
           </div>
         </main>
       </div>

@@ -52,7 +52,7 @@ const getTabIndexFromPath = (path: string) => {
   return 0;
 };
 
-const InfiniteScrollQueryWrapper = () => {
+const ModpacksInfiniteScrollQueryWrapper = () => {
   const params = useParams();
   const routeData: ReturnType<typeof fetchData> = useRouteData();
 
@@ -519,4 +519,4 @@ const Modpack = () => {
   );
 };
 
-export default InfiniteScrollQueryWrapper;
+export default ModpacksInfiniteScrollQueryWrapper;
