@@ -2,7 +2,7 @@ import { ModalProps, useModal } from "..";
 import ModalLayout from "../ModalLayout";
 import { Button, Progressbar } from "@gd/ui";
 import { Trans } from "@gd/i18n";
-import { Show, createResource } from "solid-js";
+import { Match, Show, Switch, createResource } from "solid-js";
 import { Portal } from "solid-js/web";
 import { RTprogress, RTsetProgress } from "@/utils/runtimePathProgress";
 
@@ -23,7 +23,14 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
       >
         <div class="flex flex-col justify-between h-full">
           <div class="h-h-full">
-            <Trans key="settings:confirm_change_runtime_path_text" />
+            <Switch>
+              <Match when={props.data.isTargetFolderAlreadyUsed}>
+                <Trans key="settings:confirm_change_runtime_path_already_used_text" />
+              </Match>
+              <Match when={!props.data.isTargetFolderAlreadyUsed}>
+                <Trans key="settings:confirm_change_runtime_path_text" />
+              </Match>
+            </Switch>
           </div>
           <div class="h-h-full">
             <div class="font-bold text-red-400">
@@ -34,10 +41,21 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
             </div>
           </div>
           <div class="h-h-full">
-            <div class="font-bold text-green-400">
+            <div
+              class="font-bold"
+              classList={{
+                "text-green-400": !props.data.isTargetFolderAlreadyUsed,
+                "text-yellow-400": props.data.isTargetFolderAlreadyUsed
+              }}
+            >
               <Trans key="settings:runtime_path_new_path" />
             </div>
-            <div class="bg-darkSlate-900 p-4 mt-4">
+            <div
+              class="bg-darkSlate-900 p-4 mt-4"
+              classList={{
+                "text-yellow-400": props.data.isTargetFolderAlreadyUsed
+              }}
+            >
               <div>{props.data.runtimePath.replaceAll("\\\\", "/")}</div>
             </div>
           </div>

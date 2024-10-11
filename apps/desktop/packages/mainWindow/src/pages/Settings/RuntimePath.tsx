@@ -111,10 +111,18 @@ const RuntimePath = () => {
             <Tooltip
               content={
                 <Switch>
-                  <Match when={isPathValid()}>
+                  <Match when={currentRuntimePath() === runtimePath()}>
+                    <Trans key="tooltip.rtp_unchanged" />
+                  </Match>
+                  <Match
+                    when={
+                      isPathValid() === "valid" ||
+                      isPathValid() === "potentially_valid"
+                    }
+                  >
                     <Trans key="tooltip.apply_and_restart" />
                   </Match>
-                  <Match when={!isPathValid()}>
+                  <Match when={!isPathValid() || isPathValid() === "invalid"}>
                     <Trans key="tooltip.rtp_not_valid" />
                   </Match>
                 </Switch>
@@ -125,7 +133,17 @@ const RuntimePath = () => {
                 type="primary"
                 class="h-10"
                 size="small"
-                disabled={!isPathValid() || isChangingRuntimePath()}
+                backgroundColor={
+                  isPathValid() === "potentially_valid"
+                    ? "bg-yellow-400"
+                    : undefined
+                }
+                disabled={
+                  !isPathValid() ||
+                  isPathValid() === "invalid" ||
+                  isChangingRuntimePath() ||
+                  currentRuntimePath() === runtimePath()
+                }
                 loading={isChangingRuntimePath()}
                 onClick={async () => {
                   modalsContext?.openModal(
@@ -134,6 +152,8 @@ const RuntimePath = () => {
                     },
                     {
                       runtimePath: runtimePath()!,
+                      isTargetFolderAlreadyUsed:
+                        isPathValid() === "potentially_valid",
                       setIsChangingRuntimePath,
                       isChangingRuntimePath: isChangingRuntimePath
                     }

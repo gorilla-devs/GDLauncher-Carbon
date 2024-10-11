@@ -735,25 +735,25 @@ ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
 
 ipcMain.handle("validateRuntimePath", async (_, newPath: string | null) => {
   if (!newPath || newPath === CURRENT_RUNTIME_PATH) {
-    return false;
+    return "invalid";
   }
 
   const pathExists = await fse.pathExists(newPath);
   if (!pathExists) {
-    return true;
+    return "valid";
   }
 
   const newPathStat = await fs.stat(newPath);
   if (!newPathStat.isDirectory()) {
-    return false;
+    return "invalid";
   }
 
   const files = await fs.readdir(newPath);
   if (files.length > 0) {
-    return false;
+    return "potentially_valid";
   }
 
-  return true;
+  return "valid";
 });
 
 ipcMain.handle("getCoreModule", async () => {
