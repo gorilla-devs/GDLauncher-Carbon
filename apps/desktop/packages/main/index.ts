@@ -560,7 +560,9 @@ async function createWindow(): Promise<BrowserWindow> {
     isSpawningWindow = false;
 
     coreModule.finally(() => {
-      win?.show();
+      if (win && !win?.isDestroyed()) {
+        win?.show();
+      }
     });
 
     function upsertKeyValue(obj: any, keyToChange: string, value: any) {
@@ -672,6 +674,7 @@ ipcMain.handle("getRuntimePath", async () => {
 
 ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
   type Progress = {
+    action: "copy" | "remove";
     currentName: string;
     current: number;
     total: number;
@@ -711,9 +714,10 @@ ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
     const file = files[i];
 
     win?.webContents.send("changeRuntimePathProgress", {
+      action: "copy",
       currentName: path.basename(file),
       current: i,
-      total
+      total: total * 2
     } satisfies Progress);
 
     await fse.copy(
@@ -728,6 +732,19 @@ ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
   }
 
   await fse.writeFile(runtimeOverridePath, newPath);
+
+  for (let i = 0; i < total; i++) {
+    const file = files[i];
+
+    win?.webContents.send("changeRuntimePathProgress", {
+      action: "remove",
+      currentName: path.basename(file),
+      current: total + i,
+      total: total * 2
+    } satisfies Progress);
+
+    await fse.remove(path.join(CURRENT_RUNTIME_PATH!, file));
+  }
 
   app.relaunch();
   app.exit();

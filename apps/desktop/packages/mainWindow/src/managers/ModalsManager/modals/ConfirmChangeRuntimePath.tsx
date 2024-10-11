@@ -2,12 +2,16 @@ import { ModalProps, useModal } from "..";
 import ModalLayout from "../ModalLayout";
 import { Button, Progressbar } from "@gd/ui";
 import { Trans } from "@gd/i18n";
-import { Match, Show, Switch, createResource } from "solid-js";
+import { Match, Show, Switch, createResource, createSignal } from "solid-js";
 import { Portal } from "solid-js/web";
 import { RTprogress, RTsetProgress } from "@/utils/runtimePathProgress";
 
 const ConfirmChangeRuntimePath = (props: ModalProps) => {
   const modalsContext = useModal();
+
+  const [migrationError, setMigrationError] = createSignal<string | undefined>(
+    undefined
+  );
 
   const [currentRuntimePath] = createResource(() => {
     return window.getRuntimePath();
@@ -73,11 +77,15 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
               onClick={async () => {
                 props.data.setIsChangingRuntimePath(true);
 
-                await window.changeRuntimePath(props.data.runtimePath);
-                RTsetProgress(undefined);
+                try {
+                  await window.changeRuntimePath(props.data.runtimePath);
+                  modalsContext?.closeModal();
+                } catch (e: any) {
+                  setMigrationError(e.message);
+                }
 
+                RTsetProgress(undefined);
                 props.data.setIsChangingRuntimePath(false);
-                modalsContext?.closeModal();
               }}
             >
               <Trans key="settings:confirm_change_confirm_button" />
@@ -85,15 +93,50 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
           </div>
         </div>
       </ModalLayout>
-      <Show when={props.data.isChangingRuntimePath()}>
+      <Show when={props.data.isChangingRuntimePath() || migrationError()}>
         <Portal>
-          <div class="inset-0 z-100 backdrop-blur-sm flex flex-col items-center justify-center fixed bg-black bg-opacity-65">
-            <div class="flex text-2xl items-center">
-              <Trans key="settings:applying_new_runtime_path" />
-              <div class="ml-2 i-ri:loader-4-line animate-spin" />
+          <div
+            class="inset-0 z-100 backdrop-blur-sm flex flex-col items-center justify-center fixed bg-opacity-65 p-8"
+            classList={{
+              "bg-black": !migrationError(),
+              "bg-red-900": !!migrationError()
+            }}
+          >
+            <div>
+              <Switch>
+                <Match when={migrationError()}>
+                  <div class="flex text-2xl items-center text-center">
+                    <div>
+                      <Trans key="settings:migration_errored">
+                        {""}
+                        <span
+                          class="underline cursor-pointer text-lightSlate-50 hover:text-lightSlate-400"
+                          onClick={() => {
+                            window.openExternalLink(
+                              "https://gdlauncher.com/docs/troubleshooting/#migration-error"
+                            );
+                          }}
+                        />
+                        {""}
+                      </Trans>
+                    </div>
+                  </div>
+                </Match>
+                <Match when={!migrationError()}>
+                  <div class="flex text-2xl items-center">
+                    <Trans key="settings:applying_new_runtime_path" />
+                    <div class="ml-2 i-ri:loader-4-line animate-spin" />
+                  </div>
+                </Match>
+              </Switch>
             </div>
             <div class="mt-4">
-              <Trans key="settings:do_not_close_app" />
+              <Switch>
+                <Match when={migrationError()}>{migrationError()}</Match>
+                <Match when={!migrationError()}>
+                  <Trans key="settings:do_not_close_app" />
+                </Match>
+              </Switch>
               <div
                 class="mt-4 text-lightSlate-400"
                 classList={{
@@ -103,7 +146,26 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                 <div>
                   {RTprogress()?.current} / {RTprogress()?.total}
                 </div>
-                <div>{RTprogress()?.currentName}</div>
+                <div>
+                  <Switch>
+                    <Match when={RTprogress()?.action === "copy"}>
+                      <Trans
+                        key="settings:copying_file"
+                        options={{
+                          file: RTprogress()?.currentName
+                        }}
+                      />
+                    </Match>
+                    <Match when={RTprogress()?.action === "remove"}>
+                      <Trans
+                        key="settings:removing_file"
+                        options={{
+                          file: RTprogress()?.currentName
+                        }}
+                      />
+                    </Match>
+                  </Switch>
+                </div>
 
                 <div class="w-full">
                   <Progressbar
