@@ -574,9 +574,9 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                   }}
                   value={title()!}
                   errorMessage={
-                    error() &&
-                    !title() &&
-                    (t("error.missing_field_title") as string)
+                    error() && !title()
+                      ? (t("error.missing_field_title") as string)
+                      : undefined
                   }
                 />
               </div>
