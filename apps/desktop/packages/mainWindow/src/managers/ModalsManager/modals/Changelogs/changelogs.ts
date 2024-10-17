@@ -31,6 +31,10 @@ const changelogs: Changelog = {
         "As part of the GDL accounts, we also redesigned the accounts management system.",
       description:
         'We added an "Accounts" tab in the settings to easily manage your accounts, as well as your GDL account.'
+    },
+    {
+      title: "Library featured modpack can now be hidden",
+      description: "by clicking the eye icon in the top right corner."
     }
   ],
   fixed: [
@@ -74,9 +78,17 @@ const changelogs: Changelog = {
         "It now takes up less space, and accomodates for a smaller featured tile. While it's static for now, we're working on a dynamic featured tile."
     },
     {
-      title: "Improve network download performance",
+      title: "Improved network download performance",
       description:
         "We've made some changes to the way we download files, which should improve performance and, more importantly, make them more reliable."
+    },
+    {
+      title: "Improved runtime path migration.",
+      description:
+        "We've made some changes to the way we migrate the runtime path. The UI now shows the current progress of the operation and will display an error message if the migration fails."
+    },
+    {
+      title: "Potato PC mode now also disables hardware acceleration."
     }
   ]
 };

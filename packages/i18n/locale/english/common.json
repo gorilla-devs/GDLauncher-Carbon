@@ -449,6 +449,7 @@
   "tooltip.reset": "Reset",
   "tooltip.apply_and_restart": "Apply and restart",
   "tooltip.rtp_not_valid": "The runtime path is not valid. Either the path is not a folder or it's not an empty directory",
+  "tooltip.rtp_unchanged": "The runtime path is unchanged",
   "why_are_ads_needed": "Why are ads needed?",
   "ads.paragraph-1": "At GDLauncher, we strive to provide a high-quality user-experience, which involves ongoing development and maintenance costs. To support these efforts, our platform features ads.",
   "ads.paragraph-2": "Ongoing development is crucial because:",

@@ -21,12 +21,14 @@ const FeaturedModpackTile = () => {
   const [shouldShow, setShouldShow] = createSignal(true);
 
   const [hexingTales] = createResource(() => {
-    return rspcContext.client.query([
-      "modplatforms.curseforge.getMod",
-      {
-        modId: HEXING_TALES_MODPACK_ID
-      }
-    ]);
+    return rspcContext.client
+      .query([
+        "modplatforms.curseforge.getMod",
+        {
+          modId: HEXING_TALES_MODPACK_ID
+        }
+      ])
+      .catch(console.error);
   });
 
   const settingsMutation = rspc.createMutation(() => ({
