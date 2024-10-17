@@ -95,7 +95,7 @@ const Dropdown = (props: Props) => {
 
   const position = useFloating(buttonRef, menuRef, {
     placement: props.menuPlacement || "bottom-start",
-    middleware: [offset(5), flip(), shift(), hide(), size()],
+    middleware: [offset(10), flip(), shift(), hide(), size()],
     whileElementsMounted: (reference, floating, update) =>
       autoUpdate(reference, floating, update, {
         animationFrame: true,
@@ -143,7 +143,7 @@ const Dropdown = (props: Props) => {
     <>
       <div class={`block relative ${props.containerClass || ""}`} id={props.id}>
         <button
-          class={`flex justify-between font-semibold py-2 items-center min-h-10 box-border ${props.class} ${props.bgColorClass} ${props.textColorClass}`}
+          class={`flex justify-between transition-200 ease-in-out font-semibold py-2 items-center min-h-10 box-border ${props.class} ${props.bgColorClass} ${props.textColorClass}`}
           onClick={() => {
             if (props.disabled) return;
             setMenuOpened(!menuOpened());
@@ -157,8 +157,17 @@ const Dropdown = (props: Props) => {
           classList={{
             "border-0": !props.error,
             "border-2 border-solid border-red-500": !!props.error,
-            "text-darkSlate-50 hover:text-lightSlate-50":
-              !props.disabled && !props.error && !props.textColorClass,
+            "text-darkSlate-50": props.disabled,
+            "text-darkSlate-50 hover:text-lightSlate-50 outline-none hover:outline-darkSlate-600":
+              !props.disabled &&
+              !props.error &&
+              !props.textColorClass &&
+              !menuOpened(),
+            "text-lightSlate-50 outline outline-offset-2 outline-darkSlate-500 hover:outline-darkSlate-500":
+              !props.disabled &&
+              !props.error &&
+              !props.textColorClass &&
+              menuOpened(),
             "text-darkSlate-500": !!props.error && !props.textColorClass,
             "rounded-full": props.rounded,
             "bg-darkSlate-700": !props.bgColorClass && !props.disabled,
@@ -168,7 +177,6 @@ const Dropdown = (props: Props) => {
             "group px-4": !props.btnDropdown,
             "bg-primary-500 duration-100": props.btnDropdown && !props.disabled,
             "hover:bg-primary-300": props.btnDropdown && !props.disabled,
-            "cursor-pointer": !props.disabled,
             "cursor-not-allowed": props.disabled && !!props.bgColorClass,
             "cursor-not-allowed bg-darkSlate-800":
               props.disabled && !props.bgColorClass,
@@ -178,33 +186,11 @@ const Dropdown = (props: Props) => {
             <Show when={props.icon}>
               <span class="mr-2">{props.icon}</span>
             </Show>
-            <div
-              class="w-[calc(100%-2rem)] flex justify-between"
-              classList={{
-                "text-lightSlate-50": !!props.error,
-                "text-darkSlate-50 hover:text-lightSlate-50 group-hover:text-lightSlate-50":
-                  !props.disabled && !props.error && !props.textColorClass,
-                "text-darkSlate-500":
-                  props.disabled && !props.textColorClass && !props.btnDropdown,
-              }}
-            >
+            <div class="w-[calc(100%-2rem)] flex justify-between">
               {selectedValue()?.label ?? props.placeholder}
             </div>
           </Show>
-          <div
-            class="i-ri:arrow-drop-down-line w-8 h-8 ease-in-out duration-100"
-            classList={{
-              "text-darkSlate-50 group-hover:text-lightSlate-50":
-                !props.disabled &&
-                !props.error &&
-                !props.btnDropdown &&
-                !props.textColorClass,
-              "text-lightSlate-50":
-                !!props.error ||
-                (props.btnDropdown && !props.textColorClass && !props.disabled),
-              "text-darkSlate-500": props.disabled,
-            }}
-          />
+          <div class="i-ri:arrow-drop-down-line w-8 h-8 ease-in-out duration-100" />
         </button>
         <Show when={menuOpened()}>
           <Portal>

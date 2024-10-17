@@ -8,6 +8,7 @@ import {
   untrack,
   JSX,
   splitProps,
+  createEffect,
 } from "solid-js";
 import { useTabsContext } from "./Tabs";
 
@@ -21,7 +22,10 @@ interface Props extends JSX.HTMLAttributes<HTMLDivElement> {
 }
 
 const Tab = (_props: Props) => {
-  const [onclick, props] = splitProps(_props, ["onClick"]);
+  const [{ onClick, class: classProp }, props] = splitProps(_props, [
+    "onClick",
+    "class",
+  ]);
   const [index, setIndex] = createSignal(-1);
   let ref: HTMLDivElement;
 
@@ -61,6 +65,10 @@ const Tab = (_props: Props) => {
     observer?.disconnect();
   });
 
+  createEffect(() => {
+    console.log(index(), tabsContext?.isSelectedIndex(index()));
+  });
+
   return (
     <div
       classList={{
@@ -69,17 +77,16 @@ const Tab = (_props: Props) => {
         "h-full":
           tabsContext?.variant() === "underline" &&
           tabsContext?.orientation() === "horizontal",
-        "cursor-pointer": !props.noPointer,
         "flex flex-col justify-center": props.noPadding,
         "text-lightSlate-50": tabsContext?.isSelectedIndex(index()),
         "text-lightSlate-800": !tabsContext?.isSelectedIndex(index()),
       }}
-      class="bg-darkSlate-800 hover:text-lightSlate-50 flex items-center"
+      class={`bg-darkSlate-800 hover:text-lightSlate-50 flex justify-center items-center text-center transition-colors text-lightSlate-800 ${classProp}`}
       ref={(el) => {
         ref = el;
       }}
       onClick={() => {
-        if (onclick.onClick) onclick.onClick();
+        if (onClick) onClick();
         if (!props.ignored) tabsContext?.setSelectedIndex(index());
       }}
       {...props}
@@ -87,7 +94,7 @@ const Tab = (_props: Props) => {
       <Switch>
         <Match when={tabsContext?.variant() === "underline"}>
           <div
-            class={`hover:text-lightSlate-50 transition-colors font-500 capitalize flex items-center h-full ${
+            class={`font-500 capitalize flex items-center h-full ${
               tabsContext?.paddingX?.() || ""
             } ${tabsContext?.paddingY?.() || ""}`}
             classList={{
@@ -107,7 +114,7 @@ const Tab = (_props: Props) => {
         </Match>
         <Match when={tabsContext?.variant() === "block"}>
           <div
-            class={`flex gap-1 hover:text-lightSlate-50 justify-center items-center flex-1 h-full cursor-pointer rounded-xl font-500 capitalize box-border ${
+            class={`flex gap-1 justify-center items-center flex-1 h-full cursor-pointer rounded-xl font-500 capitalize box-border ${
               tabsContext?.paddingX?.() || ""
             } ${tabsContext?.paddingY?.() || ""}`}
             classList={{
@@ -133,13 +140,11 @@ const Tab = (_props: Props) => {
         </Match>
         <Match when={tabsContext?.variant() === "traditional"}>
           <div
-            class={`flex gap-1 hover:text-lightSlate-50 justify-center items-center bg-darkSlate-800 flex-1 h-full font-500 capitalize box-border rounded-t-xl ${
+            class={`flex gap-1 justify-center items-center flex-1 h-full font-500 capitalize box-border rounded-t-xl ${
               tabsContext?.paddingX?.() || ""
             } ${tabsContext?.paddingY?.() || ""}`}
             classList={{
               "px-2": !tabsContext?.paddingX?.(),
-              "text-lightSlate-50": tabsContext?.isSelectedIndex(index()),
-              "text-lightSlate-800": !tabsContext?.isSelectedIndex(index()),
               "bg-darkSlate-700": tabsContext?.isSelectedIndex(index()),
             }}
           >

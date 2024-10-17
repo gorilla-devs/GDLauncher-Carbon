@@ -110,9 +110,9 @@ const getVariant = (
     },
     secondary: {
       ...commonStyle,
-      "border-1": true,
-      "hover:border-white": !isDisabled,
-      "border-darkSlate-500": !isDisabled,
+      "border-2": true,
+      "hover:border-darkSlate-500": !isDisabled,
+      "border-darkSlate-600": !isDisabled,
       "bg-darkSlate-700": true,
       "text-darkSlate-500": isDisabled,
       "cursor-not-allowed": isDisabled,

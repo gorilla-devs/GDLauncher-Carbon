@@ -118,7 +118,7 @@ function Input(props: Props) {
     ? local.inputColor
     : "bg-darkSlate-600";
 
-  let containerClasses = `outline-none  has-[:focus-visible]:outline-darkSlate-500 hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-darkSlate-500 h-10 gap-2 box-border transition-all duration-100 rounded-md ease-in-out ${
+  let containerClasses = `outline-none has-[:focus-visible]:outline-darkSlate-500 hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-darkSlate-500 h-10 gap-2 box-border transition-all duration-100 rounded-md ease-in-out ${
     local.class || ""
   }`;
   if (local.icon) {
