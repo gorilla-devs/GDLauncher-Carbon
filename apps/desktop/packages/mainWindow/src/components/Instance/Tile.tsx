@@ -21,6 +21,7 @@ import {
 } from "@/managers/ModalsManager/modals/InstanceExport";
 import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/atoms/ExportCheckboxParent";
 import { setClickedInstanceId } from "../InstanceTile";
+import { useGlobalStore } from "../GlobalStoreContext";
 
 type Variant = "default" | "sidebar" | "sidebar-small";
 
@@ -53,6 +54,8 @@ const Tile = (props: Props) => {
     props
   );
 
+  const globalStore = useGlobalStore();
+
   const [copiedError, setCopiedError] = createSignal(false);
 
   const rspcContext = rspc.useContext();
@@ -83,7 +86,34 @@ const Tile = (props: Props) => {
     });
   };
 
+  const isLoading = () => props.isLoading;
+
   const handlePlay = () => {
+    if (props.isPreparing) {
+      return;
+    }
+
+    if (props.isRunning) {
+      killInstanceMutation.mutate(props.instance.id);
+      return;
+    }
+
+    if (
+      globalStore.currentlySelectedAccount()?.status === "expired" ||
+      globalStore.currentlySelectedAccount()?.status === "invalid"
+    ) {
+      modalsContext?.openModal(
+        {
+          name: "accountExpired"
+        },
+        {
+          id: props.instance.id
+        }
+      );
+
+      return;
+    }
+
     launchInstanceMutation.mutate(props.instance.id);
   };
 
@@ -147,19 +177,19 @@ const Tile = (props: Props) => {
       icon: props.isRunning ? "i-ri:stop-fill" : "i-ri:play-fill",
       label: props.isRunning ? t("instance.stop") : t("instance.action_play"),
       action: handlePlay,
-      disabled: props.isLoading || isInQueue() || props.isDeleting
+      disabled: isLoading() || isInQueue() || props.isDeleting
     },
     {
       icon: "i-ri:pencil-fill",
       label: t("instance.action_edit"),
       action: handleEdit,
-      disabled: props.isLoading || isInQueue() || props.isDeleting
+      disabled: isLoading() || isInQueue() || props.isDeleting
     },
     {
       icon: "i-ri:settings-3-fill",
       label: t("instance.action_settings"),
       action: handleSettings,
-      disabled: props.isLoading || isInQueue() || props.isDeleting
+      disabled: isLoading() || isInQueue() || props.isDeleting
     },
     ...(!props.isInvalid
       ? [
@@ -167,7 +197,7 @@ const Tile = (props: Props) => {
             icon: "i-ri:file-copy-fill",
             label: t("instance.action_duplicate"),
             action: handleDuplicate,
-            disabled: props.isLoading || isInQueue() || props.isDeleting
+            disabled: isLoading() || isInQueue() || props.isDeleting
           }
         ]
       : []),
@@ -196,14 +226,14 @@ const Tile = (props: Props) => {
           name: "exportInstance"
         });
       },
-      disabled: props.isLoading || isInQueue() || props.isDeleting
+      disabled: isLoading() || isInQueue() || props.isDeleting
     },
     {
       id: "delete",
       icon: "i-ri:delete-bin-2-fill",
       label: t("instance.action_delete"),
       action: handleDelete,
-      disabled: props.isLoading || isInQueue() || props.isDeleting
+      disabled: isLoading() || isInQueue() || props.isDeleting
     }
   ];
 
@@ -214,18 +244,7 @@ const Tile = (props: Props) => {
     return {};
   };
 
-  const handlePlayClick = () => {
-    if (props.isPreparing) {
-      return;
-    }
-    if (props.isRunning) {
-      killInstanceMutation.mutate(props.instance.id);
-    } else {
-      launchInstanceMutation.mutate(props.instance.id);
-    }
-  };
-
-  const isInQueue = () => props.isPreparing && !props.isLoading;
+  const isInQueue = () => props.isPreparing && !isLoading();
 
   return (
     <Switch>
@@ -274,11 +293,11 @@ const Tile = (props: Props) => {
             }
           >
             <div
-              class="flex justify-center flex-col relative select-none group items-start hover:-translate-y-2 duration-200 ease-in-out"
+              class="flex justify-center flex-col relative select-none group items-start duration-200 ease-in-out"
               onClick={(e) => {
                 e.stopPropagation();
                 if (
-                  !props.isLoading &&
+                  !isLoading() &&
                   !isInQueue() &&
                   !props.isInvalid &&
                   !props.isDeleting
@@ -292,10 +311,10 @@ const Tile = (props: Props) => {
                   class="absolute h-full w-full top-0 left-0 transition-[opacity,background] duration-300 ease-in-out"
                   classList={{
                     "opacity-0 bg-transparent":
-                      !props.isLoading && !props.isRunning,
-                    "opacity-100": props.isLoading || props.isRunning,
+                      !isLoading() && !props.isRunning,
+                    "opacity-100": isLoading() || props.isRunning,
                     "bg-green-400": props.isRunning,
-                    "instance-tile-spinning": props.isLoading
+                    "instance-tile-spinning": isLoading()
                   }}
                 />
                 <div
@@ -317,9 +336,11 @@ const Tile = (props: Props) => {
                   }
                 >
                   <div
-                    class="flex justify-center relative items-center rounded-2xl overflow-hidden h-full w-full bg-cover bg-center group-hover:scale-120 transition-all duration-300 ease-in-out"
+                    class="flex justify-center relative items-center rounded-2xl overflow-hidden h-full w-full bg-cover bg-center transition-all duration-300 ease-in-out"
                     classList={{
-                      grayscale: props.isLoading || isInQueue()
+                      grayscale: isLoading() || isInQueue(),
+                      "group-hover:blur-[2px] group-hover:scale-120":
+                        !isLoading() && !isInQueue()
                     }}
                     style={{
                       "background-image": props.img
@@ -393,7 +414,7 @@ const Tile = (props: Props) => {
 
                   <Show
                     when={
-                      props.isLoading &&
+                      isLoading() &&
                       props.percentage !== undefined &&
                       props.percentage !== null
                     }
@@ -464,9 +485,7 @@ const Tile = (props: Props) => {
                       />
                     </div>
                   </Show>
-                  <Show
-                    when={props.isLoading || isInQueue() || props.isDeleting}
-                  >
+                  <Show when={isLoading() || isInQueue() || props.isDeleting}>
                     <div
                       class="absolute top-0 bottom-0 left-0 right-0 backdrop-blur-sm z-11"
                       style={
@@ -504,10 +523,10 @@ const Tile = (props: Props) => {
                   <div
                     class="z-50 hidden justify-center items-center absolute rounded-2xl ease-in-out duration-200 h-12 w-12 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
                     classList={{
-                      "scale-100 bg-red-500": props.isLoading,
+                      "scale-100 bg-red-500": isLoading(),
                       "flex bg-primary-500 hover:bg-primary-400 text-2xl":
                         !props.isRunning &&
-                        !props.isLoading &&
+                        !isLoading() &&
                         !isInQueue() &&
                         !props.isDeleting,
                       "scale-0": !props.isRunning,
@@ -515,7 +534,7 @@ const Tile = (props: Props) => {
                         props.isRunning,
 
                       "group-hover:scale-100":
-                        !props.isLoading &&
+                        !isLoading() &&
                         !isInQueue() &&
                         !props.isInvalid &&
                         !props.failError &&
@@ -532,7 +551,7 @@ const Tile = (props: Props) => {
                     }
                     onClick={(e) => {
                       e.stopPropagation();
-                      handlePlayClick();
+                      handlePlay();
                     }}
                   >
                     <div
@@ -550,9 +569,9 @@ const Tile = (props: Props) => {
                 class="text-ellipsis whitespace-nowrap mt-2 mb-1"
                 classList={{
                   "text-lightSlate-50":
-                    !props.isLoading && !isInQueue() && !props.isDeleting,
+                    !isLoading() && !isInQueue() && !props.isDeleting,
                   "text-lightGray-900":
-                    props.isLoading || isInQueue() || props.isDeleting,
+                    isLoading() || isInQueue() || props.isDeleting,
                   "max-w-100": props.size === 5,
                   "max-w-70": props.size === 4,
                   "max-w-50": props.size === 3,
@@ -579,7 +598,7 @@ const Tile = (props: Props) => {
                 </Tooltip>
               </h4>
               <Switch>
-                <Match when={!props.isLoading && !props.isPreparing}>
+                <Match when={!isLoading() && !props.isPreparing}>
                   <div class="flex gap-2 justify-between text-lightGray-900">
                     <span
                       class="flex gap-1"
@@ -606,7 +625,7 @@ const Tile = (props: Props) => {
                 </Match>
                 <Match
                   when={
-                    props.isLoading &&
+                    isLoading() &&
                     props.downloaded !== 0 &&
                     props.totalDownload !== 0
                   }
