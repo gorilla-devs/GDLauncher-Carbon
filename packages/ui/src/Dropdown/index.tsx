@@ -18,11 +18,62 @@ import {
   shift,
   size,
 } from "@floating-ui/dom";
+import { cva, type VariantProps } from "class-variance-authority";
 
 type Option = {
   label: string | JSX.Element | Element;
   key: string | number;
 };
+
+const dropdownButton = cva(
+  "flex justify-between transition-all transition-200 ease-in-out font-semibold py-2 items-center min-h-10 box-border",
+  {
+    variants: {
+      error: {
+        true: "border-2 border-solid border-red-500",
+        false: "border-0",
+      },
+      disabled: {
+        true: "text-darkSlate-50 cursor-not-allowed",
+        false: "",
+      },
+      menuOpened: {
+        true: "text-lightSlate-50 outline outline-offset-2 outline-darkSlate-500 hover:outline-darkSlate-500",
+        false:
+          "text-darkSlate-50 hover:text-lightSlate-50 outline-none hover:outline-darkSlate-600",
+      },
+      rounded: {
+        true: "rounded-full",
+        false: "rounded-md",
+      },
+      btnDropdown: {
+        true: "group-hover:bg-primary-300 border-l-1 border-solid border-primary-300 bg-primary-500 duration-100 hover:bg-primary-300",
+        false: "group px-4",
+      },
+    },
+    compoundVariants: [
+      {
+        disabled: false,
+        btnDropdown: false,
+        class: "bg-darkSlate-700",
+      },
+      {
+        disabled: true,
+        btnDropdown: false,
+        class: "bg-darkSlate-800",
+      },
+    ],
+    defaultVariants: {
+      error: false,
+      disabled: false,
+      menuOpened: false,
+      rounded: false,
+      btnDropdown: false,
+    },
+  }
+);
+
+type DropdownButtonProps = VariantProps<typeof dropdownButton>;
 
 type Props = {
   options: Option[];
@@ -42,7 +93,7 @@ type Props = {
   placeholder?: string;
   placement?: "bottom" | "top";
   menuPlacement?: Placement;
-};
+} & DropdownButtonProps;
 
 interface DropDownButtonProps {
   children: JSX.Element;
@@ -143,7 +194,14 @@ const Dropdown = (props: Props) => {
     <>
       <div class={`block relative ${props.containerClass || ""}`} id={props.id}>
         <button
-          class={`flex justify-between transition-200 ease-in-out font-semibold py-2 items-center min-h-10 box-border ${props.class} ${props.bgColorClass} ${props.textColorClass}`}
+          class={dropdownButton({
+            error: !!props.error,
+            disabled: props.disabled,
+            menuOpened: menuOpened(),
+            rounded: props.rounded,
+            btnDropdown: props.btnDropdown,
+            class: `${props.class} ${props.bgColorClass} ${props.textColorClass}`,
+          })}
           onClick={() => {
             if (props.disabled) return;
             setMenuOpened(!menuOpened());
@@ -154,33 +212,6 @@ const Dropdown = (props: Props) => {
             }
           }}
           ref={setButtonRef}
-          classList={{
-            "border-0": !props.error,
-            "border-2 border-solid border-red-500": !!props.error,
-            "text-darkSlate-50": props.disabled,
-            "text-darkSlate-50 hover:text-lightSlate-50 outline-none hover:outline-darkSlate-600":
-              !props.disabled &&
-              !props.error &&
-              !props.textColorClass &&
-              !menuOpened(),
-            "text-lightSlate-50 outline outline-offset-2 outline-darkSlate-500 hover:outline-darkSlate-500":
-              !props.disabled &&
-              !props.error &&
-              !props.textColorClass &&
-              menuOpened(),
-            "text-darkSlate-500": !!props.error && !props.textColorClass,
-            "rounded-full": props.rounded,
-            "bg-darkSlate-700": !props.bgColorClass && !props.disabled,
-            "rounded-md": !props.btnDropdown && !props.rounded,
-            "group-hover:bg-primary-300 border-l-1 border-solid border-primary-300":
-              props.btnDropdown && !props.disabled,
-            "group px-4": !props.btnDropdown,
-            "bg-primary-500 duration-100": props.btnDropdown && !props.disabled,
-            "hover:bg-primary-300": props.btnDropdown && !props.disabled,
-            "cursor-not-allowed": props.disabled && !!props.bgColorClass,
-            "cursor-not-allowed bg-darkSlate-800":
-              props.disabled && !props.bgColorClass,
-          }}
         >
           <Show when={!props.btnDropdown}>
             <Show when={props.icon}>

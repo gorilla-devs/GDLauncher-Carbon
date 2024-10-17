@@ -10,21 +10,71 @@ import {
   onCleanup,
 } from "solid-js";
 import { Portal } from "solid-js/web";
+import { cva, type VariantProps } from "class-variance-authority";
 
 type AutoCompleteOption = {
   value: string;
   label: JSX.Element | string;
 };
 
-interface Props extends JSX.InputHTMLAttributes<HTMLInputElement> {
-  error?: string | boolean;
-  disabled?: boolean;
+const input = cva(
+  "h-full w-full box-border py-2 rounded-md placeholder:text-darkSlate-400 outline-none",
+  {
+    variants: {
+      error: {
+        true: "border-2 border-solid border-red-500",
+        false:
+          "border-0 border-transparent hover:border-darkSlate-500 active:border-darkSlate-500",
+      },
+      disabled: {
+        true: "text-darkSlate-300",
+        false: "text-lightSlate-50",
+      },
+      hasIcon: {
+        true: "",
+        false: "px-4",
+      },
+    },
+    compoundVariants: [
+      {
+        hasIcon: true,
+        class: "bg-darkSlate-700",
+      },
+    ],
+    defaultVariants: {
+      error: false,
+      disabled: false,
+      hasIcon: false,
+    },
+  }
+);
+
+const container = cva(
+  "outline-none has-[:focus-visible]:outline-darkSlate-500 hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-darkSlate-500 h-10 gap-2 box-border transition-all duration-200 rounded-md ease-in-out",
+  {
+    variants: {
+      hasIcon: {
+        true: "flex items-center px-4 bg-darkSlate-700",
+        false: "",
+      },
+    },
+    defaultVariants: {
+      hasIcon: false,
+    },
+  }
+);
+
+interface Props
+  extends Omit<JSX.InputHTMLAttributes<HTMLInputElement>, "disabled">,
+    VariantProps<typeof input> {
   class?: string;
   inputClass?: string;
   inputColor?: string;
   icon?: Element | any;
   autoCompleteOptions?: AutoCompleteOption[];
   onSearch?: (_value: string) => void;
+  containerClass?: string;
+  disabled?: boolean;
 }
 
 function Input(props: Props) {
@@ -97,44 +147,27 @@ function Input(props: Props) {
     }
   });
 
-  let inputBaseClasses = `h-full w-full box-border py-2 rounded-md placeholder:text-darkSlate-400 outline-none ${
-    local.inputClass || ""
-  }`;
-  if (local.icon) {
-    inputBaseClasses += ` ${
-      local.inputColor ? local.inputColor : "bg-darkSlate-700"
-    }`;
-  } else {
-    inputBaseClasses += ` px-4`;
-  }
-
-  let errorClasses = local.error
-    ? "border-2 border-solid border-red-500"
-    : "border-0 border-transparent hover:border-darkSlate-500 active:border-darkSlate-500";
-  let disabledClasses = local.disabled
-    ? "text-darkSlate-300"
-    : "text-lightSlate-50";
-  let inputColorClasses = local.inputColor
-    ? local.inputColor
-    : "bg-darkSlate-600";
-
-  let containerClasses = `outline-none has-[:focus-visible]:outline-darkSlate-500 hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-darkSlate-500 h-10 gap-2 box-border transition-all duration-100 rounded-md ease-in-out ${
-    local.class || ""
-  }`;
-  if (local.icon) {
-    containerClasses += ` ${
-      local.inputColor ? local.inputColor : "bg-darkSlate-700"
-    } flex items-center px-4`;
-  }
-
   const focusIn = () => focusInUl() || focusInInput();
 
   return (
     <>
-      <div class={containerClasses} ref={setInputContainerRef}>
+      <div
+        class={container({
+          hasIcon: !!local.icon,
+          class: `${local.class || ""} ${local.inputColor || ""}`,
+        })}
+        ref={setInputContainerRef}
+      >
         <input
           ref={setInputRef}
-          class={`${inputBaseClasses} ${disabledClasses} ${errorClasses} ${inputColorClasses}`}
+          class={input({
+            error: !!local.error,
+            disabled: !!local.disabled,
+            hasIcon: !!local.icon,
+            class: `${local.inputClass || ""} ${
+              local.inputColor || "bg-darkSlate-600"
+            }`,
+          })}
           disabled={local.disabled}
           onInput={(e) => {
             if (props.disabled) return;

@@ -15,8 +15,8 @@ interface ITabsContext {
   gap?: () => number | undefined;
   paddingX?: () => string | undefined;
   paddingY?: () => string | undefined;
-  variant: () => string;
-  orientation: () => string;
+  variant: () => "underline" | "block" | "traditional" | undefined;
+  orientation: () => "horizontal" | "vertical" | undefined;
   clearTabs: () => void;
   setSelectedIndex: (_: number) => void;
   registerTab: (_obj: TabType, _index?: number) => number;
