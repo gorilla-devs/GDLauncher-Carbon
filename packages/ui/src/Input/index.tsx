@@ -21,7 +21,7 @@ const input = cva(
   "h-full w-full box-border py-2 rounded-md placeholder:text-darkSlate-400 outline-none",
   {
     variants: {
-      error: {
+      errorMessage: {
         true: "border-2 border-solid border-red-500",
         false:
           "border-0 border-transparent hover:border-darkSlate-500 active:border-darkSlate-500",
@@ -42,7 +42,7 @@ const input = cva(
       },
     ],
     defaultVariants: {
-      error: false,
+      errorMessage: false,
       disabled: false,
       hasIcon: false,
     },
@@ -66,7 +66,7 @@ const container = cva(
 
 interface Props
   extends Omit<JSX.InputHTMLAttributes<HTMLInputElement>, "disabled">,
-    VariantProps<typeof input> {
+    Omit<VariantProps<typeof input>, "errorMessage"> {
   class?: string;
   inputClass?: string;
   inputColor?: string;
@@ -75,6 +75,7 @@ interface Props
   onSearch?: (_value: string) => void;
   containerClass?: string;
   disabled?: boolean;
+  errorMessage?: string;
 }
 
 function Input(props: Props) {
@@ -83,7 +84,6 @@ function Input(props: Props) {
     "icon",
     "inputClass",
     "disabled",
-    "error",
     "inputColor",
     "onBlur",
     "onFocus",
@@ -161,7 +161,7 @@ function Input(props: Props) {
         <input
           ref={setInputRef}
           class={input({
-            error: !!local.error,
+            errorMessage: !!props.errorMessage,
             disabled: !!local.disabled,
             hasIcon: !!local.icon,
             class: `${local.inputClass || ""} ${
@@ -235,8 +235,10 @@ function Input(props: Props) {
         </Show>
       </div>
 
-      <Show when={local.error}>
-        <div class="text-red-500 text-left mt-2 font-light">{local.error}</div>
+      <Show when={props.errorMessage}>
+        <div class="text-red-500 text-left mt-2 font-light">
+          {props.errorMessage}
+        </div>
       </Show>
 
       <Show when={menuOpened()}>

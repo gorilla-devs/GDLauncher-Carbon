@@ -19,7 +19,7 @@ export const Main: Story = {
   args: {
     value: "Value",
     placeholder: "Type here",
-    error: "",
+    errorMessage: "",
     disabled: false,
     icon: <div class="i-ri:refresh-line" />,
   },

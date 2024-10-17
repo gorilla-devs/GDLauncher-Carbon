@@ -12,7 +12,7 @@ const Collapsable = (props: Props) => {
   const [opened, setOpened] = createSignal(props.defaultOpened ?? true);
 
   return (
-    <div class="w-full box-border flex flex-col py-2 overflow-hidden select-none max-w-full">
+    <div class="w-full box-border flex flex-col py-2 select-none max-w-full">
       <div
         class="max-w-full h-8 flex gap-2 items-center cursor-pointer"
         classList={{
@@ -30,7 +30,7 @@ const Collapsable = (props: Props) => {
           }}
         />
         <p
-          class="m-0 text-darkSlate-100 flex items-center uppercase text-ellipsis overflow-hidden max-w-full text-left"
+          class="m-0 text-darkSlate-100 flex items-center uppercase text-ellipsis max-w-full text-left"
           classList={{
             "text-md": props.size !== "small",
             "text-xs": props.size === "small",
@@ -40,10 +40,9 @@ const Collapsable = (props: Props) => {
         </p>
       </div>
       <div
-        class="overflow-hidden"
         classList={{
           "h-auto": opened(),
-          "h-0": !opened(),
+          "h-0 overflow-hidden": !opened(),
         }}
       >
         {props.children}

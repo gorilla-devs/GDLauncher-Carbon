@@ -573,7 +573,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                     setCustomTitle(e.currentTarget.value);
                   }}
                   value={title()!}
-                  error={
+                  errorMessage={
                     error() &&
                     !title() &&
                     (t("error.missing_field_title") as string)

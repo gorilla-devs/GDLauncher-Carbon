@@ -1,46 +1,54 @@
 import { JSX, createEffect, createSignal } from "solid-js";
 import { cva, type VariantProps } from "class-variance-authority";
 
-const switchStyles = cva("absolute top-0 left-0 right-0 bottom-0 transition-colors duration-100 ease-in-out rounded-full", {
-  variants: {
-    state: {
-      default: "bg-darkSlate-500",
-      checked: "bg-primary-500",
-      disabled: "bg-darkSlate-700",
-      disabledChecked: "bg-primary-700",
-      indeterminate: "bg-darkSlate-500",
-      loading: "bg-darkSlate-500",
+const switchStyles = cva(
+  "absolute top-0 left-0 right-0 bottom-0 transition-colors duration-100 ease-in-out rounded-full",
+  {
+    variants: {
+      state: {
+        default: "bg-darkSlate-500",
+        checked: "bg-primary-500",
+        disabled: "bg-darkSlate-700",
+        disabledChecked: "bg-primary-700",
+        indeterminate: "bg-darkSlate-500",
+        loading: "bg-darkSlate-500",
+      },
+      cursor: {
+        pointer: "cursor-pointer",
+        notAllowed: "cursor-not-allowed",
+      },
     },
-    cursor: {
-      pointer: "cursor-pointer",
-      notAllowed: "cursor-not-allowed",
+    defaultVariants: {
+      state: "default",
+      cursor: "pointer",
     },
-  },
-  defaultVariants: {
-    state: "default",
-    cursor: "pointer",
-  },
-});
+  }
+);
 
-const toggleStyles = cva("absolute content-[] w-4 h-4 bottom-0.5 rounded-full transition-all duration-100 ease-in-out", {
-  variants: {
-    position: {
-      start: "translate-x-0.5 bg-darkSlate-800",
-      middle: "translate-x-3 bg-white",
-      end: "translate-x-5 bg-white",
+const toggleStyles = cva(
+  "absolute content-[] w-4 h-4 bottom-0.5 rounded-full transition-all duration-100 ease-in-out",
+  {
+    variants: {
+      position: {
+        start: "translate-x-0.5 bg-darkSlate-800",
+        middle: "translate-x-3 bg-white",
+        end: "translate-x-5 bg-white",
+      },
+      disabled: {
+        true: "bg-darkSlate-50",
+        false: "",
+      },
     },
-    disabled: {
-      true: "bg-darkSlate-50",
-      false: "",
+    defaultVariants: {
+      position: "start",
+      disabled: false,
     },
-  },
-  defaultVariants: {
-    position: "start",
-    disabled: false,
-  },
-});
+  }
+);
 
-interface Props extends JSX.InputHTMLAttributes<HTMLInputElement>, VariantProps<typeof switchStyles> {
+interface Props
+  extends JSX.InputHTMLAttributes<HTMLInputElement>,
+    VariantProps<typeof switchStyles> {
   isIndeterminate?: boolean;
   isLoading?: boolean;
 }
@@ -48,7 +56,13 @@ interface Props extends JSX.InputHTMLAttributes<HTMLInputElement>, VariantProps<
 function Switch(props: Props) {
   const [state, setState] = createSignal<{
     togglePosition: "start" | "middle" | "end";
-    switchState: "default" | "checked" | "disabled" | "disabledChecked" | "indeterminate" | "loading";
+    switchState:
+      | "default"
+      | "checked"
+      | "disabled"
+      | "disabledChecked"
+      | "indeterminate"
+      | "loading";
     cursorStyle: "pointer" | "notAllowed";
     isLoading: boolean;
   }>({
@@ -99,7 +113,10 @@ function Switch(props: Props) {
         disabled={props.disabled}
       />
       <span
-        class={switchStyles({ state: state().switchState, cursor: state().cursorStyle })}
+        class={switchStyles({
+          state: state().switchState,
+          cursor: state().cursorStyle,
+        })}
       >
         {state().isLoading && (
           <i
@@ -108,7 +125,10 @@ function Switch(props: Props) {
           />
         )}
         <span
-          class={toggleStyles({ position: state().togglePosition, disabled: props.disabled })}
+          class={toggleStyles({
+            position: state().togglePosition,
+            disabled: props.disabled,
+          })}
         />
       </span>
       <span class="absolute inset-0 rounded-full transition-all duration-200 ease-in-out group-hover:ring-1 group-hover:ring-darkSlate-200" />
