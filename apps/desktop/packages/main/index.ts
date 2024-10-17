@@ -19,6 +19,7 @@ import path, { join, resolve } from "path";
 import fs from "fs/promises";
 import fss from "fs";
 import fse from "fs-extra";
+import glob from "glob";
 import type { ChildProcessWithoutNullStreams } from "child_process";
 import { spawn } from "child_process";
 import crypto from "crypto";
@@ -559,7 +560,9 @@ async function createWindow(): Promise<BrowserWindow> {
     isSpawningWindow = false;
 
     coreModule.finally(() => {
-      win?.show();
+      if (win && !win?.isDestroyed()) {
+        win?.show();
+      }
     });
 
     function upsertKeyValue(obj: any, keyToChange: string, value: any) {
@@ -670,6 +673,13 @@ ipcMain.handle("getRuntimePath", async () => {
 });
 
 ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
+  type Progress = {
+    action: "copy" | "remove";
+    currentName: string;
+    current: number;
+    total: number;
+  };
+
   if (newPath === CURRENT_RUNTIME_PATH) {
     return;
   }
@@ -690,42 +700,77 @@ ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
     // No op
   }
 
-  // TODO: Copy with progress
-  await fse.copy(CURRENT_RUNTIME_PATH!, newPath, {
-    overwrite: true,
-    errorOnExist: false
+  const files = await glob("**/*", {
+    cwd: CURRENT_RUNTIME_PATH!,
+    nodir: true,
+    dot: true,
+    stat: false,
+    ignore: ["**/.DS_Store", RUNTIME_PATH_OVERRIDE_NAME]
   });
 
-  await fs.writeFile(runtimeOverridePath, newPath);
+  const total = files.length;
 
-  await fse.remove(CURRENT_RUNTIME_PATH!);
+  for (let i = 0; i < total; i++) {
+    const file = files[i];
 
-  // TODO: with a bit of work we can change the RTPath without actually restarting the app
+    win?.webContents.send("changeRuntimePathProgress", {
+      action: "copy",
+      currentName: path.basename(file),
+      current: i,
+      total: total * 2
+    } satisfies Progress);
+
+    await fse.copy(
+      path.join(CURRENT_RUNTIME_PATH!, file),
+      path.join(newPath, file),
+      {
+        overwrite: true,
+        errorOnExist: false,
+        recursive: true
+      }
+    );
+  }
+
+  await fse.writeFile(runtimeOverridePath, newPath);
+
+  for (let i = 0; i < total; i++) {
+    const file = files[i];
+
+    win?.webContents.send("changeRuntimePathProgress", {
+      action: "remove",
+      currentName: path.basename(file),
+      current: total + i,
+      total: total * 2
+    } satisfies Progress);
+
+    await fse.remove(path.join(CURRENT_RUNTIME_PATH!, file));
+  }
+
   app.relaunch();
   app.exit();
 });
 
 ipcMain.handle("validateRuntimePath", async (_, newPath: string | null) => {
   if (!newPath || newPath === CURRENT_RUNTIME_PATH) {
-    return false;
+    return "invalid";
   }
 
   const pathExists = await fse.pathExists(newPath);
   if (!pathExists) {
-    return true;
+    return "valid";
   }
 
   const newPathStat = await fs.stat(newPath);
   if (!newPathStat.isDirectory()) {
-    return false;
+    return "invalid";
   }
 
   const files = await fs.readdir(newPath);
   if (files.length > 0) {
-    return false;
+    return "potentially_valid";
   }
 
-  return true;
+  return "valid";
 });
 
 ipcMain.handle("getCoreModule", async () => {
