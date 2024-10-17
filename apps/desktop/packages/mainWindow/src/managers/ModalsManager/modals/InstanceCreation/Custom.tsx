@@ -520,7 +520,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
           </div>
           <div class="flex gap-4 w-full">
             <div
-              class="relative flex justify-center items-center bg-darkSlate-900 cursor-pointer bg-center bg-cover h-20 rounded-xl w-20"
+              class="relative flex justify-center items-center bg-darkSlate-800 bg-center bg-cover h-20 rounded-xl w-20 box-border outline-none hover:outline-darkSlate-600 transition-all ease-in-out duration-200"
               style={{
                 ...(bgPreview() && {
                   "background-image": `url("${bgPreview()}")`
@@ -573,10 +573,10 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                     setCustomTitle(e.currentTarget.value);
                   }}
                   value={title()!}
-                  error={
-                    error() &&
-                    !title() &&
-                    (t("error.missing_field_title") as string)
+                  errorMessage={
+                    error() && !title()
+                      ? (t("error.missing_field_title") as string)
+                      : undefined
                   }
                 />
               </div>
@@ -729,11 +729,11 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             <For each={modloaders}>
               {(modloader) => (
                 <div
-                  class="px-3 py-2 bg-darkSlate-800 rounded-lg cursor-pointer border-box text-darkSlate-50 hover:text-lightSlate-50"
+                  class="px-3 py-2 bg-darkSlate-800 rounded-lg border-box text-darkSlate-50 hover:text-lightSlate-50"
                   classList={{
-                    "border-2 border-solid border-transparent":
+                    "hover:outline-darkSlate-600 outline-none":
                       loader() !== modloader.key,
-                    "border-2 border-solid border-primary-500 text-lightSlate-50":
+                    "outline-primary-500 outline text-lightSlate-50":
                       loader() === modloader.key
                   }}
                   onClick={() => {

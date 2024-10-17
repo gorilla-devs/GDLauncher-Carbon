@@ -1,11 +1,49 @@
 import { JSXElement, Match, Show, Switch } from "solid-js";
 import { SpacingTab, TabType, useTabsContext } from "./Tabs";
+import { cva, type VariantProps } from "class-variance-authority";
 
-interface Props {
+interface Props extends VariantProps<typeof tabListStyles> {
   aligment?: "between" | "default";
   children: Element[] | JSXElement;
   heightClass?: string;
 }
+
+const tabListStyles = cva("flex relative items-start w-full min-h-12 gap-6", {
+  variants: {
+    variant: {
+      underline: "bg-darkSlate-800",
+      block: "bg-darkSlate-900",
+      traditional: "",
+    },
+    orientation: {
+      horizontal: "",
+      vertical: "",
+    },
+    alignment: {
+      between: "justify-between",
+      default: "",
+    },
+  },
+  defaultVariants: {
+    variant: "underline",
+    orientation: "horizontal",
+    alignment: "default",
+  },
+});
+
+const tabListContentStyles = cva("flex box-border overflow-auto w-full gap-6", {
+  variants: {
+    variant: {
+      underline: "border-b-darkSlate-800 border-b-1 h-full",
+      block: "items-center m-2 rounded-xl",
+      traditional: "items-center scrollbar-hide",
+    },
+    orientation: {
+      horizontal: "flex-row",
+      vertical: "flex-col",
+    },
+  },
+});
 
 const TabList = (props: Props) => {
   const tabsContext = useTabsContext();
@@ -28,13 +66,13 @@ const TabList = (props: Props) => {
 
       if (tabsContext?.orientation() === "horizontal") {
         if (isSpacing) {
-          if (isSpacing) dimension += (tab as SpacingTab).space;
+          dimension += (tab as SpacingTab).space;
         } else {
           dimension += (tab as TabType).ref.offsetWidth;
         }
       } else {
         if (isSpacing) {
-          if (isSpacing) dimension += (tab as SpacingTab).space;
+          dimension += (tab as SpacingTab).space;
         } else {
           dimension += (tab as TabType).ref.offsetHeight;
         }
@@ -67,24 +105,20 @@ const TabList = (props: Props) => {
 
   return (
     <div
-      class={`flex relative items-start w-full min-h-12 ${
-        props.heightClass ?? "h-full"
-      }`}
-      classList={{
-        "bg-darkSlate-800": tabsContext?.variant() === "underline",
-        "bg-darkSlate-900": tabsContext?.variant() === "block",
-      }}
+      class={tabListStyles({
+        variant: tabsContext?.variant(),
+        orientation: tabsContext?.orientation(),
+        alignment: props.aligment,
+        class: props.heightClass ?? "h-full",
+      })}
     >
       <Switch>
         <Match when={tabsContext?.variant() === "underline"}>
           <div
-            class="flex border-b-darkSlate-800 border-b-1 box-border overflow-auto w-full h-full"
-            classList={{
-              "gap-6": tabsContext?.orientation() !== undefined,
-              "flex-row": tabsContext?.orientation() === "horizontal",
-              "flex-col": tabsContext?.orientation() === "vertical",
-              "justify-between": props.aligment === "between",
-            }}
+            class={tabListContentStyles({
+              variant: "underline",
+              orientation: tabsContext?.orientation(),
+            })}
             style={{
               gap: tabsContext?.gap?.()?.toString() + "rem",
             }}
@@ -128,13 +162,10 @@ const TabList = (props: Props) => {
         </Match>
         <Match when={tabsContext?.variant() === "block"}>
           <div
-            class="flex items-center m-2 rounded-xl box-border overflow-auto w-full"
-            classList={{
-              "gap-6": tabsContext?.orientation() !== undefined,
-              "flex-row": tabsContext?.orientation() === "horizontal",
-              "flex-col": tabsContext?.orientation() === "vertical",
-              "justify-between": props.aligment === "between",
-            }}
+            class={tabListContentStyles({
+              variant: "block",
+              orientation: tabsContext?.orientation(),
+            })}
             style={{
               gap: (tabsContext?.gap?.()?.toString() ?? 1.5) + "rem",
             }}
@@ -144,12 +175,10 @@ const TabList = (props: Props) => {
         </Match>
         <Match when={tabsContext?.variant() === "traditional"}>
           <div
-            class="flex items-center box-border overflow-auto w-full scrollbar-hide"
-            classList={{
-              "flex-row": tabsContext?.orientation() === "horizontal",
-              "flex-col": tabsContext?.orientation() === "vertical",
-              "justify-between": props.aligment === "between",
-            }}
+            class={tabListContentStyles({
+              variant: "traditional",
+              orientation: tabsContext?.orientation(),
+            })}
             style={{
               gap: (tabsContext?.gap?.()?.toString() ?? 1.5) + "rem",
             }}
