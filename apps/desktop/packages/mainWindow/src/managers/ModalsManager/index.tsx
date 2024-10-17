@@ -120,6 +120,10 @@ const defaultModals = {
   confirmMsWithGDLAccountRemoval: {
     component: lazy(() => import("./modals/ConfirmMsWithGDLAccountRemoval")),
     title: "Confirm Account Removal"
+  },
+  accountExpired: {
+    component: lazy(() => import("./modals/AccountExpired")),
+    title: "Account Expired"
   }
 };
 
