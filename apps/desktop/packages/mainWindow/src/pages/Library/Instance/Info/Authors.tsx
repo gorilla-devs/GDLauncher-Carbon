@@ -16,21 +16,20 @@ type Props = {
 
 const Authors = (props: Props) => {
   const [authors, setAuthors] = createSignal<MRFETeamResponse>([]);
+  const rspcContext = rspc.useContext();
 
-  createEffect(() => {
+  createEffect(async () => {
     if (
       props.modpackDetails &&
       props.isModrinth &&
       (props.modpackDetails as MRFEProject)?.team
     ) {
-      const modrinthAuthorsQuery = rspc.createQuery(() => ({
-        queryKey: [
-          "modplatforms.modrinth.getTeam",
-          (props.modpackDetails as MRFEProject)?.team
-        ]
-      }));
+      const modrinthAuthorsQuery = await rspcContext.client.query([
+        "modplatforms.modrinth.getTeam",
+        (props.modpackDetails as MRFEProject)?.team
+      ]);
 
-      if (modrinthAuthorsQuery.data) setAuthors(modrinthAuthorsQuery.data);
+      if (modrinthAuthorsQuery) setAuthors(modrinthAuthorsQuery);
     }
   });
 
