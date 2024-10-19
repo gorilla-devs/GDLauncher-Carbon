@@ -336,7 +336,7 @@ const Tile = (props: Props) => {
                   }
                 >
                   <div
-                    class="flex justify-center relative items-center rounded-2xl overflow-hidden h-full w-full bg-cover bg-center transition-all duration-300 ease-in-out"
+                    class="flex justify-center relative items-center rounded-2xl bg-darkSlate-800 overflow-hidden h-full w-full bg-cover bg-center transition-all duration-300 ease-in-out"
                     classList={{
                       grayscale: isLoading() || isInQueue(),
                       "group-hover:blur-[2px] group-hover:scale-120":
