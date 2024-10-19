@@ -8,7 +8,6 @@ import {
   untrack,
   JSX,
   splitProps,
-  createEffect,
 } from "solid-js";
 import { useTabsContext } from "./Tabs";
 import { cva, type VariantProps } from "class-variance-authority";
@@ -143,10 +142,6 @@ const Tab = (_props: Props) => {
   onCleanup(() => {
     tabsContext?.clearTabs();
     observer?.disconnect();
-  });
-
-  createEffect(() => {
-    console.log(index(), tabsContext?.isSelectedIndex(index()));
   });
 
   return (

@@ -2,7 +2,15 @@ import { convertSecondsToHumanTime } from "@/utils/helpers";
 import { rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
 import { Navigate } from "@solidjs/router";
-import { createEffect, createSignal, Match, onCleanup, Switch } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  getOwner,
+  Match,
+  onCleanup,
+  runWithOwner,
+  Switch
+} from "solid-js";
 
 interface Props {
   nextStep: () => void;
@@ -14,6 +22,7 @@ interface Props {
 const GDLAccountVerification = (props: Props) => {
   const [cooldown, setCooldown] = createSignal(0);
   const [sentVisible, setSentVisible] = createSignal(false);
+  const owner = getOwner();
 
   const saveGdlAccountMutation = rspc.createMutation(() => ({
     mutationKey: ["account.saveGdlAccount"]
@@ -50,13 +59,15 @@ const GDLAccountVerification = (props: Props) => {
   let interval: ReturnType<typeof setInterval>;
 
   createEffect(async () => {
-    if (props.activeUuid) {
-      if (interval) {
-        clearInterval(interval);
-      }
+    runWithOwner(owner, async () => {
+      if (props.activeUuid) {
+        if (interval) {
+          clearInterval(interval);
+        }
 
-      interval = setInterval(invalidateEmailVerification, 1000);
-    }
+        interval = setInterval(invalidateEmailVerification, 1000);
+      }
+    });
   });
 
   onCleanup(() => {
