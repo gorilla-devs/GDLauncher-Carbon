@@ -32,7 +32,7 @@ export const ButtonDropdown = (props: ButtonDropdownProps) => {
         {({ item, onClick }) => (
           <div
             onClick={onClick}
-            class=" px-4 py-2 text-lightSlate-50 hover:bg-bluegd-400 hover:text-lightSlate-50 w-full text-left"
+            class=" px-4 py-2 text-white hover:bg-bluegd-400 hover:text-white w-full text-left"
           >
             {item}
           </div>

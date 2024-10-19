@@ -5,7 +5,7 @@ import {
   createSolidTable
 } from "@tanstack/solid-table";
 import { Trans, useTransContext } from "@gd/i18n";
-import { Button, createNotification, Tooltip } from "@gd/ui";
+import { Button, createNotification, Popover, Tooltip } from "@gd/ui";
 import { port, rspc } from "@/utils/rspcClient";
 import PageTitle from "./components/PageTitle";
 import Row from "./components/Row";
@@ -233,14 +233,24 @@ const Accounts = () => {
                       <Trans key="settings:gdl_account_synced" />
                     </div>
 
-                    <Button
-                      type="outline"
-                      onClick={() => {
-                        removeGDLAccountMutation.mutate(undefined);
-                      }}
+                    <Popover
+                      content={() => (
+                        <div class="flex items-center gap-2">
+                          <i class="block w-6 h-6 i-ri:logout-box-line" />
+
+                          <Trans key="settings:log_out_gdl_account" />
+                        </div>
+                      )}
                     >
-                      <Trans key="settings:log_out_gdl_account" />
-                    </Button>
+                      <Button
+                        type="secondary"
+                        onClick={() => {
+                          removeGDLAccountMutation.mutate(undefined);
+                        }}
+                      >
+                        <i class="block w-6 h-6 i-ri:logout-box-line" />
+                      </Button>
+                    </Popover>
                   </div>
                   <Show
                     when={validGDLUser() && !validGDLUser()?.isEmailVerified}
@@ -314,7 +324,8 @@ const Accounts = () => {
                   </div>
                 </div>
 
-                <div class="my-10 text-red-500 text-xl">
+                <div class="flex items-center gap-2 my-10 text-red-500 text-xl">
+                  <div class="w-4 h-4 i-ri:alert-fill" />
                   <Trans key="settings:danger_zone" />
                 </div>
                 <div class="flex items-center justify-between gap-12 text-lightSlate-800">
@@ -332,6 +343,7 @@ const Accounts = () => {
                         });
                       }}
                     >
+                      <i class="block w-6 h-6 i-ri:delete-bin-7-fill" />
                       <Trans key="settings:request_account_deletion" />
                     </Button>
                   </Tooltip>
@@ -375,6 +387,7 @@ const Accounts = () => {
                       removeGDLAccountMutation.mutate(undefined);
                     }}
                   >
+                    <i class="block w-6 h-6 i-ri:logout-box-line" />
                     <Trans key="settings:log_out_gdl_account" />
                   </Button>
                 </div>

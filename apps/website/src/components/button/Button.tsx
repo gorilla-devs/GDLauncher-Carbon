@@ -22,7 +22,7 @@ const button = cva("button", {
       primary: [
         "bg-bluegd-500",
         "shadow-mdgd",
-        "text-lightSlate-50",
+        "text-white",
         "hover:bg-bluegd-400 transition-all duration-300 ease-in-out",
         "rounded-smgd",
         "flex",
@@ -30,7 +30,7 @@ const button = cva("button", {
         "justify-center",
         "relative",
       ],
-      secondary: ["bg-bluegd-600", "text-lightSlate-50", "rounded-xsgd"],
+      secondary: ["bg-bluegd-600", "text-white", "rounded-xsgd"],
       transparent: [
         "bg-transparent",
         "text-bluegd-500",
@@ -81,7 +81,7 @@ const Button = (props: ButtonProps & Props) => {
             {
               item: (
                 <a
-                  class="flex items-center gap-2 p-1 hover:bg-bluegd-400 hover:text-lightSlate-50"
+                  class="flex items-center gap-2 p-1 hover:bg-bluegd-400 hover:text-white"
                   href={props.items![1]}
                 >
                   <Apple /> MacOS
@@ -91,7 +91,7 @@ const Button = (props: ButtonProps & Props) => {
             {
               item: (
                 <a
-                  class="flex items-center gap-2 p-1 hover:bg-bluegd-400 hover:text-lightSlate-50"
+                  class="flex items-center gap-2 p-1 hover:bg-bluegd-400 hover:text-white"
                   href={props.items![0]}
                 >
                   <Windows /> Windows
@@ -101,7 +101,7 @@ const Button = (props: ButtonProps & Props) => {
             {
               item: (
                 <a
-                  class="flex items-center gap-2 p-1 hover:bg-bluegd-400 hover:text-lightSlate-50"
+                  class="flex items-center gap-2 p-1 hover:bg-bluegd-400 hover:text-white"
                   href={props.items![2]}
                 >
                   <Linux /> Linux
