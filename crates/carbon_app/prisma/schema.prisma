@@ -53,6 +53,7 @@ model AppConfiguration {
   metricsEnabledLastUpdate        DateTime? // should ask again after 12 months
   gdlAccountUuid                  String?
   gdlAccountStatus                Bytes?
+  gdlHashedEmailPermission        Boolean?
 }
 
 model Java {
