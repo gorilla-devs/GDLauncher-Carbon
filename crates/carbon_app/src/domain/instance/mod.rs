@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
 use uuid::Uuid;
 
 use crate::domain::vtask::VisualTaskId;
@@ -26,6 +26,7 @@ pub struct GameLogEntry {
     pub id: GameLogId,
     pub instance_id: InstanceId,
     pub active: bool,
+    pub datetime: DateTime<Local>,
 }
 
 pub struct InstanceDetails {

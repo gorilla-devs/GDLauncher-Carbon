@@ -6,6 +6,7 @@ type Props = {
   size?: "standard" | "small";
   noPadding?: boolean;
   defaultOpened?: boolean;
+  class?: string;
 };
 
 const Collapsable = (props: Props) => {
@@ -18,6 +19,9 @@ const Collapsable = (props: Props) => {
         classList={{
           "px-6": props.size !== "small" && !props.noPadding,
           "px-2": props.size === "small" && !props.noPadding,
+          ...(props.class && {
+            [props.class]: true,
+          }),
         }}
         onClick={() => {
           setOpened((prev) => !prev);

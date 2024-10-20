@@ -54,6 +54,17 @@ export const convertSecondsToHumanTime = (seconds: number): string => {
   }
 };
 
+export const getTitleByDays = (days: string) => {
+  const parsedDays = Number.parseInt(days, 10);
+  if (parsedDays === 0) return "Today";
+  else if (parsedDays === 1) return "Yesterday";
+  else if (parsedDays > 1 && parsedDays < 30)
+    return `${Math.floor(parsedDays)} days ago`;
+  else if (parsedDays >= 30 && parsedDays < 365)
+    return `${Math.floor(parsedDays / 30)} months ago`;
+  else return `${Math.floor(parsedDays / 365)} years ago`;
+};
+
 export const blobToBase64 = (
   blob: Blob
 ): Promise<string | ArrayBuffer | null> => {

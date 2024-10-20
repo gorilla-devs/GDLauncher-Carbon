@@ -161,10 +161,13 @@ impl ManagerRef<'_, InstanceManager> {
         static LOG_ID: AtomicI32 = AtomicI32::new(0);
         let (log_tx, log_rx) = watch::channel(GameLog::new());
         let id = GameLogId(LOG_ID.fetch_add(1, Ordering::Relaxed));
+
+        let current_datetime = chrono::Local::now();
+
         self.game_logs
             .write()
             .await
-            .insert(id, (instance_id, log_rx));
+            .insert(id, (instance_id, current_datetime, log_rx));
         self.app.invalidate(GET_LOGS, None);
 
         (id, log_tx)
@@ -174,7 +177,7 @@ impl ManagerRef<'_, InstanceManager> {
         let mut logs = self.game_logs.write().await;
 
         match logs.get(&id) {
-            Some((_, rx)) => {
+            Some((_, _, rx)) => {
                 // sender dropped
                 match rx.has_changed() {
                     Ok(_) => Err(anyhow::anyhow!("cannot delete active log")),
@@ -194,7 +197,7 @@ impl ManagerRef<'_, InstanceManager> {
         id: GameLogId,
     ) -> Result<watch::Receiver<GameLog>, InvalidGameLogIdError> {
         match self.game_logs.read().await.get(&id) {
-            Some((_, log)) => Ok(log.clone()),
+            Some((_, _, log)) => Ok(log.clone()),
             None => Err(InvalidGameLogIdError),
         }
     }
@@ -204,11 +207,12 @@ impl ManagerRef<'_, InstanceManager> {
             .read()
             .await
             .iter()
-            .filter(|(_, (id, _))| *id == instance_id)
-            .map(|(id, (instance_id, rx))| GameLogEntry {
+            .filter(|(_, (id, _, _))| *id == instance_id)
+            .map(|(id, (instance_id, datetime, rx))| GameLogEntry {
                 id: *id,
                 instance_id: *instance_id,
                 active: rx.has_changed().is_ok(),
+                datetime: datetime.clone(),
             })
             .sorted_by_key(|entry| entry.id.0)
             .collect()

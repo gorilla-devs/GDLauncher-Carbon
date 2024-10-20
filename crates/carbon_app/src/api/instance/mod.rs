@@ -791,6 +791,7 @@ struct GameLogEntry {
     id: GameLogId,
     instance_id: FEInstanceId,
     active: bool,
+    timestamp: String,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -1511,6 +1512,7 @@ impl From<domain::GameLogEntry> for GameLogEntry {
             id: value.id.into(),
             instance_id: value.instance_id.into(),
             active: value.active,
+            timestamp: value.datetime.timestamp_millis().to_string(),
         }
     }
 }

@@ -68,7 +68,16 @@ pub struct InstanceManager {
     persistence_manager: PersistenceManager,
     import_manager: InstanceImportManager,
     export_manager: InstanceExportManager,
-    game_logs: RwLock<HashMap<GameLogId, (InstanceId, watch::Receiver<GameLog>)>>,
+    game_logs: RwLock<
+        HashMap<
+            GameLogId,
+            (
+                InstanceId,
+                chrono::DateTime<chrono::Local>,
+                watch::Receiver<GameLog>,
+            ),
+        >,
+    >,
     modpack_info_semaphore: Mutex<()>,
     pub any_instance_running: Arc<watch::Sender<bool>>,
     instance_running_tracker: Arc<LivenessTracker>,

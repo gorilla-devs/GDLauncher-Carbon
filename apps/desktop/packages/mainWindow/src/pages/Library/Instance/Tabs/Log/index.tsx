@@ -1,18 +1,21 @@
 import { LogEntry, LogEntryLevel } from "@/utils/logs";
 import { port, rspc } from "@/utils/rspcClient";
 import { Trans } from "@gd/i18n";
-import { useParams } from "@solidjs/router";
+import { Outlet, useParams } from "@solidjs/router";
 import {
   For,
   Match,
   Show,
-  Switch,
   createEffect,
   createSignal,
   onCleanup,
   onMount
 } from "solid-js";
-import { Button, Tooltip } from "@gd/ui";
+import { Button, Switch } from "@gd/ui";
+import LogsSidebar from "./LogsSidebar";
+import LogsContent from "./LogsContent";
+
+export const [isFullScreen, setIsFullScreen] = createSignal(false);
 
 const Logs = () => {
   const [logsCopied, setLogsCopied] = createSignal(false);
@@ -52,142 +55,80 @@ const Logs = () => {
     }
   });
 
-  const copyLogsToClipboard = () => {
-    window.copyToClipboard(JSON.stringify(instanceLogs()));
-    setLogsCopied(true);
-  };
+  // const copyLogsToClipboard = () => {
+  //   window.copyToClipboard(JSON.stringify(instanceLogs()));
+  //   setLogsCopied(true);
+  // };
+
+  // createEffect(() => {
+  //   if (logsCopied()) {
+  //     const timeoutId = setTimeout(() => {
+  //       setLogsCopied(false);
+  //     }, 400);
+
+  //     onCleanup(() => {
+  //       clearTimeout(timeoutId);
+  //     });
+  //   }
+  // });
+
+  // const [showButton, setShowButton] = createSignal(false);
+
+  // const checkScrollTop = () => {
+  //   const container = document.getElementById(
+  //     "main-container-instance-details"
+  //   );
+  //   if (container) {
+  //     if (!showButton() && container.scrollTop > 400) {
+  //       setShowButton(true);
+  //     } else if (showButton() && container.scrollTop <= 400) {
+  //       setShowButton(false);
+  //     }
+  //   }
+  // };
+
+  // // Function to scroll to top smoothly
+  // const scrollTop = () => {
+  //   const container = document.getElementById(
+  //     "main-container-instance-details"
+  //   );
+  //   if (container) {
+  //     container.scrollTo({ top: 0, behavior: "smooth" });
+  //   }
+  // };
+
+  // const container = document.getElementById("main-container-instance-details");
+  // // Scroll event listener
+  // onMount(() => {
+  //   if (container) {
+  //     container.addEventListener("scroll", checkScrollTop);
+  //   }
+  // });
+
+  // onCleanup(() => {
+  //   if (container) {
+  //     container.removeEventListener("scroll", checkScrollTop);
+  //   }
+  // });
 
   createEffect(() => {
-    if (logsCopied()) {
-      const timeoutId = setTimeout(() => {
-        setLogsCopied(false);
-      }, 400);
+    if (isFullScreen()) {
+      const container = document.getElementById("logs-content-box");
 
-      onCleanup(() => {
-        clearTimeout(timeoutId);
-      });
-    }
-  });
-
-  const [showButton, setShowButton] = createSignal(false);
-
-  const checkScrollTop = () => {
-    const container = document.getElementById(
-      "main-container-instance-details"
-    );
-    if (container) {
-      if (!showButton() && container.scrollTop > 400) {
-        setShowButton(true);
-      } else if (showButton() && container.scrollTop <= 400) {
-        setShowButton(false);
+      if (container) {
+        container.scrollIntoView({ block: "start", inline: "end" });
       }
-    }
-  };
-
-  // Function to scroll to top smoothly
-  const scrollTop = () => {
-    const container = document.getElementById(
-      "main-container-instance-details"
-    );
-    if (container) {
-      container.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  };
-
-  const container = document.getElementById("main-container-instance-details");
-  // Scroll event listener
-  onMount(() => {
-    if (container) {
-      container.addEventListener("scroll", checkScrollTop);
     }
   });
 
   onCleanup(() => {
-    if (container) {
-      container.removeEventListener("scroll", checkScrollTop);
-    }
+    setIsFullScreen(false);
   });
 
   return (
-    <div>
-      <Show when={showButton()}>
-        <div class="rounded-full fixed bottom-4 right-[490px]">
-          <Button typeof="secondary" onClick={scrollTop}>
-            <Trans key="logs.scroll_top" />
-          </Button>
-        </div>
-      </Show>
-      <div class="w-full flex justify-end px-4 py-2 box-border">
-        <Tooltip content={logsCopied() ? "Copied" : "Copy"}>
-          <Button type="secondary" onClick={copyLogsToClipboard}>
-            <div class="i-ri:file-copy-fill cursor-pointer" />
-            <span>
-              <Trans key="logs.copy" />
-            </span>
-          </Button>
-        </Tooltip>
-      </div>
-      <div class="pb-4 max-h-full flex flex-col divide-y divide-darkSlate-500 divide-x-none divide-solid select-text">
-        <Switch>
-          <Match when={(logs().length || 0) > 0}>
-            <For each={logs()}>
-              {(log) => {
-                let levelColorClass = "";
-
-                switch (log.level) {
-                  case LogEntryLevel.Trace: {
-                    levelColorClass = "text-gray-500";
-
-                    break;
-                  }
-                  case LogEntryLevel.Debug: {
-                    levelColorClass = "text-orange-500";
-
-                    break;
-                  }
-                  case LogEntryLevel.Info: {
-                    levelColorClass = "text-green-500";
-
-                    break;
-                  }
-                  case LogEntryLevel.Warn: {
-                    levelColorClass = "text-text-500";
-
-                    break;
-                  }
-                  case LogEntryLevel.Error: {
-                    levelColorClass = "text-red-500";
-
-                    break;
-                  }
-                }
-
-                return (
-                  <div class="flex flex-col justify-center items-center w-full overflow-x-auto scrollbar-hide">
-                    <pre class="m-0 w-full box-border leading-8">
-                      <code class="text-darkSlate-50 text-sm select-text">
-                        <span class={levelColorClass}>
-                          [{log.level.toUpperCase()}]
-                        </span>{" "}
-                        {log.logger}@{log.thread}
-                        {": "}
-                        {log?.message}
-                      </code>
-                    </pre>
-                  </div>
-                );
-              }}
-            </For>
-          </Match>
-          <Match when={(logs().length || 0) === 0}>
-            <div class="h-full flex justify-center items-center">
-              <p>
-                <Trans key="logs.no_logs" />
-              </p>
-            </div>
-          </Match>
-        </Switch>
-      </div>
+    <div class="h-full flex overflow-hidden" id="logs-content-box">
+      <LogsSidebar logs={_logs.data || []} />
+      <LogsContent />
     </div>
   );
 };

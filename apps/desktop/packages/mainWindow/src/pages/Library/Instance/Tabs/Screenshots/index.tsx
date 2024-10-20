@@ -4,6 +4,7 @@ import { For, Show, createEffect } from "solid-js";
 import pictureImage from "/assets/images/icons/picture.png";
 import { createStore } from "solid-js/store";
 import { format } from "date-fns";
+import { getTitleByDays } from "@/utils/helpers";
 
 type ScreenshotsType = {
   img: string;
@@ -100,18 +101,6 @@ const Screenshots = () => {
 
     setFilteredScreenshots(Object.fromEntries(hashmapDates));
   });
-
-  const getTitleByDays = (days: string) => {
-    const parsedDays = Number.parseInt(days, 10);
-    if (parsedDays === 0) return "Today";
-    else if (parsedDays === 1) return "Yesterday";
-    else if (parsedDays > 1 && parsedDays < 30)
-      return `${Math.floor(parsedDays)} days ago`;
-    else if (parsedDays >= 30 && parsedDays < 365)
-      return `${Math.floor(parsedDays / 30)} months ago`;
-    else if (parsedDays >= 365)
-      return `${Math.floor(parsedDays / 365)} years ago`;
-  };
 
   return (
     <div>

@@ -332,7 +332,7 @@ where
             java_path == managed_java.path
         });
 
-        println!(
+        info!(
             "java {} is used in profile: {}",
             managed_java.path, is_java_used_in_profile
         );
