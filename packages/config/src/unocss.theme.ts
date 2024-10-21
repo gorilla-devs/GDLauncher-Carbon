@@ -150,6 +150,8 @@ const theme = {
         "{ 0% { transform: scale(1); } 50% { transform: scale(0); } 70% { transform: scale(1); } 85% { transform: scale(1.2); } 100% { transform: scale(1); } }",
       wiggle:
         "{ 0% { transform: rotate(0deg); } 25% { transform: rotate(10deg); } 50% { transform: rotate(-10deg); } 75% { transform: rotate(5deg); } 100% { transform: rotate(0deg); } }",
+      liveCirclePulse:
+        " { 0% { box-shadow: 0 0 0 0 rgba(255,0,0, 0.4); } 70% { box-shadow: 0 0 0 15px rgba(255,0,0, 0); } 100% { box-shadow: 0 0 0 0 rgba(255,0,0, 0); } }",
     },
 
     durations: {
@@ -157,14 +159,20 @@ const theme = {
       enterWithOpacityChange: "200ms",
       scaleBounce: "600ms",
       wiggle: "300ms",
+      liveCirclePulse: "1s",
     },
     timingFns: {
       loadingbar: "linear",
       enterWithOpacityChange: "ease-in-out",
       scaleBounce: "cubic-bezier(0.68, -0.55, 0.265, 1.55)",
       wiggles: "ease-in-out",
+      liveCirclePulse: "ease-in-out",
     },
-    counts: { loadingbar: "infinite", enterWithOpacityChange: "forwards" },
+    counts: {
+      loadingbar: "infinite",
+      enterWithOpacityChange: "forwards",
+      liveCirclePulse: "infinite",
+    },
   },
   screens: {
     xs: { max: "800px" }, // For the condition width <= 800

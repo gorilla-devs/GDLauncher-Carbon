@@ -61,9 +61,9 @@ const LogsSidebar = (props: LogsSidebarProps) => {
 
   return (
     <div class="w-50 box-border pr-6">
-      <div>All Logs</div>
-      <div class="mt-10 flex items-center bg-darkSlate-600 rounded-md px-4 py-1 w-full h-10 box-border text-darkSlate-100">
-        <div class="i-ri:record-circle-fill text-red-400 w-4 h-4 mr-2" />
+      <div class="h-10 px-4 py-2 flex items-center">All Logs</div>
+      <div class="flex items-center bg-darkSlate-600 rounded-md px-4 py-1 w-full h-10 box-border text-lightSlate-50">
+        <div class="bg-red-400 rounded-full text-red-400 w-4 h-4 mr-2 animate-liveCirclePulse" />
         <div>LIVE</div>
       </div>
 

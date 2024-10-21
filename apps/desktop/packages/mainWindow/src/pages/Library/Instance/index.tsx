@@ -719,9 +719,10 @@ const Instance = () => {
               </div>
             </div>
             <div
-              class="py-0"
+              class="px-4"
               classList={{
-                "pt-14": isFullScreen()
+                "pt-14": isFullScreen(),
+                "pt-4": !isFullScreen()
               }}
             >
               <Outlet />

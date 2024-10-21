@@ -1,4 +1,4 @@
-import { JSX, createEffect, createSignal } from "solid-js";
+import { JSX, Show, createEffect, createSignal } from "solid-js";
 import { cva, type VariantProps } from "class-variance-authority";
 
 const switchStyles = cva(
@@ -131,7 +131,9 @@ function Switch(props: Props) {
           })}
         />
       </span>
-      <span class="absolute inset-0 rounded-full transition-all duration-200 ease-in-out group-hover:ring-1 group-hover:ring-darkSlate-200" />
+      <Show when={!props.disabled}>
+        <span class="absolute inset-0 rounded-full transition-all duration-200 ease-in-out group-hover:ring-1 group-hover:ring-darkSlate-200" />
+      </Show>
     </label>
   );
 }

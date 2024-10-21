@@ -74,7 +74,7 @@ const App = (props: Props) => {
   });
 
   return (
-    <div class="relative w-screen select-none">
+    <div class="relative w-screen">
       <div class="w-screen flex z-10 h-auto">
         <main class="relative flex-grow max-w-screen">
           <Route />

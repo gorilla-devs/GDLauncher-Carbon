@@ -118,8 +118,14 @@
         will-change: transform; */
       }
 
-      * {
+      body:not(#instance_logs_container *) {
+        user-select: none;
         cursor: default !important;
+      }
+
+      #instance_logs_container * {
+        user-select: text;
+        cursor: auto;
       }
 
       *[data-cursor-pointer] {

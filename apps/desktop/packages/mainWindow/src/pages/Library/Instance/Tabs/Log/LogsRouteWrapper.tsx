@@ -5,7 +5,7 @@ const LogsRouteWrapper = () => {
   return (
     <div
       style={{
-        height: isFullScreen() ? "calc(100vh - 135px)" : "calc(100vh - 375px)"
+        height: isFullScreen() ? "calc(100vh - 135px)" : "calc(100vh - 389px)"
       }}
     >
       <Outlet />

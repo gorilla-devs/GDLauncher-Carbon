@@ -27,10 +27,6 @@
   backdrop-filter: none !important;
 }
 
-* {
-  user-select: none;
-}
-
 a {
   color: theme("colors.blue.500");
 }

@@ -126,7 +126,10 @@ const Logs = () => {
   });
 
   return (
-    <div class="h-full flex overflow-hidden" id="logs-content-box">
+    <div
+      class="h-full flex overflow-hidden border border-darkSlate-600 border-t-solid"
+      id="logs-content-box"
+    >
       <LogsSidebar logs={_logs.data || []} />
       <LogsContent />
     </div>
