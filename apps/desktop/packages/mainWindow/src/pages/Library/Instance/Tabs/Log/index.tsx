@@ -14,45 +14,46 @@ import {
 import { Button, Switch } from "@gd/ui";
 import LogsSidebar from "./LogsSidebar";
 import LogsContent from "./LogsContent";
+import { createStore } from "solid-js/store";
 
 export const [isFullScreen, setIsFullScreen] = createSignal(false);
 
 const Logs = () => {
   const [logsCopied, setLogsCopied] = createSignal(false);
-  const [logs, setLogs] = createSignal<LogEntry[]>([]);
+  const [logs, setLogs] = createStore<LogEntry[]>([]);
   const params = useParams();
 
-  const _logs = rspc.createQuery(() => ({
+  const availableLogEntries = rspc.createQuery(() => ({
     queryKey: ["instance.getLogs", parseInt(params.id, 10)]
   }));
 
-  const instanceLogs = () => {
-    if (!_logs.data) {
+  const instanceLogEntry = () => {
+    if (!availableLogEntries.data) {
       return undefined;
     }
 
-    return _logs.data[_logs.data.length - 1];
+    return availableLogEntries.data[availableLogEntries.data.length - 1];
   };
 
   createEffect(() => {
-    if (instanceLogs()) {
-      setLogs([]);
+    if (!instanceLogEntry()) return;
 
-      const wsConnection = new WebSocket(
-        `ws://127.0.0.1:${port}/instance/log?id=${instanceLogs()?.id}`
-      );
+    setLogs([]);
 
-      wsConnection.onmessage = (event) => {
-        const newLog = JSON.parse(event.data) as LogEntry;
-        setLogs((prevLogs) => [...prevLogs, newLog]);
-      };
+    const wsConnection = new WebSocket(
+      `ws://127.0.0.1:${port}/instance/log?id=${instanceLogEntry()?.id}`
+    );
 
-      onCleanup(() => {
-        if (wsConnection && wsConnection.readyState === wsConnection.OPEN) {
-          wsConnection.close();
-        }
-      });
-    }
+    wsConnection.onmessage = (event) => {
+      const newLog = JSON.parse(event.data) as LogEntry;
+      setLogs(logs.length, newLog);
+    };
+
+    onCleanup(() => {
+      if (wsConnection && wsConnection.readyState === wsConnection.OPEN) {
+        wsConnection.close();
+      }
+    });
   });
 
   // const copyLogsToClipboard = () => {
@@ -130,8 +131,8 @@ const Logs = () => {
       class="h-full flex overflow-hidden border border-darkSlate-600 border-t-solid"
       id="logs-content-box"
     >
-      <LogsSidebar logs={_logs.data || []} />
-      <LogsContent />
+      <LogsSidebar availableLogEntries={availableLogEntries.data || []} />
+      <LogsContent logs={logs} />
     </div>
   );
 };

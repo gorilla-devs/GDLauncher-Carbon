@@ -1720,6 +1720,8 @@ impl ManagerRef<'_, InstanceManager> {
                 }
             }
 
+            app.invalidate(GET_LOGS, Some(instance_id.0.into()));
+
             let now = Utc::now();
             let offset_in_sec = Local::now().offset().local_minus_utc();
 

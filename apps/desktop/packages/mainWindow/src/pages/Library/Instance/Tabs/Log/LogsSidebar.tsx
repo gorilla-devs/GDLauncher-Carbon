@@ -1,51 +1,54 @@
 import { getTitleByDays } from "@/utils/helpers";
 import { GameLogEntry } from "@gd/core_module/bindings";
 import { Collapsable } from "@gd/ui";
-import { For } from "solid-js";
+import { For, Show } from "solid-js";
 
 type LogsByTimespan = Record<string, Array<GameLogEntry>>;
 
 export type LogsCollapsableProps = {
   title: string;
-  logs: Array<GameLogEntry>;
+  logGroup: Array<GameLogEntry>;
 };
 
 const LogsCollapsable = (props: LogsCollapsableProps) => {
+  const sortedLogs = () => {
+    return props.logGroup
+      .filter((log) => !log.active)
+      .sort((a, b) => {
+        return parseInt(b.timestamp, 10) - parseInt(a.timestamp, 10);
+      });
+  };
+
   return (
-    <Collapsable
-      title={props.title}
-      noPadding
-      class="bg-darkSlate-600 rounded-md px-4 py-1"
-    >
-      <For each={props.logs}>
-        {(log) => (
-          <div class="text-darkSlate-100 py-4">
-            {new Date(parseInt(log.timestamp, 10)).toLocaleString()}
-          </div>
-        )}
-      </For>
-    </Collapsable>
+    <Show when={sortedLogs().length > 0}>
+      <Collapsable
+        title={props.title}
+        noPadding
+        class="bg-darkSlate-600 rounded-md px-4 py-1"
+      >
+        <For each={sortedLogs()}>
+          {(log) => (
+            <div class="text-darkSlate-100 py-4">
+              {new Date(parseInt(log.timestamp, 10)).toLocaleString()}
+            </div>
+          )}
+        </For>
+      </Collapsable>
+    </Show>
   );
 };
 
 export type LogsSidebarProps = {
-  logs: GameLogEntry[];
+  availableLogEntries: GameLogEntry[];
 };
 
 const LogsSidebar = (props: LogsSidebarProps) => {
-  const logs = () => {
+  const logGroups = () => {
     const logsByTimespan: LogsByTimespan = {};
 
-    for (const log of props.logs) {
+    for (const log of props.availableLogEntries) {
       const timeDiff: number = Date.now() - parseInt(log.timestamp, 10);
       const days = Math.floor(timeDiff / 1000) / 60 / 60 / 24;
-
-      console.log(
-        log.timestamp,
-        timeDiff,
-        days,
-        getTitleByDays(days.toString())
-      );
 
       const dateText = getTitleByDays(days.toString());
 
@@ -67,8 +70,8 @@ const LogsSidebar = (props: LogsSidebarProps) => {
         <div>LIVE</div>
       </div>
 
-      <For each={Object.keys(logs())}>
-        {(key) => <LogsCollapsable title={key} logs={logs()[key]} />}
+      <For each={Object.keys(logGroups())}>
+        {(key) => <LogsCollapsable title={key} logGroup={logGroups()[key]} />}
       </For>
     </div>
   );
