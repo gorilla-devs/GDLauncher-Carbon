@@ -30,6 +30,9 @@ const Logs = () => {
     queryKey: ["instance.getLogs", parseInt(params.id, 10)]
   }));
 
+  const isActive = () =>
+    availableLogEntries.data?.find((log) => log.id === selectedLog())?.active;
+
   createEffect(() => {
     if (!availableLogEntries.data) return;
 
@@ -135,7 +138,7 @@ const Logs = () => {
 
   return (
     <div
-      class="h-full flex overflow-hidden border border-darkSlate-600 border-t-solid"
+      class="h-full w-full flex overflow-hidden border border-darkSlate-600 border-t-solid"
       id="logs-content-box"
     >
       <LogsSidebar
@@ -143,7 +146,7 @@ const Logs = () => {
         setSelectedLog={setSelectedLog}
         selectedLog={selectedLog()}
       />
-      <LogsContent logs={logs} />
+      <LogsContent logs={logs} isActive={isActive() || false} />
     </div>
   );
 };

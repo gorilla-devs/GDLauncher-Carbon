@@ -1,7 +1,7 @@
 import { getTitleByDays } from "@/utils/helpers";
 import { GameLogEntry } from "@gd/core_module/bindings";
 import { Collapsable } from "@gd/ui";
-import { For, Show } from "solid-js";
+import { createSignal, For, Show } from "solid-js";
 import formatDateTime from "./formatDateTime";
 
 type LogsByTimespan = Record<string, Array<GameLogEntry>>;
@@ -11,6 +11,7 @@ export type LogsCollapsableProps = {
   logGroup: Array<GameLogEntry>;
   setSelectedLog: (_: number | undefined) => void;
   selectedLog: number | undefined;
+  sortDirection: "asc" | "desc";
 };
 
 const LogsCollapsable = (props: LogsCollapsableProps) => {
@@ -18,7 +19,11 @@ const LogsCollapsable = (props: LogsCollapsableProps) => {
     return props.logGroup
       .filter((log) => !log.active)
       .sort((a, b) => {
-        return parseInt(b.timestamp, 10) - parseInt(a.timestamp, 10);
+        if (props.sortDirection === "asc") {
+          return parseInt(b.timestamp, 10) - parseInt(a.timestamp, 10);
+        } else {
+          return parseInt(a.timestamp, 10) - parseInt(b.timestamp, 10);
+        }
       });
   };
 
@@ -32,7 +37,7 @@ const LogsCollapsable = (props: LogsCollapsableProps) => {
         <For each={sortedLogs()}>
           {(log) => (
             <div
-              class="relative text-darkSlate-100 py-3.5 hover:bg-darkSlate-700 rounded-md w-full box-border"
+              class="relative text-darkSlate-100 py-3.5 px-4 hover:bg-darkSlate-700 rounded-md w-full box-border"
               onClick={() => props.setSelectedLog(log.id)}
             >
               {formatDateTime(new Date(parseInt(log.timestamp, 10)))}
@@ -54,14 +59,32 @@ export type LogsSidebarProps = {
 };
 
 const LogsSidebar = (props: LogsSidebarProps) => {
+  const [sortDirection, setSortDirection] = createSignal<"asc" | "desc">("asc");
+
   const logGroups = () => {
     const logsByTimespan: LogsByTimespan = {};
 
-    for (const log of props.availableLogEntries) {
-      const timeDiff: number = Date.now() - parseInt(log.timestamp, 10);
-      const days = Math.floor(timeDiff / 1000) / 60 / 60 / 24;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-      const dateText = getTitleByDays(days.toString());
+    for (const log of props.availableLogEntries) {
+      const logDate = new Date(parseInt(log.timestamp, 10));
+      logDate.setHours(0, 0, 0, 0);
+
+      const diffTime = Math.abs(today.getTime() - logDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      let dateText: string;
+
+      if (diffDays === 0) {
+        dateText = "Today";
+      } else if (diffDays === 1) {
+        dateText = "Yesterday";
+      } else if (diffDays < 7) {
+        dateText = logDate.toLocaleDateString(undefined, { weekday: "long" });
+      } else {
+        dateText = logDate.toLocaleDateString();
+      }
 
       if (!logsByTimespan[dateText]) {
         logsByTimespan[dateText] = [];
@@ -70,7 +93,27 @@ const LogsSidebar = (props: LogsSidebarProps) => {
       logsByTimespan[dateText].push(log);
     }
 
-    return logsByTimespan;
+    const sortedGroups = Object.entries(logsByTimespan).sort(
+      ([dateA], [dateB]) => {
+        const timeA = new Date(
+          dateA === "Today"
+            ? today
+            : dateA === "Yesterday"
+              ? new Date(today.getTime() - 86400000)
+              : dateA
+        ).getTime();
+        const timeB = new Date(
+          dateB === "Today"
+            ? today
+            : dateB === "Yesterday"
+              ? new Date(today.getTime() - 86400000)
+              : dateB
+        ).getTime();
+        return sortDirection() === "asc" ? timeB - timeA : timeA - timeB;
+      }
+    );
+
+    return Object.fromEntries(sortedGroups);
   };
 
   const activeLog = () => {
@@ -79,7 +122,23 @@ const LogsSidebar = (props: LogsSidebarProps) => {
 
   return (
     <div class="flex flex-col w-50 box-border pr-6 h-full">
-      <div class="h-10 px-4 py-2 flex items-center">All Logs</div>
+      <div class="h-10 px-4 py-2 flex items-center justify-between">
+        <div>All Sessions</div>
+        <div
+          class="w-6 h-6 text-lightSlate-600 hover:text-lightSlate-50 duration-100 ease-in-out"
+          classList={{
+            "i-ri:sort-asc": sortDirection() === "asc",
+            "i-ri:sort-desc": sortDirection() === "desc"
+          }}
+          onClick={() => {
+            if (sortDirection() === "asc") {
+              setSortDirection("desc");
+            } else {
+              setSortDirection("asc");
+            }
+          }}
+        />
+      </div>
 
       <div class="relative overflow-y-auto h-full">
         <Show when={activeLog()}>
@@ -104,6 +163,7 @@ const LogsSidebar = (props: LogsSidebarProps) => {
               logGroup={logGroups()[key]}
               setSelectedLog={props.setSelectedLog}
               selectedLog={props.selectedLog}
+              sortDirection={sortDirection()}
             />
           )}
         </For>
