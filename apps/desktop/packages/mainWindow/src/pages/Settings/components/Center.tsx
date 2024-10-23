@@ -5,7 +5,7 @@ type Props = {
   class?: string;
 };
 
-function RightHandSide(props: Props) {
+function Center(props: Props) {
   const c = children(() => props.children);
 
   return (
@@ -15,4 +15,4 @@ function RightHandSide(props: Props) {
   );
 }
 
-export default RightHandSide;
+export default Center;

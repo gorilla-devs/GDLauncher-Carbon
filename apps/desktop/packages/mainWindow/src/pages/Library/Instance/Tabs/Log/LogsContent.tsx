@@ -4,7 +4,7 @@ import { isFullScreen, setIsFullScreen } from ".";
 import { LogEntry, LogEntryLevel } from "@/utils/logs";
 import formatDateTime from "./formatDateTime";
 import FullscreenToggle from "./components/FullscreenToggle";
-import LogsOptions from "./components/LogsOptions";
+import LogsOptions, { Columns, LogDensity } from "./components/LogsOptions";
 
 type Props = {
   logs: LogEntry[];
@@ -19,9 +19,19 @@ const color = {
   Error: "text-red-500"
 };
 
-function DateTimeFormatter(props: { timestamp: number }) {
+function DateTimeFormatter(props: {
+  timestamp: number;
+  fontMultiplier: 0 | 1 | 2;
+}) {
   return (
-    <span class="text-lightSlate-600 text-sm font-thin mr-2">
+    <span
+      class="text-lightSlate-600 font-thin mr-2"
+      classList={{
+        "text-xs": props.fontMultiplier === 0,
+        "text-sm": props.fontMultiplier === 1,
+        "text-base": props.fontMultiplier === 2
+      }}
+    >
       {formatDateTime(new Date(props.timestamp))}
       {/* These absolute dividers are used to interrupt text selection to this column, as it selects the largest continuous block of text it can find */}
       <div class="absolute top-0 bottom-0 right-0 w-2 bg-transparent select-none" />
@@ -29,16 +39,30 @@ function DateTimeFormatter(props: { timestamp: number }) {
   );
 }
 
-function LevelFormatter(props: { level: LogEntryLevel }) {
+function LevelFormatter(props: {
+  level: LogEntryLevel;
+  fontMultiplier: 0 | 1 | 2;
+}) {
   return (
-    <span class={`mr-2 text-sm font-thin ${color[props.level]}`}>
+    <span
+      class={`mr-2 font-thin ${color[props.level]}`}
+      classList={{
+        "text-xs": props.fontMultiplier === 0,
+        "text-sm": props.fontMultiplier === 1,
+        "text-base": props.fontMultiplier === 2
+      }}
+    >
       [{props.level.toUpperCase()}]
       <div class="absolute top-0 bottom-0 right-0 w-2 bg-transparent select-none" />
     </span>
   );
 }
 
-function ContentFormatter(props: { level: LogEntryLevel; message: string }) {
+function ContentFormatter(props: {
+  level: LogEntryLevel;
+  message: string;
+  fontMultiplier: 0 | 1 | 2;
+}) {
   const defaultColor = () =>
     props.level === LogEntryLevel.Info ||
     props.level === LogEntryLevel.Debug ||
@@ -46,10 +70,12 @@ function ContentFormatter(props: { level: LogEntryLevel; message: string }) {
 
   return (
     <span
-      class="text-sm"
       classList={{
         "text-lightSlate-50": defaultColor(),
-        [color[props.level]]: !defaultColor()
+        [color[props.level]]: !defaultColor(),
+        "text-xs": props.fontMultiplier === 0,
+        "text-sm": props.fontMultiplier === 1,
+        "text-base": props.fontMultiplier === 2
       }}
     >
       {props.message}
@@ -58,12 +84,26 @@ function ContentFormatter(props: { level: LogEntryLevel; message: string }) {
 }
 
 const LogsContent = (props: Props) => {
+  const [logsDensity, setLogsDensity] = createSignal<LogDensity>("low");
+  const [columns, setColumns] = createSignal<Columns>({
+    timestamp: true,
+    level: true
+  });
+  const [fontMultiplier, setFontMultiplier] = createSignal<0 | 1 | 2>(1);
+
   return (
     <div class="relative flex-1 min-w-0 flex flex-col border border-darkSlate-700 border-l-solid">
       <div class="flex-shrink-0 flex justify-between items-center gap-4 w-full h-10 bg-darkSlate-800 py-8 px-4 box-border">
         <Input icon={<div class="i-ri:search-line" />} placeholder="Search" />
         <div class="flex items-center gap-4">
-          <LogsOptions />
+          <LogsOptions
+            logsDensity={logsDensity()}
+            setLogsDensity={setLogsDensity}
+            columns={columns()}
+            setColumns={setColumns}
+            fontMultiplier={fontMultiplier()}
+            setFontMultiplier={setFontMultiplier}
+          />
           <FullscreenToggle
             isFullScreen={isFullScreen}
             setIsFullScreen={setIsFullScreen}
@@ -89,10 +129,31 @@ const LogsContent = (props: Props) => {
           <Match when={props.logs.length > 0}>
             <For each={props.logs}>
               {(log) => (
-                <div class="w-full py-3 break-words border-b border-b-solid border-darkSlate-600 relative">
-                  <DateTimeFormatter timestamp={log.timestamp} />
-                  <LevelFormatter level={log.level} />
-                  <ContentFormatter message={log.message} level={log.level} />
+                <div
+                  class="w-full break-words border-b border-b-solid border-darkSlate-600 relative"
+                  classList={{
+                    "py-3": logsDensity() === "low",
+                    "py-2": logsDensity() === "medium",
+                    "py-1": logsDensity() === "high"
+                  }}
+                >
+                  <Show when={columns().timestamp}>
+                    <DateTimeFormatter
+                      timestamp={log.timestamp}
+                      fontMultiplier={fontMultiplier()}
+                    />
+                  </Show>
+                  <Show when={columns().level}>
+                    <LevelFormatter
+                      level={log.level}
+                      fontMultiplier={fontMultiplier()}
+                    />
+                  </Show>
+                  <ContentFormatter
+                    message={log.message}
+                    level={log.level}
+                    fontMultiplier={fontMultiplier()}
+                  />
                 </div>
               )}
             </For>

@@ -165,7 +165,7 @@ const Instance = () => {
       path: `/library/${params.id}/settings`
     },
     {
-      label: "Logs & Monitoring",
+      label: "Logs",
       path: `/library/${params.id}/logs`
     }
     // {
