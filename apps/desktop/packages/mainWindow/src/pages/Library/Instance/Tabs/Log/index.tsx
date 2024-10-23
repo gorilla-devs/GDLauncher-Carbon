@@ -21,27 +21,28 @@ export const [isFullScreen, setIsFullScreen] = createSignal(false);
 const Logs = () => {
   const [logsCopied, setLogsCopied] = createSignal(false);
   const [logs, setLogs] = createStore<LogEntry[]>([]);
+  const [selectedLog, setSelectedLog] = createSignal<number | undefined>(
+    undefined
+  );
   const params = useParams();
 
   const availableLogEntries = rspc.createQuery(() => ({
     queryKey: ["instance.getLogs", parseInt(params.id, 10)]
   }));
 
-  const instanceLogEntry = () => {
-    if (!availableLogEntries.data) {
-      return undefined;
-    }
+  createEffect(() => {
+    if (!availableLogEntries.data) return;
 
-    return availableLogEntries.data[availableLogEntries.data.length - 1];
-  };
+    const activeLogId = availableLogEntries.data.find((log) => log.active)?.id;
+
+    if (activeLogId) setSelectedLog(activeLogId);
+  });
 
   createEffect(() => {
-    if (!instanceLogEntry()) return;
-
-    setLogs([]);
+    if (!selectedLog()) return;
 
     const wsConnection = new WebSocket(
-      `ws://127.0.0.1:${port}/instance/log?id=${instanceLogEntry()?.id}`
+      `ws://127.0.0.1:${port}/instance/log?id=${selectedLog()}`
     );
 
     wsConnection.onmessage = (event) => {
@@ -50,10 +51,16 @@ const Logs = () => {
     };
 
     onCleanup(() => {
+      setLogs([]);
+
       if (wsConnection && wsConnection.readyState === wsConnection.OPEN) {
         wsConnection.close();
       }
     });
+  });
+
+  onCleanup(() => {
+    setSelectedLog(undefined);
   });
 
   // const copyLogsToClipboard = () => {
@@ -131,7 +138,11 @@ const Logs = () => {
       class="h-full flex overflow-hidden border border-darkSlate-600 border-t-solid"
       id="logs-content-box"
     >
-      <LogsSidebar availableLogEntries={availableLogEntries.data || []} />
+      <LogsSidebar
+        availableLogEntries={availableLogEntries.data || []}
+        setSelectedLog={setSelectedLog}
+        selectedLog={selectedLog()}
+      />
       <LogsContent logs={logs} />
     </div>
   );

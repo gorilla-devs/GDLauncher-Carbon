@@ -1,28 +1,12 @@
 import { Input } from "@gd/ui";
-import { For } from "solid-js";
+import { For, Match, Switch } from "solid-js";
 import { isFullScreen, setIsFullScreen } from ".";
 import { LogEntry, LogEntryLevel } from "@/utils/logs";
+import formatDateTime from "./formatDateTime";
 
 type Props = {
   logs: LogEntry[];
 };
-
-function formatDateTime(
-  date: Date,
-  locale: string = navigator.language
-): string {
-  const day: string = date.getDate().toString().padStart(2, "0");
-  const month: string = (date.getMonth() + 1).toString().padStart(2, "0");
-  const hours: string = date.getHours().toString().padStart(2, "0");
-  const minutes: string = date.getMinutes().toString().padStart(2, "0");
-  const seconds: string = date.getSeconds().toString().padStart(2, "0");
-  const time: string = `${hours}:${minutes}:${seconds}`;
-
-  const isUSFormat: boolean = /^en-US/i.test(locale);
-  const dateStr: string = isUSFormat ? `${month}.${day}` : `${day}.${month}`;
-
-  return `${dateStr} ${time}`;
-}
 
 function LevelFormatter(props: { level: LogEntryLevel }) {
   const color = {
@@ -53,24 +37,33 @@ const LogsContent = (props: Props) => {
         />
       </div>
       <div
-        class="bg-darkSlate-900 flex-1 overflow-y-scroll px-4 py-2 w-full box-border"
+        class="bg-darkSlate-900 flex-1 overflow-y-scroll px-4 py-2 w-full box-border mb-4"
         id="instance_logs_container"
       >
-        <For each={props.logs}>
-          {(log) => (
-            <div class="flex gap-2 items-center w-full">
-              <div class="text-lightSlate-600 text-sm font-thin min-w-fit">
-                {formatDateTime(new Date(log.timestamp))}
-              </div>
-              <div class="text-lightSlate-600 text-sm font-thin min-w-fit">
-                <LevelFormatter level={log.level} />
-              </div>
-              <div class="text-lightSlate-50 text-sm border-t border-t-solid border-darkSlate-600 py-2 flex-1 flex-wrap break-words w-0">
-                {log.message}
-              </div>
+        <Switch>
+          <Match when={props.logs.length === 0}>
+            <div class="flex h-full justify-center items-center text-center text-lightSlate-600 text-2xl">
+              No logs available
             </div>
-          )}
-        </For>
+          </Match>
+          <Match when={props.logs.length > 0}>
+            <For each={props.logs}>
+              {(log) => (
+                <div class="flex gap-2 items-center w-full">
+                  <div class="text-lightSlate-600 text-sm font-thin min-w-fit">
+                    {formatDateTime(new Date(log.timestamp))}
+                  </div>
+                  <div class="text-lightSlate-600 text-sm font-thin min-w-fit">
+                    <LevelFormatter level={log.level} />
+                  </div>
+                  <div class="text-lightSlate-50 text-sm border-t border-t-solid border-darkSlate-600 py-2 flex-1 flex-wrap break-words w-0">
+                    {log.message}
+                  </div>
+                </div>
+              )}
+            </For>
+          </Match>
+        </Switch>
       </div>
     </div>
   );
