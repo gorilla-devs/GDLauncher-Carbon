@@ -19,6 +19,7 @@ import { createStore } from "solid-js/store";
 export const [isFullScreen, setIsFullScreen] = createSignal(false);
 
 const Logs = () => {
+  let logsContainerRef: HTMLDivElement | undefined;
   const [logsCopied, setLogsCopied] = createSignal(false);
   const [logs, setLogs] = createStore<LogEntry[]>([]);
   const [selectedLog, setSelectedLog] = createSignal<number | undefined>(
@@ -123,12 +124,11 @@ const Logs = () => {
   // });
 
   createEffect(() => {
-    if (isFullScreen()) {
-      const container = document.getElementById("logs-content-box");
-
-      if (container) {
-        container.scrollIntoView({ block: "start", inline: "end" });
-      }
+    if (isFullScreen() && logsContainerRef) {
+      logsContainerRef.scrollIntoView({
+        block: "start",
+        inline: "end"
+      });
     }
   });
 
@@ -139,7 +139,7 @@ const Logs = () => {
   return (
     <div
       class="h-full w-full flex overflow-hidden border border-darkSlate-600 border-t-solid"
-      id="logs-content-box"
+      ref={(ref) => (logsContainerRef = ref)}
     >
       <LogsSidebar
         availableLogEntries={availableLogEntries.data || []}

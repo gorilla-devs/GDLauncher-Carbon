@@ -118,7 +118,7 @@ const LogsContent = (props: Props) => {
       </Show>
       <div
         class="relative bg-darkSlate-900 flex-1 overflow-auto px-4 py-2 w-full box-border mb-4"
-        id="instance_logs_container"
+        id="instance_logs_container" // used to override user select and cursor in index.html
       >
         <Switch>
           <Match when={props.logs.length === 0}>

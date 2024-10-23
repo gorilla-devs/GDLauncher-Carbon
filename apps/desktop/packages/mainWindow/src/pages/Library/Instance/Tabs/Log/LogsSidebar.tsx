@@ -38,7 +38,9 @@ const LogsCollapsable = (props: LogsCollapsableProps) => {
           {(log) => (
             <div
               class="relative text-darkSlate-100 py-3.5 px-4 hover:bg-darkSlate-700 rounded-md w-full box-border"
-              onClick={() => props.setSelectedLog(log.id)}
+              onClick={() => {
+                props.setSelectedLog(log.id);
+              }}
             >
               {formatDateTime(new Date(parseInt(log.timestamp, 10)))}
               <Show when={props.selectedLog === log.id}>
