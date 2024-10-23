@@ -3,6 +3,7 @@ import Row from "@/pages/Settings/components/Row";
 import RowsContainer from "@/pages/Settings/components/RowsContainer";
 import Title from "@/pages/Settings/components/Title";
 import { Button, Checkbox, Popover, Radio, Skeleton, Slider } from "@gd/ui";
+import { createSignal } from "solid-js";
 
 function LowDensityRows() {
   return (
@@ -77,6 +78,8 @@ type Props = {
 };
 
 export default function LogsOptions(props: Props) {
+  const [isOpen, setIsOpen] = createSignal(false);
+
   return (
     <Popover
       placement="top"
@@ -84,6 +87,8 @@ export default function LogsOptions(props: Props) {
       noTip
       noShadow
       trigger="click"
+      onOpen={() => setIsOpen(true)}
+      onClose={() => setIsOpen(false)}
       content={() => (
         <div class="text-lightSlate-50 bg-darkSlate-700 w-130 h-auto p-4 rounded-lg shadow-lg shadow-darkSlate-900">
           <RowsContainer>
@@ -205,7 +210,13 @@ export default function LogsOptions(props: Props) {
         </div>
       )}
     >
-      <div class="w-6 h-6 bg-lightSlate-800 hover:bg-lightSlate-50 transition-colors duration-200 ease-in-out i-ri:settings-3-line" />
+      <div
+        class="w-6 h-6 hover:bg-lightSlate-50 transition-colors duration-200 ease-in-out i-ri:settings-3-line"
+        classList={{
+          "bg-lightSlate-800": !isOpen(),
+          "bg-lightSlate-50": isOpen()
+        }}
+      />
     </Popover>
   );
 }
