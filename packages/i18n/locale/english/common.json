@@ -412,6 +412,7 @@
   "logs.copy": "Copy logs",
   "logs.new_logs": "{{logsCount}} New Logs",
   "logs.see_new_logs": "See New Logs",
+  "logs.logs_paused_due_to_scroll": "Logs Paused due to Scroll",
   "logs.autofollow": "Automatically Scroll on New Logs",
   "Copy": "Copy",
   "copied_to_clipboard": "Copied to clipboard",

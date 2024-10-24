@@ -90,6 +90,57 @@ function ContentFormatter(props: {
   );
 }
 
+function ScrollBottomButton(props: {
+  onClick: () => void;
+  newLogsCount: number;
+}) {
+  const [isHovered, setIsHovered] = createSignal(false);
+
+  return (
+    <Button
+      size="small"
+      type="secondary"
+      fullWidth
+      onClick={props.onClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <Switch>
+        <Match when={isHovered()}>
+          <Switch>
+            <Match when={props.newLogsCount > 0}>
+              <div class="flex items-center gap-2">
+                <div class="i-ri:arrow-down-s-line" />
+                <Trans
+                  key="logs.new_logs"
+                  options={{
+                    logsCount:
+                      props.newLogsCount > 999
+                        ? "999+"
+                        : props.newLogsCount.toString()
+                  }}
+                />
+              </div>
+            </Match>
+            <Match when={props.newLogsCount === 0}>
+              <div class="flex items-center gap-2">
+                <div class="i-ri:arrow-down-s-line" />
+                <Trans key="logs.see_new_logs" />
+              </div>
+            </Match>
+          </Switch>
+        </Match>
+        <Match when={!isHovered()}>
+          <div class="flex items-center gap-2">
+            <div class="w-4 h-4 i-ri:pause-fill" />
+            <Trans key="logs.logs_paused_due_to_scroll" />
+          </div>
+        </Match>
+      </Switch>
+    </Button>
+  );
+}
+
 const LogsContent = (props: Props) => {
   const [logsDensity, setLogsDensity] = createSignal<LogDensity>("low");
   const [columns, setColumns] = createSignal<Columns>({
@@ -130,31 +181,11 @@ const LogsContent = (props: Props) => {
         class="justify-center hidden"
         ref={(el) => props.assignScrollBottomRef(el)}
       >
-        <div class="z-1 flex justify-center fixed bottom-6">
-          <Button onClick={props.scrollToBottom}>
-            <Switch>
-              <Match when={props.newLogsCount > 0}>
-                <div class="flex items-center gap-2">
-                  <div class="i-ri:arrow-down-s-line" />
-                  <Trans
-                    key="logs.new_logs"
-                    options={{
-                      logsCount:
-                        props.newLogsCount > 999
-                          ? "999+"
-                          : props.newLogsCount.toString()
-                    }}
-                  />
-                </div>
-              </Match>
-              <Match when={props.newLogsCount === 0}>
-                <div class="flex items-center gap-2">
-                  <div class="i-ri:arrow-down-s-line" />
-                  <Trans key="logs.see_new_logs" />
-                </div>
-              </Match>
-            </Switch>
-          </Button>
+        <div class="w-60 z-1 flex justify-center fixed bottom-6">
+          <ScrollBottomButton
+            onClick={props.scrollToBottom}
+            newLogsCount={props.newLogsCount}
+          />
         </div>
       </div>
       <div
