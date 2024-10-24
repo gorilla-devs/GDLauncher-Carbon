@@ -5,10 +5,17 @@ import formatDateTime from "./formatDateTime";
 import FullscreenToggle from "./components/FullscreenToggle";
 import LogsOptions, { Columns, LogDensity } from "./components/LogsOptions";
 import { Trans } from "@gd/i18n";
+import { Button } from "@gd/ui";
 
 type Props = {
   logs: LogEntry[];
   isActive: boolean;
+  scrollToBottom: () => void;
+  assignScrollBottomRef: (ref: HTMLDivElement) => void;
+  assignLogsContentRef: (ref: HTMLDivElement) => void;
+  newLogsCount: number;
+  autoFollowPreference: boolean;
+  setAutoFollowPreference: (_: boolean) => void;
 };
 
 const color = {
@@ -104,6 +111,8 @@ const LogsContent = (props: Props) => {
             setColumns={setColumns}
             fontMultiplier={fontMultiplier()}
             setFontMultiplier={setFontMultiplier}
+            autoFollowPreference={props.autoFollowPreference}
+            setAutoFollowPreference={props.setAutoFollowPreference}
           />
           <FullscreenToggle
             isFullScreen={isFullScreen}
@@ -118,7 +127,39 @@ const LogsContent = (props: Props) => {
         </div>
       </Show>
       <div
+        class="justify-center hidden"
+        ref={(el) => props.assignScrollBottomRef(el)}
+      >
+        <div class="z-1 flex justify-center fixed bottom-6">
+          <Button onClick={props.scrollToBottom}>
+            <Switch>
+              <Match when={props.newLogsCount > 0}>
+                <div class="flex items-center gap-2">
+                  <div class="i-ri:arrow-down-s-line" />
+                  <Trans
+                    key="logs.new_logs"
+                    options={{
+                      logsCount:
+                        props.newLogsCount > 999
+                          ? "999+"
+                          : props.newLogsCount.toString()
+                    }}
+                  />
+                </div>
+              </Match>
+              <Match when={props.newLogsCount === 0}>
+                <div class="flex items-center gap-2">
+                  <div class="i-ri:arrow-down-s-line" />
+                  <Trans key="logs.see_new_logs" />
+                </div>
+              </Match>
+            </Switch>
+          </Button>
+        </div>
+      </div>
+      <div
         class="relative bg-darkSlate-900 flex-1 overflow-auto px-4 py-2 w-full box-border mb-4"
+        ref={props.assignLogsContentRef}
         id="instance_logs_container" // used to override user select and cursor in index.html
       >
         <Switch>

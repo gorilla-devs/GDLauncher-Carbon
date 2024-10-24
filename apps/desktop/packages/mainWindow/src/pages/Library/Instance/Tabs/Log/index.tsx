@@ -1,7 +1,7 @@
 import { LogEntry } from "@/utils/logs";
 import { port, rspc } from "@/utils/rspcClient";
 import { useParams } from "@solidjs/router";
-import { createEffect, createSignal, onCleanup } from "solid-js";
+import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
 import LogsSidebar from "./LogsSidebar";
 import LogsContent from "./LogsContent";
 import { createStore } from "solid-js/store";
@@ -9,13 +9,16 @@ import { createStore } from "solid-js/store";
 export const [isFullScreen, setIsFullScreen] = createSignal(false);
 
 const Logs = () => {
-  let logsContainerRef: HTMLDivElement | undefined;
-  // const [logsCopied, setLogsCopied] = createSignal(false);
+  let logsContentRef: HTMLDivElement | undefined;
+  let scrollBottomRef: HTMLDivElement | undefined;
   const [logs, setLogs] = createStore<LogEntry[]>([]);
   const [selectedLog, setSelectedLog] = createSignal<number | undefined>(
     undefined
   );
+  const [autoFollowPreference, setAutoFollowPreference] = createSignal(true);
+  const [autoFollow, setAutoFollow] = createSignal(true);
   const params = useParams();
+  const [newLogsCount, setNewLogsCount] = createSignal(0);
 
   const availableLogEntries = rspc.createQuery(() => ({
     queryKey: ["instance.getLogs", parseInt(params.id, 10)]
@@ -41,6 +44,15 @@ const Logs = () => {
     wsConnection.onmessage = (event) => {
       const newLog = JSON.parse(event.data) as LogEntry;
       setLogs(logs.length, newLog);
+
+      if (!logsContentRef || !autoFollowPreference()) return;
+
+      if (autoFollow()) {
+        logsContentRef.scrollTop = logsContentRef.scrollHeight;
+        setNewLogsCount(0);
+      } else {
+        setNewLogsCount((prev) => prev + 1);
+      }
     };
 
     onCleanup(() => {
@@ -56,65 +68,52 @@ const Logs = () => {
     setSelectedLog(undefined);
   });
 
-  // const copyLogsToClipboard = () => {
-  //   window.copyToClipboard(JSON.stringify(instanceLogs()));
-  //   setLogsCopied(true);
-  // };
+  createEffect(() => {
+    // autoFollowPreference call NEEDS to be here for scrollToBottom to be called when it changes
+    autoFollowPreference();
+    setNewLogsCount(0);
+    handleScroll();
+  });
 
-  // createEffect(() => {
-  //   if (logsCopied()) {
-  //     const timeoutId = setTimeout(() => {
-  //       setLogsCopied(false);
-  //     }, 400);
+  const handleScroll = () => {
+    if (!logsContentRef) return;
 
-  //     onCleanup(() => {
-  //       clearTimeout(timeoutId);
-  //     });
-  //   }
-  // });
+    const isAtBottom =
+      logsContentRef.scrollHeight - logsContentRef.scrollTop ===
+      logsContentRef.clientHeight;
 
-  // const [showButton, setShowButton] = createSignal(false);
+    if (scrollBottomRef && !autoFollowPreference()) {
+      scrollBottomRef.style.display = "none";
+    }
 
-  // const checkScrollTop = () => {
-  //   const container = document.getElementById(
-  //     "main-container-instance-details"
-  //   );
-  //   if (container) {
-  //     if (!showButton() && container.scrollTop > 400) {
-  //       setShowButton(true);
-  //     } else if (showButton() && container.scrollTop <= 400) {
-  //       setShowButton(false);
-  //     }
-  //   }
-  // };
+    if (isAtBottom) {
+      setAutoFollow(true);
+      if (scrollBottomRef && autoFollowPreference()) {
+        scrollBottomRef.style.display = "none";
+      }
+    } else {
+      setAutoFollow(false);
+      if (scrollBottomRef && autoFollowPreference()) {
+        scrollBottomRef.style.display = "flex";
+      }
+    }
+  };
 
-  // // Function to scroll to top smoothly
-  // const scrollTop = () => {
-  //   const container = document.getElementById(
-  //     "main-container-instance-details"
-  //   );
-  //   if (container) {
-  //     container.scrollTo({ top: 0, behavior: "smooth" });
-  //   }
-  // };
+  onMount(() => {
+    if (logsContentRef) {
+      logsContentRef.addEventListener("scroll", handleScroll);
+    }
+  });
 
-  // const container = document.getElementById("main-container-instance-details");
-  // // Scroll event listener
-  // onMount(() => {
-  //   if (container) {
-  //     container.addEventListener("scroll", checkScrollTop);
-  //   }
-  // });
-
-  // onCleanup(() => {
-  //   if (container) {
-  //     container.removeEventListener("scroll", checkScrollTop);
-  //   }
-  // });
+  onCleanup(() => {
+    if (logsContentRef) {
+      logsContentRef.removeEventListener("scroll", handleScroll);
+    }
+  });
 
   createEffect(() => {
-    if (isFullScreen() && logsContainerRef) {
-      logsContainerRef.scrollIntoView({
+    if (isFullScreen() && logsContentRef) {
+      logsContentRef.scrollIntoView({
         block: "start",
         inline: "end"
       });
@@ -125,17 +124,42 @@ const Logs = () => {
     setIsFullScreen(false);
   });
 
+  const scrollToBottom = () => {
+    if (logsContentRef) {
+      logsContentRef.scrollTop = logsContentRef.scrollHeight;
+      setAutoFollow(true);
+      setNewLogsCount(0);
+      if (scrollBottomRef) {
+        scrollBottomRef.style.display = "none";
+      }
+    }
+  };
+
+  function assignScrollBottomRef(ref: HTMLDivElement) {
+    scrollBottomRef = ref;
+  }
+
+  function assignLogsContentRef(ref: HTMLDivElement) {
+    logsContentRef = ref;
+  }
+
   return (
-    <div
-      class="h-full w-full flex overflow-hidden border border-darkSlate-600 border-t-solid"
-      ref={(ref) => (logsContainerRef = ref)}
-    >
+    <div class="h-full w-full flex overflow-hidden border border-darkSlate-600 border-t-solid">
       <LogsSidebar
         availableLogEntries={availableLogEntries.data || []}
         setSelectedLog={setSelectedLog}
         selectedLog={selectedLog()}
       />
-      <LogsContent logs={logs} isActive={isActive() || false} />
+      <LogsContent
+        logs={logs}
+        isActive={isActive() || false}
+        scrollToBottom={scrollToBottom}
+        assignScrollBottomRef={assignScrollBottomRef}
+        assignLogsContentRef={assignLogsContentRef}
+        newLogsCount={newLogsCount()}
+        autoFollowPreference={autoFollowPreference()}
+        setAutoFollowPreference={setAutoFollowPreference}
+      />
     </div>
   );
 };

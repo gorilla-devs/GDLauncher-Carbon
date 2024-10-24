@@ -189,7 +189,6 @@ const Popover = (_props: Props) => {
               "px-2 py-1": !props.noPadding,
             }}
             onClick={(e) => {
-              e.preventDefault();
               e.stopImmediatePropagation();
               e.stopPropagation();
             }}

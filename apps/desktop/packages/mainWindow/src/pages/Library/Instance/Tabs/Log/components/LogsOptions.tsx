@@ -2,7 +2,7 @@ import RightHandSide from "@/pages/Settings/components/RightHandSide";
 import Row from "@/pages/Settings/components/Row";
 import RowsContainer from "@/pages/Settings/components/RowsContainer";
 import { Trans } from "@gd/i18n";
-import { Checkbox, Popover, Radio, Slider } from "@gd/ui";
+import { Checkbox, Popover, Radio, Slider, Switch } from "@gd/ui";
 import { createSignal } from "solid-js";
 
 function LowDensityRows() {
@@ -66,6 +66,8 @@ type Props = {
   setColumns: (_: Columns) => void;
   fontMultiplier: 0 | 1 | 2;
   setFontMultiplier: (_: 0 | 1 | 2) => void;
+  autoFollowPreference: boolean;
+  setAutoFollowPreference: (_: boolean) => void;
 };
 
 export default function LogsOptions(props: Props) {
@@ -73,7 +75,6 @@ export default function LogsOptions(props: Props) {
 
   return (
     <Popover
-      placement="top"
       color="bg-transparent"
       noTip
       noShadow
@@ -206,6 +207,22 @@ export default function LogsOptions(props: Props) {
                       }}
                     />
                   </div>
+                </div>
+              </RightHandSide>
+            </Row>
+            <hr class="h-px w-full bg-darkSlate-400 border-0 rounded" />
+            <Row>
+              <div>
+                <Trans key="logs.autofollow" />
+              </div>
+              <RightHandSide>
+                <div class="flex gap-6 w-full h-auto items-center">
+                  <Switch
+                    checked={props.autoFollowPreference}
+                    onChange={(e) => {
+                      props.setAutoFollowPreference(e.currentTarget.checked);
+                    }}
+                  />
                 </div>
               </RightHandSide>
             </Row>

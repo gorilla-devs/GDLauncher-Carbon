@@ -34,7 +34,7 @@ function Settings() {
     {
       name: (
         <div class="relative flex gap-2 items-center">
-          Appearance
+          {"Appearance"}
           <div class="absolute -top-14 right-0">
             <FeatureStatusBadge type="updated" />
           </div>
