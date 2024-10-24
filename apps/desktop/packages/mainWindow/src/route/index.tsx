@@ -69,7 +69,8 @@ export const routes: RouteDefinition[] = [
               {
                 path: "/logs",
                 component: lazy(
-                  () => import("@/pages/Library/Instance/Tabs/Log/LogsRouteWrapper")
+                  () =>
+                    import("@/pages/Library/Instance/Tabs/Log/LogsRouteWrapper")
                 ),
                 children: [
                   {
