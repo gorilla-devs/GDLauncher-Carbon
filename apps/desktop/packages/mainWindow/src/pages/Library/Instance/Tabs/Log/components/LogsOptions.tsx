@@ -2,52 +2,99 @@ import RightHandSide from "@/pages/Settings/components/RightHandSide";
 import Row from "@/pages/Settings/components/Row";
 import RowsContainer from "@/pages/Settings/components/RowsContainer";
 import { Trans } from "@gd/i18n";
-import { Checkbox, Popover, Radio, Slider, Switch } from "@gd/ui";
-import { createSignal } from "solid-js";
+import { Popover, Slider, Switch } from "@gd/ui";
+import { createEffect, createSignal } from "solid-js";
+import { Show } from "solid-js";
 
-function LowDensityRows() {
+type DensityRowProps = {
+  selected: boolean;
+  onClick: () => void;
+};
+
+function LowDensityRows(props: DensityRowProps) {
   return (
-    <div class="w-24 h-10 flex flex-col justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md">
+    <div
+      class="relative w-24 h-10 flex flex-col justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md cursor-pointer"
+      classList={{ "bg-lightSlate-600": props.selected }}
+      onClick={props.onClick}
+    >
       <div class="w-14 h-3 rounded-sm bg-darkSlate-100" />
+      <Show when={props.selected}>
+        <div class="absolute top-1 right-1 w-4 h-4 i-ri:checkbox-fill text-green-600" />
+      </Show>
     </div>
   );
 }
 
-function MediumDensityRows() {
+function MediumDensityRows(props: DensityRowProps) {
   return (
-    <div class="w-24 h-10 flex flex-col gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md">
+    <div
+      class="relative w-24 h-10 flex flex-col gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md cursor-pointer"
+      classList={{ "bg-lightSlate-600": props.selected }}
+      onClick={props.onClick}
+    >
       <div class="w-14 h-1.5 rounded-sm bg-darkSlate-100" />
       <div class="w-14 h-1.5 rounded-sm bg-darkSlate-100" />
+      <Show when={props.selected}>
+        <div class="absolute top-1 right-1 w-4 h-4 i-ri:checkbox-fill text-green-600" />
+      </Show>
     </div>
   );
 }
 
-function HighDensityRows() {
+function HighDensityRows(props: DensityRowProps) {
   return (
-    <div class="w-24 h-10 flex flex-col gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md">
+    <div
+      class="relative w-24 h-10 flex flex-col gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md cursor-pointer"
+      classList={{ "bg-lightSlate-600": props.selected }}
+      onClick={props.onClick}
+    >
       <div class="w-14 h-1 rounded-sm bg-darkSlate-100" />
       <div class="w-14 h-1 rounded-sm bg-darkSlate-100" />
       <div class="w-14 h-1 rounded-sm bg-darkSlate-100" />
       <div class="w-14 h-1 rounded-sm bg-darkSlate-100" />
+      <Show when={props.selected}>
+        <div class="absolute top-1 right-1 w-4 h-4 i-ri:checkbox-fill text-green-600" />
+      </Show>
     </div>
   );
 }
 
-function TimestampColumn() {
+type ColumnProps = {
+  selected: boolean;
+  onClick: () => void;
+};
+
+function TimestampColumn(props: ColumnProps) {
   return (
-    <div class="w-24 h-10 flex gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md">
+    <div
+      class="relative w-24 h-10 flex gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md cursor-pointer"
+      classList={{ "bg-lightSlate-600": props.selected }}
+      onClick={props.onClick}
+    >
       <div class="w-4 h-2 rounded-sm bg-lightSlate-50" />
       <div class="w-4 h-2 rounded-sm bg-darkSlate-100" />
       <div class="w-10 h-2 rounded-sm bg-darkSlate-100" />
+      <Show when={props.selected}>
+        <div class="absolute top-1 right-1 w-4 h-4 i-ri:checkbox-fill text-green-600" />
+      </Show>
     </div>
   );
 }
-function LogLevelColumn() {
+
+function LogLevelColumn(props: ColumnProps) {
   return (
-    <div class="w-24 h-10 flex gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md">
+    <div
+      class="relative w-24 h-10 flex gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md cursor-pointer"
+      classList={{ "bg-lightSlate-600": props.selected }}
+      onClick={props.onClick}
+    >
       <div class="w-4 h-2 rounded-sm bg-darkSlate-100" />
       <div class="w-4 h-2 rounded-sm bg-lightSlate-50" />
       <div class="w-10 h-2 rounded-sm bg-darkSlate-100" />
+      <Show when={props.selected}>
+        <div class="absolute top-1 right-1 w-4 h-4 i-ri:checkbox-fill text-green-600" />
+      </Show>
     </div>
   );
 }
@@ -73,6 +120,10 @@ type Props = {
 export default function LogsOptions(props: Props) {
   const [isOpen, setIsOpen] = createSignal(false);
 
+  createEffect(() => {
+    console.log(props.logsDensity);
+  });
+
   return (
     <Popover
       color="bg-transparent"
@@ -94,39 +145,27 @@ export default function LogsOptions(props: Props) {
                     <div class="text-sm text-lightSlate-600 text-center">
                       <Trans key="logs_density.low" />
                     </div>
-                    <LowDensityRows />
-                    <Radio
-                      value={"low"}
-                      checked={props.logsDensity === "low"}
-                      onChange={(value) => {
-                        props.setLogsDensity(value as LogDensity);
-                      }}
+                    <LowDensityRows
+                      selected={props.logsDensity === "low"}
+                      onClick={() => props.setLogsDensity("low")}
                     />
                   </div>
                   <div class="w-full flex flex-col items-center gap-3">
                     <div class="text-sm text-lightSlate-600 text-center">
                       <Trans key="logs_density.comfortable" />
                     </div>
-                    <MediumDensityRows />
-                    <Radio
-                      value={"medium"}
-                      checked={props.logsDensity === "medium"}
-                      onChange={(value) => {
-                        props.setLogsDensity(value as LogDensity);
-                      }}
+                    <MediumDensityRows
+                      selected={props.logsDensity === "medium"}
+                      onClick={() => props.setLogsDensity("medium")}
                     />
                   </div>
                   <div class="w-full flex flex-col items-center gap-3">
                     <div class="text-sm text-lightSlate-600 text-center">
                       <Trans key="logs_density.compact" />
                     </div>
-                    <HighDensityRows />
-                    <Radio
-                      value={"high"}
-                      checked={props.logsDensity === "high"}
-                      onChange={(value) => {
-                        props.setLogsDensity(value as LogDensity);
-                      }}
+                    <HighDensityRows
+                      selected={props.logsDensity === "high"}
+                      onClick={() => props.setLogsDensity("high")}
                     />
                   </div>
                 </div>
@@ -181,30 +220,28 @@ export default function LogsOptions(props: Props) {
                     <div class="text-sm text-lightSlate-600 text-center">
                       <Trans key="columns.timestamp" />
                     </div>
-                    <TimestampColumn />
-                    <Checkbox
-                      checked={props.columns.timestamp}
-                      onChange={(checked) => {
+                    <TimestampColumn
+                      selected={props.columns.timestamp}
+                      onClick={() =>
                         props.setColumns({
                           ...props.columns,
-                          timestamp: checked
-                        });
-                      }}
+                          timestamp: !props.columns.timestamp
+                        })
+                      }
                     />
                   </div>
                   <div class="w-full flex flex-col items-center gap-3">
                     <div class="text-sm text-lightSlate-600 text-center">
                       <Trans key="columns.level" />
                     </div>
-                    <LogLevelColumn />
-                    <Checkbox
-                      checked={props.columns.level}
-                      onChange={(checked) => {
+                    <LogLevelColumn
+                      selected={props.columns.level}
+                      onClick={() =>
                         props.setColumns({
                           ...props.columns,
-                          level: checked
-                        });
-                      }}
+                          level: !props.columns.level
+                        })
+                      }
                     />
                   </div>
                 </div>
