@@ -120,10 +120,6 @@ type Props = {
 export default function LogsOptions(props: Props) {
   const [isOpen, setIsOpen] = createSignal(false);
 
-  createEffect(() => {
-    console.log(props.logsDensity);
-  });
-
   return (
     <Popover
       color="bg-transparent"
