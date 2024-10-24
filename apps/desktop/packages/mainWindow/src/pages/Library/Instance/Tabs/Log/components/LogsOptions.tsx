@@ -8,7 +8,7 @@ import { createSignal } from "solid-js";
 function LowDensityRows() {
   return (
     <div class="w-24 h-10 flex flex-col justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md">
-      <div class="w-14 h-3 rounded-md bg-darkSlate-100" />
+      <div class="w-14 h-3 rounded-sm bg-darkSlate-100" />
     </div>
   );
 }
@@ -16,8 +16,8 @@ function LowDensityRows() {
 function MediumDensityRows() {
   return (
     <div class="w-24 h-10 flex flex-col gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md">
-      <div class="w-14 h-1.5 rounded-md bg-darkSlate-100" />
-      <div class="w-14 h-1.5 rounded-md bg-darkSlate-100" />
+      <div class="w-14 h-1.5 rounded-sm bg-darkSlate-100" />
+      <div class="w-14 h-1.5 rounded-sm bg-darkSlate-100" />
     </div>
   );
 }
@@ -25,10 +25,10 @@ function MediumDensityRows() {
 function HighDensityRows() {
   return (
     <div class="w-24 h-10 flex flex-col gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md">
-      <div class="w-14 h-1 rounded-md bg-darkSlate-100" />
-      <div class="w-14 h-1 rounded-md bg-darkSlate-100" />
-      <div class="w-14 h-1 rounded-md bg-darkSlate-100" />
-      <div class="w-14 h-1 rounded-md bg-darkSlate-100" />
+      <div class="w-14 h-1 rounded-sm bg-darkSlate-100" />
+      <div class="w-14 h-1 rounded-sm bg-darkSlate-100" />
+      <div class="w-14 h-1 rounded-sm bg-darkSlate-100" />
+      <div class="w-14 h-1 rounded-sm bg-darkSlate-100" />
     </div>
   );
 }
@@ -36,27 +36,18 @@ function HighDensityRows() {
 function TimestampColumn() {
   return (
     <div class="w-24 h-10 flex gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md">
-      <div class="w-4 h-2 rounded-md bg-lightSlate-50" />
-      <div class="w-4 h-2 rounded-md bg-darkSlate-100" />
-      <div class="w-10 h-2 rounded-md bg-darkSlate-100" />
+      <div class="w-4 h-2 rounded-sm bg-lightSlate-50" />
+      <div class="w-4 h-2 rounded-sm bg-darkSlate-100" />
+      <div class="w-10 h-2 rounded-sm bg-darkSlate-100" />
     </div>
   );
 }
 function LogLevelColumn() {
   return (
     <div class="w-24 h-10 flex gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md">
-      <div class="w-4 h-2 rounded-md bg-darkSlate-100" />
-      <div class="w-4 h-2 rounded-md bg-lightSlate-50" />
-      <div class="w-10 h-2 rounded-md bg-darkSlate-100" />
-    </div>
-  );
-}
-function MessageColumn() {
-  return (
-    <div class="w-24 h-10 flex gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md">
-      <div class="w-4 h-2 rounded-md bg-darkSlate-100" />
-      <div class="w-4 h-2 rounded-md bg-darkSlate-100" />
-      <div class="w-10 h-2 rounded-md bg-lightSlate-50" />
+      <div class="w-4 h-2 rounded-sm bg-darkSlate-100" />
+      <div class="w-4 h-2 rounded-sm bg-lightSlate-50" />
+      <div class="w-10 h-2 rounded-sm bg-darkSlate-100" />
     </div>
   );
 }

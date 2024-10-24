@@ -124,7 +124,7 @@ const LogsSidebar = (props: LogsSidebarProps) => {
 
   return (
     <div class="flex flex-col w-50 box-border pr-6 h-full">
-      <div class="h-10 px-4 py-2 flex items-center justify-between">
+      <div class="h-10 px-4 py-4 flex items-center justify-between">
         <div>All Sessions</div>
         <div
           class="w-6 h-6 text-lightSlate-600 hover:text-lightSlate-50 duration-100 ease-in-out"
