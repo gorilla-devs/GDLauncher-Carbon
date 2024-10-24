@@ -125,7 +125,9 @@ const LogsSidebar = (props: LogsSidebarProps) => {
   return (
     <div class="flex flex-col w-50 box-border pr-6 h-full">
       <div class="h-10 px-4 py-4 flex items-center justify-between">
-        <div>All Sessions</div>
+        <div>
+          <Trans key="logs.all_sessions" />
+        </div>
         <div
           class="w-6 h-6 text-lightSlate-600 hover:text-lightSlate-50 duration-100 ease-in-out"
           classList={{
@@ -175,7 +177,7 @@ const LogsSidebar = (props: LogsSidebarProps) => {
         </Match>
         <Match when={props.availableLogEntries.length === 0}>
           <div class="h-full flex items-center justify-center text-lightSlate-600 text-center">
-            <Trans key="no_log_sessions_available" />
+            <Trans key="logs.no_log_sessions_available" />
           </div>
         </Match>
       </Switch>
