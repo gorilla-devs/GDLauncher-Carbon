@@ -1,7 +1,8 @@
 import { GameLogEntry } from "@gd/core_module/bindings";
 import { Collapsable } from "@gd/ui";
-import { createSignal, For, Show } from "solid-js";
+import { createSignal, For, Match, Show, Switch } from "solid-js";
 import formatDateTime from "./formatDateTime";
+import { Trans } from "@gd/i18n";
 
 type LogsByTimespan = Record<string, Array<GameLogEntry>>;
 
@@ -141,34 +142,43 @@ const LogsSidebar = (props: LogsSidebarProps) => {
         />
       </div>
 
-      <div class="relative overflow-y-auto h-full">
-        <Show when={activeLog()}>
-          <div
-            class="z-1 sticky top-0 bg-darkSlate-800 w-full h-10 text-lightSlate-50 rounded-b-md rounded-t-none"
-            onClick={() => props.setSelectedLog(activeLog()?.id)}
-          >
-            <div class="relative w-full h-full flex items-center px-4 py-1 box-border bg-darkSlate-600 rounded-md">
-              <div class="bg-red-400 rounded-full text-red-400 w-4 h-4 mr-2 animate-liveCirclePulse" />
-              <div>LIVE</div>
-              <Show when={props.selectedLog === activeLog()?.id}>
-                <div class="absolute right-0 top-0 w-1 h-full bg-primary-400" />
-              </Show>
-            </div>
-          </div>
-        </Show>
+      <Switch>
+        <Match when={props.availableLogEntries.length > 0}>
+          <div class="relative overflow-y-auto h-full">
+            <Show when={activeLog()}>
+              <div
+                class="z-1 sticky top-0 bg-darkSlate-800 w-full h-10 text-lightSlate-50 rounded-b-md rounded-t-none"
+                onClick={() => props.setSelectedLog(activeLog()?.id)}
+              >
+                <div class="relative w-full h-full flex items-center px-4 py-1 box-border bg-darkSlate-600 rounded-md">
+                  <div class="bg-red-400 rounded-full text-red-400 w-4 h-4 mr-2 animate-liveCirclePulse" />
+                  <div>LIVE</div>
+                  <Show when={props.selectedLog === activeLog()?.id}>
+                    <div class="absolute right-0 top-0 w-1 h-full bg-primary-400" />
+                  </Show>
+                </div>
+              </div>
+            </Show>
 
-        <For each={Object.keys(logGroups())}>
-          {(key) => (
-            <LogsCollapsable
-              title={key}
-              logGroup={logGroups()[key]}
-              setSelectedLog={props.setSelectedLog}
-              selectedLog={props.selectedLog}
-              sortDirection={sortDirection()}
-            />
-          )}
-        </For>
-      </div>
+            <For each={Object.keys(logGroups())}>
+              {(key) => (
+                <LogsCollapsable
+                  title={key}
+                  logGroup={logGroups()[key]}
+                  setSelectedLog={props.setSelectedLog}
+                  selectedLog={props.selectedLog}
+                  sortDirection={sortDirection()}
+                />
+              )}
+            </For>
+          </div>
+        </Match>
+        <Match when={props.availableLogEntries.length === 0}>
+          <div class="h-full flex items-center justify-center text-lightSlate-600 text-center">
+            <Trans key="no_log_sessions_available" />
+          </div>
+        </Match>
+      </Switch>
     </div>
   );
 };

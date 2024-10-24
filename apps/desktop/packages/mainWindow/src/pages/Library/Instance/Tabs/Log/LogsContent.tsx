@@ -195,8 +195,8 @@ const LogsContent = (props: Props) => {
       >
         <Switch>
           <Match when={props.logs.length === 0}>
-            <div class="flex h-full justify-center items-center text-center text-lightSlate-600 text-2xl select-none">
-              <Trans key="no_logs_available" />
+            <div class="flex h-full justify-center items-center text-center text-lightSlate-600 text-xl select-none">
+              <Trans key="logs.no_logs" />
             </div>
           </Match>
           <Match when={props.logs.length > 0}>
