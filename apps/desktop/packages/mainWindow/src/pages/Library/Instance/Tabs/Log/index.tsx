@@ -39,11 +39,13 @@ const Logs = () => {
 
     const activeLogId = availableLogEntries.data.find((log) => log.active)?.id;
 
-    if (activeLogId) setSelectedLog(activeLogId);
+    console.log("Found", activeLogId);
+
+    if (activeLogId !== undefined) setSelectedLog(activeLogId);
   });
 
   createEffect(() => {
-    if (!selectedLog()) return;
+    if (selectedLog() === undefined) return;
 
     const wsConnection = new WebSocket(
       `ws://127.0.0.1:${port}/instance/log?id=${selectedLog()}`
