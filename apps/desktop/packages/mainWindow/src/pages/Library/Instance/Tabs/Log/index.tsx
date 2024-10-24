@@ -36,10 +36,7 @@ const Logs = () => {
 
   createEffect(() => {
     if (!availableLogEntries.data) return;
-
     const activeLogId = availableLogEntries.data.find((log) => log.active)?.id;
-
-    console.log("Found", activeLogId);
 
     if (activeLogId !== undefined) setSelectedLog(activeLogId);
   });

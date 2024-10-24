@@ -94,7 +94,8 @@ const LogsContent = (props: Props) => {
   return (
     <div class="relative flex-1 min-w-0 flex flex-col border border-darkSlate-700 border-l-solid">
       <div class="flex-shrink-0 flex justify-between items-center gap-4 w-full h-10 bg-darkSlate-800 py-8 px-4 box-border">
-        <Input icon={<div class="i-ri:search-line" />} placeholder="Search" />
+        {/* <Input icon={<div class="i-ri:search-line" />} placeholder="Search" /> */}
+        <div />
         <div class="flex items-center gap-4">
           <LogsOptions
             logsDensity={logsDensity()}

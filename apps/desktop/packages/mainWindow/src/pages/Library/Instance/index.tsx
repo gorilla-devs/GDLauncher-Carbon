@@ -41,6 +41,7 @@ import {
 } from "@/managers/ModalsManager/modals/InstanceExport";
 import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/atoms/ExportCheckboxParent";
 import { isFullScreen } from "./Tabs/Log";
+import FeatureStatusBadge from "@/components/FeatureStatusBadge";
 
 type InstancePage = {
   label: string;
@@ -165,7 +166,12 @@ const Instance = () => {
       path: `/library/${params.id}/settings`
     },
     {
-      label: "Logs",
+      label: (
+        <div class="flex gap-2 items-center">
+          Logs
+          <FeatureStatusBadge type="new" />
+        </div>
+      ),
       path: `/library/${params.id}/logs`
     }
     // {
