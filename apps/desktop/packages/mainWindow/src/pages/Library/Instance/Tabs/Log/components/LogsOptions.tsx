@@ -1,6 +1,7 @@
 import RightHandSide from "@/pages/Settings/components/RightHandSide";
 import Row from "@/pages/Settings/components/Row";
 import RowsContainer from "@/pages/Settings/components/RowsContainer";
+import { Trans } from "@gd/i18n";
 import { Checkbox, Popover, Radio, Slider } from "@gd/ui";
 import { createSignal } from "solid-js";
 
@@ -83,12 +84,14 @@ export default function LogsOptions(props: Props) {
         <div class="text-lightSlate-50 bg-darkSlate-700 w-130 h-auto p-4 rounded-lg shadow-lg shadow-darkSlate-900">
           <RowsContainer>
             <Row>
-              <div>Logs Density</div>
+              <div>
+                <Trans key="logs_density" />
+              </div>
               <RightHandSide>
                 <div class="flex gap-6 w-full h-auto items-center">
                   <div class="w-full flex flex-col items-center gap-3">
                     <div class="text-sm text-lightSlate-600 text-center">
-                      Low
+                      <Trans key="logs_density.low" />
                     </div>
                     <LowDensityRows />
                     <Radio
@@ -101,7 +104,7 @@ export default function LogsOptions(props: Props) {
                   </div>
                   <div class="w-full flex flex-col items-center gap-3">
                     <div class="text-sm text-lightSlate-600 text-center">
-                      Comfortable
+                      <Trans key="logs_density.comfortable" />
                     </div>
                     <MediumDensityRows />
                     <Radio
@@ -114,7 +117,7 @@ export default function LogsOptions(props: Props) {
                   </div>
                   <div class="w-full flex flex-col items-center gap-3">
                     <div class="text-sm text-lightSlate-600 text-center">
-                      Compact
+                      <Trans key="logs_density.compact" />
                     </div>
                     <HighDensityRows />
                     <Radio
@@ -130,7 +133,9 @@ export default function LogsOptions(props: Props) {
             </Row>
             <hr class="h-px w-full bg-darkSlate-400 border-0 rounded" />
             <Row>
-              <div>Font Size</div>
+              <div>
+                <Trans key="font_size" />
+              </div>
               <RightHandSide>
                 <div class="w-84">
                   <Slider
@@ -140,14 +145,20 @@ export default function LogsOptions(props: Props) {
                     value={props.fontMultiplier}
                     marks={{
                       0: {
-                        label: <div class="text-lightSlate-600 text-xs">aA</div>
+                        label: (
+                          <div class="text-lightSlate-600 text-xs">{"aA"}</div>
+                        )
                       },
                       1: {
-                        label: <div class="text-lightSlate-600 text-sm">aA</div>
+                        label: (
+                          <div class="text-lightSlate-600 text-sm">{"aA"}</div>
+                        )
                       },
                       2: {
                         label: (
-                          <div class="text-lightSlate-600 text-base">aA</div>
+                          <div class="text-lightSlate-600 text-base">
+                            {"aA"}
+                          </div>
                         )
                       }
                     }}
@@ -160,12 +171,14 @@ export default function LogsOptions(props: Props) {
             </Row>
             <hr class="h-px w-full bg-darkSlate-400 border-0 rounded" />
             <Row>
-              <div>Columns</div>
+              <div>
+                <Trans key="columns" />
+              </div>
               <RightHandSide>
                 <div class="flex gap-6 w-full h-auto items-center">
                   <div class="w-full flex flex-col items-center gap-3">
                     <div class="text-sm text-lightSlate-600 text-center">
-                      Timestamp
+                      <Trans key="columns.timestamp" />
                     </div>
                     <TimestampColumn />
                     <Checkbox
@@ -180,7 +193,7 @@ export default function LogsOptions(props: Props) {
                   </div>
                   <div class="w-full flex flex-col items-center gap-3">
                     <div class="text-sm text-lightSlate-600 text-center">
-                      Log Level
+                      <Trans key="columns.level" />
                     </div>
                     <LogLevelColumn />
                     <Checkbox

@@ -4,6 +4,7 @@ import { LogEntry, LogEntryLevel } from "@/utils/logs";
 import formatDateTime from "./formatDateTime";
 import FullscreenToggle from "./components/FullscreenToggle";
 import LogsOptions, { Columns, LogDensity } from "./components/LogsOptions";
+import { Trans } from "@gd/i18n";
 
 type Props = {
   logs: LogEntry[];
@@ -123,7 +124,7 @@ const LogsContent = (props: Props) => {
         <Switch>
           <Match when={props.logs.length === 0}>
             <div class="flex h-full justify-center items-center text-center text-lightSlate-600 text-2xl select-none">
-              No logs available
+              <Trans key="no_logs_available" />
             </div>
           </Match>
           <Match when={props.logs.length > 0}>

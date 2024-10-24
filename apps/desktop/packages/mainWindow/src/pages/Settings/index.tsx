@@ -1,61 +1,69 @@
 import { Outlet, useLocation } from "@solidjs/router";
 import ContentWrapper from "@/components/ContentWrapper";
 import { Tab, TabList, Tabs } from "@gd/ui";
-import { For } from "solid-js";
+import { For, JSX } from "solid-js";
 import { useGDNavigate } from "@/managers/NavigationManager";
+import FeatureStatusBadge from "@/components/FeatureStatusBadge";
 
 export type settingsItem = {
-  name: string;
+  name: string | JSX.Element;
   icon: string;
   path: string;
 };
 
-const settings: Array<settingsItem> = [
-  {
-    name: "General",
-    icon: "i-ri:home-gear-fill",
-    path: "/settings"
-  },
-  {
-    name: "Accounts",
-    icon: "i-ri:account-box-fill",
-    path: "/settings/accounts"
-  },
-  {
-    name: "Language",
-    icon: "i-ri:global-fill",
-    path: "/settings/language"
-  },
-  {
-    name: "Appearance",
-    icon: "i-ri:brush-fill",
-    path: "/settings/appearance"
-  },
-  {
-    name: "Java",
-    icon: "i-nonicons:java-16",
-    path: "/settings/java"
-  },
-  {
-    name: "Custom Commands",
-    icon: "i-ri:terminal-fill",
-    path: "/settings/custom-commands"
-  },
-  {
-    name: "Privacy",
-    icon: "i-ri:shield-keyhole-fill",
-    path: "/settings/privacy"
-  },
-  {
-    name: "Runtime Path",
-    icon: "i-ri-folder-fill",
-    path: "/settings/runtime-path"
-  }
-];
-
 function Settings() {
   const location = useLocation();
   const navigate = useGDNavigate();
+
+  const settings: Array<settingsItem> = [
+    {
+      name: "General",
+      icon: "i-ri:home-gear-fill",
+      path: "/settings"
+    },
+    {
+      name: "Accounts",
+      icon: "i-ri:account-box-fill",
+      path: "/settings/accounts"
+    },
+    {
+      name: "Language",
+      icon: "i-ri:global-fill",
+      path: "/settings/language"
+    },
+    {
+      name: (
+        <div class="relative flex gap-2 items-center">
+          Appearance
+          <div class="absolute -top-14 right-0">
+            <FeatureStatusBadge type="updated" />
+          </div>
+        </div>
+      ),
+      icon: "i-ri:brush-fill",
+      path: "/settings/appearance"
+    },
+    {
+      name: "Java",
+      icon: "i-nonicons:java-16",
+      path: "/settings/java"
+    },
+    {
+      name: "Custom Commands",
+      icon: "i-ri:terminal-fill",
+      path: "/settings/custom-commands"
+    },
+    {
+      name: "Privacy",
+      icon: "i-ri:shield-keyhole-fill",
+      path: "/settings/privacy"
+    },
+    {
+      name: "Runtime Path",
+      icon: "i-ri-folder-fill",
+      path: "/settings/runtime-path"
+    }
+  ];
 
   return (
     <>

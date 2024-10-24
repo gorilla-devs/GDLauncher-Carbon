@@ -1,7 +1,7 @@
 import { Trans } from "@gd/i18n";
 
 type Props = {
-  type: "new" | "beta" | "soon";
+  type: "new" | "beta" | "soon" | "updated";
 };
 
 export default function FeatureStatusBadge(props: Props) {
@@ -12,6 +12,8 @@ export default function FeatureStatusBadge(props: Props) {
       case "beta":
         return "bg-yellow-400 text-darkSlate-900";
       case "soon":
+        return "bg-primary-400 text-lightSlate-50";
+      case "updated":
         return "bg-primary-400 text-lightSlate-50";
     }
   };
@@ -24,6 +26,8 @@ export default function FeatureStatusBadge(props: Props) {
         return <Trans key="badge_beta" />;
       case "soon":
         return <Trans key="badge_soon" />;
+      case "updated":
+        return <Trans key="badge_updated" />;
     }
   };
 

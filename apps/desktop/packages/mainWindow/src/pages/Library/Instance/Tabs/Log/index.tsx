@@ -10,7 +10,7 @@ export const [isFullScreen, setIsFullScreen] = createSignal(false);
 
 const Logs = () => {
   let logsContainerRef: HTMLDivElement | undefined;
-  const [logsCopied, setLogsCopied] = createSignal(false);
+  // const [logsCopied, setLogsCopied] = createSignal(false);
   const [logs, setLogs] = createStore<LogEntry[]>([]);
   const [selectedLog, setSelectedLog] = createSignal<number | undefined>(
     undefined
