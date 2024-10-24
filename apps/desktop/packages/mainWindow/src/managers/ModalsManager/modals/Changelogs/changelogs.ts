@@ -33,8 +33,17 @@ const changelogs: Changelog = {
         'We added an "Accounts" tab in the settings to easily manage your accounts, as well as your GDL account.'
     },
     {
+      title: "A whole new logs page just dropped in!",
+      description:
+        "The old one was more of a placeholder. This page is still under heavy development, but it's already a lot better than the old one."
+    },
+    {
       title: "Library featured modpack can now be hidden",
       description: "by clicking the eye icon in the top right corner."
+    },
+    {
+      title:
+        "Added confirmation dialog when trying to launch an instance with a expired or invalid account."
     }
   ],
   fixed: [
@@ -50,6 +59,13 @@ const changelogs: Changelog = {
     {
       title:
         "Fixed microphone not being allowed to be used in instances on MacOS."
+    },
+    {
+      title: "Fixed tabs always being flagged as selected by default"
+    },
+    {
+      title:
+        "Fixed infinite calls sometimes being made to the API from the instance page resulting in errors"
     }
   ],
   improved: [
@@ -89,6 +105,13 @@ const changelogs: Changelog = {
     },
     {
       title: "Potato PC mode now also disables hardware acceleration."
+    },
+    {
+      title: "Fully reworked how consents are handled",
+      description: "resulting in a deeper compliance with GDPR and CCPA."
+    },
+    {
+      title: "Updated terms of service and privacy statement"
     }
   ]
 };

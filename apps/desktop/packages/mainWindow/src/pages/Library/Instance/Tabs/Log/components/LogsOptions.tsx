@@ -3,7 +3,7 @@ import Row from "@/pages/Settings/components/Row";
 import RowsContainer from "@/pages/Settings/components/RowsContainer";
 import { Trans } from "@gd/i18n";
 import { Popover, Slider, Switch } from "@gd/ui";
-import { createEffect, createSignal } from "solid-js";
+import { createSignal } from "solid-js";
 import { Show } from "solid-js";
 
 type DensityRowProps = {

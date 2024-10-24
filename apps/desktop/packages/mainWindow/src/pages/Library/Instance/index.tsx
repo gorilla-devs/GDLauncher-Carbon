@@ -170,7 +170,7 @@ const Instance = () => {
       label: (
         <div class="flex gap-2 items-center">
           Logs
-          <FeatureStatusBadge type="updated" />
+          <FeatureStatusBadge type="beta" />
         </div>
       ),
       path: `/library/${params.id}/logs`
