@@ -1,4 +1,3 @@
-import { getTitleByDays } from "@/utils/helpers";
 import { GameLogEntry } from "@gd/core_module/bindings";
 import { Collapsable } from "@gd/ui";
 import { createSignal, For, Show } from "solid-js";

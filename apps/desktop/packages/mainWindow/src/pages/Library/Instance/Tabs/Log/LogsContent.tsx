@@ -1,4 +1,3 @@
-import { Button, Input, ButtonGroup } from "@gd/ui";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { isFullScreen, setIsFullScreen } from ".";
 import { LogEntry, LogEntryLevel } from "@/utils/logs";

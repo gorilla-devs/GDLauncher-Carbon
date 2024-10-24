@@ -5,6 +5,7 @@ import { Tabs, TabList, Tab, Button, ContextMenu } from "@gd/ui";
 import { Outlet, useLocation, useParams, useRouteData } from "@solidjs/router";
 import {
   For,
+  JSX,
   Match,
   Show,
   Switch,
@@ -44,7 +45,7 @@ import { isFullScreen } from "./Tabs/Log";
 import FeatureStatusBadge from "@/components/FeatureStatusBadge";
 
 type InstancePage = {
-  label: string;
+  label: string | JSX.Element;
   path: string;
 };
 

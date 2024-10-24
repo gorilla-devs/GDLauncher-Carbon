@@ -1,8 +1,7 @@
 import RightHandSide from "@/pages/Settings/components/RightHandSide";
 import Row from "@/pages/Settings/components/Row";
 import RowsContainer from "@/pages/Settings/components/RowsContainer";
-import Title from "@/pages/Settings/components/Title";
-import { Button, Checkbox, Popover, Radio, Skeleton, Slider } from "@gd/ui";
+import { Checkbox, Popover, Radio, Slider } from "@gd/ui";
 import { createSignal } from "solid-js";
 
 function LowDensityRows() {

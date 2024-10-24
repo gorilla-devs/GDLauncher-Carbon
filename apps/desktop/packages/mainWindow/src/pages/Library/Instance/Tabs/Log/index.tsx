@@ -1,17 +1,7 @@
-import { LogEntry, LogEntryLevel } from "@/utils/logs";
+import { LogEntry } from "@/utils/logs";
 import { port, rspc } from "@/utils/rspcClient";
-import { Trans } from "@gd/i18n";
-import { Outlet, useParams } from "@solidjs/router";
-import {
-  For,
-  Match,
-  Show,
-  createEffect,
-  createSignal,
-  onCleanup,
-  onMount
-} from "solid-js";
-import { Button, Switch } from "@gd/ui";
+import { useParams } from "@solidjs/router";
+import { createEffect, createSignal, onCleanup } from "solid-js";
 import LogsSidebar from "./LogsSidebar";
 import LogsContent from "./LogsContent";
 import { createStore } from "solid-js/store";
