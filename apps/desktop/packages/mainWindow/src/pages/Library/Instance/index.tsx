@@ -399,7 +399,7 @@ const Instance = () => {
         ref={(el) => {
           headerRef = el;
         }}
-        class="relative flex flex-col justify-between ease-in-out transition-all ease-in-out items-stretch bg-cover bg-center min-h-60 transition-100"
+        class="relative flex flex-col justify-between ease-in-out transition-all items-stretch bg-cover bg-center min-h-60 transition-100"
         style={{
           transition: "height 0.2s",
           "background-image": routeData.instanceDetails.data?.iconRevision
@@ -482,7 +482,7 @@ const Instance = () => {
                           onInput={(e) => {
                             setNewName(e.target.innerHTML);
                           }}
-                          class="cursor-pointer z-10 m-0 border-box focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text min-h-10"
+                          class="z-10 m-0 border-box focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text min-h-10"
                           contentEditable={editableName()}
                           onFocusIn={() => {
                             setEditableName(true);

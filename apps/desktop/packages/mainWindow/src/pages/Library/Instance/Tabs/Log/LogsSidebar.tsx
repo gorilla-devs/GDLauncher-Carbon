@@ -1,5 +1,5 @@
 import { GameLogEntry } from "@gd/core_module/bindings";
-import { Collapsable } from "@gd/ui";
+import { Collapsable, Spinner } from "@gd/ui";
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import formatDateTime from "./formatDateTime";
 import { Trans } from "@gd/i18n";
@@ -27,10 +27,34 @@ const LogsCollapsable = (props: LogsCollapsableProps) => {
       });
   };
 
+  const groupTitle = () => {
+    const logDate = new Date(props.title);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const diffTime = Math.abs(today.getTime() - logDate.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    let dateText: string;
+
+    if (diffDays === 0) {
+      dateText = "Today";
+    } else if (diffDays === 1) {
+      dateText = "Yesterday";
+    } else if (diffDays < 7) {
+      dateText = logDate.toLocaleDateString(undefined, { weekday: "long" });
+    } else {
+      dateText = props.title;
+    }
+
+    return dateText;
+  };
+
   return (
     <Show when={sortedLogs().length > 0}>
       <Collapsable
-        title={props.title}
+        title={groupTitle()}
         noPadding
         class="bg-darkSlate-600 rounded-md px-4 py-1 mb-2"
       >
@@ -58,6 +82,7 @@ export type LogsSidebarProps = {
   availableLogEntries: GameLogEntry[];
   setSelectedLog: (_: number | undefined) => void;
   selectedLog: number | undefined;
+  isLoading: boolean;
 };
 
 const LogsSidebar = (props: LogsSidebarProps) => {
@@ -66,27 +91,11 @@ const LogsSidebar = (props: LogsSidebarProps) => {
   const logGroups = () => {
     const logsByTimespan: LogsByTimespan = {};
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     for (const log of props.availableLogEntries) {
       const logDate = new Date(parseInt(log.timestamp, 10));
       logDate.setHours(0, 0, 0, 0);
 
-      const diffTime = Math.abs(today.getTime() - logDate.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      let dateText: string;
-
-      if (diffDays === 0) {
-        dateText = "Today";
-      } else if (diffDays === 1) {
-        dateText = "Yesterday";
-      } else if (diffDays < 7) {
-        dateText = logDate.toLocaleDateString(undefined, { weekday: "long" });
-      } else {
-        dateText = logDate.toLocaleDateString();
-      }
+      const dateText = logDate.toDateString();
 
       if (!logsByTimespan[dateText]) {
         logsByTimespan[dateText] = [];
@@ -97,20 +106,9 @@ const LogsSidebar = (props: LogsSidebarProps) => {
 
     const sortedGroups = Object.entries(logsByTimespan).sort(
       ([dateA], [dateB]) => {
-        const timeA = new Date(
-          dateA === "Today"
-            ? today
-            : dateA === "Yesterday"
-              ? new Date(today.getTime() - 86400000)
-              : dateA
-        ).getTime();
-        const timeB = new Date(
-          dateB === "Today"
-            ? today
-            : dateB === "Yesterday"
-              ? new Date(today.getTime() - 86400000)
-              : dateB
-        ).getTime();
+        const timeA = new Date(dateA).getTime();
+        const timeB = new Date(dateB).getTime();
+
         return sortDirection() === "asc" ? timeB - timeA : timeA - timeB;
       }
     );
@@ -145,6 +143,11 @@ const LogsSidebar = (props: LogsSidebarProps) => {
       </div>
 
       <Switch>
+        <Match when={props.isLoading}>
+          <div class="h-full w-full flex items-center justify-center">
+            <Spinner />
+          </div>
+        </Match>
         <Match when={props.availableLogEntries.length > 0}>
           <div class="relative overflow-y-auto h-full">
             <Show when={activeLog()}>

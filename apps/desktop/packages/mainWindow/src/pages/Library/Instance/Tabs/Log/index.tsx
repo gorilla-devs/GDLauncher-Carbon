@@ -152,6 +152,7 @@ const Logs = () => {
         availableLogEntries={availableLogEntries.data || []}
         setSelectedLog={setSelectedLog}
         selectedLog={selectedLog()}
+        isLoading={availableLogEntries.isLoading}
       />
       <LogsContent
         logs={logs}
