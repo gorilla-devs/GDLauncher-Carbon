@@ -148,6 +148,11 @@ impl InstancePath {
     pub fn get_logs_path(&self) -> PathBuf {
         self.get_data_path().join("logs")
     }
+
+    pub fn get_gdl_logs_path(&self) -> PathBuf {
+        self.get_root().join("logs")
+    }
+
     pub fn get_plugins_path(&self) -> PathBuf {
         self.get_data_path().join("plugins")
     }

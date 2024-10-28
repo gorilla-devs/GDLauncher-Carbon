@@ -416,6 +416,7 @@
   "logs.see_new_logs": "See New Logs",
   "logs.logs_paused_due_to_scroll": "Logs Paused due to Scroll",
   "logs.autofollow": "Automatically Scroll on New Logs",
+  "logs.start_log_message_on_new_line": "Start Log Message on New Line",
   "Copy": "Copy",
   "copied_to_clipboard": "Copied to clipboard",
   "introduction": "Introduction",
@@ -502,6 +503,9 @@
   "logs_density.compact": "Compact",
   "columns": "Columns",
   "columns.timestamp": "Timestamp",
+  "columns.logger": "Logger",
+  "columns.source_kind": "Source Kind",
+  "columns.thread_name": "Thread Name",
   "columns.level": "Log Level",
   "font_size": "Font Size"
 }

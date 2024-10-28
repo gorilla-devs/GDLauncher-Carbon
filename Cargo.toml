@@ -123,6 +123,7 @@ sysinfo = "0.31.2"
 serde_qs = "0.13.0"
 markdown = "1.0.0-alpha.11"
 ring = "0.17.8"
+html-escape = "0.2.13"
 
 # dev dependencies
 assert2 = "0.3.11"

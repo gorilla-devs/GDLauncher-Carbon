@@ -1,6 +1,6 @@
 import { createSignal, For, Match, Show, Switch } from "solid-js";
 import { isFullScreen, setIsFullScreen } from ".";
-import { LogEntry, LogEntryLevel } from "@/utils/logs";
+import { LogEntry, LogEntryLevel, LogEntrySourceKind } from "@/utils/logs";
 import formatDateTime from "./formatDateTime";
 import FullscreenToggle from "./components/FullscreenToggle";
 import LogsOptions, { Columns, LogDensity } from "./components/LogsOptions";
@@ -46,6 +46,64 @@ function DateTimeFormatter(props: {
   );
 }
 
+function LoggerFormatter(props: { logger: string; fontMultiplier: 0 | 1 | 2 }) {
+  return (
+    <span
+      class={`mr-2 font-thin`}
+      classList={{
+        "text-xs": props.fontMultiplier === 0,
+        "text-sm": props.fontMultiplier === 1,
+        "text-base": props.fontMultiplier === 2
+      }}
+    >
+      [{props.logger.toUpperCase()}]
+      {/* These absolute dividers are used to interrupt text selection to this column, as it selects the largest continuous block of text it can find */}
+      <div class="absolute top-0 bottom-0 right-0 w-2 bg-transparent select-none" />
+    </span>
+  );
+}
+
+function SourceKindFormatter(props: {
+  sourceKind: LogEntrySourceKind;
+  fontMultiplier: 0 | 1 | 2;
+}) {
+  return (
+    <span
+      class={`mr-2 font-thin`}
+      classList={{
+        "text-xs": props.fontMultiplier === 0,
+        "text-sm": props.fontMultiplier === 1,
+        "text-base": props.fontMultiplier === 2,
+        "text-primary-400": props.sourceKind === LogEntrySourceKind._System
+      }}
+    >
+      [{props.sourceKind.toUpperCase()}]
+      {/* These absolute dividers are used to interrupt text selection to this column, as it selects the largest continuous block of text it can find */}
+      <div class="absolute top-0 bottom-0 right-0 w-2 bg-transparent select-none" />
+    </span>
+  );
+}
+
+function ThreadNameFormatter(props: {
+  threadName: string;
+  fontMultiplier: 0 | 1 | 2;
+}) {
+  return (
+    <span
+      class={`mr-2 font-thin`}
+      classList={{
+        "text-xs": props.fontMultiplier === 0,
+        "text-sm": props.fontMultiplier === 1,
+        "text-base": props.fontMultiplier === 2
+      }}
+    >
+      [{props.threadName}]
+      {/* These absolute dividers are used to interrupt text selection to this column, as it selects the largest continuous block of text it can find */}
+      <div class="absolute top-0 bottom-0 right-0 w-2 bg-transparent select-none" />
+    </span>
+  );
+}
+
 function LevelFormatter(props: {
   level: LogEntryLevel;
   fontMultiplier: 0 | 1 | 2;
@@ -67,22 +125,28 @@ function LevelFormatter(props: {
 
 function ContentFormatter(props: {
   level: LogEntryLevel;
+  sourceKind: LogEntrySourceKind;
   message: string;
   fontMultiplier: 0 | 1 | 2;
+  startLogMessageOnNewLine: boolean;
 }) {
   const defaultColor = () =>
     props.level === LogEntryLevel.Info ||
     props.level === LogEntryLevel.Debug ||
     props.level === LogEntryLevel.Trace;
 
+  const isSystemLog = () => props.sourceKind === LogEntrySourceKind._System;
+
   return (
     <span
       classList={{
-        "text-lightSlate-50": defaultColor(),
-        [color[props.level]]: !defaultColor(),
+        "text-lightSlate-50": defaultColor() && !isSystemLog(),
+        [color[props.level]]: !defaultColor() && !isSystemLog(),
+        "text-primary-400": isSystemLog(),
         "text-xs": props.fontMultiplier === 0,
         "text-sm": props.fontMultiplier === 1,
-        "text-base": props.fontMultiplier === 2
+        "text-base": props.fontMultiplier === 2,
+        "block w-full pt-2": props.startLogMessageOnNewLine
       }}
     >
       {props.message}
@@ -145,9 +209,14 @@ const LogsContent = (props: Props) => {
   const [logsDensity, setLogsDensity] = createSignal<LogDensity>("low");
   const [columns, setColumns] = createSignal<Columns>({
     timestamp: true,
+    logger: true,
+    sourceKind: true,
+    threadName: true,
     level: true
   });
   const [fontMultiplier, setFontMultiplier] = createSignal<0 | 1 | 2>(1);
+  const [startLogMessageOnNewLine, setStartLogMessageOnNewLine] =
+    createSignal(false);
 
   return (
     <div class="relative flex-1 min-w-0 flex flex-col border border-darkSlate-700 border-l-solid">
@@ -164,6 +233,8 @@ const LogsContent = (props: Props) => {
             setFontMultiplier={setFontMultiplier}
             autoFollowPreference={props.autoFollowPreference}
             setAutoFollowPreference={props.setAutoFollowPreference}
+            startLogMessageOnNewLine={startLogMessageOnNewLine()}
+            setStartLogMessageOnNewLine={setStartLogMessageOnNewLine}
           />
           <FullscreenToggle
             isFullScreen={isFullScreen}
@@ -216,16 +287,36 @@ const LogsContent = (props: Props) => {
                       fontMultiplier={fontMultiplier()}
                     />
                   </Show>
+                  <Show when={columns().sourceKind}>
+                    <SourceKindFormatter
+                      sourceKind={log.sourceKind}
+                      fontMultiplier={fontMultiplier()}
+                    />
+                  </Show>
                   <Show when={columns().level}>
                     <LevelFormatter
                       level={log.level}
                       fontMultiplier={fontMultiplier()}
                     />
                   </Show>
+                  <Show when={columns().logger}>
+                    <LoggerFormatter
+                      logger={log.logger}
+                      fontMultiplier={fontMultiplier()}
+                    />
+                  </Show>
+                  <Show when={columns().threadName}>
+                    <ThreadNameFormatter
+                      threadName={log.thread}
+                      fontMultiplier={fontMultiplier()}
+                    />
+                  </Show>
                   <ContentFormatter
                     message={log.message}
                     level={log.level}
+                    sourceKind={log.sourceKind}
                     fontMultiplier={fontMultiplier()}
+                    startLogMessageOnNewLine={startLogMessageOnNewLine()}
                   />
                 </div>
               )}

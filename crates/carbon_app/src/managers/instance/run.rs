@@ -1,3 +1,4 @@
+use super::log::LogProcessor;
 use super::modpack::PackVersionFile;
 use super::{InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError};
 use crate::api::keys::instance::*;
@@ -33,6 +34,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Context};
 use carbon_net::DownloadOptions;
+use carbon_parsing::log::{LogParser, ParsedItem};
 use chrono::{DateTime, Local, Utc};
 use futures::Future;
 use itertools::Itertools;
@@ -44,6 +46,8 @@ use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
 use tokio::sync::{watch, Mutex, Semaphore};
 use tokio::task::JoinHandle;
 use tokio::{io::AsyncReadExt, sync::mpsc};
@@ -1595,7 +1599,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let start_time = Utc::now();
 
-                    let (log_id, log) = app.instance_manager().create_log(instance_id).await;
+                    let (log_id, log) = app.instance_manager().create_log(instance_id, None).await;
                     let _ = app.instance_manager()
                         .change_launch_state(
                             instance_id,
@@ -1608,8 +1612,7 @@ impl ManagerRef<'_, InstanceManager> {
                         )
                         .await;
 
-                    let (Some(mut stdout), Some(mut stderr)) =
-                        (child.stdout.take(), child.stderr.take())
+                    let (Some(stdout), Some(stderr)) = (child.stdout.take(), child.stderr.take())
                     else {
                         panic!("stdout and stderr are not availible even though the child process was created with both enabled");
                     };
@@ -1633,13 +1636,33 @@ impl ManagerRef<'_, InstanceManager> {
 
                     time_at_start = Some(Utc::now());
 
+                    let log_file_name = format!(
+                        "{}_{}",
+                        start_time.format("%Y-%m-%d"),
+                        start_time.format("%H-%M-%S")
+                    );
+
+                    let logs_file_path = instance_path
+                        .get_gdl_logs_path()
+                        .join(format!("{}.log", log_file_name));
+
                     tokio::select! {
-                        _ = child.wait() => {},
-                        _ = kill_rx.recv() => drop(child.kill().await),
-                        // infallible, canceled by the above tasks
-                        _ = read_logs(&log, &mut stdout,&mut  stderr) => {},
-                        _ = update_playtime => {}
+                        _ = child.wait() => {
+                            tracing::info!("Instance waited");
+                        },
+                        _ = kill_rx.recv() => {
+                            tracing::info!("Instance killed");
+                            drop(child.kill().await);
+                        },
+                        _ = read_logs(log.clone(), stdout, stderr, logs_file_path) => {
+                            tracing::info!("Instance read logs");
+                        },
+                        _ = update_playtime => {
+                            tracing::info!("Instance updated playtime");
+                        }
                     }
+
+                    tracing::info!("Instance exited");
 
                     let r = app
                         .instance_manager()
@@ -1863,184 +1886,91 @@ impl From<&LaunchState> for domain::LaunchState {
         }
     }
 }
-
-#[cfg(test)]
-mod test {
-    use std::collections::HashSet;
-
-    use super::domain;
-    use chrono::Utc;
-
-    use crate::{
-        api::keys,
-        domain::instance::info::{self, StandardVersion},
-        managers::{account::FullAccount, instance::InstanceVersionSource},
-    };
-
-    //#[tokio::test(flavor = "multi_thread", worker_threads = 12)]
-    async fn test_launch() -> anyhow::Result<()> {
-        let app = crate::setup_managers_for_test().await;
-
-        let instance_id = app
-            .instance_manager()
-            .create_instance(
-                app.instance_manager().get_default_group().await?,
-                String::from("test"),
-                false,
-                InstanceVersionSource::Version(info::GameVersion::Standard(StandardVersion {
-                    release: String::from("1.16.5"),
-                    modloaders: HashSet::new(),
-                })),
-                String::new(),
-            )
-            .await?;
-
-        let account = FullAccount {
-            username: String::from("test"),
-            uuid: String::from("very real uuid"),
-            type_: crate::managers::account::FullAccountType::Offline,
-            last_used: Utc::now().into(),
-        };
-
-        app.instance_manager()
-            .prepare_game(instance_id, Some(account), None, true)
-            .await?;
-
-        let task = match app.instance_manager().get_launch_state(instance_id).await? {
-            domain::LaunchState::Preparing(taskid) => taskid,
-            _ => unreachable!(),
-        };
-
-        app.task_manager().wait_with_log(task).await?;
-        app.wait_for_invalidation(keys::instance::INSTANCE_DETAILS)
-            .await?;
-        tracing::info!("Task exited");
-        let log_id = match app.instance_manager().get_launch_state(instance_id).await? {
-            domain::LaunchState::Inactive { .. } => {
-                tracing::info!("Game not running");
-                return Ok(());
-            }
-            domain::LaunchState::Running { log_id, .. } => log_id,
-            _ => unreachable!(),
-        };
-
-        let mut log = app.instance_manager().get_log(log_id).await?;
-
-        let mut idx = 0;
-        while log.changed().await.is_ok() {
-            let log = log.borrow();
-            let new_lines = log.get_span(idx..);
-            idx = log.len();
-            for line in new_lines {
-                tracing::info!("[{:?}]: {}", line.source_kind, line.message);
-            }
-        }
-
-        Ok(())
-    }
-}
-
-/// Reads `stdout` and `stderr`, sending each whole line to the log.
 async fn read_logs(
-    log: &watch::Sender<GameLog>,
-    mut stdout: impl AsyncReadExt + Unpin,
-    mut stderr: impl AsyncReadExt + Unpin,
+    log: watch::Sender<GameLog>,
+    stdout: impl AsyncReadExt + Unpin + Send + 'static,
+    stderr: impl AsyncReadExt + Unpin + Send + 'static,
+    log_file_path: PathBuf,
 ) {
-    let mut stdout_line_buf = String::with_capacity(1024);
-    let mut stderr_line_buf = String::with_capacity(1024);
+    let (stdout_tx, stdout_rx) = mpsc::channel::<Vec<u8>>(1000);
+    let (stderr_tx, stderr_rx) = mpsc::channel::<Vec<u8>>(1000);
 
-    loop {
-        // TODO: should we still dispatch modifications on a
-        // time based window like before? Traffic should be low enough
-        // to not need it
-        let modified = tokio::select! { biased;
-            modified = read_pipe(
-                    &log,
-                    LogEntrySourceKind::StdErr,
-                    &mut stderr,
-                    &mut stdout_line_buf
-                ) => { modified }
-            modified = read_pipe(
-                    &log,
-                    LogEntrySourceKind::StdOut,
-                    &mut stdout,
-                    &mut stderr_line_buf
-                ) => { modified }
-        };
+    let stdout_task = tokio::spawn(read_pipe(stdout, stdout_tx));
+    let stderr_task = tokio::spawn(read_pipe(stderr, stderr_tx));
 
-        log.send_if_modified(|_| modified);
-    }
+    let process_task = tokio::spawn(process_logs(log, stdout_rx, stderr_rx, log_file_path));
+
+    let _ = tokio::join!(stdout_task, stderr_task, process_task);
 }
 
-/// Performs a single poll for data from the given pipe.
-///
-/// Returns `true` when a line was fully received, at which point it is
-/// safe to flush to the log.
-///
-/// This function will modify the [`GameLog`], but not notify watchers.
-/// It is the responsibility of the caller to ensure notification happens
-/// at some point in the future if this function returns `true`.
 async fn read_pipe(
-    log: &watch::Sender<GameLog>,
-    kind: LogEntrySourceKind,
-    mut pipe: impl AsyncReadExt + Unpin,
-    line_buf: &mut String,
-) -> bool {
+    mut pipe: impl AsyncReadExt + Unpin + Send + 'static,
+    tx: mpsc::Sender<Vec<u8>>,
+) {
     let mut buf = [0; 1024];
 
-    match pipe.read(&mut buf).await {
-        Ok(size) if size != 0 => {
-            let utf8 = String::from_utf8_lossy(&buf[..size]);
-
-            line_buf.push_str(&utf8);
-
-            match carbon_parsing::log::parse_log_entry(line_buf) {
-                Ok((rest, entry)) => {
-                    log.send_if_modified(|log| {
-                        log.add_entry((kind, entry).into());
-
-                        false
-                    });
-
-                    let rest = rest.to_owned();
-                    *line_buf = rest;
-
-                    true
+    loop {
+        match pipe.read(&mut buf).await {
+            Ok(size) if size != 0 => {
+                if let Err(e) = tx.send(buf[..size].to_vec()).await {
+                    tracing::error!("Failed to send data through channel: {}", e);
+                    break;
                 }
-                // do nothing, wait for more bytes
-                Err(nom::Err::Incomplete(_)) => false,
-                Err(err) => {
-                    tracing::error!("failed to parse log entry:\n{err:#?}");
 
-                    log.send_if_modified(|log| {
-                        log.add_entry(LogEntry::system_error(
-                            "failed to parse log entry from {kind:?}",
-                        ));
-
-                        false
-                    });
-
-                    true
-                }
+                tracing::trace!("Got log event from pipe");
+            }
+            Ok(_) => {
+                tracing::trace!("Got EOF from pipe");
+                break;
+            }
+            Err(e) => {
+                tracing::error!("Failed to read from pipe: {}", e);
+                break;
             }
         }
-        Ok(_) => false,
-        Err(err) => {
-            tracing::error!("failed to read stdout into the log:\n{err:#?}");
+    }
+}
 
-            // We might have missed some data, including a
-            // `\n`, so give up on this line and flush it
-            log.send_if_modified(|log| {
-                log.add_entry(LogEntry::system_error(format!(
-                    "failed to receive data from `{kind:?}: {}`",
-                    line_buf.as_str()
-                )));
-                line_buf.clear();
+async fn process_logs(
+    log: watch::Sender<GameLog>,
+    mut stdout_rx: mpsc::Receiver<Vec<u8>>,
+    mut stderr_rx: mpsc::Receiver<Vec<u8>>,
+    log_file_path: PathBuf,
+) {
+    let file_fut = log_file_path
+        .parent()
+        .map(|p| async {
+            if let Err(e) = tokio::fs::create_dir_all(log_file_path.parent().unwrap()).await {
+                tracing::error!({ error = ?e }, "Failed to create log directory");
+            }
+        })
+        .map(|f| async {
+            f.await;
+            tokio::fs::File::create(&log_file_path).await
+        });
 
-                false
-            });
+    let mut file = match file_fut {
+        Some(f) => f.await.ok(),
+        None => None,
+    };
 
-            true
+    let mut stdout_processor = LogProcessor::new(LogEntrySourceKind::StdOut, log.clone()).await;
+
+    let mut stderr_processor = LogProcessor::new(LogEntrySourceKind::StdErr, log).await;
+
+    loop {
+        tokio::select! {
+            Some(data) = stdout_rx.recv() => {
+                if let Err(e) = stdout_processor.process_data(&data, file.as_mut()).await {
+                    tracing::error!("Failed to process stdout data: {}", e);
+                }
+            }
+            Some(data) = stderr_rx.recv() => {
+                if let Err(e) = stderr_processor.process_data(&data, file.as_mut()).await {
+                    tracing::error!("Failed to process stderr data: {}", e);
+                }
+            }
+            else => break,
         }
     }
 }

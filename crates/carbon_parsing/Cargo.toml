@@ -8,3 +8,6 @@ edition = "2021"
 [dependencies]
 chrono = { workspace = true }
 nom = { workspace = true }
+html-escape = { workspace = true }
+quick-xml = "0.36"
+thiserror = "1.0"

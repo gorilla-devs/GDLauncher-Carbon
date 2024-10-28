@@ -42,8 +42,9 @@ const Logs = () => {
     );
 
     wsConnection.onmessage = (event) => {
-      const newLog = JSON.parse(event.data) as LogEntry;
-      setLogs(logs.length, newLog);
+      const newLogs = JSON.parse(event.data) as LogEntry[];
+
+      setLogs((prev) => [...prev, ...newLogs]);
 
       if (!logsContentRef || !autoFollowPreference()) return;
 
@@ -71,6 +72,7 @@ const Logs = () => {
   createEffect(() => {
     // autoFollowPreference call NEEDS to be here for scrollToBottom to be called when it changes
     autoFollowPreference();
+    selectedLog();
     setNewLogsCount(0);
     handleScroll();
   });
@@ -82,8 +84,9 @@ const Logs = () => {
       logsContentRef.scrollHeight - logsContentRef.scrollTop ===
       logsContentRef.clientHeight;
 
-    if (scrollBottomRef && !autoFollowPreference()) {
+    if (scrollBottomRef && (!autoFollowPreference() || !isActive())) {
       scrollBottomRef.style.display = "none";
+      return;
     }
 
     if (isAtBottom) {

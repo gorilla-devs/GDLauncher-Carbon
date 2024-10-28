@@ -1702,7 +1702,7 @@ impl From<importer::FullImportScanStatus> for FullImportScanStatus {
 
 mod log {
     use axum::extract::{ws::Message, WebSocketUpgrade};
-    use tracing::error;
+    use tracing::{error, trace};
 
     use super::*;
 
@@ -1748,10 +1748,7 @@ mod log {
                         .get_span(last_idx..)
                         .into_iter()
                         .inspect(|entry| tracing::trace!(?entry, "received log entry"))
-                        .map(|entry| {
-                            serde_json::to_string(&entry)
-                                .expect("serialization of a log entry should be infallible")
-                        })
+                        .map(|entry| entry.clone())
                         .collect::<Vec<_>>();
 
                     last_idx = log.len();
@@ -1759,14 +1756,18 @@ mod log {
                     new_lines
                 };
 
-                for line in new_lines {
-                    if let Err(e) = socket.send(Message::Text(line)).await {
-                        error!(?e, "Failed to send log entry");
-                    }
+                if let Err(e) = socket
+                    .send(Message::Text(
+                        serde_json::to_string(&new_lines)
+                            .expect("serialization of a log entry should be infallible"),
+                    ))
+                    .await
+                {
+                    error!(?e, "Failed to send log entry");
                 }
 
                 if let Err(_) = log_rx.changed().await {
-                    error!("`log_rx` was closed, killing log stream");
+                    trace!("`log_rx` was closed, killing log stream");
 
                     return;
                 }

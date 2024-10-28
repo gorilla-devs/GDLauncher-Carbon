@@ -1,3 +1,5 @@
+use carbon_parsing::log::{LogParser, ParsedItem};
+use chrono::{DateTime, Local, NaiveDateTime, TimeZone};
 use itertools::Itertools;
 use serde::Serialize;
 use std::{
@@ -6,7 +8,11 @@ use std::{
 };
 
 use thiserror::Error;
-use tokio::sync::watch;
+use tokio::{
+    fs::File,
+    io::{AsyncReadExt, AsyncWriteExt},
+    sync::watch,
+};
 
 use crate::{api::keys::instance::*, domain::instance::GameLogEntry};
 use crate::{
@@ -37,7 +43,7 @@ pub struct LogEntry {
     pub message: String,
 }
 
-impl From<(LogEntrySourceKind, carbon_parsing::log::LogEntry<'_>)> for LogEntry {
+impl From<(LogEntrySourceKind, carbon_parsing::log::LogEntry)> for LogEntry {
     fn from((source_kind, entry): (LogEntrySourceKind, carbon_parsing::log::LogEntry)) -> Self {
         let carbon_parsing::log::LogEntry {
             logger,
@@ -156,13 +162,17 @@ impl GameLog {
     }
 }
 
+static LOG_ID: AtomicI32 = AtomicI32::new(0);
 impl ManagerRef<'_, InstanceManager> {
-    pub async fn create_log(self, instance_id: InstanceId) -> (GameLogId, watch::Sender<GameLog>) {
-        static LOG_ID: AtomicI32 = AtomicI32::new(0);
+    pub async fn create_log(
+        self,
+        instance_id: InstanceId,
+        datetime: Option<DateTime<Local>>,
+    ) -> (GameLogId, watch::Sender<GameLog>) {
         let (log_tx, log_rx) = watch::channel(GameLog::new());
         let id = GameLogId(LOG_ID.fetch_add(1, Ordering::Relaxed));
 
-        let current_datetime = chrono::Local::now();
+        let current_datetime = datetime.unwrap_or_else(chrono::Local::now);
 
         self.game_logs
             .write()
@@ -203,19 +213,150 @@ impl ManagerRef<'_, InstanceManager> {
     }
 
     pub async fn get_logs(self, instance_id: InstanceId) -> Vec<GameLogEntry> {
-        self.game_logs
-            .read()
-            .await
-            .iter()
-            .filter(|(_, (id, _, _))| *id == instance_id)
-            .map(|(id, (instance_id, datetime, rx))| GameLogEntry {
-                id: *id,
-                instance_id: *instance_id,
-                active: rx.has_changed().is_ok(),
-                datetime: datetime.clone(),
-            })
-            .sorted_by_key(|entry| entry.id.0)
-            .collect()
+        async fn read_logs_from_memory(
+            itself: ManagerRef<'_, InstanceManager>,
+            instance_id: InstanceId,
+        ) -> Vec<GameLogEntry> {
+            itself
+                .game_logs
+                .read()
+                .await
+                .iter()
+                .filter(|(_, (id, _, _))| *id == instance_id)
+                .map(|(id, (instance_id, datetime, rx))| GameLogEntry {
+                    id: *id,
+                    instance_id: *instance_id,
+                    active: rx.has_changed().is_ok(),
+                    datetime: datetime.clone(),
+                })
+                .sorted_by_key(|entry| entry.id.0)
+                .collect()
+        }
+
+        let in_memory_logs = read_logs_from_memory(self.clone(), instance_id).await;
+
+        if in_memory_logs.len() == 0 {
+            let instance_lock = self.instances.read().await;
+            let Some(shortpath) = instance_lock.get(&instance_id).map(|v| v.shortpath.clone())
+            else {
+                tracing::error!("instance id {instance_id} not found in instances");
+                return in_memory_logs;
+            };
+            drop(instance_lock);
+
+            let instance_logs_path = self
+                .app
+                .settings_manager()
+                .runtime_path
+                .get_instances()
+                .get_instance_path(&shortpath)
+                .get_gdl_logs_path();
+
+            if instance_logs_path.exists() {
+                let Ok(instance_logs_path) = instance_logs_path.read_dir() else {
+                    tracing::error!("Failed to read instance logs directory");
+                    return in_memory_logs;
+                };
+
+                for entry in instance_logs_path {
+                    let Ok(entry) = entry else {
+                        tracing::error!("Failed to read log file entry");
+                        continue;
+                    };
+                    let file_name = entry.file_name();
+                    let file_name = file_name.to_string_lossy();
+
+                    if file_name.ends_with(".log") {
+                        let file_datetime_str = file_name
+                            .strip_suffix(".log")
+                            .expect("file name should end with .log because we just checked that");
+
+                        let Ok(naive) =
+                            NaiveDateTime::parse_from_str(file_datetime_str, "%Y-%m-%d_%H-%M-%S")
+                        else {
+                            continue;
+                        };
+
+                        let file_as_datetime = Local.from_utc_datetime(&naive);
+
+                        let (log_id, tx) =
+                            self.create_log(instance_id, Some(file_as_datetime)).await;
+
+                        // read the file and send it to the log
+                        let Ok(file) = tokio::fs::File::open(entry.path()).await else {
+                            tracing::error!({ file_name = ?file_name }, "Failed to open log file");
+                            continue;
+                        };
+                        let mut reader = tokio::io::BufReader::new(file);
+
+                        let mut buf = [0; 1024];
+
+                        let mut stdout_processor =
+                            LogProcessor::new(LogEntrySourceKind::StdOut, tx).await;
+
+                        while let Ok(size) = reader.read(&mut buf).await {
+                            if size == 0 {
+                                break;
+                            }
+
+                            if let Err(e) = stdout_processor.process_data(&buf[..size], None).await
+                            {
+                                tracing::error!({ error = ?e }, "Failed to process stdout data");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        read_logs_from_memory(self.clone(), instance_id).await
+    }
+}
+
+pub struct LogProcessor {
+    pub parser: LogParser,
+    pub kind: LogEntrySourceKind,
+    pub log: watch::Sender<GameLog>,
+}
+
+impl LogProcessor {
+    pub async fn new(kind: LogEntrySourceKind, log: watch::Sender<GameLog>) -> Self {
+        Self {
+            parser: LogParser::new(),
+            kind,
+            log,
+        }
+    }
+
+    pub async fn process_data(
+        &mut self,
+        data: &[u8],
+        file: Option<&mut File>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(file) = file {
+            file.write_all(data).await?;
+        }
+
+        self.parser.feed(data);
+
+        while let Some(item) = self.parser.parse_next()? {
+            match item {
+                ParsedItem::LogEntry(entry) => {
+                    self.log.send_if_modified(|log| {
+                        log.add_entry((self.kind, entry).into());
+                        true
+                    });
+                }
+                ParsedItem::PlainText(text) => {
+                    tracing::trace!("Plain text log: {}", text);
+                }
+                ParsedItem::Partial(_) => {
+                    break;
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
