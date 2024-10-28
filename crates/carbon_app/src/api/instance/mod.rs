@@ -1747,7 +1747,6 @@ mod log {
                     let new_lines = log
                         .get_span(last_idx..)
                         .into_iter()
-                        .inspect(|entry| tracing::trace!(?entry, "received log entry"))
                         .map(|entry| entry.clone())
                         .collect::<Vec<_>>();
 
