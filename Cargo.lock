@@ -666,6 +666,7 @@ dependencies = [
  "html-escape",
  "nom",
  "quick-xml 0.36.1",
+ "rand 0.8.5",
  "thiserror",
 ]
 
