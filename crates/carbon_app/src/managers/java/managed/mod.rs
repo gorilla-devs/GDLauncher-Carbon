@@ -1,3 +1,11 @@
+use self::azul_zulu::AzulZulu;
+use super::java_checker::{JavaChecker, RealJavaChecker};
+use crate::{
+    api::keys::java::GET_SETUP_MANAGED_JAVA_PROGRESS,
+    db::PrismaClient,
+    domain::java::{JavaArch, JavaOs, JavaVendor, JavaVersion},
+};
+use carbon_rt_path::{ManagedJavasPath, TempPath};
 use serde::Serialize;
 use std::{
     collections::HashMap,
@@ -9,19 +17,6 @@ use tokio::sync::{
     watch::{self, Sender},
     Mutex,
 };
-
-use crate::{
-    api::keys::java::GET_SETUP_MANAGED_JAVA_PROGRESS,
-    db::PrismaClient,
-    domain::{
-        java::{JavaArch, JavaOs, JavaVendor, JavaVersion},
-        runtime_path::{ManagedJavasPath, TempPath},
-    },
-};
-
-use self::azul_zulu::AzulZulu;
-
-use super::java_checker::{JavaChecker, RealJavaChecker};
 
 // mod adoptopenjdk;
 // mod mojang;

@@ -1,10 +1,7 @@
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
-
-use anyhow::anyhow;
-use chrono::{DateTime, NaiveDateTime, Utc};
-use tokio::sync::RwLock;
-use tracing::trace;
-
+use super::{
+    ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter, InternalImportEntry,
+    InvalidImportEntry,
+};
 use crate::{
     api::keys::instance::*,
     api::translation::Translation,
@@ -16,11 +13,11 @@ use crate::{
     },
     managers::{instance::InstanceVersionSource, AppInner},
 };
-
-use super::{
-    ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter, InternalImportEntry,
-    InvalidImportEntry,
-};
+use anyhow::anyhow;
+use chrono::{DateTime, NaiveDateTime, Utc};
+use std::{collections::HashSet, path::PathBuf, sync::Arc};
+use tokio::sync::RwLock;
+use tracing::trace;
 
 #[derive(Debug, Clone)]
 struct Importable {
@@ -234,7 +231,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
 
                 trace!("Copying files from legacy instance");
                 // create copy-filter function in file utils for all importers
-                crate::domain::runtime_path::copy_dir_filter(&instance.path, &path, |path| {
+                carbon_rt_path::copy_dir_filter(&instance.path, &path, |path| {
                     match path.to_str() {
                         Some("config.json" | "manifest.json" | "installing.lock" | "natives") => {
                             false

@@ -1,8 +1,8 @@
-use anyhow::{bail, Context};
-use carbon_net::{Checksum, DownloadOptions, Downloadable};
-use std::{ops::Deref, pin::Pin, sync::Arc, time::Duration};
-use tokio::{sync::Mutex, task::AbortHandle};
-
+use super::{Instance, InstanceData, InstanceType, InvalidInstanceIdError};
+use crate::db::{
+    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
+    modrinth_mod_cache as mrdb,
+};
 use crate::{
     api::{
         keys::instance::{INSTANCE_DETAILS, INSTANCE_MODS},
@@ -11,19 +11,6 @@ use crate::{
     domain::{
         self,
         instance::{self, InstanceId},
-        modplatforms::{
-            curseforge::{
-                self,
-                filters::{ModFileParameters, ModFilesParameters, ModFilesParametersQuery},
-            },
-            modrinth::{
-                self,
-                project::ProjectVersionsFilters,
-                search::{ProjectID, VersionID},
-            },
-            ModChannel,
-        },
-        runtime_path::InstancePath,
         vtask::VisualTaskId,
     },
     managers::{
@@ -32,15 +19,24 @@ use crate::{
         AppInner,
     },
 };
-
-use crate::db::{
-    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
-    modrinth_mod_cache as mrdb,
+use anyhow::{bail, Context};
+use carbon_net::{Checksum, DownloadOptions, Downloadable};
+use carbon_platforms::{
+    curseforge::{
+        self,
+        filters::{ModFileParameters, ModFilesParameters, ModFilesParametersQuery},
+    },
+    modrinth::{
+        self,
+        project::ProjectVersionsFilters,
+        search::{ProjectID, VersionID},
+    },
+    ModChannel,
 };
-
-use super::{Instance, InstanceData, InstanceType, InvalidInstanceIdError};
-
+use carbon_rt_path::InstancePath;
 use futures::future::Future;
+use std::{ops::Deref, pin::Pin, sync::Arc, time::Duration};
+use tokio::{sync::Mutex, task::AbortHandle};
 
 type BoxedResourceInstaller = Box<dyn ResourceInstaller + Send>;
 type ResourceInstallerGetter = Box<
@@ -538,7 +534,7 @@ impl Installer {
 
 // curseforge
 pub struct CurseforgeModInstaller {
-    file: crate::domain::modplatforms::curseforge::File,
+    file: curseforge::File,
     download_url: String,
     applied_data: Arc<Mutex<Option<(Mod, Downloadable)>>>,
 }
@@ -570,7 +566,7 @@ impl CurseforgeModInstaller {
         })
     }
 
-    pub fn from_file(file: crate::domain::modplatforms::curseforge::File) -> anyhow::Result<Self> {
+    pub fn from_file(file: curseforge::File) -> anyhow::Result<Self> {
         let download_url = file.download_url.clone().ok_or_else(|| {
             anyhow::anyhow!("mod cannot be downloaded without privileged api key")
         })?;
@@ -597,12 +593,8 @@ impl ResourceInstaller for CurseforgeModInstaller {
             .hashes
             .iter()
             .map(|hash| match hash.algo {
-                crate::domain::modplatforms::curseforge::HashAlgo::Sha1 => {
-                    Checksum::Sha1(hash.value.clone())
-                }
-                crate::domain::modplatforms::curseforge::HashAlgo::Md5 => {
-                    Checksum::Md5(hash.value.clone())
-                }
+                curseforge::HashAlgo::Sha1 => Checksum::Sha1(hash.value.clone()),
+                curseforge::HashAlgo::Md5 => Checksum::Md5(hash.value.clone()),
             })
             .collect::<Vec<_>>();
 
@@ -811,8 +803,8 @@ impl IntoInstaller for CurseforgeModInstaller {
 
 // modrinth
 pub struct ModrinthModInstaller {
-    version: crate::domain::modplatforms::modrinth::version::Version,
-    file: crate::domain::modplatforms::modrinth::version::VersionFile,
+    version: modrinth::version::Version,
+    file: modrinth::version::VersionFile,
     download_url: String,
     applied_data: Arc<Mutex<Option<(Mod, Downloadable)>>>,
 }
@@ -852,9 +844,7 @@ impl ModrinthModInstaller {
         })
     }
 
-    pub fn from_version(
-        version: crate::domain::modplatforms::modrinth::version::Version,
-    ) -> anyhow::Result<Self> {
+    pub fn from_version(version: modrinth::version::Version) -> anyhow::Result<Self> {
         let file = version
             .files
             .iter()

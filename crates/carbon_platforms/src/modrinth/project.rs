@@ -5,12 +5,10 @@
 use std::path::PathBuf;
 
 use carbon_macro::into_query_parameters;
+use carbon_rt_path::InstancePath;
 use daedalus::minecraft::VersionManifest;
 
-use crate::domain::{
-    runtime_path::InstancePath,
-    url::{deserialize_from_raw_json, serialize_as_raw_json},
-};
+use crate::{deserialize_from_raw_json, serialize_as_raw_json};
 
 use super::{search::ProjectID, *};
 

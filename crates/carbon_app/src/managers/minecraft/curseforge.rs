@@ -1,21 +1,18 @@
+use crate::managers::instance::modpack::packinfo::PackInfo;
+use crate::managers::vtask::Subtask;
+use crate::managers::App;
+use anyhow::Context;
+use carbon_net::{DownloadOptions, Downloadable, Progress};
+use carbon_platforms::curseforge::filters::{ModsParameters, ModsParametersBody};
+use carbon_platforms::curseforge::{self, CurseForgeResponse, File, HashAlgo};
+use carbon_rt_path::InstancePath;
+use itertools::Itertools;
 use std::borrow::BorrowMut;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
-
-use anyhow::Context;
-use itertools::Itertools;
-
-use carbon_net::{DownloadOptions, Downloadable, Progress};
 use tokio::task::spawn_blocking;
 use tracing::trace;
-
-use crate::domain::modplatforms::curseforge::filters::{ModsParameters, ModsParametersBody};
-use crate::domain::modplatforms::curseforge::{self, CurseForgeResponse, File, HashAlgo};
-use crate::domain::runtime_path::InstancePath;
-use crate::managers::instance::modpack::packinfo::PackInfo;
-use crate::managers::vtask::Subtask;
-use crate::managers::App;
 
 use super::UpdateValue;
 

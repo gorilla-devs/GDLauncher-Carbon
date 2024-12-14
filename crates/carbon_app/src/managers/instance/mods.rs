@@ -1,11 +1,7 @@
-use std::borrow::Cow;
-use std::str::FromStr;
-
-use anyhow::{anyhow, bail};
-use chrono::{DateTime, FixedOffset, Utc};
-use futures::Future;
-use thiserror::Error;
-
+use super::{
+    installer::{CurseforgeModInstaller, IntoInstaller, ModrinthModInstaller},
+    InstanceId, InstanceManager, InvalidInstanceIdError,
+};
 use crate::api::keys::instance::INSTANCE_MODS;
 use crate::db::{
     curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
@@ -13,24 +9,25 @@ use crate::db::{
 };
 use crate::domain::instance::info::{GameVersion, ModLoaderType};
 use crate::domain::instance::{self as domain, info};
-use crate::domain::modplatforms::curseforge::filters::{
-    ModFilesParameters, ModFilesParametersQuery, ModParameters,
-};
-use crate::domain::modplatforms::curseforge::FileReleaseType;
-use crate::domain::modplatforms::modrinth::project::ProjectVersionsFilters;
-use crate::domain::modplatforms::modrinth::search::ProjectID;
-use crate::domain::modplatforms::modrinth::version::VersionType;
-use crate::domain::modplatforms::{
-    curseforge, modrinth, ModChannel, ModChannelWithUsage, ModPlatform, ModSources, RemoteVersion,
-};
 use crate::managers::instance::InstanceType;
 use crate::managers::AppInner;
 use crate::{domain::vtask::VisualTaskId, managers::ManagerRef};
-
-use super::{
-    installer::{CurseforgeModInstaller, IntoInstaller, ModrinthModInstaller},
-    InstanceId, InstanceManager, InvalidInstanceIdError,
+use anyhow::{anyhow, bail};
+use carbon_platforms::curseforge::filters::{
+    ModFilesParameters, ModFilesParametersQuery, ModParameters,
 };
+use carbon_platforms::curseforge::FileReleaseType;
+use carbon_platforms::modrinth::project::ProjectVersionsFilters;
+use carbon_platforms::modrinth::search::ProjectID;
+use carbon_platforms::modrinth::version::VersionType;
+use carbon_platforms::{
+    curseforge, modrinth, ModChannel, ModChannelWithUsage, ModPlatform, ModSources, RemoteVersion,
+};
+use chrono::{DateTime, FixedOffset, Utc};
+use futures::Future;
+use std::borrow::Cow;
+use std::str::FromStr;
+use thiserror::Error;
 
 impl ManagerRef<'_, InstanceManager> {
     async fn ensure_modpack_not_locked(&self, instance_id: InstanceId) -> anyhow::Result<()> {
@@ -615,42 +612,6 @@ impl ManagerRef<'_, InstanceManager> {
         let mr = metadata
             .modrinth
             .expect("modrinth metadata was queried but not returned");
-
-        impl RemoteVersion {
-            fn date(&self) -> DateTime<Utc> {
-                match self {
-                    Self::Curseforge(v) => v.file_date,
-                    Self::Modrinth(v) => v.date_published,
-                }
-            }
-
-            fn channel(&self) -> ModChannel {
-                match self {
-                    Self::Curseforge(v) => v.release_type.into(),
-                    Self::Modrinth(v) => v.version_type.into(),
-                }
-            }
-        }
-
-        impl PartialEq for RemoteVersion {
-            fn eq(&self, other: &Self) -> bool {
-                PartialEq::eq(&self.date(), &other.date())
-            }
-        }
-
-        impl Eq for RemoteVersion {}
-
-        impl PartialOrd for RemoteVersion {
-            fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-                PartialOrd::partial_cmp(&other.date(), &self.date())
-            }
-        }
-
-        impl Ord for RemoteVersion {
-            fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-                Ord::cmp(&other.date(), &self.date())
-            }
-        }
 
         let mut versions = Vec::new();
 

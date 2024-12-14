@@ -1,30 +1,27 @@
-use std::collections::HashMap;
-
-use anyhow::bail;
-use serde::{Deserialize, Serialize};
-
+use super::{InstanceData, InstanceManager, InstanceType};
 use crate::{
     domain::{
         instance::{
             info::{self, CurseforgeModpack, Modpack, ModpackInfo, ModrinthModpack},
             InstanceId,
         },
-        modplatforms::{
-            curseforge::{
-                self,
-                filters::{
-                    ModFilesParameters, ModFilesParametersQuery, ModParameters, ModsParameters,
-                    ModsParametersBody,
-                },
-            },
-            modrinth::{project::ProjectVersionsFilters, search::ProjectID},
-        },
         vtask::VisualTaskId,
     },
     managers::{instance::InvalidInstanceIdError, ManagerRef},
 };
-
-use super::{InstanceData, InstanceManager, InstanceType};
+use anyhow::bail;
+use carbon_platforms::{
+    curseforge::{
+        self,
+        filters::{
+            ModFilesParameters, ModFilesParametersQuery, ModParameters, ModsParameters,
+            ModsParametersBody,
+        },
+    },
+    modrinth::{project::ProjectVersionsFilters, search::ProjectID},
+};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub mod packinfo;
 

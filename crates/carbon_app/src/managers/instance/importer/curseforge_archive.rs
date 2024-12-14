@@ -1,20 +1,12 @@
-use std::{
-    fs,
-    io::{Cursor, Read},
-    path::PathBuf,
-    sync::Arc,
+use super::{
+    ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter, InternalImportEntry,
+    InvalidImportEntry,
 };
-
-use anyhow::anyhow;
-use tokio::sync::RwLock;
-use tracing::info;
-
 use crate::{
     api::keys::instance::*,
     api::translation::Translation,
     domain::{
         instance::info::{CurseforgeModpack, GameVersion, Modpack},
-        modplatforms::curseforge::manifest::Manifest,
         vtask::VisualTaskId,
     },
     managers::{
@@ -22,11 +14,16 @@ use crate::{
         modplatforms::curseforge::convert_cf_version_to_standard_version, AppInner,
     },
 };
-
-use super::{
-    ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter, InternalImportEntry,
-    InvalidImportEntry,
+use anyhow::anyhow;
+use carbon_platforms::curseforge::manifest::Manifest;
+use std::{
+    fs,
+    io::{Cursor, Read},
+    path::PathBuf,
+    sync::Arc,
 };
+use tokio::sync::RwLock;
+use tracing::info;
 
 #[derive(Debug, Clone)]
 struct Importable {

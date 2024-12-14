@@ -1,9 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    path::{Path, PathBuf},
-    sync::Arc,
-};
-
+use crate::managers::account::{FullAccount, FullAccountType};
 use crate::{
     app_version::APP_VERSION,
     db::{app_configuration::pre_launch_hook, PrismaClient},
@@ -16,6 +11,7 @@ use crate::{
     },
 };
 use anyhow::Context;
+use carbon_rt_path::{InstancePath, RuntimePath};
 use daedalus::minecraft::{
     Argument, ArgumentType, ArgumentValue, Library, LibraryGroup, Os, Version, VersionInfo,
     VersionManifest,
@@ -23,15 +19,15 @@ use daedalus::minecraft::{
 use prisma_client_rust::QueryError;
 use regex::{Captures, Regex};
 use reqwest::Url;
+use std::{
+    collections::{HashMap, HashSet},
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use strum_macros::EnumIter;
 use thiserror::Error;
 use tokio::{process::Child, sync::Mutex, time::Instant};
 use tracing::{info, trace, warn};
-
-use crate::{
-    domain::runtime_path::{InstancePath, RuntimePath},
-    managers::account::{FullAccount, FullAccountType},
-};
 
 use super::META_VERSION;
 

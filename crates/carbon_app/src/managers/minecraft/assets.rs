@@ -1,13 +1,12 @@
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
-
+use crate::db::PrismaClient;
 use anyhow::Context;
+use carbon_rt_path::AssetsPath;
 use daedalus::minecraft::{AssetIndex, AssetsIndex};
 use prisma_client_rust::QueryError;
+use std::{collections::HashSet, path::PathBuf, sync::Arc};
 use thiserror::Error;
 use tokio::sync::Mutex;
 use tracing::trace;
-
-use crate::{db::PrismaClient, domain::runtime_path::AssetsPath};
 
 #[derive(Error, Debug)]
 pub enum AssetsError {

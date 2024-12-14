@@ -1,13 +1,10 @@
-use tracing::error;
-
 use crate::{
     db,
-    domain::{
-        instance::{info::CurseforgeModpack, InstanceModpackInfo},
-        modplatforms::curseforge::filters::{ModFileParameters, ModParameters},
-    },
+    domain::instance::{info::CurseforgeModpack, InstanceModpackInfo},
     managers::{metadata::cache, App},
 };
+use carbon_platforms::curseforge::filters::{ModFileParameters, ModParameters};
+use tracing::error;
 
 pub async fn get_modpack_icon(app: &App, curseforge: CurseforgeModpack) -> anyhow::Result<Vec<u8>> {
     app.prisma_client

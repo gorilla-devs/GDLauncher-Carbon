@@ -15,14 +15,14 @@ use crate::domain::instance::{
     self as domain, GameLogId, GroupId, InstanceFolder, InstanceId, InstanceModpackInfo,
 };
 use crate::domain::java::{SystemJavaProfileName, SYSTEM_JAVA_PROFILE_NAME_PREFIX};
-use crate::domain::modplatforms::curseforge::filters::{ModFileParameters, ModParameters};
-use crate::domain::modplatforms::modrinth::search::{ProjectID, VersionID};
-use crate::domain::modplatforms::ModPlatform;
 use crate::domain::vtask::VisualTaskId;
 use crate::livenesstracker::LivenessTracker;
 use crate::managers::instance::modpack::PackVersionFile;
 use anyhow::bail;
 use anyhow::{anyhow, Context};
+use carbon_platforms::curseforge::filters::{ModFileParameters, ModParameters};
+use carbon_platforms::modrinth::search::{ProjectID, VersionID};
+use carbon_platforms::ModPlatform;
 use chrono::{DateTime, Utc};
 use daedalus::minecraft::MinecraftJavaProfile;
 use db::instance::Data as CachedInstance;

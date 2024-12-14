@@ -1,22 +1,15 @@
+use super::UpdateValue;
+use crate::managers::instance::modpack::packinfo::PackInfo;
+use crate::managers::App;
+use anyhow::Context;
+use carbon_net::{DownloadOptions, Downloadable, Progress};
+use carbon_platforms::modrinth::version::{ModpackIndex, ModrinthEnvironmentSupport, VersionFile};
+use carbon_rt_path::InstancePath;
 use std::borrow::BorrowMut;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
-
-use anyhow::Context;
-use carbon_net::{DownloadOptions, Downloadable, Progress};
-use tokio::task::spawn_blocking;
-
-use crate::domain::runtime_path::InstancePath;
-use crate::managers::App;
-
-use crate::domain::modplatforms::modrinth::version::{
-    ModpackIndex, ModrinthEnvironmentSupport, VersionFile,
-};
-use crate::managers::instance::modpack::packinfo::PackInfo;
-
 use thiserror::Error;
-
-use super::UpdateValue;
+use tokio::task::spawn_blocking;
 
 #[derive(Error, Debug)]
 pub enum PathTraversalError {

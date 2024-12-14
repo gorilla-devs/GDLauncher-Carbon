@@ -1,8 +1,7 @@
+use crate::serialize_as_raw_json;
 use carbon_macro::into_query_parameters;
 use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
-
-use crate::domain::url::serialize_as_raw_json;
 
 use super::{ClassId, ModLoaderType};
 

@@ -78,17 +78,25 @@ test.describe("Init Tests", () => {
     // set the CI environment variable to true
     process.env.CI = "e2e"
 
+    // log process stdout and stderr
+    electronApp.process().stdout?.on("data", (data) => {
+      console.log(data.toString())
+    })
+    electronApp.process().stderr?.on("data", (data) => {
+      console.error(data.toString())
+    })
+
     electronApp = await electron.launch({
       args: [],
       executablePath: await getBinaryPath(),
       env: { ...process.env } as any
     })
 
-    page = await electronApp.firstWindow()
-
-    electronApp.on("console", (msg) => {
-      console.log(msg.text())
+    electronApp.process().on("message", (message) => {
+      console.log(message)
     })
+
+    page = await electronApp.firstWindow()
 
     // capture errors
     page.on("pageerror", (error) => {

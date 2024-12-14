@@ -1,3 +1,23 @@
+use crate::api::keys::instance::INSTANCE_MODS;
+use crate::db::read_filters::BytesFilter;
+use crate::db::read_filters::IntFilter;
+use crate::db::read_filters::StringFilter;
+use crate::db::{mod_file_cache as fcdb, mod_metadata as metadb};
+use crate::domain::instance::InstanceId;
+use crate::managers::App;
+use crate::managers::ManagerRef;
+use anyhow::anyhow;
+use carbon_rt_path::InstancesPath;
+use curseforge::CurseforgeModCacher;
+use futures::join;
+use futures::Future;
+use image::ImageFormat;
+use itertools::Itertools;
+use md5::Digest;
+use modrinth::ModrinthModCacher;
+use murmurhash32::Murmur2Digest;
+use sha1::Sha1;
+use sha2::Sha512;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;
@@ -11,16 +31,6 @@ use std::sync::atomic::AtomicI32;
 use std::sync::Arc;
 use std::thread::available_parallelism;
 use std::usize;
-
-use anyhow::anyhow;
-use futures::join;
-use futures::Future;
-use image::ImageFormat;
-use itertools::Itertools;
-use md5::Digest;
-use murmurhash32::Murmur2Digest;
-use sha1::Sha1;
-use sha2::Sha512;
 use tokio::io::AsyncSeekExt;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
@@ -35,22 +45,8 @@ use tracing::trace;
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::api::keys::instance::INSTANCE_MODS;
-use crate::db::read_filters::BytesFilter;
-use crate::db::read_filters::IntFilter;
-use crate::db::read_filters::StringFilter;
-use crate::db::{mod_file_cache as fcdb, mod_metadata as metadb};
-use crate::domain::instance::InstanceId;
-
-use crate::domain::runtime_path::InstancesPath;
-use crate::managers::App;
-use crate::managers::ManagerRef;
-
 pub mod curseforge;
 pub mod modrinth;
-
-use curseforge::CurseforgeModCacher;
-use modrinth::ModrinthModCacher;
 
 pub struct MetaCacheManager {
     //waiting_instances: RwLock<HashSet<InstanceId>>,

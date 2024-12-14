@@ -1,29 +1,24 @@
+use super::{Managed, ManagedJavaArchMap, ManagedJavaOsMap, ManagedJavaVersion, Step};
+use crate::{
+    db::PrismaClient,
+    domain::java::{JavaArch, JavaOs, JavaVersion},
+    managers::java::{java_checker::JavaChecker, scan_and_sync::upsert_java_component_to_db},
+};
+use anyhow::Context;
+use carbon_net::{DownloadOptions, Downloadable, Progress};
+use carbon_rt_path::{ManagedJavasPath, TempPath};
+use serde::Deserialize;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     sync::Arc,
 };
-
-use anyhow::Context;
-use carbon_net::{DownloadOptions, Downloadable, Progress};
-use serde::Deserialize;
 use strum::IntoEnumIterator;
 use tokio::{
     sync::{watch::Sender, RwLock},
     task::spawn_blocking,
 };
 use tracing::{instrument, trace};
-
-use crate::{
-    db::PrismaClient,
-    domain::{
-        java::{JavaArch, JavaOs, JavaVersion},
-        runtime_path::{ManagedJavasPath, TempPath},
-    },
-    managers::java::{java_checker::JavaChecker, scan_and_sync::upsert_java_component_to_db},
-};
-
-use super::{Managed, ManagedJavaArchMap, ManagedJavaOsMap, ManagedJavaVersion, Step};
 
 #[derive(Debug, Default)]
 pub struct AzulZulu {

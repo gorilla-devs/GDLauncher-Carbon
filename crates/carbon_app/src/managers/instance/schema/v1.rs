@@ -235,8 +235,6 @@ pub struct ModSources {
     pub platform_blacklist: Vec<ModPlatform>,
 }
 
-use crate::domain::{instance::info, modplatforms};
-
 impl From<Instance> for info::Instance {
     fn from(value: Instance) -> Self {
         Self {
@@ -540,33 +538,38 @@ impl From<(u16, u16)> for MemoryRange {
     }
 }
 
+use crate::domain::instance::info;
 use crate::mirror_into;
 
 mirror_into!(
     ModPlatform,
-    modplatforms::ModPlatform,
+    carbon_platforms::ModPlatform,
     |value| match value {
         Other::Curseforge => Self::Curseforge,
         Other::Modrinth => Self::Modrinth,
     }
 );
 
-mirror_into!(ModChannel, modplatforms::ModChannel, |value| match value {
-    Other::Alpha => Self::Alpha,
-    Other::Beta => Self::Beta,
-    Other::Stable => Self::Stable,
-});
+mirror_into!(
+    ModChannel,
+    carbon_platforms::ModChannel,
+    |value| match value {
+        Other::Alpha => Self::Alpha,
+        Other::Beta => Self::Beta,
+        Other::Stable => Self::Stable,
+    }
+);
 
 mirror_into!(
     ModChannelWithUsage,
-    modplatforms::ModChannelWithUsage,
+    carbon_platforms::ModChannelWithUsage,
     |value| Self {
         channel: value.channel.into(),
         allow_updates: value.allow_updates,
     }
 );
 
-mirror_into!(ModSources, modplatforms::ModSources, |value| Self {
+mirror_into!(ModSources, carbon_platforms::ModSources, |value| Self {
     channels: value.channels.into_iter().map(Into::into).collect(),
     platform_blacklist: value
         .platform_blacklist

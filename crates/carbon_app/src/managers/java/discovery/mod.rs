@@ -1,6 +1,5 @@
+use carbon_rt_path::RuntimePath;
 use std::path::PathBuf;
-
-use crate::domain::runtime_path::RuntimePath;
 
 mod finder;
 

@@ -1,28 +1,24 @@
-use std::{env, sync::Arc};
-
-use anyhow::bail;
-use reqwest_middleware::ClientWithMiddleware;
-use serde_json::json;
-use tracing::{info, trace};
-use url::Url;
-
 use crate::{
     domain::{
         self,
         instance::info::{ModLoader, ModLoaderType, StandardVersion},
-        modplatforms::curseforge::{
-            filters::{
-                FilesParameters, ModDescriptionParameters, ModFileChangelogParameters,
-                ModFileParameters, ModFilesParameters, ModParameters, ModSearchParameters,
-                ModsParameters,
-            },
-            Category, CurseForgeResponse, File, FingerprintsMatchesResult, MinecraftModLoaderIndex,
-            Mod,
-        },
     },
     error::request::GoodJsonRequestError,
     managers::AppInner,
 };
+use anyhow::bail;
+use carbon_platforms::curseforge::{
+    filters::{
+        FilesParameters, ModDescriptionParameters, ModFileChangelogParameters, ModFileParameters,
+        ModFilesParameters, ModParameters, ModSearchParameters, ModsParameters,
+    },
+    Category, CurseForgeResponse, File, FingerprintsMatchesResult, MinecraftModLoaderIndex, Mod,
+};
+use reqwest_middleware::ClientWithMiddleware;
+use serde_json::json;
+use std::{env, sync::Arc};
+use tracing::{info, trace};
+use url::Url;
 
 pub struct CurseForge {
     client: ClientWithMiddleware,
@@ -314,7 +310,7 @@ impl CurseForge {
 // Converts a CurseForge version (manifest.json version for example) to a standard version
 pub async fn convert_cf_version_to_standard_version(
     app: Arc<AppInner>,
-    curseforge_version: domain::modplatforms::curseforge::manifest::Minecraft,
+    curseforge_version: carbon_platforms::curseforge::manifest::Minecraft,
     dummy_string: String,
 ) -> anyhow::Result<StandardVersion> {
     let modloaders = curseforge_version
@@ -466,9 +462,9 @@ pub async fn convert_cf_version_to_standard_version(
 
 pub fn convert_standard_version_to_cf_version(
     standard_version: StandardVersion,
-) -> anyhow::Result<domain::modplatforms::curseforge::manifest::Minecraft> {
+) -> anyhow::Result<carbon_platforms::curseforge::manifest::Minecraft> {
     let mod_loaders: Result<
-        Vec<domain::modplatforms::curseforge::manifest::ModLoaders>,
+        Vec<carbon_platforms::curseforge::manifest::ModLoaders>,
         anyhow::Error,
     > = standard_version
         .modloaders
@@ -489,7 +485,7 @@ pub fn convert_standard_version_to_cf_version(
                 ModLoaderType::Quilt => Ok(format!("quilt-{}", loader.version)),
             }?;
 
-            Ok(domain::modplatforms::curseforge::manifest::ModLoaders {
+            Ok(carbon_platforms::curseforge::manifest::ModLoaders {
                 id,
                 primary: i == 0,
             })
@@ -498,7 +494,7 @@ pub fn convert_standard_version_to_cf_version(
 
     let mod_loaders = mod_loaders?;
 
-    let cf_version = domain::modplatforms::curseforge::manifest::Minecraft {
+    let cf_version = carbon_platforms::curseforge::manifest::Minecraft {
         version: standard_version.release,
         mod_loaders,
     };
@@ -508,7 +504,7 @@ pub fn convert_standard_version_to_cf_version(
 
 #[cfg(test)]
 mod test {
-    use crate::domain::modplatforms::curseforge::filters::{
+    use carbon_platforms::curseforge::filters::{
         ModFilesParametersQuery, ModSearchParametersQuery,
     };
 

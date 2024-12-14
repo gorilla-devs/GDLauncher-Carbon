@@ -1,0 +1,10 @@
+[package]
+name = "carbon_rt_path"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { workspace = true }
+anyhow = { workspace = true }
+walkdir = { workspace = true }
+futures = { workspace = true }

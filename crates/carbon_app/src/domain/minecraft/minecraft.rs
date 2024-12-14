@@ -3,10 +3,8 @@ use daedalus::minecraft::{
 };
 use std::{cmp::Ordering, collections::HashMap, path::PathBuf};
 
-use crate::domain::{
-    java::JavaArch,
-    runtime_path::{AssetsPath, LibrariesPath, RuntimePath},
-};
+use crate::domain::java::JavaArch;
+use carbon_rt_path::{AssetsPath, LibrariesPath, RuntimePath};
 
 pub fn libraries_into_vec_downloadable(
     libraries: &[Library],

@@ -1,22 +1,19 @@
-use std::path::PathBuf;
-use std::sync::Arc;
-
+use super::{
+    ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter, InternalImportEntry,
+    InvalidImportEntry, GET_IMPORT_SCAN_STATUS,
+};
 use crate::api::translation::Translation;
 use crate::domain::instance::info::{CurseforgeModpack, GameVersion, Modpack};
 use crate::managers::instance::InstanceVersionSource;
 use crate::managers::modplatforms::curseforge::convert_cf_version_to_standard_version;
 use crate::managers::AppInner;
 use crate::{domain::vtask::VisualTaskId, managers::instance::anyhow};
+use carbon_platforms::curseforge::manifest::{Manifest, Minecraft, ModLoaders};
 use serde::Deserialize;
+use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, trace};
-
-use crate::domain::modplatforms::curseforge::manifest::{Manifest, Minecraft, ModLoaders};
-
-use super::{
-    ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter, InternalImportEntry,
-    InvalidImportEntry, GET_IMPORT_SCAN_STATUS,
-};
 
 #[derive(Debug, Clone)]
 struct Importable {
@@ -210,7 +207,7 @@ impl InstanceImporter for CurseforgeImporter {
 
                 trace!("Copying files from legacy instance");
                 // create copy-filter function in file utils for all importers
-                crate::domain::runtime_path::copy_dir_filter(&instance.path, &path, |path| {
+                carbon_rt_path::copy_dir_filter(&instance.path, &path, |path| {
                     match path.to_str() {
                         Some("minecraftinstance.json" | "manifest.json" | "modelist.html") => false,
                         Some(p) if p.starts_with("profileImage") => false,

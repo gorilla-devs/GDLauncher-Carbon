@@ -2,7 +2,7 @@ use std::{collections::HashMap, ops::Deref};
 
 use serde::{Deserialize, Serialize};
 
-use crate::domain::modplatforms::modrinth::{
+use super::{
     project::Project,
     tag::{Category, Loader},
     version::Version,

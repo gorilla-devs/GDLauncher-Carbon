@@ -1,22 +1,7 @@
-use std::{
-    fs,
-    io::{Cursor, Read},
-    path::PathBuf,
-    sync::Arc,
-};
-
-use anyhow::anyhow;
-use sha2::{Digest, Sha512};
-use tokio::sync::RwLock;
-
 use crate::{
     api::translation::Translation,
     domain::{
         instance::info::{GameVersion, Modpack, ModrinthModpack},
-        modplatforms::modrinth::{
-            search::{ProjectID, VersionHashesQuery},
-            version::{HashAlgorithm, ModpackIndex},
-        },
         vtask::VisualTaskId,
     },
     managers::{
@@ -24,6 +9,19 @@ use crate::{
         modplatforms::modrinth::convert_mr_version_to_standard_version, AppInner,
     },
 };
+use anyhow::anyhow;
+use carbon_platforms::modrinth::{
+    search::{ProjectID, VersionHashesQuery},
+    version::{HashAlgorithm, ModpackIndex},
+};
+use sha2::{Digest, Sha512};
+use std::{
+    fs,
+    io::{Cursor, Read},
+    path::PathBuf,
+    sync::Arc,
+};
+use tokio::sync::RwLock;
 
 use super::{
     ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter, InternalImportEntry,

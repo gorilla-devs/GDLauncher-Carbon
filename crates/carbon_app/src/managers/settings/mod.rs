@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use anyhow::{anyhow, Context};
+use carbon_platforms::{ModChannelWithUsage, ModPlatform};
 use chrono::Utc;
 use itertools::Itertools;
 use reqwest_middleware::ClientWithMiddleware;
@@ -8,7 +9,6 @@ use reqwest_middleware::ClientWithMiddleware;
 use crate::{
     api::{keys::settings::*, settings::FESettingsUpdate},
     db::app_configuration::{self, hashed_email_accepted, last_app_version},
-    domain::{self as domain, modplatforms::ModChannelWithUsage, runtime_path},
 };
 
 use super::ManagerRef;
@@ -30,7 +30,7 @@ impl SettingsManager {
         gdl_base_api_url: String,
     ) -> Self {
         Self {
-            runtime_path: runtime_path::RuntimePath::new(runtime_path),
+            runtime_path: carbon_rt_path::RuntimePath::new(runtime_path),
             terms_and_privacy: TermsAndPrivacy::new(http_client, gdl_base_api_url.clone()),
             gdl_base_api_url,
         }
@@ -294,8 +294,8 @@ impl ManagerRef<'_, SettingsManager> {
             let platform_blacklist = mod_sources
                 .platform_blacklist
                 .into_iter()
-                .map(domain::modplatforms::ModPlatform::from)
-                .map(|p| domain::modplatforms::ModPlatform::as_str(&p))
+                .map(ModPlatform::from)
+                .map(|p| ModPlatform::as_str(&p))
                 .join(",");
 
             let channels = mod_sources

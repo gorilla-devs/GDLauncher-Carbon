@@ -1,29 +1,25 @@
-use std::{collections::HashSet, sync::Arc};
-
-use anyhow::Ok;
-use reqwest_middleware::ClientWithMiddleware;
-use tracing::trace;
-use url::Url;
-
 use crate::{
-    domain::{
-        instance::info::{ModLoader, ModLoaderType, StandardVersion},
-        modplatforms::modrinth::{
-            project::{Project, ProjectVersionsFilters},
-            responses::{
-                CategoriesResponse, LoadersResponse, ProjectsResponse, TeamResponse,
-                VersionHashesResponse, VersionsResponse,
-            },
-            search::{
-                ProjectID, ProjectIDs, ProjectSearchParameters, ProjectSearchResponse, TeamID,
-                TeamIDs, VersionHashesQuery, VersionID, VersionIDs,
-            },
-            version::{ModrinthPackDependencies, Version},
-        },
-    },
+    domain::instance::info::{ModLoader, ModLoaderType, StandardVersion},
     error::request::GoodJsonRequestError,
     managers::AppInner,
 };
+use anyhow::Ok;
+use carbon_platforms::modrinth::{
+    project::{Project, ProjectVersionsFilters},
+    responses::{
+        CategoriesResponse, LoadersResponse, ProjectsResponse, TeamResponse, VersionHashesResponse,
+        VersionsResponse,
+    },
+    search::{
+        ProjectID, ProjectIDs, ProjectSearchParameters, ProjectSearchResponse, TeamID, TeamIDs,
+        VersionHashesQuery, VersionID, VersionIDs,
+    },
+    version::{ModrinthPackDependencies, Version},
+};
+use reqwest_middleware::ClientWithMiddleware;
+use std::{collections::HashSet, sync::Arc};
+use tracing::trace;
+use url::Url;
 
 pub struct Modrinth {
     client: ClientWithMiddleware,
@@ -365,15 +361,12 @@ pub fn convert_standard_version_to_mr_version(
 
 #[cfg(test)]
 mod test {
-    use tracing_test::traced_test;
-
-    use crate::{
-        domain::modplatforms::modrinth::{
-            search::{SearchFacet, SearchIndex},
-            version::HashAlgorithm,
-        },
-        iridium_client,
+    use crate::iridium_client;
+    use carbon_platforms::modrinth::{
+        search::{SearchFacet, SearchIndex},
+        version::HashAlgorithm,
     };
+    use tracing_test::traced_test;
 
     #[tokio::test]
     #[traced_test]

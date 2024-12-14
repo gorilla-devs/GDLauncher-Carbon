@@ -2,6 +2,15 @@
 //! //!
 //! [documentation](https://docs.modrinth.com/api-spec/#tag/project_result_model)
 
+use super::version::HashAlgorithm;
+use super::{
+    project::{ProjectSupportRange, ProjectType},
+    UtcDateTime,
+};
+use crate::{deserialize_from_raw_json, serialize_as_raw_json};
+use anyhow::anyhow;
+use carbon_macro::into_query_parameters;
+use serde::{Deserialize, Serialize};
 use std::{
     convert::TryFrom,
     fmt::Display,
@@ -9,21 +18,6 @@ use std::{
     ops::Deref,
     str::FromStr,
 };
-
-use crate::domain::{
-    modplatforms::modrinth::{
-        project::{ProjectSupportRange, ProjectType},
-        UtcDateTime,
-    },
-    url::{deserialize_from_raw_json, serialize_as_raw_json},
-};
-use anyhow::anyhow;
-use carbon_macro::into_query_parameters;
-use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
-
-use super::version::HashAlgorithm;
-
-use serde_json;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct ProjectSearchResult {
@@ -430,9 +424,7 @@ impl FromIterator<String> for TeamIDs {
 
 #[cfg(test)]
 mod test {
-    use crate::domain::modplatforms::modrinth::search::SearchFacet;
-
-    use super::ProjectSearchParameters;
+    use super::{ProjectSearchParameters, SearchFacet};
 
     fn test_project_into_query() -> anyhow::Result<()> {
         let facets = vec![

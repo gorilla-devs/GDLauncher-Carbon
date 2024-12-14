@@ -2,15 +2,12 @@
 //!
 //! [documentation](https://docs.modrinth.com/api-spec/#tag/version_model)
 
-use super::*;
-use std::collections::{HashMap, HashSet};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
-use crate::domain::{
-    instance::info::{ModLoader, ModLoaderType, StandardVersion},
-    modplatforms::ModChannel,
-};
+use crate::ModChannel;
 
-use anyhow::anyhow;
+use super::UtcDateTime;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

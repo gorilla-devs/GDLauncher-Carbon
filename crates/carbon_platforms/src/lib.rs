@@ -1,8 +1,12 @@
 use std::{fmt, str::FromStr};
 
 use anyhow::{anyhow, bail};
+use chrono::{DateTime, Utc};
 use itertools::Itertools;
-use serde::{de::Visitor, Deserialize, Serialize};
+use serde::{
+    de::{DeserializeOwned, Visitor},
+    Deserialize, Deserializer, Serialize, Serializer,
+};
 
 pub mod curseforge;
 pub mod modrinth;
@@ -164,6 +168,60 @@ pub struct ModSources {
 pub enum RemoteVersion {
     Curseforge(curseforge::File),
     Modrinth(modrinth::version::Version),
+}
+
+impl RemoteVersion {
+    pub fn date(&self) -> DateTime<Utc> {
+        match self {
+            Self::Curseforge(v) => v.file_date,
+            Self::Modrinth(v) => v.date_published,
+        }
+    }
+
+    pub fn channel(&self) -> ModChannel {
+        match self {
+            Self::Curseforge(v) => v.release_type.into(),
+            Self::Modrinth(v) => v.version_type.into(),
+        }
+    }
+}
+
+impl PartialEq for RemoteVersion {
+    fn eq(&self, other: &Self) -> bool {
+        PartialEq::eq(&self.date(), &other.date())
+    }
+}
+
+impl Eq for RemoteVersion {}
+
+impl PartialOrd for RemoteVersion {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        PartialOrd::partial_cmp(&other.date(), &self.date())
+    }
+}
+
+impl Ord for RemoteVersion {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        Ord::cmp(&other.date(), &self.date())
+    }
+}
+
+pub fn serialize_as_raw_json<S, T>(value: T, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+    T: Serialize,
+{
+    let json = serde_json::to_string(&value).map_err(serde::ser::Error::custom)?;
+    s.serialize_str(&json)
+}
+
+pub fn deserialize_from_raw_json<'de, D, T>(d: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: DeserializeOwned,
+{
+    let json = String::deserialize(d)?;
+    serde_json::from_str(&json).map_err(serde::de::Error::custom)
 }
 
 #[cfg(test)]

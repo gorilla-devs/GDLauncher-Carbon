@@ -1,11 +1,9 @@
 //! Schema for instance jsons
 
-use std::collections::HashSet;
-
 use anyhow::bail;
+use carbon_platforms::{ModPlatform, ModSources};
 use chrono::{DateTime, Utc};
-
-use crate::domain::modplatforms::{ModPlatform, ModSources};
+use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
 pub struct Instance {
@@ -142,6 +140,17 @@ impl Modpack {
         match self {
             Self::Curseforge(_) => ModPlatform::Curseforge,
             Self::Modrinth(_) => ModPlatform::Modrinth,
+        }
+    }
+}
+
+impl From<ModLoaderType> for carbon_platforms::curseforge::ModLoaderType {
+    fn from(value: ModLoaderType) -> Self {
+        match value {
+            ModLoaderType::Neoforge => Self::NeoForge,
+            ModLoaderType::Forge => Self::Forge,
+            ModLoaderType::Fabric => Self::Fabric,
+            ModLoaderType::Quilt => Self::Quilt,
         }
     }
 }

@@ -1,16 +1,7 @@
-use std::{collections::HashMap, fs::File, io::Write, path::PathBuf, sync::Arc};
-
-use anyhow::anyhow;
-use tokio::sync::mpsc;
-use tracing::trace;
-
 use crate::{
     api::translation::Translation,
     domain::{
         instance::{info::GameVersion, ExportEntry, InstanceId},
-        modplatforms::curseforge::manifest::{
-            Manifest, ManifestFileReference, Minecraft, ModLoaders,
-        },
         vtask::VisualTaskId,
     },
     managers::{
@@ -20,6 +11,13 @@ use crate::{
         AppInner,
     },
 };
+use anyhow::anyhow;
+use carbon_platforms::curseforge::manifest::{
+    Manifest, ManifestFileReference, Minecraft, ModLoaders,
+};
+use std::{collections::HashMap, fs::File, io::Write, path::PathBuf, sync::Arc};
+use tokio::sync::mpsc;
+use tracing::trace;
 
 use crate::db::{mod_file_cache as fcdb, mod_metadata as metadb};
 
