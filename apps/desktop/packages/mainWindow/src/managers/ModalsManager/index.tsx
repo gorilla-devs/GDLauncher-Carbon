@@ -125,6 +125,10 @@ const defaultModals = {
   accountExpired: {
     component: lazy(() => import("./modals/AccountExpired")),
     title: "Account Expired"
+  },
+  bisectHostingAffiliate: {
+    component: lazy(() => import("./modals/BisectHostingAffiliate")),
+    title: "BisectHosting Affiliate"
   }
 }
 

@@ -85,6 +85,7 @@ interface Theme {
   "brands-curseforge": string
   "brands-modrinth": string
   "brands-discord": string
+  "brands-bisecthosting": string
 
   font: string
   "font-mono": string

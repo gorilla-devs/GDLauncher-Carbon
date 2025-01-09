@@ -92,6 +92,7 @@ const mainTheme: Theme = {
   "brands-curseforge": "241 100 54",
   "brands-modrinth": "27 217 106",
   "brands-discord": "88 101 242",
+  "brands-bisecthosting": "4 203 235",
 
   font: "Ubuntu",
   "font-mono": "Ubuntu Mono",

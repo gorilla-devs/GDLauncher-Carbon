@@ -23,6 +23,7 @@ use reqwest::Client;
 use reqwest_middleware::ClientBuilder;
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::{
     collections::{BTreeMap, HashMap},
     mem,
@@ -30,6 +31,7 @@ use std::{
     time::{Duration, Instant},
 };
 use thiserror::Error;
+use tokio::select;
 use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, error, info, trace, warn};
 
@@ -936,7 +938,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
 pub struct AccountRefreshService;
 
 impl AccountRefreshService {
-    pub fn start(app: Weak<AppInner>) {
+    pub async fn start(app: Weak<AppInner>) {
         // account status check
         let app1 = app.clone();
         tokio::spawn(async move {
@@ -1010,12 +1012,53 @@ impl AccountRefreshService {
             }
         });
 
+        let notifier = Arc::new(tokio::sync::Notify::new());
+        let notifier_clone = notifier.clone();
+
         tokio::spawn(async move {
+            let mut first_check_done = false;
+
             while let Some(app) = app.upgrade() {
                 let account_manager = app.account_manager();
 
+                let current_account = account_manager.get_active_uuid().await.unwrap_or_default();
+                let saved_gdl_account_uuid = app
+                    .settings_manager()
+                    .get_settings()
+                    .await
+                    .map(|settings| settings.gdl_account_uuid)
+                    .unwrap_or_default();
+
                 // TODO: there's not really a way to handle an error in here
                 if let Ok(accounts) = account_manager.get_account_entries().await {
+                    // Sort accounts by priority. Currently priority is
+                    // 1. GDL account (if any)
+                    // 2. Currently selected account (if any and different from GDL account)
+                    // 3. All other accounts
+
+                    let mut accounts = accounts.into_iter().collect::<Vec<_>>();
+                    accounts.sort_by(|a, b| {
+                        if let Some(gdl_account_uuid) = &saved_gdl_account_uuid {
+                            if &a.uuid == gdl_account_uuid {
+                                return Ordering::Less;
+                            } else if &b.uuid == gdl_account_uuid {
+                                return Ordering::Greater;
+                            }
+                        }
+
+                        let Some(current_account) = &current_account else {
+                            return Ordering::Equal;
+                        };
+
+                        if &a.uuid == current_account {
+                            return Ordering::Less;
+                        } else if &b.uuid == current_account {
+                            return Ordering::Greater;
+                        }
+
+                        Ordering::Equal
+                    });
+
                     for account in accounts {
                         let uuid = account.uuid.clone();
                         // ignore badly formed account entries since we can't handle them
@@ -1044,14 +1087,36 @@ impl AccountRefreshService {
                                 error!({ error = ?e }, "Failed to refresh access token for {}", &account.uuid);
                             }
 
+                            // This works because GDL account is guaranteed to be first in the list
+                            // and if there is no gdl account, the currently selected account is guaranteed
+                            // to be first
+                            if !first_check_done {
+                                notifier_clone.notify_one();
+                                first_check_done = true;
+                            }
+
                             break;
                         }
                     }
                 }
 
+                notifier_clone.notify_one();
+
                 tokio::time::sleep(Duration::from_secs(30)).await;
             }
         });
+
+        // Wait until The first refresh is complete, or 5 seconds have passed (for safety)
+        select! {
+            // tokio::sync::Notify is not cancellation safe, but in this case we don't care
+            // because if it's cancelled, we'll just continue
+            _ = notifier.notified() => {
+                info!("Initial refresh complete");
+            }
+            _ = tokio::time::sleep(Duration::from_secs(5)) => {
+                error!("Failed to wait for initial refresh to complete");
+            }
+        }
     }
 }
 

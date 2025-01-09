@@ -131,6 +131,9 @@ impl ManagerRef<'_, InstanceManager> {
         Ok(())
     }
 
+    /// Change the modpack (hence modpack version) of an instance.
+    /// While this could also change between different modpack (and modplatforms), the usual use case is to change
+    /// between modpack versions.
     pub async fn change_modpack(
         self,
         instance_id: InstanceId,

@@ -31,6 +31,10 @@ const GDLAccountCompletion = (props: Props) => {
     return account.username
   }
 
+  if (!props.nickname) {
+    props.setNickname(defaultNickname())
+  }
+
   return (
     <div class="flex-1 w-full flex flex-col justify-between items-center text-center gap-5 p-10">
       <div class="flex flex-col w-full gap-4">

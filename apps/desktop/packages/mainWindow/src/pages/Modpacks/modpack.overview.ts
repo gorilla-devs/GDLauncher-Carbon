@@ -23,6 +23,9 @@ const fetchData = ({ params }: { params: any }) => {
     const modpackDetails = rspc.createQuery(() => ({
       queryKey: ["modplatforms.modrinth.getProject", params.id]
     }))
+
+    console.log(modpackDetails)
+
     const modrinthProjectVersions = rspc.createQuery(() => ({
       queryKey: [
         "modplatforms.modrinth.getProjectVersions",

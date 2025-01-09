@@ -5,12 +5,14 @@ import { autoUpdater } from "electron-updater"
 console.log(autoUpdater.currentVersion)
 
 export default function initAutoUpdater(win: BrowserWindow | null) {
+  console.log("Initializing auto updater")
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
 
   ipcMain.handle(
     "checkForUpdates",
     async (_, selectedChannel: FEReleaseChannel) => {
+      console.log("Checking for updates", selectedChannel)
       if (__APP_VERSION__.includes("snapshot")) {
         return null
       }

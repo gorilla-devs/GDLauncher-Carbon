@@ -1,6 +1,13 @@
 import {
   Button,
   Collapsable,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuGroup,
+  ContextMenuGroupLabel,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
   Dropdown,
   Input,
   News,
@@ -35,6 +42,7 @@ import { initNews } from "@/utils/news"
 import { rspc } from "@/utils/rspcClient"
 import { createStore, reconcile } from "solid-js/store"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
+import { useModal } from "@/managers/ModalsManager"
 
 const NewsWrapper = () => {
   const newsInitializer = initNews()
@@ -72,6 +80,8 @@ const HomeGrid = () => {
   const [filter, setFilter] = createSignal("")
 
   const globalStore = useGlobalStore()
+
+  const modals = useModal()
 
   const [instancesTileSize, setInstancesTileSize] = createSignal(2)
 
@@ -343,9 +353,9 @@ const HomeGrid = () => {
             !globalStore.instances.isLoading
           }
         >
-          <div class="w-full h-full flex flex-col justify-center items-center mt-12">
-            <img src={skull} class="w-16 h-16" />
-            <p class="text-lightSlate-700 text-center max-w-100">
+          <div class="mt-12 flex h-full w-full flex-col items-center justify-center">
+            <img src={skull} class="h-16 w-16" />
+            <p class="text-lightSlate-700 max-w-100 text-center">
               <Trans key="instance.no_instances_text" />
             </p>
           </div>
@@ -357,7 +367,7 @@ const HomeGrid = () => {
           }
         >
           <div>
-            <div class="flex items-center gap-4 mt-8 sticky top-0 z-90 py-4 bg-darkSlate-800">
+            <div class="bg-darkSlate-800 sticky top-0 mt-8 flex items-center gap-4 py-4">
               <Input
                 ref={inputRef}
                 placeholder={t("search_instances")}
@@ -386,11 +396,11 @@ const HomeGrid = () => {
                 noTip
                 noPadding
                 content={() => (
-                  <div class="w-100 flex flex-col gap-y-6 h-auto p-4">
-                    <div class="text-2xl mb-4">
+                  <div class="w-100 flex h-auto flex-col gap-y-6 p-4">
+                    <div class="mb-4 text-2xl">
                       <Trans key="general.instances_filters" />
                     </div>
-                    <div class="w-full flex items-center justify-between">
+                    <div class="flex w-full items-center justify-between">
                       <div>
                         <Trans key="general.instance_tile_size" />
                       </div>
@@ -423,7 +433,7 @@ const HomeGrid = () => {
                         />
                       </div>
                     </div>
-                    <div class="w-full flex items-center justify-between">
+                    <div class="flex w-full items-center justify-between">
                       <div>
                         <Trans key="general.sort_by" />
                       </div>
@@ -442,7 +452,7 @@ const HomeGrid = () => {
                           }}
                         />
                         <div
-                          class="w-6 h-6 text-lightSlate-700 hover:text-lightSlate-50"
+                          class="text-lightSlate-700 hover:text-lightSlate-50 h-6 w-6"
                           classList={{
                             "i-ri:sort-alphabet-asc":
                               globalStore.settings.data?.instancesSortByAsc,
@@ -460,7 +470,7 @@ const HomeGrid = () => {
                         />
                       </div>
                     </div>
-                    <div class="w-full flex items-center justify-between">
+                    <div class="flex w-full items-center justify-between">
                       <div>
                         <Trans key="general.group_by" />
                       </div>
@@ -479,7 +489,7 @@ const HomeGrid = () => {
                           }}
                         />
                         <div
-                          class="w-6 h-6 text-lightSlate-700 hover:text-lightSlate-50"
+                          class="text-lightSlate-700 hover:text-lightSlate-50 h-6 w-6"
                           classList={{
                             "i-ri:sort-alphabet-asc":
                               globalStore.settings.data?.instancesGroupByAsc,
@@ -527,110 +537,154 @@ const HomeGrid = () => {
                 )}
               >
                 <Button type="secondary" size="small">
-                  <i class="w-4 h-4 i-ri:filter-fill" />
+                  <i class="i-ri:filter-fill h-4 w-4" />
                 </Button>
               </Popover>
             </div>
-            <div class="mt-4">
-              <For each={instances || []}>
-                {(group, i) => {
-                  return (
-                    <Show when={group.instances.length > 0}>
-                      <Collapsable
-                        noPadding
-                        title={
-                          <>
-                            {/* <img
+            <ContextMenu>
+              <ContextMenuTrigger>
+                <div class="mt-4">
+                  <For each={instances || []}>
+                    {(group, i) => {
+                      return (
+                        <Show when={group.instances.length > 0}>
+                          <Collapsable
+                            noPadding
+                            title={
+                              <>
+                                {/* <img
                             class="w-6 h-6"
                             src={getCFModloaderIcon(key as CFFEModLoaderType)}
                           /> */}
-                            <span>{group.name}</span>
-                          </>
-                        }
-                        size="standard"
-                      >
-                        <div
-                          class="mt-4 flex flex-wrap gap-x-4"
-                          classList={{
-                            "gap-y-4": instancesTileSize() === 1,
-                            "gap-y-6": instancesTileSize() === 2,
-                            "gap-y-8": instancesTileSize() === 3,
-                            "gap-y-10": instancesTileSize() === 4,
-                            "gap-y-12": instancesTileSize() === 5
-                          }}
-                        >
-                          <For each={group.instances}>
-                            {(instance, j) => {
-                              let ref: HTMLDivElement | undefined
+                                <span>{group.name}</span>
+                              </>
+                            }
+                            size="standard"
+                          >
+                            <div
+                              class="mt-4 flex flex-wrap gap-x-4"
+                              classList={{
+                                "gap-y-4": instancesTileSize() === 1,
+                                "gap-y-6": instancesTileSize() === 2,
+                                "gap-y-8": instancesTileSize() === 3,
+                                "gap-y-10": instancesTileSize() === 4,
+                                "gap-y-12": instancesTileSize() === 5
+                              }}
+                            >
+                              <For each={group.instances}>
+                                {(instance, j) => {
+                                  let ref: HTMLDivElement | undefined
 
-                              const instancesCountInPreviousGroups = instances
-                                .slice(0, i())
-                                .reduce(
-                                  (acc, group) => acc + group.instances.length,
-                                  0
-                                )
+                                  const instancesCountInPreviousGroups =
+                                    instances
+                                      .slice(0, i())
+                                      .reduce(
+                                        (acc, group) =>
+                                          acc + group.instances.length,
+                                        0
+                                      )
 
-                              const baseDelay = 300
+                                  const baseDelay = 300
 
-                              const groupDelay =
-                                i() * 60 + 60 * instancesCountInPreviousGroups
+                                  const groupDelay =
+                                    i() * 60 +
+                                    60 * instancesCountInPreviousGroups
 
-                              const instanceDelay = j() * 60
+                                  const instanceDelay = j() * 60
 
-                              const totalDelay =
-                                baseDelay + groupDelay + instanceDelay
+                                  const totalDelay =
+                                    baseDelay + groupDelay + instanceDelay
 
-                              onMount(() => {
-                                if (ref && !initAnimationRan) {
-                                  ref.animate(
-                                    [
-                                      {
-                                        opacity: 0
-                                      },
-                                      {
-                                        opacity: 1
-                                      }
-                                    ],
-                                    {
-                                      duration: 250,
-                                      delay: totalDelay,
-                                      easing: "linear",
-                                      fill: "forwards"
+                                  onMount(() => {
+                                    if (ref && !initAnimationRan) {
+                                      ref.animate(
+                                        [
+                                          {
+                                            opacity: 0
+                                          },
+                                          {
+                                            opacity: 1
+                                          }
+                                        ],
+                                        {
+                                          duration: 250,
+                                          delay: totalDelay,
+                                          easing: "linear",
+                                          fill: "forwards"
+                                        }
+                                      )
                                     }
-                                  )
-                                }
 
-                                if (
-                                  i() === instances.length - 1 &&
-                                  j() === group.instances.length - 1
-                                ) {
-                                  requestAnimationFrame(() => {
-                                    initAnimationRan = true
+                                    if (
+                                      i() === instances.length - 1 &&
+                                      j() === group.instances.length - 1
+                                    ) {
+                                      requestAnimationFrame(() => {
+                                        initAnimationRan = true
+                                      })
+                                    }
                                   })
-                                }
-                              })
 
-                              return (
-                                <div
-                                  ref={ref}
-                                  classList={{ "opacity-0": !initAnimationRan }}
-                                >
-                                  <InstanceTile
-                                    instance={instance}
-                                    identifier={`${group.id?.toString() || group.name} - ${instance.id}`}
-                                    size={instancesTileSize() as any}
-                                  />
-                                </div>
-                              )
-                            }}
-                          </For>
-                        </div>
-                      </Collapsable>
-                    </Show>
-                  )
-                }}
-              </For>
-            </div>
+                                  return (
+                                    <div
+                                      ref={ref}
+                                      classList={{
+                                        "opacity-0": !initAnimationRan
+                                      }}
+                                    >
+                                      <InstanceTile
+                                        instance={instance}
+                                        identifier={`${group.id?.toString() || group.name} - ${instance.id}`}
+                                        size={instancesTileSize() as any}
+                                      />
+                                    </div>
+                                  )
+                                }}
+                              </For>
+                            </div>
+                          </Collapsable>
+                        </Show>
+                      )
+                    }}
+                  </For>
+                </div>
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuGroup>
+                  <ContextMenuGroupLabel>
+                    Add New Instance
+                  </ContextMenuGroupLabel>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem
+                    class="flex items-center gap-2"
+                    onClick={() => {
+                      modals?.openModal({
+                        name: "instanceCreation"
+                      })
+                    }}
+                  >
+                    <div class="i-ri:file-add-fill h-4 w-4" />
+                    Create New Instance
+                  </ContextMenuItem>
+                  <ContextMenuItem
+                    class="flex items-center gap-2"
+                    onClick={() => {
+                      modals?.openModal(
+                        {
+                          name: "instanceCreation"
+                        },
+                        {
+                          import: true
+                        }
+                      )
+                    }}
+                  >
+                    <div class="i-ri:import-fill h-4 w-4" />
+                    Import Instance
+                  </ContextMenuItem>
+                </ContextMenuGroup>
+              </ContextMenuContent>
+            </ContextMenu>
           </div>
         </Match>
       </Switch>

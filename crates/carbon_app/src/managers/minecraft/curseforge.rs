@@ -99,6 +99,8 @@ pub async fn download_modpack_zip(
     Ok(())
 }
 
+/// Given the path to an addon zip file, prepares the list of downloadables and the manifest
+/// for the modpack.
 #[tracing::instrument(skip(app, packinfo, t_addon_metadata, progress_percentage_sender))]
 pub async fn prepare_modpack_from_zip(
     app: &App,

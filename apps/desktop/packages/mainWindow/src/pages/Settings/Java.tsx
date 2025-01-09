@@ -11,7 +11,10 @@ import {
   Tooltip,
   Dropdown,
   Popover,
-  ContextMenu
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenu
 } from "@gd/ui"
 import { useRouteData } from "@solidjs/router"
 import { For, Match, Show, Switch, createMemo } from "solid-js"
@@ -260,11 +263,25 @@ const Java = () => {
                         <Trans key="java.java_description_custom_text" />
                       </div>
                     </div>
-                    <ContextMenu menuItems={menuItems()} trigger="click">
-                      <Button type="secondary" size="small">
-                        <div class="text-xl i-ri:add-fill" />
-                      </Button>
-                    </ContextMenu>
+                    <DropdownMenu placement="bottom-end">
+                      <DropdownMenuTrigger class="p-0 b-0 bg-transparent">
+                        <Button as="div" type="secondary" size="small">
+                          <div class="text-xl i-ri:add-fill" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        <For each={menuItems()}>
+                          {(item) => (
+                            <DropdownMenuItem onSelect={item.action}>
+                              <div class="flex items-center gap-2">
+                                <i class={item.icon} />
+                                <span>{item.label}</span>
+                              </div>
+                            </DropdownMenuItem>
+                          )}
+                        </For>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                   <div class="flex flex-col gap-4">
                     <For each={Object.entries(javas())}>

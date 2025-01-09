@@ -1,76 +1,42 @@
 /* eslint-disable solid/no-innerhtml */
 import { useRouteData } from "@solidjs/router"
-import {
-  createEffect,
-  createSignal,
-  Match,
-  Show,
-  Suspense,
-  Switch
-} from "solid-js"
+import { createEffect, createResource, Match, Suspense, Switch } from "solid-js"
 import { Skeleton } from "@gd/ui"
-import { marked } from "marked"
-import sanitizeHtml from "sanitize-html"
 import fetchData from "../mods.overview"
+import { parseToHtml } from "@/utils/modplatformDescriptionConverter"
+import { MRFEProject } from "@gd/core_module/bindings"
 
 const Overview = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData()
 
   const Description = () => {
-    const [parsedDescription, setParsedDescription] = createSignal<
-      string | null
-    >(null)
+    const [data, { refetch }] = createResource(async () => {
+      const params: [string | undefined, "html" | "markdown"] = [
+        undefined,
+        "html"
+      ]
 
-    createEffect(async () => {
-      if (routeData.modpackDescription?.data?.data) {
-        setParsedDescription(
-          await marked.parse(
-            sanitizeHtml(routeData.modpackDescription?.data?.data || "")
-          )
-        )
+      if (routeData.isCurseforge) {
+        params[0] = routeData.modpackDescription?.data?.data
+        params[1] = "html"
+      } else {
+        params[0] = routeData.modpackDetails.data?.body
+        params[1] = "markdown"
       }
+
+      return parseToHtml(params[0], params[1])
     })
 
-    const cleanHtml = () =>
-      sanitizeHtml(routeData.modpackDescription?.data?.data || "", {
-        allowedTags: sanitizeHtml.defaults.allowedTags.concat([
-          "img",
-          "iframe"
-        ]),
-        allowedAttributes: {
-          a: ["href", "name", "target", "class"],
-          img: ["src", "width", "height", "class"],
-          iframe: ["src", "width", "height", "allowfullscreen"]
-        },
-        allowedIframeHostnames: [
-          "www.youtube.com",
-          "i.imgur.com",
-          "cdn.ko-fi.com"
-        ],
-        transformTags: {
-          a: sanitizeHtml.simpleTransform("a", { class: "text-blue-500" }),
-          img: sanitizeHtml.simpleTransform("img", {
-            class: "max-w-full h-auto"
-          })
-        }
-      })
+    createEffect(() => {
+      const _1 = routeData.modpackDescription?.data?.data
+      const _2 = (routeData.modpackDetails.data as MRFEProject)?.body
+      refetch()
+    })
 
     return (
       <Suspense fallback={<Skeleton.modpackOverviewPage />}>
         <div>
-          <Switch fallback={<Skeleton.modpackOverviewPage />}>
-            <Match when={routeData.isCurseforge}>
-              <div
-                class="w-full max-w-full overflow-hidden"
-                innerHTML={cleanHtml()}
-              />
-            </Match>
-            <Match when={!routeData.isCurseforge}>
-              <Show when={parsedDescription()}>
-                <div class="w-full" innerHTML={parsedDescription()!} />
-              </Show>
-            </Match>
-          </Switch>
+          <div class="w-full max-w-full overflow-hidden" innerHTML={data()} />
         </div>
       </Suspense>
     )

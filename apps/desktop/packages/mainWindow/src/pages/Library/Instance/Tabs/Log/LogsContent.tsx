@@ -1,4 +1,5 @@
-import { createSignal, For, Match, Show, Switch } from "solid-js"
+import { createSignal, Match, Show, Switch } from "solid-js"
+
 import { isFullScreen, setIsFullScreen } from "."
 import { LogEntry, LogEntryLevel, LogEntrySourceKind } from "@/utils/logs"
 import formatDateTime from "./formatDateTime"
@@ -6,14 +7,18 @@ import FullscreenToggle from "./components/FullscreenToggle"
 import LogsOptions, { Columns, LogDensity } from "./components/LogsOptions"
 import { Trans } from "@gd/i18n"
 import { Button } from "@gd/ui"
+import { VList } from "@/components/VirtuaWrapper"
+import { VirtualizerHandle } from "virtua/lib/solid"
 
 interface Props {
   logs: LogEntry[]
   isActive: boolean
   isLoading: boolean
   scrollToBottom: () => void
+  onScroll: () => void
   assignScrollBottomRef: (ref: HTMLDivElement) => void
   assignLogsContentRef: (ref: HTMLDivElement) => void
+  assignVirtualizerRef: (ref: VirtualizerHandle) => void
   newLogsCount: number
   autoFollowPreference: boolean
   setAutoFollowPreference: (_: boolean) => void
@@ -33,7 +38,7 @@ function DateTimeFormatter(props: {
 }) {
   return (
     <span
-      class="text-lightSlate-600 font-thin pr-2 py-2 leading-4 sticky top-0 bg-darkSlate-900 z-10 rounded-md"
+      class="text-lightSlate-600 bg-darkSlate-900 z-10 rounded-md py-2 pr-2 font-thin leading-4"
       classList={{
         "text-xs": props.fontMultiplier === 0,
         "text-sm": props.fontMultiplier === 1,
@@ -42,7 +47,7 @@ function DateTimeFormatter(props: {
     >
       {formatDateTime(new Date(props.timestamp))}
       {/* These absolute dividers are used to interrupt text selection to this column, as it selects the largest continuous block of text it can find */}
-      <div class="absolute top-0 bottom-0 right-0 w-2 bg-transparent select-none" />
+      <div class="absolute bottom-0 right-0 top-0 w-2 select-none bg-transparent" />
     </span>
   )
 }
@@ -50,7 +55,7 @@ function DateTimeFormatter(props: {
 function LoggerFormatter(props: { logger: string; fontMultiplier: 0 | 1 | 2 }) {
   return (
     <span
-      class={`pr-2 py-2 font-thin leading-4 sticky top-0 bg-darkSlate-900 z-10 rounded-md`}
+      class={`bg-darkSlate-900 z-10 rounded-md py-2 pr-2 font-thin leading-4`}
       classList={{
         "text-xs": props.fontMultiplier === 0,
         "text-sm": props.fontMultiplier === 1,
@@ -59,7 +64,7 @@ function LoggerFormatter(props: { logger: string; fontMultiplier: 0 | 1 | 2 }) {
     >
       [{props.logger.toUpperCase()}]
       {/* These absolute dividers are used to interrupt text selection to this column, as it selects the largest continuous block of text it can find */}
-      <div class="absolute top-0 bottom-0 right-0 w-2 bg-transparent select-none" />
+      <div class="absolute bottom-0 right-0 top-0 w-2 select-none bg-transparent" />
     </span>
   )
 }
@@ -70,7 +75,7 @@ function SourceKindFormatter(props: {
 }) {
   return (
     <span
-      class={`pr-2 py-2 font-thin leading-4 sticky top-0 bg-darkSlate-900 z-10 rounded-md`}
+      class={`bg-darkSlate-900 z-10 rounded-md py-2 pr-2 font-thin leading-4`}
       classList={{
         "text-xs": props.fontMultiplier === 0,
         "text-sm": props.fontMultiplier === 1,
@@ -80,7 +85,7 @@ function SourceKindFormatter(props: {
     >
       [{props.sourceKind.toUpperCase()}]
       {/* These absolute dividers are used to interrupt text selection to this column, as it selects the largest continuous block of text it can find */}
-      <div class="absolute top-0 bottom-0 right-0 w-2 bg-transparent select-none" />
+      <div class="absolute bottom-0 right-0 top-0 w-2 select-none bg-transparent" />
     </span>
   )
 }
@@ -91,7 +96,7 @@ function ThreadNameFormatter(props: {
 }) {
   return (
     <span
-      class={`pr-2 py-2 font-thin leading-4 sticky top-0 bg-darkSlate-900 z-10 rounded-md`}
+      class={`bg-darkSlate-900 z-10 rounded-md py-2 pr-2 font-thin leading-4`}
       classList={{
         "text-xs": props.fontMultiplier === 0,
         "text-sm": props.fontMultiplier === 1,
@@ -100,7 +105,7 @@ function ThreadNameFormatter(props: {
     >
       [{props.threadName}]
       {/* These absolute dividers are used to interrupt text selection to this column, as it selects the largest continuous block of text it can find */}
-      <div class="absolute top-0 bottom-0 right-0 w-2 bg-transparent select-none" />
+      <div class="absolute bottom-0 right-0 top-0 w-2 select-none bg-transparent" />
     </span>
   )
 }
@@ -111,7 +116,7 @@ function LevelFormatter(props: {
 }) {
   return (
     <span
-      class={`pr-2 py-2 font-bold ${color[props.level]} leading-4 sticky top-0 bg-darkSlate-900 z-10 rounded-md`}
+      class={`pr-2 py-2 font-bold ${color[props.level]} bg-darkSlate-900 z-10 rounded-md leading-4`}
       classList={{
         "text-xs": props.fontMultiplier === 0,
         "text-sm": props.fontMultiplier === 1,
@@ -119,7 +124,7 @@ function LevelFormatter(props: {
       }}
     >
       [{props.level.toUpperCase()}]
-      <div class="absolute top-0 bottom-0 right-0 w-2 bg-transparent select-none" />
+      <div class="absolute bottom-0 right-0 top-0 w-2 select-none bg-transparent" />
     </span>
   )
 }
@@ -198,7 +203,7 @@ function ScrollBottomButton(props: {
         </Match>
         <Match when={!isHovered()}>
           <div class="flex items-center gap-2">
-            <div class="w-4 h-4 i-ri:pause-fill" />
+            <div class="i-ri:pause-fill h-4 w-4" />
             <Trans key="logs.logs_paused_due_to_scroll" />
           </div>
         </Match>
@@ -221,8 +226,8 @@ const LogsContent = (props: Props) => {
     createSignal(false)
 
   return (
-    <div class="relative flex-1 min-w-0 flex flex-col border border-darkSlate-700 border-l-solid">
-      <div class="flex-shrink-0 flex justify-between items-center gap-4 w-full h-10 bg-darkSlate-800 py-8 px-4 box-border">
+    <div class="border-darkSlate-700 border-l-solid relative flex min-w-0 flex-1 flex-col border">
+      <div class="bg-darkSlate-800 box-border flex h-10 w-full shrink-0 items-center justify-between gap-4 px-4 py-8">
         {/* <Input icon={<div class="i-ri:search-line" />} placeholder="Search" /> */}
         <div />
         <div class="flex items-center gap-4">
@@ -245,16 +250,16 @@ const LogsContent = (props: Props) => {
         </div>
       </div>
       <Show when={props.isActive}>
-        <div class="z-1 absolute top-20 right-6 w-fit h-10 bg-darkSlate-700 text-lightSlate-700 flex items-center px-4 rounded-3xl">
-          <div class="bg-red-400 rounded-full text-red-400 w-3 h-3 mr-2 animate-liveCirclePulse" />
+        <div class="z-1 bg-darkSlate-700 text-lightSlate-700 absolute right-6 top-20 flex h-10 w-fit items-center rounded-3xl px-4">
+          <div class="animate-liveCirclePulse mr-2 h-3 w-3 rounded-full bg-red-400 text-red-400" />
           <div>LIVE</div>
         </div>
       </Show>
       <div
-        class="justify-center hidden"
+        class="hidden justify-center"
         ref={(el) => props.assignScrollBottomRef(el)}
       >
-        <div class="w-60 z-20 flex justify-center fixed bottom-6">
+        <div class="fixed bottom-6 z-20 flex w-60 justify-center">
           <ScrollBottomButton
             onClick={props.scrollToBottom}
             newLogsCount={props.newLogsCount}
@@ -262,7 +267,7 @@ const LogsContent = (props: Props) => {
         </div>
       </div>
       <div
-        class="relative bg-darkSlate-900 flex-1 overflow-auto px-4 py-2 w-full box-border mb-4"
+        class="bg-darkSlate-900 relative mb-4 box-border w-full flex-1 overflow-auto py-2 pl-4 pr-2"
         ref={props.assignLogsContentRef}
         id="instance_logs_container" // used to override user select and cursor in index.html
       >
@@ -271,61 +276,72 @@ const LogsContent = (props: Props) => {
             <div />
           </Match>
           <Match when={props.logs.length === 0}>
-            <div class="flex h-full justify-center items-center text-center text-lightSlate-600 text-xl select-none">
+            <div class="text-lightSlate-600 flex h-full select-none items-center justify-center text-center text-xl">
               <Trans key="logs.no_logs" />
             </div>
           </Match>
           <Match when={props.logs.length > 0}>
-            <For each={props.logs}>
-              {(log) => (
-                <div
-                  class="w-full break-words border-b border-b-solid border-darkSlate-600 relative"
-                  classList={{
-                    "py-3": logsDensity() === "low",
-                    "py-2": logsDensity() === "medium",
-                    "py-1": logsDensity() === "high"
-                  }}
-                >
-                  <Show when={columns().timestamp}>
-                    <DateTimeFormatter
-                      timestamp={log.timestamp}
-                      fontMultiplier={fontMultiplier()}
-                    />
-                  </Show>
-                  <Show when={columns().sourceKind}>
-                    <SourceKindFormatter
+            <VList
+              data={props.logs}
+              ref={(virtuaHandle) => {
+                if (virtuaHandle) {
+                  props.assignVirtualizerRef(virtuaHandle)
+                }
+              }}
+              onWheel={props.onScroll}
+              overscan={10}
+            >
+              {(log) => {
+                return (
+                  <div
+                    class="border-b-solid border-darkSlate-600 relative w-full break-words border-b"
+                    classList={{
+                      "py-3": logsDensity() === "low",
+                      "py-2": logsDensity() === "medium",
+                      "py-1": logsDensity() === "high"
+                    }}
+                  >
+                    <Show when={columns().timestamp}>
+                      <DateTimeFormatter
+                        timestamp={log.timestamp}
+                        fontMultiplier={fontMultiplier()}
+                      />
+                    </Show>
+                    <Show when={columns().sourceKind}>
+                      <SourceKindFormatter
+                        sourceKind={log.sourceKind}
+                        fontMultiplier={fontMultiplier()}
+                      />
+                    </Show>
+                    <Show when={columns().level}>
+                      <LevelFormatter
+                        level={log.level}
+                        fontMultiplier={fontMultiplier()}
+                      />
+                    </Show>
+                    <Show when={columns().logger}>
+                      <LoggerFormatter
+                        logger={log.logger}
+                        fontMultiplier={fontMultiplier()}
+                      />
+                    </Show>
+                    <Show when={columns().threadName}>
+                      <ThreadNameFormatter
+                        threadName={log.thread}
+                        fontMultiplier={fontMultiplier()}
+                      />
+                    </Show>
+                    <ContentFormatter
+                      message={log.message}
+                      level={log.level}
                       sourceKind={log.sourceKind}
                       fontMultiplier={fontMultiplier()}
+                      startLogMessageOnNewLine={startLogMessageOnNewLine()}
                     />
-                  </Show>
-                  <Show when={columns().level}>
-                    <LevelFormatter
-                      level={log.level}
-                      fontMultiplier={fontMultiplier()}
-                    />
-                  </Show>
-                  <Show when={columns().logger}>
-                    <LoggerFormatter
-                      logger={log.logger}
-                      fontMultiplier={fontMultiplier()}
-                    />
-                  </Show>
-                  <Show when={columns().threadName}>
-                    <ThreadNameFormatter
-                      threadName={log.thread}
-                      fontMultiplier={fontMultiplier()}
-                    />
-                  </Show>
-                  <ContentFormatter
-                    message={log.message}
-                    level={log.level}
-                    sourceKind={log.sourceKind}
-                    fontMultiplier={fontMultiplier()}
-                    startLogMessageOnNewLine={startLogMessageOnNewLine()}
-                  />
-                </div>
-              )}
-            </For>
+                  </div>
+                )
+              }}
+            </VList>
           </Match>
         </Switch>
       </div>

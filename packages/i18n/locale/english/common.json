@@ -239,10 +239,17 @@
   "instance.action_open_folder": "Open folder",
   "instance.action_delete": "Delete",
   "instance.action_play": "Play",
+  "instance.action_create_server": "Create Server",
   "instance.action_settings": "Settings",
   "instance.action_edit": "Edit",
   "instance.select_image": "Select image",
   "instance.action_duplicate": "Duplicate",
+  "instance.toggle_favorite": "Toggle favorite",
+  "instance.view_logs": "View logs",
+  "instance.view_mods": "View mods",
+  "instance.more_options": "More options",
+  "instance.add_favorite": "Add favorite",
+  "instance.remove_favorite": "Remove favorite",
   "instance.import_select_all_instances": "Select All",
   "instance.import_deselect_all_instances": "Deselect All",
   "instance.error_invalid": "Instance Invalid or corrupted, try repairing it!",
@@ -515,5 +522,11 @@
   "columns.source_kind": "Source Kind",
   "columns.thread_name": "Thread Name",
   "columns.level": "Log Level",
-  "font_size": "Font Size"
+  "font_size": "Font Size",
+
+  "modals.title.new_instance": "New Instance",
+  "modals.title.modify_instance": "Modify Instance",
+
+  "modals.bisectHosting.promotion": "Grab a server from our official partner <0>BisectHosting</0> for effortless modded server installs and updates. New customers can save <1>25%</1> off their first month using the promo code <2>GDL</2> at checkout.",
+  "modals.bisectHosting.buttonText": "Go to BisectHosting.com"
 }

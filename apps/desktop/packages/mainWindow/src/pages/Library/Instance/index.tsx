@@ -1,6 +1,15 @@
 import getRouteIndex from "@/route/getRouteIndex"
 import { Trans, useTransContext } from "@gd/i18n"
-import { Tabs, TabList, Tab, Button, ContextMenu } from "@gd/ui"
+import {
+  Tabs,
+  TabList,
+  Tab,
+  Button,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem
+} from "@gd/ui"
 import { Outlet, useLocation, useParams, useRouteData } from "@solidjs/router"
 import {
   For,
@@ -199,7 +208,7 @@ const Instance = () => {
     },
     {
       label: (
-        <div class="flex gap-2 items-center">
+        <div class="flex items-center gap-2">
           Logs
           <FeatureStatusBadge type="beta" />
         </div>
@@ -389,7 +398,7 @@ const Instance = () => {
   return (
     <main
       id="main-container-instance-details"
-      class="h-full bg-darkSlate-800 flex flex-col relative overflow-x-hidden"
+      class="bg-darkSlate-800 relative flex h-full flex-col overflow-x-hidden"
       classList={{
         "overflow-hidden": isFullScreen(),
         "overflow-x-hidden": !isFullScreen()
@@ -399,7 +408,7 @@ const Instance = () => {
         ref={(el) => {
           headerRef = el
         }}
-        class="relative flex flex-col justify-between ease-in-out transition-all items-stretch min-h-60 transition-100 overflow-hidden"
+        class="transition-100 relative flex min-h-60 flex-col items-stretch justify-between overflow-hidden transition-all ease-in-out"
       >
         <img
           src={
@@ -411,29 +420,49 @@ const Instance = () => {
               : DefaultImg
           }
           alt="Instance cover"
-          class="absolute w-full h-full object-cover"
+          class="absolute h-full w-full object-cover"
           style={{
             transform: `translate3d(0, ${scrollTop() * 0.4}px, 0)`,
             "will-change": "transform"
           }}
         />
-        <div class="h-full bg-gradient-to-t from-darkSlate-800 relative z-10">
-          <div class="sticky top-5 left-5 w-fit z-50">
+        <div class="from-darkSlate-800 relative z-10 h-full bg-gradient-to-t">
+          <div class="sticky left-5 top-5 z-50 w-fit">
             <Button
               rounded
               onClick={() => navigate("/library")}
               size="small"
               type="transparent"
             >
-              <div class="text-xl i-ri:arrow-drop-left-line" />
+              <div class="i-ri:arrow-drop-left-line text-xl" />
             </Button>
           </div>
-          <div class="z-50 top-5 right-5 w-fit flex absolute gap-2">
-            <ContextMenu menuItems={menuItems()} trigger="click">
-              <Button rounded size="small" type="transparent">
-                <div class="text-xl i-ri:more-2-fill" />
-              </Button>
-            </ContextMenu>
+          <div class="absolute right-5 top-5 z-50 flex w-fit gap-2">
+            <DropdownMenu placement="bottom-end">
+              <DropdownMenuTrigger class="p-0 b-0 bg-transparent">
+                <Button
+                  as="div"
+                  rounded
+                  class="w-full h-full"
+                  size="small"
+                  type="transparent"
+                >
+                  <div class="i-ri:more-2-fill text-xl" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <For each={menuItems()}>
+                  {(item) => (
+                    <DropdownMenuItem onSelect={item.action}>
+                      <div class="flex items-center gap-2">
+                        <div class={item.icon} />
+                        <span>{item.label}</span>
+                      </div>
+                    </DropdownMenuItem>
+                  )}
+                </For>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               onClick={() =>
                 setFavoriteMutation.mutate({
@@ -454,10 +483,10 @@ const Instance = () => {
               />
             </Button>
           </div>
-          <div class="flex justify-center sticky w-full bg-gradient-to-t from-darkSlate-800 box-border px-6 h-24 top-52 z-20 pb-2">
+          <div class="from-darkSlate-800 sticky top-52 z-20 box-border flex h-24 w-full justify-center bg-gradient-to-t px-6 pb-2">
             <div class="flex w-full justify-start">
-              <div class="flex justify-between w-full items-end">
-                <div class="flex flex-col gap-4 flex-1 lg:flex-row justify-end">
+              <div class="flex w-full items-end justify-between">
+                <div class="flex flex-1 flex-col justify-end gap-4 lg:flex-row">
                   <img
                     src={
                       routeData.instanceDetails.data?.iconRevision
@@ -475,9 +504,9 @@ const Instance = () => {
                     }}
                   />
 
-                  <div class="flex flex-col flex-1">
+                  <div class="flex flex-1 flex-col">
                     <div
-                      class="flex gap-4 w-fit items-center pl-1"
+                      class="flex w-fit items-center gap-4 pl-1"
                       classList={{
                         "border-2 border-darkSlate-800 border-solid rounded-lg bg-darkSlate-700":
                           editableName(),
@@ -485,13 +514,13 @@ const Instance = () => {
                           !editableName()
                       }}
                     >
-                      <span class="flex gap-2 cursor-pointer">
+                      <span class="flex cursor-pointer gap-2">
                         <h1
                           ref={nameRef}
                           onInput={(e) => {
                             setNewName(e.target.innerHTML)
                           }}
-                          class="z-10 m-0 border-box focus-visible:border-0 focus:outline-none focus-visible:outline-none cursor-text min-h-10"
+                          class="border-box z-10 m-0 min-h-10 cursor-text focus:outline-none focus-visible:border-0 focus-visible:outline-none"
                           contentEditable={editableName()}
                           onFocusIn={() => {
                             setEditableName(true)
@@ -511,24 +540,24 @@ const Instance = () => {
                         </h1>
                         <Show when={!editableName()}>
                           <div
-                            class="ease-in-out transition-color duration-100 i-ri:pencil-fill hover:text-lightSlate-700"
+                            class="transition-color i-ri:pencil-fill hover:text-lightSlate-700 duration-100 ease-in-out"
                             onClick={() => setEditableName(true)}
                           />
                         </Show>
                       </span>
                       <div
-                        class="relative flex items-center gap-2 h-full pr-2"
+                        class="relative flex h-full items-center gap-2 pr-2"
                         classList={{ "bg-darkSlate-800 pl-2": editableName() }}
                       >
                         <div
-                          class="cursor-pointer ease-in-out z-10 transition text-lightSlate-50 text-3xl i-ri:check-fill duration-50 hover:text-green-500"
+                          class="text-lightSlate-50 i-ri:check-fill duration-50 z-10 cursor-pointer text-3xl transition ease-in-out hover:text-green-500"
                           classList={{
                             hidden: !editableName()
                           }}
                           onClick={() => handleNameChange()}
                         />
                         <div
-                          class="cursor-pointer ease-in-out text-lightSlate-50 transition text-3xl duration-50 z-10 i-ri:close-fill hover:text-red-500"
+                          class="text-lightSlate-50 duration-50 i-ri:close-fill z-10 cursor-pointer text-3xl transition ease-in-out hover:text-red-500"
                           classList={{
                             hidden: !editableName()
                           }}
@@ -548,11 +577,11 @@ const Instance = () => {
                     </div>
                     <div
                       ref={innerContainerRef}
-                      class="flex justify-between cursor-default flex-row"
+                      class="flex cursor-default flex-row justify-between"
                     >
-                      <div class="flex flex-row gap-4 flex-wrap items-start mt-2 ml-2 text-lightGray-600">
+                      <div class="text-lightGray-600 ml-2 mt-2 flex flex-row flex-wrap items-start gap-4">
                         <div
-                          class="m-0 flex gap-2 items-center min-h-6"
+                          class="m-0 flex min-h-6 items-center gap-2"
                           style={{
                             "view-transition-name": `instance-tile-modloader`,
                             contain: "layout"
@@ -565,7 +594,7 @@ const Instance = () => {
                               <>
                                 <Show when={modloader.type_}>
                                   <img
-                                    class="w-4 h-4"
+                                    class="h-4 w-4"
                                     src={getCFModloaderIcon(modloader.type_)}
                                     alt="Modloader icon"
                                   />
@@ -582,7 +611,7 @@ const Instance = () => {
                             undefined
                           }
                         >
-                          <div class="flex gap-2 items-center">
+                          <div class="flex items-center gap-2">
                             <div class="i-ri:time-fill" />
                             <span class="whitespace-nowrap">
                               {convertSecondsToHumanTime(
@@ -597,7 +626,7 @@ const Instance = () => {
                           isModrinth={!!modrinthData()}
                         />
                       </div>
-                      <div class="flex items-center gap-2 mt-2 lg:mt-0">
+                      <div class="mt-2 flex items-center gap-2 lg:mt-0">
                         <Button
                           uppercase
                           size="large"
@@ -648,7 +677,7 @@ const Instance = () => {
         >
           <div class="bg-darkSlate-800 w-full">
             <div
-              class="sticky flex items-center justify-between z-10 bg-darkSlate-800 top-0 h-14"
+              class="bg-darkSlate-800 sticky top-0 z-10 flex h-14 items-center justify-between"
               classList={{
                 "px-6": instancePages()[selectedIndex()]?.noPadding
               }}
@@ -656,9 +685,9 @@ const Instance = () => {
                 refStickyTabs = el
               }}
             >
-              <div class="flex items-center h-full">
+              <div class="flex h-full items-center">
                 <div
-                  class="transition-transform duration-100 ease-in-out mr-4 origin-left"
+                  class="mr-4 origin-left transition-transform duration-100 ease-in-out"
                   classList={{
                     "scale-x-100": isSticky(),
                     "scale-x-0": !isSticky()
@@ -669,7 +698,7 @@ const Instance = () => {
                 >
                   <Button
                     onClick={() => navigate("/library")}
-                    icon={<div class="text-2xl i-ri:arrow-drop-left-line" />}
+                    icon={<div class="i-ri:arrow-drop-left-line text-2xl" />}
                     size="small"
                     type="secondary"
                   >
@@ -677,7 +706,7 @@ const Instance = () => {
                   </Button>
                 </div>
                 <div
-                  class="transition-transform duration-100 ease-in-out origin-left h-full flex items-center"
+                  class="flex h-full origin-left items-center transition-transform duration-100 ease-in-out"
                   style={{
                     transform: `translateX(${tabsTranslate()}px)`
                   }}
@@ -700,7 +729,7 @@ const Instance = () => {
                 </div>
               </div>
               <div
-                class="transition-transform duration-100 ease-in-out ml-4 origin-right"
+                class="ml-4 origin-right transition-transform duration-100 ease-in-out"
                 classList={{
                   "scale-x-100": isSticky(),
                   "scale-x-0": !isSticky()

@@ -47,7 +47,7 @@ pub enum AppError {
 mod app {
     use metrics::MetricsManager;
     use sentry::capture_error;
-    use tracing::error;
+    use tracing::{error, info};
 
     use crate::{cache_middleware, domain, iridium_client::get_client};
 
@@ -107,13 +107,14 @@ mod app {
                     }
                 };
 
-            let app = Arc::new(UnsafeCell::new(MaybeUninit::<AppInner>::uninit()));
-            let unsaferef = UnsafeAppRef(Arc::downgrade(&app));
-
-            let http_client =
-                cache_middleware::new_client(unsaferef.clone(), get_client(gdl_base_api.clone()));
-
             let app = unsafe {
+                let app = Arc::new(UnsafeCell::new(MaybeUninit::<AppInner>::uninit()));
+                let unsaferef = UnsafeAppRef(Arc::downgrade(&app));
+
+                let http_client = cache_middleware::new_client(
+                    unsaferef.clone(),
+                    get_client(gdl_base_api.clone()),
+                );
                 let inner = Arc::into_raw(app);
 
                 (*inner).get().write(MaybeUninit::new(AppInner {
@@ -147,7 +148,10 @@ mod app {
                 Arc::from_raw(inner.cast::<AppInner>())
             };
 
-            account::AccountRefreshService::start(Arc::downgrade(&app));
+            let timer = tokio::time::Instant::now();
+            info!("Starting account refresh service");
+            account::AccountRefreshService::start(Arc::downgrade(&app)).await;
+            info!("Account refresh service started in {:?}", timer.elapsed());
 
             let _app = app.clone();
             tokio::spawn(async move {
@@ -165,7 +169,9 @@ mod app {
                 match settings {
                     Ok(settings) => {
                         let show_app_close_warning = settings.show_app_close_warning;
+                        info!("_SHOW_APP_CLOSE_WARNING_:{}", show_app_close_warning);
                         println!("_SHOW_APP_CLOSE_WARNING_:{}", show_app_close_warning);
+                        info!("_POTATO_PC_MODE_:{}", settings.reduced_motion);
                         println!("_POTATO_PC_MODE_:{}", settings.reduced_motion);
                     }
                     Err(e) => {
@@ -180,9 +186,9 @@ mod app {
             });
 
             let _app = app.clone();
-            let http_client = http_client.clone();
             tokio::spawn(async move {
-                let _ = http_client
+                let _ = _app
+                    .reqwest_client
                     .get(format!("{}/v1/announcement", gdl_base_api))
                     .send()
                     .await;

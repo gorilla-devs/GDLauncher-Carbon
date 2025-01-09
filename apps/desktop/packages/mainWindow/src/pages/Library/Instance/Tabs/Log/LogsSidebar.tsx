@@ -38,8 +38,6 @@ const LogsCollapsable = (props: LogsCollapsableProps) => {
     const diffTime = Math.abs(today.getTime() - logDate.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
-    console.log(diffDays)
-
     let dateText: string
 
     if (diffDays === 0) {

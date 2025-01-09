@@ -1,160 +1,278 @@
-import {
-  For,
-  createSignal,
-  JSX,
-  onMount,
-  Show,
-  mergeProps,
-  onCleanup
-} from "solid-js"
-import { Portal } from "solid-js/web"
-import { useContextMenu } from "./ContextMenuContext"
+import type { Component, ComponentProps, JSX, ValidComponent } from "solid-js"
+import { splitProps } from "solid-js"
 
-interface MenuItem {
-  icon?: string
-  label: string
-  action: () => void
-  id?: string
-  disabled?: boolean
+import * as ContextMenuPrimitive from "@kobalte/core/context-menu"
+import type { PolymorphicProps } from "@kobalte/core/polymorphic"
+
+// import { cn } from "../util"
+
+const cn = (...args: any[]) => args.join(" ")
+
+const ContextMenuTrigger = ContextMenuPrimitive.Trigger
+const ContextMenuPortal = ContextMenuPrimitive.Portal
+const ContextMenuSub = ContextMenuPrimitive.Sub
+const ContextMenuGroup = ContextMenuPrimitive.Group
+const ContextMenuRadioGroup = ContextMenuPrimitive.RadioGroup
+
+const ContextMenu: Component<ContextMenuPrimitive.ContextMenuRootProps> = (
+  props
+) => {
+  return <ContextMenuPrimitive.Root gutter={4} {...props} />
 }
 
-interface ContextMenuProps {
-  menuItems: MenuItem[]
-  children: JSX.Element
-  trigger?: "context" | "click"
-}
-
-const ContextMenu = (props: ContextMenuProps) => {
-  const [x, setX] = createSignal(0)
-  const [y, setY] = createSignal(0)
-  const [menuRef, setMenuRef] = createSignal<HTMLDivElement | undefined>()
-  const [containerRef, setContainerRef] = createSignal<
-    HTMLDivElement | undefined
-  >()
-
-  const ContextMenu = useContextMenu()
-
-  const mergedProps = mergeProps(
-    {
-      trigger: "context"
-    },
-    props
-  )
-
-  const openContextMenu = (e: MouseEvent) => {
-    e.preventDefault()
-    if (containerRef()) {
-      ContextMenu?.setOpenMenu(containerRef()!)
-    }
-
-    // Initially set the position to cursor location
-    setX(e.clientX)
-    setY(e.clientY)
-
-    // Wait for the next frame when the menu has been painted
-    requestAnimationFrame(() => {
-      if (menuRef()) {
-        const menuElement = menuRef()!
-        const boundingClientRect = menuElement.getBoundingClientRect()
-
-        const newX = e.clientX // No change to X coordinate
-        let newY = e.clientY - boundingClientRect.height
-
-        // If the new y position is less than 0, set it to 0 to prevent the menu from going out of view to the top
-        if (newY < 0) {
-          newY = 0
-        }
-
-        setX(newX)
-        setY(newY)
-      }
-    })
+type ContextMenuContentProps<T extends ValidComponent = "div"> =
+  ContextMenuPrimitive.ContextMenuContentProps<T> & {
+    class?: string | undefined
   }
 
-  const closeContextMenu = () => {
-    ContextMenu?.closeMenu()
-  }
-
-  // const handleClickOutside = (e: MouseEvent) => {
-  //   if (containerRef() && !containerRef()?.contains(e.target as Node)) {
-  //     closeContextMenu();
-  //   }
-  // };
-
-  const handleClickOutside = (e: MouseEvent) => {
-    if (
-      containerRef() &&
-      !containerRef()?.contains(e.target as Node) &&
-      containerRef() == ContextMenu?.openMenu()
-    ) {
-      closeContextMenu()
-    }
-  }
-
-  const isContextTrigger = () => mergedProps.trigger === "context"
-
-  onMount(() => {
-    document.addEventListener("click", handleClickOutside)
-    if (isContextTrigger()) {
-      containerRef()?.addEventListener("contextmenu", openContextMenu)
-    } else {
-      containerRef()?.addEventListener("click", openContextMenu)
-    }
-  })
-
-  onCleanup(() => {
-    document.removeEventListener("click", handleClickOutside)
-    containerRef()?.removeEventListener("contextmenu", openContextMenu)
-    containerRef()?.removeEventListener("click", openContextMenu)
-  })
+const ContextMenuContent = <T extends ValidComponent = "div">(
+  props: PolymorphicProps<T, ContextMenuContentProps<T>>
+) => {
+  const [local, others] = splitProps(props as ContextMenuContentProps, [
+    "class"
+  ])
   return (
-    <div ref={setContainerRef}>
-      {props.children}
-      <Show when={containerRef() == ContextMenu?.openMenu()}>
-        <Portal mount={document.body}>
-          <div class="w-screen h-screen fixed top-0 left-0 backdrop-blur-[2px] z-80" />
-        </Portal>
-      </Show>
-      <Show when={containerRef() == ContextMenu?.openMenu()}>
-        <Portal mount={document.body}>
-          <div
-            ref={setMenuRef}
-            class="rounded-lg overflow-hidden bg-darkSlate-900 context-menu w-40"
-            style={{
-              position: "absolute",
-              top: y() + "px",
-              left: x() + "px",
-              "z-index": "1000000"
-            }}
-            onClick={closeContextMenu}
-          >
-            <For each={props.menuItems}>
-              {(item) => (
-                <div
-                  class={`flex items-center cursor-pointer w-full gap-1 px-3 h-8 ${
-                    !item.disabled ? "hover:bg-darkSlate-700" : ""
-                  } py-1`}
-                  classList={{
-                    "opacity-20": item.disabled === true,
-                    "hover:text-red-600 text-red-500":
-                      item.id === "delete" && !item.disabled,
-                    "hover:text-lightSlate-50 text-darkGray-50":
-                      !item.id && !item.disabled
-                  }}
-                  onClick={item.disabled === true ? undefined : item.action}
-                >
-                  <Show when={item.icon}>
-                    <div class={`${item.icon}`} />
-                  </Show>
-                  <span>{item.label}</span>
-                </div>
-              )}
-            </For>
-          </div>
-        </Portal>
-      </Show>
-    </div>
+    <ContextMenuPrimitive.Portal>
+      <ContextMenuPrimitive.Content
+        class={cn(
+          "z-50 min-w-40 max-w-[200px] origin-[var(--kb-menu-content-transform-origin)] overflow-visible rounded-md border border-solid border-darkSlate-600 bg-darkSlate-800 p-1 text-lightSlate-200 shadow-md data-[expanded]:animate-menuEnter animate-menuLeave outline-none",
+          local.class
+        )}
+        {...others}
+      />
+    </ContextMenuPrimitive.Portal>
   )
 }
 
-export { ContextMenu }
+type ContextMenuItemProps<T extends ValidComponent = "div"> =
+  ContextMenuPrimitive.ContextMenuItemProps<T> & {
+    class?: string | undefined
+  }
+
+const ContextMenuItem = <T extends ValidComponent = "div">(
+  props: PolymorphicProps<T, ContextMenuItemProps<T>>
+) => {
+  const [local, others] = splitProps(props as ContextMenuItemProps, ["class"])
+  return (
+    <ContextMenuPrimitive.Item
+      class={cn(
+        "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-darkSlate-700 focus:text-lightSlate-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        local.class
+      )}
+      {...others}
+    />
+  )
+}
+
+const ContextMenuShortcut: Component<ComponentProps<"span">> = (props) => {
+  const [local, others] = splitProps(props, ["class"])
+  return (
+    <span
+      class={cn("ml-auto text-xs tracking-widest opacity-60", local.class)}
+      {...others}
+    />
+  )
+}
+
+type ContextMenuSeparatorProps<T extends ValidComponent = "hr"> =
+  ContextMenuPrimitive.ContextMenuSeparatorProps<T> & {
+    class?: string | undefined
+  }
+
+const ContextMenuSeparator = <T extends ValidComponent = "hr">(
+  props: PolymorphicProps<T, ContextMenuSeparatorProps<T>>
+) => {
+  const [local, others] = splitProps(props as ContextMenuSeparatorProps, [
+    "class"
+  ])
+  return (
+    <ContextMenuPrimitive.Separator
+      class={cn("h-[1px] my-1 bg-darkSlate-600 border-none", local.class)}
+      {...others}
+    />
+  )
+}
+
+type ContextMenuSubTriggerProps<T extends ValidComponent = "div"> =
+  ContextMenuPrimitive.ContextMenuSubTriggerProps<T> & {
+    class?: string | undefined
+    children?: JSX.Element
+  }
+
+const ContextMenuSubTrigger = <T extends ValidComponent = "div">(
+  props: PolymorphicProps<T, ContextMenuSubTriggerProps<T>>
+) => {
+  const [local, others] = splitProps(props as ContextMenuSubTriggerProps, [
+    "class",
+    "children"
+  ])
+  return (
+    <ContextMenuPrimitive.SubTrigger
+      class={cn(
+        "flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-darkSlate-700 data-[state=open]:bg-darkSlate-700",
+        local.class
+      )}
+      {...others}
+    >
+      {local.children}
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        class="ml-auto size-4"
+      >
+        <path d="M9 6l6 6l-6 6" />
+      </svg>
+    </ContextMenuPrimitive.SubTrigger>
+  )
+}
+
+type ContextMenuSubContentProps<T extends ValidComponent = "div"> =
+  ContextMenuPrimitive.ContextMenuSubContentProps<T> & {
+    class?: string | undefined
+  }
+
+const ContextMenuSubContent = <T extends ValidComponent = "div">(
+  props: PolymorphicProps<T, ContextMenuSubContentProps<T>>
+) => {
+  const [local, others] = splitProps(props as ContextMenuSubContentProps, [
+    "class"
+  ])
+  return (
+    <ContextMenuPrimitive.SubContent
+      class={cn(
+        "z-80 min-w-40 origin-[var(--kb-menu-content-transform-origin)] overflow-hidden rounded-md border border-solid border-darkSlate-600 bg-darkSlate-800 p-1 text-lightSlate-200 shadow-md data-[expanded]:animate-menuEnter animate-menuLeave outline-none",
+        local.class
+      )}
+      {...others}
+    />
+  )
+}
+
+type ContextMenuCheckboxItemProps<T extends ValidComponent = "div"> =
+  ContextMenuPrimitive.ContextMenuCheckboxItemProps<T> & {
+    class?: string | undefined
+    children?: JSX.Element
+  }
+
+const ContextMenuCheckboxItem = <T extends ValidComponent = "div">(
+  props: PolymorphicProps<T, ContextMenuCheckboxItemProps<T>>
+) => {
+  const [local, others] = splitProps(props as ContextMenuCheckboxItemProps, [
+    "class",
+    "children"
+  ])
+  return (
+    <ContextMenuPrimitive.CheckboxItem
+      class={cn(
+        "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-darkSlate-700 focus:text-lightSlate-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        local.class
+      )}
+      {...others}
+    >
+      <span class="absolute left-2 flex size-3.5 items-center justify-center">
+        <ContextMenuPrimitive.ItemIndicator>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="size-4"
+          >
+            <path d="M5 12l5 5l10 -10" />
+          </svg>
+        </ContextMenuPrimitive.ItemIndicator>
+      </span>
+      {local.children}
+    </ContextMenuPrimitive.CheckboxItem>
+  )
+}
+
+type ContextMenuGroupLabelProps<T extends ValidComponent = "span"> =
+  ContextMenuPrimitive.ContextMenuGroupLabelProps<T> & {
+    class?: string | undefined
+  }
+
+const ContextMenuGroupLabel = <T extends ValidComponent = "span">(
+  props: PolymorphicProps<T, ContextMenuGroupLabelProps<T>>
+) => {
+  const [local, others] = splitProps(props as ContextMenuGroupLabelProps, [
+    "class"
+  ])
+  return (
+    <ContextMenuPrimitive.GroupLabel
+      class={cn(
+        "block w-full px-2 py-1.5 text-sm font-semibold text-lightSlate-400 truncate max-w-[calc(100%-1rem)]",
+        local.class
+      )}
+      {...others}
+    />
+  )
+}
+
+type ContextMenuRadioItemProps<T extends ValidComponent = "div"> =
+  ContextMenuPrimitive.ContextMenuRadioItemProps<T> & {
+    class?: string | undefined
+    children?: JSX.Element
+  }
+
+const ContextMenuRadioItem = <T extends ValidComponent = "div">(
+  props: PolymorphicProps<T, ContextMenuRadioItemProps<T>>
+) => {
+  const [local, others] = splitProps(props as ContextMenuRadioItemProps, [
+    "class",
+    "children"
+  ])
+  return (
+    <ContextMenuPrimitive.RadioItem
+      class={cn(
+        "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-darkSlate-700 focus:text-lightSlate-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        local.class
+      )}
+      {...others}
+    >
+      <span class="absolute left-2 flex size-3.5 items-center justify-center">
+        <ContextMenuPrimitive.ItemIndicator>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="size-2 fill-current"
+          >
+            <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+          </svg>
+        </ContextMenuPrimitive.ItemIndicator>
+      </span>
+      {local.children}
+    </ContextMenuPrimitive.RadioItem>
+  )
+}
+
+export {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuPortal,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuShortcut,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubTrigger,
+  ContextMenuSubContent,
+  ContextMenuCheckboxItem,
+  ContextMenuGroup,
+  ContextMenuGroupLabel,
+  ContextMenuRadioGroup,
+  ContextMenuRadioItem
+}

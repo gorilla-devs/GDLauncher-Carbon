@@ -167,9 +167,12 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                 |State(app): State<Arc<AppInner>>,
                  Query(query): Query<WaitForVerificationQuery>| async move {
                     app.account_manager()
-                        .wait_for_account_verification(query.uuid)
+                        .wait_for_account_verification(query.uuid.clone())
                         .await
                         .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
+
+                    app.invalidate(PEEK_GDL_ACCOUNT, Some(query.uuid.clone().into()));
+                    app.invalidate(GET_GDL_ACCOUNT, None);
 
                     Ok::<_, AxumError>("ok".to_string())
                 },

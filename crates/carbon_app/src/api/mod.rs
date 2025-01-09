@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::managers::{App, AppInner};
 use crate::{app_version, managers};
 use async_stream::stream;
@@ -9,6 +7,7 @@ use axum::response::IntoResponse;
 use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use std::sync::Arc;
 use tracing::{error, info};
 
 mod account;

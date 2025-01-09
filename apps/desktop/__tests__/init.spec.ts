@@ -92,8 +92,16 @@ test.describe("Init Tests", () => {
       env: { ...process.env } as any
     })
 
-    electronApp.process().on("message", (message) => {
-      console.log(message)
+    electronApp.on("console", (msg) => {
+      console.log(msg.text())
+    })
+
+    electronApp.process().stdout?.on("data", (data) => {
+      console.log(data.toString())
+    })
+
+    electronApp.process().stderr?.on("data", (data) => {
+      console.log(data.toString())
     })
 
     page = await electronApp.firstWindow()
@@ -122,6 +130,8 @@ test.describe("Init Tests", () => {
   })
 
   test.afterAll(async () => {
+    if (!electronApp) return
+
     await electronApp.close()
   })
 

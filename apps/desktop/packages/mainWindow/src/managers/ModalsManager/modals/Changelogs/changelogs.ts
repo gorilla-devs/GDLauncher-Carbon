@@ -14,7 +14,7 @@ const changelogs: Changelog = {
     {
       title: "GDL accounts are now live.",
       description:
-        "A GDL account is just an entry in our database that is linked to a Microsoft account ID (UUID). We use your token to authenticate you, your password is NEVER stored. Having a GDL account will give you access to somw new features."
+        "A GDL account is just an entry in our database that is linked to a Microsoft account ID (UUID). We use your token to authenticate you, your password is NEVER stored. Having a GDL account will give you access to some new features."
     },
     {
       title: "Redesigned the whole authentication flow.",
@@ -38,12 +38,17 @@ const changelogs: Changelog = {
         "The old one was more of a placeholder. This page is still under heavy development, but it's already a lot better than the old one."
     },
     {
-      title: "Library featured modpack can now be hidden",
-      description: "by clicking the eye icon in the top right corner."
+      title: "Library featured modpack can now be hidden.",
+      description: "By clicking the eye icon in the top right corner."
     },
     {
       title:
-        "Added confirmation dialog when trying to launch an instance with a expired or invalid account."
+        "Added confirmation dialog when trying to launch an instance with an expired or invalid account."
+    },
+    {
+      title: 'Added "Add new instance" context menu to instances page',
+      description:
+        "You can access it by right-clicking in any blank space in the instances page."
     }
   ],
   fixed: [
@@ -51,7 +56,7 @@ const changelogs: Changelog = {
       title:
         "Fixed instances crashing when having names with precomposed UNICODE characters.",
       description:
-        "You can now use any character in instance names, including japanese characters, emoji, and any other unicode characters."
+        "You can now use any character in instance names, including Japanese characters, emoji, and any other Unicode characters."
     },
     {
       title:
@@ -63,14 +68,19 @@ const changelogs: Changelog = {
     },
     {
       title:
-        "Fixed Minecraft 1.21.2+ not working with fabric and other modloaders"
+        "Fixed Minecraft 1.21.2+ not working with fabric and other modloaders."
     },
     {
-      title: "Fixed tabs always being flagged as selected by default"
+      title: "Fixed tabs always being flagged as selected by default."
     },
     {
       title:
-        "Fixed infinite calls sometimes being made to the API from the instance page resulting in errors"
+        "Fixed infinite calls sometimes being made to the API from the instance page resulting in errors."
+    },
+    {
+      title: "Fixed the modpack updater.",
+      description:
+        "While the overall logic should now be more stable, it is still being worked on and may still have some bugs."
     }
   ],
   improved: [
@@ -80,7 +90,7 @@ const changelogs: Changelog = {
     {
       title: "Updated dependencies & toolchain.",
       description:
-        "This basically means more stability and performance, as well as less bugs and security issues."
+        "This basically means more stability and performance, as well as fewer bugs and security issues."
     },
     {
       title: "Added a small transition when switching between pages."
@@ -90,16 +100,16 @@ const changelogs: Changelog = {
         "Internal technical change that should improve performance across pages in some cases."
     },
     {
-      title: "Added many micro-transitions",
-      description: "to various parts of the app, like the instances page."
+      title: "Added many micro-transitions (not transactions!).",
+      description: "To various parts of the app, like the instances page."
     },
     {
       title: "Redesigned news component.",
       description:
-        "It now takes up less space, and accomodates for a smaller featured tile. While it's static for now, we're working on a dynamic featured tile."
+        "It now takes up less space, and accommodates for a smaller featured tile. While it's static for now, we're working on a dynamic featured tile."
     },
     {
-      title: "Improved network download performance",
+      title: "Improved network download performance.",
       description:
         "We've made some changes to the way we download files, which should improve performance and, more importantly, make them more reliable."
     },
@@ -112,14 +122,18 @@ const changelogs: Changelog = {
       title: "Potato PC mode now also disables hardware acceleration."
     },
     {
-      title: "Fully reworked how consents are handled",
-      description: "resulting in a deeper compliance with GDPR and CCPA."
+      title: "Fully reworked how consents are handled.",
+      description: "Resulting in a deeper compliance with GDPR and CCPA."
     },
     {
-      title: "Updated terms of service and privacy statement"
+      title: "Updated terms of service and privacy statement."
     },
     {
-      title: "Added a parallax effect to the instance cover image"
+      title: "Added a parallax effect to the instance cover image."
+    },
+    {
+      title: "Reworked context menus and dropdown menus",
+      description: "now being more accessible and easier to use."
     }
   ]
 }

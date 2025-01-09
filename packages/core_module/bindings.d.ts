@@ -481,8 +481,6 @@ export type InstancesSortBy = "name" | "lastPlayed" | "lastUpdated" | "created" 
 
 export type ModrinthMod = { project_id: string; version_id: string }
 
-export type Set<T> = { Set: T }
-
 export type MRFESearchFacetAnd = MRFESearchFacetOr[]
 
 export type CFFEModStatus = "new" | "changesRequired" | "underSoftReview" | "approved" | "rejected" | "changesMade" | "inactive" | "abandoned" | "deleted" | "underReview"
@@ -496,6 +494,8 @@ export type ImportRequest = { index: number; name: string | null }
 export type CFFEModsParametersBody = { modIds: number[] }
 
 export type FEModdedManifest = { gameVersions: FEModdedManifestVersion[] }
+
+export type Set<T> = { Set: T }
 
 export type FEModFilesResponse = { data: CFFEFile[]; pagination: CFFEPagination | null }
 

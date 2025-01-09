@@ -8,7 +8,22 @@ import {
 import { For, Match, Show, Switch, createSignal, mergeProps } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
-import { ContextMenu, Popover, Spinner, Tooltip } from "@gd/ui"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuGroup,
+  ContextMenuGroupLabel,
+  ContextMenuItem,
+  ContextMenuPortal,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+  Popover,
+  Spinner,
+  Tooltip
+} from "@gd/ui"
 import DefaultImg from "/assets/images/default-instance-img.png"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useModal } from "@/managers/ModalsManager"
@@ -84,6 +99,10 @@ const Tile = (props: Props) => {
       folder: "Root"
     })
   }
+
+  const setFavoriteMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.setFavorite"]
+  }))
 
   const isLoading = () => props.isLoading
 
@@ -171,71 +190,6 @@ const Tile = (props: Props) => {
     }
   }
 
-  const menuItems = () => [
-    {
-      icon: props.isRunning ? "i-ri:stop-fill" : "i-ri:play-fill",
-      label: props.isRunning ? t("instance.stop") : t("instance.action_play"),
-      action: handlePlay,
-      disabled: isLoading() || isInQueue() || props.isDeleting
-    },
-    {
-      icon: "i-ri:pencil-fill",
-      label: t("instance.action_edit"),
-      action: handleEdit,
-      disabled: isLoading() || isInQueue() || props.isDeleting
-    },
-    {
-      icon: "i-ri:settings-3-fill",
-      label: t("instance.action_settings"),
-      action: handleSettings,
-      disabled: isLoading() || isInQueue() || props.isDeleting
-    },
-    ...(!props.isInvalid
-      ? [
-          {
-            icon: "i-ri:file-copy-fill",
-            label: t("instance.action_duplicate"),
-            action: handleDuplicate,
-            disabled: isLoading() || isInQueue() || props.isDeleting
-          }
-        ]
-      : []),
-    {
-      icon: "i-ri:folder-open-fill",
-      label: t("instance.action_open_folder"),
-      action: handleOpenFolder
-    },
-    {
-      icon: "i-mingcute:file-export-fill",
-      label: t("instance.export_instance"),
-      action: () => {
-        const instanceId = props.instance.id
-        setInstanceId(instanceId)
-        setPayload({
-          target: "Curseforge",
-          save_path: undefined,
-          self_contained_addons_bundling: false,
-          filter: { entries: {} },
-
-          instance_id: instanceId
-        })
-        setExportStep(0)
-        setCheckedFiles([])
-        modalsContext?.openModal({
-          name: "exportInstance"
-        })
-      },
-      disabled: isLoading() || isInQueue() || props.isDeleting
-    },
-    {
-      id: "delete",
-      icon: "i-ri:delete-bin-2-fill",
-      label: t("instance.action_delete"),
-      action: handleDelete,
-      disabled: isLoading() || isInQueue() || props.isDeleting
-    }
-  ]
-
   const getTranslationArgs = (translation: Translation) => {
     if ("args" in translation) {
       return translation.args
@@ -248,391 +202,544 @@ const Tile = (props: Props) => {
   return (
     <Switch>
       <Match when={mergedProps.variant === "default"}>
-        <ContextMenu menuItems={menuItems()}>
-          <Popover
-            content={() =>
-              props.failError ? (
-                <div class="p-4 border-solid border-white b-1">
-                  <div class="text-xl pb-4 w-full flex justify-between">
-                    <div>
-                      <Trans key="error" />
-                    </div>
-                    <div>
-                      <Tooltip
-                        content={
-                          copiedError() ? t("copied_to_clipboard") : t("Copy")
-                        }
-                      >
-                        <div
-                          class="w-6 h-6"
-                          classList={{
-                            "text-lightSlate-700 hover:text-lightSlate-100 duration-100 ease-in-out i-ri:file-copy-2-fill":
-                              !copiedError(),
-                            "text-green-400 i-ri:checkbox-circle-fill":
-                              copiedError()
-                          }}
-                          onClick={() => {
-                            navigator.clipboard.writeText(props.failError!)
-
-                            setCopiedError(true)
-
-                            setTimeout(() => {
-                              setCopiedError(false)
-                            }, 2000)
-                          }}
-                        />
-                      </Tooltip>
-                    </div>
-                  </div>
-                  <div>{props.failError}</div>
-                </div>
-              ) : undefined
-            }
-          >
-            <div
-              class="flex justify-center flex-col relative select-none group items-start duration-200 ease-in-out"
-              onClick={(e) => {
-                e.stopPropagation()
-                if (
-                  !isLoading() &&
-                  !isInQueue() &&
-                  !props.isInvalid &&
-                  !props.isDeleting
-                ) {
-                  props?.onClick?.(e)
-                }
-              }}
-            >
-              <div class="p-[2px] relative rounded-2xl overflow-hidden box-border">
+        <ContextMenu>
+          <ContextMenuContent>
+            <ContextMenuGroup>
+              <ContextMenuGroupLabel>
+                {props.instance.name}
+              </ContextMenuGroupLabel>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                class="border-brands-bisecthosting text-brands-bisecthosting flex items-center gap-2 border-2 border-solid"
+                onClick={() => {
+                  modalsContext?.openModal({
+                    name: "bisectHostingAffiliate"
+                  })
+                }}
+              >
+                <div class="h-4 w-4 i-simple-icons:bisecthosting" />
+                <Trans key="instance.action_create_server" />
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                class="flex items-center gap-2"
+                onClick={handlePlay}
+                disabled={isLoading() || isInQueue() || props.isDeleting}
+              >
                 <div
-                  class="absolute h-full w-full top-0 left-0 transition-[opacity,background] duration-300 ease-in-out"
+                  class={`h-4 w-4 ${
+                    props.isRunning ? "i-ri:stop-fill" : "i-ri:play-fill"
+                  }`}
+                />
+                {props.isRunning
+                  ? t("instance.stop")
+                  : t("instance.action_play")}
+              </ContextMenuItem>
+              <ContextMenuItem
+                class="flex items-center gap-2"
+                onClick={handleEdit}
+                disabled={isLoading() || isInQueue() || props.isDeleting}
+              >
+                <div class="i-ri:pencil-fill h-4 w-4" />
+                {t("instance.action_edit")}
+              </ContextMenuItem>
+              <ContextMenuItem
+                class="flex items-center gap-2"
+                onClick={handleSettings}
+                disabled={isLoading() || isInQueue() || props.isDeleting}
+              >
+                <div class="i-ri:settings-3-fill h-4 w-4" />
+                {t("instance.action_settings")}
+              </ContextMenuItem>
+              <ContextMenuItem
+                class="flex items-center gap-2"
+                closeOnSelect={false}
+                onClick={() => {
+                  setFavoriteMutation.mutate({
+                    instance: props.instance.id,
+                    favorite: !props.instance.favorite
+                  })
+                }}
+              >
+                <div
+                  class="h-4 w-4"
                   classList={{
-                    "opacity-0 bg-transparent":
-                      !isLoading() && !props.isRunning,
-                    "opacity-100": isLoading() || props.isRunning,
-                    "bg-green-400": props.isRunning,
-                    "instance-tile-spinning": isLoading()
+                    "i-ri:star-fill": props.instance.favorite,
+                    "i-ri:star-line": !props.instance.favorite
                   }}
                 />
-                <div
-                  class="relative rounded-2xl overflow-hidden "
+                {props.instance.favorite
+                  ? t("instance.remove_favorite")
+                  : t("instance.add_favorite")}
+              </ContextMenuItem>
+              <ContextMenuItem
+                class="flex items-center gap-2"
+                onClick={() => {
+                  const instanceId = props.instance.id
+                  setInstanceId(instanceId)
+                  setPayload({
+                    target: "Curseforge",
+                    save_path: undefined,
+                    self_contained_addons_bundling: false,
+                    filter: { entries: {} },
+                    instance_id: instanceId
+                  })
+                  setExportStep(0)
+                  setCheckedFiles([])
+                  modalsContext?.openModal({
+                    name: "exportInstance"
+                  })
+                }}
+                disabled={isLoading() || isInQueue() || props.isDeleting}
+              >
+                <div class="i-ri:export-fill h-4 w-4" />
+                {t("instance.export_instance")}
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+              <ContextMenuSub>
+                <ContextMenuSubTrigger>
+                  {t("instance.more_options")}
+                </ContextMenuSubTrigger>
+                <ContextMenuPortal>
+                  <ContextMenuSubContent>
+                    <ContextMenuItem
+                      class="flex items-center gap-2"
+                      onClick={handleOpenFolder}
+                    >
+                      <div class="i-ri:folder-open-fill h-4 w-4" />
+                      {t("instance.action_open_folder")}
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      class="flex items-center gap-2"
+                      onClick={() => {
+                        navigate(`/library/${props.instance.id}/logs`)
+                      }}
+                    >
+                      <div class="i-ri:file-list-fill h-4 w-4" />
+                      {t("instance.view_logs")}
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      class="flex items-center gap-2"
+                      onClick={() => {
+                        navigate(`/library/${props.instance.id}/mods`)
+                      }}
+                    >
+                      <div class="i-ri:list-check h-4 w-4" />
+                      {t("instance.view_mods")}
+                    </ContextMenuItem>
+                    {!props.isInvalid && (
+                      <ContextMenuItem
+                        class="flex items-center gap-2"
+                        onClick={handleDuplicate}
+                        disabled={
+                          isLoading() || isInQueue() || props.isDeleting
+                        }
+                      >
+                        <div class="i-ri:file-copy-fill h-4 w-4" />
+                        {t("instance.action_duplicate")}
+                      </ContextMenuItem>
+                    )}
+                  </ContextMenuSubContent>
+                </ContextMenuPortal>
+              </ContextMenuSub>
+              <ContextMenuSeparator />
+              <ContextMenuItem
+                class="flex items-center gap-2"
+                onClick={handleDelete}
+                disabled={isLoading() || isInQueue() || props.isDeleting}
+              >
+                <div class="i-ri:delete-bin-2-fill h-4 w-4" />
+                {t("instance.action_delete")}
+              </ContextMenuItem>
+            </ContextMenuGroup>
+          </ContextMenuContent>
+          <ContextMenuTrigger>
+            <Popover
+              content={() =>
+                props.failError ? (
+                  <div class="b-1 border-solid border-white p-4">
+                    <div class="flex w-full justify-between pb-4 text-xl">
+                      <div>
+                        <Trans key="error" />
+                      </div>
+                      <div>
+                        <Tooltip
+                          content={
+                            copiedError() ? t("copied_to_clipboard") : t("Copy")
+                          }
+                        >
+                          <div
+                            class="h-6 w-6"
+                            classList={{
+                              "text-lightSlate-700 hover:text-lightSlate-100 duration-100 ease-in-out i-ri:file-copy-2-fill":
+                                !copiedError(),
+                              "text-green-400 i-ri:checkbox-circle-fill":
+                                copiedError()
+                            }}
+                            onClick={() => {
+                              navigator.clipboard.writeText(props.failError!)
+
+                              setCopiedError(true)
+
+                              setTimeout(() => {
+                                setCopiedError(false)
+                              }, 2000)
+                            }}
+                          />
+                        </Tooltip>
+                      </div>
+                    </div>
+                    <div>{props.failError}</div>
+                  </div>
+                ) : undefined
+              }
+            >
+              <div
+                class="group relative flex select-none flex-col items-start justify-center duration-200 ease-in-out"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (
+                    !isLoading() &&
+                    !isInQueue() &&
+                    !props.isInvalid &&
+                    !props.isDeleting
+                  ) {
+                    props?.onClick?.(e)
+                  }
+                }}
+              >
+                <div class="relative box-border overflow-hidden rounded-2xl p-[2px]">
+                  <div
+                    class="absolute left-0 top-0 h-full w-full transition-[opacity,background] duration-300 ease-in-out"
+                    classList={{
+                      "opacity-0 bg-transparent":
+                        !isLoading() && !props.isRunning,
+                      "opacity-100": isLoading() || props.isRunning,
+                      "bg-green-400": props.isRunning,
+                      "instance-tile-spinning": isLoading()
+                    }}
+                  />
+                  <div
+                    class="relative overflow-hidden rounded-2xl "
+                    classList={{
+                      "h-100 w-100": props.size === 5,
+                      "h-70 w-70": props.size === 4,
+                      "h-50 w-50": props.size === 3,
+                      "h-38 w-38": props.size === 2,
+                      "h-20 w-20": props.size === 1
+                    }}
+                    style={
+                      props.shouldSetViewTransition
+                        ? {
+                            "view-transition-name": `instance-tile-image-container`,
+                            contain: "layout"
+                          }
+                        : {}
+                    }
+                  >
+                    <div
+                      class="bg-darkSlate-800 relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-cover bg-center transition-all duration-300 ease-in-out"
+                      classList={{
+                        grayscale: isLoading() || isInQueue(),
+                        "group-hover:blur-[2px] group-hover:scale-120":
+                          !isLoading() && !isInQueue()
+                      }}
+                      style={{
+                        "background-image": props.img
+                          ? `url("${props.img}")`
+                          : `url("${DefaultImg}")`,
+                        ...(props.shouldSetViewTransition
+                          ? {
+                              "view-transition-name": `instance-tile-image`,
+                              contain: "layout"
+                            }
+                          : {})
+                      }}
+                    />
+                    <Show when={props.isInvalid}>
+                      <h2 class="z-70 absolute left-0 top-0 text-center text-sm">
+                        <Trans key="instance.error_invalid" />
+                      </h2>
+                      <div class="absolute bottom-0 left-0 right-0 top-0 z-10 h-full w-full rounded-2xl bg-gradient-to-l from-black from-30% opacity-50" />
+                      <div class="absolute bottom-0 left-0 right-0 top-0 z-10 h-full w-full rounded-2xl bg-gradient-to-t from-black opacity-50" />
+                      <div class="i-ri:alert-fill absolute right-1 top-1 z-10 text-2xl text-yellow-500" />
+                    </Show>
+                    <Show when={props.failError}>
+                      <div
+                        class="absolute bottom-0 left-0 right-0 top-0 z-10 h-full w-full rounded-2xl bg-gradient-to-l from-black from-30% opacity-60"
+                        style={
+                          props.shouldSetViewTransition
+                            ? {
+                                "view-transition-name": `instance-tile-1-error`
+                              }
+                            : {}
+                        }
+                      />
+                      <div
+                        class="absolute bottom-0 left-0 right-0 top-0 z-10 h-full w-full rounded-2xl bg-gradient-to-t from-black opacity-60"
+                        style={
+                          props.shouldSetViewTransition
+                            ? {
+                                "view-transition-name": `instance-tile-2-error`
+                              }
+                            : {}
+                        }
+                      />
+                      <div
+                        class="i-ri:alert-fill absolute bottom-20 left-0 right-0 top-0 z-10 m-auto text-4xl text-red-500"
+                        style={
+                          props.shouldSetViewTransition
+                            ? {
+                                "view-transition-name": `instance-tile-3-error`
+                              }
+                            : {}
+                        }
+                      />
+                      <div
+                        class="z-70 absolute left-1/2 top-1/2 mt-5 w-full -translate-x-1/2 -translate-y-1/2 text-center"
+                        style={
+                          props.shouldSetViewTransition
+                            ? {
+                                "view-transition-name": `instance-tile-4-error`
+                              }
+                            : {}
+                        }
+                      >
+                        <div class="text-3xl font-bold">
+                          <Trans key="error" />
+                        </div>
+                        <div class="text-sm">
+                          (<Trans key="hover_for_details" />)
+                        </div>
+                      </div>
+                    </Show>
+
+                    <Show
+                      when={
+                        isLoading() &&
+                        props.percentage !== undefined &&
+                        props.percentage !== null
+                      }
+                    >
+                      <div
+                        class="z-70 animate-enterWithOpacityChange absolute left-0 top-0 box-border flex h-full w-full flex-col items-center justify-center gap-2 p-2 opacity-0"
+                        style={
+                          props.shouldSetViewTransition
+                            ? {
+                                "view-transition-name": `instance-tile-progress-text`
+                              }
+                            : {}
+                        }
+                      >
+                        <h3 class="m-0 text-center text-3xl">
+                          {Math.round(props.percentage!)}%
+                        </h3>
+                        <div class="text-lightSlate-300 h-10">
+                          <For each={props.subTasks}>
+                            {(subTask) => (
+                              <div
+                                class="text-center"
+                                classList={{
+                                  "text-xs":
+                                    props.subTasks &&
+                                    props.subTasks?.length > 1,
+                                  "text-md": props.subTasks?.length === 1
+                                }}
+                              >
+                                <Trans
+                                  key={subTask.name.translation}
+                                  options={getTranslationArgs(subTask.name)}
+                                />
+                              </div>
+                            )}
+                          </For>
+                        </div>
+                      </div>
+                    </Show>
+                    <Show when={isInQueue() || props.isDeleting}>
+                      <div class="z-70 absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-2">
+                        <Spinner />
+                        <span class="font-bold">
+                          <Show when={props.isDeleting}>
+                            <Trans key="instance.isDeleting" />
+                          </Show>
+                          <Show when={isInQueue()}>
+                            <Trans key="instance.isInQueue" />
+                          </Show>
+                        </span>
+                      </div>
+                    </Show>
+                    <Show when={validInstance()?.modpack}>
+                      <div
+                        class="border-1 border-darkSlate-600 bg-darkSlate-900 absolute right-2 top-2 z-20 flex items-center justify-center rounded-lg border-solid p-2"
+                        style={
+                          props.shouldSetViewTransition
+                            ? {
+                                "view-transition-name": `instance-tile-modplatform`
+                              }
+                            : {}
+                        }
+                      >
+                        <img
+                          class="h-4 w-4"
+                          src={getModpackPlatformIcon(
+                            validInstance()?.modpack?.type
+                          )}
+                        />
+                      </div>
+                    </Show>
+                    <Show when={isLoading() || isInQueue() || props.isDeleting}>
+                      <div
+                        class="z-11 absolute bottom-0 left-0 right-0 top-0 rounded-2xl backdrop-blur-sm"
+                        style={
+                          props.shouldSetViewTransition
+                            ? {
+                                "view-transition-name": `instance-tile-loading-1`,
+                                contain: "layout"
+                              }
+                            : {}
+                        }
+                      />
+                      <div
+                        class="from-darkSlate-900 absolute bottom-0 left-0 right-0 top-0 z-10 h-full w-full rounded-2xl bg-gradient-to-l from-30% opacity-50"
+                        style={
+                          props.shouldSetViewTransition
+                            ? {
+                                "view-transition-name": `instance-tile-loading-2`,
+                                contain: "layout"
+                              }
+                            : {}
+                        }
+                      />
+                      <div
+                        class="from-darkSlate-900 absolute bottom-0 left-0 right-0 top-0 z-10 h-full w-full rounded-2xl bg-gradient-to-t opacity-50"
+                        style={
+                          props.shouldSetViewTransition
+                            ? {
+                                "view-transition-name": `instance-tile-loading-3`,
+                                contain: "layout"
+                              }
+                            : {}
+                        }
+                      />
+                    </Show>
+                    <div
+                      class="absolute left-1/2 top-1/2 z-50 hidden h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl transition-all duration-200 ease-in-out"
+                      classList={{
+                        "scale-100 bg-red-500": isLoading(),
+                        "flex bg-primary-500 hover:bg-primary-400 text-2xl":
+                          !props.isRunning &&
+                          !isLoading() &&
+                          !isInQueue() &&
+                          !props.isDeleting,
+                        "scale-0": !props.isRunning,
+                        "flex bg-red-500 scale-100 opacity-0 animate-enterWithOpacityChange":
+                          props.isRunning,
+
+                        "group-hover:scale-100":
+                          !isLoading() &&
+                          !isInQueue() &&
+                          !props.isInvalid &&
+                          !props.failError &&
+                          !props.isRunning &&
+                          !props.isDeleting
+                      }}
+                      style={
+                        props.shouldSetViewTransition
+                          ? {
+                              "view-transition-name": `instance-tile-play-button`,
+                              contain: "layout"
+                            }
+                          : {}
+                      }
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handlePlay()
+                      }}
+                    >
+                      <div
+                        class="text-lightSlate-50"
+                        classList={{
+                          "i-ri:play-fill": !props.isRunning,
+                          "i-ri:stop-fill text-xl": props.isRunning
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <h4
+                  class="mb-1 mt-2 text-ellipsis whitespace-nowrap"
                   classList={{
-                    "h-100 w-100": props.size === 5,
-                    "h-70 w-70": props.size === 4,
-                    "h-50 w-50": props.size === 3,
-                    "h-38 w-38": props.size === 2,
-                    "h-20 w-20": props.size === 1
+                    "text-lightSlate-50":
+                      !isLoading() && !isInQueue() && !props.isDeleting,
+                    "text-lightGray-900":
+                      isLoading() || isInQueue() || props.isDeleting,
+                    "max-w-100": props.size === 5,
+                    "max-w-70": props.size === 4,
+                    "max-w-50": props.size === 3,
+                    "max-w-38": props.size === 2,
+                    "max-w-20": props.size === 1
                   }}
                   style={
                     props.shouldSetViewTransition
                       ? {
-                          "view-transition-name": `instance-tile-image-container`,
+                          "view-transition-name": `instance-tile-title`,
                           contain: "layout"
                         }
                       : {}
                   }
                 >
-                  <div
-                    class="flex justify-center relative items-center rounded-2xl bg-darkSlate-800 overflow-hidden h-full w-full bg-cover bg-center transition-all duration-300 ease-in-out"
-                    classList={{
-                      grayscale: isLoading() || isInQueue(),
-                      "group-hover:blur-[2px] group-hover:scale-120":
-                        !isLoading() && !isInQueue()
-                    }}
-                    style={{
-                      "background-image": props.img
-                        ? `url("${props.img}")`
-                        : `url("${DefaultImg}")`,
-                      ...(props.shouldSetViewTransition
-                        ? {
-                            "view-transition-name": `instance-tile-image`,
-                            contain: "layout"
-                          }
-                        : {})
-                    }}
-                  />
-                  <Show when={props.isInvalid}>
-                    <h2 class="text-sm text-center absolute top-0 left-0 z-70">
-                      <Trans key="instance.error_invalid" />
-                    </h2>
-                    <div class="w-full rounded-2xl z-10 absolute right-0 h-full top-0 bottom-0 left-0 bg-gradient-to-l from-black opacity-50 from-30%" />
-                    <div class="z-10 absolute top-0 bottom-0 left-0 right-0 from-black opacity-50 w-full h-full rounded-2xl bg-gradient-to-t" />
-                    <div class="absolute z-10 text-2xl i-ri:alert-fill text-yellow-500 top-1 right-1" />
-                  </Show>
-                  <Show when={props.failError}>
-                    <div
-                      class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-black opacity-60 from-30% w-full h-full rounded-2xl"
-                      style={
-                        props.shouldSetViewTransition
-                          ? {
-                              "view-transition-name": `instance-tile-1-error`
-                            }
-                          : {}
-                      }
-                    />
-                    <div
-                      class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-black opacity-60 w-full h-full rounded-2xl"
-                      style={
-                        props.shouldSetViewTransition
-                          ? {
-                              "view-transition-name": `instance-tile-2-error`
-                            }
-                          : {}
-                      }
-                    />
-                    <div
-                      class="i-ri:alert-fill absolute left-0 right-0 top-0 m-auto z-10 text-4xl text-red-500 bottom-20"
-                      style={
-                        props.shouldSetViewTransition
-                          ? {
-                              "view-transition-name": `instance-tile-3-error`
-                            }
-                          : {}
-                      }
-                    />
-                    <div
-                      class="w-full absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-70 text-center mt-5"
-                      style={
-                        props.shouldSetViewTransition
-                          ? {
-                              "view-transition-name": `instance-tile-4-error`
-                            }
-                          : {}
-                      }
-                    >
-                      <div class="text-3xl font-bold">
-                        <Trans key="error" />
-                      </div>
-                      <div class="text-sm">
-                        (<Trans key="hover_for_details" />)
-                      </div>
-                    </div>
-                  </Show>
-
-                  <Show
-                    when={
-                      isLoading() &&
-                      props.percentage !== undefined &&
-                      props.percentage !== null
+                  <Tooltip
+                    content={
+                      props.instance.name.length > 20 ? props.instance.name : ""
                     }
+                    placement="top"
+                    class="w-full overflow-hidden text-ellipsis"
                   >
-                    <div
-                      class="absolute top-0 left-0 flex flex-col justify-center items-center z-70 w-full h-full gap-2 p-2 box-border opacity-0 animate-enterWithOpacityChange"
-                      style={
-                        props.shouldSetViewTransition
-                          ? {
-                              "view-transition-name": `instance-tile-progress-text`
-                            }
-                          : {}
-                      }
-                    >
-                      <h3 class="text-center m-0 text-3xl">
-                        {Math.round(props.percentage!)}%
-                      </h3>
-                      <div class="h-10 text-lightSlate-300">
-                        <For each={props.subTasks}>
-                          {(subTask) => (
-                            <div
-                              class="text-center"
-                              classList={{
-                                "text-xs":
-                                  props.subTasks && props.subTasks?.length > 1,
-                                "text-md": props.subTasks?.length === 1
-                              }}
-                            >
-                              <Trans
-                                key={subTask.name.translation}
-                                options={getTranslationArgs(subTask.name)}
-                              />
-                            </div>
-                          )}
-                        </For>
-                      </div>
-                    </div>
-                  </Show>
-                  <Show when={isInQueue() || props.isDeleting}>
-                    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-70 flex flex-col gap-2 items-center justify-center z-70">
-                      <Spinner />
-                      <span class="font-bold">
-                        <Show when={props.isDeleting}>
-                          <Trans key="instance.isDeleting" />
-                        </Show>
-                        <Show when={isInQueue()}>
-                          <Trans key="instance.isInQueue" />
+                    {props.instance.name}
+                  </Tooltip>
+                </h4>
+                <Switch>
+                  <Match when={!isLoading() && !props.isPreparing}>
+                    <div class="text-lightGray-900 flex justify-between gap-2">
+                      <span
+                        class="flex gap-1"
+                        style={
+                          props.shouldSetViewTransition
+                            ? {
+                                "view-transition-name": `instance-tile-modloader`,
+                                contain: "layout"
+                              }
+                            : {}
+                        }
+                      >
+                        <Show when={props.modloader}>
+                          <img
+                            class="h-4 w-4"
+                            src={getCFModloaderIcon(props.modloader!)}
+                          />
                         </Show>
                       </span>
+                      <p class="m-0">{props.version}</p>
                     </div>
-                  </Show>
-                  <Show when={validInstance()?.modpack}>
-                    <div
-                      class="z-20 absolute flex justify-center items-center border-1 border-solid border-darkSlate-600 bg-darkSlate-900 rounded-lg p-2 top-2 right-2"
-                      style={
-                        props.shouldSetViewTransition
-                          ? {
-                              "view-transition-name": `instance-tile-modplatform`
-                            }
-                          : {}
-                      }
-                    >
-                      <img
-                        class="w-4 h-4"
-                        src={getModpackPlatformIcon(
-                          validInstance()?.modpack?.type
-                        )}
-                      />
-                    </div>
-                  </Show>
-                  <Show when={isLoading() || isInQueue() || props.isDeleting}>
-                    <div
-                      class="absolute top-0 bottom-0 left-0 right-0 backdrop-blur-sm z-11"
-                      style={
-                        props.shouldSetViewTransition
-                          ? {
-                              "view-transition-name": `instance-tile-loading-1`,
-                              contain: "layout"
-                            }
-                          : {}
-                      }
-                    />
-                    <div
-                      class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-l from-darkSlate-900 opacity-50 from-30% w-full h-full rounded-2xl"
-                      style={
-                        props.shouldSetViewTransition
-                          ? {
-                              "view-transition-name": `instance-tile-loading-2`,
-                              contain: "layout"
-                            }
-                          : {}
-                      }
-                    />
-                    <div
-                      class="z-10 absolute top-0 bottom-0 left-0 right-0 bg-gradient-to-t from-darkSlate-900 opacity-50 w-full h-full rounded-2xl"
-                      style={
-                        props.shouldSetViewTransition
-                          ? {
-                              "view-transition-name": `instance-tile-loading-3`,
-                              contain: "layout"
-                            }
-                          : {}
-                      }
-                    />
-                  </Show>
-                  <div
-                    class="z-50 hidden justify-center items-center absolute rounded-2xl ease-in-out duration-200 h-12 w-12 transition-all top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-                    classList={{
-                      "scale-100 bg-red-500": isLoading(),
-                      "flex bg-primary-500 hover:bg-primary-400 text-2xl":
-                        !props.isRunning &&
-                        !isLoading() &&
-                        !isInQueue() &&
-                        !props.isDeleting,
-                      "scale-0": !props.isRunning,
-                      "flex bg-red-500 scale-100 opacity-0 animate-enterWithOpacityChange":
-                        props.isRunning,
-
-                      "group-hover:scale-100":
-                        !isLoading() &&
-                        !isInQueue() &&
-                        !props.isInvalid &&
-                        !props.failError &&
-                        !props.isRunning &&
-                        !props.isDeleting
-                    }}
-                    style={
-                      props.shouldSetViewTransition
-                        ? {
-                            "view-transition-name": `instance-tile-play-button`,
-                            contain: "layout"
-                          }
-                        : {}
+                  </Match>
+                  <Match
+                    when={
+                      isLoading() &&
+                      props.downloaded !== 0 &&
+                      props.totalDownload !== 0
                     }
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handlePlay()
-                    }}
                   >
-                    <div
-                      class="text-lightSlate-50"
-                      classList={{
-                        "i-ri:play-fill": !props.isRunning,
-                        "i-ri:stop-fill text-xl": props.isRunning
-                      }}
-                    />
-                  </div>
-                </div>
+                    <p class="text-lightSlate-50 m-0 text-center text-sm">
+                      {Math.round(props.downloaded || 0)}MB/
+                      {Math.round(props.totalDownload || 0)}MB
+                    </p>
+                  </Match>
+                </Switch>
               </div>
-
-              <h4
-                class="text-ellipsis whitespace-nowrap mt-2 mb-1"
-                classList={{
-                  "text-lightSlate-50":
-                    !isLoading() && !isInQueue() && !props.isDeleting,
-                  "text-lightGray-900":
-                    isLoading() || isInQueue() || props.isDeleting,
-                  "max-w-100": props.size === 5,
-                  "max-w-70": props.size === 4,
-                  "max-w-50": props.size === 3,
-                  "max-w-38": props.size === 2,
-                  "max-w-20": props.size === 1
-                }}
-                style={
-                  props.shouldSetViewTransition
-                    ? {
-                        "view-transition-name": `instance-tile-title`,
-                        contain: "layout"
-                      }
-                    : {}
-                }
-              >
-                <Tooltip
-                  content={
-                    props.instance.name.length > 20 ? props.instance.name : ""
-                  }
-                  placement="top"
-                  class="w-full text-ellipsis overflow-hidden"
-                >
-                  {props.instance.name}
-                </Tooltip>
-              </h4>
-              <Switch>
-                <Match when={!isLoading() && !props.isPreparing}>
-                  <div class="flex gap-2 justify-between text-lightGray-900">
-                    <span
-                      class="flex gap-1"
-                      style={
-                        props.shouldSetViewTransition
-                          ? {
-                              "view-transition-name": `instance-tile-modloader`,
-                              contain: "layout"
-                            }
-                          : {}
-                      }
-                    >
-                      <Show when={props.modloader}>
-                        <img
-                          class="w-4 h-4"
-                          src={getCFModloaderIcon(props.modloader!)}
-                        />
-                      </Show>
-                    </span>
-                    <p class="m-0">{props.version}</p>
-                  </div>
-                </Match>
-                <Match
-                  when={
-                    isLoading() &&
-                    props.downloaded !== 0 &&
-                    props.totalDownload !== 0
-                  }
-                >
-                  <p class="m-0 text-center text-lightSlate-50 text-sm">
-                    {Math.round(props.downloaded || 0)}MB/
-                    {Math.round(props.totalDownload || 0)}MB
-                  </p>
-                </Match>
-              </Switch>
-            </div>
-          </Popover>
+            </Popover>
+          </ContextMenuTrigger>
         </ContextMenu>
       </Match>
     </Switch>

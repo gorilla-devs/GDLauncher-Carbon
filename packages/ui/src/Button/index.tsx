@@ -8,6 +8,7 @@ import {
   Match
 } from "solid-js"
 import { Spinner } from "../Spinner"
+import { Dynamic } from "solid-js/web"
 
 type Size = "small" | "medium" | "large"
 type Type =
@@ -20,6 +21,7 @@ type Type =
 
 interface Props
   extends Omit<JSX.ButtonHTMLAttributes<HTMLButtonElement>, "type"> {
+  as?: "button" | "a" | "span" | "div"
   children: HTMLElement | string | JSX.Element
   style?: JSX.CSSProperties
   textColor?: string
@@ -191,6 +193,7 @@ function Button(props: Props) {
   const c = children(() => props.children)
 
   const [_, others] = splitProps(props, [
+    "as",
     "icon",
     "iconRight",
     "uppercase",
@@ -210,8 +213,11 @@ function Button(props: Props) {
     props
   )
 
+  const component = props.as || "button"
+
   return (
-    <button
+    <Dynamic
+      component={component}
       {...(others as JSX.ButtonHTMLAttributes<HTMLButtonElement>)}
       classList={{
         ...getVariant(
@@ -244,7 +250,7 @@ function Button(props: Props) {
       >
         {c()}
       </Show>
-    </button>
+    </Dynamic>
   )
 }
 

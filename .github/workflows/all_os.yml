@@ -63,13 +63,23 @@ jobs:
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           CURSEFORGE_API_KEY: "${{ vars.CURSEFORGE_API_KEY }}"
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
-        run: pnpm test
+        run: |
+          pnpm test
+          cargo test
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: playwright-report-linux
+          name: playwright-report-macos
           path: ./GDLauncher/apps/desktop/playwright-report/
+      - name: Upload main.log for debugging
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs-macos
+          path: |
+            ./GDLauncher/apps/desktop/release/mac-universal/gdl_data/main.log
+            ./GDLauncher/apps/desktop/release/mac-universal/gdl_data/data/__gdl_logs__/*.log
   ubuntu_x64:
     defaults:
       run:
@@ -128,7 +138,15 @@ jobs:
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           CURSEFORGE_API_KEY: "${{ vars.CURSEFORGE_API_KEY }}"
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
-        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" -- pnpm test
+        run: |
+          sudo apt-get install -y xvfb
+          /usr/bin/Xvfb :1 -screen 0 1280x960x24 &
+          export DISPLAY=:1
+          sleep 2
+          ps aux | grep Xvfb
+          ls -l /tmp/.X11-unix/
+          pnpm test
+          cargo test
       - name: Upload Playwright report
         if: always()
         uses: actions/upload-artifact@v4
@@ -139,8 +157,16 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-mac
+          name: playwright-report-linux
           path: ./GDLauncher/apps/desktop/playwright-report/
+      - name: Upload main.log for debugging
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs-linux
+          path: |
+            ./GDLauncher/apps/desktop/release/linux-unpacked/gdl_data/main.log
+            ./GDLauncher/apps/desktop/release/linux-unpacked/gdl_data/data/__gdl_logs__/*.log
   windows_x64:
     defaults:
       run:
@@ -208,10 +234,20 @@ jobs:
           CURSEFORGE_API_KEY: "${{ vars.CURSEFORGE_API_KEY }}"
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
           CARGO_NET_GIT_FETCH_WITH_CLI: true
-        run: pnpm test
+        run: |
+          pnpm test
+          cargo test
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: playwright-report-win
           path: ./GDLauncher/apps/desktop/playwright-report/
+      - name: Upload main.log for debugging
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: logs-windows
+          path: |
+            ./GDLauncher/apps/desktop/release/win-unpacked/gdl_data/main.log
+            ./GDLauncher/apps/desktop/release/win-unpacked/gdl_data/data/__gdl_logs__/*.log

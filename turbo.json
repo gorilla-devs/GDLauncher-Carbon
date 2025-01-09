@@ -31,6 +31,10 @@
       "dependsOn": ["^test"],
       "cache": false
     },
+    "test-prod": {
+      "dependsOn": ["^test-prod"],
+      "cache": false
+    },
     "lint": {
       "cache": false
     },

@@ -184,7 +184,19 @@
       }
       // TODO: handle sourcemaps decoding + sentry
       if (!import.meta.env.DEV) {
+        // These errors can be safely ignored.
+        // https://github.com/w3c/csswg-drafts/issues/5488
+        // https://github.com/DevExpress/testcafe/issues/4857#issuecomment-598775956
+        const resizeObserverErrors = [
+          /ResizeObserver loop limit exceeded/,
+          /ResizeObserver loop completed with undelivered notifications\./
+        ]
+
         window.onerror = (msg, url, line, col, error) => {
+          if (resizeObserverErrors.some((re) => re.test(msg))) {
+            return
+          }
+
           console.log(
             "Handling global uncaught error",
             msg,

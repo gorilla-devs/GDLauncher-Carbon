@@ -1,16 +1,18 @@
 import { LogEntry } from "@/utils/logs"
-import { port, rspc } from "@/utils/rspcClient"
+import { port, rspc } from "@/utils/rspcClient.js"
 import { useParams } from "@solidjs/router"
-import { createEffect, createSignal, onCleanup, onMount } from "solid-js"
+import { createEffect, createSignal, onCleanup } from "solid-js"
 import LogsSidebar from "./LogsSidebar"
 import LogsContent from "./LogsContent"
 import { createStore } from "solid-js/store"
+import { VirtualizerHandle } from "virtua/lib/solid"
 
 export const [isFullScreen, setIsFullScreen] = createSignal(false)
 
 const Logs = () => {
   let logsContentRef: HTMLDivElement | undefined
   let scrollBottomRef: HTMLDivElement | undefined
+  let virtualizerRef: VirtualizerHandle | undefined
   const [logs, setLogs] = createStore<LogEntry[]>([])
   const [isLoading, setIsLoading] = createSignal(false)
   const [selectedLog, setSelectedLog] = createSignal<number | undefined>(
@@ -45,13 +47,12 @@ const Logs = () => {
     wsConnection.onmessage = (event) => {
       setIsLoading(false)
       const newLogs = JSON.parse(event.data) as LogEntry[]
-
       setLogs((prev) => [...prev, ...newLogs])
 
-      if (!logsContentRef || !autoFollowPreference()) return
+      if (!autoFollowPreference() || !virtualizerRef) return
 
       if (autoFollow()) {
-        logsContentRef.scrollTop = logsContentRef.scrollHeight
+        virtualizerRef.scrollToIndex(logs.length - 1)
         setNewLogsCount(0)
       } else {
         setNewLogsCount((prev) => prev + 1)
@@ -83,11 +84,15 @@ const Logs = () => {
   })
 
   const handleScroll = () => {
-    if (!logsContentRef) return
+    if (!logsContentRef || !virtualizerRef) return
 
+    // This also accounts for sub-pixel rounding errors
     const isAtBottom =
-      logsContentRef.scrollHeight - logsContentRef.scrollTop ===
-      logsContentRef.clientHeight
+      Math.abs(
+        virtualizerRef.viewportSize +
+          virtualizerRef.scrollOffset -
+          virtualizerRef.scrollSize
+      ) < 1
 
     if (scrollBottomRef && (!autoFollowPreference() || !isActive())) {
       scrollBottomRef.style.display = "none"
@@ -107,18 +112,6 @@ const Logs = () => {
     }
   }
 
-  onMount(() => {
-    if (logsContentRef) {
-      logsContentRef.addEventListener("scroll", handleScroll)
-    }
-  })
-
-  onCleanup(() => {
-    if (logsContentRef) {
-      logsContentRef.removeEventListener("scroll", handleScroll)
-    }
-  })
-
   createEffect(() => {
     if (isFullScreen() && logsContentRef) {
       logsContentRef.scrollIntoView({
@@ -133,8 +126,8 @@ const Logs = () => {
   })
 
   const scrollToBottom = () => {
-    if (logsContentRef) {
-      logsContentRef.scrollTop = logsContentRef.scrollHeight
+    if (logsContentRef && virtualizerRef) {
+      virtualizerRef.scrollToIndex(logs.length - 1)
       setAutoFollow(true)
       setNewLogsCount(0)
       if (scrollBottomRef) {
@@ -151,8 +144,12 @@ const Logs = () => {
     logsContentRef = ref
   }
 
+  function assignVirtualizerRef(ref: VirtualizerHandle) {
+    virtualizerRef = ref
+  }
+
   return (
-    <div class="h-full w-full flex overflow-hidden border border-darkSlate-600 border-t-solid">
+    <div class="border-darkSlate-600 border-t-solid flex h-full w-full overflow-hidden border">
       <LogsSidebar
         availableLogEntries={availableLogEntries.data || []}
         setSelectedLog={setSelectedLog}
@@ -164,8 +161,10 @@ const Logs = () => {
         isActive={isActive() || false}
         isLoading={isLoading()}
         scrollToBottom={scrollToBottom}
+        onScroll={handleScroll}
         assignScrollBottomRef={assignScrollBottomRef}
         assignLogsContentRef={assignLogsContentRef}
+        assignVirtualizerRef={assignVirtualizerRef}
         newLogsCount={newLogsCount()}
         autoFollowPreference={autoFollowPreference()}
         setAutoFollowPreference={setAutoFollowPreference}
