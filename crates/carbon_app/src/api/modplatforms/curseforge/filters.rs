@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::domain::modplatforms::curseforge::filters::{
+use carbon_platforms::curseforge::filters::{
     FilesParameters, FilesParametersBody, ModDescriptionParameters, ModFileChangelogParameters,
     ModFileParameters, ModFilesParameters, ModFilesParametersQuery, ModParameters,
     ModSearchParameters, ModSearchParametersQuery, ModSearchSortField, ModSearchSortOrder,

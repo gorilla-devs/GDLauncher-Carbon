@@ -6,9 +6,6 @@ use crate::domain::instance::info::{
 use crate::domain::instance::{self as domain, GameLogId, InstanceId};
 use crate::domain::java::{JavaComponent, JavaComponentType, SystemJavaProfileName};
 use crate::domain::metrics::GDLMetricsEvent;
-use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
-use crate::domain::modplatforms::modrinth::search::VersionID;
-use crate::domain::runtime_path::InstancePath;
 use crate::domain::vtask::VisualTaskId;
 use crate::managers::instance::log::{
     format_message_as_log4j_event, GameLog, LogEntry, LogEntrySourceKind,
@@ -38,6 +35,9 @@ use crate::{
 use anyhow::{anyhow, bail, Context};
 use carbon_net::{DownloadOptions, Downloadable};
 use carbon_parsing::log::{LogParser, ParsedItem};
+use carbon_platforms::curseforge::filters::ModFileParameters;
+use carbon_platforms::modrinth::search::VersionID;
+use carbon_rt_path::InstancePath;
 use chrono::{DateTime, Local, Utc};
 use futures::Future;
 use md5::{Digest, Md5};

@@ -7,14 +7,14 @@ use std::{
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::domain::modplatforms::modrinth::{
+use anyhow::anyhow;
+use carbon_platforms::modrinth::{
     project::ProjectVersionsFilters,
     search::{
         ProjectID, ProjectIDs, ProjectSearchParameters, SearchFacet, SearchFacetAnd, SearchFacetOr,
         SearchIndex, TeamID, VersionID, VersionIDs,
     },
 };
-use anyhow::anyhow;
 
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "lowercase")]

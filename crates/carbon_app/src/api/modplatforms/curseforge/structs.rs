@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use strum_macros::EnumIter;
 
-use crate::domain::modplatforms::curseforge as mpcf;
+use carbon_platforms::curseforge as mpcf;
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]

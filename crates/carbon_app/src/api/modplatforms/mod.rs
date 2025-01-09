@@ -18,7 +18,6 @@ use crate::{
         modplatforms::curseforge::structs::CFFEModLoaderType,
         router::router,
     },
-    domain::modplatforms as domain,
     managers::App,
     mirror_into,
 };
@@ -68,11 +67,15 @@ impl TryFrom<i32> for ModChannel {
     }
 }
 
-mirror_into!(ModChannel, domain::ModChannel, |value| match value {
-    Other::Alpha => Self::Alpha,
-    Other::Beta => Self::Beta,
-    Other::Stable => Self::Stable,
-});
+mirror_into!(
+    ModChannel,
+    carbon_platforms::ModChannel,
+    |value| match value {
+        Other::Alpha => Self::Alpha,
+        Other::Beta => Self::Beta,
+        Other::Stable => Self::Stable,
+    }
+);
 
 #[derive(Type, Debug, Deserialize, Serialize, Clone, Copy)]
 pub enum ModPlatform {
@@ -80,10 +83,14 @@ pub enum ModPlatform {
     Modrinth,
 }
 
-mirror_into!(ModPlatform, domain::ModPlatform, |value| match value {
-    Other::Curseforge => Self::Curseforge,
-    Other::Modrinth => Self::Modrinth,
-});
+mirror_into!(
+    ModPlatform,
+    carbon_platforms::ModPlatform,
+    |value| match value {
+        Other::Curseforge => Self::Curseforge,
+        Other::Modrinth => Self::Modrinth,
+    }
+);
 
 #[derive(Type, Debug, Deserialize, Serialize, Clone, Copy)]
 pub struct ModChannelWithUsage {
@@ -91,12 +98,16 @@ pub struct ModChannelWithUsage {
     pub allow_updates: bool,
 }
 
-mirror_into!(ModChannelWithUsage, domain::ModChannelWithUsage, |value| {
-    Self {
-        channel: value.channel.into(),
-        allow_updates: value.allow_updates,
+mirror_into!(
+    ModChannelWithUsage,
+    carbon_platforms::ModChannelWithUsage,
+    |value| {
+        Self {
+            channel: value.channel.into(),
+            allow_updates: value.allow_updates,
+        }
     }
-});
+);
 
 #[derive(Type, Debug, Deserialize, Serialize, Clone)]
 pub struct ModSources {
@@ -104,7 +115,7 @@ pub struct ModSources {
     pub platform_blacklist: Vec<ModPlatform>,
 }
 
-mirror_into!(ModSources, domain::ModSources, |value| Self {
+mirror_into!(ModSources, carbon_platforms::ModSources, |value| Self {
     channels: value.channels.into_iter().map(Into::into).collect(),
     platform_blacklist: value
         .platform_blacklist
@@ -120,9 +131,9 @@ pub enum RemoteVersion {
     Modrinth(MRFEVersion),
 }
 
-impl From<domain::RemoteVersion> for RemoteVersion {
-    fn from(value: domain::RemoteVersion) -> Self {
-        use domain::RemoteVersion as Other;
+impl From<carbon_platforms::RemoteVersion> for RemoteVersion {
+    fn from(value: carbon_platforms::RemoteVersion) -> Self {
+        use carbon_platforms::RemoteVersion as Other;
 
         match value {
             Other::Curseforge(cf) => Self::Curseforge(cf.into()),

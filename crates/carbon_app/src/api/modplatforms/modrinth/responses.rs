@@ -7,7 +7,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::domain::modplatforms::modrinth::{
+use carbon_platforms::modrinth::{
     responses::{
         CategoriesResponse, LoadersResponse, ProjectsResponse, TeamResponse, VersionHashesResponse,
         VersionsResponse,

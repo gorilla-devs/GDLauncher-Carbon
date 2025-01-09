@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::domain::modplatforms::modrinth::{
+use carbon_platforms::modrinth::{
     project::{
         DonationLink, GalleryItem, License, ModeratorMessage, Project, ProjectStatus,
         ProjectSupportRange, ProjectType,

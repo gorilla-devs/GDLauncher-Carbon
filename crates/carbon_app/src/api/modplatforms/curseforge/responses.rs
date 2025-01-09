@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
-use crate::domain::modplatforms::curseforge::{
+use carbon_platforms::curseforge::{
     Category, CurseForgeResponse, File, MinecraftModLoaderIndex, Mod,
 };
 

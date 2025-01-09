@@ -18,7 +18,7 @@ use self::terms_and_privacy::TermsAndPrivacy;
 pub mod terms_and_privacy;
 
 pub(crate) struct SettingsManager {
-    pub runtime_path: runtime_path::RuntimePath,
+    pub runtime_path: carbon_rt_path::RuntimePath,
     pub terms_and_privacy: TermsAndPrivacy,
     pub gdl_base_api_url: String,
 }

@@ -9,9 +9,6 @@ use crate::{
     domain::instance::{self as domain, GameLogId},
     domain::java::{JavaComponent, JavaComponentType, SystemJavaProfileName},
     domain::metrics::GDLMetricsEvent,
-    domain::modplatforms::curseforge::filters::ModFileParameters,
-    domain::modplatforms::modrinth::search::VersionID,
-    domain::runtime_path::InstancePath,
     domain::vtask::VisualTaskId,
     managers::instance::log::{
         format_message_as_log4j_event, GameLog, LogEntry, LogEntrySourceKind,

@@ -305,7 +305,7 @@ impl From<FEUnifiedSearchParameters> for curseforge::filters::CFFEModSearchParam
 }
 
 impl TryFrom<FEUnifiedSearchParameters>
-    for crate::domain::modplatforms::curseforge::filters::ModSearchParameters
+    for carbon_platforms::curseforge::filters::ModSearchParameters
 {
     type Error = anyhow::Error;
 

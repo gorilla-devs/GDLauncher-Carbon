@@ -6,9 +6,6 @@ use crate::domain::instance::info::{
 use crate::domain::instance::{self as domain, GameLogId, InstanceId};
 use crate::domain::java::{JavaComponent, JavaComponentType, SystemJavaProfileName};
 use crate::domain::metrics::GDLMetricsEvent;
-use crate::domain::modplatforms::curseforge::filters::ModFileParameters;
-use crate::domain::modplatforms::modrinth::search::VersionID;
-use crate::domain::runtime_path::InstancePath;
 use crate::domain::vtask::VisualTaskId;
 use crate::managers::instance::log::GameLog;
 use crate::managers::instance::modpack::{packinfo, PackVersionFile};
