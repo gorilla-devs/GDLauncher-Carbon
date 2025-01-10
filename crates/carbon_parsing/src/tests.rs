@@ -469,6 +469,18 @@ Caused by: java.lang.IllegalStateException: duplicate ASM classes found on class
     assert!(next.is_none());
 }
 
+#[test]
+fn test_log_example() {
+    let input = include_str!("../fixtures/log_example.log");
+
+    let mut parser = LogParser::new();
+    parser.feed(input.as_bytes());
+
+    let items = parser.parse_available().unwrap();
+
+    assert_eq!(items.len(), 3233);
+}
+
 // #[test]
 // fn test_fuzzy_parsing_variations() {
 //     let log_text = r#"Some plain text before

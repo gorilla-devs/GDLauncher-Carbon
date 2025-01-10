@@ -31,6 +31,10 @@ pub enum LogEntryLevel {
     Warn,
     /// `ERROR` log level.
     Error,
+    /// `FATAL` log level.
+    Fatal,
+    /// `UNKNOWN` log level.
+    Unknown,
 }
 
 #[derive(Error, Debug)]
@@ -84,14 +88,15 @@ impl LogParser {
     }
 
     /// Parses a log level string into the LogEntryLevel enum.
-    fn parse_log_level(level: &str) -> Result<LogEntryLevel, ParserError> {
+    fn parse_log_level(level: &str) -> LogEntryLevel {
         match level.trim().to_uppercase().as_str() {
-            "TRACE" => Ok(LogEntryLevel::Trace),
-            "DEBUG" => Ok(LogEntryLevel::Debug),
-            "INFO" => Ok(LogEntryLevel::Info),
-            "WARN" => Ok(LogEntryLevel::Warn),
-            "ERROR" => Ok(LogEntryLevel::Error),
-            _ => Err(ParserError::InvalidLogLevel(level.to_string())),
+            "TRACE" => LogEntryLevel::Trace,
+            "DEBUG" => LogEntryLevel::Debug,
+            "INFO" => LogEntryLevel::Info,
+            "WARN" => LogEntryLevel::Warn,
+            "ERROR" => LogEntryLevel::Error,
+            "FATAL" => LogEntryLevel::Fatal,
+            _ => LogEntryLevel::Unknown,
         }
     }
 
@@ -123,7 +128,7 @@ impl LogParser {
                     }
                     entry.timestamp = value.trim().parse()?
                 }
-                "level" => entry.level = Self::parse_log_level(&value)?,
+                "level" => entry.level = Self::parse_log_level(&value),
                 "thread" => entry.thread_name = value.trim().to_string(),
                 _ => {}
             }
