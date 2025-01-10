@@ -18,7 +18,6 @@ use tracing::info;
 pub mod api;
 mod app_version;
 pub mod cache_middleware;
-pub(crate) mod db;
 pub mod domain;
 mod error;
 pub mod iridium_client;
@@ -79,6 +78,8 @@ pub fn main() {
 
         s
     };
+
+    let x = 1;
 
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()

@@ -1,5 +1,4 @@
 use crate::{
-    db,
     domain::instance::{
         info::{CurseforgeModpack, ModrinthModpack},
         InstanceModpackInfo,
@@ -10,6 +9,7 @@ use carbon_platforms::{
     curseforge::filters::{ModFileParameters, ModParameters},
     modrinth::search::{ProjectID, VersionID},
 };
+use carbon_repos::db;
 use tracing::error;
 
 pub async fn get_modpack_icon(app: &App, modrinth: ModrinthModpack) -> anyhow::Result<Vec<u8>> {

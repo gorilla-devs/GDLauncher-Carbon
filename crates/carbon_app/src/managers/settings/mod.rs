@@ -1,19 +1,13 @@
-use std::path::PathBuf;
-
+use self::terms_and_privacy::TermsAndPrivacy;
+use super::ManagerRef;
+use crate::api::{keys::settings::*, settings::FESettingsUpdate};
 use anyhow::{anyhow, Context};
 use carbon_platforms::{ModChannelWithUsage, ModPlatform};
+use carbon_repos::db::app_configuration::{self, hashed_email_accepted, last_app_version};
 use chrono::Utc;
 use itertools::Itertools;
 use reqwest_middleware::ClientWithMiddleware;
-
-use crate::{
-    api::{keys::settings::*, settings::FESettingsUpdate},
-    db::app_configuration::{self, hashed_email_accepted, last_app_version},
-};
-
-use super::ManagerRef;
-
-use self::terms_and_privacy::TermsAndPrivacy;
+use std::path::PathBuf;
 
 pub mod terms_and_privacy;
 
@@ -38,7 +32,7 @@ impl SettingsManager {
 }
 
 impl ManagerRef<'_, SettingsManager> {
-    pub async fn get_settings(self) -> anyhow::Result<crate::db::app_configuration::Data> {
+    pub async fn get_settings(self) -> anyhow::Result<carbon_repos::db::app_configuration::Data> {
         self.app
             .prisma_client
             .app_configuration()

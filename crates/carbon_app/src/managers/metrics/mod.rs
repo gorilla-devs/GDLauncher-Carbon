@@ -1,17 +1,12 @@
-use std::sync::Arc;
-
+use crate::{domain::metrics::GDLMetricsEvent, iridium_client::get_client};
+use carbon_repos::db::{app_configuration, PrismaClient};
 use display_info::DisplayInfo;
 use reqwest_middleware::ClientWithMiddleware;
 use serde::Serialize;
 use serde_json::json;
+use std::sync::Arc;
 use tracing::info;
 use uuid::Uuid;
-
-use crate::{
-    db::{app_configuration, PrismaClient},
-    domain::metrics::GDLMetricsEvent,
-    iridium_client::get_client,
-};
 
 use super::ManagerRef;
 

@@ -1,19 +1,11 @@
-use anyhow::bail;
-use prisma_client_rust::{prisma_errors::query_engine::UniqueKeyViolation, QueryError};
-use strum::IntoEnumIterator;
-use tokio::sync::{watch, Mutex};
-use tracing::{debug, error, trace};
-
 use self::{
     discovery::Discovery,
     java_checker::JavaChecker,
     managed::{ManagedService, Step},
 };
-
 use super::ManagerRef;
 use crate::{
     api::keys::java::{GET_AVAILABLE_JAVAS, GET_JAVA_PROFILES},
-    db::PrismaClient,
     domain::{
         instance::info::StandardVersion,
         java::{
@@ -23,11 +15,19 @@ use crate::{
     },
     managers::java::java_checker::RealJavaChecker,
 };
+use anyhow::bail;
+use carbon_repos::{
+    db::PrismaClient,
+    pcr::{prisma_errors::query_engine::UniqueKeyViolation, QueryError},
+};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     sync::Arc,
 };
+use strum::IntoEnumIterator;
+use tokio::sync::{watch, Mutex};
+use tracing::{debug, error, trace};
 
 mod constants;
 pub mod discovery;
@@ -53,7 +53,9 @@ impl JavaManager {
         for profile in SystemJavaProfileName::iter() {
             let exists = db_client
                 .java_profile()
-                .find_unique(crate::db::java_profile::name::equals(profile.to_string()))
+                .find_unique(carbon_repos::db::java_profile::name::equals(
+                    profile.to_string(),
+                ))
                 .exec()
                 .await?;
 
@@ -63,18 +65,18 @@ impl JavaManager {
                     db_client
                         .java_profile()
                         .update(
-                            crate::db::java_profile::name::equals(profile.to_string()),
-                            vec![crate::db::java_profile::is_system_profile::set(true)],
+                            carbon_repos::db::java_profile::name::equals(profile.to_string()),
+                            vec![carbon_repos::db::java_profile::is_system_profile::set(true)],
                         )
                         .exec()
                         .await?;
                 }
             } else {
-                let creation: Result<crate::db::java_profile::Data, QueryError> = db_client
+                let creation: Result<carbon_repos::db::java_profile::Data, QueryError> = db_client
                     .java_profile()
                     .create(
                         profile.to_string(),
-                        vec![crate::db::java_profile::is_system_profile::set(true)],
+                        vec![carbon_repos::db::java_profile::is_system_profile::set(true)],
                     )
                     .exec()
                     .await;
@@ -184,9 +186,9 @@ impl ManagerRef<'_, JavaManager> {
                 .prisma_client
                 .java_profile()
                 .update(
-                    crate::db::java_profile::name::equals(profile_name.to_string()),
-                    vec![crate::db::java_profile::java::connect(
-                        crate::db::java::id::equals(java_id),
+                    carbon_repos::db::java_profile::name::equals(profile_name.to_string()),
+                    vec![carbon_repos::db::java_profile::java::connect(
+                        carbon_repos::db::java::id::equals(java_id),
                     )],
                 )
                 .exec()
@@ -196,8 +198,8 @@ impl ManagerRef<'_, JavaManager> {
                 .prisma_client
                 .java_profile()
                 .update(
-                    crate::db::java_profile::name::equals(profile_name.to_string()),
-                    vec![crate::db::java_profile::java::disconnect()],
+                    carbon_repos::db::java_profile::name::equals(profile_name.to_string()),
+                    vec![carbon_repos::db::java_profile::java::disconnect()],
                 )
                 .exec()
                 .await?;
@@ -227,7 +229,9 @@ impl ManagerRef<'_, JavaManager> {
             .app
             .prisma_client
             .java_profile()
-            .find_unique(crate::db::java_profile::name::equals(profile_name.clone()))
+            .find_unique(carbon_repos::db::java_profile::name::equals(
+                profile_name.clone(),
+            ))
             .exec()
             .await?;
 
@@ -240,8 +244,8 @@ impl ManagerRef<'_, JavaManager> {
             .java_profile()
             .create(
                 profile_name,
-                vec![crate::db::java_profile::java::connect(
-                    crate::db::java::id::equals(java_id),
+                vec![carbon_repos::db::java_profile::java::connect(
+                    carbon_repos::db::java::id::equals(java_id),
                 )],
             )
             .exec()
@@ -269,7 +273,7 @@ impl ManagerRef<'_, JavaManager> {
         self.app
             .prisma_client
             .java_profile()
-            .delete(crate::db::java_profile::name::equals(profile_name))
+            .delete(carbon_repos::db::java_profile::name::equals(profile_name))
             .exec()
             .await?;
 
@@ -290,7 +294,7 @@ impl ManagerRef<'_, JavaManager> {
             .app
             .prisma_client
             .java()
-            .find_unique(crate::db::java::path::equals(path.clone()))
+            .find_unique(carbon_repos::db::java::path::equals(path.clone()))
             .exec()
             .await?;
 
@@ -324,7 +328,7 @@ impl ManagerRef<'_, JavaManager> {
             .app
             .prisma_client
             .java()
-            .find_unique(crate::db::java::id::equals(java_id.clone()))
+            .find_unique(carbon_repos::db::java::id::equals(java_id.clone()))
             .exec()
             .await?
             .ok_or_else(|| anyhow::anyhow!("Java with id {} not found", java_id.clone()))?;
@@ -336,7 +340,7 @@ impl ManagerRef<'_, JavaManager> {
                 self.app
                     .prisma_client
                     .java()
-                    .delete(crate::db::java::id::equals(java_id))
+                    .delete(carbon_repos::db::java::id::equals(java_id))
                     .exec()
                     .await?;
             }
@@ -364,7 +368,7 @@ impl ManagerRef<'_, JavaManager> {
                 self.app
                     .prisma_client
                     .java()
-                    .delete(crate::db::java::id::equals(java_id))
+                    .delete(carbon_repos::db::java::id::equals(java_id))
                     .exec()
                     .await?;
             }
@@ -384,15 +388,15 @@ impl ManagerRef<'_, JavaManager> {
         self,
         target_profile: SystemJavaProfileName,
     ) -> anyhow::Result<Option<JavaComponent>> {
-        use crate::db::{java, java_profile};
+        use carbon_repos::db::{java, java_profile};
 
         let profile = self
             .app
             .prisma_client
             .java_profile()
-            .find_many(vec![crate::db::java_profile::is_system_profile::equals(
-                true,
-            )])
+            .find_many(vec![
+                carbon_repos::db::java_profile::is_system_profile::equals(true),
+            ])
             .exec()
             .await?
             .into_iter()
@@ -483,7 +487,7 @@ impl ManagerRef<'_, JavaManager> {
         update_target_profile: bool,
         progress: Option<watch::Sender<Step>>,
     ) -> anyhow::Result<Option<JavaComponent>> {
-        use crate::db::java::UniqueWhereParam;
+        use carbon_repos::db::java::UniqueWhereParam;
 
         static LOCK: Mutex<()> = Mutex::const_new(());
         let _guard = LOCK.lock().await;
@@ -526,7 +530,7 @@ impl ManagerRef<'_, JavaManager> {
             .app
             .prisma_client
             .java()
-            .find_unique(crate::db::java::id::equals(id.clone()))
+            .find_unique(carbon_repos::db::java::id::equals(id.clone()))
             .exec()
             .await?;
 
@@ -546,9 +550,9 @@ impl ManagerRef<'_, JavaManager> {
                 .prisma_client
                 .java_profile()
                 .update(
-                    crate::db::java_profile::name::equals(target_profile.to_string()),
-                    vec![crate::db::java_profile::java::connect(
-                        crate::db::java::id::equals(id.clone()),
+                    carbon_repos::db::java_profile::name::equals(target_profile.to_string()),
+                    vec![carbon_repos::db::java_profile::java::connect(
+                        carbon_repos::db::java::id::equals(id.clone()),
                     )],
                 )
                 .exec()
@@ -558,9 +562,9 @@ impl ManagerRef<'_, JavaManager> {
                 .app
                 .prisma_client
                 .java_profile()
-                .find_many(vec![crate::db::java_profile::is_system_profile::equals(
-                    true,
-                )])
+                .find_many(vec![
+                    carbon_repos::db::java_profile::is_system_profile::equals(true),
+                ])
                 .exec()
                 .await?;
 
@@ -577,9 +581,9 @@ impl ManagerRef<'_, JavaManager> {
                     .prisma_client
                     .java_profile()
                     .update(
-                        crate::db::java_profile::name::equals(system_profile.name),
-                        vec![crate::db::java_profile::java::connect(
-                            crate::db::java::id::equals(id.clone()),
+                        carbon_repos::db::java_profile::name::equals(system_profile.name),
+                        vec![carbon_repos::db::java_profile::java::connect(
+                            carbon_repos::db::java::id::equals(id.clone()),
                         )],
                     )
                     .exec()
@@ -616,9 +620,9 @@ mod test {
         let profiles_in_db = app
             .prisma_client
             .java_profile()
-            .find_many(vec![crate::db::java_profile::is_system_profile::equals(
-                true,
-            )])
+            .find_many(vec![
+                carbon_repos::db::java_profile::is_system_profile::equals(true),
+            ])
             .exec()
             .await
             .unwrap();
@@ -689,8 +693,12 @@ mod test {
         app.prisma_client
             .app_configuration()
             .update(
-                crate::db::app_configuration::id::equals(0),
-                vec![crate::db::app_configuration::auto_manage_java_system_profiles::set(false)],
+                carbon_repos::db::app_configuration::id::equals(0),
+                vec![
+                    carbon_repos::db::app_configuration::auto_manage_java_system_profiles::set(
+                        false,
+                    ),
+                ],
             )
             .exec()
             .await

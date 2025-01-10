@@ -12,8 +12,8 @@ pub use app::AppInner;
 
 use crate::api::keys::Key;
 use crate::api::InvalidationEvent;
-use crate::db::PrismaClient;
 use crate::managers::settings::SettingsManager;
+use carbon_repos::db::PrismaClient;
 
 use self::account::AccountManager;
 use self::download::DownloadManager;

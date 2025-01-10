@@ -1,28 +1,29 @@
-use crate::{
-    app_version::APP_VERSION,
-    db::{self, app_configuration, PrismaClient},
+use super::{java::JavaManager, settings::terms_and_privacy::TermsAndPrivacy};
+use crate::app_version::APP_VERSION;
+use carbon_repos::db::PrismaClient;
+use carbon_repos::db::{self, app_configuration};
+use carbon_repos::db::{
+    http_cache::{SetParam, WhereParam},
+    read_filters::StringFilter,
 };
-use prisma_client_rust::raw;
+use carbon_repos::pcr::raw;
 use ring::rand::SecureRandom;
-use rusqlite_migration::{Migrations, M};
 use serde::Deserialize;
 use std::path::PathBuf;
 use sysinfo::System;
 use thiserror::Error;
 use tracing::{debug, error, instrument, trace};
 
-use super::{java::JavaManager, settings::terms_and_privacy::TermsAndPrivacy};
-
 #[derive(Error, Debug)]
 pub enum DatabaseError {
     #[error("error raised while trying to build the client for DB: {0}")]
-    Client(#[from] prisma_client_rust::NewClientError),
+    Client(#[from] carbon_repos::pcr::NewClientError),
     #[error("error while trying to migrate the database")]
     MigrationConn(#[from] rusqlite::Error),
     #[error("error while trying to migrate the database")]
     Migration(#[from] rusqlite_migration::Error),
     #[error("error while trying to query db")]
-    Query(#[from] prisma_client_rust::QueryError),
+    Query(#[from] carbon_repos::pcr::QueryError),
     #[error("error while ensuring java profiles in db")]
     EnsureProfiles(anyhow::Error),
     #[error("error while fetching latest terms and privacy checksum")]
@@ -41,58 +42,7 @@ pub(super) async fn load_and_migrate(
         runtime_path.join("gdl_conf.db").to_str().unwrap()
     );
 
-    let migrations = vec![
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240120134904_init/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240123180711_launcher_action_on_game_launch_game_resolution/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240126072544_update_modpacks/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240127230211_add_meta_cache/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240204033019_add_instances_settings/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240206064454_downloaddeps/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240206225900_add_hooks/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240212215946_fix_java_profiles/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240220223507_rename_auto_manage_java_for_system_profiles/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240403131726_add_show_app_close_warning_option/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20240410205605_add_last_app_version_and_updated_at/migration.sql"
-        ))),
-        M::up(include_str!(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/prisma/migrations/20241124163738_gdl_accounts/migration.sql"
-        ))),
-    ];
-
-    let migrations = Migrations::new(migrations);
+    let migrations = carbon_repos::get_migrations();
 
     debug!("db uri: {}", db_uri);
 

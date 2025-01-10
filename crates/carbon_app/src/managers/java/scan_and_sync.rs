@@ -1,25 +1,20 @@
+use super::{discovery::Discovery, java_checker::JavaChecker};
+use crate::domain::java::{
+    JavaArch, JavaComponent, JavaComponentType, JavaVersion, SystemJavaProfileName,
+};
+use carbon_repos::db::{read_filters::StringFilter, PrismaClient};
 use std::{path::PathBuf, sync::Arc};
-
 use strum::IntoEnumIterator;
 use tracing::{info, trace, warn};
-
-use crate::{
-    db::{read_filters::StringFilter, PrismaClient},
-    domain::java::{
-        JavaArch, JavaComponent, JavaComponentType, JavaVersion, SystemJavaProfileName,
-    },
-};
-
-use super::{discovery::Discovery, java_checker::JavaChecker};
 
 #[tracing::instrument(level = "trace", skip(db))]
 async fn get_java_component_from_db(
     db: &PrismaClient,
     path: String,
-) -> anyhow::Result<Option<crate::db::java::Data>> {
+) -> anyhow::Result<Option<carbon_repos::db::java::Data>> {
     let res = db
         .java()
-        .find_unique(crate::db::java::UniqueWhereParam::PathEquals(path))
+        .find_unique(carbon_repos::db::java::UniqueWhereParam::PathEquals(path))
         .exec()
         .await?;
 
@@ -55,8 +50,8 @@ pub async fn upsert_java_component_to_db(
         if component == java_component {
             db.java()
                 .update(
-                    crate::db::java::id::equals(id.clone()),
-                    vec![crate::db::java::is_valid::set(true)],
+                    carbon_repos::db::java::id::equals(id.clone()),
+                    vec![carbon_repos::db::java::is_valid::set(true)],
                 )
                 .exec()
                 .await?;
@@ -65,13 +60,15 @@ pub async fn upsert_java_component_to_db(
         } else if component.version.major == java_component.version.major {
             db.java()
                 .update(
-                    crate::db::java::id::equals(id.clone()),
+                    carbon_repos::db::java::id::equals(id.clone()),
                     vec![
-                        crate::db::java::full_version::set(java_component.version.to_string()),
-                        crate::db::java::arch::set(java_component.arch.to_string()),
-                        crate::db::java::os::set(java_component.os.to_string()),
-                        crate::db::java::vendor::set(java_component.vendor),
-                        crate::db::java::is_valid::set(true),
+                        carbon_repos::db::java::full_version::set(
+                            java_component.version.to_string(),
+                        ),
+                        carbon_repos::db::java::arch::set(java_component.arch.to_string()),
+                        carbon_repos::db::java::os::set(java_component.os.to_string()),
+                        carbon_repos::db::java::vendor::set(java_component.vendor),
+                        carbon_repos::db::java::is_valid::set(true),
                     ],
                 )
                 .exec()
@@ -110,8 +107,8 @@ async fn update_java_component_in_db_to_invalid(
 ) -> anyhow::Result<()> {
     db.java()
         .update(
-            crate::db::java::UniqueWhereParam::PathEquals(path),
-            vec![crate::db::java::SetParam::SetIsValid(false)],
+            carbon_repos::db::java::UniqueWhereParam::PathEquals(path),
+            vec![carbon_repos::db::java::SetParam::SetIsValid(false)],
         )
         .exec()
         .await?;
@@ -133,7 +130,7 @@ where
     let java_profiles = db
         .java_profile()
         .find_many(vec![])
-        .with(crate::db::java_profile::java::fetch())
+        .with(carbon_repos::db::java_profile::java::fetch())
         .exec()
         .await?;
 
@@ -198,7 +195,7 @@ where
                         .await?;
                     } else {
                         db.java()
-                            .delete(crate::db::java::UniqueWhereParam::PathEquals(
+                            .delete(carbon_repos::db::java::UniqueWhereParam::PathEquals(
                                 resolved_java_path.display().to_string(),
                             ))
                             .exec()
@@ -212,7 +209,7 @@ where
     // Cleanup unscanned local javas (if they are not default)
     let local_javas_from_db = db
         .java()
-        .find_many(vec![crate::db::java::r#type::equals(
+        .find_many(vec![carbon_repos::db::java::r#type::equals(
             JavaComponentType::Local.to_string(),
         )])
         .exec()
@@ -248,7 +245,7 @@ where
             update_java_component_in_db_to_invalid(db, local_java_from_db.path).await?;
         } else {
             db.java()
-                .delete(crate::db::java::UniqueWhereParam::PathEquals(
+                .delete(carbon_repos::db::java::UniqueWhereParam::PathEquals(
                     local_java_from_db.path,
                 ))
                 .exec()
@@ -266,7 +263,7 @@ where
 {
     let custom_javas = db
         .java()
-        .find_many(vec![crate::db::java::WhereParam::Type(
+        .find_many(vec![carbon_repos::db::java::WhereParam::Type(
             StringFilter::Equals(JavaComponentType::Custom.to_string()),
         )])
         .exec()
@@ -300,7 +297,7 @@ where
 {
     let managed_javas = db
         .java()
-        .find_many(vec![crate::db::java::r#type::equals(
+        .find_many(vec![carbon_repos::db::java::r#type::equals(
             JavaComponentType::Managed.to_string(),
         )])
         .exec()
@@ -309,7 +306,7 @@ where
     let java_profiles = db
         .java_profile()
         .find_many(vec![])
-        .with(crate::db::java_profile::java::fetch())
+        .with(carbon_repos::db::java_profile::java::fetch())
         .exec()
         .await?;
 
@@ -347,7 +344,9 @@ where
                     update_java_component_in_db_to_invalid(db, managed_java.path.clone()).await?;
                 } else {
                     db.java()
-                        .delete(crate::db::java::path::equals(managed_java.path.clone()))
+                        .delete(carbon_repos::db::java::path::equals(
+                            managed_java.path.clone(),
+                        ))
                         .exec()
                         .await?;
                 }
@@ -355,7 +354,7 @@ where
             (Err(_), false) => {
                 if !is_java_used_in_profile {
                     db.java()
-                        .delete(crate::db::java::UniqueWhereParam::PathEquals(
+                        .delete(carbon_repos::db::java::UniqueWhereParam::PathEquals(
                             managed_java.path.clone(),
                         ))
                         .exec()
@@ -394,7 +393,9 @@ pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result
         trace!("Syncing system java profile: {}", profile.to_string());
         let java_in_profile = db
             .java_profile()
-            .find_unique(crate::db::java_profile::name::equals(profile.to_string()))
+            .find_unique(carbon_repos::db::java_profile::name::equals(
+                profile.to_string(),
+            ))
             .exec()
             .await?
             .ok_or_else(|| {
@@ -437,9 +438,9 @@ pub async fn sync_system_java_profiles(db: &Arc<PrismaClient>) -> anyhow::Result
                 );
                 db.java_profile()
                     .update(
-                        crate::db::java_profile::name::equals(profile.to_string()),
-                        vec![crate::db::java_profile::java::connect(
-                            crate::db::java::id::equals(java.id.clone()),
+                        carbon_repos::db::java_profile::name::equals(profile.to_string()),
+                        vec![carbon_repos::db::java_profile::java::connect(
+                            carbon_repos::db::java::id::equals(java.id.clone()),
                         )],
                     )
                     .exec()
@@ -501,8 +502,8 @@ mod test {
 
         db.java()
             .update(
-                crate::db::java::path::equals(java_path.clone()),
-                vec![crate::db::java::is_valid::set(false)],
+                carbon_repos::db::java::path::equals(java_path.clone()),
+                vec![carbon_repos::db::java::is_valid::set(false)],
             )
             .exec()
             .await
@@ -615,9 +616,11 @@ mod test {
 
         db.java_profile()
             .update(
-                crate::db::java_profile::name::equals(SystemJavaProfileName::Legacy.to_string()),
-                vec![crate::db::java_profile::java::connect(
-                    crate::db::java::id::equals(java_id),
+                carbon_repos::db::java_profile::name::equals(
+                    SystemJavaProfileName::Legacy.to_string(),
+                ),
+                vec![carbon_repos::db::java_profile::java::connect(
+                    carbon_repos::db::java::id::equals(java_id),
                 )],
             )
             .exec()
@@ -668,9 +671,11 @@ mod test {
 
         db.java_profile()
             .update(
-                crate::db::java_profile::name::equals(SystemJavaProfileName::Legacy.to_string()),
-                vec![crate::db::java_profile::java::connect(
-                    crate::db::java::id::equals(java_id),
+                carbon_repos::db::java_profile::name::equals(
+                    SystemJavaProfileName::Legacy.to_string(),
+                ),
+                vec![carbon_repos::db::java_profile::java::connect(
+                    carbon_repos::db::java::id::equals(java_id),
                 )],
             )
             .exec()
@@ -720,9 +725,11 @@ mod test {
 
         db.java_profile()
             .update(
-                crate::db::java_profile::name::equals(SystemJavaProfileName::Legacy.to_string()),
-                vec![crate::db::java_profile::java::connect(
-                    crate::db::java::id::equals(java_id),
+                carbon_repos::db::java_profile::name::equals(
+                    SystemJavaProfileName::Legacy.to_string(),
+                ),
+                vec![carbon_repos::db::java_profile::java::connect(
+                    carbon_repos::db::java::id::equals(java_id),
                 )],
             )
             .exec()
@@ -769,8 +776,12 @@ mod test {
         // manually set one of the profiles to non-system to make sure it gets updated to system
         db.java_profile()
             .update(
-                crate::db::java_profile::name::equals(SystemJavaProfileName::Legacy.to_string()),
-                vec![crate::db::java_profile::is_system_profile::set(false)],
+                carbon_repos::db::java_profile::name::equals(
+                    SystemJavaProfileName::Legacy.to_string(),
+                ),
+                vec![carbon_repos::db::java_profile::is_system_profile::set(
+                    false,
+                )],
             )
             .exec()
             .await
@@ -806,7 +817,7 @@ mod test {
                     "linux".to_string(),
                     "x86_64".to_string(),
                     "Azul Systems, Inc.".to_string(),
-                    vec![crate::db::java::SetParam::SetIsValid(false)],
+                    vec![carbon_repos::db::java::SetParam::SetIsValid(false)],
                 ),
             ])
             .exec()
@@ -822,10 +833,12 @@ mod test {
         // Expect 8 and 17 to be there, but not 14 since it's invalid and 16 because not provided
         let legacy_profile = db
             .java_profile()
-            .find_unique(crate::db::java_profile::UniqueWhereParam::NameEquals(
-                SystemJavaProfileName::Legacy.to_string(),
-            ))
-            .with(crate::db::java_profile::java::fetch())
+            .find_unique(
+                carbon_repos::db::java_profile::UniqueWhereParam::NameEquals(
+                    SystemJavaProfileName::Legacy.to_string(),
+                ),
+            )
+            .with(carbon_repos::db::java_profile::java::fetch())
             .exec()
             .await
             .unwrap()
@@ -837,10 +850,12 @@ mod test {
 
         let alpha_profile = db
             .java_profile()
-            .find_unique(crate::db::java_profile::UniqueWhereParam::NameEquals(
-                SystemJavaProfileName::Alpha.to_string(),
-            ))
-            .with(crate::db::java_profile::java::fetch())
+            .find_unique(
+                carbon_repos::db::java_profile::UniqueWhereParam::NameEquals(
+                    SystemJavaProfileName::Alpha.to_string(),
+                ),
+            )
+            .with(carbon_repos::db::java_profile::java::fetch())
             .exec()
             .await
             .unwrap()
@@ -850,10 +865,12 @@ mod test {
 
         let beta_profile = db
             .java_profile()
-            .find_unique(crate::db::java_profile::UniqueWhereParam::NameEquals(
-                SystemJavaProfileName::Beta.to_string(),
-            ))
-            .with(crate::db::java_profile::java::fetch())
+            .find_unique(
+                carbon_repos::db::java_profile::UniqueWhereParam::NameEquals(
+                    SystemJavaProfileName::Beta.to_string(),
+                ),
+            )
+            .with(carbon_repos::db::java_profile::java::fetch())
             .exec()
             .await
             .unwrap()
@@ -863,10 +880,12 @@ mod test {
 
         let gamma_profile = db
             .java_profile()
-            .find_unique(crate::db::java_profile::UniqueWhereParam::NameEquals(
-                SystemJavaProfileName::Gamma.to_string(),
-            ))
-            .with(crate::db::java_profile::java::fetch())
+            .find_unique(
+                carbon_repos::db::java_profile::UniqueWhereParam::NameEquals(
+                    SystemJavaProfileName::Gamma.to_string(),
+                ),
+            )
+            .with(carbon_repos::db::java_profile::java::fetch())
             .exec()
             .await
             .unwrap()
@@ -876,10 +895,12 @@ mod test {
 
         let minecraft_exe_profile = db
             .java_profile()
-            .find_unique(crate::db::java_profile::UniqueWhereParam::NameEquals(
-                SystemJavaProfileName::MinecraftJavaExe.to_string(),
-            ))
-            .with(crate::db::java_profile::java::fetch())
+            .find_unique(
+                carbon_repos::db::java_profile::UniqueWhereParam::NameEquals(
+                    SystemJavaProfileName::MinecraftJavaExe.to_string(),
+                ),
+            )
+            .with(carbon_repos::db::java_profile::java::fetch())
             .exec()
             .await
             .unwrap()

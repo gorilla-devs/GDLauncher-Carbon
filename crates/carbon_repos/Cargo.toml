@@ -1,0 +1,14 @@
+[package]
+name = "carbon_repos"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+prisma-client-rust = { workspace = true, features = [
+  "sqlite-create-many",
+  "sqlite",
+  "migrations",
+], default_features = false }
+serde = { workspace = true, features = ["derive", "rc"] }
+rusqlite = { version = "0.25.4", features = ["bundled"] }
+rusqlite_migration = "1.0.2"

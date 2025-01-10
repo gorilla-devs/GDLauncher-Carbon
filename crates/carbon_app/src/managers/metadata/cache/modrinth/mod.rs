@@ -1,14 +1,7 @@
 use super::{BundleSender, ModplatformCacher, UpdateNotifier};
-use crate::db::{
-    mod_file_cache as fcdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
-    modrinth_mod_image_cache as mrimgdb,
-};
 use crate::domain::instance::info::ModLoaderType;
-use crate::{
-    db::read_filters::{DateTimeFilter, IntFilter},
-    domain::instance::InstanceId,
-    managers::App,
-};
+use crate::domain::instance::InstanceId;
+use crate::managers::App;
 use anyhow::anyhow;
 use carbon_platforms::modrinth::search::VersionIDs;
 use carbon_platforms::modrinth::version::Version;
@@ -19,6 +12,11 @@ use carbon_platforms::modrinth::{
     version::HashAlgorithm,
 };
 use carbon_platforms::ModChannel;
+use carbon_repos::db::read_filters::{DateTimeFilter, IntFilter};
+use carbon_repos::db::{
+    mod_file_cache as fcdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
+    modrinth_mod_image_cache as mrimgdb,
+};
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Duration, Instant};

@@ -3,7 +3,7 @@ use super::{
     InstanceId, InstanceManager, InvalidInstanceIdError,
 };
 use crate::api::keys::instance::INSTANCE_MODS;
-use crate::db::{
+use carbon_repos::db::{
     curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
     modrinth_mod_cache as mrdb,
 };

@@ -21,7 +21,7 @@ use carbon_platforms::modrinth::version::{
 use std::{collections::HashMap, fs::File, io::Write, path::PathBuf, sync::Arc};
 use tokio::sync::mpsc;
 
-use crate::db::{mod_file_cache as fcdb, mod_metadata as metadb};
+use carbon_repos::db::{mod_file_cache as fcdb, mod_metadata as metadb};
 
 use super::ZipMode;
 

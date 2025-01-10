@@ -1,11 +1,11 @@
 use super::{Managed, ManagedJavaArchMap, ManagedJavaOsMap, ManagedJavaVersion, Step};
 use crate::{
-    db::PrismaClient,
     domain::java::{JavaArch, JavaOs, JavaVersion},
     managers::java::{java_checker::JavaChecker, scan_and_sync::upsert_java_component_to_db},
 };
 use anyhow::Context;
 use carbon_net::{DownloadOptions, Downloadable, Progress};
+use carbon_repos::db::PrismaClient;
 use carbon_rt_path::{ManagedJavasPath, TempPath};
 use serde::Deserialize;
 use std::{

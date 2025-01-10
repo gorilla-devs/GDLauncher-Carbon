@@ -237,10 +237,10 @@ struct FESettings {
     gdl_account_id: Option<String>,
 }
 
-impl TryFrom<crate::db::app_configuration::Data> for FESettings {
+impl TryFrom<carbon_repos::db::app_configuration::Data> for FESettings {
     type Error = anyhow::Error;
 
-    fn try_from(data: crate::db::app_configuration::Data) -> Result<Self, Self::Error> {
+    fn try_from(data: carbon_repos::db::app_configuration::Data) -> Result<Self, Self::Error> {
         Ok(Self {
             theme: data.theme,
             language: data.language,

@@ -1,7 +1,6 @@
 use crate::managers::account::{FullAccount, FullAccountType};
 use crate::{
     app_version::APP_VERSION,
-    db::{app_configuration::pre_launch_hook, PrismaClient},
     domain::{
         java::{JavaArch, JavaComponent},
         minecraft::minecraft::{
@@ -11,12 +10,13 @@ use crate::{
     },
 };
 use anyhow::Context;
+use carbon_repos::db::{app_configuration::pre_launch_hook, PrismaClient};
+use carbon_repos::pcr::QueryError;
 use carbon_rt_path::{InstancePath, RuntimePath};
 use daedalus::minecraft::{
     Argument, ArgumentType, ArgumentValue, Library, LibraryGroup, Os, Version, VersionInfo,
     VersionManifest,
 };
-use prisma_client_rust::QueryError;
 use regex::{Captures, Regex};
 use reqwest::Url;
 use std::{
@@ -107,13 +107,13 @@ pub async fn get_version(
         db_client
             .version_info_cache()
             .upsert(
-                crate::db::version_info_cache::id::equals(mc_version.to_string()),
-                crate::db::version_info_cache::create(
+                carbon_repos::db::version_info_cache::id::equals(mc_version.to_string()),
+                carbon_repos::db::version_info_cache::create(
                     mc_version.to_string(),
                     version_meta.to_vec(),
                     vec![],
                 ),
-                vec![crate::db::version_info_cache::version_info::set(
+                vec![carbon_repos::db::version_info_cache::version_info::set(
                     version_meta.to_vec(),
                 )],
             )
@@ -128,7 +128,7 @@ pub async fn get_version(
         Err(err) => {
             let db_cache = db_client
                 .version_info_cache()
-                .find_unique(crate::db::version_info_cache::id::equals(
+                .find_unique(carbon_repos::db::version_info_cache::id::equals(
                     mc_version.to_string(),
                 ))
                 .exec()
@@ -219,9 +219,15 @@ pub async fn get_lwjgl_meta(
         db_client
             .lwjgl_meta_cache()
             .upsert(
-                crate::db::lwjgl_meta_cache::id::equals(db_entry_name.clone()),
-                crate::db::lwjgl_meta_cache::create(db_entry_name.clone(), lwjgl.to_vec(), vec![]),
-                vec![crate::db::lwjgl_meta_cache::lwjgl::set(lwjgl.to_vec())],
+                carbon_repos::db::lwjgl_meta_cache::id::equals(db_entry_name.clone()),
+                carbon_repos::db::lwjgl_meta_cache::create(
+                    db_entry_name.clone(),
+                    lwjgl.to_vec(),
+                    vec![],
+                ),
+                vec![carbon_repos::db::lwjgl_meta_cache::lwjgl::set(
+                    lwjgl.to_vec(),
+                )],
             )
             .exec()
             .await?;
@@ -234,7 +240,7 @@ pub async fn get_lwjgl_meta(
         Err(err) => {
             let db_cache = db_client
                 .lwjgl_meta_cache()
-                .find_unique(crate::db::lwjgl_meta_cache::id::equals(format!(
+                .find_unique(carbon_repos::db::lwjgl_meta_cache::id::equals(format!(
                     "{}-{}",
                     version_info_lwjgl_requirement.uid, lwjgl_suggest
                 )))

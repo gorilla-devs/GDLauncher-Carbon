@@ -1,5 +1,5 @@
 use super::{Instance, InstanceData, InstanceType, InvalidInstanceIdError};
-use crate::db::{
+use carbon_repos::db::{
     curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
     modrinth_mod_cache as mrdb,
 };
@@ -750,7 +750,7 @@ impl ResourceInstaller for CurseforgeModInstaller {
         app: &Arc<AppInner>,
         instance_id: InstanceId,
     ) -> anyhow::Result<bool> {
-        use crate::db::mod_file_cache as fcdb;
+        use carbon_repos::db::mod_file_cache as fcdb;
 
         // TODO: check with fingerprint?
         let is_installed = app
@@ -1049,7 +1049,7 @@ impl ResourceInstaller for ModrinthModInstaller {
         app: &Arc<AppInner>,
         instance_id: InstanceId,
     ) -> anyhow::Result<bool> {
-        use crate::db::mod_file_cache as fcdb;
+        use carbon_repos::db::mod_file_cache as fcdb;
 
         // TODO: check with fingerprint?
         let is_installed = app

@@ -11,10 +11,10 @@ pub struct Java {
     pub is_valid: bool,
 }
 
-impl TryFrom<crate::db::java::Data> for Java {
+impl TryFrom<carbon_repos::db::java::Data> for Java {
     type Error = anyhow::Error;
 
-    fn try_from(value: crate::db::java::Data) -> Result<Self, Self::Error> {
+    fn try_from(value: carbon_repos::db::java::Data) -> Result<Self, Self::Error> {
         let is_valid = value.is_valid;
         Ok(Self {
             id: value.id.clone(),
@@ -36,10 +36,10 @@ pub struct JavaComponent {
     pub vendor: String,
 }
 
-impl TryFrom<crate::db::java::Data> for JavaComponent {
+impl TryFrom<carbon_repos::db::java::Data> for JavaComponent {
     type Error = anyhow::Error;
 
-    fn try_from(value: crate::db::java::Data) -> Result<Self, Self::Error> {
+    fn try_from(value: carbon_repos::db::java::Data) -> Result<Self, Self::Error> {
         Ok(Self {
             path: value.path,
             arch: JavaArch::try_from(&*value.arch)?,
@@ -406,10 +406,10 @@ pub struct JavaProfile {
     pub is_system: bool,
 }
 
-impl TryFrom<crate::db::java_profile::Data> for JavaProfile {
+impl TryFrom<carbon_repos::db::java_profile::Data> for JavaProfile {
     type Error = anyhow::Error;
 
-    fn try_from(data: crate::db::java_profile::Data) -> Result<Self, Self::Error> {
+    fn try_from(data: carbon_repos::db::java_profile::Data) -> Result<Self, Self::Error> {
         Ok(Self {
             name: data.name,
             java_id: data.java_id,

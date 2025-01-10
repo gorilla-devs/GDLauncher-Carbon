@@ -1,8 +1,8 @@
-use crate::db::PrismaClient;
 use anyhow::Context;
+use carbon_repos::db::PrismaClient;
+use carbon_repos::pcr::QueryError;
 use carbon_rt_path::AssetsPath;
 use daedalus::minecraft::{AssetIndex, AssetsIndex};
-use prisma_client_rust::QueryError;
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 use thiserror::Error;
 use tokio::sync::Mutex;
@@ -49,13 +49,13 @@ pub async fn get_meta(
         db_client
             .assets_meta_cache()
             .upsert(
-                crate::db::assets_meta_cache::id::equals(version_asset_index.id.clone()),
-                crate::db::assets_meta_cache::create(
+                carbon_repos::db::assets_meta_cache::id::equals(version_asset_index.id.clone()),
+                carbon_repos::db::assets_meta_cache::create(
                     version_asset_index.id.clone(),
                     asset_index.to_vec(),
                     vec![],
                 ),
-                vec![crate::db::assets_meta_cache::assets_index::set(
+                vec![carbon_repos::db::assets_meta_cache::assets_index::set(
                     asset_index.to_vec(),
                 )],
             )
@@ -72,7 +72,7 @@ pub async fn get_meta(
         Err(err) => {
             let db_cache = db_client
                 .assets_meta_cache()
-                .find_unique(crate::db::assets_meta_cache::id::equals(
+                .find_unique(carbon_repos::db::assets_meta_cache::id::equals(
                     version_asset_index.id.clone(),
                 ))
                 .exec()

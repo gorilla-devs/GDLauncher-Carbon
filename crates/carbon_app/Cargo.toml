@@ -41,11 +41,6 @@ carbon_scheduler = { workspace = true }
 uuid = { workspace = true }
 rusqlite = { version = "0.25.4", features = ["bundled"] }
 rusqlite_migration = "1.0.2"
-prisma-client-rust = { workspace = true, features = [
-  "sqlite-create-many",
-  "sqlite",
-  "migrations",
-], default_features = false }
 strum_macros = { workspace = true }
 strum = { workspace = true }
 regex = { workspace = true }
@@ -85,6 +80,7 @@ nom = { workspace = true }
 carbon_parsing = { path = "../carbon_parsing" }
 carbon_rt_path = { path = "../carbon_rt_path" }
 carbon_platforms = { path = "../carbon_platforms" }
+carbon_repos = { path = "../carbon_repos" }
 
 [target.'cfg(windows)'.dependencies]
 winreg = { workspace = true }

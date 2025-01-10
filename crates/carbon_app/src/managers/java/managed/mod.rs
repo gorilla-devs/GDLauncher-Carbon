@@ -2,9 +2,9 @@ use self::azul_zulu::AzulZulu;
 use super::java_checker::{JavaChecker, RealJavaChecker};
 use crate::{
     api::keys::java::GET_SETUP_MANAGED_JAVA_PROGRESS,
-    db::PrismaClient,
     domain::java::{JavaArch, JavaOs, JavaVendor, JavaVersion},
 };
+use carbon_repos::db::PrismaClient;
 use carbon_rt_path::{ManagedJavasPath, TempPath};
 use serde::Serialize;
 use std::{

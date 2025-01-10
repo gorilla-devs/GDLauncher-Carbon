@@ -7,7 +7,8 @@ use std::{
 };
 
 use anyhow::bail;
-use prisma_client_rust::QueryError;
+use carbon_repos::db::read_filters::StringFilter;
+use carbon_repos::pcr::QueryError;
 use reqwest::Response;
 use reqwest_middleware::ClientWithMiddleware;
 use thiserror::Error;
@@ -19,7 +20,6 @@ use tokio::{
 use uuid::Uuid;
 
 use crate::{
-    db::read_filters::StringFilter,
     error::request::{MalformedResponseDetails, RequestContext, RequestError, RequestErrorDetails},
     once_send::OnceSend,
 };
@@ -68,7 +68,7 @@ impl ManagerRef<'_, DownloadManager> {
     ///
     /// If the download has already finished the files will be deleted anyway.
     pub async fn cancel_download(self, handle: DownloadHandle) -> Result<(), DownloadCancelError> {
-        use crate::db::active_downloads::UniqueWhereParam;
+        use carbon_repos::db::active_downloads::UniqueWhereParam;
 
         // stop the handle's drop() from being called
         let mut handle = handle.into_inner();
@@ -102,7 +102,7 @@ impl ManagerRef<'_, DownloadManager> {
         handle: DownloadHandle,
         target: &Path,
     ) -> Result<(), DownloadCompleteError> {
-        use crate::db::active_downloads::UniqueWhereParam;
+        use carbon_repos::db::active_downloads::UniqueWhereParam;
 
         let mut handle = handle.into_inner();
 
@@ -136,7 +136,7 @@ impl ManagerRef<'_, DownloadManager> {
     }
 
     pub async fn start_download(self, url: String) -> Result<DownloadHandle, DownloadStartError> {
-        use crate::db::active_downloads::WhereParam;
+        use carbon_repos::db::active_downloads::WhereParam;
 
         // Lock active_downloads. Any future downloads will have to wait here.
         // active_downloads is locked to prevent two downloads attempting to start

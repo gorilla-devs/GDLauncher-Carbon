@@ -8,8 +8,6 @@ use super::vtask::{TaskState, VisualTask};
 use super::ManagerRef;
 use crate::api::keys::instance::*;
 use crate::api::translation::Translation;
-use crate::db::read_filters::StringFilter;
-use crate::db::{self, read_filters::IntFilter};
 use crate::domain::instance::info::{GameVersion, InstanceIcon, Modpack};
 use crate::domain::instance::{
     self as domain, GameLogId, GroupId, InstanceFolder, InstanceId, InstanceModpackInfo,
@@ -23,6 +21,9 @@ use anyhow::{anyhow, Context};
 use carbon_platforms::curseforge::filters::{ModFileParameters, ModParameters};
 use carbon_platforms::modrinth::search::{ProjectID, VersionID};
 use carbon_platforms::ModPlatform;
+use carbon_repos::db::read_filters::StringFilter;
+use carbon_repos::db::{self, read_filters::IntFilter};
+use carbon_repos::pcr::Direction;
 use chrono::{DateTime, Utc};
 use daedalus::minecraft::MinecraftJavaProfile;
 use db::instance::Data as CachedInstance;
@@ -30,7 +31,6 @@ use domain::info;
 use fs_extra::dir::CopyOptions;
 use futures::future::BoxFuture;
 use futures::{join, Future};
-use prisma_client_rust::Direction;
 use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
 use specta::Type;
@@ -2044,11 +2044,13 @@ mod test {
     use std::{collections::HashSet, time::Duration};
 
     use super::domain;
-    use prisma_client_rust::Direction;
+    use carbon_repos::{
+        db::{read_filters::IntFilter, PrismaClient},
+        pcr::Direction,
+    };
     use unicode_segmentation::UnicodeSegmentation;
 
     use crate::{
-        db::{self, read_filters::IntFilter, PrismaClient},
         domain::instance::{info, InstanceSettingsUpdate},
         managers::instance::{
             GroupId, InstanceId, InstanceMoveTarget, ListGroup, ListInstance, ListInstanceStatus,
@@ -2063,7 +2065,7 @@ mod test {
         let app = crate::setup_managers_for_test().await;
 
         async fn get_ordered_groups(prisma_client: &PrismaClient) -> anyhow::Result<Vec<GroupId>> {
-            use crate::db::instance_group::OrderByParam;
+            use carbon_repos::db::instance_group::OrderByParam;
 
             Ok(prisma_client
                 .instance_group()
@@ -2152,7 +2154,7 @@ mod test {
             prisma_client: &PrismaClient,
             group: GroupId,
         ) -> anyhow::Result<Vec<InstanceId>> {
-            use crate::db::instance::{OrderByParam, WhereParam};
+            use carbon_repos::db::instance::{OrderByParam, WhereParam};
 
             Ok(prisma_client
                 .instance()
@@ -2334,7 +2336,7 @@ mod test {
 
     #[tokio::test]
     async fn delete_group() -> anyhow::Result<()> {
-        use db::instance::UniqueWhereParam::ShortpathEquals;
+        use carbon_repos::db::instance::UniqueWhereParam::ShortpathEquals;
 
         let app = crate::setup_managers_for_test().await;
 

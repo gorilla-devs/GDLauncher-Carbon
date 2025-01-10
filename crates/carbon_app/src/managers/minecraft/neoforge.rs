@@ -1,12 +1,12 @@
 use super::META_VERSION;
-use crate::{db::PrismaClient, managers::java::utils::PATH_SEPARATOR};
+use crate::managers::java::utils::PATH_SEPARATOR;
 use anyhow::{bail, Context};
+use carbon_repos::{db::PrismaClient, pcr::QueryError};
 use carbon_rt_path::{InstancePath, LibrariesPath};
 use daedalus::{
     modded::{LoaderVersion, Manifest, PartialVersionInfo, Processor, SidedDataEntry},
     GradleSpecifier,
 };
-use prisma_client_rust::QueryError;
 use std::{
     collections::HashMap,
     io::{BufRead, BufReader},
@@ -82,14 +82,14 @@ pub async fn get_version(
         db_client
             .partial_version_info_cache()
             .upsert(
-                crate::db::partial_version_info_cache::id::equals(db_entry_name.clone()),
-                crate::db::partial_version_info_cache::create(
+                carbon_repos::db::partial_version_info_cache::id::equals(db_entry_name.clone()),
+                carbon_repos::db::partial_version_info_cache::create(
                     db_entry_name.clone(),
                     version_bytes.to_vec(),
                     vec![],
                 ),
                 vec![
-                    crate::db::partial_version_info_cache::partial_version_info::set(
+                    carbon_repos::db::partial_version_info_cache::partial_version_info::set(
                         version_bytes.to_vec(),
                     ),
                 ],
@@ -105,7 +105,7 @@ pub async fn get_version(
         Err(err) => {
             let db_cache = db_client
                 .partial_version_info_cache()
-                .find_unique(crate::db::partial_version_info_cache::id::equals(
+                .find_unique(carbon_repos::db::partial_version_info_cache::id::equals(
                     db_entry_name.clone(),
                 ))
                 .exec()

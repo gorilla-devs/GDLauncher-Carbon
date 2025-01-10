@@ -1,12 +1,12 @@
 use crate::api::keys::instance::INSTANCE_MODS;
-use crate::db::read_filters::BytesFilter;
-use crate::db::read_filters::IntFilter;
-use crate::db::read_filters::StringFilter;
-use crate::db::{mod_file_cache as fcdb, mod_metadata as metadb};
 use crate::domain::instance::InstanceId;
 use crate::managers::App;
 use crate::managers::ManagerRef;
 use anyhow::anyhow;
+use carbon_repos::db::read_filters::BytesFilter;
+use carbon_repos::db::read_filters::IntFilter;
+use carbon_repos::db::read_filters::StringFilter;
+use carbon_repos::db::{mod_file_cache as fcdb, mod_metadata as metadb};
 use carbon_rt_path::InstancesPath;
 use curseforge::CurseforgeModCacher;
 use futures::join;
@@ -1095,7 +1095,7 @@ impl ManagerRef<'_, MetaCacheManager> {
         ]);
 
         let filecache_insert = self.app.prisma_client.mod_file_cache().create(
-            crate::db::instance::UniqueWhereParam::IdEquals(*instance_id),
+            carbon_repos::db::instance::UniqueWhereParam::IdEquals(*instance_id),
             mod_filename.to_string(),
             content_len as i32,
             enabled,

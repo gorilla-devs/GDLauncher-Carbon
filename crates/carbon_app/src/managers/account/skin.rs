@@ -1,15 +1,10 @@
-use std::io::Cursor;
-
-use anyhow::ensure;
-use image::{GenericImageView, ImageFormat};
-use thiserror::Error;
-
-use crate::{
-    db::{self, read_filters::StringFilter},
-    managers::ManagerRef,
-};
-
 use super::api::McSkin as ApiSkin;
+use crate::managers::ManagerRef;
+use anyhow::ensure;
+use carbon_repos::db::{self, read_filters::StringFilter};
+use image::{GenericImageView, ImageFormat};
+use std::io::Cursor;
+use thiserror::Error;
 
 pub struct SkinManager {}
 
