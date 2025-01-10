@@ -217,7 +217,7 @@ const Tile = (props: Props) => {
                   })
                 }}
               >
-                <div class="h-4 w-4 i-simple-icons:bisecthosting" />
+                <div class="i-simple-icons:bisecthosting h-4 w-4" />
                 <Trans key="instance.action_create_server" />
               </ContextMenuItem>
               <ContextMenuSeparator />
@@ -457,16 +457,16 @@ const Tile = (props: Props) => {
                       }}
                     />
                     <Show when={props.isInvalid}>
-                      <h2 class="z-70 absolute left-0 top-0 text-center text-sm">
+                      <h2 class="z-2 absolute left-0 top-0 text-center text-sm">
                         <Trans key="instance.error_invalid" />
                       </h2>
-                      <div class="absolute bottom-0 left-0 right-0 top-0 z-10 h-full w-full rounded-2xl bg-gradient-to-l from-black from-30% opacity-50" />
-                      <div class="absolute bottom-0 left-0 right-0 top-0 z-10 h-full w-full rounded-2xl bg-gradient-to-t from-black opacity-50" />
-                      <div class="i-ri:alert-fill absolute right-1 top-1 z-10 text-2xl text-yellow-500" />
+                      <div class="z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-l from-black from-30% opacity-50" />
+                      <div class="z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-t from-black opacity-50" />
+                      <div class="i-ri:alert-fill z-1 absolute right-1 top-1 text-2xl text-yellow-500" />
                     </Show>
                     <Show when={props.failError}>
                       <div
-                        class="absolute bottom-0 left-0 right-0 top-0 z-10 h-full w-full rounded-2xl bg-gradient-to-l from-black from-30% opacity-60"
+                        class="z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-l from-black from-30% opacity-60"
                         style={
                           props.shouldSetViewTransition
                             ? {
@@ -476,7 +476,7 @@ const Tile = (props: Props) => {
                         }
                       />
                       <div
-                        class="absolute bottom-0 left-0 right-0 top-0 z-10 h-full w-full rounded-2xl bg-gradient-to-t from-black opacity-60"
+                        class="z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-t from-black opacity-60"
                         style={
                           props.shouldSetViewTransition
                             ? {
@@ -486,7 +486,7 @@ const Tile = (props: Props) => {
                         }
                       />
                       <div
-                        class="i-ri:alert-fill absolute bottom-20 left-0 right-0 top-0 z-10 m-auto text-4xl text-red-500"
+                        class="i-ri:alert-fill z-1 absolute bottom-20 left-0 right-0 top-0 m-auto text-4xl text-red-500"
                         style={
                           props.shouldSetViewTransition
                             ? {
@@ -496,7 +496,7 @@ const Tile = (props: Props) => {
                         }
                       />
                       <div
-                        class="z-70 absolute left-1/2 top-1/2 mt-5 w-full -translate-x-1/2 -translate-y-1/2 text-center"
+                        class="z-3 absolute left-1/2 top-1/2 mt-5 w-full -translate-x-1/2 -translate-y-1/2 text-center"
                         style={
                           props.shouldSetViewTransition
                             ? {
@@ -522,7 +522,7 @@ const Tile = (props: Props) => {
                       }
                     >
                       <div
-                        class="z-70 animate-enterWithOpacityChange absolute left-0 top-0 box-border flex h-full w-full flex-col items-center justify-center gap-2 p-2 opacity-0"
+                        class="z-3 animate-enterWithOpacityChange absolute left-0 top-0 box-border flex h-full w-full flex-col items-center justify-center gap-2 p-2 opacity-0"
                         style={
                           props.shouldSetViewTransition
                             ? {
@@ -557,7 +557,7 @@ const Tile = (props: Props) => {
                       </div>
                     </Show>
                     <Show when={isInQueue() || props.isDeleting}>
-                      <div class="z-70 absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-2">
+                      <div class="z-3 absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-2">
                         <Spinner />
                         <span class="font-bold">
                           <Show when={props.isDeleting}>
@@ -571,7 +571,7 @@ const Tile = (props: Props) => {
                     </Show>
                     <Show when={validInstance()?.modpack}>
                       <div
-                        class="border-1 border-darkSlate-600 bg-darkSlate-900 absolute right-2 top-2 z-20 flex items-center justify-center rounded-lg border-solid p-2"
+                        class="border-1 border-darkSlate-600 bg-darkSlate-900 absolute right-2 top-2 z-3 flex items-center justify-center rounded-lg border-solid p-2"
                         style={
                           props.shouldSetViewTransition
                             ? {
@@ -590,7 +590,7 @@ const Tile = (props: Props) => {
                     </Show>
                     <Show when={isLoading() || isInQueue() || props.isDeleting}>
                       <div
-                        class="z-11 absolute bottom-0 left-0 right-0 top-0 rounded-2xl backdrop-blur-sm"
+                        class="z-1 absolute bottom-0 left-0 right-0 top-0 rounded-2xl backdrop-blur-sm"
                         style={
                           props.shouldSetViewTransition
                             ? {
@@ -601,7 +601,7 @@ const Tile = (props: Props) => {
                         }
                       />
                       <div
-                        class="from-darkSlate-900 absolute bottom-0 left-0 right-0 top-0 z-10 h-full w-full rounded-2xl bg-gradient-to-l from-30% opacity-50"
+                        class="from-darkSlate-900 z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-l from-30% opacity-50"
                         style={
                           props.shouldSetViewTransition
                             ? {
@@ -612,7 +612,7 @@ const Tile = (props: Props) => {
                         }
                       />
                       <div
-                        class="from-darkSlate-900 absolute bottom-0 left-0 right-0 top-0 z-10 h-full w-full rounded-2xl bg-gradient-to-t opacity-50"
+                        class="from-darkSlate-900 z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-t opacity-50"
                         style={
                           props.shouldSetViewTransition
                             ? {
@@ -624,7 +624,7 @@ const Tile = (props: Props) => {
                       />
                     </Show>
                     <div
-                      class="absolute left-1/2 top-1/2 z-50 hidden h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl transition-all duration-200 ease-in-out"
+                      class="absolute left-1/2 top-1/2 z-2 hidden h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl transition-all duration-200 ease-in-out"
                       classList={{
                         "scale-100 bg-red-500": isLoading(),
                         "flex bg-primary-500 hover:bg-primary-400 text-2xl":

@@ -367,7 +367,7 @@ const HomeGrid = () => {
           }
         >
           <div>
-            <div class="bg-darkSlate-800 sticky top-0 mt-8 flex items-center gap-4 py-4">
+            <div class="bg-darkSlate-800 sticky top-0 mt-8 flex items-center gap-4 py-4 z-5">
               <Input
                 ref={inputRef}
                 placeholder={t("search_instances")}
