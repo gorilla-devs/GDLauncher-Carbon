@@ -1,8 +1,4 @@
 use super::{Instance, InstanceData, InstanceType, InvalidInstanceIdError};
-use carbon_repos::db::{
-    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
-    modrinth_mod_cache as mrdb,
-};
 use crate::{
     api::{
         keys::instance::{INSTANCE_DETAILS, INSTANCE_MODS},
@@ -32,6 +28,10 @@ use carbon_platforms::{
         search::{ProjectID, VersionID},
     },
     ModChannel,
+};
+use carbon_repos::db::{
+    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
+    modrinth_mod_cache as mrdb,
 };
 use carbon_rt_path::InstancePath;
 use futures::future::Future;

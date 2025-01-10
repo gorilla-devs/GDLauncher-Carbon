@@ -3,10 +3,6 @@ use super::{
     InstanceId, InstanceManager, InvalidInstanceIdError,
 };
 use crate::api::keys::instance::INSTANCE_MODS;
-use carbon_repos::db::{
-    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
-    modrinth_mod_cache as mrdb,
-};
 use crate::domain::instance::info::{GameVersion, ModLoaderType};
 use crate::domain::instance::{self as domain, info};
 use crate::managers::instance::InstanceType;
@@ -22,6 +18,10 @@ use carbon_platforms::modrinth::search::ProjectID;
 use carbon_platforms::modrinth::version::VersionType;
 use carbon_platforms::{
     curseforge, modrinth, ModChannel, ModChannelWithUsage, ModPlatform, ModSources, RemoteVersion,
+};
+use carbon_repos::db::{
+    curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
+    modrinth_mod_cache as mrdb,
 };
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::Future;

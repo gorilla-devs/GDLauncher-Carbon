@@ -26,7 +26,7 @@ jobs:
           components: clippy, rustfmt
       - name: Prepare
         run: |
-          echo "" > crates/carbon_app/src/db.rs
+          echo "" > crates/carbon_repos/src/db.rs
           cargo fmt --check
       - run: |
           npm run sudo-init
@@ -100,7 +100,7 @@ jobs:
           components: clippy, rustfmt
       - name: Prepare
         run: |
-          echo "" > crates/carbon_app/src/db.rs
+          echo "" > crates/carbon_repos/src/db.rs
           cargo fmt --check
       - run: |
           npm run sudo-init
@@ -188,7 +188,7 @@ jobs:
       - name: Prepare
         shell: bash
         run: |
-          echo "" > crates/carbon_app/src/db.rs
+          echo "" > crates/carbon_repos/src/db.rs
           cargo fmt --check
       - name: init
         shell: bash

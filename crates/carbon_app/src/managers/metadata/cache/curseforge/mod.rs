@@ -1,12 +1,6 @@
 use super::BundleSender;
 use super::ModplatformCacher;
 use super::UpdateNotifier;
-use carbon_repos::db::read_filters::DateTimeFilter;
-use carbon_repos::db::read_filters::IntFilter;
-use carbon_repos::db::{
-    curse_forge_mod_cache as cfdb, curse_forge_mod_image_cache as cfimgdb, mod_file_cache as fcdb,
-    mod_metadata as metadb,
-};
 use crate::domain::instance::info::ModLoaderType;
 use crate::domain::instance::InstanceId;
 use crate::managers::App;
@@ -20,6 +14,12 @@ use carbon_platforms::curseforge::FileReleaseType;
 use carbon_platforms::curseforge::FingerprintsMatchesResult;
 use carbon_platforms::curseforge::Mod;
 use carbon_platforms::ModChannel;
+use carbon_repos::db::read_filters::DateTimeFilter;
+use carbon_repos::db::read_filters::IntFilter;
+use carbon_repos::db::{
+    curse_forge_mod_cache as cfdb, curse_forge_mod_image_cache as cfimgdb, mod_file_cache as fcdb,
+    mod_metadata as metadb,
+};
 use itertools::Itertools;
 use std::collections::HashMap;
 use std::collections::VecDeque;
