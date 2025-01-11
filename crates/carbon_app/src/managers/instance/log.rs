@@ -118,6 +118,8 @@ impl From<carbon_parsing::log::LogEntryLevel> for LogEntryLevel {
             LogEntryLevel_::Info => Self::Info,
             LogEntryLevel_::Warn => Self::Warn,
             LogEntryLevel_::Error => Self::Error,
+            LogEntryLevel_::Fatal => Self::Error,
+            LogEntryLevel_::Unknown => Self::Error,
         }
     }
 }
