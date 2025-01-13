@@ -120,6 +120,15 @@
         font-family: var(--font);
       }
 
+      .disable-view-transition {
+        view-transition-name: disable-view-transition;
+      }
+
+      ::view-transition-old(disable-view-transition),
+      ::view-transition-new(disable-view-transition) {
+        animation-duration: 0s;
+      }
+
       html,
       body {
         background: rgb(var(--darkSlate-800));

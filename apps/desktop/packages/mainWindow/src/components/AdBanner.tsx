@@ -8,7 +8,7 @@ export const AdsBanner = () => {
         width: `${adSize.width}px`
       }}
     >
-      <owadview class="relative z-100" />
+      <owadview class="z-100 relative" />
     </div>
   )
 }

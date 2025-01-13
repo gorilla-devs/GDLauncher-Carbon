@@ -7,7 +7,7 @@ interface Props {
 function PageTitle(props: Props) {
   const c = children(() => props.children)
 
-  return <h3 class="mt-0">{c()}</h3>
+  return <h3 class="my-4 text-2xl">{c()}</h3>
 }
 
 export default PageTitle

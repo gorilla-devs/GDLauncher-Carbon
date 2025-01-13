@@ -22,6 +22,7 @@ import ModsBrowser from "@/pages/Mods/ModsBrowser"
 import ModsInfiniteScrollQueryWrapper from "@/pages/Mods/Explore"
 import ModpacksInfiniteScrollQueryWrapper from "@/pages/Modpacks/Explore"
 import ModsLayout from "@/pages/Mods"
+import Explore from "@/pages/Explore"
 /* Defining the routes for the application. */
 
 export const routes: RouteDefinition[] = [
@@ -100,6 +101,16 @@ export const routes: RouteDefinition[] = [
                 )
               }
             ]
+          }
+        ]
+      },
+      {
+        path: "/explore",
+        component: Explore,
+        children: [
+          {
+            path: "/",
+            component: lazy(() => import("@/pages/Explore/List"))
           }
         ]
       },

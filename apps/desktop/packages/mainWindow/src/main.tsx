@@ -16,6 +16,7 @@ import App from "@/app"
 import { ModalProvider } from "@/managers/ModalsManager"
 import "virtual:uno.css"
 import "@gd/ui/style.css"
+import "@unocss/reset/tailwind.css"
 import { ContextMenuProvider, NotificationsProvider } from "@gd/ui"
 import { NavigationManager } from "./managers/NavigationManager"
 // import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
