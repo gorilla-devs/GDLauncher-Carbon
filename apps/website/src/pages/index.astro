@@ -1,21 +1,21 @@
 ---
-import BaseHead from "../components/BaseHead.astro";
-import Header from "../components/Header.astro";
-import Button from "../components/button/Button";
-import Download from "../components/Download.astro";
-import { Image } from "astro:assets";
-import BHLogo from "../assets/bh.svg";
-import Footer from "../components/Footer.astro";
-import "@fontsource/ubuntu";
-import { SITE_TITLE, SITE_DESCRIPTION, DownloadItems } from "../consts";
-import WhatMakesGDSpecial from "../components/WhatMakesGDSpecial.astro";
-import GdxCF from "../components/GdxCF.astro";
-import "../styles/HomeStyle.css";
-import DownloadDropdown from "../components/DownloadDropdown.astro";
-import { AiOutlineArrowRight } from "solid-icons/ai";
-import DownloadButton from "../components/DownloadButton.astro";
+import BaseHead from "../components/BaseHead.astro"
+import Header from "../components/Header.astro"
+import Button from "../components/button/Button"
+import Download from "../components/Download.astro"
+import { Image } from "astro:assets"
+import BHLogo from "../assets/bh.svg"
+import Footer from "../components/Footer.astro"
+import "@fontsource/ubuntu"
+import { SITE_TITLE, SITE_DESCRIPTION, DownloadItems } from "../consts"
+import WhatMakesGDSpecial from "../components/WhatMakesGDSpecial.astro"
+import GdxCF from "../components/GdxCF.astro"
+import "../styles/HomeStyle.css"
+import DownloadDropdown from "../components/DownloadDropdown.astro"
+import { AiOutlineArrowRight } from "solid-icons/ai"
+import DownloadButton from "../components/DownloadButton.astro"
 
-Astro.locals.cache(60);
+Astro.locals.cache(60)
 ---
 
 <!doctype html>
@@ -80,7 +80,6 @@ Astro.locals.cache(60);
           font-size: 2rem;
         }
       }
-
     </style></head
   >
 
@@ -123,21 +122,11 @@ Astro.locals.cache(60);
             Your All-In-One Minecraft Modded Launcher
           </span>
         </div>
-        <!-- <Button items={DownloadItems} isDropdown={true} intent="primary" size="medium">DOWNLOAD FOR</Button> -->
-
         <DownloadButton />
         <Download />
-
-        <!-- <DownloadDropdown /> -->
       </div>
       <div class="relative mx-auto z-10 pt-32 pr-2 pl-2">
         <div class="relative parallax">
-          <!-- <img
-            id="firstImg"
-            src="https://cdn.gdl.gg/github-readme/home.png"
-            alt="gd launcher"
-            class="mx-auto responsive-image"
-          /> -->
           <picture>
             <source
               srcset="https://cdn.gdl.gg/assets/website-home-app-screenshot.webp"
@@ -168,7 +157,7 @@ Astro.locals.cache(60);
     <GdxCF />
     <Footer />
     <script>
-      import vanilla from "vanilla-tilt";
+      import vanilla from "vanilla-tilt"
       document.addEventListener(
         "astro:page-load",
         () => {
@@ -176,11 +165,11 @@ Astro.locals.cache(60);
 
           vanilla.init(document.querySelector(".parallax") as HTMLElement, {
             max: 15,
-            speed: 50000,
-          });
+            speed: 50000
+          })
         },
         { once: false }
-      );
+      )
     </script>
   </body>
 </html>

@@ -29,7 +29,9 @@ const color = {
   Debug: "text-blue-500",
   Info: "text-green-500",
   Warn: "text-yellow-500",
-  Error: "text-red-500"
+  Error: "text-red-500",
+  Fatal: "text-red-500",
+  Unknown: "text-red-500"
 }
 
 function DateTimeFormatter(props: {

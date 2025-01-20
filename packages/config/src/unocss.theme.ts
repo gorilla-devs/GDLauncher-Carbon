@@ -3,33 +3,15 @@ type shade = 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900
 type Theme = {
   // Colors
   accent: string
-  darkSlate: {
-    [key in shade]: string
-  }
-  lightSlate: {
-    [key in shade]: string
-  }
-  lightGray: {
-    [key in shade]: string
-  }
-  darkGray: {
-    [key in shade]: string
-  }
-  primary: {
-    [key in shade]: string
-  }
-  red: {
-    [key in shade]: string
-  }
-  yellow: {
-    [key in shade]: string
-  }
-  green: {
-    [key in shade]: string
-  }
-  brands: {
-    [key: string]: string
-  }
+  darkSlate: Record<shade, string>
+  lightSlate: Record<shade, string>
+  lightGray: Record<shade, string>
+  darkGray: Record<shade, string>
+  primary: Record<shade, string>
+  red: Record<shade, string>
+  yellow: Record<shade, string>
+  green: Record<shade, string>
+  brands: Record<string, string>
 }
 
 const theme = {

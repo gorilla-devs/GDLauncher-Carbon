@@ -19,6 +19,12 @@
   background-color: rgb(var(--lightGray-900));
 }
 
+html,
+body {
+  background: rgb(var(--darkSlate-800));
+  color: white;
+}
+
 .potato-pc *,
 .potato-pc *::before,
 .potato-pc *::after {
@@ -28,7 +34,7 @@
 }
 
 a {
-  color: theme("colors.blue.500");
+  color: rgb(var(--primary-500));
 }
 
 @keyframes spin {
@@ -56,33 +62,4 @@ a {
   to {
     opacity: 0;
   }
-}
-
-.instance-tile-spinning {
-  background-image: linear-gradient(to right, transparent, transparent),
-    conic-gradient(
-      from var(--instance-tile-angle),
-      rgb(var(--primary)) 0deg 90deg,
-      transparent 90deg 180deg,
-      transparent 180deg 270deg,
-      transparent 270deg 360deg
-    );
-  background-origin: border-box;
-  background-clip: padding-box, border-box;
-}
-
-@keyframes rotate {
-  to {
-    --instance-tile-angle: 360deg;
-  }
-}
-
-.instance-tile-spinning {
-  animation: rotate 4s linear infinite;
-}
-
-@property --instance-tile-angle {
-  syntax: "<angle>";
-  initial-value: 0deg;
-  inherits: false;
 }

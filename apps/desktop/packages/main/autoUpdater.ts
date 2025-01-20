@@ -59,6 +59,7 @@ export default function initAutoUpdater(win: BrowserWindow | null) {
     if (win) {
       win?.webContents.send("updateAvailable", updateInfo)
     }
+
     autoUpdater.downloadUpdate()
   })
 

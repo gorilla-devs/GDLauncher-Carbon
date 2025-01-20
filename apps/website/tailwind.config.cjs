@@ -10,34 +10,34 @@ module.exports = {
         bluegd: {
           400: "rgba(62, 134, 208, 1)",
           500: "rgba(40, 101, 164, 1)",
-          600: "rgba(35, 62, 94, 1)",
-        },
+          600: "rgba(35, 62, 94, 1)"
+        }
       },
       boxShadow: {
-        mdgd: "0px 0px 12px 0px rgba(40, 101, 164, 1)",
+        mdgd: "0px 0px 12px 0px rgba(40, 101, 164, 1)"
       },
       padding: {
-        mdgd: "24px",
+        mdgd: "24px"
       },
       borderRadius: {
         xssgd: "8px",
         xsgd: "12px",
-        smgd: "34px",
+        smgd: "34px"
       },
       fontSize: {
         smgd: "1.25rem",
-        mdgd: "3.125rem",
+        mdgd: "3.125rem"
       },
       keyframes: {
         fadeIn: {
           "0%": { opacity: "0" },
-          "100%": { opacity: "1" },
-        },
+          "100%": { opacity: "1" }
+        }
       },
       animation: {
-        fadeIn: "fadeIn 0.2s ease-in-out",
-      },
-    },
+        fadeIn: "fadeIn 0.2s ease-in-out"
+      }
+    }
   },
-  plugins: [],
-};
+  plugins: []
+}

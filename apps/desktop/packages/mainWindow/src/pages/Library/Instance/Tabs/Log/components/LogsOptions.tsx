@@ -1,169 +1,17 @@
-import RightHandSide from "@/pages/Settings/components/RightHandSide"
-import Row from "@/pages/Settings/components/Row"
-import RowsContainer from "@/pages/Settings/components/RowsContainer"
 import { Trans } from "@gd/i18n"
-import { Popover, Slider, Switch } from "@gd/ui"
-import { createSignal } from "solid-js"
-import { Show } from "solid-js"
-
-interface DensityRowProps {
-  selected: boolean
-  onClick: () => void
-}
-
-function LowDensityRows(props: DensityRowProps) {
-  return (
-    <div
-      class="relative w-24 h-10 flex flex-col justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md cursor-pointer"
-      classList={{ "bg-lightSlate-600": props.selected }}
-      onClick={props.onClick}
-    >
-      <div class="w-14 h-3 rounded-sm bg-darkSlate-100" />
-      <Show when={props.selected}>
-        <div class="absolute top-1 right-1 w-4 h-4 i-ri:checkbox-fill text-green-600" />
-      </Show>
-    </div>
-  )
-}
-
-function MediumDensityRows(props: DensityRowProps) {
-  return (
-    <div
-      class="relative w-24 h-10 flex flex-col gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md cursor-pointer"
-      classList={{ "bg-lightSlate-600": props.selected }}
-      onClick={props.onClick}
-    >
-      <div class="w-14 h-1.5 rounded-sm bg-darkSlate-100" />
-      <div class="w-14 h-1.5 rounded-sm bg-darkSlate-100" />
-      <Show when={props.selected}>
-        <div class="absolute top-1 right-1 w-4 h-4 i-ri:checkbox-fill text-green-600" />
-      </Show>
-    </div>
-  )
-}
-
-function HighDensityRows(props: DensityRowProps) {
-  return (
-    <div
-      class="relative w-24 h-10 flex flex-col gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md cursor-pointer"
-      classList={{ "bg-lightSlate-600": props.selected }}
-      onClick={props.onClick}
-    >
-      <div class="w-14 h-1 rounded-sm bg-darkSlate-100" />
-      <div class="w-14 h-1 rounded-sm bg-darkSlate-100" />
-      <div class="w-14 h-1 rounded-sm bg-darkSlate-100" />
-      <div class="w-14 h-1 rounded-sm bg-darkSlate-100" />
-      <Show when={props.selected}>
-        <div class="absolute top-1 right-1 w-4 h-4 i-ri:checkbox-fill text-green-600" />
-      </Show>
-    </div>
-  )
-}
-
-interface ColumnProps {
-  selected: boolean
-  onClick: () => void
-}
-
-function TimestampColumn(props: ColumnProps) {
-  return (
-    <div
-      class="relative w-24 h-10 flex gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md cursor-pointer"
-      classList={{ "bg-lightSlate-600": props.selected }}
-      onClick={props.onClick}
-    >
-      <div class="w-3 h-2 rounded-sm bg-lightSlate-50" />
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-6 h-2 rounded-sm bg-darkSlate-100" />
-      <Show when={props.selected}>
-        <div class="absolute top-1 right-1 w-4 h-4 i-ri:checkbox-fill text-green-600" />
-      </Show>
-    </div>
-  )
-}
-
-function LoggerColumn(props: ColumnProps) {
-  return (
-    <div
-      class="relative w-24 h-10 flex gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md cursor-pointer"
-      classList={{ "bg-lightSlate-600": props.selected }}
-      onClick={props.onClick}
-    >
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-3 h-2 rounded-sm bg-lightSlate-50" />
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-6 h-2 rounded-sm bg-darkSlate-100" />
-      <Show when={props.selected}>
-        <div class="absolute top-1 right-1 w-4 h-4 i-ri:checkbox-fill text-green-600" />
-      </Show>
-    </div>
-  )
-}
-
-function SourceKindColumn(props: ColumnProps) {
-  return (
-    <div
-      class="relative w-24 h-10 flex gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md cursor-pointer"
-      classList={{ "bg-lightSlate-600": props.selected }}
-      onClick={props.onClick}
-    >
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-3 h-2 rounded-sm bg-lightSlate-50" />
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-6 h-2 rounded-sm bg-darkSlate-100" />
-      <Show when={props.selected}>
-        <div class="absolute top-1 right-1 w-4 h-4 i-ri:checkbox-fill text-green-600" />
-      </Show>
-    </div>
-  )
-}
-
-function ThreadNameColumn(props: ColumnProps) {
-  return (
-    <div
-      class="relative w-24 h-10 flex gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md cursor-pointer"
-      classList={{ "bg-lightSlate-600": props.selected }}
-      onClick={props.onClick}
-    >
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-3 h-2 rounded-sm bg-lightSlate-50" />
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-6 h-2 rounded-sm bg-darkSlate-100" />
-      <Show when={props.selected}>
-        <div class="absolute top-1 right-1 w-4 h-4 i-ri:checkbox-fill text-green-600" />
-      </Show>
-    </div>
-  )
-}
-
-function LogLevelColumn(props: ColumnProps) {
-  return (
-    <div
-      class="relative w-24 h-10 flex gap-1 justify-center items-center box-border border-2 border-solid border-darkSlate-100 rounded-md cursor-pointer"
-      classList={{ "bg-lightSlate-600": props.selected }}
-      onClick={props.onClick}
-    >
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-3 h-2 rounded-sm bg-darkSlate-100" />
-      <div class="w-3 h-2 rounded-sm bg-lightSlate-50" />
-      <div class="w-6 h-2 rounded-sm bg-darkSlate-100" />
-      <Show when={props.selected}>
-        <div class="absolute top-1 right-1 w-4 h-4 i-ri:checkbox-fill text-green-600" />
-      </Show>
-    </div>
-  )
-}
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuPortal,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger
+} from "@gd/ui"
 
 export type LogDensity = "low" | "medium" | "high"
 
@@ -189,216 +37,142 @@ interface Props {
 }
 
 export default function LogsOptions(props: Props) {
-  const [isOpen, setIsOpen] = createSignal(false)
-
   return (
-    <Popover
-      color="bg-transparent"
-      noTip
-      noShadow
-      trigger="click"
-      onOpen={() => setIsOpen(true)}
-      onClose={() => setIsOpen(false)}
-      content={() => (
-        <div class="text-lightSlate-50 bg-darkSlate-700 w-130 h-auto p-4 rounded-lg shadow-lg shadow-darkSlate-900">
-          <RowsContainer>
-            <Row>
-              <div>
-                <Trans key="logs_density" />
-              </div>
-              <RightHandSide>
-                <div class="flex gap-6 w-full h-auto items-center">
-                  <div class="w-full flex flex-col items-center gap-3">
-                    <div class="text-sm text-lightSlate-600 text-center">
-                      <Trans key="logs_density.low" />
-                    </div>
-                    <LowDensityRows
-                      selected={props.logsDensity === "low"}
-                      onClick={() => props.setLogsDensity("low")}
-                    />
-                  </div>
-                  <div class="w-full flex flex-col items-center gap-3">
-                    <div class="text-sm text-lightSlate-600 text-center">
-                      <Trans key="logs_density.comfortable" />
-                    </div>
-                    <MediumDensityRows
-                      selected={props.logsDensity === "medium"}
-                      onClick={() => props.setLogsDensity("medium")}
-                    />
-                  </div>
-                  <div class="w-full flex flex-col items-center gap-3">
-                    <div class="text-sm text-lightSlate-600 text-center">
-                      <Trans key="logs_density.compact" />
-                    </div>
-                    <HighDensityRows
-                      selected={props.logsDensity === "high"}
-                      onClick={() => props.setLogsDensity("high")}
-                    />
-                  </div>
-                </div>
-              </RightHandSide>
-            </Row>
-            <hr class="h-px w-full bg-darkSlate-400 border-0 rounded" />
-            <Row>
-              <div>
-                <Trans key="font_size" />
-              </div>
-              <RightHandSide>
-                <div class="w-84">
-                  <Slider
-                    min={0}
-                    max={2}
-                    steps={1}
-                    value={props.fontMultiplier}
-                    marks={{
-                      0: {
-                        label: (
-                          <div class="text-lightSlate-600 text-xs">{"aA"}</div>
-                        )
-                      },
-                      1: {
-                        label: (
-                          <div class="text-lightSlate-600 text-sm">{"aA"}</div>
-                        )
-                      },
-                      2: {
-                        label: (
-                          <div class="text-lightSlate-600 text-base">
-                            {"aA"}
-                          </div>
-                        )
-                      }
-                    }}
-                    onChange={(val) => {
-                      props.setFontMultiplier(val as 0 | 1 | 2)
-                    }}
-                  />
-                </div>
-              </RightHandSide>
-            </Row>
-            <hr class="h-px w-full bg-darkSlate-400 border-0 rounded" />
-            <Row>
-              <div>
-                <Trans key="columns" />
-              </div>
-              <RightHandSide>
-                <div class="flex flex-wrap gap-6 w-84 h-auto items-center">
-                  <div class="w-auto flex flex-col items-center gap-3">
-                    <div class="text-sm text-lightSlate-600 text-center">
-                      <Trans key="columns.timestamp" />
-                    </div>
-                    <TimestampColumn
-                      selected={props.columns.timestamp}
-                      onClick={() =>
-                        props.setColumns({
-                          ...props.columns,
-                          timestamp: !props.columns.timestamp
-                        })
-                      }
-                    />
-                  </div>
-                  <div class="w-auto flex flex-col items-center gap-3">
-                    <div class="text-sm text-lightSlate-600 text-center">
-                      <Trans key="columns.logger" />
-                    </div>
-                    <LoggerColumn
-                      selected={props.columns.logger}
-                      onClick={() =>
-                        props.setColumns({
-                          ...props.columns,
-                          logger: !props.columns.logger
-                        })
-                      }
-                    />
-                  </div>
-                  <div class="w-auto flex flex-col items-center gap-3">
-                    <div class="text-sm text-lightSlate-600 text-center">
-                      <Trans key="columns.source_kind" />
-                    </div>
-                    <SourceKindColumn
-                      selected={props.columns.sourceKind}
-                      onClick={() =>
-                        props.setColumns({
-                          ...props.columns,
-                          sourceKind: !props.columns.sourceKind
-                        })
-                      }
-                    />
-                  </div>
-                  <div class="w-auto flex flex-col items-center gap-3">
-                    <div class="text-sm text-lightSlate-600 text-center">
-                      <Trans key="columns.thread_name" />
-                    </div>
-                    <ThreadNameColumn
-                      selected={props.columns.threadName}
-                      onClick={() =>
-                        props.setColumns({
-                          ...props.columns,
-                          threadName: !props.columns.threadName
-                        })
-                      }
-                    />
-                  </div>
-                  <div class="w-auto flex flex-col items-center gap-3">
-                    <div class="text-sm text-lightSlate-600 text-center">
-                      <Trans key="columns.level" />
-                    </div>
-                    <LogLevelColumn
-                      selected={props.columns.level}
-                      onClick={() =>
-                        props.setColumns({
-                          ...props.columns,
-                          level: !props.columns.level
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-              </RightHandSide>
-            </Row>
-            <hr class="h-px w-full bg-darkSlate-400 border-0 rounded" />
-            <Row>
-              <div>
-                <Trans key="logs.autofollow" />
-              </div>
-              <RightHandSide>
-                <div class="flex gap-6 w-full h-auto items-center">
-                  <Switch
-                    checked={props.autoFollowPreference}
-                    onChange={(e) => {
-                      props.setAutoFollowPreference(e.currentTarget.checked)
-                    }}
-                  />
-                </div>
-              </RightHandSide>
-            </Row>
-            <hr class="h-px w-full bg-darkSlate-400 border-0 rounded" />
-            <Row>
-              <div>
-                <Trans key="logs.start_log_message_on_new_line" />
-              </div>
-              <RightHandSide>
-                <div class="flex gap-6 w-full h-auto items-center">
-                  <Switch
-                    checked={props.startLogMessageOnNewLine}
-                    onChange={(e) => {
-                      props.setStartLogMessageOnNewLine(e.currentTarget.checked)
-                    }}
-                  />
-                </div>
-              </RightHandSide>
-            </Row>
-          </RowsContainer>
-        </div>
-      )}
-    >
-      <div
-        class="w-6 h-6 hover:bg-lightSlate-50 transition-colors duration-200 ease-in-out i-ri:settings-3-line"
-        classList={{
-          "bg-lightSlate-800": !isOpen(),
-          "bg-lightSlate-50": isOpen()
-        }}
-      />
-    </Popover>
+    <DropdownMenu placement="left">
+      <DropdownMenuTrigger class="b-0 bg-transparent p-0">
+        <div class="bg-lightSlate-800 hover:bg-lightSlate-50 i-ri:settings-3-line h-6 w-6 transition-colors duration-200 ease-in-out" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Trans key="logs_density" />
+          </DropdownMenuSubTrigger>
+          <DropdownMenuPortal>
+            <DropdownMenuSubContent>
+              <DropdownMenuRadioGroup
+                value={props.logsDensity}
+                onChange={(value) => props.setLogsDensity(value as LogDensity)}
+              >
+                <DropdownMenuRadioItem value="low">
+                  <Trans key="logs_density.low" />
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="medium">
+                  <Trans key="logs_density.comfortable" />
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="high">
+                  <Trans key="logs_density.compact" />
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuPortal>
+        </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Trans key="font_size" />
+          </DropdownMenuSubTrigger>
+          <DropdownMenuPortal>
+            <DropdownMenuSubContent>
+              <DropdownMenuRadioGroup
+                value={props.fontMultiplier.toString()}
+                onChange={(value) =>
+                  props.setFontMultiplier(parseInt(value) as 0 | 1 | 2)
+                }
+              >
+                <DropdownMenuRadioItem class="text-xs" value="0">
+                  {"aAaAaA"}
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem class="text-sm" value="1">
+                  {"aAaAaA"}
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem class="text-base" value="2">
+                  {"aAaAaA"}
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuPortal>
+        </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Trans key="columns" />
+          </DropdownMenuSubTrigger>
+          <DropdownMenuPortal>
+            <DropdownMenuSubContent>
+              <DropdownMenuCheckboxItem
+                checked={props.columns.timestamp}
+                onChange={() =>
+                  props.setColumns({
+                    ...props.columns,
+                    timestamp: !props.columns.timestamp
+                  })
+                }
+              >
+                <Trans key="columns.timestamp" />
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={props.columns.logger}
+                onChange={() =>
+                  props.setColumns({
+                    ...props.columns,
+                    logger: !props.columns.logger
+                  })
+                }
+              >
+                <Trans key="columns.logger" />
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={props.columns.sourceKind}
+                onChange={() =>
+                  props.setColumns({
+                    ...props.columns,
+                    sourceKind: !props.columns.sourceKind
+                  })
+                }
+              >
+                <Trans key="columns.source_kind" />
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={props.columns.threadName}
+                onChange={() =>
+                  props.setColumns({
+                    ...props.columns,
+                    threadName: !props.columns.threadName
+                  })
+                }
+              >
+                <Trans key="columns.thread_name" />
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuCheckboxItem
+                checked={props.columns.level}
+                onChange={() =>
+                  props.setColumns({
+                    ...props.columns,
+                    level: !props.columns.level
+                  })
+                }
+              >
+                <Trans key="columns.level" />
+              </DropdownMenuCheckboxItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuPortal>
+        </DropdownMenuSub>
+        <DropdownMenuSeparator />
+        <DropdownMenuCheckboxItem
+          checked={props.autoFollowPreference}
+          onChange={() =>
+            props.setAutoFollowPreference(!props.autoFollowPreference)
+          }
+        >
+          <Trans key="logs.autofollow" />
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem
+          checked={props.startLogMessageOnNewLine}
+          onChange={() =>
+            props.setStartLogMessageOnNewLine(!props.startLogMessageOnNewLine)
+          }
+        >
+          <Trans key="logs.start_log_message_on_new_line" />
+        </DropdownMenuCheckboxItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

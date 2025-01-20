@@ -512,6 +512,7 @@
   "account_expired.expiration_description": "You can still use GDLauncher and launch instances, but you might not be able to join any servers or play multiplayer. Also, if you have a GDL account linked to this account, it won't sync.",
   "account_expired.back_to_login": "Back to login",
   "account_expired.launch_anyway": "Launch anyway",
+
   "logs_density": "Logs Density",
   "logs_density.low": "Low",
   "logs_density.comfortable": "Comfortable",

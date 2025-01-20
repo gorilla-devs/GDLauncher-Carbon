@@ -4,9 +4,7 @@ import { splitProps } from "solid-js"
 import * as ContextMenuPrimitive from "@kobalte/core/context-menu"
 import type { PolymorphicProps } from "@kobalte/core/polymorphic"
 
-// import { cn } from "../util"
-
-const cn = (...args: any[]) => args.join(" ")
+import { cn } from "../util"
 
 const ContextMenuTrigger = ContextMenuPrimitive.Trigger
 const ContextMenuPortal = ContextMenuPrimitive.Portal
