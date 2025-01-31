@@ -704,7 +704,20 @@ pub async fn launch_minecraft(
         .unwrap_or_else(|| java_component.path.as_str());
 
     if wrapper_command.is_some() {
-        startup_command.insert(0, java_component.path.clone());
+        wrapper_args = wrapper_command
+            .unwrap()
+            .split(' ')
+            .map(|s| s.to_string())
+            .collect();
+        main_command = wrapper_args.remove(0);
+
+        let mut startup_command_i = 0;
+        for arg in wrapper_args {
+            startup_command.insert(i, arg);
+            i += 1;
+        }
+
+        startup_command.insert(i, java_component.path.clone());
     }
 
     info!(
