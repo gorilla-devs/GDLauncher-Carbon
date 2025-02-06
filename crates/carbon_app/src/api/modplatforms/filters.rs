@@ -219,6 +219,10 @@ impl TryFrom<FEUnifiedModLoaderType> for modrinth::structs::MRFELoaderType {
 pub enum FEUnifiedSearchType {
     Mod,
     ModPack,
+    ResourcePack,
+    DataPack,
+    Shader,
+    World,
 }
 
 impl Display for FEUnifiedSearchType {
@@ -226,6 +230,10 @@ impl Display for FEUnifiedSearchType {
         let out = match self {
             FEUnifiedSearchType::Mod => "mod",
             FEUnifiedSearchType::ModPack => "modpack",
+            FEUnifiedSearchType::ResourcePack => "resourcepack",
+            FEUnifiedSearchType::DataPack => "datapack",
+            FEUnifiedSearchType::Shader => "shader",
+            FEUnifiedSearchType::World => "world",
         };
         write!(f, "{}", out)
     }
@@ -236,6 +244,23 @@ impl From<FEUnifiedSearchType> for curseforge::structs::CFFEClassId {
         match value {
             FEUnifiedSearchType::Mod => curseforge::structs::CFFEClassId::Mods,
             FEUnifiedSearchType::ModPack => curseforge::structs::CFFEClassId::Modpacks,
+            FEUnifiedSearchType::ResourcePack => curseforge::structs::CFFEClassId::ResourcePacks,
+            FEUnifiedSearchType::DataPack => curseforge::structs::CFFEClassId::ResourcePacks,
+            FEUnifiedSearchType::Shader => curseforge::structs::CFFEClassId::Shaders,
+            FEUnifiedSearchType::World => curseforge::structs::CFFEClassId::Worlds,
+        }
+    }
+}
+
+impl From<FEUnifiedSearchType> for modrinth::structs::MRFEProjectType {
+    fn from(value: FEUnifiedSearchType) -> Self {
+        match value {
+            FEUnifiedSearchType::Mod => modrinth::structs::MRFEProjectType::Mod,
+            FEUnifiedSearchType::ModPack => modrinth::structs::MRFEProjectType::Modpack,
+            FEUnifiedSearchType::ResourcePack => modrinth::structs::MRFEProjectType::ResourcePack,
+            FEUnifiedSearchType::DataPack => modrinth::structs::MRFEProjectType::DataPack,
+            FEUnifiedSearchType::Shader => modrinth::structs::MRFEProjectType::Shader,
+            FEUnifiedSearchType::World => modrinth::structs::MRFEProjectType::Unknown,
         }
     }
 }

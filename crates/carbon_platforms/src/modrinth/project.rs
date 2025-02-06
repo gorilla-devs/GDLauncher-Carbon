@@ -215,6 +215,8 @@ pub enum ProjectType {
     Plugin,
     Project,
     DataPack,
+    #[serde(other)]
+    Unknown,
 }
 
 impl ProjectType {

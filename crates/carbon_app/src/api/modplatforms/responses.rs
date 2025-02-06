@@ -9,9 +9,36 @@ use super::FESearchAPI;
 
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum FEUnifiedSearchResult {
-    Curseforge(CFFEMod),
-    Modrinth(MRFEProjectSearchResult),
+pub struct FEUnifiedSearchResult {
+    pub title: String,
+    pub description: String,
+    pub image_url: Option<String>,
+    pub id: String,
+    pub last_updated: String,
+}
+
+impl From<CFFEMod> for FEUnifiedSearchResult {
+    fn from(value: CFFEMod) -> Self {
+        FEUnifiedSearchResult {
+            title: value.name,
+            description: value.summary,
+            image_url: value.logo.as_ref().map(|logo| logo.thumbnail_url.clone()),
+            id: value.id.to_string(),
+            last_updated: value.date_modified.to_string(),
+        }
+    }
+}
+
+impl From<MRFEProjectSearchResult> for FEUnifiedSearchResult {
+    fn from(value: MRFEProjectSearchResult) -> Self {
+        FEUnifiedSearchResult {
+            title: value.title,
+            description: value.description,
+            image_url: value.icon_url.map(|url| url),
+            id: value.project_id,
+            last_updated: value.date_modified,
+        }
+    }
 }
 
 #[derive(Type, Debug, Deserialize, Serialize)]
@@ -38,7 +65,7 @@ impl From<curseforge::responses::FEModSearchResponse> for FEUnifiedSearchRespons
             data: value
                 .data
                 .into_iter()
-                .map(FEUnifiedSearchResult::Curseforge)
+                .map(FEUnifiedSearchResult::from)
                 .collect(),
             pagination: value.pagination.map(|pagination| FEUnifiedPagination {
                 index: pagination.index as u32,
@@ -58,7 +85,7 @@ impl From<modrinth::responses::MRFEProjectSearchResponse> for FEUnifiedSearchRes
             data: value
                 .hits
                 .into_iter()
-                .map(FEUnifiedSearchResult::Modrinth)
+                .map(FEUnifiedSearchResult::from)
                 .collect(),
             pagination: Some(FEUnifiedPagination {
                 index: value.offset,

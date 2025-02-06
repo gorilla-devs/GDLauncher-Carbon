@@ -1,7 +1,16 @@
-import { For } from "solid-js"
+import { For, JSX } from "solid-js"
+import { cn } from "../util"
 
-const Skeleton = () => {
-  return <div class="w-1/3 min-w-20 h-4 rounded-md bg-darkSlate-500" />
+const Skeleton = (props: {
+  class?: string
+  style?: string | JSX.CSSProperties
+}) => {
+  return (
+    <div
+      class={cn("w-1/3 min-w-20 h-4 rounded-md bg-darkSlate-500", props.class)}
+      style={props.style}
+    />
+  )
 }
 
 const SidebarInstance = () => {

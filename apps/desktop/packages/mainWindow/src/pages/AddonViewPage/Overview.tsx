@@ -2,7 +2,7 @@
 import { useRouteData } from "@solidjs/router"
 import { createEffect, createResource, Match, Suspense, Switch } from "solid-js"
 import { Skeleton } from "@gd/ui"
-import fetchData from "../modpack.overview"
+import fetchData from "./mods.overview"
 import { parseToHtml } from "@/utils/modplatformDescriptionConverter"
 import { MRFEProject } from "@gd/core_module/bindings"
 

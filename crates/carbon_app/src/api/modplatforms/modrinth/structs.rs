@@ -65,6 +65,8 @@ pub enum MRFEProjectType {
     Plugin,
     Project,
     DataPack,
+    #[serde(other)]
+    Unknown,
 }
 
 impl From<ProjectType> for MRFEProjectType {
@@ -77,6 +79,7 @@ impl From<ProjectType> for MRFEProjectType {
             ProjectType::Plugin => MRFEProjectType::Plugin,
             ProjectType::Project => MRFEProjectType::Project,
             ProjectType::DataPack => MRFEProjectType::DataPack,
+            ProjectType::Unknown => MRFEProjectType::Unknown,
         }
     }
 }
@@ -91,6 +94,7 @@ impl From<MRFEProjectType> for ProjectType {
             MRFEProjectType::Plugin => ProjectType::Plugin,
             MRFEProjectType::Project => ProjectType::Project,
             MRFEProjectType::DataPack => ProjectType::DataPack,
+            MRFEProjectType::Unknown => ProjectType::Unknown,
         }
     }
 }

@@ -217,6 +217,8 @@
     <script type="module">
       import { mainTheme } from "@gd/ui"
 
+      window.scrollRestoration = "manual"
+
       for (const key in mainTheme) {
         document.documentElement.style.setProperty(`--${key}`, mainTheme[key])
       }

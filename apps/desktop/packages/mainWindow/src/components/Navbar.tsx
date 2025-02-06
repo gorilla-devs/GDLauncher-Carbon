@@ -1,24 +1,19 @@
 import { useLocation, useMatch, useRouteData } from "@solidjs/router"
-import { For, Match, Show, Switch, createEffect } from "solid-js"
+import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
+import { Match, Show, Switch, createEffect } from "solid-js"
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg"
 import {
   Tab,
   TabList,
   Tabs,
-  Spacing,
   Tooltip,
   Button,
   Input,
-  Popover,
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem
 } from "@gd/ui"
-import getRouteIndex from "@/route/getRouteIndex"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import fetchData from "@/pages/app.data"
 import { AccountsDropdown } from "./AccountsDropdown"
@@ -118,7 +113,11 @@ const AppNavbar = () => {
             icon={
               <DropdownMenu>
                 <DropdownMenuTrigger>
-                  <div class="i-ri:filter-line hover:text-lightSlate-50 transition-colors duration-200 ease-[cubic-bezier(.4,0,.2,1)]" />
+                  <div class="flex items-center gap-2 group hover:bg-darkSlate-800 rounded-md h-full p-2">
+                    {/* <img src={CurseforgeLogo} class="w-4 h-4" /> */}
+                    <img src={ModrinthLogo} class="w-4 h-4" />
+                    <div class="i-ri:filter-line w-7 h-7 group-hover:text-lightSlate-50 transition-colors duration-200 ease-[cubic-bezier(.4,0,.2,1)]" />
+                  </div>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <DropdownMenuItem>

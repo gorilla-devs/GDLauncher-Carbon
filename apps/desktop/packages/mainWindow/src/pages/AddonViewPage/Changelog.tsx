@@ -10,7 +10,7 @@ import {
 } from "solid-js"
 import { Dropdown, Skeleton } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
-import fetchData from "../mods.overview"
+import fetchData from "./mods.overview"
 import { CFFEFile, CFFEFileIndex } from "@gd/core_module/bindings"
 import { sortArrayByGameVersion } from "@/utils/mods"
 

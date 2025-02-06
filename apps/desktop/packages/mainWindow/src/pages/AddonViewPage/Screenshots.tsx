@@ -1,7 +1,7 @@
 import { Trans } from "@gd/i18n"
 import { useRouteData } from "@solidjs/router"
 import { For, Match, Suspense, Switch } from "solid-js"
-import fetchData from "../modpack.screenshots"
+import fetchData from "./mods.screenshots"
 import { Skeleton } from "@gd/ui"
 import { CFFEModAsset } from "@gd/core_module/bindings"
 
@@ -33,7 +33,7 @@ const Screenshots = () => {
                           ? (screenshot as CFFEModAsset).thumbnailUrl
                           : screenshot.url
                       }
-                      class="rounded-xl h-44 w-72"
+                      class="rounded-xl w-72 h-44"
                       alt={screenshot.description || ""}
                     />
                   )}

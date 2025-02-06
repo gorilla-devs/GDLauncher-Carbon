@@ -1,6 +1,7 @@
 // New components
 export * from "./DropdownMenu"
 export * from "./Menu"
+export * from "./Badge"
 
 export { Button } from "./Button"
 export { Input } from "./Input"

@@ -59,13 +59,13 @@ function withAdsLayout() {
     <>
       <AppNavbar />
       <div
-        class="flex w-screen z-10 h-auto"
+        class="z-99 flex h-auto w-screen"
         style={{
           background: "var(--ads-sidebar-background)"
         }}
       >
         <main class="relative flex-grow">
-          <div class="flex justify-end h-[calc(100vh-60px)]">
+          <div class="flex h-[calc(100vh-60px)] justify-end">
             <div
               style={{
                 width: `calc(100vw - ${adSize.width}px)`
@@ -73,9 +73,9 @@ function withAdsLayout() {
             >
               <Outlet />
             </div>
-            <div class="flex flex-col justify-between h-[calc(100vh-100px)]">
+            <div class="flex h-full flex-col justify-between gap-4">
               <div
-                class="py-4"
+                // class="py-4"
                 style={{
                   width: `${adSize.width}px`,
                   height: `${adSize.height}px`
@@ -94,7 +94,7 @@ function withAdsLayout() {
               </div>
               <div class="flex justify-center">
                 <div
-                  class="text-center hover:text-lightSlate-50 transition-colors duration-200 text-lightSlate-700"
+                  class="hover:text-lightSlate-50 text-lightSlate-700 text-center transition-colors duration-200"
                   onClick={() => {
                     modalContext?.openModal({
                       name: "whyAreAdsNeeded"
