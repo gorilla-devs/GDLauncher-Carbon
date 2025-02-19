@@ -62,7 +62,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         mutation REFRESH_ACCOUNT[app, uuid: String] {
-            app.account_manager().refresh_account(uuid).await
+            let _ = app.account_manager().refresh_account(uuid).await;
+
+            Ok(())
         }
 
         query GET_HEAD[_, _uuid: String] { Ok(()) }

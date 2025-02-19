@@ -129,6 +129,10 @@ const defaultModals = {
   bisectHostingAffiliate: {
     component: lazy(() => import("./modals/BisectHostingAffiliate")),
     title: "BisectHosting Affiliate"
+  },
+  changeGDLAccountRecoveryEmail: {
+    component: lazy(() => import("./modals/ChangeGDLAccountRecoveryEmail")),
+    title: "Change GDLAccount Recovery Email"
   }
 }
 

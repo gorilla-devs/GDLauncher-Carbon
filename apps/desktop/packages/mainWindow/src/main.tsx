@@ -16,15 +16,21 @@ import App from "@/app"
 import { ModalProvider } from "@/managers/ModalsManager"
 import "virtual:uno.css"
 import "@gd/ui/style.css"
+import { ContextMenuProvider, NotificationsProvider, Progressbar } from "@gd/ui"
 import "@unocss/reset/tailwind.css"
-import { ContextMenuProvider, NotificationsProvider } from "@gd/ui"
 import { NavigationManager } from "./managers/NavigationManager"
 // import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
 import RiveAppWapper from "./utils/RiveAppWrapper"
 import GDAnimation from "./gd_logo_animation.riv"
 import { GlobalStoreProvider } from "./components/GlobalStoreContext"
+import PatternBackground from "./components/PatternBackground"
+import gdlauncherLogo from "/assets/images/gdlauncher_wide_logo_blue.svg"
 
 render(() => {
+  const [coreModuleProgress, setCoreModuleProgress] = createSignal<
+    number | undefined
+  >(undefined)
+
   const [coreModuleLoaded] = createResource(async () => {
     let port
     try {
@@ -60,6 +66,35 @@ render(() => {
     return port
   })
 
+  window.listenToCoreModuleProgress((_, progress) => {
+    const startProgress = coreModuleProgress() ?? 0
+    const endProgress = progress
+    const duration = 300
+    const startTime = Date.now()
+
+    const easeOutCubic = (x: number): number => {
+      return 1 - Math.pow(1 - x, 3)
+    }
+
+    const animate = () => {
+      const currentTime = Date.now()
+      const elapsed = currentTime - startTime
+      const progress = Math.min(elapsed / duration, 1)
+
+      if (progress < 1) {
+        const easedProgress = easeOutCubic(progress)
+        const currentValue =
+          startProgress + (endProgress - startProgress) * easedProgress
+        setCoreModuleProgress(currentValue)
+        requestAnimationFrame(animate)
+      } else {
+        setCoreModuleProgress(endProgress)
+      }
+    }
+
+    requestAnimationFrame(animate)
+  })
+
   const startTime = Date.now()
 
   const [isReady, setIsReady] = createSignal(false)
@@ -70,7 +105,16 @@ render(() => {
   createEffect(() => {
     if (!isIntroAnimationFinished()) return
 
-    setIsReady(coreModuleLoaded.state === "ready")
+    const minLoadingTime = 2500
+    const timeElapsed = Date.now() - startTime
+
+    if (coreModuleLoaded.state === "ready" && timeElapsed >= minLoadingTime) {
+      setIsReady(true)
+    } else if (coreModuleLoaded.state === "ready") {
+      setTimeout(() => {
+        setIsReady(true)
+      }, minLoadingTime - timeElapsed)
+    }
   })
 
   return (
@@ -92,22 +136,45 @@ render(() => {
               </NotificationsProvider>
             </Match>
             <Match when={!isReady()}>
-              <div class="flex flex-col gap-8 justify-center items-center h-screen w-screen">
-                <Show when={Date.now() - startTime > 5000}>
-                  <div class="text-xl">
-                    {
-                      // Hardcoded because we don't know the language at this point
-                      "App initialization is taking longer than expected. Please wait for up to 2 minutes."
-                    }
+              <PatternBackground>
+                <div class="flex h-screen w-screen flex-col items-center justify-center gap-8">
+                  <Show when={Date.now() - startTime > 5000}>
+                    <div class="text-xl">
+                      {
+                        // Hardcoded because we don't know the language at this point
+                        "App initialization is taking longer than expected. Please wait for up to 2 minutes."
+                      }
+                    </div>
+                  </Show>
+
+                  <div class="overflow-visible">
+                    <img
+                      src={gdlauncherLogo}
+                      class="animate-logoReveal opacity-0"
+                      style={{ "animation-delay": "1000ms" }}
+                    />
                   </div>
-                </Show>
-                <div class="animate-spin rounded-full h-12 w-12 bg-blue-500 i-ri:loader-4-line" />
-              </div>
+
+                  <div class="i-ri:loader-4-line h-12 w-12 animate-spin rounded-full bg-blue-500" />
+
+                  <div
+                    class="w-1/3 transition-opacity duration-300"
+                    classList={{
+                      "opacity-0": coreModuleProgress() === undefined
+                    }}
+                  >
+                    <Progressbar
+                      color="bg-blue-500"
+                      percentage={coreModuleProgress() ?? 0}
+                    />
+                  </div>
+                </div>
+              </PatternBackground>
             </Match>
           </Switch>
         </Match>
         <Match when={!isIntroAnimationFinished()}>
-          <div class="w-full flex justify-center items-center h-screen">
+          <div class="flex h-screen w-full items-center justify-center">
             <RiveAppWapper
               src={GDAnimation}
               onStop={() => {

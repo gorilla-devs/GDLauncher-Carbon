@@ -16,7 +16,7 @@ import {
   session,
   shell
 } from "electron"
-import os, { platform, release } from "os"
+import os from "os"
 import path, { join, resolve } from "path"
 import fs from "fs/promises"
 import fss from "fs"
@@ -32,12 +32,12 @@ import getAdSize from "./adSize"
 import handleUncaughtException from "./handleUncaughtException"
 import initAutoUpdater from "./autoUpdater"
 import "./appMenu"
-import { FELauncherActionOnGameLaunch } from "@gd/core_module/bindings"
+import {
+  CoreModuleStatus,
+  FELauncherActionOnGameLaunch
+} from "@gd/core_module/bindings"
 
 console.log("Modules imported successfully")
-
-const timeStart = Date.now()
-let isPotatoPcModeSet = false
 
 export const RUNTIME_PATH_OVERRIDE_NAME = "runtime_path_override"
 const RUNTIME_PATH_DEFAULT_NAME = "data"
@@ -46,8 +46,14 @@ export let CURRENT_RUNTIME_PATH: string | null = null
 
 let win: BrowserWindow | null = null
 
+const getWin = () => {
+  return win
+}
+
 let isGameRunning = false
 let showAppCloseWarning = true
+
+app.enableSandbox()
 
 export function initRTPath(override: string | null | undefined) {
   console.log("Initializing runtime path...")
@@ -221,35 +227,6 @@ if (!disableSentry) {
   }
 }
 
-function maybeDisableGPU(override: boolean) {
-  console.log("Checking if GPU should be disabled...")
-  if (app.isReady()) {
-    console.error("App is ready, cannot disable GPU")
-    return
-  }
-
-  const disableGPU = validateArgument("--disable-gpu") || override
-
-  if (disableGPU) {
-    console.log("Disabling GPU...")
-    app.commandLine.appendSwitch("no-sandbox")
-    app.commandLine.appendSwitch("disable-gpu")
-    app.commandLine.appendSwitch("disable-software-rasterizer")
-    app.commandLine.appendSwitch("disable-gpu-compositing")
-    app.commandLine.appendSwitch("disable-gpu-rasterization")
-    app.commandLine.appendSwitch("disable-gpu-sandbox")
-    app.commandLine.appendSwitch("--no-sandbox")
-  }
-
-  // Disable GPU Acceleration for Windows 7
-  if (disableGPU || (release().startsWith("6.1") && platform() === "win32")) {
-    app.disableHardwareAcceleration()
-    console.log("Hardware acceleration disabled")
-  }
-}
-
-maybeDisableGPU(false)
-
 export interface Log {
   type: "info" | "error"
   message: string
@@ -365,18 +342,51 @@ const loadCoreModule: CoreModule = () =>
 
       for (const row of rows) {
         if (row.startsWith("_STATUS_:")) {
-          const port: number = row.split("|")[1]
-          console.log(`[CORE] Port: ${port}`)
+          const rightPart = row.split(":")[1]
+          const event = rightPart.split("|")[0]
+          const port: number = rightPart.split("|")[1]
+          console.log(`[CORE] Event: ${event}, Port: ${port}`)
 
-          started = true
-
-          resolve({
-            type: "success",
-            result: {
-              port,
-              kill: () => coreModule?.kill()
+          if (event === "READY") {
+            started = true
+            resolve({
+              type: "success",
+              result: {
+                port,
+                kill: () => coreModule?.kill()
+              }
+            })
+          } else {
+            let progress = 0
+            switch (event as CoreModuleStatus) {
+              case "LoadAndMigrate":
+                progress = 10
+                break
+              case "RefreshMSAuth":
+                progress = 25
+                break
+              case "XboxAuth":
+                progress = 35
+                break
+              case "McLogin":
+                progress = 50
+                break
+              case "MCEntitlements":
+                progress = 65
+                break
+              case "McProfile":
+                progress = 80
+                break
+              case "AccountRefreshComplete":
+                progress = 90
+                break
+              case "LaunchBackgroundTasks":
+                progress = 100
+                break
             }
-          })
+
+            getWin()?.webContents.send("coreModuleProgress", progress)
+          }
         } else if (row.startsWith("_INSTANCE_STATE_:")) {
           const rightPart = row.split(":")[1]
           const event = rightPart.split("|")[0]
@@ -432,13 +442,6 @@ const loadCoreModule: CoreModule = () =>
           const rightPart = row.split(":")[1]
           showAppCloseWarning = rightPart === "true"
           console.log("Show app close warning:", showAppCloseWarning)
-        } else if (row.startsWith("_POTATO_PC_MODE_:")) {
-          isPotatoPcModeSet = true
-          const rightPart = row.split(":")[1]
-          if (rightPart === "true") {
-            maybeDisableGPU(true)
-          }
-          console.log("Potato PC mode set:", isPotatoPcModeSet)
         } else if (row.startsWith("_HASHED_EMAIL_PREFERENCE_CHANGED_:")) {
           const rightPart = row.split(":")[1]
           const enabled = rightPart.split("|")[0] === "true"
@@ -626,12 +629,6 @@ async function createWindow(): Promise<BrowserWindow> {
   win.on("ready-to-show", () => {
     isSpawningWindow = false
     console.log("Window is ready to show")
-
-    coreModule.finally(() => {
-      if (win && !win?.isDestroyed()) {
-        win?.show()
-      }
-    })
 
     function upsertKeyValue(obj: any, keyToChange: string, value: any) {
       const keyToChangeLower = keyToChange.toLowerCase()
@@ -977,16 +974,3 @@ app.on("render-process-gone", (event, webContents, detailed) => {
 app.on("open-url", (event, url) => {
   dialog.showErrorBox("Welcome Back", `You arrived from: ${url}`)
 })
-
-const LOOP_TIMEOUT = 4000
-
-// keep event loop busy until potato pc mode is set or timeout is reached
-if (!isPotatoPcModeSet && !import.meta.env.DEV) {
-  let timeEnd = Date.now()
-  while (!isPotatoPcModeSet && timeEnd - timeStart < LOOP_TIMEOUT) {
-    timeEnd = Date.now()
-  }
-
-  // DO NOT REMOVE THIS CONSOLE LOG as V8 optimizes the loop away
-  console.log("First event loop tick done in ", timeEnd - timeStart)
-}

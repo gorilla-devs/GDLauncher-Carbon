@@ -1,4 +1,5 @@
 use crate::api::keys::settings::GET_SETTINGS;
+use crate::api::{update_core_module_status, CoreModuleStatus};
 use crate::domain::account::*;
 use crate::{
     api::keys::account::*,
@@ -570,7 +571,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(())
     }
 
-    pub async fn refresh_account(self, uuid: String) -> anyhow::Result<()> {
+    pub async fn refresh_account(
+        self,
+        uuid: String,
+    ) -> anyhow::Result<tokio::task::JoinHandle<Result<(), futures::future::Aborted>>> {
         use db::account::UniqueWhereParam;
 
         info!("Refreshing account {uuid}");
@@ -673,7 +677,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             }
         }
 
-        let enrollment = EnrollmentTask::refresh(
+        let (enrollment, handler) = EnrollmentTask::refresh(
             self.app.reqwest_client.clone(),
             refresh_token.clone(),
             Invalidator {
@@ -687,7 +691,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
         self.app.invalidate(GET_ACCOUNTS, Some(uuid.into()));
 
-        Ok(())
+        Ok(handler)
     }
 
     pub async fn delete_account(self, uuid: String) -> anyhow::Result<()> {
@@ -1081,16 +1085,21 @@ impl AccountRefreshService {
                                 "Attempting to refresh access token for expired account {}",
                                 &account.uuid
                             );
-                            let r = account_manager.refresh_account(account.uuid.clone()).await;
-
-                            if let Err(e) = r {
-                                error!({ error = ?e }, "Failed to refresh access token for {}", &account.uuid);
-                            }
+                            let Ok(handler) =
+                                account_manager.refresh_account(account.uuid.clone()).await
+                            else {
+                                error!("Failed to refresh access token for {}", &account.uuid);
+                                notifier_clone.notify_one();
+                                first_check_done = true;
+                                continue;
+                            };
 
                             // This works because GDL account is guaranteed to be first in the list
                             // and if there is no gdl account, the currently selected account is guaranteed
                             // to be first
                             if !first_check_done {
+                                let _ = handler.await;
+
                                 notifier_clone.notify_one();
                                 first_check_done = true;
                             }
@@ -1111,9 +1120,11 @@ impl AccountRefreshService {
             // tokio::sync::Notify is not cancellation safe, but in this case we don't care
             // because if it's cancelled, we'll just continue
             _ = notifier.notified() => {
+                update_core_module_status(CoreModuleStatus::AccountRefreshComplete);
+
                 info!("Initial refresh complete");
             }
-            _ = tokio::time::sleep(Duration::from_secs(5)) => {
+            _ = tokio::time::sleep(Duration::from_secs(10)) => {
                 error!("Failed to wait for initial refresh to complete");
             }
         }

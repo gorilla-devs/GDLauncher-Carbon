@@ -586,7 +586,7 @@ export default function Login() {
                 step() === Steps.CodeStep ||
                 step() === Steps.GDLAccountVerification ||
                 (step() === Steps.GDLAccountCompletion &&
-                  (!recoveryEmail() || !nickname()))
+                  (!recoveryEmail()?.trim() || !nickname()?.trim()))
               }
               loading={
                 loadingButton() || step() === Steps.GDLAccountVerification
@@ -672,10 +672,14 @@ export default function Login() {
                     throw new Error("No active uuid")
                   }
 
-                  const email = recoveryEmail()
+                  const email = recoveryEmail()?.trim()
 
                   if (!email) {
                     throw new Error("No recovery email")
+                  }
+
+                  if (!nickname()?.trim()) {
+                    throw new Error("No nickname")
                   }
 
                   try {

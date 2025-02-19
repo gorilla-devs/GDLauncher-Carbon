@@ -41,6 +41,34 @@ pub struct FEOperatingSystem {
     pub os_version: String,
 }
 
+#[derive(Type, Debug, Serialize, Clone)]
+pub enum CoreModuleStatus {
+    LoadAndMigrate,
+    LaunchBackgroundTasks,
+    RefreshMSAuth,
+    RequestingCode,
+    PollingCode,
+    McLogin,
+    XboxAuth,
+    MCEntitlements,
+    McProfile,
+    AccountRefreshComplete,
+}
+
+impl std::fmt::Display for CoreModuleStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            serde_json::to_string(self).unwrap().trim_matches('"')
+        )
+    }
+}
+
+pub fn update_core_module_status(status: CoreModuleStatus) {
+    println!("_STATUS_:{status}");
+}
+
 pub fn build_rspc_router() -> RouterBuilder<App> {
     let mut counter = Arc::new(0);
 
@@ -54,6 +82,9 @@ pub fn build_rspc_router() -> RouterBuilder<App> {
                 tokio::time::sleep(std::time::Duration::from_secs(10)).await;
                 Ok(true)
             })
+        })
+        .query("fake", |t| {
+            t(|_ctx, _: ()| async move { Ok(CoreModuleStatus::AccountRefreshComplete) })
         })
         .merge(keys::account::GROUP_PREFIX, account::mount())
         .merge(keys::java::GROUP_PREFIX, java::mount())

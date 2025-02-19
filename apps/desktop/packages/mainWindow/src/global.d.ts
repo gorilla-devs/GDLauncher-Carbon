@@ -65,6 +65,9 @@ declare global {
     closeWindow: () => void
     onShowWindowCloseModal: (cb: () => void) => void
     relaunch: () => void
+    listenToCoreModuleProgress: (
+      cb: (event: Electron.IpcRendererEvent, progress: number) => void
+    ) => void
   }
 }
 

@@ -653,8 +653,6 @@ pub async fn generate_startup_command(
         }
     }
 
-    command.push("-Dorg.lwjgl.util.Debug=true".to_string());
-
     command.push(version.main_class);
 
     substitute_arguments(&mut command, arguments.get(&ArgumentType::Game).unwrap());

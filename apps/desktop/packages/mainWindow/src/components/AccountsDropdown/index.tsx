@@ -49,9 +49,9 @@ export const AccountsDropdown = (props: Props) => {
       ? globalStore.gdlAccount.data?.value
       : undefined
 
-  let gdlAccountRef: HTMLDivElement
-  let mcAccountsRef: HTMLDivElement
-  let settingsButtonRef: HTMLDivElement
+  let gdlAccountRef: HTMLDivElement | undefined
+  let mcAccountsRef: HTMLDivElement | undefined
+  let settingsButtonRef: HTMLDivElement | undefined
 
   return (
     <Popover

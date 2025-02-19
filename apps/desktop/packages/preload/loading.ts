@@ -93,3 +93,9 @@ const { fatalError } = useLoading()
 
 // --------- Expose some API to the Renderer process. ---------
 contextBridge.exposeInMainWorld("fatalError", fatalError)
+
+contextBridge.exposeInMainWorld(
+  "listenToCoreModuleProgress",
+  (cb: (event: Electron.IpcRendererEvent, progress: number) => void) =>
+    ipcRenderer.on("coreModuleProgress", cb)
+)

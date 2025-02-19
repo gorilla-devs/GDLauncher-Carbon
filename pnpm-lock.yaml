@@ -102,8 +102,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@overwolf/ow-electron':
-        specifier: ^31.7.3
-        version: 31.7.3
+        specifier: ^31.7.7
+        version: 31.7.7
       '@overwolf/ow-electron-builder':
         specifier: ^24.13.8
         version: 24.13.8(electron-builder-squirrel-windows@25.0.5)
@@ -162,8 +162,8 @@ importers:
         specifier: ^16.3.1
         version: 16.4.0
       electron:
-        specifier: ^31.7.3
-        version: 31.7.5
+        specifier: ^31.7.7
+        version: 31.7.7
       electron-log:
         specifier: ^5.1.1
         version: 5.1.1
@@ -2492,8 +2492,8 @@ packages:
     engines: {node: '>=14.0.0'}
     hasBin: true
 
-  '@overwolf/ow-electron@31.7.3':
-    resolution: {integrity: sha512-mRsIztRTpqCTqXXAwcvBfwIbapm4hZZGLHtaHMpyt+qJd9cProIW3K5IHnPCXltjT/FjSDguIVfXp2OIfs4g5A==}
+  '@overwolf/ow-electron@31.7.7':
+    resolution: {integrity: sha512-5Z31MXVeGXtpmUfB52sE0N9OAOg8DHaSVu5X+Pgus5a84n2+AgDUHNHJ3890SICE8sThTWDaW83Suz7cxhWQSA==}
     engines: {node: '>= 10.17.0'}
     hasBin: true
 
@@ -3526,10 +3526,10 @@ packages:
   '@storybook/builder-manager@7.6.10':
     resolution: {integrity: sha512-f+YrjZwohGzvfDtH8BHzqM3xW0p4vjjg9u7uzRorqUiNIAAKHpfNrZ/WvwPlPYmrpAHt4xX/nXRJae4rFSygPw==}
 
-  '@storybook/builder-vite@8.6.0-alpha.0':
-    resolution: {integrity: sha512-31OJfaS6Aj3vFO/0pJE6iz3sDkQU6TB0m6/WfZ+i80Re4OG1pu5GCvP8bqOFuEAQpyc2sFKs6B+wOBvZuuSskg==}
+  '@storybook/builder-vite@8.6.0-beta.2':
+    resolution: {integrity: sha512-q6dHn+oLBm697mrsCxL+QLigTsqxpX9fo8Y/QWhJjlKT43pz9TNPqDEsUFcmU66PNnqJ8VXe9XzHyTlruDZF3A==}
     peerDependencies:
-      storybook: ^8.6.0-alpha.0
+      storybook: ^8.6.0-beta.2
       vite: ^4.0.0 || ^5.0.0 || ^6.0.0
 
   '@storybook/channels@7.6.10':
@@ -3563,10 +3563,10 @@ packages:
   '@storybook/csf-plugin@7.6.10':
     resolution: {integrity: sha512-Sc+zZg/BnPH2X28tthNaQBnDiFfO0QmfjVoOx0fGYM9SvY3P5ehzWwp5hMRBim6a/twOTzePADtqYL+t6GMqqg==}
 
-  '@storybook/csf-plugin@8.6.0-alpha.0':
-    resolution: {integrity: sha512-FkI3YW7ObEAFBQokJ04uPIQnBbnsfUKf08jriZ/nB03dcUNVDkl1GjPHONXJK8IwUKfKsiXRVqmrqJPSkK6xvQ==}
+  '@storybook/csf-plugin@8.6.0-beta.2':
+    resolution: {integrity: sha512-Be6F6E3lSzWct3ZKaJp1lR2PXStqHOutnFMp971m9IuNPj7Tija9HBSqbTool7JZFrVmPGbMoG9F7StHA8OAmQ==}
     peerDependencies:
-      storybook: ^8.6.0-alpha.0
+      storybook: ^8.6.0-beta.2
 
   '@storybook/csf-tools@7.6.10':
     resolution: {integrity: sha512-TnDNAwIALcN6SA4l00Cb67G02XMOrYU38bIpFJk5VMDX2dvgPjUtJNBuLmEbybGcOt7nPyyFIHzKcY5FCVGoWA==}
@@ -5423,8 +5423,8 @@ packages:
   electron-updater@6.3.9:
     resolution: {integrity: sha512-2PJNONi+iBidkoC5D1nzT9XqsE8Q1X28Fn6xRQhO3YX8qRRyJ3mkV4F1aQsuRnYPqq6Hw+E51y27W75WgDoofw==}
 
-  electron@31.7.5:
-    resolution: {integrity: sha512-8zFzVJdhxTRmoPcRiKkEmPW0bJHAUsTQJwEX2YJ8X0BVFIJLwSvHkSlpCjEExVbNCAk+gHnkIYX+2OyCXrRwHQ==}
+  electron@31.7.7:
+    resolution: {integrity: sha512-HZtZg8EHsDGnswFt0QeV8If8B+et63uD6RJ7I4/xhcXqmTIbI08GoubX/wm+HdY0DwcuPe1/xsgqpmYvjdjRoA==}
     engines: {node: '>= 12.20.55'}
     hasBin: true
 
@@ -12620,7 +12620,7 @@ snapshots:
       - electron-builder-squirrel-windows
       - supports-color
 
-  '@overwolf/ow-electron@31.7.3':
+  '@overwolf/ow-electron@31.7.7':
     dependencies:
       '@electron/get': 1.14.1
       '@types/node': 16.18.75
@@ -13875,9 +13875,9 @@ snapshots:
       - encoding
       - supports-color
 
-  '@storybook/builder-vite@8.6.0-alpha.0(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))':
+  '@storybook/builder-vite@8.6.0-beta.2(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))':
     dependencies:
-      '@storybook/csf-plugin': 8.6.0-alpha.0(storybook@7.6.10(encoding@0.1.13))
+      '@storybook/csf-plugin': 8.6.0-beta.2(storybook@7.6.10(encoding@0.1.13))
       browser-assert: 1.2.1
       storybook: 7.6.10(encoding@0.1.13)
       ts-dedent: 2.2.0
@@ -14070,7 +14070,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@storybook/csf-plugin@8.6.0-alpha.0(storybook@7.6.10(encoding@0.1.13))':
+  '@storybook/csf-plugin@8.6.0-beta.2(storybook@7.6.10(encoding@0.1.13))':
     dependencies:
       storybook: 7.6.10(encoding@0.1.13)
       unplugin: 1.6.0
@@ -16576,7 +16576,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  electron@31.7.5:
+  electron@31.7.7:
     dependencies:
       '@electron/get': 2.0.3
       '@types/node': 20.11.6
@@ -20609,7 +20609,7 @@ snapshots:
 
   storybook-solidjs-vite@1.0.0-beta.2(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0)):
     dependencies:
-      '@storybook/builder-vite': 8.6.0-alpha.0(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))
+      '@storybook/builder-vite': 8.6.0-beta.2(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))
     transitivePeerDependencies:
       - storybook
       - vite

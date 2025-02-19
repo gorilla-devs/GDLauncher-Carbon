@@ -49,7 +49,11 @@ mod app {
     use sentry::capture_error;
     use tracing::{error, info};
 
-    use crate::{cache_middleware, domain, iridium_client::get_client};
+    use crate::{
+        api::{update_core_module_status, CoreModuleStatus},
+        cache_middleware, domain,
+        iridium_client::get_client,
+    };
 
     use self::java::{
         discovery::{Discovery, RealDiscovery},
@@ -107,6 +111,8 @@ mod app {
                     }
                 };
 
+            update_core_module_status(CoreModuleStatus::LoadAndMigrate);
+
             let app = unsafe {
                 let app = Arc::new(UnsafeCell::new(MaybeUninit::<AppInner>::uninit()));
                 let unsaferef = UnsafeAppRef(Arc::downgrade(&app));
@@ -160,6 +166,8 @@ mod app {
                     .launch_background_tasks()
                     .await;
                 _app.meta_cache_manager().launch_background_tasks().await;
+
+                update_core_module_status(CoreModuleStatus::LaunchBackgroundTasks);
             });
 
             let _app = app.clone();

@@ -27,23 +27,34 @@ const GDLAccountRowItem = (props: {
   const addNotification = createNotification()
 
   return (
-    <div
-      class="flex justify-between items-center group"
-      onClick={() => {
-        if (!props.value) return
+    <div class="flex justify-between items-center">
+      <div
+        class="flex flex-col gap-2 justify-center group"
+        onClick={() => {
+          if (!props.value) return
 
-        navigator.clipboard.writeText(props.value)
+          navigator.clipboard.writeText(props.value)
 
-        addNotification({
-          name: "Copied to clipboard",
-          type: "success"
-        })
-      }}
-    >
-      <div class="flex flex-col gap-2 justify-center">
+          addNotification({
+            name: "Copied to clipboard",
+            type: "success"
+          })
+        }}
+      >
         <Show when={props.title}>
-          <div class="flex gap-4 items-center text-base font-light text-lightSlate-700 uppercase group-hover:text-lightSlate-50">
+          <div class="flex gap-4 items-center text-base font-light text-lightSlate-700 uppercase group-hover:text-lightSlate-50 transition-all duration-100 ease-in-out">
             {props.title}
+            <Show when={props.onEdit}>
+              <div
+                class="text-md underline text-lightSlate-700 hover:text-lightSlate-50 transition-all duration-100 ease-in-out"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  props.onEdit?.()
+                }}
+              >
+                EDIT
+              </div>
+            </Show>
             <div class="hidden group-hover:block">
               <div class="i-ri:clipboard-fill text-lightSlate-50" />
             </div>
@@ -56,9 +67,6 @@ const GDLAccountRowItem = (props: {
         </Show>
         {props.children}
       </div>
-      {/* <Show when={props.onEdit}>
-        <div class="text-md underline">EDIT</div>
-      </Show> */}
     </div>
   )
 }
@@ -318,7 +326,6 @@ const Accounts = () => {
                     <GDLAccountRowItem
                       title={t("settings:friend_code")}
                       value={validGDLUser()?.friendCode}
-                      onEdit={() => {}}
                     />
                     <GDLAccountRowItem
                       title={t("settings:microsoft_username")}
@@ -329,7 +336,6 @@ const Accounts = () => {
                             globalStore.settings.data?.gdlAccountId
                         )?.username
                       }
-                      onEdit={() => {}}
                     />
                     <GDLAccountRowItem
                       title={t("settings:microsoft_oid")}
@@ -338,7 +344,11 @@ const Accounts = () => {
                     <GDLAccountRowItem
                       title={t("settings:recovery_email")}
                       value={validGDLUser()?.email}
-                      onEdit={() => {}}
+                      onEdit={() => {
+                        modalsContext?.openModal({
+                          name: "changeGDLAccountRecoveryEmail"
+                        })
+                      }}
                     />
                     <GDLAccountRowItem
                       title={t("settings:microsoft_email")}

@@ -135,7 +135,32 @@ const theme = {
       menuEnter:
         "{ 0% { opacity: 0; transform: scale(0); } 100% { opacity: 1; transform: scale(1); } }",
       menuLeave:
-        "{ 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(0); } }"
+        "{ 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(0); } }",
+      logoReveal: `{ 
+        0% { 
+          clip-path: polygon(0 0, 0 0, 0 100%, 0 100%);
+          transform: scale(1.1);
+          opacity: 0;
+        }
+        40% {
+          transform: scale(1.2);
+          opacity: 1;
+        }
+        50% {
+          clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+        }
+        65% {
+          transform: scale(1.2);
+        }
+        85% {
+          transform: scale(0.95);
+        }
+        100% { 
+          transform: scale(1);
+          opacity: 1;
+          clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
+        }
+      }`
     },
 
     durations: {
@@ -145,7 +170,8 @@ const theme = {
       wiggle: "300ms",
       liveCirclePulse: "1s",
       menuEnter: "180ms",
-      menuLeave: "150ms"
+      menuLeave: "150ms",
+      logoReveal: "1.3s"
     },
     timingFns: {
       loadingbar: "linear",
@@ -154,14 +180,16 @@ const theme = {
       wiggles: "ease-in-out",
       liveCirclePulse: "ease-in-out",
       menuEnter: "cubic-bezier(0.4, 0.0, 0.2, 1)",
-      menuLeave: "cubic-bezier(0.4, 0.0, 0.2, 1)"
+      menuLeave: "cubic-bezier(0.4, 0.0, 0.2, 1)",
+      logoReveal: "cubic-bezier(0.22, 1, 0.36, 1)"
     },
     counts: {
       loadingbar: "infinite",
       enterWithOpacityChange: "forwards",
       liveCirclePulse: "infinite",
       menuEnter: "forwards",
-      menuLeave: "forwards"
+      menuLeave: "forwards",
+      logoReveal: "forwards"
     }
   },
   screens: {
