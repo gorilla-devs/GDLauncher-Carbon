@@ -29,10 +29,6 @@ function withAdsLayout() {
           ])
         }
       })
-      setMappedMcVersions((prev) => [
-        { key: "", label: "All version" },
-        ...prev
-      ])
     }
   })
 
@@ -46,8 +42,9 @@ function withAdsLayout() {
   })
 
   createEffect(() => {
-    if (routeData.curseforgeCategories.data)
+    if (routeData.curseforgeCategories.data) {
       setCurseforgeCategories(routeData.curseforgeCategories.data.data)
+    }
   })
 
   createEffect(() => {
@@ -59,13 +56,13 @@ function withAdsLayout() {
     <>
       <AppNavbar />
       <div
-        class="flex w-screen z-10 h-auto"
+        class="z-99 flex h-auto w-screen"
         style={{
           background: "var(--ads-sidebar-background)"
         }}
       >
         <main class="relative flex-grow">
-          <div class="flex justify-end h-[calc(100vh-60px)]">
+          <div class="flex h-[calc(100vh-60px)] justify-end">
             <div
               style={{
                 width: `calc(100vw - ${adSize.width}px)`
@@ -73,9 +70,9 @@ function withAdsLayout() {
             >
               <Outlet />
             </div>
-            <div class="flex flex-col justify-between h-[calc(100vh-100px)]">
+            <div class="flex h-full flex-col justify-between gap-4">
               <div
-                class="py-4"
+                // class="py-4"
                 style={{
                   width: `${adSize.width}px`,
                   height: `${adSize.height}px`

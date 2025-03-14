@@ -5,7 +5,14 @@ import {
   createSolidTable
 } from "@tanstack/solid-table"
 import { Trans, useTransContext } from "@gd/i18n"
-import { Button, createNotification, Popover, Tooltip } from "@gd/ui"
+import {
+  Button,
+  createNotification,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Tooltip
+} from "@gd/ui"
 import { port, rspc } from "@/utils/rspcClient"
 import PageTitle from "./components/PageTitle"
 import Row from "./components/Row"
@@ -27,9 +34,9 @@ const GDLAccountRowItem = (props: {
   const addNotification = createNotification()
 
   return (
-    <div class="flex justify-between items-center">
+    <div class="flex items-center justify-between">
       <div
-        class="flex flex-col gap-2 justify-center group"
+        class="group flex flex-col justify-center gap-2"
         onClick={() => {
           if (!props.value) return
 
@@ -42,11 +49,11 @@ const GDLAccountRowItem = (props: {
         }}
       >
         <Show when={props.title}>
-          <div class="flex gap-4 items-center text-base font-light text-lightSlate-700 uppercase group-hover:text-lightSlate-50 transition-all duration-100 ease-in-out">
+          <div class="text-lightSlate-700 group-hover:text-lightSlate-50 flex items-center gap-4 text-base font-light uppercase transition-all duration-100 ease-in-out">
             {props.title}
             <Show when={props.onEdit}>
               <div
-                class="text-md underline text-lightSlate-700 hover:text-lightSlate-50 transition-all duration-100 ease-in-out"
+                class="text-md text-lightSlate-700 hover:text-lightSlate-50 underline transition-all duration-100 ease-in-out"
                 onClick={(e) => {
                   e.stopPropagation()
                   props.onEdit?.()
@@ -61,7 +68,7 @@ const GDLAccountRowItem = (props: {
           </div>
         </Show>
         <Show when={props.value}>
-          <div class="text-lightSlate-50 text-ellipsis overflow-hidden whitespace-nowrap">
+          <div class="text-lightSlate-50 overflow-hidden text-ellipsis whitespace-nowrap">
             {props.value}
           </div>
         </Show>
@@ -86,12 +93,12 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
     accessorFn: (row) => row.username,
     id: "username",
     cell: (info) => (
-      <div class="flex gap-4 items-center">
+      <div class="flex items-center gap-4">
         <img
           src={`http://127.0.0.1:${port}/account/headImage?uuid=${info.row.original.uuid}`}
-          class="w-8 h-8 rounded-md"
+          class="h-8 w-8 rounded-md"
         />
-        <div class="truncate max-w-50 2xl:max-w-100">
+        <div class="max-w-50 2xl:max-w-100 truncate">
           {info.row.original.username}
         </div>
       </div>
@@ -116,19 +123,19 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
     accessorFn: (row) => row.status,
     id: "status",
     cell: (info) => (
-      <div class="flex justify-center items-center">
+      <div class="flex items-center justify-center">
         <Switch>
           <Match when={info.getValue() === "ok"}>
-            <div class="w-4 h-4 i-ri:check-fill text-green-500" />
+            <div class="i-ri:check-fill h-4 w-4 text-green-500" />
           </Match>
           <Match when={info.getValue() === "expired"}>
-            <div class="w-4 h-4 i-ri:alert-fill text-yellow-500" />
+            <div class="i-ri:alert-fill h-4 w-4 text-yellow-500" />
           </Match>
           <Match when={info.getValue() === "refreshing"}>
-            <div class="w-4 h-4 i-ri:refresh-line text-yellow-500" />
+            <div class="i-ri:refresh-line h-4 w-4 text-yellow-500" />
           </Match>
           <Match when={info.getValue() === "invalid"}>
-            <div class="w-4 h-4 i-ri:close-line text-red-500" />
+            <div class="i-ri:close-line h-4 w-4 text-red-500" />
           </Match>
         </Switch>
       </div>
@@ -144,7 +151,7 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
     id: "uuid",
     cell: (info) => (
       <div>
-        <div class="truncate max-w-50 2xl:max-w-100">
+        <div class="max-w-50 2xl:max-w-100 truncate">
           {info.getValue() as string}
         </div>
       </div>
@@ -248,40 +255,41 @@ const Accounts = () => {
           <Title>
             <Trans key="settings:gdl_account_title" />
           </Title>
-          <div class="bg-darkSlate-700 p-4 mb-6">
+          <div class="bg-darkSlate-700 mb-6 p-4">
             <Switch>
               <Match when={validGDLUser()}>
                 <div class="flex flex-col gap-4">
-                  <div class="flex gap-2 items-center justify-between">
-                    <div class="text-green-400 text-xl">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="text-xl text-green-400">
                       <Trans key="settings:gdl_account_synced" />
                     </div>
 
-                    <Popover
-                      content={() => (
+                    <Popover>
+                      <PopoverTrigger>
                         <div class="flex items-center gap-2">
-                          <i class="block w-6 h-6 i-ri:logout-box-line" />
+                          <i class="i-ri:logout-box-line block h-6 w-6" />
 
                           <Trans key="settings:log_out_gdl_account" />
                         </div>
-                      )}
-                    >
-                      <Button
-                        type="secondary"
-                        onClick={() => {
-                          removeGDLAccountMutation.mutate(undefined)
-                        }}
-                      >
-                        <i class="block w-6 h-6 i-ri:logout-box-line" />
-                      </Button>
+                      </PopoverTrigger>
+                      <PopoverContent>
+                        <Button
+                          type="secondary"
+                          onClick={() => {
+                            removeGDLAccountMutation.mutate(undefined)
+                          }}
+                        >
+                          <i class="i-ri:logout-box-line block h-6 w-6" />
+                        </Button>
+                      </PopoverContent>
                     </Popover>
                   </div>
                   <Show
                     when={validGDLUser() && !validGDLUser()?.isEmailVerified}
                   >
-                    <div class="flex items-center gap-8 justify-between outline outline-yellow-500 text-yellow-500 p-4 rounded-md mb-4">
+                    <div class="mb-4 flex items-center justify-between gap-8 rounded-md p-4 text-yellow-500 outline outline-yellow-500">
                       <div class="flex items-center gap-4">
-                        <i class="block w-6 h-6 i-ri:alert-fill" />
+                        <i class="i-ri:alert-fill block h-6 w-6" />
                         <Trans key="settings:gdl_account_not_verified" />
                       </div>
                       <Tooltip content={verificationContent()}>
@@ -319,7 +327,7 @@ const Accounts = () => {
                     <div class="flex items-center gap-4">
                       <img
                         src={validGDLUser()?.profileIconUrl}
-                        class="w-12 h-12 rounded-md"
+                        class="h-12 w-12 rounded-md"
                       />
                       {validGDLUser()?.nickname}
                     </div>
@@ -357,11 +365,11 @@ const Accounts = () => {
                   </div>
                 </div>
 
-                <div class="flex items-center gap-2 my-10 text-red-500 text-xl">
-                  <div class="w-4 h-4 i-ri:alert-fill" />
+                <div class="my-10 flex items-center gap-2 text-xl text-red-500">
+                  <div class="i-ri:alert-fill h-4 w-4" />
                   <Trans key="settings:danger_zone" />
                 </div>
-                <div class="flex items-center justify-between gap-12 text-lightSlate-700">
+                <div class="text-lightSlate-700 flex items-center justify-between gap-12">
                   <div>
                     <Trans key="settings:request_account_deletion_description" />
                   </div>
@@ -376,15 +384,15 @@ const Accounts = () => {
                         })
                       }}
                     >
-                      <i class="block w-6 h-6 i-ri:delete-bin-7-fill" />
+                      <i class="i-ri:delete-bin-7-fill block h-6 w-6" />
                       <Trans key="settings:request_account_deletion" />
                     </Button>
                   </Tooltip>
                 </div>
               </Match>
               <Match when={!validGDLUser() && !invalidGDLUser()}>
-                <div class="flex gap-2 items-center justify-between">
-                  <div class="text-red-400 text-xl">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="text-xl text-red-400">
                     <Trans key="settings:gdl_account_not_synced" />
                   </div>
 
@@ -400,8 +408,8 @@ const Accounts = () => {
                 </div>
               </Match>
               <Match when={invalidGDLUser()}>
-                <div class="flex gap-2 items-center justify-between">
-                  <div class="text-yellow-400 text-xl">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="text-xl text-yellow-400">
                     <Trans key="settings:gdl_account_error" />
                   </div>
 
@@ -411,7 +419,7 @@ const Accounts = () => {
                       removeGDLAccountMutation.mutate(undefined)
                     }}
                   >
-                    <i class="block w-6 h-6 i-ri:logout-box-line" />
+                    <i class="i-ri:logout-box-line block h-6 w-6" />
                     <Trans key="settings:log_out_gdl_account" />
                   </Button>
                 </div>
@@ -446,7 +454,7 @@ const Accounts = () => {
                   <For each={headerGroup.headers}>
                     {(header, i) => (
                       <th
-                        class={`text-lightSlate-900 border-0 border-darkSlate-500 border-solid ${i() !== 0 ? "border-l-1" : ""}`}
+                        class={`text-lightSlate-900 border-darkSlate-500 border-0 border-solid ${i() !== 0 ? "border-l-1" : ""}`}
                       >
                         {header.isPlaceholder
                           ? null
@@ -464,11 +472,11 @@ const Accounts = () => {
           <tbody>
             <For each={accountsTable.getRowModel().rows}>
               {(row) => (
-                <tr class="hover:bg-darkSlate-700 transition-colors duration-100 ease-in-out group/external">
+                <tr class="hover:bg-darkSlate-700 group/external transition-colors duration-100 ease-in-out">
                   <For each={row.getVisibleCells()}>
                     {(cell, i) => (
                       <td
-                        class="group/internal text-lightSlate-300 relative py-2 px-4 border-0 border-transparent group-hover/external:border-darkSlate-500 border-solid"
+                        class="group/internal text-lightSlate-300 group-hover/external:border-darkSlate-500 relative border-0 border-solid border-transparent px-4 py-2"
                         classList={{
                           "hover:text-lightSlate-50":
                             cell.column.columnDef.id === "username" ||
@@ -499,20 +507,20 @@ const Accounts = () => {
                       >
                         <Switch>
                           <Match when={cell.column.columnDef.id === "actions"}>
-                            <div class="flex gap-4 items-center justify-center w-full">
+                            <div class="flex w-full items-center justify-center gap-4">
                               <Show when={row.original.status !== "ok"}>
                                 <div class="w-full text-yellow-500 hover:text-yellow-200">
                                   <div
-                                    class="w-4 h-4 i-ri:refresh-line"
+                                    class="i-ri:refresh-line h-4 w-4"
                                     onClick={async () => {
                                       navigate("/?addMicrosoftAccount=true")
                                     }}
                                   />
                                 </div>
                               </Show>
-                              <div class="w-full flex justify-center items-center hover:text-red-500">
+                              <div class="flex w-full items-center justify-center hover:text-red-500">
                                 <div
-                                  class="w-4 h-4 i-ri:delete-bin-2-fill"
+                                  class="i-ri:delete-bin-2-fill h-4 w-4"
                                   onClick={async () => {
                                     const gdlAccountUuid =
                                       globalStore.settings.data?.gdlAccountId
@@ -553,7 +561,7 @@ const Accounts = () => {
                             }
                           >
                             <div class="flex items-center justify-center">
-                              <div class="w-4 h-4 text-lightSlate-50 i-ri:checkbox-circle-fill" />
+                              <div class="text-lightSlate-50 i-ri:checkbox-circle-fill h-4 w-4" />
                             </div>
                           </Match>
                           <Match
@@ -563,8 +571,8 @@ const Accounts = () => {
                                 globalStore.currentlySelectedAccountUuid.data
                             }
                           >
-                            <div class="flex items-center justify-center opacity-0 group-hover/internal:opacity-100 duration-100 ease-in-out">
-                              <div class="w-4 h-4 text-darkSlate-300 i-ri:checkbox-circle-fill" />
+                            <div class="flex items-center justify-center opacity-0 duration-100 ease-in-out group-hover/internal:opacity-100">
+                              <div class="text-darkSlate-300 i-ri:checkbox-circle-fill h-4 w-4" />
                             </div>
                           </Match>
                           <Match
@@ -573,7 +581,7 @@ const Accounts = () => {
                               cell.column.columnDef.id === "uuid"
                             }
                           >
-                            <div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover/internal:opacity-100 duration-100 ease-in-out">
+                            <div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 duration-100 ease-in-out group-hover/internal:opacity-100">
                               <div class="i-ri:clipboard-fill text-lightSlate-50" />
                             </div>
                           </Match>

@@ -67,8 +67,8 @@ function Settings() {
 
   return (
     <>
-      <ContentWrapper>
-        <div class="w-full box-border sticky top-0 z-50">
+      <ContentWrapper zeroPadding>
+        <div class="w-full box-border sticky top-0 z-50 px-6">
           <Tabs
             orientation="horizontal"
             defaultIndex={settings.findIndex(
@@ -98,7 +98,9 @@ function Settings() {
           </Tabs>
         </div>
         <div class="pt-4 h-1 w-1" />
-        <Outlet />
+        <div class="px-6">
+          <Outlet />
+        </div>
         <div class="pb-4 h-1 w-1" />
       </ContentWrapper>
     </>

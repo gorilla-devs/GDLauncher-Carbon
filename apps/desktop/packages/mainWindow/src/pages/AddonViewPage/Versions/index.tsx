@@ -1,5 +1,5 @@
 import { useRouteData, useSearchParams } from "@solidjs/router"
-import fetchData from "../../mods.versions"
+import fetchData from "../mods.versions"
 import VersionRow from "./VersionRow"
 import { rspc } from "@/utils/rspcClient"
 import MainContainer from "@/components/Browser/MainContainer"

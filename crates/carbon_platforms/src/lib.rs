@@ -1,4 +1,4 @@
-use std::{fmt, str::FromStr};
+use std::str::FromStr;
 
 use anyhow::{anyhow, bail};
 use chrono::{DateTime, Utc};

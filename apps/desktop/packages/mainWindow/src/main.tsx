@@ -17,6 +17,7 @@ import { ModalProvider } from "@/managers/ModalsManager"
 import "virtual:uno.css"
 import "@gd/ui/style.css"
 import { ContextMenuProvider, NotificationsProvider, Progressbar } from "@gd/ui"
+import "@unocss/reset/tailwind.css"
 import { NavigationManager } from "./managers/NavigationManager"
 // import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
 import RiveAppWapper from "./utils/RiveAppWrapper"

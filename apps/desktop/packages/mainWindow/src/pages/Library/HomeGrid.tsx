@@ -9,9 +9,21 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
   Dropdown,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuPortal,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
   Input,
-  News,
   Popover,
+  PopoverContent,
+  PopoverTrigger,
   Skeleton,
   Slider
 } from "@gd/ui"
@@ -22,56 +34,24 @@ import {
   Switch,
   createEffect,
   createMemo,
-  createResource,
   createSignal,
   onMount
 } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import InstanceTile from "@/components/InstanceTile"
 import skull from "/assets/images/icons/skull.png"
-import DefaultImg from "/assets/images/default-instance-img.png"
 import UnstableCard from "@/components/UnstableCard"
-import FeaturedModpackTile from "./FeaturedModpackTile"
 import {
   InstancesGroupBy,
   InstancesSortBy,
   ListInstance,
   ValidListInstance
 } from "@gd/core_module/bindings"
-import { initNews } from "@/utils/news"
 import { rspc } from "@/utils/rspcClient"
 import { createStore, reconcile } from "solid-js/store"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { useModal } from "@/managers/ModalsManager"
 import Announcements from "@/components/Announcements"
-
-const NewsWrapper = () => {
-  const newsInitializer = initNews()
-
-  const [news] = createResource(() => newsInitializer)
-
-  return (
-    <div class="flex gap-4">
-      <div class="flex-1 flex-grow">
-        <Switch>
-          <Match when={(news()?.length || 0) > 0}>
-            <News
-              slides={news()}
-              onClick={(news) => {
-                window.openExternalLink(news.url || "")
-              }}
-              fallBackImg={DefaultImg}
-            />
-          </Match>
-          <Match when={news.length === 0}>
-            <Skeleton.news />
-          </Match>
-        </Switch>
-      </div>
-      <FeaturedModpackTile />
-    </div>
-  )
-}
 
 let initAnimationRan = false
 
@@ -339,13 +319,9 @@ const HomeGrid = () => {
   return (
     <div class="p-6">
       <UnstableCard />
-      <Announcements />
-      <Show when={globalStore.settings.data?.showNews}>
-        <NewsWrapper />
-      </Show>
       <Switch>
         <Match when={globalStore.instances.isLoading}>
-          <div class="mt-8">
+          <div>
             <Skeleton.instances />
           </div>
         </Match>
@@ -369,7 +345,7 @@ const HomeGrid = () => {
           }
         >
           <div>
-            <div class="bg-darkSlate-800 sticky top-0 mt-8 flex items-center gap-4 py-4 z-5">
+            <div class="bg-darkSlate-800 z-5 sticky top-0 flex items-center gap-4 py-4">
               <Input
                 ref={inputRef}
                 placeholder={t("search_instances")}
@@ -393,155 +369,263 @@ const HomeGrid = () => {
                   </Switch>
                 }
               />
-              <Popover
-                trigger="click"
-                noTip
-                noPadding
-                content={() => (
-                  <div class="w-100 flex h-auto flex-col gap-y-6 p-4">
-                    <div class="mb-4 text-2xl">
-                      <Trans key="general.instances_filters" />
-                    </div>
-                    <div class="flex w-full items-center justify-between">
-                      <div>
-                        <Trans key="general.instance_tile_size" />
-                      </div>
-                      <div class="w-50 flex items-center">
-                        <Slider
-                          min={1}
-                          max={5}
-                          marks={[]}
-                          steps={1}
-                          value={instancesTileSize()}
-                          onChange={(value) => {
-                            if (!value) return
-
-                            setInstancesTileSize(value)
-                          }}
-                          OnRelease={(value) => {
-                            if (
-                              value ===
-                              globalStore.settings.data?.instancesTileSize
-                            ) {
-                              return
-                            }
-
-                            settingsMutation.mutate({
-                              instancesTileSize: {
-                                Set: value
-                              }
-                            })
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div class="flex w-full items-center justify-between">
-                      <div>
-                        <Trans key="general.sort_by" />
-                      </div>
-                      <div class="flex items-center gap-4">
-                        <Dropdown
-                          class="w-40"
-                          options={sortByOptions}
-                          icon={<div class="i-ri:price-tag-3-fill" />}
-                          value={globalStore.settings.data?.instancesSortBy}
-                          onChange={(val) => {
-                            settingsMutation.mutate({
-                              instancesSortBy: {
-                                Set: val.key as InstancesSortBy
-                              }
-                            })
-                          }}
-                        />
-                        <div
-                          class="text-lightSlate-700 hover:text-lightSlate-50 h-6 w-6"
-                          classList={{
-                            "i-ri:sort-alphabet-asc":
-                              globalStore.settings.data?.instancesSortByAsc,
-                            "i-ri:sort-alphabet-desc":
-                              !globalStore.settings.data?.instancesSortByAsc
-                          }}
-                          onClick={() => {
-                            settingsMutation.mutate({
-                              instancesSortByAsc: {
-                                Set: !globalStore.settings.data
-                                  ?.instancesSortByAsc
-                              }
-                            })
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div class="flex w-full items-center justify-between">
-                      <div>
-                        <Trans key="general.group_by" />
-                      </div>
-                      <div class="flex items-center gap-4">
-                        <Dropdown
-                          class="w-40"
-                          options={groupByOptions}
-                          icon={<div class="i-ri:price-tag-3-fill" />}
-                          value={globalStore.settings.data?.instancesGroupBy}
-                          onChange={(val) => {
-                            settingsMutation.mutate({
-                              instancesGroupBy: {
-                                Set: val.key as InstancesGroupBy
-                              }
-                            })
-                          }}
-                        />
-                        <div
-                          class="text-lightSlate-700 hover:text-lightSlate-50 h-6 w-6"
-                          classList={{
-                            "i-ri:sort-alphabet-asc":
-                              globalStore.settings.data?.instancesGroupByAsc,
-                            "i-ri:sort-alphabet-desc":
-                              !globalStore.settings.data?.instancesGroupByAsc
-                          }}
-                          onClick={() => {
-                            settingsMutation.mutate({
-                              instancesGroupByAsc: {
-                                Set: !globalStore.settings.data
-                                  ?.instancesGroupByAsc
-                              }
-                            })
-                          }}
-                        />
-                      </div>
-                    </div>
-                    <div class="flex justify-end">
-                      <span
-                        class="text-lightSlate-700 hover:text-lightSlate-50 mt-4"
+              <DropdownMenu>
+                <DropdownMenuTrigger>
+                  <Button type="secondary" size="small">
+                    <i class="i-ri:filter-fill h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent class="w-64">
+                  <DropdownMenuLabel>
+                    <div class="flex items-center justify-between gap-2">
+                      <div>Platform</div>
+                      <div
+                        class="text-lightSlate-900 hover:text-lightSlate-50 text-xs transition-colors duration-200 ease-[cubic-bezier(.4,0,.2,1)]"
                         onClick={() => {
+                          // Reset all filter settings to defaults
                           settingsMutation.mutate({
-                            instancesSortBy: {
-                              Set: "name"
-                            },
-                            instancesSortByAsc: {
-                              Set: true
-                            },
-                            instancesGroupBy: {
-                              Set: "group"
-                            },
-                            instancesGroupByAsc: {
-                              Set: true
-                            },
-                            instancesTileSize: {
-                              Set: 2
-                            }
+                            instancesTileSize: { Set: 2 },
+                            instancesSortBy: { Set: "name" },
+                            instancesSortByAsc: { Set: true },
+                            instancesGroupBy: { Set: "group" },
+                            instancesGroupByAsc: { Set: true }
                           })
+                          setInstancesTileSize(2)
                         }}
                       >
-                        <Trans key="general.reset_filters" />
-                      </span>
+                        Reset
+                      </div>
                     </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+
+                  <div class="flex w-full flex-col">
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger class="w-full">
+                        <div class="flex w-full items-center justify-between">
+                          <Trans key="general.instance_tile_size" />
+                          <div class="flex items-center gap-2">
+                            <span>{instancesTileSize()}</span>
+                          </div>
+                        </div>
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuPortal>
+                        <DropdownMenuSubContent>
+                          <DropdownMenuLabel>Tile Size</DropdownMenuLabel>
+                          <DropdownMenuRadioGroup
+                            value={instancesTileSize().toString()}
+                          >
+                            <For each={[1, 2, 3, 4, 5]}>
+                              {(size) => (
+                                <DropdownMenuRadioItem
+                                  value={size.toString()}
+                                  onSelect={() => {
+                                    setInstancesTileSize(size)
+                                    settingsMutation.mutate({
+                                      instancesTileSize: {
+                                        Set: size
+                                      }
+                                    })
+                                  }}
+                                >
+                                  {size}
+                                </DropdownMenuRadioItem>
+                              )}
+                            </For>
+                          </DropdownMenuRadioGroup>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuPortal>
+                    </DropdownMenuSub>
+
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger class="w-full">
+                        <div class="flex w-full items-center justify-between">
+                          <Trans key="general.sort_by" />
+                          <div class="flex items-center gap-2">
+                            <span>
+                              {sortByOptions.find(
+                                (opt) =>
+                                  opt.key ===
+                                  globalStore.settings.data?.instancesSortBy
+                              )?.label || "Name"}
+                            </span>
+                            {globalStore.settings.data?.instancesSortBy && (
+                              <div
+                                class="h-4 w-4 ml-2"
+                                classList={{
+                                  "i-ri:sort-alphabet-asc":
+                                    globalStore.settings.data
+                                      ?.instancesSortByAsc,
+                                  "i-ri:sort-alphabet-desc":
+                                    !globalStore.settings.data
+                                      ?.instancesSortByAsc
+                                }}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuPortal>
+                        <DropdownMenuSubContent>
+                          <DropdownMenuLabel>Sort Options</DropdownMenuLabel>
+                          <DropdownMenuRadioGroup
+                            value={
+                              globalStore.settings.data?.instancesSortBy || ""
+                            }
+                          >
+                            <For each={sortByOptions}>
+                              {(option) => (
+                                <DropdownMenuRadioItem
+                                  value={option.key}
+                                  onSelect={() => {
+                                    const currentOption =
+                                      globalStore.settings.data?.instancesSortBy
+                                    const currentDirection =
+                                      globalStore.settings.data
+                                        ?.instancesSortByAsc
+
+                                    // If clicking the same option
+                                    if (currentOption === option.key) {
+                                      // Toggle direction
+                                      settingsMutation.mutate({
+                                        instancesSortByAsc: {
+                                          Set: !currentDirection
+                                        }
+                                      })
+                                    } else {
+                                      // New option, set to ascending by default
+                                      settingsMutation.mutate({
+                                        instancesSortBy: {
+                                          Set: option.key
+                                        },
+                                        instancesSortByAsc: {
+                                          Set: true
+                                        }
+                                      })
+                                    }
+                                  }}
+                                >
+                                  <div class="flex w-full items-center justify-between">
+                                    <span>{option.label}</span>
+                                    {globalStore.settings.data
+                                      ?.instancesSortBy === option.key && (
+                                      <div
+                                        class="h-4 w-4 ml-4"
+                                        classList={{
+                                          "i-ri:sort-alphabet-asc":
+                                            globalStore.settings.data
+                                              ?.instancesSortByAsc,
+                                          "i-ri:sort-alphabet-desc":
+                                            !globalStore.settings.data
+                                              ?.instancesSortByAsc
+                                        }}
+                                      />
+                                    )}
+                                  </div>
+                                </DropdownMenuRadioItem>
+                              )}
+                            </For>
+                          </DropdownMenuRadioGroup>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuPortal>
+                    </DropdownMenuSub>
+
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger class="w-full">
+                        <div class="flex w-full items-center justify-between">
+                          <Trans key="general.group_by" />
+                          <div class="flex items-center gap-2">
+                            <span>
+                              {groupByOptions.find(
+                                (opt) =>
+                                  opt.key ===
+                                  globalStore.settings.data?.instancesGroupBy
+                              )?.label || "Group"}
+                            </span>
+                            {globalStore.settings.data?.instancesGroupBy && (
+                              <div
+                                class="h-4 w-4 ml-2"
+                                classList={{
+                                  "i-ri:sort-alphabet-asc":
+                                    globalStore.settings.data
+                                      ?.instancesGroupByAsc,
+                                  "i-ri:sort-alphabet-desc":
+                                    !globalStore.settings.data
+                                      ?.instancesGroupByAsc
+                                }}
+                              />
+                            )}
+                          </div>
+                        </div>
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuPortal>
+                        <DropdownMenuSubContent>
+                          <DropdownMenuLabel>Group Options</DropdownMenuLabel>
+                          <DropdownMenuRadioGroup
+                            value={
+                              globalStore.settings.data?.instancesGroupBy || ""
+                            }
+                          >
+                            <For each={groupByOptions}>
+                              {(option) => (
+                                <DropdownMenuRadioItem
+                                  value={option.key}
+                                  onSelect={() => {
+                                    const currentOption =
+                                      globalStore.settings.data
+                                        ?.instancesGroupBy
+                                    const currentDirection =
+                                      globalStore.settings.data
+                                        ?.instancesGroupByAsc
+
+                                    // If clicking the same option
+                                    if (currentOption === option.key) {
+                                      // Toggle direction
+                                      settingsMutation.mutate({
+                                        instancesGroupByAsc: {
+                                          Set: !currentDirection
+                                        }
+                                      })
+                                    } else {
+                                      // New option, set to ascending by default
+                                      settingsMutation.mutate({
+                                        instancesGroupBy: {
+                                          Set: option.key
+                                        },
+                                        instancesGroupByAsc: {
+                                          Set: true
+                                        }
+                                      })
+                                    }
+                                  }}
+                                >
+                                  <div class="flex w-full items-center justify-between">
+                                    <span>{option.label}</span>
+                                    {globalStore.settings.data
+                                      ?.instancesGroupBy === option.key && (
+                                      <div
+                                        class="h-4 w-4 ml-4"
+                                        classList={{
+                                          "i-ri:sort-alphabet-asc":
+                                            globalStore.settings.data
+                                              ?.instancesGroupByAsc,
+                                          "i-ri:sort-alphabet-desc":
+                                            !globalStore.settings.data
+                                              ?.instancesGroupByAsc
+                                        }}
+                                      />
+                                    )}
+                                  </div>
+                                </DropdownMenuRadioItem>
+                              )}
+                            </For>
+                          </DropdownMenuRadioGroup>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuPortal>
+                    </DropdownMenuSub>
                   </div>
-                )}
-              >
-                <Button type="secondary" size="small">
-                  <i class="i-ri:filter-fill h-4 w-4" />
-                </Button>
-              </Popover>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <ContextMenu>
               <ContextMenuTrigger>

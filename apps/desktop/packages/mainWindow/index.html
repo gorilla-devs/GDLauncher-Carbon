@@ -14,7 +14,7 @@
        img-src 'self' data: https: blob: http://127.0.0.1:* http://localhost:* http://i.imgur.com;
        default-src 'unsafe-inline' 'self';
        frame-src 'self' https: https://youtube.com;
-       connect-src 'self' data: ws://127.0.0.1:* https://www.minecraft.net https://launchercontent.mojang.com/news.json http://127.0.0.1:* https://unpkg.com/@rive-app/canvas@2.21.5/rive.wasm https://cdn.jsdelivr.net/npm/@rive-app/canvas@2.21.5/rive_fallback.wasm https://*.gdl.gg;
+       connect-src 'self' data: ws://127.0.0.1:* https://www.minecraft.net https://launchercontent.mojang.com http://127.0.0.1:* https://unpkg.com/@rive-app/canvas@2.21.5/rive.wasm https://cdn.jsdelivr.net/npm/@rive-app/canvas@2.21.5/rive_fallback.wasm https://*.gdl.gg;
      "
     />
 
@@ -120,6 +120,21 @@
         font-family: var(--font);
       }
 
+      .disable-view-transition {
+        view-transition-name: disable-view-transition;
+      }
+
+      ::view-transition-old(disable-view-transition),
+      ::view-transition-new(disable-view-transition) {
+        animation-duration: 0s;
+      }
+
+      html,
+      body {
+        background: rgb(var(--darkSlate-800));
+        color: white;
+      }
+
       img {
         -webkit-user-drag: none;
       }
@@ -201,6 +216,8 @@
     <title>GDLauncher Carbon</title>
     <script type="module">
       import { mainTheme } from "@gd/ui"
+
+      window.scrollRestoration = "manual"
 
       for (const key in mainTheme) {
         document.documentElement.style.setProperty(`--${key}`, mainTheme[key])

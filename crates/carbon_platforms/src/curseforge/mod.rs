@@ -268,6 +268,7 @@ pub enum ClassId {
     Worlds = 17,
     Addons = 4559,
     Shaders = 6552,
+    Datapacks = 6945,
     Other(u16),
 }
 
@@ -328,6 +329,7 @@ impl<'de> Deserialize<'de> for ClassId {
             17 => Ok(Self::Worlds),
             4559 => Ok(Self::Addons),
             6552 => Ok(Self::Shaders),
+            6945 => Ok(Self::Datapacks),
             other => Ok(Self::Other(other)),
         }
     }
@@ -346,6 +348,7 @@ impl Serialize for ClassId {
             Self::BukkitPlugins => 5,
             Self::Worlds => 17,
             Self::Addons => 4559,
+            Self::Datapacks => 6945,
             Self::Shaders => 6552,
             Self::Other(other) => *other,
         })
@@ -530,7 +533,7 @@ pub struct Category {
     pub icon_url: Option<String>,
     pub date_modified: String,
     pub is_class: Option<bool>,
-    pub class_id: Option<i32>,
+    pub class_id: Option<ClassId>,
     pub parent_category_id: Option<i32>,
     pub display_index: Option<i32>,
 }

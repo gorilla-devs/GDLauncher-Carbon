@@ -22,6 +22,9 @@ opt-level = "s"
 incremental = true
 debug-assertions = true
 
+[profile.dev]
+opt-level = 1
+
 [workspace.dependencies]
 anyhow = { version = "1.0.86", features = ["backtrace"] }
 async-stream = "0.3.5"

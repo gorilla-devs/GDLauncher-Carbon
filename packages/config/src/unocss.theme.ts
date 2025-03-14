@@ -136,6 +136,18 @@ const theme = {
         "{ 0% { opacity: 0; transform: scale(0); } 100% { opacity: 1; transform: scale(1); } }",
       menuLeave:
         "{ 0% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(0); } }",
+      popoverEnter:
+        "{ 0% { opacity: 0; transform: translateY(4px); } 100% { opacity: 1; transform: translateY(0); } }",
+      popoverLeave:
+        "{ 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(4px); } }",
+      selectEnter:
+        "{ 0% { opacity: 0; transform: translateY(-4px); } 100% { opacity: 1; transform: translateY(0); } }",
+      selectLeave:
+        "{ 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-4px); } }",
+      searchbarEnter:
+        "{ 0% { opacity: 0; transform: scaleY(0.95) translateY(-2.5%); } 100% { opacity: 1; transform: scaleY(1) translateY(0); } }",
+      searchbarLeave:
+        "{ 0% { opacity: 1; transform: scaleY(1) translateY(0); } 100% { opacity: 0; transform: scaleY(0.95) translateY(-2.5%); } }",
       logoReveal: `{ 
         0% { 
           clip-path: polygon(0 0, 0 0, 0 100%, 0 100%);
@@ -171,16 +183,28 @@ const theme = {
       liveCirclePulse: "1s",
       menuEnter: "180ms",
       menuLeave: "150ms",
+      popoverEnter: "200ms",
+      popoverLeave: "150ms",
+      selectEnter: "150ms",
+      selectLeave: "150ms",
+      searchbarEnter: "200ms",
+      searchbarLeave: "150ms",
       logoReveal: "1.3s"
     },
     timingFns: {
-      loadingbar: "linear",
-      enterWithOpacityChange: "ease-in-out",
-      scaleBounce: "cubic-bezier(0.68, -0.55, 0.265, 1.55)",
-      wiggles: "ease-in-out",
-      liveCirclePulse: "ease-in-out",
-      menuEnter: "cubic-bezier(0.4, 0.0, 0.2, 1)",
-      menuLeave: "cubic-bezier(0.4, 0.0, 0.2, 1)",
+      loadingbar: "cubic-bezier(.4,0,.2,1)",
+      enterWithOpacityChange: "cubic-bezier(.4,0,.2,1)",
+      scaleBounce: "cubic-bezier(.4,0,.2,1)",
+      wiggles: "cubic-bezier(.4,0,.2,1)",
+      liveCirclePulse: "cubic-bezier(.4,0,.2,1)",
+      menuEnter: "cubic-bezier(.4,0,.2,1)",
+      menuLeave: "cubic-bezier(.4,0,.2,1)",
+      popoverEnter: "cubic-bezier(.4,0,.2,1)",
+      popoverLeave: "cubic-bezier(.4,0,.2,1)",
+      selectEnter: "cubic-bezier(.4,0,.2,1)",
+      selectLeave: "cubic-bezier(.4,0,.2,1)",
+      searchbarEnter: "cubic-bezier(.4,0,.2,1)",
+      searchbarLeave: "cubic-bezier(.4,0,.2,1)",
       logoReveal: "cubic-bezier(0.22, 1, 0.36, 1)"
     },
     counts: {
@@ -189,6 +213,12 @@ const theme = {
       liveCirclePulse: "infinite",
       menuEnter: "forwards",
       menuLeave: "forwards",
+      popoverEnter: "forwards",
+      popoverLeave: "forwards",
+      selectEnter: "forwards",
+      selectLeave: "forwards",
+      searchbarEnter: "forwards",
+      searchbarLeave: "forwards",
       logoReveal: "forwards"
     }
   },

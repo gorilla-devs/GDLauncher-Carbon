@@ -1,11 +1,12 @@
 // New components
 export * from "./DropdownMenu"
 export * from "./Menu"
+export * from "./Badge"
 export * from "./Popover"
+export * from "./Select"
 
 export { Button } from "./Button"
 export { Input } from "./Input"
-export { Select } from "./Select"
 export { Carousel } from "./Carousel"
 export { Slider } from "./Slider"
 export { Switch } from "./Switch"

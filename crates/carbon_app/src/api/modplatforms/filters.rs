@@ -6,10 +6,10 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 
 use super::curseforge::filters::CFFEModSearchParametersQuery;
-use super::modrinth;
 use super::{curseforge, FESearchAPI};
+use super::{modrinth, FEUnifiedSearchType};
 
-#[derive(Type, Debug, Deserialize, Serialize)]
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Or<T>(pub Vec<T>);
 
@@ -47,7 +47,7 @@ impl<T> FromIterator<T> for Or<T> {
     }
 }
 
-#[derive(Type, Debug, Deserialize, Serialize)]
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct And<T>(pub Vec<Or<T>>);
 
@@ -103,7 +103,7 @@ impl<T> From<Or<T>> for And<T> {
     }
 }
 
-#[derive(Type, Debug, Deserialize, Serialize)]
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum FEUnifiedModSortIndex {
     CurseForge(curseforge::filters::CFFEModSearchSortField),
@@ -214,40 +214,14 @@ impl TryFrom<FEUnifiedModLoaderType> for modrinth::structs::MRFELoaderType {
     }
 }
 
-#[derive(Type, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum FEUnifiedSearchType {
-    Mod,
-    ModPack,
-}
-
-impl Display for FEUnifiedSearchType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let out = match self {
-            FEUnifiedSearchType::Mod => "mod",
-            FEUnifiedSearchType::ModPack => "modpack",
-        };
-        write!(f, "{}", out)
-    }
-}
-
-impl From<FEUnifiedSearchType> for curseforge::structs::CFFEClassId {
-    fn from(value: FEUnifiedSearchType) -> Self {
-        match value {
-            FEUnifiedSearchType::Mod => curseforge::structs::CFFEClassId::Mods,
-            FEUnifiedSearchType::ModPack => curseforge::structs::CFFEClassId::Modpacks,
-        }
-    }
-}
-
-#[derive(Type, Debug, Deserialize, Serialize)]
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum FEUnifiedSearchCategoryID {
     Curseforge(i32),
     Modrinth(String),
 }
 
-#[derive(Type, Debug, Deserialize, Serialize)]
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FEUnifiedSearchParameters {
     pub search_query: Option<String>,
@@ -259,7 +233,7 @@ pub struct FEUnifiedSearchParameters {
     pub sort_order: Option<curseforge::filters::CFFEModSearchSortOrder>,
     pub index: Option<u32>,
     pub page_size: Option<u32>,
-    pub search_api: FESearchAPI,
+    pub search_api: Option<FESearchAPI>,
 }
 
 impl From<FEUnifiedSearchParameters> for curseforge::filters::CFFEModSearchParameters {

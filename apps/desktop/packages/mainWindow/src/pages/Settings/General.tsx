@@ -63,22 +63,8 @@ const General = () => {
       </PageTitle>
       <RowsContainer>
         <Row>
-          <Title
-            description={
-              <Trans
-                key="settings:release_channel_text"
-                options={{
-                  defaultValue: "Select the preferred release channel"
-                }}
-              />
-            }
-          >
-            <Trans
-              key="settings:release_channel_title"
-              options={{
-                defaultValue: "Release Channel"
-              }}
-            />
+          <Title description={<Trans key="settings:release_channel_text" />}>
+            <Trans key="settings:release_channel_title" />
           </Title>
           <RightHandSide>
             <Dropdown

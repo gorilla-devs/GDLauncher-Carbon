@@ -1,9 +1,7 @@
 import { useLocation, useMatch, useRouteData } from "@solidjs/router"
-import { For, Match, Show, Switch, createEffect } from "solid-js"
+import { Match, Show, Switch, createEffect } from "solid-js"
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg"
-import { NAVBAR_ROUTES } from "@/constants"
-import { Tab, TabList, Tabs, Spacing, Tooltip, Button } from "@gd/ui"
-import getRouteIndex from "@/route/getRouteIndex"
+import { Tab, TabList, Tabs, Tooltip, Button } from "@gd/ui"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import fetchData from "@/pages/app.data"
 import { AccountsDropdown } from "./AccountsDropdown"
@@ -16,8 +14,9 @@ import updateAvailable, {
 } from "@/utils/updater"
 import { Trans } from "@gd/i18n"
 import { useModal } from "@/managers/ModalsManager"
+import NavSearchInput from "./NavSearchInput"
 
-interface AccountsStatus {
+export interface AccountsStatus {
   label: {
     name: string
     icon: string | undefined
@@ -37,15 +36,12 @@ const AppNavbar = () => {
   const isLogin = useMatch(() => "/")
   const isSettings = useMatch(() => "/settings")
   const isSettingsNested = useMatch(() => "/settings/*")
-
-  // const blockingMutation = rspc.createMutation(() => ({
-  //   mutationKey: "longRunning"
-  // }));
-
-  const selectedIndex = () =>
-    !!isSettings() || !!isSettingsNested()
-      ? 5
-      : getRouteIndex(NAVBAR_ROUTES, location.pathname)
+  const isNews = useMatch(() => "/news/*")
+  const selectedIndex = () => {
+    if (isSettings() || isSettingsNested()) return 0
+    if (isNews()) return 1
+    return -1
+  }
 
   const routeData = useRouteData<typeof fetchData>()
 
@@ -73,72 +69,51 @@ const AppNavbar = () => {
   return (
     <Show when={!isLogin()}>
       <nav
-        class="flex items-center bg-darkSlate-800 text-lightSlate-50 px-5"
+        class="disable-view-transition bg-darkSlate-800 text-lightSlate-50 flex items-center justify-between gap-8 px-5"
         style={{
           height: "60px"
         }}
       >
-        <div class="flex items-center" style={{ width: "19rem" }}>
-          <img
-            src={GDLauncherWideLogo}
-            class="h-9"
-            onClick={() => navigate("/library")}
-          />
+        <div
+          class="group relative z-0 flex h-full w-fit items-center"
+          onClick={() => navigate("/library")}
+        >
+          <div class="bg-darkSlate-700 -z-1 absolute left-0 top-0 h-full w-full scale-75 rounded-md opacity-0 transition-[transform,opacity] duration-150 ease-[cubic-bezier(.4,0,.2,1)] group-hover:scale-100 group-hover:opacity-100" />
+          <div class="flex items-center gap-2 px-2">
+            <div
+              class="i-ri:arrow-left-s-fill h-6 w-6 transition-[transform,opacity] duration-200 ease-[cubic-bezier(.4,0,.2,1)]"
+              classList={{
+                "opacity-0 -translate-x-4": location.pathname === "/library"
+              }}
+            />
+            <img
+              src={GDLauncherWideLogo}
+              class="h-9 max-w-none transition-transform duration-200 ease-[cubic-bezier(.4,0,.2,1)]"
+              classList={{
+                "-translate-x-4": location.pathname === "/library"
+              }}
+            />
+          </div>
         </div>
-        <div class="flex text-lightSlate-50 w-full items-center h-full list-none gap-6">
+        <div class="flex w-full items-center justify-center gap-4">
+          <NavSearchInput />
+          <Button
+            class="w-max"
+            size="small"
+            type="primary"
+            onClick={() => {
+              modalsContext?.openModal({
+                name: "instanceCreation"
+              })
+            }}
+          >
+            <i class="i-ri:add-fill flex" />
+          </Button>
+        </div>
+        <div class="text-lightSlate-50 flex h-full list-none items-center gap-6">
           <Tabs index={selectedIndex()}>
             <TabList aligment="between">
-              <For each={NAVBAR_ROUTES}>
-                {(route) => {
-                  return (
-                    <Tab
-                      onClick={() =>
-                        navigate(route.path, {
-                          getLastInstance: true
-                        })
-                      }
-                    >
-                      <div class="flex items-center gap-2">
-                        <Show when={route.icon}>
-                          <i class={"w-5 h-5 " + route.icon} />
-                        </Show>
-                        <div class="no-underline">{route.label}</div>
-                      </div>
-                    </Tab>
-                  )
-                }}
-              </For>
-              <Spacing class="hidden w-full lg:block" />
-              <Tab ignored noPadding>
-                <Button
-                  class="w-max"
-                  size="small"
-                  type="primary"
-                  onClick={() => {
-                    modalsContext?.openModal({
-                      name: "instanceCreation"
-                    })
-                  }}
-                >
-                  <i class="flex i-ri:add-fill" />
-                  <Trans key="sidebar.add_instance" />
-                </Button>
-                {/* <Button
-                  class="w-max"
-                  size="small"
-                  type="primary"
-                  onClick={async () => {
-                    console.log("BLOCKING MUTATION");
-                    const x = await blockingMutation.mutateAsync(undefined);
-                    console.log("GOT IT MUTATION", x);
-                  }}
-                >
-                  <i class="flex i-ri:add-fill" />
-                  BLOCKING MUTATION
-                </Button> */}
-              </Tab>
-
-              <div class="flex gap-6 items-center">
+              <div class="flex items-center gap-6">
                 <div
                   onClick={() => {
                     if (!(!!isSettings() || !!isSettingsNested()))
@@ -149,10 +124,24 @@ const AppNavbar = () => {
                 >
                   <Tab>
                     <div
-                      class="text-2xl i-ri:settings-3-fill"
+                      class="i-ri:settings-3-fill text-2xl"
                       classList={{
                         "text-lightSlate-50":
                           !!isSettings() || !!isSettingsNested()
+                      }}
+                    />
+                  </Tab>
+                </div>
+                <div
+                  onClick={() => {
+                    navigate("/news")
+                  }}
+                >
+                  <Tab>
+                    <div
+                      class="i-ri:news-fill text-2xl"
+                      classList={{
+                        "text-lightSlate-50": !!isNews()
                       }}
                     />
                   </Tab>
@@ -187,7 +176,7 @@ const AppNavbar = () => {
                       }
                     >
                       <div
-                        class="text-2xl text-green-500 i-ri:download-2-fill"
+                        class="i-ri:download-2-fill text-2xl text-green-500"
                         classList={{
                           "hover:text-green-100": !updateDownloaded()
                         }}
@@ -205,14 +194,14 @@ const AppNavbar = () => {
               </div>
             </TabList>
           </Tabs>
-        </div>
-        <div class="flex ml-2 justify-end lg:min-w-52 lg:ml-4">
-          <Show when={routeData?.accounts.data}>
-            <AccountsDropdown
-              accounts={accounts}
-              value={routeData.activeUuid.data}
-            />
-          </Show>
+          <div class="mr-6 flex justify-end lg:min-w-fit">
+            <Show when={routeData?.accounts.data}>
+              <AccountsDropdown
+                accounts={accounts}
+                value={routeData.activeUuid.data}
+              />
+            </Show>
+          </div>
         </div>
       </nav>
     </Show>
