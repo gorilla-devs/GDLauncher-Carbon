@@ -55,6 +55,7 @@ keys! {
         SAVE_GDL_ACCOUNT                            = "saveGdlAccount";
         REQUEST_GDL_ACCOUNT_DELETION                = "requestGdlAccountDeletion";
         CHANGE_GDL_ACCOUNT_NICKNAME                 = "changeGdlAccountNickname";
+        UPLOAD_PROFILE_ICON                         = "uploadProfileIcon";
     }
 
     java {
@@ -104,6 +105,7 @@ keys! {
         LAUNCH_INSTANCE                             = "launchInstance";
         KILL_INSTANCE                               = "killInstance";
         GET_LOGS                                    = "getLogs";
+        SEARCH_LOGS                                 = "searchLogs";
         DELETE_LOG                                  = "deleteLog";
         OPEN_INSTANCE_FOLDER                        = "openInstanceFolder";
         ENABLE_MOD                                  = "enableMod";

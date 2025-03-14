@@ -1,4 +1,4 @@
-use crate::api::keys::account::*;
+use crate::api::keys::{self, account::*};
 use crate::api::router::router;
 use crate::domain::account as domain;
 use crate::error::{AxumError, FeError};
@@ -129,6 +129,10 @@ pub(super) fn mount() -> RouterBuilder<App> {
             app.account_manager()
                 .change_nickname(args.uuid, args.nickname)
                 .await
+        }
+
+        mutation UPLOAD_PROFILE_ICON[app, args: FEUploadProfileIcon] {
+            app.account_manager().upload_profile_icon(args.uuid, args.icon_path).await
         }
     }
 }
@@ -495,4 +499,11 @@ impl From<Result<(), RequestGDLAccountDeletionError>> for FERequestDeletionStatu
 pub struct FEChangeGdlAccountNickname {
     pub uuid: String,
     pub nickname: String,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FEUploadProfileIcon {
+    pub uuid: String,
+    pub icon_path: String,
 }

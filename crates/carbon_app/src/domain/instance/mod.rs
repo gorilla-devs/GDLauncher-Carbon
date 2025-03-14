@@ -15,6 +15,12 @@ pub struct InstanceId(pub i32);
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
 pub struct GameLogId(pub i32);
 
+impl From<i32> for GameLogId {
+    fn from(id: i32) -> Self {
+        GameLogId(id)
+    }
+}
+
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct InstanceModId(pub Uuid);
 

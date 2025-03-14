@@ -477,6 +477,27 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(())
     }
 
+    pub async fn upload_profile_icon(self, uuid: String, icon_path: String) -> anyhow::Result<()> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to get an account that does not exist"
+            ))?
+            .id_token
+        else {
+            return Err(anyhow::anyhow!(
+                "this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})"
+            ));
+        };
+
+        self.gdl_account_task
+            .upload_profile_icon(id_token, icon_path)
+            .await
+    }
+
     /// Add or update an account
     async fn add_account(self, account: FullAccount) -> anyhow::Result<()> {
         use db::account::{SetParam, UniqueWhereParam};
@@ -1064,23 +1085,29 @@ impl AccountRefreshService {
                     });
 
                     for account in accounts {
+                        trace!("Considering checking account: {account:#?}");
+
                         let uuid = account.uuid.clone();
                         // ignore badly formed account entries since we can't handle them
                         let Ok(account) = FullAccount::try_from(account) else {
                             tracing::error!("Badly formed account entry for uuid {uuid}. Cannot check refresh status.");
                             continue;
                         };
-                        let FullAccountType::Microsoft { token_expires, .. } = account.type_ else {
-                            continue;
+                        let token_expires = match account.type_ {
+                            FullAccountType::Microsoft { token_expires, .. } => Some(token_expires),
+                            _ => None,
                         };
 
                         let now = Utc::now();
-                        let token_expiration_threshold =
-                            token_expires - chrono::Duration::hours(12);
+                        let token_expiration_threshold = token_expires
+                            .map(|token_expires| token_expires - chrono::Duration::hours(12));
 
-                        trace!("Checking account {uuid} for token expiration. Expires at {token_expires}. Current time is {now}. Comparison is {token_expiration_threshold} < {now}", now = Utc::now());
+                        let should_refresh = match token_expiration_threshold {
+                            Some(token_expiration_threshold) => token_expiration_threshold < now,
+                            None => true,
+                        };
 
-                        if token_expiration_threshold < now {
+                        if should_refresh {
                             debug!(
                                 "Attempting to refresh access token for expired account {}",
                                 &account.uuid

@@ -179,7 +179,8 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
 
     let app1 = app.clone();
     let app2 = app.clone();
-    let rspc_axum_router: axum::Router<Arc<AppInner>> = rspc_axum::endpoint(router, move || app);
+    let rspc_axum_router: axum::Router<Arc<AppInner>> =
+        rspc_axum::endpoint(router, move || app.clone());
 
     let app = axum::Router::new()
         .nest("/", crate::api::build_axum_vanilla_router())

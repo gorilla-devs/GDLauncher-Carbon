@@ -1,6 +1,7 @@
 // New components
 export * from "./DropdownMenu"
 export * from "./Menu"
+export * from "./Popover"
 
 export { Button } from "./Button"
 export { Input } from "./Input"
@@ -26,6 +27,5 @@ export {
 } from "./NotificationManager"
 export { Dropdown } from "./Dropdown"
 export { Tooltip } from "./Tooltip"
-export { Popover } from "./Popover"
 export { ContextMenuProvider, useContextMenu } from "./Menu/ContextMenuContext"
 export * from "./themes"

@@ -76,6 +76,7 @@ interface Props
   containerClass?: string
   disabled?: boolean
   errorMessage?: string
+  ref?: HTMLInputElement | ((el: HTMLInputElement) => void)
 }
 
 function Input(props: Props) {
@@ -89,7 +90,8 @@ function Input(props: Props) {
     "onFocus",
     "onInput",
     "onMouseDown",
-    "onSearch"
+    "onSearch",
+    "ref"
   ])
 
   const [menuOpened, setMenuOpened] = createSignal(false)
@@ -158,7 +160,14 @@ function Input(props: Props) {
         ref={setInputContainerRef}
       >
         <input
-          ref={setInputRef}
+          ref={(el) => {
+            setInputRef(el)
+            if (typeof local.ref === "function") {
+              local.ref(el)
+            } else if (local.ref) {
+              local.ref = el
+            }
+          }}
           class={input({
             errorMessage: !!props.errorMessage,
             disabled: !!local.disabled,
@@ -230,12 +239,14 @@ function Input(props: Props) {
           {...otherProps}
         />
         <Show when={local.icon}>
-          <span class="text-darkSlate-300">{local.icon}</span>
+          <span class="text-darkSlate-300 flex h-full items-center">
+            {local.icon}
+          </span>
         </Show>
       </div>
 
       <Show when={props.errorMessage}>
-        <div class="text-red-500 text-left mt-2 font-light">
+        <div class="mt-2 text-left font-light text-red-500">
           {props.errorMessage}
         </div>
       </Show>

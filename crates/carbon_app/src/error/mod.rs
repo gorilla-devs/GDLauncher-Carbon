@@ -75,10 +75,3 @@ impl From<anyhow::Error> for FeError {
         FeError::from_anyhow(&value)
     }
 }
-
-pub fn anyhow_into_rspc(value: anyhow::Error) -> rspc::Error {
-    rspc::Error::new(
-        rspc::ErrorCode::InternalServerError,
-        format!("backend error: {value:#?}"),
-    )
-}

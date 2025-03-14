@@ -3,11 +3,12 @@ use super::router::router;
 use super::translation::Translation;
 use super::vtask::FETaskId;
 use super::Set;
+use crate::api::keys;
 use crate::api::modplatforms::RemoteVersion;
 use crate::domain::instance::{self as domain, InstanceModpackInfo};
 use crate::error::{AxumError, FeError};
 use crate::managers::instance as manager;
-use crate::managers::instance::log::LogEntrySourceKind;
+use crate::managers::instance::log::{LogEntrySourceKind, SearchResult};
 use crate::managers::instance::InstanceMoveTarget;
 use crate::managers::{instance::importer, App, AppInner};
 use anyhow::anyhow;
@@ -237,6 +238,23 @@ pub(super) fn mount() -> RouterBuilder<App> {
                .into_iter()
                .map(GameLogEntry::from)
                .collect::<Vec<_>>())
+        }
+
+        query SEARCH_LOGS[app, query: SearchLogsQuery] {
+            let res = app.instance_manager()
+                .search_in_log(
+                    query.log_id.into(),
+                    &*query.query,
+                    query.match_case,
+                    query.match_whole_word,
+                    query.use_regex,
+                )
+                .await?
+                .into_iter()
+                .map(FESearchResult::from)
+                .collect::<Vec<_>>();
+
+            Ok(res)
         }
 
         mutation DELETE_LOG[app, id: GameLogId] {
@@ -1768,5 +1786,41 @@ mod log {
                 }
             }
         })
+    }
+}
+
+#[derive(Debug, Deserialize, Type)]
+pub struct SearchLogsQuery {
+    log_id: i32,
+    query: String,
+    match_case: bool,
+    match_whole_word: bool,
+    use_regex: bool,
+}
+
+#[derive(Debug, Type, Serialize)]
+struct FESearchResult {
+    pub entry_index: u32,
+    pub pos: u32,
+    pub len: u32,
+}
+
+impl From<SearchResult> for FESearchResult {
+    fn from(value: SearchResult) -> Self {
+        Self {
+            entry_index: value.entry_index as u32,
+            pos: value.pos as u32,
+            len: value.len as u32,
+        }
+    }
+}
+
+impl From<FESearchResult> for SearchResult {
+    fn from(value: FESearchResult) -> Self {
+        Self {
+            entry_index: value.entry_index as usize,
+            pos: value.pos as usize,
+            len: value.len as usize,
+        }
     }
 }

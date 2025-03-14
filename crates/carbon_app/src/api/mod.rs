@@ -1,6 +1,7 @@
 use crate::base_api_override::get_base_api_override;
 use crate::managers::{App, AppInner};
 use crate::{app_version, managers};
+use anyhow::Error;
 use async_stream::stream;
 use axum::extract::ws::Message;
 use axum::extract::{State, WebSocketUpgrade};

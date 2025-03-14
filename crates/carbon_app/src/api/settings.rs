@@ -4,8 +4,11 @@ use super::{
 };
 use crate::{
     api::{
-        keys::settings::{
-            GET_PRIVACY_STATEMENT_BODY, GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY, SET_SETTINGS,
+        keys::{
+            self,
+            settings::{
+                GET_PRIVACY_STATEMENT_BODY, GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY, SET_SETTINGS,
+            },
         },
         router::router,
     },

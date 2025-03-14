@@ -66,6 +66,7 @@ reqwest = { version = "0.12.7", features = [
   "blocking",
   "stream",
   "rustls-tls",
+  "multipart",
 ] }
 reqwest-middleware = "0.3.3"
 reqwest-retry = "0.6.1"
@@ -94,6 +95,7 @@ tracing = "0.1.40"
 walkdir = "2.5.0"
 tracing-subscriber = { version = "0.3.18", features = ["ansi", "env-filter"] }
 tracing-appender = "0.2.3"
+strip-ansi-escapes = "0.2.1"
 # tracing-forest = { version = "0.1.5", features = [
 #   "smallvec",
 #   "chrono",

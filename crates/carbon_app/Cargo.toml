@@ -76,6 +76,7 @@ markdown = { workspace = true }
 ring = { workspace = true }
 num_cpus = { workspace = true }
 display-info = "0.5.1"
+strip-ansi-escapes = { workspace = true }
 # libc = { workspace = true }
 nom = { workspace = true }
 carbon_parsing = { path = "../carbon_parsing" }
