@@ -641,6 +641,7 @@ pub enum CFFEClassId {
     Worlds,
     Addons,
     Shaders,
+    Datapacks,
     Other(u16),
 }
 
@@ -655,6 +656,7 @@ impl From<mpcf::ClassId> for CFFEClassId {
             mpcf::ClassId::Worlds => CFFEClassId::Worlds,
             mpcf::ClassId::Addons => CFFEClassId::Addons,
             mpcf::ClassId::Shaders => CFFEClassId::Shaders,
+            mpcf::ClassId::Datapacks => CFFEClassId::Datapacks,
             mpcf::ClassId::Other(other) => CFFEClassId::Other(other),
         }
     }
@@ -671,6 +673,7 @@ impl From<CFFEClassId> for mpcf::ClassId {
             CFFEClassId::Worlds => mpcf::ClassId::Worlds,
             CFFEClassId::Addons => mpcf::ClassId::Addons,
             CFFEClassId::Shaders => mpcf::ClassId::Shaders,
+            CFFEClassId::Datapacks => mpcf::ClassId::Datapacks,
             CFFEClassId::Other(other) => mpcf::ClassId::Other(other),
         }
     }
@@ -973,6 +976,9 @@ pub enum CFFEModStatus {
 }
 
 use mpcf::ModStatus as CFModStatus;
+
+use crate::api::modplatforms::FEUnifiedSearchType;
+
 impl From<CFModStatus> for CFFEModStatus {
     fn from(minecraft_mod_status: CFModStatus) -> Self {
         match minecraft_mod_status {
@@ -1000,7 +1006,7 @@ pub struct CFFECategory {
     pub icon_url: Option<String>,
     pub date_modified: String,
     pub is_class: Option<bool>,
-    pub class_id: Option<i32>,
+    pub class_id: Option<FEUnifiedSearchType>,
     pub parent_category_id: Option<i32>,
     pub display_index: Option<i32>,
 }
@@ -1015,7 +1021,9 @@ impl From<mpcf::Category> for CFFECategory {
             icon_url: minecraft_category.icon_url,
             date_modified: minecraft_category.date_modified,
             is_class: minecraft_category.is_class,
-            class_id: minecraft_category.class_id,
+            class_id: minecraft_category
+                .class_id
+                .map(|class_id| CFFEClassId::from(class_id).into()),
             parent_category_id: minecraft_category.parent_category_id,
             display_index: minecraft_category.display_index,
         }

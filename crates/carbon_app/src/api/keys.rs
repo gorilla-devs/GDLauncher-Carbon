@@ -172,5 +172,6 @@ keys! {
         MODRINTH_GET_TEAM                           = "modrinth.getTeam";
 
         UNIFIED_SEARCH                              = "unifiedSearch";
+        UNIFIED_SEARCH_PROJECT_TYPE                 = "unifiedSearchProjectType";
     }
 }

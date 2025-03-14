@@ -97,6 +97,20 @@ export const routes: RouteDefinition[] = [
         ]
       },
       {
+        path: "/news",
+        component: lazy(() => import("@/pages/News/NewsWrapper")),
+        children: [
+          {
+            path: "/",
+            component: lazy(() => import("@/pages/News"))
+          },
+          {
+            path: "/:id",
+            component: lazy(() => import("@/pages/News/PageView"))
+          }
+        ]
+      },
+      {
         path: "/explore",
         component: Explore,
         children: [

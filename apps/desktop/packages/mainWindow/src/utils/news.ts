@@ -56,16 +56,15 @@ export const initNews = async () => {
 
     const data = await resp.json()
 
-    const filteredNews = data.entries.filter(
-      (entry: NewsItem) => entry.tag === "News"
-    )
+    const filteredNews = data.entries
 
     const newsArr =
       filteredNews?.map((newsEntry: NewsItem) => ({
         title: newsEntry.title,
         description: newsEntry.text,
         image: `${MOJANG_API}${newsEntry.newsPageImage.url}`,
-        url: newsEntry.readMoreLink
+        url: newsEntry.readMoreLink,
+        date: newsEntry.date
       })) || []
 
     return newsArr.splice(0, 20)

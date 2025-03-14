@@ -7,7 +7,7 @@ const Skeleton = (props: {
 }) => {
   return (
     <div
-      class={cn("w-1/3 min-w-20 h-4 rounded-md bg-darkSlate-500", props.class)}
+      class={cn("w-1/3 h-4 rounded-md bg-darkSlate-500", props.class)}
       style={props.style}
     />
   )

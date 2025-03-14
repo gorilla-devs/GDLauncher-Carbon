@@ -4,20 +4,11 @@ import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import { Badge, Skeleton } from "@gd/ui"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { saveScrollPosition } from "@/utils/scrollRestoration"
+import { FEUnifiedSearchResult } from "@gd/core_module/bindings"
 
 interface MasonryProps {
   title: string
-  elements: {
-    id: string
-    imageUrl: string
-    highResImageUrl: string
-    title: string
-    description: string
-    platform: string
-    downloads: number
-    type: string | null
-    lastUpdated: Date
-  }[]
+  elements: FEUnifiedSearchResult[]
 }
 
 const Masonry: Component<MasonryProps> = (props) => {
@@ -102,7 +93,7 @@ const Masonry: Component<MasonryProps> = (props) => {
                           ? "2/1"
                           : "1"
                   }}
-                  src={element.highResImageUrl}
+                  src={element.highResImageUrl ?? ""}
                   alt={element.title}
                 />
                 <div class="bg-darkSlate-900/80 absolute right-2 top-2 rounded-full p-1.5">
@@ -127,7 +118,7 @@ const Masonry: Component<MasonryProps> = (props) => {
                             : "text-xs"
                       }`}
                     >
-                      {element.downloads.toLocaleString()} downloads
+                      {element.downloadsCount.toLocaleString()} downloads
                     </p>
                   </Badge>
                   <Badge class="bg-darkSlate-900 w-fit">
@@ -153,7 +144,8 @@ const Masonry: Component<MasonryProps> = (props) => {
                             : "text-xs"
                       }`}
                     >
-                      Last updated: {element.lastUpdated.toLocaleDateString()}
+                      Last updated:{" "}
+                      {new Date(element.lastUpdated).toLocaleDateString()}
                     </p>
                   </Badge>
                 </div>

@@ -7,12 +7,14 @@ import {
   onMount,
   Show
 } from "solid-js"
+import { cn } from "../util"
 
 interface SlideProps {
   image: string
   title: string
   description: string
   url?: string
+  date: string
 }
 
 interface SliderProps {
@@ -22,6 +24,7 @@ interface SliderProps {
   onClick?: (_news: SlideProps) => void
   fallBackImg: string | undefined
   onSlideClick?: (_news: SlideProps) => void
+  className?: string
 }
 
 interface CarouselProps {
@@ -33,6 +36,7 @@ interface CarouselProps {
   showIndicators?: boolean
   fallBackImg?: string
   onClick?: (_news: SlideProps) => void
+  className?: string
 }
 
 const News = (props: CarouselProps) => {
@@ -111,11 +115,11 @@ const News = (props: CarouselProps) => {
     })
 
     return (
-      <div ref={slidesRef} class="flex h-24">
+      <div ref={slidesRef} class="flex h-full">
         <For each={copiedSlides()}>
           {(slide) => (
             <div
-              class="inset-0 box-border flex h-24 w-full flex-shrink-0 flex-grow transform items-center justify-center bg-cover bg-center bg-no-repeat"
+              class="inset-0 box-border flex h-full w-full flex-shrink-0 flex-grow transform items-center justify-center bg-cover bg-center bg-no-repeat"
               style={{
                 "background-image": `url('${slide.image}'), url('${props.fallBackImg}')`
               }}
@@ -126,23 +130,30 @@ const News = (props: CarouselProps) => {
                   background: "rgba(29, 32, 40, 0.7)"
                 }}
               />
-              <div class="absolute box-border flex h-full w-full items-center px-4 pb-6">
-                <div class="flex select-none flex-col gap-1">
+              <div class="absolute box-border flex h-full w-full p-8">
+                <div class="flex select-none flex-col gap-2 w-full">
                   <div
-                    class="group flex cursor-pointer items-center gap-2"
+                    class="group flex cursor-pointer items-center gap-2 text-3xl"
                     onClick={() => props.onSlideClick?.(slide)}
                   >
-                    <h2 class="m-0 overflow-hidden text-ellipsis whitespace-nowrap group-hover:underline">
+                    <h1 class="m-0 overflow-hidden text-ellipsis whitespace-nowrap group-hover:underline">
                       {slide.title}
-                    </h2>
+                    </h1>
                     <div class="i-ri:external-link-line peer" />
                   </div>
-                  <h4
-                    class="text-lightSlate-400 m-0 overflow-hidden text-ellipsis whitespace-nowrap
-                "
-                  >
+                  <h2 class="text-lightSlate-200 m-0 w-full overflow-hidden text-ellipsis whitespace-nowrap text-xl">
                     {slide.description}
-                  </h4>
+                  </h2>
+                </div>
+
+                <div class="absolute bottom-0 left-0 p-8">
+                  <p class="text-lightSlate-200 text-sm">
+                    {new Date(slide.date).toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric"
+                    })}
+                  </p>
                 </div>
               </div>
             </div>
@@ -153,7 +164,12 @@ const News = (props: CarouselProps) => {
   }
 
   return (
-    <div class="bg-darkSlate-900 group relative h-24 overflow-hidden rounded-lg">
+    <div
+      class={cn(
+        "bg-darkSlate-900 group relative h-84 overflow-hidden rounded-lg",
+        props.className
+      )}
+    >
       <Show when={mergedProps.showArrows}>
         <div
           class="bg-darkSlate-800 absolute left-5 top-1/2 z-40 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full opacity-0 duration-200 ease-in-out group-hover:opacity-100 "
@@ -199,6 +215,7 @@ const News = (props: CarouselProps) => {
           currentImageIndex={currentImageIndex()}
           slides={props.slides}
           onSlideClick={(news) => props?.onClick?.(news)}
+          className={props.className}
         />
       </Show>
     </div>

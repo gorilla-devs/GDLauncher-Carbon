@@ -1,19 +1,7 @@
 import { useLocation, useMatch, useRouteData } from "@solidjs/router"
-import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import { Match, Show, Switch, createEffect } from "solid-js"
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg"
-import {
-  Tab,
-  TabList,
-  Tabs,
-  Tooltip,
-  Button,
-  Input,
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem
-} from "@gd/ui"
+import { Tab, TabList, Tabs, Tooltip, Button } from "@gd/ui"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import fetchData from "@/pages/app.data"
 import { AccountsDropdown } from "./AccountsDropdown"
@@ -26,8 +14,9 @@ import updateAvailable, {
 } from "@/utils/updater"
 import { Trans } from "@gd/i18n"
 import { useModal } from "@/managers/ModalsManager"
+import NavSearchInput from "./NavSearchInput"
 
-interface AccountsStatus {
+export interface AccountsStatus {
   label: {
     name: string
     icon: string | undefined
@@ -47,8 +36,12 @@ const AppNavbar = () => {
   const isLogin = useMatch(() => "/")
   const isSettings = useMatch(() => "/settings")
   const isSettingsNested = useMatch(() => "/settings/*")
-
-  const selectedIndex = () => (!!isSettings() || !!isSettingsNested() ? 0 : -1)
+  const isNews = useMatch(() => "/news/*")
+  const selectedIndex = () => {
+    if (isSettings() || isSettingsNested()) return 0
+    if (isNews()) return 1
+    return -1
+  }
 
   const routeData = useRouteData<typeof fetchData>()
 
@@ -102,31 +95,8 @@ const AppNavbar = () => {
             />
           </div>
         </div>
-        <div class="flex w-full items-center justify-center gap-2">
-          <Input
-            placeholder="Click to browse or search anything..."
-            class="max-w-100 w-full"
-            containerClass="px-10"
-            onClick={() => {
-              navigate("/explore")
-            }}
-            icon={
-              <DropdownMenu>
-                <DropdownMenuTrigger>
-                  <div class="flex items-center gap-2 group hover:bg-darkSlate-800 rounded-md h-full p-2">
-                    {/* <img src={CurseforgeLogo} class="w-4 h-4" /> */}
-                    <img src={ModrinthLogo} class="w-4 h-4" />
-                    <div class="i-ri:filter-line w-7 h-7 group-hover:text-lightSlate-50 transition-colors duration-200 ease-[cubic-bezier(.4,0,.2,1)]" />
-                  </div>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem>
-                    <div>Ciao</div>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            }
-          />
+        <div class="flex w-full items-center justify-center gap-4">
+          <NavSearchInput />
           <Button
             class="w-max"
             size="small"
@@ -158,6 +128,20 @@ const AppNavbar = () => {
                       classList={{
                         "text-lightSlate-50":
                           !!isSettings() || !!isSettingsNested()
+                      }}
+                    />
+                  </Tab>
+                </div>
+                <div
+                  onClick={() => {
+                    navigate("/news")
+                  }}
+                >
+                  <Tab>
+                    <div
+                      class="i-ri:news-fill text-2xl"
+                      classList={{
+                        "text-lightSlate-50": !!isNews()
                       }}
                     />
                   </Tab>
@@ -210,7 +194,7 @@ const AppNavbar = () => {
               </div>
             </TabList>
           </Tabs>
-          <div class="ml-2 flex justify-end lg:ml-4 lg:min-w-52">
+          <div class="mr-6 flex justify-end lg:min-w-fit">
             <Show when={routeData?.accounts.data}>
               <AccountsDropdown
                 accounts={accounts}

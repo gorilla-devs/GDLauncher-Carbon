@@ -1,22 +1,25 @@
 import { useGDNavigate } from "@/managers/NavigationManager"
-import {
-  restoreScrollPosition,
-  saveScrollPosition
-} from "@/utils/scrollRestoration"
+import { saveScrollPosition } from "@/utils/scrollRestoration"
+import { FEUnifiedSearchResult } from "@gd/core_module/bindings"
 import { Button, Skeleton } from "@gd/ui"
-import { For, Suspense, createSignal, onMount } from "solid-js"
-
-interface ShowcaseScrollerElement {
-  title: string
-  description: string
-  imageUrl: string
-  id: string
-  platform: string
-}
+import {
+  For,
+  JSX,
+  Show,
+  Suspense,
+  createSignal,
+  onCleanup,
+  onMount
+} from "solid-js"
 
 interface ShowcaseScrollerProps {
   title: string
-  elements: ShowcaseScrollerElement[]
+  elements: FEUnifiedSearchResult[]
+  viewAllAction?: JSX.EventHandlerUnion<
+    HTMLButtonElement,
+    MouseEvent,
+    JSX.EventHandler<HTMLButtonElement, MouseEvent>
+  >
 }
 
 export default function ShowcaseScroller(props: ShowcaseScrollerProps) {
@@ -98,7 +101,7 @@ export default function ShowcaseScroller(props: ShowcaseScrollerProps) {
     element.scrollLeft = scrollLeft() - walk
   }
 
-  const handleClick = (element: ShowcaseScrollerElement) => {
+  const handleClick = (element: FEUnifiedSearchResult) => {
     // Only navigate if the drag duration was less than 150ms
     if (Date.now() - dragStartTime() < 150) {
       const contentWrapper = document.getElementById("gdl-content-wrapper")
@@ -112,25 +115,22 @@ export default function ShowcaseScroller(props: ShowcaseScrollerProps) {
       scrollContainer.addEventListener("wheel", handleScroll, {
         passive: false
       })
+
+      onCleanup(() => {
+        scrollContainer.removeEventListener("wheel", handleScroll)
+      })
     }
   })
 
   return (
-    <div class="flex flex-col gap-4 overflow-y-hidden z-0">
+    <div class="z-0 flex flex-col gap-4 overflow-y-hidden">
       <div class="flex items-center justify-between">
         <h2 class="text-2xl font-bold">{props.title}</h2>
-        <Button
-          type="text"
-          onClick={() => {
-            const contentWrapper = document.getElementById(
-              "gdl-content-wrapper"
-            )
-            saveScrollPosition(contentWrapper)
-            navigate("/explore/list")
-          }}
-        >
-          View All
-        </Button>
+        <Show when={props.viewAllAction}>
+          <Button type="text" onClick={props.viewAllAction}>
+            View All
+          </Button>
+        </Show>
       </div>
       <div class="relative">
         <div
@@ -188,7 +188,7 @@ export default function ShowcaseScroller(props: ShowcaseScrollerProps) {
                   >
                     <img
                       class="h-auto w-full rounded-lg object-cover transition duration-200 group-hover:scale-110"
-                      src={element.imageUrl}
+                      src={element.imageUrl ?? ""}
                     />
                   </div>
                   <div class="absolute bottom-0 left-0 h-full w-full rounded-lg bg-black/50 transition-opacity duration-300 group-hover:opacity-0" />
@@ -208,18 +208,16 @@ export default function ShowcaseScroller(props: ShowcaseScrollerProps) {
               )}
             </For>
           </Suspense>
-          <div
-            class="w-42 bg-primary-400 my-4 flex shrink-0 cursor-pointer items-center justify-center rounded-lg"
-            onClick={() => {
-              const contentWrapper = document.getElementById(
-                "gdl-content-wrapper"
-              )
-              saveScrollPosition(contentWrapper)
-              navigate("/explore/list")
-            }}
-          >
-            <h3 class="p-2 font-bold text-white">Show More</h3>
-          </div>
+          <Show when={props.viewAllAction}>
+            <div
+              class="w-42 bg-primary-400 my-4 flex shrink-0 cursor-pointer items-center justify-center rounded-lg"
+              onClick={() => {
+                navigate("/explore/list")
+              }}
+            >
+              <h3 class="p-2 font-bold text-white">Show More</h3>
+            </div>
+          </Show>
         </div>
         {/* <div class="from-darkSlate-900 pointer-events-none absolute right-0 top-0 h-full w-24 bg-gradient-to-l to-transparent" /> */}
       </div>

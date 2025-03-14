@@ -3526,10 +3526,10 @@ packages:
   '@storybook/builder-manager@7.6.10':
     resolution: {integrity: sha512-f+YrjZwohGzvfDtH8BHzqM3xW0p4vjjg9u7uzRorqUiNIAAKHpfNrZ/WvwPlPYmrpAHt4xX/nXRJae4rFSygPw==}
 
-  '@storybook/builder-vite@8.6.0-beta.2':
-    resolution: {integrity: sha512-q6dHn+oLBm697mrsCxL+QLigTsqxpX9fo8Y/QWhJjlKT43pz9TNPqDEsUFcmU66PNnqJ8VXe9XzHyTlruDZF3A==}
+  '@storybook/builder-vite@8.6.0-beta.1':
+    resolution: {integrity: sha512-8wwd8ys1JZubXF8EvJQsRoNJopu0tVT3KZ2CtmUNEPSFH5gHgrTcKLsaGOHz35JVepztyD+V7T192TTJJRHUPA==}
     peerDependencies:
-      storybook: ^8.6.0-beta.2
+      storybook: ^8.6.0-beta.1
       vite: ^4.0.0 || ^5.0.0 || ^6.0.0
 
   '@storybook/channels@7.6.10':
@@ -3563,10 +3563,10 @@ packages:
   '@storybook/csf-plugin@7.6.10':
     resolution: {integrity: sha512-Sc+zZg/BnPH2X28tthNaQBnDiFfO0QmfjVoOx0fGYM9SvY3P5ehzWwp5hMRBim6a/twOTzePADtqYL+t6GMqqg==}
 
-  '@storybook/csf-plugin@8.6.0-beta.2':
-    resolution: {integrity: sha512-Be6F6E3lSzWct3ZKaJp1lR2PXStqHOutnFMp971m9IuNPj7Tija9HBSqbTool7JZFrVmPGbMoG9F7StHA8OAmQ==}
+  '@storybook/csf-plugin@8.6.0-beta.1':
+    resolution: {integrity: sha512-hZ5oDXGa/1Jr/4qCTJXDShdkZN3k8hs3P/2yq0ACbHZBHBnDu4bBB6iznVHgKE7HahaClNqQnF9zbpBI0mR/PA==}
     peerDependencies:
-      storybook: ^8.6.0-beta.2
+      storybook: ^8.6.0-beta.1
 
   '@storybook/csf-tools@7.6.10':
     resolution: {integrity: sha512-TnDNAwIALcN6SA4l00Cb67G02XMOrYU38bIpFJk5VMDX2dvgPjUtJNBuLmEbybGcOt7nPyyFIHzKcY5FCVGoWA==}
@@ -12165,7 +12165,7 @@ snapshots:
 
   '@floating-ui/react-dom@2.0.6(react-dom@18.2.0(react@18.2.0))(react@18.2.0)':
     dependencies:
-      '@floating-ui/dom': 1.5.4
+      '@floating-ui/dom': 1.6.12
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
 
@@ -13875,9 +13875,9 @@ snapshots:
       - encoding
       - supports-color
 
-  '@storybook/builder-vite@8.6.0-beta.2(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))':
+  '@storybook/builder-vite@8.6.0-beta.1(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))':
     dependencies:
-      '@storybook/csf-plugin': 8.6.0-beta.2(storybook@7.6.10(encoding@0.1.13))
+      '@storybook/csf-plugin': 8.6.0-beta.1(storybook@7.6.10(encoding@0.1.13))
       browser-assert: 1.2.1
       storybook: 7.6.10(encoding@0.1.13)
       ts-dedent: 2.2.0
@@ -14070,7 +14070,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@storybook/csf-plugin@8.6.0-beta.2(storybook@7.6.10(encoding@0.1.13))':
+  '@storybook/csf-plugin@8.6.0-beta.1(storybook@7.6.10(encoding@0.1.13))':
     dependencies:
       storybook: 7.6.10(encoding@0.1.13)
       unplugin: 1.6.0
@@ -20609,7 +20609,7 @@ snapshots:
 
   storybook-solidjs-vite@1.0.0-beta.2(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0)):
     dependencies:
-      '@storybook/builder-vite': 8.6.0-beta.2(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))
+      '@storybook/builder-vite': 8.6.0-beta.1(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))
     transitivePeerDependencies:
       - storybook
       - vite

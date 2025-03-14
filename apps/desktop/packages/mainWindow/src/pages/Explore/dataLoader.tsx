@@ -4,6 +4,7 @@ import {
 } from "@tanstack/solid-query"
 import {
   createContext,
+  createEffect,
   createSignal,
   JSX,
   mergeProps,
@@ -28,6 +29,8 @@ import {
 import { modpacksDefaultQuery } from "@/pages/Modpacks/useModsQuery"
 import { modsDefaultQuery } from "@/pages/Mods/useModsQuery"
 import { useSearchParams } from "@solidjs/router"
+import { createStore } from "solid-js/store"
+import { searchQuery } from "@/components/NavSearchInput"
 
 interface InfiniteQueryType {
   infiniteQuery: CreateInfiniteQueryResult<any, unknown>
@@ -50,47 +53,42 @@ export const useInfiniteAddonsQuery = () => {
   return useContext(InfiniteQueryContext)!
 }
 
-export const [lastType, setLastType] = createSignal<FEUnifiedSearchType | null>(
-  null
-)
 const [lastScrollPosition, setLastScrollPosition] = createSignal<number>(0)
 
 const AddonsInfiniteLoader = (props: Props) => {
   const rspcContext = rspc.useContext()
   const [searchParams, setSearchParams] = useSearchParams()
+
   const [parentRef, setParentRef] = createSignal<Element | null>(null)
-
-  const mergedProps = mergeProps({ type: "modPack" }, props)
-
-  const isModpack = mergedProps.type === "modPack"
-
-  const query = isModpack ? modpacksQuery : modsQuery
-  const getQueryFunction = isModpack ? setModpacksQuery : setModsQuery
-  const defaultQuery = {
-    ...(isModpack ? modpacksDefaultQuery : modsDefaultQuery),
-    ...(props.initialQuery || {})
-  }
 
   const infiniteQuery = createInfiniteQuery(() => ({
     queryKey: ["modplatforms.unifiedSearch"],
     queryFn: (ctx) => {
-      getQueryFunction({
+      setSearchParams({
         index: ctx.pageParam
       })
 
-      return rspcContext.client.query(["modplatforms.unifiedSearch", query])
+      return rspcContext.client.query([
+        "modplatforms.unifiedSearch",
+        searchQuery()
+      ])
     },
     initialPageParam: 0,
     getNextPageParam: (lastPage) => {
       const index = lastPage?.pagination?.index || 0
       const totalCount = lastPage.pagination?.totalCount || 0
-      const pageSize = query.pageSize || 20
+      const pageSize = searchQuery().pageSize || 20
       const hasNextPage = index + pageSize < totalCount
 
       return (hasNextPage && index + 20) || null
     },
     enabled: false
   }))
+
+  createEffect(() => {
+    searchQuery()
+    infiniteQuery.refetch()
+  })
 
   // when the user navigates away from the page, get the scroll position
   function getCurrentScrollPosition() {
@@ -114,7 +112,7 @@ const AddonsInfiniteLoader = (props: Props) => {
   })
 
   const setQueryWrapper = (newValue: Partial<FEUnifiedSearchParameters>) => {
-    getQueryFunction(newValue)
+    setSearchParams(newValue as any)
     rspcContext.queryClient.removeQueries({
       queryKey: ["modplatforms.unifiedSearch"]
     })
@@ -122,52 +120,47 @@ const AddonsInfiniteLoader = (props: Props) => {
     // rowVirtualizer.scrollToIndex(0);
   }
 
-  if (lastType() !== mergedProps.type) {
-    getQueryFunction(defaultQuery)
+  // if (lastType() !== mergedProps.type) {
 
-    const _instanceId = parseInt(searchParams.instanceId, 10)
-    if (_instanceId && !lastType()) {
-      setInstanceId(_instanceId)
+  const _instanceId = parseInt(searchParams.instanceId, 10)
+  setInstanceId(_instanceId)
 
-      rspcContext.client
-        .query(["instance.getInstanceDetails", _instanceId])
-        .then((details) => {
-          setQueryWrapper({
-            modloaders: details?.modloaders.map((v: any) => v.type_) || [],
-            gameVersions: details?.version ? [details?.version] : []
-          })
-        })
-    } else if (lastType() === "mod") {
-      setSearchParams({
-        instanceId: undefined
-      })
-      setInstanceId(undefined)
-    }
-
-    rspcContext.queryClient.removeQueries({
-      queryKey: ["modplatforms.unifiedSearch"]
-    })
-    infiniteQuery.refetch()
-    parentRef()?.scrollTo(0, scrollTop())
-    setLastType(mergedProps.type)
-    setLastScrollPosition(0)
-  } else if (!infiniteQuery.isFetched) {
-    infiniteQuery.refetch()
-  } else {
-    queueMicrotask(() => {
-      parentRef()?.scrollTo({
-        top: lastScrollPosition()
+  rspcContext.client
+    .query(["instance.getInstanceDetails", _instanceId])
+    .then((details) => {
+      setQueryWrapper({
+        modloaders: details?.modloaders.map((v: any) => v.type_) || [],
+        gameVersions: details?.version ? [details?.version] : []
       })
     })
-  }
+
+  rspcContext.queryClient.removeQueries({
+    queryKey: ["modplatforms.unifiedSearch"]
+  })
+  infiniteQuery.refetch()
+  parentRef()?.scrollTo(0, scrollTop())
+  setLastScrollPosition(0)
+  // } else if (!infiniteQuery.isFetched) {
+  //   infiniteQuery.refetch()
+  // } else {
+  //   queueMicrotask(() => {
+  //     parentRef()?.scrollTo({
+  //       top: lastScrollPosition()
+  //     })
+  //   })
+  // }
 
   const context = {
     infiniteQuery,
     get query() {
-      return query
+      return searchQuery
     },
     get isLoading() {
-      return infiniteQuery.isLoading
+      return (
+        infiniteQuery.isLoading ||
+        infiniteQuery.isFetching ||
+        infiniteQuery.isRefetching
+      )
     },
     setQuery: setQueryWrapper,
     rowVirtualizer,

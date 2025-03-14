@@ -1,135 +1,159 @@
 import { rspc } from "@/utils/rspcClient"
 import ShowcaseScroller from "./components/ShowcaseScroller"
-import Categories from "./components/Categories"
 import Masonry from "./components/Masonry"
-import { CFFEMod, MRFEProjectSearchResult } from "@gd/core_module/bindings"
 import { restoreScrollPosition } from "@/utils/scrollRestoration"
 import { onMount } from "solid-js"
+import { useGDNavigate } from "@/managers/NavigationManager"
+import { setSearchQuery } from "@/components/NavSearchInput"
 
-const convertCFToStandard = (mod: CFFEMod) => {
-  return {
-    title: mod.name,
-    description: mod.summary,
-    imageUrl: mod.logo?.thumbnailUrl!,
-    highResImageUrl: mod.logo?.url!,
-    id: mod.id.toString(),
-    platform: "curseforge",
-    downloads: mod.downloadCount,
-    // eslint-disable-next-line @typescript-eslint/no-base-to-string
-    type: mod.classId?.toString() ?? null,
-    lastUpdated: new Date(mod.dateModified)
-  }
-}
+export function Explore() {
+  const navigate = useGDNavigate()
 
-const convertMRToStandard = (mod: MRFEProjectSearchResult) => {
-  return {
-    title: mod.title,
-    description: mod.description,
-    imageUrl: mod.icon_url!,
-    highResImageUrl: mod.icon_url!,
-    id: mod.project_id,
-    platform: "modrinth",
-    downloads: mod.downloads,
-    type: mod.project_type.toString(),
-    lastUpdated: new Date(mod.date_modified)
-  }
-}
-
-export function List() {
-  const popularCF = rspc.createQuery(() => ({
+  const popularModpacksCF = rspc.createQuery(() => ({
     queryKey: [
-      "modplatforms.curseforge.search",
+      "modplatforms.unifiedSearch",
       {
-        query: {
-          gameId: 432,
-          authorId: null,
-          categoryIds: [],
-          classId: null,
-          gameVersion: null,
-          gameVersionTypeId: null,
-          index: null,
-          modLoaderTypes: [],
-          pageSize: 15,
-          searchFilter: null,
-          sortField: "popularity",
-          sortOrder: "descending",
-          slug: null
-        }
+        sortIndex: {
+          curseForge: "popularity" as const
+        },
+        sortOrder: "descending" as const,
+        searchQuery: null,
+        categories: null,
+        gameVersions: null,
+        modloaders: null,
+        pageSize: 15,
+        projectType: "modpack",
+        index: null,
+        searchApi: "curseforge"
       }
     ]
   }))
+
+  const popularModpacksMR = rspc.createQuery(() => ({
+    queryKey: [
+      "modplatforms.unifiedSearch",
+      {
+        sortIndex: {
+          modrinth: "relevance" as const
+        },
+        sortOrder: "descending" as const,
+        searchQuery: null,
+        categories: null,
+        gameVersions: null,
+        modloaders: null,
+        pageSize: 15,
+        projectType: "modpack",
+        index: null,
+        searchApi: "modrinth"
+      }
+    ]
+  }))
+
+  const popularCFQuery = {
+    sortIndex: {
+      curseForge: "popularity" as const
+    },
+    sortOrder: "descending" as const,
+    searchQuery: null,
+    categories: null,
+    gameVersions: null,
+    modloaders: null,
+    pageSize: 15,
+    projectType: null,
+    index: null,
+    searchApi: "curseforge" as const
+  }
+
+  const popularCF = rspc.createQuery(() => ({
+    queryKey: ["modplatforms.unifiedSearch", popularCFQuery]
+  }))
+
+  const popularMRQuery = {
+    sortIndex: {
+      modrinth: "relevance" as const
+    },
+    sortOrder: "descending" as const,
+    searchQuery: null,
+    categories: null,
+    gameVersions: null,
+    modloaders: null,
+    pageSize: 15,
+    projectType: null,
+    index: null,
+    searchApi: "modrinth" as const
+  }
 
   const popularMR = rspc.createQuery(() => ({
-    queryKey: [
-      "modplatforms.modrinth.search",
-      {
-        query: "",
-        gameId: 432,
-        facets: null,
-        index: "relevance",
-        limit: 15,
-        offset: null,
-        filters: null
-      }
-    ]
+    queryKey: ["modplatforms.unifiedSearch", popularMRQuery]
   }))
+
+  const recentlyUpdatedCFQuery = {
+    sortIndex: {
+      curseForge: "lastUpdated" as const
+    },
+    sortOrder: "descending" as const,
+    searchQuery: null,
+    categories: null,
+    gameVersions: null,
+    modloaders: null,
+    pageSize: 25,
+    projectType: null,
+    index: null,
+    searchApi: "curseforge" as const
+  }
 
   const recentlyUpdatedCF = rspc.createQuery(() => ({
-    queryKey: [
-      "modplatforms.curseforge.search",
-      {
-        query: {
-          gameId: 432,
-          authorId: null,
-          categoryIds: [],
-          classId: null,
-          gameVersion: null,
-          gameVersionTypeId: null,
-          index: null,
-          modLoaderTypes: [],
-          pageSize: 50,
-          searchFilter: null,
-          sortField: "lastUpdated",
-          sortOrder: "descending",
-          slug: null
-        }
-      }
-    ]
+    queryKey: ["modplatforms.unifiedSearch", recentlyUpdatedCFQuery]
   }))
+
+  const recentlyUpdatedMRQuery = {
+    sortIndex: {
+      modrinth: "updated" as const
+    },
+    sortOrder: "descending" as const,
+    searchQuery: null,
+    categories: null,
+    gameVersions: null,
+    modloaders: null,
+    pageSize: 25,
+    projectType: null,
+    index: null,
+    searchApi: "modrinth" as const
+  }
 
   const recentlyUpdatedMR = rspc.createQuery(() => ({
-    queryKey: [
-      "modplatforms.modrinth.search",
-      {
-        query: "",
-        gameId: 432,
-        facets: null,
-        index: "updated",
-        limit: 50,
-        offset: null,
-        filters: null
-      }
-    ]
+    queryKey: ["modplatforms.unifiedSearch", recentlyUpdatedMRQuery]
   }))
 
-  const popularCFElements = () =>
-    popularCF.data?.data.map((mod) => convertCFToStandard(mod))
-
-  const popularMRElements = () =>
-    popularMR.data?.hits.map((mod) => convertMRToStandard(mod))
-
-  const recentlyUpdatedCFElements = () =>
-    recentlyUpdatedCF.data?.data.map((mod) => convertCFToStandard(mod))
-
-  const recentlyUpdatedMRElements = () =>
-    recentlyUpdatedMR.data?.hits.map((mod) => convertMRToStandard(mod))
-
   const recentlyUpdatedAllElements = () => {
-    const curseforge = recentlyUpdatedCFElements() ?? []
-    const modrinth = recentlyUpdatedMRElements() ?? []
+    const curseforge = recentlyUpdatedCF.data?.data ?? []
+    const modrinth = recentlyUpdatedMR.data?.data ?? []
     return [...curseforge, ...modrinth].sort(
-      (a, b) => b.lastUpdated.getTime() - a.lastUpdated.getTime()
+      (a, b) =>
+        new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
     )
+  }
+
+  const popularModpacks = () => {
+    const curseforge = popularModpacksCF.data?.data ?? []
+    const modrinth = popularModpacksMR.data?.data ?? []
+
+    // Normalize download counts to account for platform differences
+    const normalizedModpacks = [
+      ...curseforge.map((pack) => ({
+        ...pack,
+        normalizedDownloads: pack.downloadsCount / 10 // Curseforge tends to have ~100x more downloads
+      })),
+      ...modrinth.map((pack) => ({
+        ...pack,
+        normalizedDownloads: pack.downloadsCount
+      }))
+    ]
+
+    // Sort by normalized downloads and take top 15
+    return normalizedModpacks
+      .sort((a, b) => b.normalizedDownloads - a.normalizedDownloads)
+      .slice(0, 15)
   }
 
   onMount(() => {
@@ -143,14 +167,25 @@ export function List() {
   return (
     <div class="flex flex-col gap-8">
       <h1 class="text-center text-4xl font-bold">Explore or Search Anything</h1>
-      {/* <Categories /> */}
+      <ShowcaseScroller
+        title="Some Modpacks You Might Like"
+        elements={popularModpacks()}
+      />
       <ShowcaseScroller
         title="Currently Popular on Curseforge"
-        elements={popularCFElements() ?? []}
+        elements={popularCF.data?.data ?? []}
+        viewAllAction={() => {
+          setSearchQuery(popularCFQuery)
+          navigate("/explore/list")
+        }}
       />
       <ShowcaseScroller
         title="Currently Popular on Modrinth"
-        elements={popularMRElements() ?? []}
+        elements={popularMR.data?.data ?? []}
+        viewAllAction={() => {
+          setSearchQuery(popularMRQuery)
+          navigate("/explore/list")
+        }}
       />
       <Masonry
         title="Check out these recently updated addons"
@@ -160,4 +195,4 @@ export function List() {
   )
 }
 
-export default List
+export default Explore

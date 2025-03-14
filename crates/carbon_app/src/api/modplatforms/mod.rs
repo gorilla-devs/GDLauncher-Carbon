@@ -1,9 +1,7 @@
-use rspc::RouterBuilder;
-use serde::{Deserialize, Serialize};
-use specta::Type;
-use strum::IntoEnumIterator;
-use tracing::info;
-
+use self::{
+    curseforge::structs::CFFEFile,
+    modrinth::structs::{MRFEVersion, MRFEVersionFile},
+};
 use crate::{
     api::{
         keys::modplatforms::{
@@ -13,7 +11,7 @@ use crate::{
             CURSEFORGE_SEARCH, MODRINTH_GET_CATEGORIES, MODRINTH_GET_LOADERS, MODRINTH_GET_PROJECT,
             MODRINTH_GET_PROJECTS, MODRINTH_GET_PROJECT_TEAM, MODRINTH_GET_PROJECT_VERSIONS,
             MODRINTH_GET_TEAM, MODRINTH_GET_VERSION, MODRINTH_GET_VERSIONS, MODRINTH_SEARCH,
-            UNIFIED_SEARCH,
+            UNIFIED_SEARCH, UNIFIED_SEARCH_PROJECT_TYPE,
         },
         modplatforms::curseforge::structs::CFFEModLoaderType,
         router::router,
@@ -21,126 +19,19 @@ use crate::{
     managers::App,
     mirror_into,
 };
-
-use self::{
-    curseforge::structs::CFFEFile,
-    modrinth::structs::{MRFEVersion, MRFEVersionFile},
-};
+use curseforge::structs::CFFEClassId;
+use modrinth::structs::MRFEProjectType;
+use rspc::RouterBuilder;
+use serde::{Deserialize, Serialize};
+use specta::Type;
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
+use tracing::info;
 
 mod curseforge;
 mod filters;
 mod modrinth;
 mod responses;
-
-#[derive(Type, Debug, Deserialize, Serialize, Clone)]
-#[serde(rename_all = "lowercase")]
-pub enum FESearchAPI {
-    Curseforge,
-    Modrinth,
-}
-
-#[derive(Type, Debug, Deserialize, Serialize, Clone, Copy)]
-#[repr(i32)]
-pub enum ModChannel {
-    Alpha = 0,
-    Beta,
-    Stable,
-}
-impl Default for ModChannel {
-    fn default() -> Self {
-        Self::Stable
-    }
-}
-
-impl TryFrom<i32> for ModChannel {
-    type Error = anyhow::Error;
-
-    fn try_from(value: i32) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(Self::Alpha),
-            1 => Ok(Self::Beta),
-            2 => Ok(Self::Stable),
-            _ => Err(anyhow::anyhow!(
-                "Invalid mod channel id {value} not in range 0..=2"
-            )),
-        }
-    }
-}
-
-mirror_into!(
-    ModChannel,
-    carbon_platforms::ModChannel,
-    |value| match value {
-        Other::Alpha => Self::Alpha,
-        Other::Beta => Self::Beta,
-        Other::Stable => Self::Stable,
-    }
-);
-
-#[derive(Type, Debug, Deserialize, Serialize, Clone, Copy)]
-pub enum ModPlatform {
-    Curseforge,
-    Modrinth,
-}
-
-mirror_into!(
-    ModPlatform,
-    carbon_platforms::ModPlatform,
-    |value| match value {
-        Other::Curseforge => Self::Curseforge,
-        Other::Modrinth => Self::Modrinth,
-    }
-);
-
-#[derive(Type, Debug, Deserialize, Serialize, Clone, Copy)]
-pub struct ModChannelWithUsage {
-    pub channel: ModChannel,
-    pub allow_updates: bool,
-}
-
-mirror_into!(
-    ModChannelWithUsage,
-    carbon_platforms::ModChannelWithUsage,
-    |value| {
-        Self {
-            channel: value.channel.into(),
-            allow_updates: value.allow_updates,
-        }
-    }
-);
-
-#[derive(Type, Debug, Deserialize, Serialize, Clone)]
-pub struct ModSources {
-    pub channels: Vec<ModChannelWithUsage>,
-    pub platform_blacklist: Vec<ModPlatform>,
-}
-
-mirror_into!(ModSources, carbon_platforms::ModSources, |value| Self {
-    channels: value.channels.into_iter().map(Into::into).collect(),
-    platform_blacklist: value
-        .platform_blacklist
-        .into_iter()
-        .map(Into::into)
-        .collect(),
-});
-
-#[derive(Type, Debug, Serialize)]
-#[serde(tag = "platform")]
-pub enum RemoteVersion {
-    Curseforge(CFFEFile),
-    Modrinth(MRFEVersion),
-}
-
-impl From<carbon_platforms::RemoteVersion> for RemoteVersion {
-    fn from(value: carbon_platforms::RemoteVersion) -> Self {
-        use carbon_platforms::RemoteVersion as Other;
-
-        match value {
-            Other::Curseforge(cf) => Self::Curseforge(cf.into()),
-            Other::Modrinth(mr) => Self::Modrinth(mr.into()),
-        }
-    }
-}
 
 pub(super) fn mount() -> RouterBuilder<App> {
     router! {
@@ -277,21 +168,243 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         query UNIFIED_SEARCH[app, search_params: filters::FEUnifiedSearchParameters] {
             match search_params.search_api {
-                FESearchAPI::Curseforge => {
+                Some(FESearchAPI::Curseforge) => {
                     let search_params: curseforge::filters::CFFEModSearchParameters = search_params.try_into()?;
                     let modplatforms = app.modplatforms_manager();
                     let curseforge_response = modplatforms.curseforge.search(search_params.into()).await?;
                     let fe_curseforge_response = curseforge::responses::FEModSearchResponse::from(curseforge_response);
                     Ok(responses::FEUnifiedSearchResponse::from(fe_curseforge_response))
                 }
-                FESearchAPI::Modrinth => {
-                    let search_params:  modrinth::filters::MRFEProjectSearchParameters = search_params.try_into()?;
+                Some(FESearchAPI::Modrinth) => {
+                    let search_params: modrinth::filters::MRFEProjectSearchParameters = search_params.try_into()?;
                     let modplatforms = app.modplatforms_manager();
                     let modrinth_response = modplatforms.modrinth.search(search_params.into()).await?;
                     let fe_modrinth_response = modrinth::responses::MRFEProjectSearchResponse::from(modrinth_response);
                     Ok(responses::FEUnifiedSearchResponse::from(fe_modrinth_response))
                 }
+                None => {
+                    // Search both platforms and merge results
+                    let modplatforms = app.modplatforms_manager();
+
+                    let cf_params: curseforge::filters::CFFEModSearchParameters = search_params.clone().try_into()?;
+                    let mr_params: modrinth::filters::MRFEProjectSearchParameters = search_params.try_into()?;
+
+                    let (cf_response, mr_response) = tokio::try_join!(
+                        modplatforms.curseforge.search(cf_params.into()),
+                        modplatforms.modrinth.search(mr_params.into())
+                    )?;
+
+                    let cf_results = curseforge::responses::FEModSearchResponse::from(cf_response);
+                    let mr_results = modrinth::responses::MRFEProjectSearchResponse::from(mr_response);
+
+                    let merged = responses::FEUnifiedSearchResponse::merge(cf_results.into(), mr_results.into());
+                    Ok(merged)
+                }
             }
+        }
+
+        query UNIFIED_SEARCH_PROJECT_TYPE[app, _args: ()] {
+            Ok(FEUnifiedSearchType::iter().collect::<Vec<_>>())
+        }
+    }
+}
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum FESearchAPI {
+    Curseforge,
+    Modrinth,
+}
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone, Copy)]
+#[repr(i32)]
+pub enum ModChannel {
+    Alpha = 0,
+    Beta,
+    Stable,
+}
+impl Default for ModChannel {
+    fn default() -> Self {
+        Self::Stable
+    }
+}
+
+impl TryFrom<i32> for ModChannel {
+    type Error = anyhow::Error;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Alpha),
+            1 => Ok(Self::Beta),
+            2 => Ok(Self::Stable),
+            _ => Err(anyhow::anyhow!(
+                "Invalid mod channel id {value} not in range 0..=2"
+            )),
+        }
+    }
+}
+
+mirror_into!(
+    ModChannel,
+    carbon_platforms::ModChannel,
+    |value| match value {
+        Other::Alpha => Self::Alpha,
+        Other::Beta => Self::Beta,
+        Other::Stable => Self::Stable,
+    }
+);
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone, Copy)]
+pub enum ModPlatform {
+    Curseforge,
+    Modrinth,
+}
+
+mirror_into!(
+    ModPlatform,
+    carbon_platforms::ModPlatform,
+    |value| match value {
+        Other::Curseforge => Self::Curseforge,
+        Other::Modrinth => Self::Modrinth,
+    }
+);
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone, Copy)]
+pub struct ModChannelWithUsage {
+    pub channel: ModChannel,
+    pub allow_updates: bool,
+}
+
+mirror_into!(
+    ModChannelWithUsage,
+    carbon_platforms::ModChannelWithUsage,
+    |value| {
+        Self {
+            channel: value.channel.into(),
+            allow_updates: value.allow_updates,
+        }
+    }
+);
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
+pub struct ModSources {
+    pub channels: Vec<ModChannelWithUsage>,
+    pub platform_blacklist: Vec<ModPlatform>,
+}
+
+mirror_into!(ModSources, carbon_platforms::ModSources, |value| Self {
+    channels: value.channels.into_iter().map(Into::into).collect(),
+    platform_blacklist: value
+        .platform_blacklist
+        .into_iter()
+        .map(Into::into)
+        .collect(),
+});
+
+#[derive(Type, Debug, Serialize)]
+#[serde(tag = "platform")]
+pub enum RemoteVersion {
+    Curseforge(CFFEFile),
+    Modrinth(MRFEVersion),
+}
+
+impl From<carbon_platforms::RemoteVersion> for RemoteVersion {
+    fn from(value: carbon_platforms::RemoteVersion) -> Self {
+        use carbon_platforms::RemoteVersion as Other;
+
+        match value {
+            Other::Curseforge(cf) => Self::Curseforge(cf.into()),
+            Other::Modrinth(mr) => Self::Modrinth(mr.into()),
+        }
+    }
+}
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone, EnumIter)]
+#[serde(rename_all = "camelCase")]
+pub enum FEUnifiedSearchType {
+    Mod,
+    Modpack,
+    ResourcePack,
+    Shader,
+    World,
+    Plugin,
+    Datapack,
+    Unknown,
+}
+
+impl ToString for FEUnifiedSearchType {
+    fn to_string(&self) -> String {
+        match self {
+            FEUnifiedSearchType::Mod => "mod",
+            FEUnifiedSearchType::Modpack => "modpack",
+            FEUnifiedSearchType::ResourcePack => "resourcepack",
+            FEUnifiedSearchType::Shader => "shader",
+            FEUnifiedSearchType::World => "world",
+            FEUnifiedSearchType::Plugin => "plugin",
+            FEUnifiedSearchType::Datapack => "datapack",
+            FEUnifiedSearchType::Unknown => "unknown",
+        }
+        .to_string()
+    }
+}
+
+impl From<CFFEClassId> for FEUnifiedSearchType {
+    fn from(value: CFFEClassId) -> Self {
+        match value {
+            CFFEClassId::Mods => FEUnifiedSearchType::Mod,
+            CFFEClassId::Modpacks => FEUnifiedSearchType::Modpack,
+            CFFEClassId::ResourcePacks => FEUnifiedSearchType::ResourcePack,
+            CFFEClassId::Shaders => FEUnifiedSearchType::Shader,
+            CFFEClassId::Worlds => FEUnifiedSearchType::World,
+            CFFEClassId::BukkitPlugins => FEUnifiedSearchType::Plugin,
+            CFFEClassId::Customizations => FEUnifiedSearchType::ResourcePack,
+            CFFEClassId::Addons => FEUnifiedSearchType::ResourcePack,
+            CFFEClassId::Datapacks => FEUnifiedSearchType::Datapack,
+            CFFEClassId::Other(_) => FEUnifiedSearchType::Unknown,
+        }
+    }
+}
+
+impl From<FEUnifiedSearchType> for CFFEClassId {
+    fn from(value: FEUnifiedSearchType) -> Self {
+        match value {
+            FEUnifiedSearchType::Mod => CFFEClassId::Mods,
+            FEUnifiedSearchType::Modpack => CFFEClassId::Modpacks,
+            FEUnifiedSearchType::ResourcePack => CFFEClassId::ResourcePacks,
+            FEUnifiedSearchType::Shader => CFFEClassId::Shaders,
+            FEUnifiedSearchType::World => CFFEClassId::Worlds,
+            FEUnifiedSearchType::Plugin => CFFEClassId::BukkitPlugins,
+            FEUnifiedSearchType::Datapack => CFFEClassId::Datapacks,
+            FEUnifiedSearchType::Unknown => CFFEClassId::Other(0),
+        }
+    }
+}
+
+impl From<MRFEProjectType> for FEUnifiedSearchType {
+    fn from(value: MRFEProjectType) -> Self {
+        match value {
+            MRFEProjectType::Mod => FEUnifiedSearchType::Mod,
+            MRFEProjectType::Modpack => FEUnifiedSearchType::Modpack,
+            MRFEProjectType::ResourcePack => FEUnifiedSearchType::ResourcePack,
+            MRFEProjectType::Shader => FEUnifiedSearchType::Shader,
+            MRFEProjectType::Plugin => FEUnifiedSearchType::Plugin,
+            MRFEProjectType::DataPack => FEUnifiedSearchType::Datapack,
+            MRFEProjectType::Unknown => FEUnifiedSearchType::Unknown,
+        }
+    }
+}
+
+impl From<FEUnifiedSearchType> for MRFEProjectType {
+    fn from(value: FEUnifiedSearchType) -> Self {
+        match value {
+            FEUnifiedSearchType::Mod => MRFEProjectType::Mod,
+            FEUnifiedSearchType::Modpack => MRFEProjectType::Modpack,
+            FEUnifiedSearchType::ResourcePack => MRFEProjectType::ResourcePack,
+            FEUnifiedSearchType::Shader => MRFEProjectType::Shader,
+            FEUnifiedSearchType::Plugin => MRFEProjectType::Plugin,
+            FEUnifiedSearchType::Datapack => MRFEProjectType::DataPack,
+            FEUnifiedSearchType::World => MRFEProjectType::Unknown,
+            FEUnifiedSearchType::Unknown => MRFEProjectType::Unknown,
         }
     }
 }

@@ -29,10 +29,6 @@ function withAdsLayout() {
           ])
         }
       })
-      setMappedMcVersions((prev) => [
-        { key: "", label: "All version" },
-        ...prev
-      ])
     }
   })
 
@@ -46,8 +42,9 @@ function withAdsLayout() {
   })
 
   createEffect(() => {
-    if (routeData.curseforgeCategories.data)
+    if (routeData.curseforgeCategories.data) {
       setCurseforgeCategories(routeData.curseforgeCategories.data.data)
+    }
   })
 
   createEffect(() => {
