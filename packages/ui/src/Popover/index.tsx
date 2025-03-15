@@ -1,3 +1,4 @@
+import { cn } from "../util"
 import type { PolymorphicProps } from "@kobalte/core/polymorphic"
 import type {
   PopoverContentProps,
@@ -6,7 +7,6 @@ import type {
 import { Popover as PopoverPrimitive } from "@kobalte/core/popover"
 import type { ParentProps, ValidComponent } from "solid-js"
 import { mergeProps, splitProps } from "solid-js"
-import { cn } from "../util"
 
 export const PopoverTrigger = PopoverPrimitive.Trigger
 export const PopoverTitle = PopoverPrimitive.Title
@@ -44,14 +44,14 @@ export const PopoverContent = <T extends ValidComponent = "div">(
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Content
         class={cn(
-          "z-50 w-72 rounded-md border bg-popover p-4 text-popover-foreground shadow-md outline-none data-[expanded]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[expanded]:fade-in-0 data-[closed]:zoom-out-95 data-[expanded]:zoom-in-95",
+          "z-200 w-72 rounded-md border border-solid border-darkSlate-600 bg-darkSlate-800 p-4 text-lightSlate-200 shadow-md outline-none data-[expanded]:animate-popoverEnter data-[closed]:animate-popoverLeave",
           local.class
         )}
         {...rest}
       >
         {local.children}
         {!local.hideCloseButton && (
-          <PopoverPrimitive.CloseButton class="ring-offset-background focus:ring-ring absolute right-4 top-4 rounded-sm opacity-70 transition-[opacity,box-shadow] hover:opacity-100 focus:outline-none focus:ring-[1.5px] focus:ring-offset-2 disabled:pointer-events-none">
+          <PopoverPrimitive.CloseButton class="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-[1.5px] focus:ring-darkSlate-600 focus:ring-offset-2 disabled:pointer-events-none">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"

@@ -24,24 +24,28 @@ export const Main: Story = {
       {
         title: "title",
         description: "this is a nice and fair description",
+        date: "2021-01-01",
         image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
         url: "https://randomurl.com"
       },
       {
         title: "title1",
         description: "this is a nice and fair description",
+        date: "2021-01-01",
         image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
         url: "https://randomurl.com"
       },
       {
         title: "title2",
         description: "this is a nice and fair description",
+        date: "2021-01-01",
         image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
         url: "https://randomurl.com"
       },
       {
         title: "title3",
         description: "this is a nice and fair description",
+        date: "2021-01-01",
         image: `https://www.minecraft.net/content/dam/games/minecraft/screenshots/1.19.3-rc3_1x1.jpg`,
         url: "https://randomurl.com"
       }
