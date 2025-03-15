@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/solid-query"
 import { WebsocketTransport, createClient } from "@rspc/client"
-import { createSolidQueryHooks } from "@rspc/solid"
+import { createSolidQueryHooks } from "@rspc/solid-query"
 import type { Procedures } from "@gd/core_module"
 import { createNotification } from "@gd/ui"
 
