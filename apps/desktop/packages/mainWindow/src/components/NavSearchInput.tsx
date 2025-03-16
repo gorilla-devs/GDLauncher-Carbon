@@ -14,14 +14,7 @@ import {
   FESearchAPI,
   FEUnifiedSearchParameters
 } from "@gd/core_module/bindings"
-import {
-  createEffect,
-  createMemo,
-  createSignal,
-  For,
-  Match,
-  Switch
-} from "solid-js"
+import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import {
   SearchApiDropdown,
@@ -190,6 +183,39 @@ export default function NavSearchInput() {
               setIsOpen(false)
             }
           }}
+          icon={
+            <div class="flex items-center gap-1">
+              <Show when={searchQuery().searchQuery?.length || 0 > 0}>
+                <div
+                  class="i-ri:close-line text-darkSlate-500 text-xl transition-colors duration-200 ease-in-out hover:text-white"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setSearchQuery((prev) => ({
+                      ...prev,
+                      searchQuery: ""
+                    }))
+                  }}
+                />
+              </Show>
+
+              <div
+                class="border-darkSlate-500 flex items-center gap-1 border-l border-solid pl-2"
+                onKeyDown={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  navigate("/explore")
+                  setIsOpen(false)
+                }}
+              >
+                <div class="i-ri:store-3-line text-darkSlate-500 text-xl transition-colors duration-200 ease-in-out   hover:text-white" />
+              </div>
+            </div>
+          }
         />
       </PopoverTrigger>
       <PopoverContent

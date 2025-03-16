@@ -20,7 +20,10 @@ use carbon_net::{Checksum, DownloadOptions, Downloadable};
 use carbon_platforms::{
     curseforge::{
         self,
-        filters::{ModFileParameters, ModFilesParameters, ModFilesParametersQuery},
+        filters::{
+            ModFileParameters, ModFilesParameters, ModFilesParametersQuery, ModParameters,
+            ModsParameters, ModsParametersBody,
+        },
     },
     modrinth::{
         self,
@@ -534,6 +537,7 @@ impl Installer {
 
 // curseforge
 pub struct CurseforgeModInstaller {
+    addon_type: curseforge::ClassId,
     file: curseforge::File,
     download_url: String,
     applied_data: Arc<Mutex<Option<(Mod, Downloadable)>>>,
@@ -555,23 +559,33 @@ impl CurseforgeModInstaller {
             .await?
             .data;
 
+        let addon = app
+            .modplatforms_manager()
+            .curseforge
+            .get_mod(ModParameters {
+                mod_id: project_id as i32,
+            })
+            .await?;
+
         let download_url = file.download_url.clone().ok_or_else(|| {
             anyhow::anyhow!("mod cannot be downloaded without privileged api key")
         })?;
 
         Ok(Self {
+            addon_type: addon.data.class_id.unwrap_or(curseforge::ClassId::Mods),
             file,
             download_url,
             applied_data: Arc::new(Mutex::new(None)),
         })
     }
 
-    pub fn from_file(file: curseforge::File) -> anyhow::Result<Self> {
+    pub fn from_file(file: curseforge::File, mod_info: curseforge::Mod) -> anyhow::Result<Self> {
         let download_url = file.download_url.clone().ok_or_else(|| {
             anyhow::anyhow!("mod cannot be downloaded without privileged api key")
         })?;
 
         Ok(Self {
+            addon_type: mod_info.class_id.unwrap_or(curseforge::ClassId::Mods),
             file,
             download_url,
             applied_data: Arc::new(Mutex::new(None)),
@@ -586,7 +600,15 @@ impl ResourceInstaller for CurseforgeModInstaller {
     }
 
     async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable> {
-        let install_path = instance_path.get_mods_path().join(&self.file.file_name);
+        let install_path = match self.addon_type {
+            curseforge::ClassId::Mods => instance_path.get_mods_path(),
+            curseforge::ClassId::ResourcePacks => instance_path.get_resourcepacks_path(),
+            curseforge::ClassId::Worlds => instance_path.get_saves_path(),
+            curseforge::ClassId::Shaders => instance_path.get_shaderpacks_path(),
+            curseforge::ClassId::Datapacks => instance_path.get_datapacks_path(),
+            _ => instance_path.get_mods_path(),
+        }
+        .join(&self.file.file_name);
 
         let checksums = &self
             .file
@@ -651,21 +673,25 @@ impl ResourceInstaller for CurseforgeModInstaller {
                             return None;
                         }
 
-                        let r = app_clone
-                            .modplatforms_manager()
-                            .curseforge
-                            .get_mod_files(ModFilesParameters {
-                                mod_id,
-                                query: ModFilesParametersQuery {
-                                    game_version: None,
-                                    game_version_type_id: None,
-                                    index: None,
-                                    page_size: None,
-                                    mod_loader_type: None,
-                                },
-                            })
-                            .await
-                            .and_then(|res| {
+                        let platform = &app_clone.modplatforms_manager().curseforge;
+
+                        let files = platform.get_mod_files(ModFilesParameters {
+                            mod_id,
+                            query: ModFilesParametersQuery {
+                                game_version: None,
+                                game_version_type_id: None,
+                                index: None,
+                                page_size: None,
+                                mod_loader_type: None,
+                            },
+                        });
+
+                        let mods = platform.get_mod(ModParameters {
+                            mod_id: mod_id as i32,
+                        });
+
+                        let r = tokio::try_join!(files, mods)
+                            .and_then(|(files, mod_info)| {
                                 // select an appropriate file based on game version and loader, or
                                 // the first file if that fails
                                 if let Some((release, modloaders)) = game_version {
@@ -687,7 +713,7 @@ impl ResourceInstaller for CurseforgeModInstaller {
                                         })
                                         .collect();
 
-                                    let mut matching_versions = res
+                                    let mut matching_versions = files
                                         .data
                                         .iter()
                                         .filter(|&file| {
@@ -717,23 +743,26 @@ impl ResourceInstaller for CurseforgeModInstaller {
                                     }
 
                                     if let Some(file) = matched_version {
-                                        Ok(file.clone())
+                                        Ok((file.clone(), mod_info))
                                     } else {
-                                        res.data
+                                        files
+                                            .data
                                             .first()
                                             .cloned()
                                             .ok_or_else(|| anyhow::anyhow!("no files found"))
+                                            .map(|file| (file, mod_info))
                                     }
                                 } else {
-                                    res.data
+                                    files
+                                        .data
                                         .first()
                                         .cloned()
                                         .ok_or_else(|| anyhow::anyhow!("no files found"))
+                                        .map(|file| (file, mod_info))
                                 }
                             })
-                            .and_then(|file| {
-                                // let app_clone = Arc::clone(&self.app);
-                                CurseforgeModInstaller::from_file(file)
+                            .and_then(|(file, mod_info)| {
+                                CurseforgeModInstaller::from_file(file, mod_info.data)
                                     .map(|installer| Box::new(installer) as BoxedResourceInstaller)
                             });
 
@@ -805,6 +834,7 @@ impl IntoInstaller for CurseforgeModInstaller {
 pub struct ModrinthModInstaller {
     version: modrinth::version::Version,
     file: modrinth::version::VersionFile,
+    mod_info: modrinth::project::Project,
     download_url: String,
     applied_data: Arc<Mutex<Option<(Mod, Downloadable)>>>,
 }
@@ -815,11 +845,12 @@ impl ModrinthModInstaller {
         project_id: String,
         version_id: String,
     ) -> anyhow::Result<Self> {
-        let version = app
-            .modplatforms_manager()
-            .modrinth
-            .get_version(VersionID(version_id.clone()))
-            .await?;
+        let platform = &app.modplatforms_manager().modrinth;
+
+        let version = platform.get_version(VersionID(version_id.clone()));
+        let project = platform.get_project(ProjectID(project_id.clone()));
+
+        let (version, project) = tokio::try_join!(version, project)?;
 
         let file = version
             .files
@@ -839,12 +870,16 @@ impl ModrinthModInstaller {
         Ok(Self {
             version,
             file,
+            mod_info: project,
             download_url,
             applied_data: Arc::new(Mutex::new(None)),
         })
     }
 
-    pub fn from_version(version: modrinth::version::Version) -> anyhow::Result<Self> {
+    pub fn from_version(
+        version: modrinth::version::Version,
+        project: modrinth::project::Project,
+    ) -> anyhow::Result<Self> {
         let file = version
             .files
             .iter()
@@ -863,6 +898,7 @@ impl ModrinthModInstaller {
         Ok(Self {
             version,
             file,
+            mod_info: project,
             download_url,
             applied_data: Arc::new(Mutex::new(None)),
         })
@@ -935,39 +971,43 @@ impl ResourceInstaller for ModrinthModInstaller {
                             }
 
                             if let Some(version_id) = version_id {
-                                return Some(
-                                    app_clone
-                                        .modplatforms_manager()
-                                        .modrinth
-                                        .get_version(VersionID(version_id))
-                                        .await
-                                        .and_then(|version| {
-                                            // let app_clone = Arc::clone(&self.app);
-                                            ModrinthModInstaller::from_version(version).map(
-                                                |installer| {
-                                                    Box::new(installer) as BoxedResourceInstaller
-                                                },
-                                            )
-                                        }),
-                                );
+                                let platform = &app_clone.modplatforms_manager().modrinth;
+
+                                let version = platform.get_version(VersionID(version_id));
+
+                                let project = platform.get_project(ProjectID(project_id.clone()));
+
+                                return Some(tokio::try_join!(version, project).and_then(
+                                    |(version, project)| {
+                                        ModrinthModInstaller::from_version(version, project).map(
+                                            |installer| {
+                                                Box::new(installer) as BoxedResourceInstaller
+                                            },
+                                        )
+                                    },
+                                ));
                             }
 
-                            let r = app_clone
-                                .modplatforms_manager()
-                                .modrinth
-                                .get_project_versions(ProjectVersionsFilters {
-                                    project_id: ProjectID(project_id),
-                                    game_versions: None,
-                                    loaders: None,
-                                    limit: None,
-                                    offset: None,
-                                })
-                                .await
-                                .and_then(|versions| {
-                                    if let Some((release, modloaders)) = game_version {
-                                        let modloader_strings: Vec<String> = modloaders
-                                            .iter()
-                                            .map(|modloader| match modloader.type_ {
+                            let platform = &app_clone.modplatforms_manager().modrinth;
+
+                            let versions = platform.get_project_versions(ProjectVersionsFilters {
+                                project_id: ProjectID(project_id.clone()),
+                                game_versions: None,
+                                loaders: None,
+                                limit: None,
+                                offset: None,
+                            });
+
+                            let project = platform.get_project(ProjectID(project_id));
+
+                            Some(
+                                tokio::try_join!(versions, project)
+                                    .and_then(|(versions, project)| {
+                                        if let Some((release, modloaders)) = game_version {
+                                            let modloader_strings: Vec<String> = modloaders
+                                                .iter()
+                                                .map(|modloader| {
+                                                    match modloader.type_ {
                                                 domain::instance::info::ModLoaderType::Neoforge => {
                                                     "neoforge".to_string()
                                                 }
@@ -980,62 +1020,69 @@ impl ResourceInstaller for ModrinthModInstaller {
                                                 domain::instance::info::ModLoaderType::Quilt => {
                                                     "quilt".to_string()
                                                 }
-                                            })
-                                            .collect();
+                                            }
+                                                })
+                                                .collect();
 
-                                        let mut matching_versions = versions
-                                            .iter()
-                                            .filter(|&version| {
-                                                let has_release =
-                                                    version.game_versions.contains(&release);
-                                                let has_one_of_our_modloaders =
-                                                    version.loaders.iter().any(|loader| {
-                                                        modloader_strings
-                                                            .contains(&loader.to_lowercase())
-                                                    });
-                                                has_release && has_one_of_our_modloaders
-                                            })
-                                            .peekable();
+                                            let mut matching_versions = versions
+                                                .iter()
+                                                .filter(|&version| {
+                                                    let has_release =
+                                                        version.game_versions.contains(&release);
+                                                    let has_one_of_our_modloaders =
+                                                        version.loaders.iter().any(|loader| {
+                                                            modloader_strings
+                                                                .contains(&loader.to_lowercase())
+                                                        });
+                                                    has_release && has_one_of_our_modloaders
+                                                })
+                                                .peekable();
 
-                                        let mut matched_version =
-                                            matching_versions.peek().map(|f| *f);
-                                        let mut matched_channel = ModChannel::Alpha;
+                                            let mut matched_version =
+                                                matching_versions.peek().map(|f| *f);
+                                            let mut matched_channel = ModChannel::Alpha;
 
-                                        for version in matching_versions {
-                                            let channel = ModChannel::from(version.version_type);
+                                            for version in matching_versions {
+                                                let channel =
+                                                    ModChannel::from(version.version_type);
 
-                                            if channel > matched_channel {
-                                                matched_version = Some(version);
-                                                matched_channel = channel;
+                                                if channel > matched_channel {
+                                                    matched_version = Some(version);
+                                                    matched_channel = channel;
+                                                }
+
+                                                if channel >= preferred_channel {
+                                                    break;
+                                                }
                                             }
 
-                                            if channel >= preferred_channel {
-                                                break;
+                                            if let Some(version) = matched_version {
+                                                Ok((version.clone(), project))
+                                            } else {
+                                                versions
+                                                    .first()
+                                                    .cloned()
+                                                    .ok_or_else(|| {
+                                                        anyhow::anyhow!("no versions found")
+                                                    })
+                                                    .map(|version| (version, project))
                                             }
-                                        }
-
-                                        if let Some(version) = matched_version {
-                                            Ok(version.clone())
                                         } else {
                                             versions
                                                 .first()
                                                 .cloned()
                                                 .ok_or_else(|| anyhow::anyhow!("no versions found"))
+                                                .map(|version| (version, project))
                                         }
-                                    } else {
-                                        versions
-                                            .first()
-                                            .cloned()
-                                            .ok_or_else(|| anyhow::anyhow!("no versions found"))
-                                    }
-                                })
-                                .and_then(|version| {
-                                    ModrinthModInstaller::from_version(version).map(|installer| {
-                                        Box::new(installer) as BoxedResourceInstaller
                                     })
-                                });
-
-                            Some(r)
+                                    .and_then(|(version, project)| {
+                                        ModrinthModInstaller::from_version(version, project).map(
+                                            |installer| {
+                                                Box::new(installer) as BoxedResourceInstaller
+                                            },
+                                        )
+                                    }),
+                            )
                         })
                     }));
                 }

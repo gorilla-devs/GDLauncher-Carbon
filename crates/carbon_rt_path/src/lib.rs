@@ -145,6 +145,10 @@ impl InstancePath {
         self.get_data_path().join("saves")
     }
 
+    pub fn get_datapacks_path(&self) -> PathBuf {
+        self.get_data_path().join("datapacks")
+    }
+
     pub fn get_logs_path(&self) -> PathBuf {
         self.get_data_path().join("logs")
     }
