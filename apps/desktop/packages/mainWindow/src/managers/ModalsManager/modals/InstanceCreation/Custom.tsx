@@ -19,9 +19,9 @@ import {
   ModLoader
 } from "@gd/core_module/bindings"
 import { blobToBase64 } from "@/utils/helpers"
-import { mcVersions } from "@/utils/mcVersion"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { ReactiveMap } from "@solid-primitives/map"
+import { useGlobalStore } from "@/components/GlobalStoreContext"
 
 type MappedMcVersions = ManifestVersion & { hasModloader?: boolean }
 
@@ -34,7 +34,6 @@ interface Instancetype {
   img: string | undefined
 }
 
-// eslint-disable-next-line no-unused-vars
 enum Modloaders {
   _Quilt = "quilt",
   _Forge = "forge",
@@ -88,6 +87,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
 
   const addNotification = createNotification()
   const modalsContext = useModal()
+  const globalStore = useGlobalStore()
   const navigate = useGDNavigate()
 
   const forgeVersionsQuery = rspc.createQuery(() => ({
@@ -249,7 +249,9 @@ const Custom = (props: Pick<ModalProps, "data">) => {
   })
 
   createEffect(() => {
-    const filteredData = mcVersions().filter(
+    if (!globalStore.minecraftVersions.data) return
+
+    const filteredData = globalStore.minecraftVersions.data.filter(
       (item) =>
         item.type === "release" ||
         (item.type === "snapshot" && snapshotVersionFilter()) ||

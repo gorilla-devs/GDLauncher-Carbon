@@ -41,7 +41,7 @@ import DefaultImg from "/assets/images/default-instance-img.png"
 import { useModal } from "@/managers/ModalsManager"
 import { convertSecondsToHumanTime } from "@/utils/helpers"
 import Authors from "./Info/Authors"
-import { getCFModloaderIcon } from "@/utils/sidebar"
+import { getModloaderIcon } from "@/utils/sidebar"
 import { setInstanceId } from "@/utils/browser"
 import { getInstanceIdFromPath } from "@/utils/routes"
 import {
@@ -595,7 +595,7 @@ const Instance = () => {
                                 <Show when={modloader.type_}>
                                   <img
                                     class="h-4 w-4"
-                                    src={getCFModloaderIcon(modloader.type_)}
+                                    src={getModloaderIcon(modloader.type_)}
                                     alt="Modloader icon"
                                   />
                                 </Show>

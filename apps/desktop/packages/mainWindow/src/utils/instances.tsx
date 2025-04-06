@@ -6,12 +6,11 @@ import {
   FESubtask,
   ListInstance,
   ValidListInstance,
-  CFFECategory,
-  MRFECategory
+  FEUnifiedCategory
 } from "@gd/core_module/bindings"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
-import { Show, Switch, Match, createSignal } from "solid-js"
+import { Switch, Match, createSignal } from "solid-js"
 import { port } from "./rspcClient"
 
 export const isListInstanceInvalid = (status: ListInstanceStatus) => {
@@ -124,33 +123,14 @@ export const getModpackPlatformIcon = (
   }
 }
 
-export const getCategoryIcon = (category: CFFECategory | MRFECategory) => {
-  if ("iconUrl" in category) {
-    return category.iconUrl
-  } else return category.icon
-}
-
-export const CategoryIcon = (props: {
-  category: CFFECategory | MRFECategory
-}) => {
+export const CategoryIcon = (props: { category: FEUnifiedCategory }) => {
   return (
-    <Switch
-      fallback={
-        <div>
-          <Show when={getCategoryIcon(props.category)}>
-            <div
-              class="w-4 h-4"
-              innerHTML={getCategoryIcon(props.category) as string | undefined}
-            />
-          </Show>
-        </div>
-      }
-    >
-      <Match when={"iconUrl" in props.category}>
-        <img
-          class="h-4 w-4"
-          src={getCategoryIcon(props.category) as string | undefined}
-        />
+    <Switch>
+      <Match when={props.category.icon.type === "embedded"}>
+        <div class="h-4 w-4" innerHTML={props.category.icon.value} />
+      </Match>
+      <Match when={props.category.icon.type === "url"}>
+        <img class="h-4 w-4" src={props.category.icon.value} />
       </Match>
     </Switch>
   )

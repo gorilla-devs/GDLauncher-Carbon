@@ -227,7 +227,7 @@ pub struct MinecraftModLoaderVersion {
     pub install_profile_json: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Mod {
     pub id: i32,
@@ -444,7 +444,7 @@ pub enum GameVersionTypeStatus {
     Deleted = 2,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[repr(u8)]
 pub enum ModLoaderType {
     Forge = 1,
@@ -499,7 +499,7 @@ pub enum ModLoaderInstallMethod {
     ForgeInstallerV2 = 3,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ModLinks {
     pub website_url: Option<String>,
@@ -508,7 +508,7 @@ pub struct ModLinks {
     pub source_url: Option<String>,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Debug, Serialize_repr, Deserialize_repr, Clone)]
 #[repr(u8)]
 pub enum ModStatus {
     New = 1,
@@ -523,7 +523,7 @@ pub enum ModStatus {
     UnderReview = 10,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Category {
     pub id: i32,
@@ -538,15 +538,16 @@ pub struct Category {
     pub display_index: Option<i32>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ModAuthor {
     pub id: i32,
     pub name: String,
     pub url: String,
+    pub avatar_url: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ModAsset {
     pub id: i32,
@@ -557,7 +558,7 @@ pub struct ModAsset {
     pub url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FileIndex {
     pub game_version: String,

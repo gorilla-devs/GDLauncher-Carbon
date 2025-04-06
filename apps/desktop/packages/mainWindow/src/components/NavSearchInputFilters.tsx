@@ -12,54 +12,46 @@ import {
 } from "@gd/ui"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
-import {
-  FESearchAPI,
-  FEUnifiedModLoaderType,
-  FEUnifiedSearchCategoryID,
-  FEUnifiedSearchType
-} from "@gd/core_module/bindings"
-import { For, Match, Switch } from "solid-js"
+import { FESearchAPI, FEUnifiedSearchType } from "@gd/core_module/bindings"
+import { For, Match, Switch, useContext } from "solid-js"
 import { rspc } from "@/utils/rspcClient"
 import { capitalize } from "@/utils/helpers"
 import { ModloaderIcon } from "@/utils/sidebar"
-import { mappedMcVersions } from "@/utils/mcVersion"
-import {
-  searchQuery,
-  setSearchQuery,
-  setViewMode,
-  viewMode
-} from "./NavSearchInput"
+import { useGlobalStore } from "./GlobalStoreContext"
+import { SearchInputContext } from "./NavSearchInput"
 
 interface DropdownProps {
   disabled?: boolean
 }
 
 export function SearchApiDropdown() {
+  const searchResults = useContext(SearchInputContext)
+
   return (
     <>
       <DropdownMenuLabel>Platform</DropdownMenuLabel>
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
-        <DropdownMenuRadioGroup value={searchQuery().searchApi ?? ""}>
+        <DropdownMenuRadioGroup
+          value={searchResults?.searchQuery().searchApi ?? ""}
+        >
           <For each={["curseforge", "modrinth"] as const}>
             {(value) => (
               <DropdownMenuRadioItem
                 value={value}
                 onSelect={() => {
-                  if (value === searchQuery().searchApi) {
-                    setSearchQuery((prev) => ({
+                  if (value === searchResults?.searchQuery().searchApi) {
+                    searchResults?.setSearchQuery((prev) => ({
                       ...prev,
                       searchApi: null,
                       sortIndex: null
                     }))
                   } else {
-                    setSearchQuery((prev) => ({
+                    searchResults?.setSearchQuery((prev) => ({
                       ...prev,
                       searchApi: value as FESearchAPI,
                       sortIndex:
-                        value === "curseforge"
-                          ? { curseForge: "popularity" }
-                          : { modrinth: "relevance" }
+                        value === "curseforge" ? "popularity" : "relevance"
                     }))
                   }
                 }}
@@ -81,6 +73,7 @@ export function SearchApiDropdown() {
 }
 
 export function SearchProjectTypeDropdown(props: DropdownProps) {
+  const searchResults = useContext(SearchInputContext)
   const projectTypes = rspc.createQuery(() => ({
     queryKey: ["modplatforms.unifiedSearchProjectType"]
   }))
@@ -91,25 +84,29 @@ export function SearchProjectTypeDropdown(props: DropdownProps) {
         <div class="flex items-center gap-2">
           Project Type
           <div class="text-lightSlate-500 text-xs">
-            {searchQuery().projectType || "All"}
+            {searchResults?.searchQuery().projectType || "All"}
           </div>
         </div>
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent>
-          <DropdownMenuRadioGroup value={searchQuery().projectType ?? ""}>
+          <DropdownMenuRadioGroup
+            value={searchResults?.searchQuery().projectType ?? ""}
+          >
             <For each={projectTypes.data?.filter((v) => v !== "unknown")}>
               {(projectType) => (
                 <DropdownMenuRadioItem
                   value={projectType}
                   onSelect={() => {
-                    if (projectType === searchQuery().projectType) {
-                      setSearchQuery((prev) => ({
+                    if (
+                      projectType === searchResults?.searchQuery().projectType
+                    ) {
+                      searchResults?.setSearchQuery((prev) => ({
                         ...prev,
                         projectType: null
                       }))
                     } else {
-                      setSearchQuery((prev) => ({
+                      searchResults?.setSearchQuery((prev) => ({
                         ...prev,
                         projectType: projectType as FEUnifiedSearchType
                       }))
@@ -128,33 +125,31 @@ export function SearchProjectTypeDropdown(props: DropdownProps) {
 }
 
 export function SearchCategoryDropdown(props: DropdownProps) {
-  const curseforgeCategories = rspc.createQuery(() => ({
-    queryKey: ["modplatforms.curseforge.getCategories"]
+  const searchResults = useContext(SearchInputContext)
+  const categories = rspc.createQuery(() => ({
+    queryKey: ["modplatforms.getUnifiedCategories"]
   }))
 
-  const modrinthCategories = rspc.createQuery(() => ({
-    queryKey: ["modplatforms.modrinth.getCategories"]
-  }))
+  const curseforgeCategories = categories.data?.curseforge
+  const modrinthCategories = categories.data?.modrinth
 
   const currentCategories = () => {
     const categories =
-      searchQuery().searchApi === "curseforge"
-        ? curseforgeCategories.data?.data
-            .filter((v) => v.classId === searchQuery().projectType)
+      searchResults?.searchQuery().searchApi === "curseforge"
+        ? Object.values(curseforgeCategories ?? {})
+            ?.filter((v) => v.id === searchResults?.searchQuery().projectType)
             .map((category) => ({
               label: category.name,
-              value: {
-                curseforge: category.id
-              } as FEUnifiedSearchCategoryID,
-              icon: <img src={category.iconUrl ?? ""} class="h-4 w-4" />
+              value: category.id,
+              icon: <img src={category.icon.value ?? ""} class="h-4 w-4" />
             }))
-        : modrinthCategories.data
-            ?.filter((v) => v.project_type === searchQuery().projectType)
+        : Object.values(modrinthCategories ?? {})
+            ?.filter((v) => v.id === searchResults?.searchQuery().projectType)
             .map((category) => ({
               label: category.name,
-              value: { modrinth: category.name } as FEUnifiedSearchCategoryID,
+              value: category.id,
               // eslint-disable-next-line solid/no-innerhtml
-              icon: <div class="h-4 w-4" innerHTML={category.icon} />
+              icon: <div class="h-4 w-4" innerHTML={category.icon.value} />
             }))
 
     return categories
@@ -172,17 +167,13 @@ export function SearchCategoryDropdown(props: DropdownProps) {
               <For each={currentCategories()}>
                 {(category) => (
                   <DropdownMenuCheckboxItem
-                    checked={searchQuery().categories?.find((v) => {
-                      console.log(v)
-                      if ("curseforge" in v[0]) {
-                        return v[0].curseforge === category.value.curseforge
-                      }
-
-                      return v[0].modrinth === category.value.modrinth
-                    })}
+                    checked={searchResults
+                      ?.searchQuery()
+                      .categories?.some((v) => {
+                        return v[0] === category.value
+                      })}
                     onChange={(checked) => {
-                      console.log(category.value, checked)
-                      setSearchQuery((prev) => {
+                      searchResults?.setSearchQuery((prev) => {
                         if (!prev.categories) {
                           prev.categories = []
                         }
@@ -202,7 +193,7 @@ export function SearchCategoryDropdown(props: DropdownProps) {
                         }
                       })
 
-                      console.log(searchQuery().categories)
+                      console.log(searchResults?.searchQuery().categories)
                     }}
                   >
                     <div class="flex items-center gap-2">
@@ -224,25 +215,21 @@ export function SearchCategoryDropdown(props: DropdownProps) {
 }
 
 export function SearchModloaderDropdown(props: DropdownProps) {
-  const curseForgeModloaders = rspc.createQuery(() => ({
-    queryKey: ["modplatforms.curseforge.getModloaders"]
-  }))
-  const modrinthModloaders = rspc.createQuery(() => ({
-    queryKey: ["modplatforms.modrinth.getLoaders"]
-  }))
+  const globalStore = useGlobalStore()
+  const searchResults = useContext(SearchInputContext)
 
   const currentModloaders = () => {
-    if (searchQuery().searchApi === "curseforge") {
-      return curseForgeModloaders.data?.map((modloader) => ({
+    if (searchResults?.searchQuery().searchApi === "curseforge") {
+      return globalStore.modloaders.data?.curseforge.map((modloader) => ({
         label: capitalize(modloader),
-        value: modloader as FEUnifiedModLoaderType,
+        value: modloader,
         icon: <ModloaderIcon modloader={modloader} />
       }))
     }
 
-    return modrinthModloaders.data?.map((modloader) => ({
-      label: capitalize(modloader.name),
-      value: modloader.name as FEUnifiedModLoaderType,
+    return globalStore.modloaders.data?.modrinth.map((modloader) => ({
+      label: capitalize(modloader),
+      value: modloader,
       icon: <ModloaderIcon modloader={modloader} />
     }))
   }
@@ -259,11 +246,11 @@ export function SearchModloaderDropdown(props: DropdownProps) {
               <For each={currentModloaders()}>
                 {(modloader) => (
                   <DropdownMenuCheckboxItem
-                    checked={searchQuery().modloaders?.includes(
-                      modloader.value
-                    )}
+                    checked={searchResults
+                      ?.searchQuery()
+                      .modloaders?.includes(modloader.value)}
                     onChange={(checked) => {
-                      setSearchQuery((prev) => {
+                      searchResults?.setSearchQuery((prev) => {
                         const prevModloaders = prev.modloaders || []
                         const filteredModloaders = prevModloaders.filter(
                           (m) => m !== modloader.value
@@ -299,6 +286,8 @@ export function SearchModloaderDropdown(props: DropdownProps) {
 }
 
 export function SearchEnvironmentDropdown(props: DropdownProps) {
+  const searchResults = useContext(SearchInputContext)
+
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger disabled={props.disabled}>
@@ -306,19 +295,21 @@ export function SearchEnvironmentDropdown(props: DropdownProps) {
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent>
-          <DropdownMenuRadioGroup value={searchQuery().environment ?? ""}>
+          <DropdownMenuRadioGroup
+            value={searchResults?.searchQuery().environment ?? ""}
+          >
             <For each={["server", "client"] as const}>
               {(value) => (
                 <DropdownMenuRadioItem
                   value={value}
                   onSelect={() => {
-                    if (value === searchQuery().environment) {
-                      setSearchQuery((prev) => ({
+                    if (value === searchResults?.searchQuery().environment) {
+                      searchResults?.setSearchQuery((prev) => ({
                         ...prev,
                         environment: null
                       }))
                     } else {
-                      setSearchQuery((prev) => ({
+                      searchResults?.setSearchQuery((prev) => ({
                         ...prev,
                         environment: value
                       }))
@@ -346,6 +337,8 @@ export function SearchEnvironmentDropdown(props: DropdownProps) {
 }
 
 export function SearchSortIndexDropdown(props: DropdownProps) {
+  const searchResults = useContext(SearchInputContext)
+
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger disabled={props.disabled}>
@@ -353,17 +346,19 @@ export function SearchSortIndexDropdown(props: DropdownProps) {
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent>
-          <DropdownMenuRadioGroup value={searchQuery().sortIndex ?? ""}>
+          <DropdownMenuRadioGroup
+            value={searchResults?.searchQuery().sortIndex?.toString()}
+          >
             <DropdownMenuRadioItem
               value="relevance"
               onSelect={() => {
-                if ("relevance" === searchQuery().sortIndex) {
-                  setSearchQuery((prev) => ({
+                if ("relevance" === searchResults?.searchQuery().sortIndex) {
+                  searchResults?.setSearchQuery((prev) => ({
                     ...prev,
                     sortIndex: null
                   }))
                 } else {
-                  setSearchQuery((prev) => ({
+                  searchResults?.setSearchQuery((prev) => ({
                     ...prev,
                     sortIndex: "relevance"
                   }))
@@ -380,6 +375,8 @@ export function SearchSortIndexDropdown(props: DropdownProps) {
 }
 
 export function SearchSortOrderDropdown(props: DropdownProps) {
+  const searchResults = useContext(SearchInputContext)
+
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger disabled={props.disabled}>
@@ -387,19 +384,21 @@ export function SearchSortOrderDropdown(props: DropdownProps) {
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent>
-          <DropdownMenuRadioGroup value={searchQuery().sortOrder ?? ""}>
+          <DropdownMenuRadioGroup
+            value={searchResults?.searchQuery().sortOrder ?? ""}
+          >
             <For each={["ascending", "descending"] as const}>
               {(value) => (
                 <DropdownMenuRadioItem
                   value={value}
                   onSelect={() => {
-                    if (value === searchQuery().sortOrder) {
-                      setSearchQuery((prev) => ({
+                    if (value === searchResults?.searchQuery().sortOrder) {
+                      searchResults?.setSearchQuery((prev) => ({
                         ...prev,
                         sortOrder: null
                       }))
                     } else {
-                      setSearchQuery((prev) => ({
+                      searchResults?.setSearchQuery((prev) => ({
                         ...prev,
                         sortOrder: value
                       }))
@@ -418,7 +417,12 @@ export function SearchSortOrderDropdown(props: DropdownProps) {
 }
 
 export function SearchGameVersionDropdown(props: DropdownProps) {
-  const versions = mappedMcVersions()
+  const globalStore = useGlobalStore()
+  const versions = () =>
+    globalStore.minecraftVersions.data?.map((version) => ({
+      label: version.id,
+      value: version.id
+    }))
 
   return (
     <DropdownMenuSub>
@@ -427,7 +431,7 @@ export function SearchGameVersionDropdown(props: DropdownProps) {
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent class="max-h-[300px] overflow-y-auto">
-          <For each={versions}>
+          <For each={versions()}>
             {(version) => (
               <DropdownMenuCheckboxItem>
                 {version.label}
@@ -441,6 +445,8 @@ export function SearchGameVersionDropdown(props: DropdownProps) {
 }
 
 export function SearchViewModeDropdown(props: DropdownProps) {
+  const searchResults = useContext(SearchInputContext)
+
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger disabled={props.disabled}>
@@ -448,16 +454,16 @@ export function SearchViewModeDropdown(props: DropdownProps) {
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent>
-          <DropdownMenuRadioGroup value={viewMode()}>
+          <DropdownMenuRadioGroup value={searchResults?.viewMode() ?? ""}>
             <For each={["list", "grid"] as const}>
               {(value) => (
                 <DropdownMenuRadioItem
                   value={value}
                   onSelect={() => {
-                    if (value === viewMode()) {
-                      setViewMode("list")
+                    if (value === searchResults?.viewMode()) {
+                      searchResults?.setViewMode("list")
                     } else {
-                      setViewMode(value)
+                      searchResults?.setViewMode(value)
                     }
                   }}
                 >

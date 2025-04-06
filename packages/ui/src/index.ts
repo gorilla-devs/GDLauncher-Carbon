@@ -4,6 +4,7 @@ export * from "./Menu"
 export * from "./Badge"
 export * from "./Popover"
 export * from "./Select"
+export * from "./Tooltip"
 
 export { Button } from "./Button"
 export { Input } from "./Input"
@@ -27,6 +28,5 @@ export {
   createNotification
 } from "./NotificationManager"
 export { Dropdown } from "./Dropdown"
-export { Tooltip } from "./Tooltip"
 export { ContextMenuProvider, useContextMenu } from "./Menu/ContextMenuContext"
 export * from "./themes"

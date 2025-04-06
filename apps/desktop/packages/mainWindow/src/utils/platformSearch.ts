@@ -1,0 +1,228 @@
+import { FEUnifiedSearchParameters } from "@gd/core_module/bindings"
+
+import { createEffect, createMemo, createSignal, mergeProps } from "solid-js"
+import { rspc } from "./rspcClient"
+import { createInfiniteQuery } from "@tanstack/solid-query"
+import { createVirtualizer } from "@tanstack/solid-virtual"
+import { VirtualizerHandle } from "virtua/lib/solid"
+
+const defaultSearchQuery: FEUnifiedSearchParameters = {
+  searchQuery: "",
+  categories: null,
+  gameVersions: null,
+  modloaders: null,
+  projectType: null,
+  sortIndex: null,
+  sortOrder: null,
+  index: 0,
+  pageSize: 40,
+  searchApi: null,
+  environment: null
+}
+
+export interface SearchResultsOpts {
+  defaultSearchQuery?: Partial<
+    Omit<FEUnifiedSearchParameters, "pageSize" | "index">
+  >
+  limit?: number
+  offset?: number
+  parentRef?: Element | null
+  overscan?: number
+}
+
+export const getSearchResults = (_opts?: SearchResultsOpts) => {
+  const rspcContext = rspc.useContext()
+
+  const opts = mergeProps(_opts, {
+    limit: 40,
+    offset: 0,
+    defaultSearchQuery: {},
+    parentRef: null,
+    overscan: 10
+  })
+
+  const [viewMode, setViewMode] = createSignal<"list" | "grid">("list")
+  const [ref, setRef] = createSignal<VirtualizerHandle | null>(opts.parentRef)
+  const [lastScrollOffset, setLastScrollOffset] = createSignal(0)
+
+  const [searchQuery, setSearchQuery] = createSignal<FEUnifiedSearchParameters>(
+    {
+      ...defaultSearchQuery,
+      ...opts.defaultSearchQuery
+    },
+    {
+      equals: false
+    }
+  )
+
+  const actualPageSize = () => {
+    let pageSize = searchQuery().pageSize || 40
+
+    if (searchQuery().searchApi) {
+      // Use Math.ceil to handle odd numbers properly
+      pageSize = Math.ceil(pageSize / 2)
+    }
+    return pageSize
+  }
+
+  const cfInfiniteResults = createInfiniteQuery(() => ({
+    queryKey: ["modplatforms.unifiedSearch.cf"],
+    enabled:
+      (searchQuery().searchQuery?.length || 0) > 0 &&
+      (!searchQuery().searchApi || searchQuery().searchApi === "curseforge"),
+    queryFn: (ctx) => {
+      return rspcContext.client.query([
+        "modplatforms.unifiedSearch",
+        {
+          sortIndex: searchQuery().sortIndex || "totalDownloads",
+          sortOrder: searchQuery().sortOrder || "descending",
+          searchQuery: searchQuery().searchQuery,
+          categories: searchQuery().categories,
+          gameVersions: searchQuery().gameVersions,
+          modloaders: searchQuery().modloaders,
+          pageSize: actualPageSize(),
+          projectType: searchQuery().projectType,
+          index: ctx.pageParam,
+          searchApi: "curseforge",
+          environment: searchQuery().environment
+        }
+      ])
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => {
+      const hasMore = (lastPage?.data?.length || 0) === actualPageSize()
+      return hasMore
+        ? (lastPage?.pagination?.index || 0) + actualPageSize()
+        : null
+    }
+  }))
+
+  const mrInfiniteResults = createInfiniteQuery(() => ({
+    queryKey: ["modplatforms.unifiedSearch.mr"],
+    enabled:
+      (searchQuery().searchQuery?.length || 0) > 0 &&
+      (!searchQuery().searchApi || searchQuery().searchApi === "modrinth"),
+    queryFn: (ctx) => {
+      return rspcContext.client.query([
+        "modplatforms.unifiedSearch",
+        {
+          sortIndex: searchQuery().sortIndex || "downloads",
+          sortOrder: searchQuery().sortOrder || "descending",
+          searchQuery: searchQuery().searchQuery,
+          categories: searchQuery().categories,
+          gameVersions: searchQuery().gameVersions,
+          modloaders: searchQuery().modloaders,
+          pageSize: actualPageSize(),
+          projectType: searchQuery().projectType,
+          index: ctx.pageParam,
+          searchApi: "modrinth",
+          environment: searchQuery().environment
+        }
+      ])
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => {
+      const hasMore = (lastPage?.data?.length || 0) === actualPageSize()
+      return hasMore
+        ? (lastPage?.pagination?.index || 0) + actualPageSize()
+        : null
+    }
+  }))
+
+  createEffect(() => {
+    searchQuery()
+
+    mrInfiniteResults.refetch()
+    cfInfiniteResults.refetch()
+  })
+
+  const allRows = () => {
+    const cfData =
+      searchQuery().searchApi === "modrinth"
+        ? []
+        : (cfInfiniteResults.data?.pages.flatMap((p) => p.data) ?? [])
+    const mrData =
+      searchQuery().searchApi === "curseforge"
+        ? []
+        : (mrInfiniteResults.data?.pages.flatMap((p) => p.data) ?? [])
+
+    if (searchQuery().searchApi === "curseforge") return cfData
+    if (searchQuery().searchApi === "modrinth") return mrData
+
+    // Interleave results
+    const interleaved = []
+    const maxLength = Math.max(cfData.length, mrData.length)
+    for (let i = 0; i < maxLength; i++) {
+      if (i < cfData.length) interleaved.push(cfData[i])
+      if (i < mrData.length) interleaved.push(mrData[i])
+    }
+    return interleaved
+  }
+
+  const hasNextPage = createMemo(() => {
+    if (searchQuery().searchApi === "curseforge") {
+      return cfInfiniteResults.hasNextPage
+    } else if (searchQuery().searchApi === "modrinth") {
+      return mrInfiniteResults.hasNextPage
+    }
+    return cfInfiniteResults.hasNextPage || mrInfiniteResults.hasNextPage
+  })
+
+  const isLoading = createMemo(() => {
+    if (searchQuery().searchApi === "curseforge") {
+      return cfInfiniteResults.isLoading || cfInfiniteResults.isFetching
+    } else if (searchQuery().searchApi === "modrinth") {
+      return mrInfiniteResults.isLoading || mrInfiniteResults.isFetching
+    }
+    return (
+      cfInfiniteResults.isLoading ||
+      cfInfiniteResults.isFetching ||
+      mrInfiniteResults.isLoading ||
+      mrInfiniteResults.isFetching
+    )
+  })
+
+  const virtualOnScrollHandler = (_index: number) => {
+    const virtualizer = ref()
+    setLastScrollOffset(virtualizer?.scrollOffset || 0)
+
+    if (!virtualizer) return
+
+    // Check if we're near the bottom with an overscan of 10
+    const endIndex = virtualizer.findEndIndex()
+    const totalItems = allRows().length
+
+    // If we're within 10 items of the end and we have a next page
+    if (endIndex + opts.overscan > totalItems && hasNextPage()) {
+      if (searchQuery().searchApi === "curseforge") {
+        cfInfiniteResults.fetchNextPage()
+      } else if (searchQuery().searchApi === "modrinth") {
+        mrInfiniteResults.fetchNextPage()
+      } else {
+        // If both platforms are enabled, fetch both
+        if (cfInfiniteResults.hasNextPage) {
+          cfInfiniteResults.fetchNextPage()
+        }
+        if (mrInfiniteResults.hasNextPage) {
+          mrInfiniteResults.fetchNextPage()
+        }
+      }
+    }
+  }
+
+  return {
+    allRows,
+    isLoading,
+    hasNextPage,
+    viewMode,
+    setViewMode,
+    searchQuery,
+    setSearchQuery,
+    setRef,
+    ref,
+    cfInfiniteResults,
+    mrInfiniteResults,
+    virtualOnScrollHandler,
+    lastScrollOffset
+  }
+}

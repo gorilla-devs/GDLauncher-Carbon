@@ -4,8 +4,11 @@ import {
   Announcement,
   FEGDLAccountStatus,
   FESettings,
+  FEUnifiedCategories,
+  FEUnifiedModLoaders,
   ListGroup,
-  ListInstance
+  ListInstance,
+  ManifestVersion
 } from "@gd/core_module/bindings"
 import { RSPCError } from "@rspc/client"
 import { CreateQueryResult } from "@tanstack/solid-query"
@@ -20,6 +23,9 @@ interface Context {
   currentlySelectedAccountUuid: CreateQueryResult<string | null, RSPCError>
   gdlAccount: CreateQueryResult<FEGDLAccountStatus | null, RSPCError>
   announcements: CreateQueryResult<Announcement[], RSPCError>
+  categories: CreateQueryResult<FEUnifiedCategories, RSPCError>
+  modloaders: CreateQueryResult<FEUnifiedModLoaders, RSPCError>
+  minecraftVersions: CreateQueryResult<ManifestVersion[], RSPCError>
 }
 
 const GlobalStoreContext = createContext()
@@ -60,6 +66,18 @@ export const GlobalStoreProvider = (props: { children: JSX.Element }) => {
     queryKey: ["getAnnouncements"]
   }))
 
+  const categories = rspc.createQuery(() => ({
+    queryKey: ["modplatforms.getUnifiedCategories"]
+  }))
+
+  const modloaders = rspc.createQuery(() => ({
+    queryKey: ["modplatforms.getUnifiedModloaders"]
+  }))
+
+  const minecraftVersions = rspc.createQuery(() => ({
+    queryKey: ["mc.getMinecraftVersions"]
+  }))
+
   const store: Context = {
     instances,
     instanceGroups: groups,
@@ -68,7 +86,10 @@ export const GlobalStoreProvider = (props: { children: JSX.Element }) => {
     currentlySelectedAccountUuid,
     currentlySelectedAccount,
     gdlAccount,
-    announcements
+    announcements,
+    categories,
+    modloaders,
+    minecraftVersions
   }
 
   return (

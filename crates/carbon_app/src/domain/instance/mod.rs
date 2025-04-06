@@ -178,6 +178,7 @@ pub enum ExploreEntryType {
 pub enum ExportTarget {
     Curseforge,
     Modrinth,
+    Gdlauncher,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

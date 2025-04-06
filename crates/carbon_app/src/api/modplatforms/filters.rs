@@ -1,13 +1,12 @@
-use std::fmt::Display;
-use std::ops::{Deref, DerefMut};
-
+use super::curseforge::filters::CFFEModSearchParametersQuery;
+use super::unified::{FEUnifiedCategoryId, FEUnifiedModLoaderType};
+use super::{curseforge, FESearchAPI};
+use super::{modrinth, FEUnifiedSearchType};
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use specta::Type;
-
-use super::curseforge::filters::CFFEModSearchParametersQuery;
-use super::{curseforge, FESearchAPI};
-use super::{modrinth, FEUnifiedSearchType};
+use std::fmt::Display;
+use std::ops::{Deref, DerefMut};
 
 #[derive(Type, Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -105,127 +104,24 @@ impl<T> From<Or<T>> for And<T> {
 
 #[derive(Type, Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub enum FEUnifiedModSortIndex {
-    CurseForge(curseforge::filters::CFFEModSearchSortField),
-    Modrinth(modrinth::filters::MRFESearchIndex),
-}
-
-#[derive(
-    Type,
-    Debug,
-    serde_enum_str::Deserialize_enum_str,
-    serde_enum_str::Serialize_enum_str,
-    PartialEq,
-    Eq,
-    Clone,
-    strum_macros::EnumIter,
-)]
-#[serde(rename_all = "lowercase")]
-pub enum FEUnifiedModLoaderType {
-    // all
-    Forge,
-    NeoForge,
-    Fabric,
-    Quilt,
-    LiteLoader,
-    Unknown,
-
-    // curseforge
-    Cauldron,
-
-    // modrinth
-    Bukkit,
-    Bungeecord,
-    Canvas,
-    Datapack,
-    Folia,
-    Iris,
-    Minecraft,
-    Modloader,
-    Optifine,
-    Paper,
-    Purpur,
-    Rift,
-    Spigot,
-    Sponge,
-    Vanilla,
-    Velocity,
-    Waterfall,
-}
-
-impl TryFrom<FEUnifiedModLoaderType> for curseforge::structs::CFFEModLoaderType {
-    type Error = anyhow::Error;
-
-    fn try_from(value: FEUnifiedModLoaderType) -> Result<Self, Self::Error> {
-        match value {
-            FEUnifiedModLoaderType::Forge => Ok(curseforge::structs::CFFEModLoaderType::Forge),
-
-            FEUnifiedModLoaderType::NeoForge => {
-                Ok(curseforge::structs::CFFEModLoaderType::Neoforge)
-            }
-            FEUnifiedModLoaderType::Fabric => Ok(curseforge::structs::CFFEModLoaderType::Fabric),
-            FEUnifiedModLoaderType::Quilt => Ok(curseforge::structs::CFFEModLoaderType::Quilt),
-            FEUnifiedModLoaderType::LiteLoader => {
-                Ok(curseforge::structs::CFFEModLoaderType::LiteLoader)
-            }
-            FEUnifiedModLoaderType::Cauldron => {
-                Ok(curseforge::structs::CFFEModLoaderType::Cauldron)
-            }
-            value => Err(anyhow!(
-                "Curseforge does not support the `{}` loader",
-                value.to_string()
-            )),
-        }
-    }
-}
-
-impl TryFrom<FEUnifiedModLoaderType> for modrinth::structs::MRFELoaderType {
-    type Error = anyhow::Error;
-
-    fn try_from(value: FEUnifiedModLoaderType) -> Result<Self, Self::Error> {
-        match value {
-            FEUnifiedModLoaderType::Forge => Ok(modrinth::structs::MRFELoaderType::Forge),
-            FEUnifiedModLoaderType::NeoForge => Ok(modrinth::structs::MRFELoaderType::Neoforge),
-            FEUnifiedModLoaderType::Fabric => Ok(modrinth::structs::MRFELoaderType::Fabric),
-            FEUnifiedModLoaderType::Quilt => Ok(modrinth::structs::MRFELoaderType::Quilt),
-            FEUnifiedModLoaderType::LiteLoader => Ok(modrinth::structs::MRFELoaderType::Liteloader),
-            FEUnifiedModLoaderType::Bukkit => Ok(modrinth::structs::MRFELoaderType::Bukkit),
-            FEUnifiedModLoaderType::Bungeecord => Ok(modrinth::structs::MRFELoaderType::Bungeecord),
-            FEUnifiedModLoaderType::Canvas => Ok(modrinth::structs::MRFELoaderType::Canvas),
-            FEUnifiedModLoaderType::Datapack => Ok(modrinth::structs::MRFELoaderType::Datapack),
-            FEUnifiedModLoaderType::Folia => Ok(modrinth::structs::MRFELoaderType::Folia),
-            FEUnifiedModLoaderType::Iris => Ok(modrinth::structs::MRFELoaderType::Iris),
-            FEUnifiedModLoaderType::Minecraft => Ok(modrinth::structs::MRFELoaderType::Minecraft),
-            FEUnifiedModLoaderType::Modloader => Ok(modrinth::structs::MRFELoaderType::Modloader),
-            FEUnifiedModLoaderType::Optifine => Ok(modrinth::structs::MRFELoaderType::Optifine),
-            FEUnifiedModLoaderType::Paper => Ok(modrinth::structs::MRFELoaderType::Paper),
-            FEUnifiedModLoaderType::Purpur => Ok(modrinth::structs::MRFELoaderType::Purpur),
-            FEUnifiedModLoaderType::Rift => Ok(modrinth::structs::MRFELoaderType::Rift),
-            FEUnifiedModLoaderType::Spigot => Ok(modrinth::structs::MRFELoaderType::Spigot),
-            FEUnifiedModLoaderType::Sponge => Ok(modrinth::structs::MRFELoaderType::Sponge),
-            FEUnifiedModLoaderType::Vanilla => Ok(modrinth::structs::MRFELoaderType::Vanilla),
-            FEUnifiedModLoaderType::Velocity => Ok(modrinth::structs::MRFELoaderType::Velocity),
-            FEUnifiedModLoaderType::Waterfall => Ok(modrinth::structs::MRFELoaderType::Waterfall),
-            FEUnifiedModLoaderType::Unknown => Err(anyhow!("Can't use unknown modloader type")),
-            FEUnifiedModLoaderType::Cauldron => {
-                Err(anyhow!("Modrinth does not support the `Cauldron` loader"))
-            }
-        }
-    }
+pub enum FEUnifiedEnvironment {
+    Server,
+    Client,
 }
 
 #[derive(Type, Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub enum FEUnifiedSearchCategoryID {
-    Curseforge(i32),
-    Modrinth(String),
+#[serde(untagged)]
+pub enum FEUnifiedModSortIndex {
+    CurseForge(curseforge::filters::CFFEModSearchSortField),
+    Modrinth(modrinth::filters::MRFESearchIndex),
 }
 
 #[derive(Type, Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FEUnifiedSearchParameters {
     pub search_query: Option<String>,
-    pub categories: Option<And<FEUnifiedSearchCategoryID>>,
+    pub categories: Option<And<FEUnifiedCategoryId>>,
     pub game_versions: Option<Or<String>>,
     pub modloaders: Option<Or<FEUnifiedModLoaderType>>,
     pub project_type: Option<FEUnifiedSearchType>,
@@ -234,6 +130,7 @@ pub struct FEUnifiedSearchParameters {
     pub index: Option<u32>,
     pub page_size: Option<u32>,
     pub search_api: Option<FESearchAPI>,
+    pub environment: Option<FEUnifiedEnvironment>,
 }
 
 impl From<FEUnifiedSearchParameters> for curseforge::filters::CFFEModSearchParameters {
@@ -250,8 +147,8 @@ impl From<FEUnifiedSearchParameters> for curseforge::filters::CFFEModSearchParam
                             // Curseforge does't support ORs of categories, take only the first of each
                             // group
                             cats.into_iter().find_map(|cat| match cat {
-                                FEUnifiedSearchCategoryID::Curseforge(id) => Some(id),
-                                FEUnifiedSearchCategoryID::Modrinth(_) => None,
+                                FEUnifiedCategoryId::Curseforge(id) => Some(id),
+                                FEUnifiedCategoryId::Modrinth(_) => None,
                             })
                         })
                         .collect()
@@ -297,8 +194,8 @@ impl From<FEUnifiedSearchParameters> for modrinth::filters::MRFEProjectSearchPar
                 let category_or = cat_or
                     .into_iter()
                     .filter_map(|cat| match cat {
-                        FEUnifiedSearchCategoryID::Curseforge(_) => None,
-                        FEUnifiedSearchCategoryID::Modrinth(id) => {
+                        FEUnifiedCategoryId::Curseforge(_) => None,
+                        FEUnifiedCategoryId::Modrinth(id) => {
                             Some(modrinth::filters::MRFESearchFacet::Category(id))
                         }
                     })

@@ -200,6 +200,8 @@
   "modpack.total_download": "Total Downloads",
   "modpack.last_updated": "Last Updated:",
   "modpack.last_updated_time": "{{time}} ago",
+  "modpack.release_date": "Release Date:",
+  "modpack.release_date_time": "{{time}} ago",
   "modpack.authors": "Authors:",
   "modpack.modloader": "Modloader:",
   "modpack.version_downloading": "Downloading...",

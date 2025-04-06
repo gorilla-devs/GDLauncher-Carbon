@@ -9,6 +9,7 @@ use serde::{
 };
 
 pub mod curseforge;
+pub mod gdlauncher;
 pub mod modrinth;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

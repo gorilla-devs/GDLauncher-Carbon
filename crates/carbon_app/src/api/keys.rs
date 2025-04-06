@@ -151,8 +151,6 @@ keys! {
     }
 
     modplatforms {
-        CURSEFORGE_GET_MODLOADERS                   = "curseforge.getModloaders";
-        CURSEFORGE_GET_CATEGORIES                   = "curseforge.getCategories";
         CURSEFORGE_SEARCH                           = "curseforge.search";
         CURSEFORGE_GET_MOD                          = "curseforge.getMod";
         CURSEFORGE_GET_MODS                         = "curseforge.getMods";
@@ -161,9 +159,6 @@ keys! {
         CURSEFORGE_GET_MOD_FILES                    = "curseforge.getModFiles";
         CURSEFORGE_GET_FILES                        = "curseforge.getFiles";
         CURSEFORGE_GET_MOD_FILE_CHANGELOG           = "curseforge.getModFileChangelog";
-
-        MODRINTH_GET_LOADERS                        = "modrinth.getLoaders";
-        MODRINTH_GET_CATEGORIES                     = "modrinth.getCategories";
         MODRINTH_SEARCH                             = "modrinth.search";
         MODRINTH_GET_PROJECT                        = "modrinth.getProject";
         MODRINTH_GET_PROJECTS                       = "modrinth.getProjects";
@@ -175,5 +170,7 @@ keys! {
 
         UNIFIED_SEARCH                              = "unifiedSearch";
         UNIFIED_SEARCH_PROJECT_TYPE                 = "unifiedSearchProjectType";
+        GET_UNIFIED_CATEGORIES                      = "getUnifiedCategories";
+        GET_UNIFIED_MODLOADERS                      = "getUnifiedModloaders";
     }
 }

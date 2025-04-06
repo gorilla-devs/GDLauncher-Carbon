@@ -1,4 +1,4 @@
-import { getCFModloaderIcon } from "@/utils/sidebar"
+import { getModloaderIcon } from "@/utils/sidebar"
 import {
   ListInstance,
   CFFEModLoaderType,
@@ -22,7 +22,9 @@ import {
   ContextMenuTrigger,
   Popover,
   Spinner,
-  Tooltip
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
 } from "@gd/ui"
 import DefaultImg from "/assets/images/default-instance-img.png"
 import { useGDNavigate } from "@/managers/NavigationManager"
@@ -363,29 +365,32 @@ const Tile = (props: Props) => {
                         <Trans key="error" />
                       </div>
                       <div>
-                        <Tooltip
-                          content={
-                            copiedError() ? t("copied_to_clipboard") : t("Copy")
-                          }
-                        >
-                          <div
-                            class="h-6 w-6"
-                            classList={{
-                              "text-lightSlate-700 hover:text-lightSlate-100 duration-100 ease-in-out i-ri:file-copy-2-fill":
-                                !copiedError(),
-                              "text-green-400 i-ri:checkbox-circle-fill":
-                                copiedError()
-                            }}
-                            onClick={() => {
-                              navigator.clipboard.writeText(props.failError!)
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <div
+                              class="h-6 w-6"
+                              classList={{
+                                "text-lightSlate-700 hover:text-lightSlate-100 duration-100 ease-in-out i-ri:file-copy-2-fill":
+                                  !copiedError(),
+                                "text-green-400 i-ri:checkbox-circle-fill":
+                                  copiedError()
+                              }}
+                              onClick={() => {
+                                navigator.clipboard.writeText(props.failError!)
 
-                              setCopiedError(true)
+                                setCopiedError(true)
 
-                              setTimeout(() => {
-                                setCopiedError(false)
-                              }, 2000)
-                            }}
-                          />
+                                setTimeout(() => {
+                                  setCopiedError(false)
+                                }, 2000)
+                              }}
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {copiedError()
+                              ? t("copied_to_clipboard")
+                              : t("Copy")}
+                          </TooltipContent>
                         </Tooltip>
                       </div>
                     </div>
@@ -690,14 +695,15 @@ const Tile = (props: Props) => {
                       : {}
                   }
                 >
-                  <Tooltip
-                    content={
-                      props.instance.name.length > 20 ? props.instance.name : ""
-                    }
-                    placement="top"
-                    class="w-full overflow-hidden text-ellipsis"
-                  >
-                    {props.instance.name}
+                  <Tooltip placement="top">
+                    <TooltipTrigger class="w-full overflow-hidden text-ellipsis">
+                      {props.instance.name}
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {props.instance.name.length > 20
+                        ? props.instance.name
+                        : ""}
+                    </TooltipContent>
                   </Tooltip>
                 </h4>
                 <Switch>
@@ -717,7 +723,7 @@ const Tile = (props: Props) => {
                         <Show when={props.modloader}>
                           <img
                             class="h-4 w-4"
-                            src={getCFModloaderIcon(props.modloader!)}
+                            src={getModloaderIcon(props.modloader!)}
                           />
                         </Show>
                       </span>

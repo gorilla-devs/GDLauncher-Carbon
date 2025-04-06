@@ -8,7 +8,6 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-  Dropdown,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuLabel,
@@ -21,11 +20,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   Input,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  Skeleton,
-  Slider
+  Skeleton
 } from "@gd/ui"
 import {
   For,
@@ -51,7 +46,6 @@ import { rspc } from "@/utils/rspcClient"
 import { createStore, reconcile } from "solid-js/store"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { useModal } from "@/managers/ModalsManager"
-import Announcements from "@/components/Announcements"
 
 let initAnimationRan = false
 
@@ -638,10 +632,6 @@ const HomeGrid = () => {
                             noPadding
                             title={
                               <>
-                                {/* <img
-                            class="w-6 h-6"
-                            src={getCFModloaderIcon(key as CFFEModLoaderType)}
-                          /> */}
                                 <span>{group.name}</span>
                               </>
                             }

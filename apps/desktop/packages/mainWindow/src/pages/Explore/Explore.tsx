@@ -4,10 +4,19 @@ import Masonry from "./components/Masonry"
 import { restoreScrollPosition } from "@/utils/scrollRestoration"
 import { onMount } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
-import { setSearchQuery } from "@/components/NavSearchInput"
+import { getSearchResults } from "@/utils/platformSearch"
 
 export function Explore() {
   const navigate = useGDNavigate()
+  const searchResults = getSearchResults({
+    offset: 0,
+    limit: 40,
+    defaultSearchQuery: {
+      sortIndex: "popularity",
+      sortOrder: "descending",
+      projectType: "modpack"
+    }
+  })
 
   const popularModpacksCF = rspc.createQuery(() => ({
     queryKey: [
@@ -166,7 +175,7 @@ export function Explore() {
 
   return (
     <div class="flex flex-col gap-8">
-      <h1 class="text-center text-4xl font-bold">Explore or Search Anything</h1>
+      {/* <h1 class="text-center text-4xl font-bold">Explore or Search Anything</h1>
       <ShowcaseScroller
         title="Some Modpacks You Might Like"
         elements={popularModpacks()}
@@ -190,7 +199,7 @@ export function Explore() {
       <Masonry
         title="Check out these recently updated addons"
         elements={recentlyUpdatedAllElements()}
-      />
+      /> */}
     </div>
   )
 }

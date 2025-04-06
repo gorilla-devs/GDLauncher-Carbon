@@ -1,9 +1,8 @@
-import { useLocation, useMatch, useRouteData } from "@solidjs/router"
+import { useLocation, useMatch } from "@solidjs/router"
 import { Match, Show, Switch, createEffect } from "solid-js"
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg"
 import { Tab, TabList, Tabs, Tooltip, Button } from "@gd/ui"
 import { useGDNavigate } from "@/managers/NavigationManager"
-import fetchData from "@/pages/app.data"
 import { AccountsDropdown } from "./AccountsDropdown"
 import { AccountStatus, AccountType } from "@gd/core_module/bindings"
 import { createStore } from "solid-js/store"
@@ -15,6 +14,7 @@ import updateAvailable, {
 import { Trans } from "@gd/i18n"
 import { useModal } from "@/managers/ModalsManager"
 import NavSearchInput from "./NavSearchInput"
+import { useGlobalStore } from "./GlobalStoreContext"
 
 export interface AccountsStatus {
   label: {
@@ -30,6 +30,7 @@ export interface AccountsStatus {
 const AppNavbar = () => {
   const location = useLocation()
   const navigate = useGDNavigate()
+  const globalStore = useGlobalStore()
   const [accounts, setAccounts] = createStore<AccountsStatus[]>([])
   const modalsContext = useModal()
 
@@ -43,10 +44,8 @@ const AppNavbar = () => {
     return -1
   }
 
-  const routeData = useRouteData<typeof fetchData>()
-
   createEffect(() => {
-    const mappedAccounts = routeData.accounts.data?.map((account) => {
+    const mappedAccounts = globalStore.accounts.data?.map((account) => {
       const accountStatusQuery = {} as any
 
       return {
@@ -195,10 +194,10 @@ const AppNavbar = () => {
             </TabList>
           </Tabs>
           <div class="mr-6 flex justify-end lg:min-w-fit">
-            <Show when={routeData?.accounts.data}>
+            <Show when={globalStore.accounts.data}>
               <AccountsDropdown
                 accounts={accounts}
-                value={routeData.activeUuid.data}
+                value={globalStore.currentlySelectedAccountUuid.data}
               />
             </Show>
           </div>

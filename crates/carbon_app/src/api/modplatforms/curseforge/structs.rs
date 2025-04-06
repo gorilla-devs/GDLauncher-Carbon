@@ -1036,6 +1036,7 @@ pub struct CFFEModAuthor {
     pub id: i32,
     pub name: String,
     pub url: String,
+    pub avatar_url: Option<String>,
 }
 
 impl From<mpcf::ModAuthor> for CFFEModAuthor {
@@ -1044,6 +1045,7 @@ impl From<mpcf::ModAuthor> for CFFEModAuthor {
             id: minecraft_mod_author.id,
             name: minecraft_mod_author.name,
             url: minecraft_mod_author.url,
+            avatar_url: minecraft_mod_author.avatar_url,
         }
     }
 }

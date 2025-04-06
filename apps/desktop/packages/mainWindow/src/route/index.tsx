@@ -3,7 +3,6 @@ import { RouteDefinition } from "@solidjs/router"
 import SettingsJavaData from "@/pages/Settings/settings.java.data"
 import SettingsGeneralData from "@/pages/Settings/settings.general.data"
 import LoginData from "@/pages/Login/auth.login.data"
-import AppData from "@/pages/app.data"
 import AddonViewPageData from "@/pages/AddonViewPage/mods.overview"
 import AddonVersionsData from "@/pages/AddonViewPage/mods.versions"
 import AddonScreenshotsData from "@/pages/AddonViewPage/mods.screenshots"
@@ -26,7 +25,6 @@ export const routes: RouteDefinition[] = [
   {
     path: "/",
     component: withAdsLayout,
-    data: AppData,
     children: [
       {
         path: "/library",

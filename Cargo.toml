@@ -96,6 +96,7 @@ governor = "0.6.3"
 hex = "0.4.3"
 tracing = "0.1.40"
 walkdir = "2.5.0"
+serde_plain = "1.0.2"
 tracing-subscriber = { version = "0.3.18", features = ["ansi", "env-filter"] }
 tracing-appender = "0.2.3"
 strip-ansi-escapes = "0.2.1"

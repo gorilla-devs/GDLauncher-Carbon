@@ -108,6 +108,11 @@ render(() => {
     const minLoadingTime = 2500
     const timeElapsed = Date.now() - startTime
 
+    // DEV ONLY
+    if (import.meta.env.DEV && coreModuleLoaded.state === "ready") {
+      setIsReady(true)
+    }
+
     if (coreModuleLoaded.state === "ready" && timeElapsed >= minLoadingTime) {
       setIsReady(true)
     } else if (coreModuleLoaded.state === "ready") {

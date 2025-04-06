@@ -1,5 +1,3 @@
-import { mcVersions } from "@/utils/mcVersion"
-import { supportedModloaders } from "@/utils/sidebar"
 import DefaultImg from "/assets/images/default-instance-img.png"
 import { McType } from "@gd/core_module/bindings"
 import { Trans } from "@gd/i18n"
@@ -10,6 +8,7 @@ import { createStore } from "solid-js/store"
 import { rspc } from "@/utils/rspcClient"
 import { useInfiniteVersionsQuery } from "../InfiniteScrollVersionsQueryWrapper"
 import { getInstanceImageUrl } from "@/utils/instances"
+import { useGlobalStore } from "../GlobalStoreContext"
 
 const mapTypeToColor = (type: McType) => {
   return (
@@ -38,6 +37,7 @@ interface Props {
 const ExploreVersionsNavbar = (props: Props) => {
   const [searchParams, _setSearchParams] = useSearchParams()
   const instanceId = () => parseInt(searchParams.instanceId, 10)
+  const globalStore = useGlobalStore()
 
   const infiniteQuery = useInfiniteVersionsQuery()
 
@@ -59,21 +59,19 @@ const ExploreVersionsNavbar = (props: Props) => {
     let res: { label: string; key: string }[] = []
 
     if (props.modplatform === "modrinth") {
-      const results = supportedModloaders[props.modplatform]
-      res = results
-        .filter((modloader) =>
-          modloader.supported_project_types.includes("modpack")
-        )
-        .map((v) => ({
-          label: v.name.toString(),
-          key: v.name.toString()
-        }))
+      const results = globalStore.modloaders.data?.[props.modplatform]
+      res =
+        results?.map((v) => ({
+          label: v.toString(),
+          key: v.toString()
+        })) || []
     } else if (props.modplatform === "curseforge") {
-      const results = supportedModloaders[props.modplatform]
-      res = results.map((v) => ({
-        label: v.toString(),
-        key: v.toString()
-      }))
+      const results = globalStore.modloaders.data?.[props.modplatform]
+      res =
+        results?.map((v) => ({
+          label: v.toString(),
+          key: v.toString()
+        })) || []
     }
 
     return [
@@ -89,7 +87,7 @@ const ExploreVersionsNavbar = (props: Props) => {
     const oldAlpha = gameVersionFilters.oldAlpha
     const oldBeta = gameVersionFilters.oldBeta
 
-    return mcVersions().filter(
+    return globalStore.minecraftVersions.data?.filter(
       (item) =>
         item.type === "release" ||
         (item.type === "snapshot" && snapshot) ||
@@ -110,7 +108,7 @@ const ExploreVersionsNavbar = (props: Props) => {
 
     return [
       allVersionsLabel,
-      ...filteredGameVersions().map((item) => ({
+      ...(filteredGameVersions() || []).map((item) => ({
         label: (
           <div class="flex justify-between w-full">
             <span>{item.id}</span>

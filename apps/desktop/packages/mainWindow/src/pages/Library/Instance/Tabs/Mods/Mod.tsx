@@ -1,6 +1,6 @@
 import { getInstanceIdFromPath } from "@/utils/routes"
 import { queryClient, rspc } from "@/utils/rspcClient"
-import { getCFModloaderIcon } from "@/utils/sidebar"
+import { getModloaderIcon } from "@/utils/sidebar"
 import { CFFEFile, MRFEVersion, Mod as ModType } from "@gd/core_module/bindings"
 import {
   Button,
@@ -564,7 +564,7 @@ const Mod = (props: Props) => {
                                 <Show when={modloader}>
                                   <img
                                     class="w-4 h-4"
-                                    src={getCFModloaderIcon(modloader)}
+                                    src={getModloaderIcon(modloader)}
                                   />
                                 </Show>
                                 <div class="text-sm">{modloader}</div>

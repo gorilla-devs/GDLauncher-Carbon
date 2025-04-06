@@ -84,6 +84,7 @@ async-recursion = "1.1.1"
 shlex = "1.3.0"
 serde-enum-str = "0.4.0"
 markdown = { workspace = true }
+serde_plain = { workspace = true }
 ring = { workspace = true }
 num_cpus = { workspace = true }
 display-info = "0.5.1"

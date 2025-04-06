@@ -20,6 +20,7 @@ use crate::{
 };
 
 mod curseforge_archive;
+mod gdlauncher_archive;
 mod modrinth_archive;
 
 #[derive(Debug)]
@@ -53,6 +54,16 @@ impl ManagerRef<'_, InstanceExportManager> {
             }
             ExportTarget::Modrinth => {
                 modrinth_archive::export_modrinth(
+                    self.app.clone(),
+                    instance_id,
+                    save_path,
+                    self_contained_addons_bundling,
+                    filter,
+                )
+                .await
+            }
+            ExportTarget::Gdlauncher => {
+                gdlauncher_archive::export_gdlauncher(
                     self.app.clone(),
                     instance_id,
                     save_path,

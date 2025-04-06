@@ -5,13 +5,13 @@ use self::{
 use crate::{
     api::{
         keys::modplatforms::{
-            CURSEFORGE_GET_CATEGORIES, CURSEFORGE_GET_FILES, CURSEFORGE_GET_MOD,
-            CURSEFORGE_GET_MODLOADERS, CURSEFORGE_GET_MODS, CURSEFORGE_GET_MOD_DESCRIPTION,
-            CURSEFORGE_GET_MOD_FILE, CURSEFORGE_GET_MOD_FILES, CURSEFORGE_GET_MOD_FILE_CHANGELOG,
-            CURSEFORGE_SEARCH, MODRINTH_GET_CATEGORIES, MODRINTH_GET_LOADERS, MODRINTH_GET_PROJECT,
-            MODRINTH_GET_PROJECTS, MODRINTH_GET_PROJECT_TEAM, MODRINTH_GET_PROJECT_VERSIONS,
-            MODRINTH_GET_TEAM, MODRINTH_GET_VERSION, MODRINTH_GET_VERSIONS, MODRINTH_SEARCH,
-            UNIFIED_SEARCH, UNIFIED_SEARCH_PROJECT_TYPE,
+            CURSEFORGE_GET_FILES, CURSEFORGE_GET_MOD, CURSEFORGE_GET_MODS,
+            CURSEFORGE_GET_MOD_DESCRIPTION, CURSEFORGE_GET_MOD_FILE, CURSEFORGE_GET_MOD_FILES,
+            CURSEFORGE_GET_MOD_FILE_CHANGELOG, CURSEFORGE_SEARCH, GET_UNIFIED_CATEGORIES,
+            GET_UNIFIED_MODLOADERS, MODRINTH_GET_PROJECT, MODRINTH_GET_PROJECTS,
+            MODRINTH_GET_PROJECT_TEAM, MODRINTH_GET_PROJECT_VERSIONS, MODRINTH_GET_TEAM,
+            MODRINTH_GET_VERSION, MODRINTH_GET_VERSIONS, MODRINTH_SEARCH, UNIFIED_SEARCH,
+            UNIFIED_SEARCH_PROJECT_TYPE,
         },
         modplatforms::curseforge::structs::CFFEModLoaderType,
         router::router,
@@ -19,6 +19,7 @@ use crate::{
     managers::App,
     mirror_into,
 };
+use carbon_platforms::{curseforge::ClassId, modrinth::project::ProjectType};
 use curseforge::structs::CFFEClassId;
 use modrinth::structs::MRFEProjectType;
 use rspc::RouterBuilder;
@@ -27,11 +28,12 @@ use specta::Type;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use tracing::info;
+use unified::{FEUnifiedCategories, FEUnifiedCategory, FEUnifiedModLoaders, FEUnifiedSearchType};
 
 mod curseforge;
 mod filters;
 mod modrinth;
-mod responses;
+mod unified;
 
 pub(super) fn mount() -> RouterBuilder<App> {
     router! {
@@ -41,17 +43,6 @@ pub(super) fn mount() -> RouterBuilder<App> {
             let response = modplatforms.curseforge.search(filters.into()).await?;
 
             Ok(curseforge::responses::FEModSearchResponse::from(response))
-        }
-
-        query CURSEFORGE_GET_MODLOADERS[app, _args: ()] {
-            Ok(CFFEModLoaderType::iter().collect::<Vec<_>>())
-        }
-
-        query CURSEFORGE_GET_CATEGORIES[app, args: ()] {
-            let modplatforms = app.modplatforms_manager();
-            let response = modplatforms.curseforge.get_categories().await?;
-
-            Ok(curseforge::responses::FECategoriesResponse::from(response))
         }
 
         query CURSEFORGE_GET_MOD[app, mod_parameters: curseforge::filters::CFFEModParameters] {
@@ -111,54 +102,60 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok(modrinth::responses::MRFEProjectSearchResponse::from(response))
 
         }
-        query MODRINTH_GET_LOADERS[app, _args: ()] {
-            let modplatforms = app.modplatforms_manager();
-            let response = modplatforms.modrinth.get_loaders().await?;
 
-            Ok(modrinth::responses::MRFELoadersResponse::from(response))
-        }
-        query MODRINTH_GET_CATEGORIES[app, args: () ] {
+        query GET_UNIFIED_MODLOADERS[app, _args: ()] {
             let modplatforms = app.modplatforms_manager();
-            let response = modplatforms.modrinth.get_categories().await?;
+            let curseforge = CFFEModLoaderType::iter().collect::<Vec<_>>();
+            let modrinth = modrinth::responses::MRFELoadersResponse::from(modplatforms.modrinth.get_loaders().await?);
 
-            Ok(modrinth::responses::MRFECategoriesResponse::from(response))
+            Ok(FEUnifiedModLoaders {
+                curseforge: curseforge.into_iter().map(Into::into).collect(),
+                modrinth: modrinth.into_iter().map(|v| v.name).map(Into::into).collect(),
+            })
         }
+
         query MODRINTH_GET_PROJECT[app, project: modrinth::filters::MRFEProjectID  ] {
             let modplatforms = app.modplatforms_manager();
             let response = modplatforms.modrinth.get_project(project.into()).await?;
 
             Ok(modrinth::structs::MRFEProject::from(response))
         }
+
         query MODRINTH_GET_PROJECTS[app, projects: modrinth::filters::MRFEProjectIDs] {
             let modplatforms = app.modplatforms_manager();
             let response = modplatforms.modrinth.get_projects(projects.into()).await?;
 
             Ok(modrinth::responses::MRFEProjectsResponse::from(response))
         }
+
         query MODRINTH_GET_PROJECT_VERSIONS[app, filters: modrinth::filters::MRFEProjectVersionsFilters] {
             let modplatforms = app.modplatforms_manager();
             let response = modplatforms.modrinth.get_project_versions(filters.into()).await?;
 
             Ok(modrinth::responses::MRFEVersionsResponse::from(response))
         }
+
         query MODRINTH_GET_VERSION[app, version: modrinth::filters::MRFEVersionID] {
             let modplatforms = app.modplatforms_manager();
             let response = modplatforms.modrinth.get_version(version.into()).await?;
 
             Ok(modrinth::structs::MRFEVersion::from(response))
         }
+
         query MODRINTH_GET_VERSIONS[app, versions: modrinth::filters::MRFEVersionIDs] {
             let modplatforms = app.modplatforms_manager();
             let response = modplatforms.modrinth.get_versions(versions.into()).await?;
 
             Ok(modrinth::responses::MRFEVersionsResponse::from(response))
         }
+
         query MODRINTH_GET_PROJECT_TEAM[app, project: modrinth::filters::MRFEProjectID] {
             let modplatforms = app.modplatforms_manager();
             let response = modplatforms.modrinth.get_project_team(project.into()).await?;
 
             Ok(modrinth::responses::MRFETeamResponse::from(response))
         }
+
         query MODRINTH_GET_TEAM[app, team: modrinth::filters::MRFETeamID] {
             let modplatforms = app.modplatforms_manager();
             let response = modplatforms.modrinth.get_team(team.into()).await?;
@@ -173,14 +170,14 @@ pub(super) fn mount() -> RouterBuilder<App> {
                     let modplatforms = app.modplatforms_manager();
                     let curseforge_response = modplatforms.curseforge.search(search_params.into()).await?;
                     let fe_curseforge_response = curseforge::responses::FEModSearchResponse::from(curseforge_response);
-                    Ok(responses::FEUnifiedSearchResponse::from(fe_curseforge_response))
+                    Ok(unified::FEUnifiedSearchResponse::from(fe_curseforge_response))
                 }
                 Some(FESearchAPI::Modrinth) => {
                     let search_params: modrinth::filters::MRFEProjectSearchParameters = search_params.try_into()?;
                     let modplatforms = app.modplatforms_manager();
                     let modrinth_response = modplatforms.modrinth.search(search_params.into()).await?;
                     let fe_modrinth_response = modrinth::responses::MRFEProjectSearchResponse::from(modrinth_response);
-                    Ok(responses::FEUnifiedSearchResponse::from(fe_modrinth_response))
+                    Ok(unified::FEUnifiedSearchResponse::from(fe_modrinth_response))
                 }
                 None => {
                     // Search both platforms and merge results
@@ -197,7 +194,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
                     let cf_results = curseforge::responses::FEModSearchResponse::from(cf_response);
                     let mr_results = modrinth::responses::MRFEProjectSearchResponse::from(mr_response);
 
-                    let merged = responses::FEUnifiedSearchResponse::merge(cf_results.into(), mr_results.into());
+                    let merged = unified::FEUnifiedSearchResponse::merge(cf_results.into(), mr_results.into());
                     Ok(merged)
                 }
             }
@@ -205,6 +202,25 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         query UNIFIED_SEARCH_PROJECT_TYPE[app, _args: ()] {
             Ok(FEUnifiedSearchType::iter().collect::<Vec<_>>())
+        }
+
+        query GET_UNIFIED_CATEGORIES[app, _args:()] {
+            let modplatforms = app.modplatforms_manager();
+            let curseforge_categories = modplatforms.curseforge.get_categories();
+            let modrinth_categories = modplatforms.modrinth.get_categories();
+
+            let (cf_categories, mr_categories) = tokio::try_join!(
+                curseforge_categories,
+                modrinth_categories
+            )?;
+
+            let cf_categories = cf_categories.data.into_iter().map(|category| (category.id, FEUnifiedCategory::from(category))).collect();
+            let mr_categories = mr_categories.into_iter().map(|category| (category.name.clone(), FEUnifiedCategory::from(category))).collect();
+
+            Ok(FEUnifiedCategories {
+                modrinth: mr_categories,
+                curseforge: cf_categories,
+            })
         }
     }
 }
@@ -315,96 +331,6 @@ impl From<carbon_platforms::RemoteVersion> for RemoteVersion {
         match value {
             Other::Curseforge(cf) => Self::Curseforge(cf.into()),
             Other::Modrinth(mr) => Self::Modrinth(mr.into()),
-        }
-    }
-}
-
-#[derive(Type, Debug, Deserialize, Serialize, Clone, EnumIter)]
-#[serde(rename_all = "camelCase")]
-pub enum FEUnifiedSearchType {
-    Mod,
-    Modpack,
-    ResourcePack,
-    Shader,
-    World,
-    Plugin,
-    Datapack,
-    Unknown,
-}
-
-impl ToString for FEUnifiedSearchType {
-    fn to_string(&self) -> String {
-        match self {
-            FEUnifiedSearchType::Mod => "mod",
-            FEUnifiedSearchType::Modpack => "modpack",
-            FEUnifiedSearchType::ResourcePack => "resourcepack",
-            FEUnifiedSearchType::Shader => "shader",
-            FEUnifiedSearchType::World => "world",
-            FEUnifiedSearchType::Plugin => "plugin",
-            FEUnifiedSearchType::Datapack => "datapack",
-            FEUnifiedSearchType::Unknown => "unknown",
-        }
-        .to_string()
-    }
-}
-
-impl From<CFFEClassId> for FEUnifiedSearchType {
-    fn from(value: CFFEClassId) -> Self {
-        match value {
-            CFFEClassId::Mods => FEUnifiedSearchType::Mod,
-            CFFEClassId::Modpacks => FEUnifiedSearchType::Modpack,
-            CFFEClassId::ResourcePacks => FEUnifiedSearchType::ResourcePack,
-            CFFEClassId::Shaders => FEUnifiedSearchType::Shader,
-            CFFEClassId::Worlds => FEUnifiedSearchType::World,
-            CFFEClassId::BukkitPlugins => FEUnifiedSearchType::Plugin,
-            CFFEClassId::Customizations => FEUnifiedSearchType::ResourcePack,
-            CFFEClassId::Addons => FEUnifiedSearchType::ResourcePack,
-            CFFEClassId::Datapacks => FEUnifiedSearchType::Datapack,
-            CFFEClassId::Other(_) => FEUnifiedSearchType::Unknown,
-        }
-    }
-}
-
-impl From<FEUnifiedSearchType> for CFFEClassId {
-    fn from(value: FEUnifiedSearchType) -> Self {
-        match value {
-            FEUnifiedSearchType::Mod => CFFEClassId::Mods,
-            FEUnifiedSearchType::Modpack => CFFEClassId::Modpacks,
-            FEUnifiedSearchType::ResourcePack => CFFEClassId::ResourcePacks,
-            FEUnifiedSearchType::Shader => CFFEClassId::Shaders,
-            FEUnifiedSearchType::World => CFFEClassId::Worlds,
-            FEUnifiedSearchType::Plugin => CFFEClassId::BukkitPlugins,
-            FEUnifiedSearchType::Datapack => CFFEClassId::Datapacks,
-            FEUnifiedSearchType::Unknown => CFFEClassId::Other(0),
-        }
-    }
-}
-
-impl From<MRFEProjectType> for FEUnifiedSearchType {
-    fn from(value: MRFEProjectType) -> Self {
-        match value {
-            MRFEProjectType::Mod => FEUnifiedSearchType::Mod,
-            MRFEProjectType::Modpack => FEUnifiedSearchType::Modpack,
-            MRFEProjectType::ResourcePack => FEUnifiedSearchType::ResourcePack,
-            MRFEProjectType::Shader => FEUnifiedSearchType::Shader,
-            MRFEProjectType::Plugin => FEUnifiedSearchType::Plugin,
-            MRFEProjectType::DataPack => FEUnifiedSearchType::Datapack,
-            MRFEProjectType::Unknown => FEUnifiedSearchType::Unknown,
-        }
-    }
-}
-
-impl From<FEUnifiedSearchType> for MRFEProjectType {
-    fn from(value: FEUnifiedSearchType) -> Self {
-        match value {
-            FEUnifiedSearchType::Mod => MRFEProjectType::Mod,
-            FEUnifiedSearchType::Modpack => MRFEProjectType::Modpack,
-            FEUnifiedSearchType::ResourcePack => MRFEProjectType::ResourcePack,
-            FEUnifiedSearchType::Shader => MRFEProjectType::Shader,
-            FEUnifiedSearchType::Plugin => MRFEProjectType::Plugin,
-            FEUnifiedSearchType::Datapack => MRFEProjectType::DataPack,
-            FEUnifiedSearchType::World => MRFEProjectType::Unknown,
-            FEUnifiedSearchType::Unknown => MRFEProjectType::Unknown,
         }
     }
 }
