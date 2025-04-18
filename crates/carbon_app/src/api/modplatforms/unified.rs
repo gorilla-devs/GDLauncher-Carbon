@@ -2,13 +2,14 @@ use std::collections::HashMap;
 
 use carbon_platforms::curseforge::ClassId;
 use carbon_platforms::modrinth::project::ProjectType;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use specta::Type;
 use strum_macros::EnumIter;
 
+use super::FESearchAPI;
 use super::curseforge::structs::{CFFECategory, CFFEClassId, CFFEMod};
 use super::modrinth::structs::{MRFECategory, MRFEProjectSearchResult, MRFEProjectType};
-use super::FESearchAPI;
 use super::{curseforge, modrinth};
 
 #[derive(Type, Debug, Deserialize, Serialize, Clone, EnumIter)]
@@ -186,6 +187,7 @@ pub struct FEUnifiedSearchResult {
     pub website_url: Option<String>,
     pub categories: Vec<FEUnifiedCategoryId>,
     pub screenshot_urls: Vec<String>,
+    pub minecraft_versions: Vec<String>,
 }
 
 impl From<CFFEMod> for FEUnifiedSearchResult {
@@ -196,7 +198,7 @@ impl From<CFFEMod> for FEUnifiedSearchResult {
             image_url: value.logo.as_ref().map(|logo| logo.thumbnail_url.clone()),
             high_res_image_url: value.logo.as_ref().map(|logo| logo.url.clone()),
             id: value.id.to_string(),
-            release_date: value.date_released,
+            release_date: value.date_created,
             last_updated: value.date_modified.to_string(),
             downloads_count: value.download_count,
             platform: FEUnifiedPlatform::Curseforge,
@@ -223,6 +225,42 @@ impl From<CFFEMod> for FEUnifiedSearchResult {
                 .into_iter()
                 .map(|screenshot| screenshot.url)
                 .collect(),
+            minecraft_versions: {
+                let mut all_versions: Vec<String> = value
+                    .latest_files_indexes
+                    .iter()
+                    .map(|v| v.game_version.clone())
+                    .collect();
+
+                // all_versions.sort_by(|a, b| {
+                //     // Parse versions with a custom comparator that handles Minecraft versioning
+                //     let parse_version = |v: &str| -> (u32, u32, u32) {
+                //         let parts: Vec<&str> = v.split('.').collect();
+                //         let major = parts
+                //             .get(0)
+                //             .and_then(|s| s.parse::<u32>().ok())
+                //             .unwrap_or(0);
+                //         let minor = parts
+                //             .get(1)
+                //             .and_then(|s| s.parse::<u32>().ok())
+                //             .unwrap_or(0);
+                //         let patch = parts
+                //             .get(2)
+                //             .and_then(|s| s.parse::<u32>().ok())
+                //             .unwrap_or(0);
+                //         (major, minor, patch)
+                //     };
+
+                //     let a_version = parse_version(a);
+                //     let b_version = parse_version(b);
+
+                //     // Compare versions component by component
+                //     a_version.cmp(&b_version)
+                // });
+
+                all_versions.dedup();
+                all_versions
+            },
         }
     }
 }
@@ -257,6 +295,7 @@ impl From<MRFEProjectSearchResult> for FEUnifiedSearchResult {
                 .map(|category| FEUnifiedCategoryId::Modrinth(category))
                 .collect(),
             screenshot_urls: value.gallery.unwrap_or_default(),
+            minecraft_versions: value.versions,
         }
     }
 }

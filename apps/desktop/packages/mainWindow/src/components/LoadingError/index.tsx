@@ -17,12 +17,12 @@ const LoadingError = (props: Props) => {
   return (
     <Switch>
       <Match when={props.routeData.data.isLoading}>
-        <div class="h-full w-full flex justify-center items-center">
+        <div class="flex h-full w-full items-center justify-center">
           <Spinner />
         </div>
       </Match>
       <Match when={props.routeData.data.isError}>
-        <div class="h-full w-full flex justify-center items-center">
+        <div class="flex h-full w-full items-center justify-center">
           Some error
         </div>
       </Match>

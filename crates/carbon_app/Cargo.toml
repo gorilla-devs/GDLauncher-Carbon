@@ -1,8 +1,7 @@
 [package]
 name = "carbon_app"
 version = "0.0.0"
-edition = "2021"
-author = "GorillaDevs Inc."
+edition = "2024"
 
 [target.aarch64-apple-darwin]
 rustflags = [
@@ -27,7 +26,7 @@ serde_qs = { workspace = true }
 directories = { workspace = true }
 tokio = { workspace = true }
 futures = { workspace = true }
-tower-http = { workspace = true, default-features = false, features = ["cors"] }
+tower-http = { workspace = true }
 rspc = { workspace = true }
 specta = { workspace = true, features = ["chrono"] }
 rspc-axum = { workspace = true, features = ["ws"] }
@@ -111,7 +110,7 @@ static_vcruntime = { version = "2.0.0" }
 
 [dev-dependencies]
 assert2 = { workspace = true }
-tempdir = { workspace = true }
+tempfile = { workspace = true }
 flowtest = { workspace = true }
 tracing-test = { workspace = true }
 mockito = { workspace = true }

@@ -10,11 +10,11 @@ const FadedBanner = (props: Props) => {
 
   return (
     <>
-      <div class="absolute z-10 bg-gradient-to-r from-darkSlate-700 from-50% inset-0" />
-      <div class="absolute right-0 from-darkSlate-700 z-10 bg-gradient-to-r top-0 bottom-0 w-1/2" />
+      <div class="from-darkSlate-700 absolute inset-0 z-10 bg-gradient-to-r from-50%" />
+      <div class="from-darkSlate-700 absolute bottom-0 right-0 top-0 z-10 w-1/2 bg-gradient-to-r" />
       <Show when={props.imageUrl}>
         <img
-          class="absolute right-0 top-0 bottom-0 select-none w-1/2 z-0"
+          class="absolute bottom-0 right-0 top-0 z-0 w-1/2 select-none"
           src={props.imageUrl}
         />
       </Show>
@@ -25,8 +25,8 @@ const FadedBanner = (props: Props) => {
 
 export const FadedBannerSkeleton = () => {
   return (
-    <div class="w-full h-full">
-      <div class="w-full h-full bg-gray-700" />
+    <div class="h-full w-full">
+      <div class="h-full w-full bg-gray-700" />
     </div>
   )
 }

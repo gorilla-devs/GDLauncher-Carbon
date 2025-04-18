@@ -1,8 +1,7 @@
 [package]
 name = "carbon_compression"
 version = "0.0.0"
-edition = "2021"
-author = "GorillaDevs Inc."
+edition = "2024"
 
 [lib]
 crate-type = ["lib"]

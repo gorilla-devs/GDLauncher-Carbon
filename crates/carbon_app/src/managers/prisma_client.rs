@@ -252,7 +252,7 @@ mod test {
             .create_async()
             .await;
 
-        let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
         let temp_path = dunce::canonicalize(temp_dir.into_path()).unwrap();
 
         let db_client = load_and_migrate(temp_path.clone(), mock_url.to_string())
@@ -315,7 +315,7 @@ mod test {
             .create_async()
             .await;
 
-        let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
         let temp_path = dunce::canonicalize(temp_dir.into_path()).unwrap();
 
         let db_client = load_and_migrate(temp_path.clone(), mock_url_200)

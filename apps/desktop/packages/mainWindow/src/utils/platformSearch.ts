@@ -132,6 +132,13 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   createEffect(() => {
     searchQuery()
 
+    rspcContext.queryClient.removeQueries({
+      queryKey: ["modplatforms.unifiedSearch.cf"]
+    })
+    rspcContext.queryClient.removeQueries({
+      queryKey: ["modplatforms.unifiedSearch.mr"]
+    })
+
     mrInfiniteResults.refetch()
     cfInfiniteResults.refetch()
   })
@@ -168,32 +175,18 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     return cfInfiniteResults.hasNextPage || mrInfiniteResults.hasNextPage
   })
 
-  const isLoading = createMemo(() => {
-    if (searchQuery().searchApi === "curseforge") {
-      return cfInfiniteResults.isLoading || cfInfiniteResults.isFetching
-    } else if (searchQuery().searchApi === "modrinth") {
-      return mrInfiniteResults.isLoading || mrInfiniteResults.isFetching
-    }
-    return (
-      cfInfiniteResults.isLoading ||
-      cfInfiniteResults.isFetching ||
-      mrInfiniteResults.isLoading ||
-      mrInfiniteResults.isFetching
-    )
-  })
-
   const virtualOnScrollHandler = (_index: number) => {
     const virtualizer = ref()
     setLastScrollOffset(virtualizer?.scrollOffset || 0)
 
     if (!virtualizer) return
 
-    // Check if we're near the bottom with an overscan of 10
+    // Check if we're near the bottom with an increased overscan of 20
     const endIndex = virtualizer.findEndIndex()
     const totalItems = allRows().length
 
-    // If we're within 10 items of the end and we have a next page
-    if (endIndex + opts.overscan > totalItems && hasNextPage()) {
+    // If we're within 20 items of the end and we have a next page
+    if (endIndex + 20 > totalItems && hasNextPage()) {
       if (searchQuery().searchApi === "curseforge") {
         cfInfiniteResults.fetchNextPage()
       } else if (searchQuery().searchApi === "modrinth") {
@@ -209,6 +202,20 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
       }
     }
   }
+
+  const isLoading = createMemo(() => {
+    if (searchQuery().searchApi === "curseforge") {
+      return cfInfiniteResults.isLoading || cfInfiniteResults.isFetching
+    } else if (searchQuery().searchApi === "modrinth") {
+      return mrInfiniteResults.isLoading || mrInfiniteResults.isFetching
+    }
+    return (
+      cfInfiniteResults.isLoading ||
+      cfInfiniteResults.isFetching ||
+      mrInfiniteResults.isLoading ||
+      mrInfiniteResults.isFetching
+    )
+  })
 
   return {
     allRows,

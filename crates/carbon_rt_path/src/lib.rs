@@ -421,7 +421,7 @@ where
     futures::future::join_all(entries)
         .await
         .into_iter()
-        .collect::<Result<_, _>>()?;
+        .collect::<Result<Vec<()>, _>>()?;
 
     Ok(())
 }

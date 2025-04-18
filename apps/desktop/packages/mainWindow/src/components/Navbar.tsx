@@ -13,8 +13,8 @@ import updateAvailable, {
 } from "@/utils/updater"
 import { Trans } from "@gd/i18n"
 import { useModal } from "@/managers/ModalsManager"
-import NavSearchInput from "./NavSearchInput"
 import { useGlobalStore } from "./GlobalStoreContext"
+import { NavSearchInput } from "./NavSearchInput"
 
 export interface AccountsStatus {
   label: {

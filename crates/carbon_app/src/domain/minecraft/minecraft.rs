@@ -52,9 +52,7 @@ pub fn libraries_into_vec_downloadable(
 // Use java arch instead of system arch
 pub fn is_rule_allowed(rule: &Rule, java_arch: &JavaArch) -> bool {
     let res = match rule {
-        Rule {
-            os: Some(ref os), ..
-        } => os_rule(os, java_arch),
+        Rule { os: Some(os), .. } => os_rule(os, java_arch),
         Rule {
             features: Some(_), ..
         } => false,

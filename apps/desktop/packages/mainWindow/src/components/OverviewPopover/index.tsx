@@ -16,10 +16,7 @@ const Authors = (props: { data: ModRowProps }) => {
             <Badge class="bg-darkSlate-600 flex items-center gap-2">
               <Switch>
                 <Match when={author.avatarUrl}>
-                  <img
-                    src={author.avatarUrl as string}
-                    class="h-3 w-3 rounded-full"
-                  />
+                  <img src={author.avatarUrl!} class="h-3 w-3 rounded-full" />
                 </Match>
                 <Match when={!author.avatarUrl}>
                   <div class="text-lightSlate-100 i-ri:user-fill h-3 w-3" />
@@ -51,19 +48,24 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
     )
   }
 
+  const hasScreenshots = props.data.data.screenshotUrls.length > 0
+
   return (
     <div
-      class="bg-darkSlate-900 max-h-100 flex gap-2 overflow-hidden pb-4"
+      class="bg-darkSlate-900 relative overflow-hidden pb-4"
       classList={{
-        "w-120": props.data.data.screenshotUrls.length > 0,
-        "w-80": props.data.data.screenshotUrls.length === 0
+        "w-120": hasScreenshots,
+        "w-80": !hasScreenshots
       }}
       onMouseDown={(e) => {
         e.stopPropagation()
         e.preventDefault()
       }}
     >
-      <div class="relative flex flex-1 flex-col overflow-hidden">
+      <div
+        class="max-h-140 relative flex flex-col overflow-hidden"
+        style={{ width: hasScreenshots ? "calc(100% - 176px)" : "100%" }}
+      >
         <Show when={props.data.data.websiteUrl}>
           <div
             class="h-6 w-6 cursor-pointer rounded-lg"
@@ -75,7 +77,7 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
             <div class="text-lightSlate-500 hover:text-lightSlate-50 transition-color transition-100 i-ri:external-link-line absolute right-4 top-4 z-30 h-4 w-4 ease-in-out" />
           </div>
         </Show>
-        <h4 class="text-lightSlate-100 z-30 mb-2 px-4 text-xl">
+        <h4 class="text-lightSlate-100 z-30 mb-2 w-fit px-4 text-xl">
           {props.data.data.title}
         </h4>
         <div class="from-darkSlate-900 absolute bottom-0 left-0 right-0 top-0 z-20 bg-gradient-to-t from-70%" />
@@ -154,20 +156,21 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
                 {formatDownloadCount(props.data.data.downloadsCount)}
               </div>
             </div>
-            <div class="text-lightSlate-700 flex items-center gap-2">
+            <div class="text-lightSlate-700 flex w-full items-center gap-2">
               <div class="text-lightSlate-100 i-ri:gamepad-fill" />
               <p class="text-lightSlate-100 m-0 text-sm">
                 <Trans key="modpack.mcVersion" />
               </p>
-              <div class="scrollbar-hide flex max-w-full flex-wrap gap-2 text-sm">
-                {/* {getLatestVersion(props.data)} */}
+              <div class="flex max-h-20 w-full flex-wrap gap-2 overflow-auto text-sm">
+                {props.data.data.minecraftVersions.join(" - ")}
               </div>
             </div>
           </div>
         </div>
       </div>
-      <Show when={props.data.data.screenshotUrls.length > 0}>
-        <div class="border-darkSlate-800 relative flex flex-col gap-4 overflow-y-auto overflow-x-hidden border-t p-4">
+
+      <Show when={hasScreenshots}>
+        <div class="border-darkSlate-800 max-h-140 absolute bottom-0 right-0 top-0 flex w-44 flex-col gap-4 overflow-y-auto overflow-x-hidden border-l p-4">
           <For each={props.data.data.screenshotUrls}>
             {(url) => (
               <div class="bg-darkSlate-900 h-40 w-40 rounded-md">

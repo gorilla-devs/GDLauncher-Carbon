@@ -102,8 +102,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@overwolf/ow-electron':
-        specifier: ^34.3.3
-        version: 34.3.3
+        specifier: ^34.4.1
+        version: 34.4.1
       '@overwolf/ow-electron-builder':
         specifier: ^24.13.8
         version: 24.13.8(electron-builder-squirrel-windows@25.0.5)
@@ -162,7 +162,7 @@ importers:
         specifier: ^16.3.1
         version: 16.4.0
       electron:
-        specifier: ^34.3.3
+        specifier: ^34.4.1
         version: 34.5.0
       electron-log:
         specifier: ^5.1.1
@@ -2492,8 +2492,8 @@ packages:
     engines: {node: '>=14.0.0'}
     hasBin: true
 
-  '@overwolf/ow-electron@34.3.3':
-    resolution: {integrity: sha512-CLQt5wnaYsGo4F5frebMmwvxwWhSFnpEwWk/VFVZP8jM1lVS/MgE85sjr9OOOASwGrxbH+trb7KLxluOyS0Wzg==}
+  '@overwolf/ow-electron@34.4.1':
+    resolution: {integrity: sha512-3P0vhF2cSRcA8d8qGEjmDvQ6g47pJ4pKv5PqBGgQremHFiSPy0djxXQ9yeBHAxeOgOtCX1yAbyp/PjHfqAhXsQ==}
     engines: {node: '>= 10.17.0'}
     hasBin: true
 
@@ -3526,10 +3526,10 @@ packages:
   '@storybook/builder-manager@7.6.10':
     resolution: {integrity: sha512-f+YrjZwohGzvfDtH8BHzqM3xW0p4vjjg9u7uzRorqUiNIAAKHpfNrZ/WvwPlPYmrpAHt4xX/nXRJae4rFSygPw==}
 
-  '@storybook/builder-vite@9.0.0-alpha.17':
-    resolution: {integrity: sha512-Xz7QXErLIc4B+yU26l8eEXQ5Ikv8h+purD8FRVHjaNvx9pnK0GeOXpmXzvybDqP21F6CY2f03AKuz1BZaYsMnQ==}
+  '@storybook/builder-vite@9.0.0-alpha.20':
+    resolution: {integrity: sha512-l0NLD2ynYJVRNXTKC9Rqspb7AaTDNbf1+tnHyBKlZfpA8Z/vSKde/6iPISjNGJ2R+nOhnrQbS55Q2IYayk77dQ==}
     peerDependencies:
-      storybook: ^9.0.0-alpha.17
+      storybook: ^9.0.0-alpha.20
       vite: ^5.0.0 || ^6.0.0
 
   '@storybook/channels@7.6.10':
@@ -3563,10 +3563,10 @@ packages:
   '@storybook/csf-plugin@7.6.10':
     resolution: {integrity: sha512-Sc+zZg/BnPH2X28tthNaQBnDiFfO0QmfjVoOx0fGYM9SvY3P5ehzWwp5hMRBim6a/twOTzePADtqYL+t6GMqqg==}
 
-  '@storybook/csf-plugin@9.0.0-alpha.17':
-    resolution: {integrity: sha512-5as8EF6Nabo5Oi0h8/XOTy3SgQIgYRMb+u3RixUYKfItDmKbh99n1/Bqhvs7350HIIopvjRkm8AoAC6c4WpQcw==}
+  '@storybook/csf-plugin@9.0.0-alpha.20':
+    resolution: {integrity: sha512-nsSA/MxwncX6LDLmZ0dZJfBkjtuyUxN2XzEkcR9YkR7xCUkrADYTBN2PUGTyJ6fVC4I97XaoFFUX1dIZV4+nSw==}
     peerDependencies:
-      storybook: ^9.0.0-alpha.17
+      storybook: ^9.0.0-alpha.20
 
   '@storybook/csf-tools@7.6.10':
     resolution: {integrity: sha512-TnDNAwIALcN6SA4l00Cb67G02XMOrYU38bIpFJk5VMDX2dvgPjUtJNBuLmEbybGcOt7nPyyFIHzKcY5FCVGoWA==}
@@ -12620,7 +12620,7 @@ snapshots:
       - electron-builder-squirrel-windows
       - supports-color
 
-  '@overwolf/ow-electron@34.3.3':
+  '@overwolf/ow-electron@34.4.1':
     dependencies:
       '@electron/get': 1.14.1
       '@types/node': 16.18.75
@@ -13875,9 +13875,9 @@ snapshots:
       - encoding
       - supports-color
 
-  '@storybook/builder-vite@9.0.0-alpha.17(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))':
+  '@storybook/builder-vite@9.0.0-alpha.20(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))':
     dependencies:
-      '@storybook/csf-plugin': 9.0.0-alpha.17(storybook@7.6.10(encoding@0.1.13))
+      '@storybook/csf-plugin': 9.0.0-alpha.20(storybook@7.6.10(encoding@0.1.13))
       browser-assert: 1.2.1
       storybook: 7.6.10(encoding@0.1.13)
       ts-dedent: 2.2.0
@@ -14070,7 +14070,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@storybook/csf-plugin@9.0.0-alpha.17(storybook@7.6.10(encoding@0.1.13))':
+  '@storybook/csf-plugin@9.0.0-alpha.20(storybook@7.6.10(encoding@0.1.13))':
     dependencies:
       storybook: 7.6.10(encoding@0.1.13)
       unplugin: 1.6.0
@@ -20609,7 +20609,7 @@ snapshots:
 
   storybook-solidjs-vite@1.0.0-beta.2(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0)):
     dependencies:
-      '@storybook/builder-vite': 9.0.0-alpha.17(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))
+      '@storybook/builder-vite': 9.0.0-alpha.20(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))
     transitivePeerDependencies:
       - storybook
       - vite

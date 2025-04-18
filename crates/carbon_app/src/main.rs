@@ -269,7 +269,7 @@ impl std::ops::Deref for TestEnv {
 
 #[cfg(test)]
 async fn setup_managers_for_test() -> TestEnv {
-    let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
+    let temp_dir = tempfile::tempdir().unwrap();
     let temp_path = dunce::canonicalize(temp_dir.into_path()).unwrap();
     //let log_guard = logger::setup_logger(&temp_path).await;
     println!("Test RTP: {}", temp_path.to_str().unwrap());
@@ -331,7 +331,7 @@ mod test {
     async fn test_router() {
         let tcp_listener = get_available_port().await;
         let port = &tcp_listener.local_addr().unwrap().port();
-        let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
         let server = tokio::spawn(async move {
             super::start_router(
                 temp_dir.into_path(),

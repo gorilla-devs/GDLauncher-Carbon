@@ -707,7 +707,7 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
     }
 
     'mcmodinfo: {
-        let mut file: Option<ZipFile> = None;
+        let mut file: Option<ZipFile<_>> = None;
 
         // CodeChickenCore for some unearthly reason uses cccmod.info instead of mcmod.info
         // https://github.com/Chicken-Bones/CodeChickenCore/blob/master/resources/cccmod.info
