@@ -41,7 +41,7 @@ export default function DynamicBadgeContainer(props: {
     if (!containerRef || !typeBadgeRef) return
 
     const containerWidth = containerRef.clientWidth
-    const categories = [...props.categories]
+    const categories = [...props.categories.filter((c) => c.icon)]
 
     // Get actual width of the type badge
     const typeBadgeWidth = typeBadgeRef.offsetWidth
@@ -115,7 +115,10 @@ export default function DynamicBadgeContainer(props: {
           <Tooltip placement="top">
             <TooltipTrigger>
               <Badge variant="secondary" class="flex shrink-0 items-center">
-                <CategoryIcon category={category} />
+                <CategoryIcon
+                  type={category.icon?.type}
+                  value={category.icon?.value}
+                />
               </Badge>
             </TooltipTrigger>
             <TooltipContent>{category.name}</TooltipContent>
@@ -141,7 +144,10 @@ export default function DynamicBadgeContainer(props: {
                       class="flex shrink-0 items-center"
                     >
                       <div class="flex items-center gap-1">
-                        <CategoryIcon category={category} />
+                        <CategoryIcon
+                          type={category.icon?.type}
+                          value={category.icon?.value}
+                        />
                         <span class="text-xs">{category.name}</span>
                       </div>
                     </Badge>

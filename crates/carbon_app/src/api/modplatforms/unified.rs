@@ -405,7 +405,7 @@ pub struct FEUnifiedCategory {
     pub platform: FEUnifiedPlatform,
     pub id: FEUnifiedCategoryId,
     pub name: Option<String>,
-    pub icon: FEUnifiedCategoryIcon,
+    pub icon: Option<FEUnifiedCategoryIcon>,
     pub project_type: FEUnifiedSearchType,
     pub parent_id: Option<String>,
 }
@@ -416,7 +416,7 @@ impl From<carbon_platforms::modrinth::tag::Category> for FEUnifiedCategory {
             platform: FEUnifiedPlatform::Modrinth,
             id: FEUnifiedCategoryId::Modrinth(value.name.clone()),
             name: Some(value.name),
-            icon: FEUnifiedCategoryIcon::Embedded(value.icon),
+            icon: value.icon.map(|icon| FEUnifiedCategoryIcon::Embedded(icon)),
             project_type: value.project_type.into(),
             parent_id: match value.header.as_str() {
                 "categories" => None,
@@ -432,7 +432,7 @@ impl From<carbon_platforms::curseforge::Category> for FEUnifiedCategory {
             platform: FEUnifiedPlatform::Curseforge,
             id: FEUnifiedCategoryId::Curseforge(value.id),
             name: Some(value.name),
-            icon: FEUnifiedCategoryIcon::Url(value.icon_url.unwrap_or_default()),
+            icon: value.icon_url.map(|url| FEUnifiedCategoryIcon::Url(url)),
             project_type: value
                 .class_id
                 .map(|id| id.into())

@@ -5,8 +5,7 @@ import {
   ListInstanceStatus,
   FESubtask,
   ListInstance,
-  ValidListInstance,
-  FEUnifiedCategory
+  ValidListInstance
 } from "@gd/core_module/bindings"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
@@ -123,14 +122,17 @@ export const getModpackPlatformIcon = (
   }
 }
 
-export const CategoryIcon = (props: { category: FEUnifiedCategory }) => {
+export const CategoryIcon = (props: {
+  type: "embedded" | "url" | undefined
+  value: string | undefined
+}) => {
   return (
     <Switch>
-      <Match when={props.category.icon.type === "embedded"}>
-        <div class="h-4 w-4" innerHTML={props.category.icon.value} />
+      <Match when={props.type === "embedded"}>
+        <div class="h-4 w-4" innerHTML={props.value} />
       </Match>
-      <Match when={props.category.icon.type === "url"}>
-        <img class="h-4 w-4" src={props.category.icon.value} />
+      <Match when={props.type === "url"}>
+        <img class="h-4 w-4" src={props.value} />
       </Match>
     </Switch>
   )

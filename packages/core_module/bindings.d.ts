@@ -426,7 +426,7 @@ export type UpdateMod = { instance_id: FEInstanceId; mod_id: string }
 
 export type ExploreQuery = { instance_id: FEInstanceId; path: string[] }
 
-export type FEUnifiedCategory = { platform: FEUnifiedPlatform; id: FEUnifiedCategoryId; name: string | null; icon: FEUnifiedCategoryIcon; projectType: FEUnifiedSearchType; parentId: string | null }
+export type FEUnifiedCategory = { platform: FEUnifiedPlatform; id: FEUnifiedCategoryId; name: string | null; icon: FEUnifiedCategoryIcon | null; projectType: FEUnifiedSearchType; parentId: string | null }
 
 export type CFFEClassId = "mods" | "resourcePacks" | "modpacks" | "customizations" | "bukkitPlugins" | "worlds" | "addons" | "shaders" | "datapacks" | { other: number }
 

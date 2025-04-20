@@ -202,7 +202,7 @@ impl TryFrom<MRFEProjectSearchResult> for ProjectSearchResult {
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
 pub struct MRFECategory {
     /// An SVG icon for the category
-    pub icon: String,
+    pub icon: Option<String>,
     pub name: String,
     /// The project type this category is applicable to
     pub project_type: FEUnifiedSearchType,

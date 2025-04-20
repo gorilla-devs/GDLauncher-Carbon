@@ -3,7 +3,6 @@ import { FEUnifiedSearchParameters } from "@gd/core_module/bindings"
 import { createEffect, createMemo, createSignal, mergeProps } from "solid-js"
 import { rspc } from "./rspcClient"
 import { createInfiniteQuery } from "@tanstack/solid-query"
-import { createVirtualizer } from "@tanstack/solid-virtual"
 import { VirtualizerHandle } from "virtua/lib/solid"
 
 const defaultSearchQuery: FEUnifiedSearchParameters = {
@@ -181,12 +180,14 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
 
     if (!virtualizer) return
 
-    // Check if we're near the bottom with an increased overscan of 20
+    // Check if we're near the bottom with an increased threshold
     const endIndex = virtualizer.findEndIndex()
     const totalItems = allRows().length
 
-    // If we're within 20 items of the end and we have a next page
-    if (endIndex + 20 > totalItems && hasNextPage()) {
+    // Load more when user reaches 25% from the end of current items
+    const loadThreshold = Math.ceil(totalItems - totalItems * 0.25)
+
+    if (endIndex >= loadThreshold && hasNextPage()) {
       if (searchQuery().searchApi === "curseforge") {
         cfInfiniteResults.fetchNextPage()
       } else if (searchQuery().searchApi === "modrinth") {
