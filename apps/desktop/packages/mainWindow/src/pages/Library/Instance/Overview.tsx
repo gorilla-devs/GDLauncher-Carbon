@@ -13,7 +13,7 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 const Overview = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData()
   const params = useParams()
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const [t] = useTransContext()
 
   const modpackPlatform = () =>
@@ -170,13 +170,13 @@ const Overview = () => {
                     type="primary"
                     onClick={() => {
                       if (modpackPlatform() === "curseforge") {
-                        navigate(
+                        navigator.navigate(
                           `/modpacks/${modpackProjectId()}/curseforge?instanceId=${
                             params.id
                           }`
                         )
                       } else if (modpackPlatform() === "modrinth") {
-                        navigate(
+                        navigator.navigate(
                           `/modpacks/${modpackProjectId()}/modrith?instanceId=${
                             params.id
                           }`

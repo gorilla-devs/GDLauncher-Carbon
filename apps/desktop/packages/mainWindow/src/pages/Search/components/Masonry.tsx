@@ -12,7 +12,7 @@ interface MasonryProps {
 }
 
 const Masonry: Component<MasonryProps> = (props) => {
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   // Assign sizes in a pattern that ensures no gaps
   const getSizePattern = (index: number) => {
     // Create a repeating pattern of sizes that fits perfectly
@@ -80,7 +80,7 @@ const Masonry: Component<MasonryProps> = (props) => {
                     "gdl-content-wrapper"
                   )
                   saveScrollPosition(scrollContainer)
-                  navigate(`/addon/${element.id}/${element.platform}`)
+                  navigator.navigate(`/addon/${element.id}/${element.platform}`)
                 }}
               >
                 <img

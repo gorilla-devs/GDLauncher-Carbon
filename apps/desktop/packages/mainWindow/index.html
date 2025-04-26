@@ -120,6 +120,52 @@
         font-family: var(--font);
       }
 
+      /* View transition classes */
+
+      @keyframes slide-out-to-left {
+        from {
+          transform: translateX(0);
+        }
+        to {
+          transform: translateX(-100%);
+        }
+      }
+
+      @keyframes slide-in-from-right {
+        from {
+          transform: translateX(100%);
+        }
+        to {
+          transform: translateX(0);
+        }
+      }
+
+      @keyframes slide-out-to-right {
+        from {
+          transform: translateX(0);
+        }
+        to {
+          transform: translateX(100%);
+        }
+      }
+
+      @keyframes slide-in-from-left {
+        from {
+          transform: translateX(-100%);
+        }
+        to {
+          transform: translateX(0);
+        }
+      }
+
+      /* Base transitions for all view transitions */
+      ::view-transition-old(root),
+      ::view-transition-new(root) {
+        animation-duration: 300ms;
+        animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        animation-fill-mode: both;
+      }
+
       .disable-view-transition {
         view-transition-name: disable-view-transition;
       }
@@ -127,6 +173,44 @@
       ::view-transition-old(disable-view-transition),
       ::view-transition-new(disable-view-transition) {
         animation-duration: 0s;
+      }
+
+      .slide-right-transition {
+        view-transition-name: slide-right-transition;
+      }
+
+      .slide-left-transition {
+        view-transition-name: slide-left-transition;
+      }
+
+      ::view-transition-old(slide-right-transition),
+      ::view-transition-new(slide-right-transition) {
+        animation-duration: 300ms;
+        animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        animation-fill-mode: both;
+      }
+
+      ::view-transition-old(slide-left-transition),
+      ::view-transition-new(slide-left-transition) {
+        animation-duration: 300ms;
+        animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        animation-fill-mode: both;
+      }
+
+      ::view-transition-old(slide-right-transition) {
+        animation-name: slide-out-to-left;
+      }
+
+      ::view-transition-new(slide-right-transition) {
+        animation-name: slide-in-from-right;
+      }
+
+      ::view-transition-old(slide-left-transition) {
+        animation-name: slide-out-to-right;
+      }
+
+      ::view-transition-new(slide-left-transition) {
+        animation-name: slide-in-from-left;
       }
 
       html,

@@ -7,7 +7,7 @@ import { rspc } from "@/utils/rspcClient"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 
 function AccountExpired(props: ModalProps) {
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const modalsContext = useModal()
   const globalStore = useGlobalStore()
 
@@ -55,7 +55,7 @@ function AccountExpired(props: ModalProps) {
             type="primary"
             size="large"
             onClick={() => {
-              navigate("/?addMicrosoftAccount=true")
+              navigator.navigate("/?addMicrosoftAccount=true")
               modalsContext?.closeModal()
             }}
           >

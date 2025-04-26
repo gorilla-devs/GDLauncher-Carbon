@@ -178,7 +178,7 @@ const Accounts = () => {
   const globalStore = useGlobalStore()
   const [t] = useTransContext()
 
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const modalsContext = useModal()
   const addNotification = createNotification()
 
@@ -400,7 +400,7 @@ const Accounts = () => {
                     type="outline"
                     onClick={async () => {
                       await removeGDLAccountMutation.mutateAsync(undefined)
-                      navigate("/")
+                      navigator.navigate("/")
                     }}
                   >
                     <Trans key="settings:link_gdl_account" />
@@ -437,7 +437,7 @@ const Accounts = () => {
                 type="secondary"
                 size="small"
                 onClick={() => {
-                  navigate("/?addMicrosoftAccount=true")
+                  navigator("/?addMicrosoftAccount=true")
                 }}
               >
                 <div class="i-ri:add-line" />
@@ -513,7 +513,7 @@ const Accounts = () => {
                                   <div
                                     class="i-ri:refresh-line h-4 w-4"
                                     onClick={async () => {
-                                      navigate("/?addMicrosoftAccount=true")
+                                      navigator("/?addMicrosoftAccount=true")
                                     }}
                                   />
                                 </div>
@@ -545,7 +545,7 @@ const Accounts = () => {
                                       )
 
                                       if (accountsLength === 1) {
-                                        navigate("/")
+                                        navigator.navigate("/")
                                       }
                                     }
                                   }}

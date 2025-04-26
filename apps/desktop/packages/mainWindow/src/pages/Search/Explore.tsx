@@ -7,7 +7,7 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 import { getSearchResults } from "@/utils/platformSearch"
 
 export function Explore() {
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const searchResults = getSearchResults({
     offset: 0,
     limit: 40,

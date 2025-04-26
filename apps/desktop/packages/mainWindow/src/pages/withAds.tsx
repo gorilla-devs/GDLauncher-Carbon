@@ -7,20 +7,21 @@ import adSize from "@/utils/adhelper"
 import { Trans } from "@gd/i18n"
 import { useModal } from "@/managers/ModalsManager"
 import { BisectBanner } from "@/components/BisectBanner"
+import { SearchInputContext } from "@/components/SearchInputContext"
+import { getSearchResults } from "@/utils/platformSearch"
 
 function withAdsLayout() {
   const modalContext = useModal()
+  const searchResults = getSearchResults({
+    limit: 20,
+    offset: 0
+  })
 
   return (
-    <>
+    <SearchInputContext.Provider value={searchResults}>
       <AppNavbar />
-      <div
-        class="z-99 flex h-auto w-screen"
-        style={{
-          background: "var(--ads-sidebar-background)"
-        }}
-      >
-        <main class="relative flex-grow">
+      <div class="z-99 flex h-auto w-screen">
+        <main class="relative grow">
           <div class="flex h-[calc(100vh-60px)] justify-end">
             <div
               style={{
@@ -29,9 +30,14 @@ function withAdsLayout() {
             >
               <Outlet />
             </div>
-            <div class="flex h-full flex-col justify-between gap-4">
+            <div
+              class="flex h-full flex-col justify-between gap-4"
+              style={{
+                "view-transition-name": `ad`,
+                background: "var(--ads-sidebar-background)"
+              }}
+            >
               <div
-                // class="py-4"
                 style={{
                   width: `${adSize.width}px`,
                   height: `${adSize.height}px`
@@ -64,7 +70,7 @@ function withAdsLayout() {
           </div>
         </main>
       </div>
-    </>
+    </SearchInputContext.Provider>
   )
 }
 

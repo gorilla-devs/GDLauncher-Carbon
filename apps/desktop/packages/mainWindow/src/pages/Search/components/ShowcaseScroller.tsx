@@ -23,7 +23,7 @@ interface ShowcaseScrollerProps {
 }
 
 export default function ShowcaseScroller(props: ShowcaseScrollerProps) {
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const [isDragging, setIsDragging] = createSignal(false)
   const [startX, setStartX] = createSignal(0)
   const [scrollLeft, setScrollLeft] = createSignal(0)
@@ -106,7 +106,7 @@ export default function ShowcaseScroller(props: ShowcaseScrollerProps) {
     if (Date.now() - dragStartTime() < 150) {
       const contentWrapper = document.getElementById("gdl-content-wrapper")
       saveScrollPosition(contentWrapper)
-      navigate(`/addon/${element.id}/${element.platform}`)
+      navigator.navigate(`/addon/${element.id}/${element.platform}`)
     }
   }
 
@@ -212,7 +212,7 @@ export default function ShowcaseScroller(props: ShowcaseScrollerProps) {
             <div
               class="w-42 bg-primary-400 my-4 flex shrink-0 cursor-pointer items-center justify-center rounded-lg"
               onClick={() => {
-                navigate("/explore/list")
+                navigator.navigate("/explore/list")
               }}
             >
               <h3 class="p-2 font-bold text-white">Show More</h3>

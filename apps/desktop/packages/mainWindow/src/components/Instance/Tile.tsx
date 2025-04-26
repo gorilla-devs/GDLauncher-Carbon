@@ -76,7 +76,7 @@ const Tile = (props: Props) => {
 
   const rspcContext = rspc.useContext()
   const [t] = useTransContext()
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const modalsContext = useModal()
 
   const launchInstanceMutation = rspc.createMutation(() => ({
@@ -153,7 +153,7 @@ const Tile = (props: Props) => {
   const handleSettings = () => {
     setClickedInstanceId(props.identifier)
     requestAnimationFrame(() => {
-      navigate(`/library/${props.instance.id}/settings`)
+      navigator.navigate(`/library/${props.instance.id}/settings`)
     })
   }
 
@@ -314,7 +314,7 @@ const Tile = (props: Props) => {
                     <ContextMenuItem
                       class="flex items-center gap-2"
                       onClick={() => {
-                        navigate(`/library/${props.instance.id}/logs`)
+                        navigator.navigate(`/library/${props.instance.id}/logs`)
                       }}
                     >
                       <div class="i-ri:file-list-fill h-4 w-4" />
@@ -323,7 +323,7 @@ const Tile = (props: Props) => {
                     <ContextMenuItem
                       class="flex items-center gap-2"
                       onClick={() => {
-                        navigate(`/library/${props.instance.id}/mods`)
+                        navigator.navigate(`/library/${props.instance.id}/mods`)
                       }}
                     >
                       <div class="i-ri:list-check h-4 w-4" />
@@ -576,7 +576,7 @@ const Tile = (props: Props) => {
                     </Show>
                     <Show when={validInstance()?.modpack}>
                       <div
-                        class="border-1 border-darkSlate-600 bg-darkSlate-900 absolute right-2 top-2 z-3 flex items-center justify-center rounded-lg border-solid p-2"
+                        class="border-1 border-darkSlate-600 bg-darkSlate-900 z-3 absolute right-2 top-2 flex items-center justify-center rounded-lg border-solid p-2"
                         style={
                           props.shouldSetViewTransition
                             ? {
@@ -629,7 +629,7 @@ const Tile = (props: Props) => {
                       />
                     </Show>
                     <div
-                      class="absolute left-1/2 top-1/2 z-2 hidden h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl transition-all duration-200 ease-in-out"
+                      class="z-2 absolute left-1/2 top-1/2 hidden h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl transition-all duration-200 ease-in-out"
                       classList={{
                         "scale-100 bg-red-500": isLoading(),
                         "flex bg-primary-500 hover:bg-primary-400 text-2xl":

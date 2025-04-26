@@ -13,7 +13,7 @@ import Library from "@/pages/Library"
 import Home from "@/pages/Library/Home"
 import Instance from "@/pages/Library/Instance"
 import AddonViewPage from "@/pages/AddonViewPage"
-import Explore from "@/pages/Explore"
+import Search from "@/pages/Search"
 /* Defining the routes for the application. */
 
 export const routes: RouteDefinition[] = [
@@ -109,16 +109,12 @@ export const routes: RouteDefinition[] = [
         ]
       },
       {
-        path: "/explore",
-        component: Explore,
+        path: "/search",
+        component: Search,
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Explore/Explore"))
-          },
-          {
-            path: "/list",
-            component: lazy(() => import("@/pages/Explore/List"))
+            component: lazy(() => import("@/pages/Search/List"))
           }
         ]
       },

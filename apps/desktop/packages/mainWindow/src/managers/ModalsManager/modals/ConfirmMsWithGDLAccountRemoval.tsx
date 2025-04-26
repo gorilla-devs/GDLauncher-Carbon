@@ -12,7 +12,7 @@ interface Props {
 
 const ConfirmMsWithGDLAccountRemoval = (props: ModalProps) => {
   const [t] = useTransContext()
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const data: () => Props = () => props?.data
 
   const modalsContext = useModal()
@@ -50,7 +50,7 @@ const ConfirmMsWithGDLAccountRemoval = (props: ModalProps) => {
               modalsContext?.closeModal()
 
               if (accountsLength() === 1) {
-                navigate("/")
+                navigator.navigate("/")
               }
             }}
           >

@@ -1,6 +1,15 @@
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { Trans } from "@gd/i18n"
-import { Button, Skeleton, Tab, TabList, Tabs, Tooltip } from "@gd/ui"
+import {
+  Button,
+  Skeleton,
+  Tab,
+  TabList,
+  Tabs,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from "@gd/ui"
 import {
   Outlet,
   useLocation,
@@ -53,7 +62,7 @@ const ModsInfiniteScrollQueryWrapper = () => {
 }
 
 const ModExplore = () => {
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const params = useParams()
   const routeData: ReturnType<typeof fetchData> = useRouteData()
   const infiniteQuery = useInfiniteVersionsQuery()
@@ -132,32 +141,37 @@ const ModExplore = () => {
           />
           <div class="sticky top-5 z-20 box-border flex w-full justify-between px-6">
             <Button
-              onClick={() => navigate(-1)}
+              onClick={() => navigator.prev()}
               icon={<div class="i-ri:arrow-drop-left-line text-2xl" />}
               size="small"
               type="secondary"
             >
               <Trans key="instance.step_back" />
             </Button>
-            <Tooltip content={<Trans key="instance.open_in_browser" />}>
-              <Button
-                rounded
-                size="small"
-                type="transparent"
-                onClick={() => {
-                  if (routeData.isCurseforge) {
-                    window.openExternalLink(
-                      `https://www.curseforge.com/minecraft/mc-mods/${routeData.modpackDetails.data?.data.slug}`
-                    )
-                  } else {
-                    window.openExternalLink(
-                      `https://modrinth.com/mod/${routeData.modpackDetails.data?.slug}`
-                    )
-                  }
-                }}
-              >
-                <div class="i-ri:external-link-line text-xl" />
-              </Button>
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  rounded
+                  size="small"
+                  type="transparent"
+                  onClick={() => {
+                    if (routeData.isCurseforge) {
+                      window.openExternalLink(
+                        `https://www.curseforge.com/minecraft/mc-mods/${routeData.modpackDetails.data?.data.slug}`
+                      )
+                    } else {
+                      window.openExternalLink(
+                        `https://modrinth.com/mod/${routeData.modpackDetails.data?.slug}`
+                      )
+                    }
+                  }}
+                >
+                  <div class="i-ri:external-link-line text-xl" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <Trans key="instance.open_in_browser" />
+              </TooltipContent>
             </Tooltip>
           </div>
           <div class="from-darkSlate-800 sticky top-52 z-40 flex h-24 justify-center bg-gradient-to-t from-10% px-6">
@@ -278,7 +292,7 @@ const ModExplore = () => {
                 <Show when={isSticky()}>
                   <span class="mr-4">
                     <Button
-                      onClick={() => navigate(-1)}
+                      onClick={() => navigator.prev()}
                       size="small"
                       type="secondary"
                     >
@@ -294,9 +308,12 @@ const ModExplore = () => {
                         {(page) => (
                           <Tab
                             onClick={() => {
-                              navigate(`${page.path}${location.search}`, {
-                                replace: true
-                              })
+                              navigator.navigate(
+                                `${page.path}${location.search}`,
+                                {
+                                  replace: true
+                                }
+                              )
                             }}
                           >
                             {page.label}

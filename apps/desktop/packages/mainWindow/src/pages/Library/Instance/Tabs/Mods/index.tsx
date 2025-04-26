@@ -23,7 +23,7 @@ import { useModal } from "@/managers/ModalsManager"
 const Mods = () => {
   const [t] = useTransContext()
   const params = useParams()
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const modalsContext = useModal()
 
   const [filter, setFilter] = createSignal("")
@@ -116,7 +116,7 @@ const Mods = () => {
             type="outline"
             size="medium"
             onClick={() => {
-              navigate(`/mods?instanceId=${params.id}`)
+              navigator.navigate(`/mods?instanceId=${params.id}`)
             }}
           >
             <Trans key="instance.add_mod" />
@@ -355,7 +355,7 @@ const Mods = () => {
                 size="medium"
                 onClick={() => {
                   setLastType(null)
-                  navigate(`/mods?instanceId=${params.id}`)
+                  navigator.navigate(`/mods?instanceId=${params.id}`)
                 }}
               >
                 <Trans key="instance.add_mod" />

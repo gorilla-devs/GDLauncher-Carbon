@@ -1,76 +1,80 @@
 import { useGlobalStore } from "@/components/GlobalStoreContext"
-import {
-  getInstanceIdFromPath,
-  isLibraryPath,
-  setLastInstanceOpened
-} from "@/utils/routes"
-import { useNavigate } from "@solidjs/router"
+import { isAddonPath, isSearchPath } from "@/utils/routes"
+import { useLocation, useNavigate } from "@solidjs/router"
 import { JSX, createContext, createSignal, useContext } from "solid-js"
 
+const getTransitionClassToApply = (from: string, to: string) => {
+  if (isSearchPath(from) && isAddonPath(to)) {
+    return "slide-right-transition"
+  } else if (isAddonPath(from) && isSearchPath(to)) {
+    return "slide-left-transition"
+  }
+}
+
 interface NavigateOptions {
-  getLastInstance?: boolean
   replace?: boolean
 }
 
-type Context = (_path: string | number, _options?: NavigateOptions) => void
+interface NavigationContext {
+  navigate: (_path: string, _options?: NavigateOptions) => void
+  prev: () => void
+}
 
-const NavigationContext = createContext<Context>()
-
-export const [lastPathVisited, setLastPathVisited] = createSignal("/")
+const NavigationContext = createContext<NavigationContext>()
 
 export const NavigationManager = (props: { children: JSX.Element }) => {
   const navigate = useNavigate()
+  const location = useLocation()
   const globalstore = useGlobalStore()
+  const [lastPathVisited, setLastPathVisited] = createSignal(location.pathname)
 
   const shouldTransition = () =>
-    !globalstore.settings.data?.reducedMotion &&
-    (document as any).startViewTransition
+    !globalstore.settings.data?.reducedMotion && document.startViewTransition
 
-  const manager = (path: string | number, options?: NavigateOptions) => {
-    if (typeof path == "number") {
-      if (shouldTransition()) {
-        ;(document as any).startViewTransition(() => {
-          navigate(path)
-        })
-      } else {
-        navigate(path)
-      }
-      return
-    }
+  const gdNavigate = (destinationPath: string, options?: NavigateOptions) => {
+    const currentPath = location.pathname
 
-    if (isLibraryPath(path) && options?.getLastInstance) {
-      const parameters = path.split("?")[1]
-      const instanceId = getInstanceIdFromPath(path)
-      if (instanceId) setLastInstanceOpened(instanceId)
-      if (instanceId === undefined) return
-      const route = `/library/${instanceId}/${parameters || ""}`
-      setLastPathVisited(route)
-      if (shouldTransition()) {
-        ;(document as any).startViewTransition(() => {
-          navigate(route)
-        })
-      } else {
-        navigate(route)
+    const transitionClass = getTransitionClassToApply(
+      currentPath,
+      destinationPath
+    )
+
+    if (shouldTransition()) {
+      if (transitionClass) {
+        document.body.classList.add(transitionClass)
       }
+      const result = document.startViewTransition(() => {
+        navigate(destinationPath, { replace: options?.replace })
+      })
+
+      result.finished.then(() => {
+        if (transitionClass) {
+          document.body.classList.remove(transitionClass)
+        }
+      })
     } else {
-      setLastPathVisited(path)
-      if (shouldTransition()) {
-        ;(document as any).startViewTransition(() => {
-          navigate(path, { replace: options?.replace })
-        })
-      } else {
-        navigate(path, { replace: options?.replace })
-      }
+      navigate(destinationPath, { replace: options?.replace })
     }
+
+    setLastPathVisited(currentPath)
+  }
+
+  const prev = () => {
+    gdNavigate(lastPathVisited())
+  }
+
+  const navigationCtx = {
+    navigate: gdNavigate,
+    prev
   }
 
   return (
-    <NavigationContext.Provider value={manager}>
+    <NavigationContext.Provider value={navigationCtx}>
       {props.children}
     </NavigationContext.Provider>
   )
 }
 
-export const useGDNavigate = (): Context => {
+export const useGDNavigate = (): NavigationContext => {
   return useContext(NavigationContext)!
 }

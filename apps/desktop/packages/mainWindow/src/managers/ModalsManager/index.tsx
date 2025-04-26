@@ -153,7 +153,7 @@ type Stack = { name: ModalName; data: any }[]
 const ModalsContext = createContext<Context>()
 
 export const ModalProvider = (props: { children: JSX.Element }) => {
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const location = useLocation()
   const queryParams = () => location.search as ModalName
   const urlSearchParams = () => new URLSearchParams(queryParams())
@@ -214,7 +214,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
         url.append(`m[${modalStack().length}]`, modal.name)
 
         const decodedParamString = decodeURIComponent(url.toString())
-        navigate(decodedParamString.replace("=&", "?"))
+        navigator.navigate(decodedParamString.replace("=&", "?"))
       } else {
         setSearchParams({
           [`m[${modalStack().length}]`]: modal.name

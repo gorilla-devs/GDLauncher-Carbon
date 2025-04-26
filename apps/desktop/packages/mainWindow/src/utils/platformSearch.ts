@@ -1,4 +1,7 @@
-import { FEUnifiedSearchParameters } from "@gd/core_module/bindings"
+import {
+  FEUnifiedSearchParameters,
+  FEUnifiedSearchResult
+} from "@gd/core_module/bindings"
 
 import { createEffect, createMemo, createSignal, mergeProps } from "solid-js"
 import { rspc } from "./rspcClient"
@@ -10,7 +13,7 @@ const defaultSearchQuery: FEUnifiedSearchParameters = {
   categories: null,
   gameVersions: null,
   modloaders: null,
-  projectType: null,
+  projectType: "modpack",
   sortIndex: null,
   sortOrder: null,
   index: 0,
@@ -29,6 +32,11 @@ export interface SearchResultsOpts {
   overscan?: number
 }
 
+export interface SearchResultItem {
+  type: "value" | "loader"
+  value?: FEUnifiedSearchResult
+}
+
 export const getSearchResults = (_opts?: SearchResultsOpts) => {
   const rspcContext = rspc.useContext()
 
@@ -42,6 +50,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
 
   const [viewMode, setViewMode] = createSignal<"list" | "grid">("list")
   const [ref, setRef] = createSignal<VirtualizerHandle | null>(opts.parentRef)
+
   const [lastScrollOffset, setLastScrollOffset] = createSignal(0)
 
   const [searchQuery, setSearchQuery] = createSignal<FEUnifiedSearchParameters>(
@@ -142,7 +151,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     cfInfiniteResults.refetch()
   })
 
-  const allRows = () => {
+  const allRows = (): SearchResultItem[] => {
     const cfData =
       searchQuery().searchApi === "modrinth"
         ? []
@@ -152,17 +161,36 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
         ? []
         : (mrInfiniteResults.data?.pages.flatMap((p) => p.data) ?? [])
 
-    if (searchQuery().searchApi === "curseforge") return cfData
-    if (searchQuery().searchApi === "modrinth") return mrData
+    let results: SearchResultItem[] = []
 
-    // Interleave results
-    const interleaved = []
-    const maxLength = Math.max(cfData.length, mrData.length)
-    for (let i = 0; i < maxLength; i++) {
-      if (i < cfData.length) interleaved.push(cfData[i])
-      if (i < mrData.length) interleaved.push(mrData[i])
+    if (searchQuery().searchApi === "curseforge") {
+      results = cfData.map((item) => ({ type: "value", value: item }))
+    } else if (searchQuery().searchApi === "modrinth") {
+      results = mrData.map((item) => ({ type: "value", value: item }))
+    } else {
+      // Interleave results
+      const interleaved: SearchResultItem[] = []
+      const maxLength = Math.max(cfData.length, mrData.length)
+      for (let i = 0; i < maxLength; i++) {
+        if (i < cfData.length)
+          interleaved.push({ type: "value", value: cfData[i] })
+        if (i < mrData.length)
+          interleaved.push({ type: "value", value: mrData[i] })
+      }
+      results = interleaved
     }
-    return interleaved
+
+    // Add a loader item if either query is loading or fetching more data
+    const cfLoading =
+      cfInfiniteResults.isFetching && searchQuery().searchApi !== "modrinth"
+    const mrLoading =
+      mrInfiniteResults.isFetching && searchQuery().searchApi !== "curseforge"
+
+    if (cfLoading || mrLoading) {
+      results.push({ type: "loader" })
+    }
+
+    return results
   }
 
   const hasNextPage = createMemo(() => {
@@ -178,7 +206,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     const virtualizer = ref()
     setLastScrollOffset(virtualizer?.scrollOffset || 0)
 
-    if (!virtualizer) return
+    if (!virtualizer || isLoading()) return
 
     // Check if we're near the bottom with an increased threshold
     const endIndex = virtualizer.findEndIndex()

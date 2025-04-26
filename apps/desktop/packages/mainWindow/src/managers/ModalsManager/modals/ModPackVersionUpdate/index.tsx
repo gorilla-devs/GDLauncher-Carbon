@@ -16,7 +16,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
   const [selectedVersion, setSelectedVersion] = createSignal<string | null>(
     null
   )
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const modalContext = useModal()
   const instance = rspc.createQuery(() => ({
     queryKey: ["instance.getInstanceDetails", instanceId()!]
@@ -140,7 +140,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
     })
 
     modalContext?.closeModal()
-    navigate("/library")
+    navigator.navigate("/library")
   }
 
   return (

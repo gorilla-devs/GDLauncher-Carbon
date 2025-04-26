@@ -48,7 +48,7 @@ export default function Login() {
 
   const globalStore = useGlobalStore()
 
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const [step, setStep] = createSignal<Steps>(Steps.TermsAndConditions)
   const [deviceCodeObject, setDeviceCodeObject] =
     createSignal<DeviceCodeObjectType | null>(null)
@@ -176,11 +176,11 @@ export default function Login() {
         })
 
         setTimeout(() => {
-          navigate("/library")
+          navigator.navigate("/library")
           resolve(null)
         }, 5000)
       } else {
-        navigate("/library")
+        navigator.navigate("/library")
         resolve(null)
       }
     })
@@ -551,7 +551,7 @@ export default function Login() {
                     (step() === Steps.Auth || step() === Steps.CodeStep) &&
                     globalStore.accounts.data?.length !== 0
                   ) {
-                    navigate("/settings/accounts")
+                    navigator.navigate("/settings/accounts")
                   } else {
                     handleAnimationBackward()
                     prevStep()
@@ -617,7 +617,7 @@ export default function Login() {
                   setLoadingButton(false)
 
                   if (!searchParams.addMicrosoftAccount && activeUuid.data) {
-                    navigate("/library")
+                    navigator.navigate("/library")
                   } else {
                     nextStep()
                   }

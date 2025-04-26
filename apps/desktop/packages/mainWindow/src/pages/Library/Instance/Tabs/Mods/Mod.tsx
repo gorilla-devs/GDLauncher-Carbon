@@ -107,7 +107,7 @@ const Mod = (props: Props) => {
     null
   )
 
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const params = useParams()
   const addNotification = createNotification()
   const location = useLocation()
@@ -602,7 +602,7 @@ const Mod = (props: Props) => {
                           rounded={false}
                           size="small"
                           onClick={() => {
-                            navigate(
+                            navigator.navigate(
                               `/mods/${
                                 props.mod.curseforge?.project_id
                               }/curseforge?instanceId=${instanceId()}`
@@ -653,7 +653,7 @@ const Mod = (props: Props) => {
                           rounded={false}
                           size="small"
                           onClick={() => {
-                            navigate(
+                            navigator.navigate(
                               `/mods/${
                                 props.mod.modrinth?.project_id
                               }/modrith?instanceId=${instanceId()}`
@@ -716,7 +716,7 @@ const Mod = (props: Props) => {
                         <div
                           class="p-4 text-md flex gap-4 justify-between hover:bg-darkSlate-800"
                           onClick={() => {
-                            navigate(
+                            navigator.navigate(
                               `/mods/${
                                 props.mod.modrinth?.project_id
                               }/modrinth/versions?instanceId=${instanceId()}`
@@ -735,7 +735,7 @@ const Mod = (props: Props) => {
                         <div
                           class="hover:bg-darkSlate-800 p-4 text-md flex gap-4 justify-between"
                           onClick={() => {
-                            navigate(
+                            navigator.navigate(
                               `/mods/${
                                 props.mod.curseforge?.project_id
                               }/curseforge/versions?instanceId=${instanceId()}`

@@ -1,7 +1,16 @@
 import { useLocation, useMatch } from "@solidjs/router"
 import { Match, Show, Switch, createEffect } from "solid-js"
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg"
-import { Tab, TabList, Tabs, Tooltip, Button } from "@gd/ui"
+import {
+  Tab,
+  TabList,
+  Tabs,
+  Tooltip,
+  Button,
+  Input,
+  TooltipContent,
+  TooltipTrigger
+} from "@gd/ui"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { AccountsDropdown } from "./AccountsDropdown"
 import { AccountStatus, AccountType } from "@gd/core_module/bindings"
@@ -14,7 +23,7 @@ import updateAvailable, {
 import { Trans } from "@gd/i18n"
 import { useModal } from "@/managers/ModalsManager"
 import { useGlobalStore } from "./GlobalStoreContext"
-import { NavSearchInput } from "./NavSearchInput"
+import useSearchContext from "./SearchInputContext"
 
 export interface AccountsStatus {
   label: {
@@ -29,10 +38,12 @@ export interface AccountsStatus {
 
 const AppNavbar = () => {
   const location = useLocation()
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const globalStore = useGlobalStore()
   const [accounts, setAccounts] = createStore<AccountsStatus[]>([])
   const modalsContext = useModal()
+
+  const searchResults = useSearchContext()
 
   const isLogin = useMatch(() => "/")
   const isSettings = useMatch(() => "/settings")
@@ -75,7 +86,7 @@ const AppNavbar = () => {
       >
         <div
           class="group relative z-0 flex h-full w-fit items-center"
-          onClick={() => navigate("/library")}
+          onClick={() => navigator.navigate("/library")}
         >
           <div class="bg-darkSlate-700 -z-1 absolute left-0 top-0 h-full w-full scale-75 rounded-md opacity-0 transition-[transform,opacity] duration-150 ease-[cubic-bezier(.4,0,.2,1)] group-hover:scale-100 group-hover:opacity-100" />
           <div class="flex items-center gap-2 px-2">
@@ -95,7 +106,36 @@ const AppNavbar = () => {
           </div>
         </div>
         <div class="flex w-full items-center justify-center gap-4">
-          <NavSearchInput />
+          <Input
+            placeholder="Search anything..."
+            containerClass="px-10"
+            tabIndex={0}
+            value={searchResults?.searchQuery().searchQuery ?? ""}
+            onFocus={() => {
+              navigator.navigate("/search")
+            }}
+            icon={
+              <div class="flex items-center gap-1">
+                <Show
+                  when={
+                    searchResults?.searchQuery().searchQuery?.length || 0 > 0
+                  }
+                >
+                  <div
+                    class="i-ri:close-line text-darkSlate-500 text-xl transition-colors duration-200 ease-in-out hover:text-white"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      searchResults?.setSearchQuery((prev) => ({
+                        ...prev,
+                        searchQuery: ""
+                      }))
+                    }}
+                  />
+                </Show>
+              </div>
+            }
+          />{" "}
           <Button
             class="w-max"
             size="small"
@@ -116,9 +156,7 @@ const AppNavbar = () => {
                 <div
                   onClick={() => {
                     if (!(!!isSettings() || !!isSettingsNested()))
-                      navigate("/settings", {
-                        getLastInstance: true
-                      })
+                      navigator.navigate("/settings")
                   }}
                 >
                   <Tab>
@@ -133,7 +171,7 @@ const AppNavbar = () => {
                 </div>
                 <div
                   onClick={() => {
-                    navigate("/news")
+                    navigator.navigate("/news")
                   }}
                 >
                   <Tab>
@@ -153,9 +191,23 @@ const AppNavbar = () => {
                   }
                 >
                   <Tab ignored>
-                    <Tooltip
-                      placement="bottom"
-                      content={
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <div
+                          class="i-ri:download-2-fill text-2xl text-green-500"
+                          classList={{
+                            "hover:text-green-100": !updateDownloaded()
+                          }}
+                          onClick={() => {
+                            if (updateDownloaded()) {
+                              window.installUpdate()
+                            } else {
+                              modalsContext?.openModal({ name: "appUpdate" })
+                            }
+                          }}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent>
                         <Switch>
                           <Match when={updateDownloaded()}>
                             <Trans key="app_update.apply_and_restart" />
@@ -172,21 +224,7 @@ const AppNavbar = () => {
                             <Trans key="app_update.new_update_available_text" />
                           </Match>
                         </Switch>
-                      }
-                    >
-                      <div
-                        class="i-ri:download-2-fill text-2xl text-green-500"
-                        classList={{
-                          "hover:text-green-100": !updateDownloaded()
-                        }}
-                        onClick={() => {
-                          if (updateDownloaded()) {
-                            window.installUpdate()
-                          } else {
-                            modalsContext?.openModal({ name: "appUpdate" })
-                          }
-                        }}
-                      />
+                      </TooltipContent>
                     </Tooltip>
                   </Tab>
                 </Show>

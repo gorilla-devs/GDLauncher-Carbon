@@ -18,7 +18,7 @@ interface Props extends ModalProps {
 
 const ModalLayout = (props: Props) => {
   const c = children(() => props.children)
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const location = useLocation()
   const modalsContext = useModal()
 
@@ -49,7 +49,7 @@ const ModalLayout = (props: Props) => {
               class="h-5 w-5 text-darkSlate-300 i-ri:close-fill hover:text-lightSlate-100 duration-100 ease-in-out"
               onClick={() => {
                 if (!props.preventClose) {
-                  navigate(location.pathname)
+                  navigator.navigate(location.pathname)
                   modalsContext?.closeModal()
                 }
               }}

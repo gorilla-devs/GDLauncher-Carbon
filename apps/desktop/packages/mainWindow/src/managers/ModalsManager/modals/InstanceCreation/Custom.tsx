@@ -88,7 +88,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
   const addNotification = createNotification()
   const modalsContext = useModal()
   const globalStore = useGlobalStore()
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
 
   const forgeVersionsQuery = rspc.createQuery(() => ({
     queryKey: ["mc.getForgeVersions"],
@@ -409,7 +409,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
         await prepareInstanceMutation.mutateAsync(instanceId)
 
         modalsContext?.closeModal()
-        navigate(`/library`)
+        navigator.navigate(`/library`)
         addNotification({
           name: "Instance successfully created.",
           type: "success"

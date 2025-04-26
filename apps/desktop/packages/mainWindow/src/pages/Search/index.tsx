@@ -1,12 +1,12 @@
 import ContentWrapper from "@/components/ContentWrapper"
 import { Outlet } from "@solidjs/router"
 
-export function Explore() {
+export function Search() {
   return (
-    <ContentWrapper>
+    <ContentWrapper zeroPadding>
       <Outlet />
     </ContentWrapper>
   )
 }
 
-export default Explore
+export default Search

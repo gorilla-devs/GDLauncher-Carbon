@@ -1,4 +1,4 @@
-import { createContext } from "solid-js"
+import { createContext, useContext } from "solid-js"
 import { getSearchResults } from "@/utils/platformSearch"
 
 export const SearchInputContext = createContext<
@@ -6,8 +6,5 @@ export const SearchInputContext = createContext<
 >()
 
 export default function useSearchContext() {
-  return getSearchResults({
-    offset: 0,
-    limit: 20
-  })
+  return useContext(SearchInputContext)
 }

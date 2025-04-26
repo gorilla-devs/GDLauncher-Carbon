@@ -58,7 +58,7 @@ interface InstancePage {
 }
 
 const Instance = () => {
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const params = useParams()
   const rspcContext = rspc.useContext()
   const location = useLocation()
@@ -391,7 +391,7 @@ const Instance = () => {
         (instance) => instance.id === parseInt(params.id, 10)
       )
     ) {
-      navigate("/library")
+      navigator.navigate("/library")
     }
   })
 
@@ -430,7 +430,7 @@ const Instance = () => {
           <div class="sticky left-5 top-5 z-50 w-fit">
             <Button
               rounded
-              onClick={() => navigate("/library")}
+              onClick={() => navigator.navigate("/library")}
               size="small"
               type="transparent"
             >
@@ -697,7 +697,7 @@ const Instance = () => {
                   }}
                 >
                   <Button
-                    onClick={() => navigate("/library")}
+                    onClick={() => navigator.navigate("/library")}
                     icon={<div class="i-ri:arrow-drop-left-line text-2xl" />}
                     size="small"
                     type="secondary"
@@ -717,7 +717,7 @@ const Instance = () => {
                         {(page: InstancePage) => (
                           <Tab
                             onClick={() => {
-                              navigate(page.path)
+                              navigator.navigate(page.path)
                             }}
                           >
                             {page.label}

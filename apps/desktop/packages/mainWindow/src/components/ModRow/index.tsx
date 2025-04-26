@@ -39,7 +39,7 @@ const ModRow = (props: ModRowProps) => {
   const rspcContext = rspc.useContext()
 
   const mergedProps = mergeProps({ type: "Modpack" }, props)
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const addNotification = createNotification()
 
   const prepareInstanceMutation = rspc.createMutation(() => ({
@@ -60,7 +60,7 @@ const ModRow = (props: ModRowProps) => {
     },
     onSettled() {
       setLoading(false)
-      navigate(`/library`)
+      navigator.navigate(`/library`)
     }
   }))
 
@@ -86,7 +86,7 @@ const ModRow = (props: ModRowProps) => {
   }))
 
   const handleExplore = () => {
-    navigate(
+    navigator.navigate(
       `/${mergedProps.type === "Modpack" ? "modpacks" : "mods"}/${getProjectId(
         props
       )}/${

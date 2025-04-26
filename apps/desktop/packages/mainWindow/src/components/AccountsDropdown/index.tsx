@@ -37,7 +37,7 @@ export interface Props {
 
 export const AccountsDropdown = (props: Props) => {
   const globalStore = useGlobalStore()
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const [showAccountsDropdown, setShowAccountsDropdown] = createSignal(false)
 
   const setActiveAccountMutation = rspc.createMutation(() => ({
@@ -259,7 +259,7 @@ export const AccountsDropdown = (props: Props) => {
               onClick={() => {
                 if (props.disabled) return
                 setShowAccountsDropdown(false)
-                navigate("/settings/accounts")
+                navigator.navigate("/settings/accounts")
               }}
             >
               <div

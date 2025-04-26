@@ -13,7 +13,7 @@ export interface settingsItem {
 
 function Settings() {
   const location = useLocation()
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
 
   const settings: settingsItem[] = [
     {
@@ -81,7 +81,7 @@ function Settings() {
                   {(item) => (
                     <Tab
                       onClick={() => {
-                        navigate(item.path)
+                        navigator.navigate(item.path)
                       }}
                     >
                       <div class="flex flex-col gap-2 justify-center items-center">
