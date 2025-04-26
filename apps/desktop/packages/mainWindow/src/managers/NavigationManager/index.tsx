@@ -56,7 +56,9 @@ export const NavigationManager = (props: { children: JSX.Element }) => {
       navigate(destinationPath, { replace: options?.replace })
     }
 
-    setLastPathVisited(currentPath)
+    if (!options?.replace) {
+      setLastPathVisited(currentPath)
+    }
   }
 
   const prev = () => {

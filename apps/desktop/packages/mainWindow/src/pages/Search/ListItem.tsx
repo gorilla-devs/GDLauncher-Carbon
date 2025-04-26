@@ -39,8 +39,9 @@ export function ListItem(props: SearchResultItemProps) {
           style={{
             "background-image": `url(${props.result.imageUrl || ""})`,
             "mask-image": "linear-gradient(to right, transparent 20%, black)",
-            "-webkit-mask-image":
-              "linear-gradient(to right, transparent 20%, black)"
+            "-webkit-mask-image": "linear-gradient(to right, transparent 20%, black)",
+            "filter": "blur(8px)",
+            "-webkit-filter": "blur(8px)"
           }}
         />
         <div class="relative z-10 flex w-full items-center gap-4">
