@@ -645,6 +645,38 @@ pub enum CFFEClassId {
     Other(u16),
 }
 
+impl From<FEUnifiedSearchType> for CFFEClassId {
+    fn from(value: FEUnifiedSearchType) -> Self {
+        match value {
+            FEUnifiedSearchType::Mod => CFFEClassId::Mods,
+            FEUnifiedSearchType::Modpack => CFFEClassId::Modpacks,
+            FEUnifiedSearchType::ResourcePack => CFFEClassId::ResourcePacks,
+            FEUnifiedSearchType::Shader => CFFEClassId::Shaders,
+            FEUnifiedSearchType::World => CFFEClassId::Worlds,
+            FEUnifiedSearchType::Plugin => CFFEClassId::BukkitPlugins,
+            FEUnifiedSearchType::Datapack => CFFEClassId::Datapacks,
+            FEUnifiedSearchType::Unknown => CFFEClassId::Other(0),
+        }
+    }
+}
+
+impl From<CFFEClassId> for FEUnifiedSearchType {
+    fn from(value: CFFEClassId) -> Self {
+        match value {
+            CFFEClassId::Mods => FEUnifiedSearchType::Mod,
+            CFFEClassId::ResourcePacks => FEUnifiedSearchType::ResourcePack,
+            CFFEClassId::Modpacks => FEUnifiedSearchType::Modpack,
+            CFFEClassId::Customizations => FEUnifiedSearchType::Unknown,
+            CFFEClassId::BukkitPlugins => FEUnifiedSearchType::Plugin,
+            CFFEClassId::Worlds => FEUnifiedSearchType::World,
+            CFFEClassId::Addons => FEUnifiedSearchType::Unknown,
+            CFFEClassId::Shaders => FEUnifiedSearchType::Shader,
+            CFFEClassId::Datapacks => FEUnifiedSearchType::Datapack,
+            CFFEClassId::Other(other) => FEUnifiedSearchType::Unknown,
+        }
+    }
+}
+
 impl From<mpcf::ClassId> for CFFEClassId {
     fn from(class_id: mpcf::ClassId) -> Self {
         match class_id {

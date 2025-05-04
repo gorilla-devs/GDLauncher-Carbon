@@ -7,7 +7,16 @@ import {
 import { VersionRowTypeData } from "../InfiniteScrollVersionsQueryWrapper"
 import { For, Match, Show, Switch, createSignal } from "solid-js"
 import { Trans } from "@gd/i18n"
-import { Button, Popover, Spinner, Tooltip } from "@gd/ui"
+import {
+  Button,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Spinner,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from "@gd/ui"
 import { format } from "date-fns"
 import CopyIcon from "../CopyIcon"
 import ModDownloadButton from "../ModDownloadButton"
@@ -39,16 +48,17 @@ const CopiableEntity = (props: {
   text: string | undefined | null | number
 }) => {
   return (
-    <div class="flex items-center text-lightSlate-200 w-60">
+    <div class="text-lightSlate-200 flex w-60 items-center">
       <div class="truncate">
-        <Tooltip
-          content={<div class="max-w-110 break-all">{props.text || "-"}</div>}
-        >
-          {props.text || "-"}
+        <Tooltip>
+          <TooltipTrigger>{props.text || "-"}</TooltipTrigger>
+          <TooltipContent>
+            <div class="max-w-110 break-all">{props.text || "-"}</div>
+          </TooltipContent>
         </Tooltip>
       </div>
       <Show when={props.text}>
-        <div class="flex-shrink-0 ml-2">
+        <div class="ml-2 shrink-0">
           <CopyIcon text={props.text} />
         </div>
       </Show>
@@ -62,11 +72,11 @@ const RowContainer = (props: Props & AdditionalProps) => {
   return (
     <Switch>
       <Match when={props.modVersion}>
-        <div class="py-2 flex flex-col justify-center">
-          <h4 class="m-0 pb-2 font-medium text-md">
+        <div class="flex flex-col justify-center py-2">
+          <h4 class="text-md m-0 pb-2 font-medium">
             {props.modVersion.name.replaceAll(".zip", "")}
           </h4>
-          <div class="flex text-sm gap-2 divide-darkSlate-500 text-lightGray-800 divide-x-1">
+          <div class="divide-darkSlate-500 text-lightGray-800 divide-x-1 flex gap-2 text-sm">
             <Trans key="explore_versions.tags" />
             <For each={props.modVersion.gameVersions}>
               {(version) => <div>{version}</div>}
@@ -92,16 +102,26 @@ const RowContainer = (props: Props & AdditionalProps) => {
         <div class="flex items-center">
           <div onClick={(e) => e.stopPropagation()}>
             <Popover
-              noPadding
-              noTip
-              onOpen={() => setIsHoveringInfoCard(true)}
-              onClose={() => setIsHoveringInfoCard(false)}
-              content={() => (
+              placement="left"
+              onOpenChange={(open) => {
+                if (open) setIsHoveringInfoCard(true)
+                else setIsHoveringInfoCard(false)
+              }}
+            >
+              <PopoverTrigger>
                 <div
-                  class="bg-darkSlate-900 rounded-lg shadow-md p-4 text-lightSlate-700 border-darkSlate-700 border-solid border-1 shadow-darkSlate-90 w-110"
+                  class="hover:text-lightSlate-50 text-lightSlate-700 i-ri:information-fill transition-color cursor-pointer text-2xl duration-100 ease-in-out"
+                  classList={{
+                    "text-lightSlate-50": isHoveringInfoCard()
+                  }}
+                />
+              </PopoverTrigger>
+              <PopoverContent class="border-none p-0">
+                <div
+                  class="bg-darkSlate-900 text-lightSlate-700 border-darkSlate-700 border-1 shadow-darkSlate-90 w-110 rounded-lg border-solid p-4 shadow-md"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div class="text-lightSlate-50 font-bold mb-4 text-xl">
+                  <div class="text-lightSlate-50 mb-4 text-xl font-bold">
                     <Trans
                       key="addons_versions.technical_info_for"
                       options={{
@@ -112,44 +132,44 @@ const RowContainer = (props: Props & AdditionalProps) => {
                       <span class="italic">{""}</span>
                     </Trans>
                   </div>
-                  <div class="flex flex-col w-full">
-                    <div class="flex justify-between w-full text-sm">
+                  <div class="flex w-full flex-col">
+                    <div class="flex w-full justify-between text-sm">
                       <div class="w-50">
                         <Trans key="addons_versions.project_id" />
                       </div>
                       <CopiableEntity text={props.modVersion.id} />
                     </div>
-                    <div class="flex justify-between w-full text-sm">
+                    <div class="flex w-full justify-between text-sm">
                       <div class="w-50">
                         <Trans key="addons_versions.file_id" />
                       </div>
                       <CopiableEntity text={props.modVersion.fileId} />
                     </div>
-                    <div class="flex justify-between w-full text-sm">
+                    <div class="flex w-full justify-between text-sm">
                       <div class="w-50">
                         <Trans key="addons_versions.file_name" />
                       </div>
                       <CopiableEntity text={props.modVersion.fileName} />
                     </div>
-                    <div class="flex justify-between w-full text-sm">
+                    <div class="flex w-full justify-between text-sm">
                       <div class="w-50">
                         <Trans key="addons_versions.file_size" />
                       </div>
                       <CopiableEntity text={props.modVersion.size} />
                     </div>
-                    <div class="flex justify-between w-full text-sm">
+                    <div class="flex w-full justify-between text-sm">
                       <div class="w-50">
                         <Trans key="addons_versions.hash" />
                       </div>
                       <CopiableEntity text={props.modVersion.hash} />
                     </div>
-                    <div class="flex justify-between w-full text-sm">
+                    <div class="flex w-full justify-between text-sm">
                       <div class="w-50">
                         <Trans key="addons_versions.status" />
                       </div>
                       <CopiableEntity text={props.modVersion.status} />
                     </div>
-                    <div class="flex justify-between w-full text-sm">
+                    <div class="flex w-full justify-between text-sm">
                       <div class="w-50">
                         <Trans key="addons_versions.release_type" />
                       </div>
@@ -157,17 +177,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
                     </div>
                   </div>
                 </div>
-              )}
-              trigger="click"
-              placement="left-end"
-              color="bg-darkSlate-900"
-            >
-              <div
-                class="duration-100 ease-in-out cursor-pointer hover:text-lightSlate-50 text-2xl text-lightSlate-700 i-ri:information-fill transition-color"
-                classList={{
-                  "text-lightSlate-50": isHoveringInfoCard()
-                }}
-              />
+              </PopoverContent>
             </Popover>
           </div>
         </div>
@@ -175,7 +185,6 @@ const RowContainer = (props: Props & AdditionalProps) => {
           <Switch>
             <Match when={props.type === "mod"}>
               <ModDownloadButton
-                size="medium"
                 projectId={props.modVersion.id}
                 fileId={props.modVersion.fileId}
                 isCurseforge={props.isCurseforge || false}
@@ -199,7 +208,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
                     </Match>
                     <Match when={props.loading}>
                       <Trans key="modpack.version_downloading" />
-                      <Spinner class="w-5 h-5" />
+                      <Spinner class="h-5 w-5" />
                     </Match>
                     <Match when={!props.loading && !props.isInstalled}>
                       <Switch>
@@ -210,7 +219,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
                           <Trans key="modpack.version_download" />
                         </Match>
                       </Switch>
-                      <div class="w-5 h-5 i-ri:download-2-fill" />
+                      <div class="i-ri:download-2-fill h-5 w-5" />
                     </Match>
                     <Match when={!props.loading && props.isInstalled}>
                       <Trans key="modpack.version_installed" />

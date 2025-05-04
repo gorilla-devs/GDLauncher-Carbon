@@ -1,15 +1,70 @@
 import { ListItem } from "./ListItem"
 import { VList } from "@/components/VirtuaWrapper"
 import useSearchContext from "@/components/SearchInputContext"
-import { Tabs } from "@gd/ui"
+import {
+  Badge,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  Tabs
+} from "@gd/ui"
 import { Tab, TabList } from "@gd/ui"
-import { createSignal, For, onMount, Suspense } from "solid-js"
+import { For, onMount, Suspense } from "solid-js"
 import { FEUnifiedSearchType } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
+import { useParams } from "@solidjs/router"
+import FiltersDisplay from "./FiltersDisplay"
+import { FiltersDropdown } from "./FiltersDropdown"
+
+export const projectTypeTabs: {
+  label: string
+  value: FEUnifiedSearchType
+  icon: string
+  path: string
+}[] = [
+  {
+    label: "Modpacks",
+    value: "modpack",
+    icon: "i-ri:folder-fill",
+    path: "/search/modpack"
+  },
+  {
+    label: "Mods",
+    value: "mod",
+    icon: "i-ri:file-text-fill",
+    path: "/search/mod"
+  },
+  {
+    label: "Shaders",
+    value: "shader",
+    icon: "i-ri:paint-fill",
+    path: "/search/shader"
+  },
+  {
+    label: "Resource Packs",
+    value: "resourcePack",
+    icon: "i-ri:folder-fill",
+    path: "/search/resourcePack"
+  },
+  {
+    label: "Data Packs",
+    value: "datapack",
+    icon: "i-ri:folder-fill",
+    path: "/search/datapack"
+  },
+  {
+    label: "Worlds",
+    value: "world",
+    icon: "i-ri:folder-fill",
+    path: "/search/world"
+  }
+]
 
 export function List() {
   const searchContext = useSearchContext()
   const navigator = useGDNavigate()
+  const params = useParams()
+  const type = () => params.type ?? "modpack"
 
   onMount(() => {
     queueMicrotask(() => {
@@ -17,50 +72,34 @@ export function List() {
     })
   })
 
-  const [selectedTab, setSelectedTab] = createSignal(0)
-  const tabs: { label: string; value: FEUnifiedSearchType }[] = [
-    {
-      label: "Modpacks",
-      value: "modpack"
-    },
-    {
-      label: "Mods",
-      value: "mod"
-    },
-    {
-      label: "Shaders",
-      value: "shader"
-    },
-    {
-      label: "Resource Packs",
-      value: "resourcePack"
-    },
-    {
-      label: "Data Packs",
-      value: "datapack"
-    },
-    {
-      label: "Worlds",
-      value: "world"
-    }
-  ]
-
   return (
-    <div class="flex h-full flex-col">
-      <div class="w-full p-4">
-        <Tabs index={selectedTab()}>
+    <div class="flex h-full flex-col py-6">
+      <FiltersDisplay />
+      <div class="flex w-full justify-between px-6">
+        <Tabs
+          defaultIndex={projectTypeTabs.findIndex(
+            (tab) => tab.value === type()
+          )}
+        >
           <TabList aligment="between">
-            <For each={tabs}>
+            <For each={projectTypeTabs}>
               {(tab, index) => (
                 <Tab
                   onClick={() => {
-                    if (index() === selectedTab()) return
+                    if (
+                      index() ===
+                      projectTypeTabs.findIndex((tab) => tab.value === type())
+                    )
+                      return
 
-                    setSelectedTab(index)
-                    searchContext?.setSearchQuery((prev) => ({
-                      ...prev,
-                      projectType: tab.value
-                    }))
+                    navigator.navigate(tab.path)
+
+                    queueMicrotask(() => {
+                      searchContext?.setSearchQuery((prev) => ({
+                        ...prev,
+                        projectType: tab.value
+                      }))
+                    })
                   }}
                 >
                   {tab.label}
@@ -69,8 +108,31 @@ export function List() {
             </For>
           </TabList>
         </Tabs>
+        <div>
+          <DropdownMenu>
+            <DropdownMenuTrigger>
+              <Badge>
+                <div class="flex items-center gap-1">
+                  <div>Filters</div>
+                  <div class="i-ri:arrow-down-s-line text-xs" />
+                </div>
+              </Badge>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <FiltersDropdown
+                disabled={!searchContext?.searchQuery().searchApi}
+              />
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
-      <Suspense>
+      <Suspense
+        fallback={
+          <div class="m-4 flex h-20 items-center justify-center">
+            <div class="i-ri:loader-4-line animate-spin text-2xl" />
+          </div>
+        }
+      >
         <VList
           data={searchContext?.allRows() || []}
           class="flex max-w-full flex-col gap-4 overflow-x-hidden"

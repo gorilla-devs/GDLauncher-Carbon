@@ -169,6 +169,8 @@ keys! {
         MODRINTH_GET_TEAM                           = "modrinth.getTeam";
 
         UNIFIED_SEARCH                              = "unifiedSearch";
+        UNIFIED_GET_PROJECT                         = "unifiedGetProject";
+        UNIFIED_GET_PROJECT_VERSIONS                = "unifiedGetProjectVersions";
         UNIFIED_SEARCH_PROJECT_TYPE                 = "unifiedSearchProjectType";
         GET_UNIFIED_CATEGORIES                      = "getUnifiedCategories";
         GET_UNIFIED_MODLOADERS                      = "getUnifiedModloaders";

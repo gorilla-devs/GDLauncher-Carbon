@@ -1,16 +1,16 @@
+use super::Set;
 use super::keys::instance::*;
 use super::router::router;
+use super::settings::ModSources;
 use super::translation::Translation;
 use super::vtask::FETaskId;
-use super::Set;
 use crate::api::keys;
-use crate::api::modplatforms::RemoteVersion;
 use crate::domain::instance::{self as domain, InstanceModpackInfo};
 use crate::error::{AxumError, FeError};
 use crate::managers::instance as manager;
-use crate::managers::instance::log::{LogEntrySourceKind, SearchResult};
 use crate::managers::instance::InstanceMoveTarget;
-use crate::managers::{instance::importer, App, AppInner};
+use crate::managers::instance::log::{LogEntrySourceKind, SearchResult};
+use crate::managers::{App, AppInner, instance::importer};
 use anyhow::anyhow;
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
@@ -63,9 +63,16 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 return Err(anyhow::anyhow!("instance name cannot be empty"));
             }
 
+            let group: domain::GroupId = match details.group {
+                Some(group) => group.into(),
+                None => app.instance_manager()
+                .get_default_group()
+                .await?
+            };
+
             app.instance_manager()
                 .create_instance(
-                    details.group.into(),
+                    group,
                     details.name,
                     details.use_loaded_icon,
                     details.version.try_into()?,
@@ -330,19 +337,19 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok(super::vtask::FETaskId::from(task))
         }
 
-        query FIND_MOD_UPDATE[app, args: UpdateMod] {
-            app.instance_manager().find_mod_update(
-                args.instance_id.into(),
-                args.mod_id,
-            ).await
-            .map(|v| v.map(RemoteVersion::from))
-        }
+        // query FIND_MOD_UPDATE[app, args: UpdateMod] {
+        //     app.instance_manager().find_mod_update(
+        //         args.instance_id.into(),
+        //         args.mod_id,
+        //     ).await
+        //     .map(|v| v.map(RemoteVersion::from))
+        // }
 
         query GET_MOD_SOURCES[app, instance_id: FEInstanceId] {
             app.instance_manager()
                 .get_instance_mod_sources(instance_id.into())
                 .await
-                .map(super::modplatforms::ModSources::from)
+                .map(crate::api::settings::ModSources::from)
         }
 
         mutation INSTALL_LATEST_MOD[app, imod: InstallLatestMod] {
@@ -656,7 +663,8 @@ enum ConfigurationParseErrorType {
 
 #[derive(Type, Debug, Deserialize)]
 struct CreateInstance {
-    group: FEGroupId,
+    #[specta(optional)]
+    group: Option<FEGroupId>,
     name: String,
     use_loaded_icon: bool,
     version: CreateInstanceVersion,
@@ -724,7 +732,7 @@ struct FEUpdateInstance {
     #[specta(optional)]
     game_resolution: Option<Set<Option<GameResolution>>>,
     #[specta(optional)]
-    mod_sources: Option<Set<Option<super::modplatforms::ModSources>>>,
+    mod_sources: Option<Set<Option<ModSources>>>,
     #[specta(optional)]
     modpack_locked: Option<Set<Option<bool>>>,
 }
@@ -899,6 +907,7 @@ impl From<GameResolution> for domain::info::GameResolution {
 #[derive(Type, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct InstanceDetails {
+    id: FEInstanceId,
     name: String,
     favorite: bool,
     version: Option<String>,
@@ -1164,6 +1173,7 @@ struct ImportRequest {
 impl From<domain::InstanceDetails> for InstanceDetails {
     fn from(value: domain::InstanceDetails) -> Self {
         Self {
+            id: value.id.into(),
             favorite: value.favorite,
             name: value.name,
             version: value.version,
@@ -1715,7 +1725,7 @@ impl From<importer::FullImportScanStatus> for FullImportScanStatus {
 }
 
 mod log {
-    use axum::extract::{ws::Message, WebSocketUpgrade};
+    use axum::extract::{WebSocketUpgrade, ws::Message};
     use tracing::{error, trace};
 
     use super::*;

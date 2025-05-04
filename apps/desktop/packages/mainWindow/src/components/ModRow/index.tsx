@@ -287,7 +287,7 @@ const ModRow = (props: ModRowProps) => {
                             <Spinner />
                           </Show>
                           <Show when={!loading()}>
-                            <Trans key="instance.download_latest" />
+                            <Trans key="instance.download" />
                           </Show>
                         </Button>
                       </Show>

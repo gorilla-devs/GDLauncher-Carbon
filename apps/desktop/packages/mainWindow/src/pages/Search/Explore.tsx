@@ -1,177 +1,169 @@
-import { rspc } from "@/utils/rspcClient"
-import ShowcaseScroller from "./components/ShowcaseScroller"
-import Masonry from "./components/Masonry"
-import { restoreScrollPosition } from "@/utils/scrollRestoration"
-import { onMount } from "solid-js"
-import { useGDNavigate } from "@/managers/NavigationManager"
-import { getSearchResults } from "@/utils/platformSearch"
-
 export function Explore() {
-  const navigator = useGDNavigate()
-  const searchResults = getSearchResults({
-    offset: 0,
-    limit: 40,
-    defaultSearchQuery: {
-      sortIndex: "popularity",
-      sortOrder: "descending",
-      projectType: "modpack"
-    }
-  })
+  // const navigator = useGDNavigate()
+  // const searchResults = getSearchResults({
+  //   offset: 0,
+  //   limit: 40,
+  //   defaultSearchQuery: {
+  //     sortIndex: "popularity",
+  //     sortOrder: "descending",
+  //     projectType: "modpack"
+  //   }
+  // })
 
-  const popularModpacksCF = rspc.createQuery(() => ({
-    queryKey: [
-      "modplatforms.unifiedSearch",
-      {
-        sortIndex: {
-          curseForge: "popularity" as const
-        },
-        sortOrder: "descending" as const,
-        searchQuery: null,
-        categories: null,
-        gameVersions: null,
-        modloaders: null,
-        pageSize: 15,
-        projectType: "modpack",
-        index: null,
-        searchApi: "curseforge"
-      }
-    ]
-  }))
+  // const popularModpacksCF = rspc.createQuery(() => ({
+  //   queryKey: [
+  //     "modplatforms.unifiedSearch",
+  //     {
+  //       sortIndex: {
+  //         curseForge: "popularity" as const
+  //       },
+  //       sortOrder: "descending" as const,
+  //       searchQuery: null,
+  //       categories: null,
+  //       gameVersions: null,
+  //       modloaders: null,
+  //       pageSize: 15,
+  //       projectType: "modpack",
+  //       index: null,
+  //       searchApi: "curseforge"
+  //     }
+  //   ]
+  // }))
 
-  const popularModpacksMR = rspc.createQuery(() => ({
-    queryKey: [
-      "modplatforms.unifiedSearch",
-      {
-        sortIndex: {
-          modrinth: "relevance" as const
-        },
-        sortOrder: "descending" as const,
-        searchQuery: null,
-        categories: null,
-        gameVersions: null,
-        modloaders: null,
-        pageSize: 15,
-        projectType: "modpack",
-        index: null,
-        searchApi: "modrinth"
-      }
-    ]
-  }))
+  // const popularModpacksMR = rspc.createQuery(() => ({
+  //   queryKey: [
+  //     "modplatforms.unifiedSearch",
+  //     {
+  //       sortIndex: {
+  //         modrinth: "relevance" as const
+  //       },
+  //       sortOrder: "descending" as const,
+  //       searchQuery: null,
+  //       categories: null,
+  //       gameVersions: null,
+  //       modloaders: null,
+  //       pageSize: 15,
+  //       projectType: "modpack",
+  //       index: null,
+  //       searchApi: "modrinth"
+  //     }
+  //   ]
+  // }))
 
-  const popularCFQuery = {
-    sortIndex: {
-      curseForge: "popularity" as const
-    },
-    sortOrder: "descending" as const,
-    searchQuery: null,
-    categories: null,
-    gameVersions: null,
-    modloaders: null,
-    pageSize: 15,
-    projectType: null,
-    index: null,
-    searchApi: "curseforge" as const
-  }
+  // const popularCFQuery = {
+  //   sortIndex: {
+  //     curseForge: "popularity" as const
+  //   },
+  //   sortOrder: "descending" as const,
+  //   searchQuery: null,
+  //   categories: null,
+  //   gameVersions: null,
+  //   modloaders: null,
+  //   pageSize: 15,
+  //   projectType: null,
+  //   index: null,
+  //   searchApi: "curseforge" as const
+  // }
 
-  const popularCF = rspc.createQuery(() => ({
-    queryKey: ["modplatforms.unifiedSearch", popularCFQuery]
-  }))
+  // const popularCF = rspc.createQuery(() => ({
+  //   queryKey: ["modplatforms.unifiedSearch", popularCFQuery]
+  // }))
 
-  const popularMRQuery = {
-    sortIndex: {
-      modrinth: "relevance" as const
-    },
-    sortOrder: "descending" as const,
-    searchQuery: null,
-    categories: null,
-    gameVersions: null,
-    modloaders: null,
-    pageSize: 15,
-    projectType: null,
-    index: null,
-    searchApi: "modrinth" as const
-  }
+  // const popularMRQuery = {
+  //   sortIndex: {
+  //     modrinth: "relevance" as const
+  //   },
+  //   sortOrder: "descending" as const,
+  //   searchQuery: null,
+  //   categories: null,
+  //   gameVersions: null,
+  //   modloaders: null,
+  //   pageSize: 15,
+  //   projectType: null,
+  //   index: null,
+  //   searchApi: "modrinth" as const
+  // }
 
-  const popularMR = rspc.createQuery(() => ({
-    queryKey: ["modplatforms.unifiedSearch", popularMRQuery]
-  }))
+  // const popularMR = rspc.createQuery(() => ({
+  //   queryKey: ["modplatforms.unifiedSearch", popularMRQuery]
+  // }))
 
-  const recentlyUpdatedCFQuery = {
-    sortIndex: {
-      curseForge: "lastUpdated" as const
-    },
-    sortOrder: "descending" as const,
-    searchQuery: null,
-    categories: null,
-    gameVersions: null,
-    modloaders: null,
-    pageSize: 25,
-    projectType: null,
-    index: null,
-    searchApi: "curseforge" as const
-  }
+  // const recentlyUpdatedCFQuery = {
+  //   sortIndex: {
+  //     curseForge: "lastUpdated" as const
+  //   },
+  //   sortOrder: "descending" as const,
+  //   searchQuery: null,
+  //   categories: null,
+  //   gameVersions: null,
+  //   modloaders: null,
+  //   pageSize: 25,
+  //   projectType: null,
+  //   index: null,
+  //   searchApi: "curseforge" as const
+  // }
 
-  const recentlyUpdatedCF = rspc.createQuery(() => ({
-    queryKey: ["modplatforms.unifiedSearch", recentlyUpdatedCFQuery]
-  }))
+  // const recentlyUpdatedCF = rspc.createQuery(() => ({
+  //   queryKey: ["modplatforms.unifiedSearch", recentlyUpdatedCFQuery]
+  // }))
 
-  const recentlyUpdatedMRQuery = {
-    sortIndex: {
-      modrinth: "updated" as const
-    },
-    sortOrder: "descending" as const,
-    searchQuery: null,
-    categories: null,
-    gameVersions: null,
-    modloaders: null,
-    pageSize: 25,
-    projectType: null,
-    index: null,
-    searchApi: "modrinth" as const
-  }
+  // const recentlyUpdatedMRQuery = {
+  //   sortIndex: {
+  //     modrinth: "updated" as const
+  //   },
+  //   sortOrder: "descending" as const,
+  //   searchQuery: null,
+  //   categories: null,
+  //   gameVersions: null,
+  //   modloaders: null,
+  //   pageSize: 25,
+  //   projectType: null,
+  //   index: null,
+  //   searchApi: "modrinth" as const
+  // }
 
-  const recentlyUpdatedMR = rspc.createQuery(() => ({
-    queryKey: ["modplatforms.unifiedSearch", recentlyUpdatedMRQuery]
-  }))
+  // const recentlyUpdatedMR = rspc.createQuery(() => ({
+  //   queryKey: ["modplatforms.unifiedSearch", recentlyUpdatedMRQuery]
+  // }))
 
-  const recentlyUpdatedAllElements = () => {
-    const curseforge = recentlyUpdatedCF.data?.data ?? []
-    const modrinth = recentlyUpdatedMR.data?.data ?? []
-    return [...curseforge, ...modrinth].sort(
-      (a, b) =>
-        new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
-    )
-  }
+  // const recentlyUpdatedAllElements = () => {
+  //   const curseforge = recentlyUpdatedCF.data?.data ?? []
+  //   const modrinth = recentlyUpdatedMR.data?.data ?? []
+  //   return [...curseforge, ...modrinth].sort(
+  //     (a, b) =>
+  //       new Date(b.lastUpdated).getTime() - new Date(a.lastUpdated).getTime()
+  //   )
+  // }
 
-  const popularModpacks = () => {
-    const curseforge = popularModpacksCF.data?.data ?? []
-    const modrinth = popularModpacksMR.data?.data ?? []
+  // const popularModpacks = () => {
+  //   const curseforge = popularModpacksCF.data?.data ?? []
+  //   const modrinth = popularModpacksMR.data?.data ?? []
 
-    // Normalize download counts to account for platform differences
-    const normalizedModpacks = [
-      ...curseforge.map((pack) => ({
-        ...pack,
-        normalizedDownloads: pack.downloadsCount / 10 // Curseforge tends to have ~100x more downloads
-      })),
-      ...modrinth.map((pack) => ({
-        ...pack,
-        normalizedDownloads: pack.downloadsCount
-      }))
-    ]
+  //   // Normalize download counts to account for platform differences
+  //   const normalizedModpacks = [
+  //     ...curseforge.map((pack) => ({
+  //       ...pack,
+  //       normalizedDownloads: pack.downloadsCount / 10 // Curseforge tends to have ~100x more downloads
+  //     })),
+  //     ...modrinth.map((pack) => ({
+  //       ...pack,
+  //       normalizedDownloads: pack.downloadsCount
+  //     }))
+  //   ]
 
-    // Sort by normalized downloads and take top 15
-    return normalizedModpacks
-      .sort((a, b) => b.normalizedDownloads - a.normalizedDownloads)
-      .slice(0, 15)
-  }
+  //   // Sort by normalized downloads and take top 15
+  //   return normalizedModpacks
+  //     .sort((a, b) => b.normalizedDownloads - a.normalizedDownloads)
+  //     .slice(0, 15)
+  // }
 
-  onMount(() => {
-    requestAnimationFrame(() => {
-      const scrollContainer = document.getElementById("gdl-content-wrapper")
-      console.log(window.location)
-      restoreScrollPosition(scrollContainer)
-    })
-  })
+  // onMount(() => {
+  //   requestAnimationFrame(() => {
+  //     const scrollContainer = document.getElementById("gdl-content-wrapper")
+  //     console.log(window.location)
+  //     restoreScrollPosition(scrollContainer)
+  //   })
+  // })
 
   return (
     <div class="flex flex-col gap-8">

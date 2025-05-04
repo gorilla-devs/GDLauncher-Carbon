@@ -12,20 +12,19 @@ import {
 } from "@gd/ui"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
-import { FESearchAPI, FEUnifiedSearchType } from "@gd/core_module/bindings"
-import { For, Match, Switch, useContext } from "solid-js"
+import { For, Match, Switch } from "solid-js"
 import { rspc } from "@/utils/rspcClient"
 import { capitalize } from "@/utils/helpers"
 import { ModloaderIcon } from "@/utils/sidebar"
 import { useGlobalStore } from "./GlobalStoreContext"
-import { SearchInputContext } from "./NavSearchInput"
+import useSearchContext from "./SearchInputContext"
 
 interface DropdownProps {
   disabled?: boolean
 }
 
 export function SearchApiDropdown() {
-  const searchResults = useContext(SearchInputContext)
+  const searchResults = useSearchContext()
 
   return (
     <>
@@ -49,9 +48,8 @@ export function SearchApiDropdown() {
                   } else {
                     searchResults?.setSearchQuery((prev) => ({
                       ...prev,
-                      searchApi: value as FESearchAPI,
-                      sortIndex:
-                        value === "curseforge" ? "popularity" : "relevance"
+                      searchApi: value,
+                      sortIndex: "relevance"
                     }))
                   }
                 }}
@@ -72,60 +70,8 @@ export function SearchApiDropdown() {
   )
 }
 
-export function SearchProjectTypeDropdown(props: DropdownProps) {
-  const searchResults = useContext(SearchInputContext)
-  const projectTypes = rspc.createQuery(() => ({
-    queryKey: ["modplatforms.unifiedSearchProjectType"]
-  }))
-
-  return (
-    <DropdownMenuSub>
-      <DropdownMenuSubTrigger disabled={props.disabled}>
-        <div class="flex items-center gap-2">
-          Project Type
-          <div class="text-lightSlate-500 text-xs">
-            {searchResults?.searchQuery().projectType || "All"}
-          </div>
-        </div>
-      </DropdownMenuSubTrigger>
-      <DropdownMenuPortal>
-        <DropdownMenuSubContent>
-          <DropdownMenuRadioGroup
-            value={searchResults?.searchQuery().projectType ?? ""}
-          >
-            <For each={projectTypes.data?.filter((v) => v !== "unknown")}>
-              {(projectType) => (
-                <DropdownMenuRadioItem
-                  value={projectType}
-                  onSelect={() => {
-                    if (
-                      projectType === searchResults?.searchQuery().projectType
-                    ) {
-                      searchResults?.setSearchQuery((prev) => ({
-                        ...prev,
-                        projectType: null
-                      }))
-                    } else {
-                      searchResults?.setSearchQuery((prev) => ({
-                        ...prev,
-                        projectType: projectType as FEUnifiedSearchType
-                      }))
-                    }
-                  }}
-                >
-                  {projectType}
-                </DropdownMenuRadioItem>
-              )}
-            </For>
-          </DropdownMenuRadioGroup>
-        </DropdownMenuSubContent>
-      </DropdownMenuPortal>
-    </DropdownMenuSub>
-  )
-}
-
 export function SearchCategoryDropdown(props: DropdownProps) {
-  const searchResults = useContext(SearchInputContext)
+  const searchResults = useSearchContext()
   const categories = rspc.createQuery(() => ({
     queryKey: ["modplatforms.getUnifiedCategories"]
   }))
@@ -133,23 +79,31 @@ export function SearchCategoryDropdown(props: DropdownProps) {
   const curseforgeCategories = categories.data?.curseforge
   const modrinthCategories = categories.data?.modrinth
 
+  console.log(curseforgeCategories, modrinthCategories)
+
   const currentCategories = () => {
     const categories =
       searchResults?.searchQuery().searchApi === "curseforge"
         ? Object.values(curseforgeCategories ?? {})
-            ?.filter((v) => v.id === searchResults?.searchQuery().projectType)
+            ?.filter(
+              (v) => v.projectType === searchResults?.searchQuery().projectType
+            )
             .map((category) => ({
               label: category.name,
               value: category.id,
-              icon: <img src={category.icon.value ?? ""} class="h-4 w-4" />
+              icon: <img src={category.icon?.value ?? ""} class="h-4 w-4" />
             }))
         : Object.values(modrinthCategories ?? {})
-            ?.filter((v) => v.id === searchResults?.searchQuery().projectType)
+            ?.filter(
+              (v) => v.projectType === searchResults?.searchQuery().projectType
+            )
             .map((category) => ({
               label: category.name,
               value: category.id,
-              // eslint-disable-next-line solid/no-innerhtml
-              icon: <div class="h-4 w-4" innerHTML={category.icon.value} />
+              icon: (
+                // eslint-disable-next-line solid/no-innerhtml
+                <div class="h-4 w-4" innerHTML={category.icon?.value ?? ""} />
+              )
             }))
 
     return categories
@@ -169,31 +123,18 @@ export function SearchCategoryDropdown(props: DropdownProps) {
                   <DropdownMenuCheckboxItem
                     checked={searchResults
                       ?.searchQuery()
-                      .categories?.some((v) => {
-                        return v[0] === category.value
-                      })}
+                      .categories?.some((v) => v === category.value)}
                     onChange={(checked) => {
                       searchResults?.setSearchQuery((prev) => {
-                        if (!prev.categories) {
-                          prev.categories = []
-                        }
-                        if (checked) {
-                          prev.categories?.push([category.value])
-                        } else {
-                          prev.categories =
-                            prev.categories?.filter(
-                              (v) =>
-                                JSON.stringify(v[0]) !==
-                                JSON.stringify(category.value)
-                            ) ?? null
-                        }
-
                         return {
-                          ...prev
+                          ...prev,
+                          categories: checked
+                            ? [...(prev.categories || []), category.value]
+                            : (prev.categories || []).filter(
+                                (v) => v !== category.value
+                              )
                         }
                       })
-
-                      console.log(searchResults?.searchQuery().categories)
                     }}
                   >
                     <div class="flex items-center gap-2">
@@ -216,18 +157,10 @@ export function SearchCategoryDropdown(props: DropdownProps) {
 
 export function SearchModloaderDropdown(props: DropdownProps) {
   const globalStore = useGlobalStore()
-  const searchResults = useContext(SearchInputContext)
+  const searchResults = useSearchContext()
 
   const currentModloaders = () => {
-    if (searchResults?.searchQuery().searchApi === "curseforge") {
-      return globalStore.modloaders.data?.curseforge.map((modloader) => ({
-        label: capitalize(modloader),
-        value: modloader,
-        icon: <ModloaderIcon modloader={modloader} />
-      }))
-    }
-
-    return globalStore.modloaders.data?.modrinth.map((modloader) => ({
+    return globalStore.modloaders.data?.map((modloader) => ({
       label: capitalize(modloader),
       value: modloader,
       icon: <ModloaderIcon modloader={modloader} />
@@ -286,7 +219,7 @@ export function SearchModloaderDropdown(props: DropdownProps) {
 }
 
 export function SearchEnvironmentDropdown(props: DropdownProps) {
-  const searchResults = useContext(SearchInputContext)
+  const searchResults = useSearchContext()
 
   return (
     <DropdownMenuSub>
@@ -337,7 +270,7 @@ export function SearchEnvironmentDropdown(props: DropdownProps) {
 }
 
 export function SearchSortIndexDropdown(props: DropdownProps) {
-  const searchResults = useContext(SearchInputContext)
+  const searchResults = useSearchContext()
 
   return (
     <DropdownMenuSub>
@@ -375,7 +308,7 @@ export function SearchSortIndexDropdown(props: DropdownProps) {
 }
 
 export function SearchSortOrderDropdown(props: DropdownProps) {
-  const searchResults = useContext(SearchInputContext)
+  const searchResults = useSearchContext()
 
   return (
     <DropdownMenuSub>
@@ -445,7 +378,7 @@ export function SearchGameVersionDropdown(props: DropdownProps) {
 }
 
 export function SearchViewModeDropdown(props: DropdownProps) {
-  const searchResults = useContext(SearchInputContext)
+  const searchResults = useSearchContext()
 
   return (
     <DropdownMenuSub>

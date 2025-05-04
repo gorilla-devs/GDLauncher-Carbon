@@ -4,7 +4,15 @@ import {
   ImportableInstance,
   InvalidImportEntry
 } from "@gd/core_module/bindings"
-import { Button, Checkbox, Input, Spinner, Tooltip } from "@gd/ui"
+import {
+  Button,
+  Checkbox,
+  Input,
+  Spinner,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from "@gd/ui"
 import {
   For,
   Match,
@@ -147,12 +155,12 @@ const SingleEntity = (props: {
 
   return (
     <>
-      <div class="flex-1 w-full flex flex-col items-center justify-center p-4">
-        <div class="flex flex-col items-start w-full gap-2 justify-start">
+      <div class="flex w-full flex-1 flex-col items-center justify-center p-4">
+        <div class="flex w-full flex-col items-start justify-start gap-2">
           <span class="font-bold">
             {props.entity.entity} <Trans key="instance.import_path" />:
           </span>
-          <div class="flex items-center w-full gap-2">
+          <div class="flex w-full items-center gap-2">
             <Input
               value={path()}
               onInput={(e) => {
@@ -176,82 +184,97 @@ const SingleEntity = (props: {
             />
             <div class="flex gap-2">
               <Show when={entityDefaultPath.data}>
-                <Tooltip content={<Trans key="tooltip.reset" />}>
-                  <div class="flex items-center justify-center p-2 bg-darkSlate-800 rounded-lg text-lightSlate-700 hover:text-lightSlate-50">
-                    <div
-                      onClick={async () => {
-                        setPath(entityDefaultPath.data!)
-                      }}
-                      class="text-xl i-ri:arrow-go-back-fill"
-                    />
-                  </div>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <div class="bg-darkSlate-800 text-lightSlate-700 hover:text-lightSlate-50 flex items-center justify-center rounded-lg p-2">
+                      <div
+                        onClick={async () => {
+                          setPath(entityDefaultPath.data!)
+                        }}
+                        class="i-ri:arrow-go-back-fill text-xl"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <Trans key="tooltip.reset" />
+                  </TooltipContent>
                 </Tooltip>
               </Show>
               <Show when={props.entity.selection_type === "directory"}>
-                <Tooltip content={<Trans key="instance.select_path" />}>
-                  <div class="flex items-center justify-center p-2 bg-darkSlate-800 rounded-lg text-lightSlate-700 hover:text-lightSlate-50">
-                    <div
-                      onClick={async () => {
-                        const result = await window.openFileDialog({
-                          title: t("instance.select_path"),
-                          defaultPath: path() || "",
-                          properties: ["openFile", "openDirectory"]
-                        })
+                <Tooltip>
+                  <TooltipTrigger>
+                    <div class="bg-darkSlate-800 text-lightSlate-700 hover:text-lightSlate-50 flex items-center justify-center rounded-lg p-2">
+                      <div
+                        onClick={async () => {
+                          const result = await window.openFileDialog({
+                            title: t("instance.select_path"),
+                            defaultPath: path() || "",
+                            properties: ["openFile", "openDirectory"]
+                          })
 
-                        if (result.canceled) {
-                          return
-                        }
+                          if (result.canceled) {
+                            return
+                          }
 
-                        setPath(result.filePaths[0])
-                      }}
-                      class="text-xl i-ri:folder-line"
-                    />
-                  </div>
+                          setPath(result.filePaths[0])
+                        }}
+                        class="i-ri:folder-line text-xl"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <Trans key="instance.select_path" />
+                  </TooltipContent>
                 </Tooltip>
               </Show>
               <Show when={props.entity.selection_type === "file"}>
-                <Tooltip content={<Trans key="instance.select_zip" />}>
-                  <div class="flex items-center justify-center p-2 bg-darkSlate-800 rounded-lg text-lightSlate-700 hover:text-lightSlate-50">
-                    <div
-                      onClick={async () => {
-                        const result = await window.openFileDialog({
-                          title: t("instance.select_zip"),
-                          defaultPath: path() || "",
-                          properties: ["openFile"],
-                          filters: [
-                            {
-                              name: "ZIP Files",
-                              extensions:
-                                props.entity.entity === "CurseForgeZip"
-                                  ? ["zip"]
-                                  : ["mrpack"]
-                            },
-                            { name: "All Files", extensions: ["*"] }
-                          ]
-                        })
+                <Tooltip>
+                  <TooltipTrigger>
+                    <div class="bg-darkSlate-800 text-lightSlate-700 hover:text-lightSlate-50 flex items-center justify-center rounded-lg p-2">
+                      <div
+                        onClick={async () => {
+                          const result = await window.openFileDialog({
+                            title: t("instance.select_zip"),
+                            defaultPath: path() || "",
+                            properties: ["openFile"],
+                            filters: [
+                              {
+                                name: "ZIP Files",
+                                extensions:
+                                  props.entity.entity === "CurseForgeZip"
+                                    ? ["zip"]
+                                    : ["mrpack"]
+                              },
+                              { name: "All Files", extensions: ["*"] }
+                            ]
+                          })
 
-                        if (result.canceled) {
-                          return
-                        }
+                          if (result.canceled) {
+                            return
+                          }
 
-                        setPath(result.filePaths[0])
-                      }}
-                      class="text-xl i-ri:file-zip-line"
-                    />
-                  </div>
+                          setPath(result.filePaths[0])
+                        }}
+                        class="i-ri:file-zip-line text-xl"
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <Trans key="instance.select_zip" />
+                  </TooltipContent>
                 </Tooltip>
               </Show>
             </div>
           </div>
         </div>
-        <div class="flex-1 w-full flex items-start justify-start mt-2 py-2 rounded-md bg-[#1D2028]">
+        <div class="mt-2 flex w-full flex-1 items-start justify-start rounded-md bg-[#1D2028] py-2">
           <Switch>
             <Match when={step() === "selectionStep"}>
               <Switch
                 fallback={
                   <>
                     <Show when={importScanStatus.data?.scanning}>
-                      <div class="w-full h-full flex items-center justify-center">
+                      <div class="flex h-full w-full items-center justify-center">
                         <Spinner />
                       </div>
                     </Show>
@@ -261,7 +284,7 @@ const SingleEntity = (props: {
                         !importScanStatus.data?.scanning
                       }
                     >
-                      <div class="w-full h-full flex items-center justify-center">
+                      <div class="flex h-full w-full items-center justify-center">
                         <p class="text-xl text-gray-500">
                           {path()
                             ? t("instance.no_instance_found")
@@ -273,7 +296,7 @@ const SingleEntity = (props: {
                 }
               >
                 <Match when={typeof instance.multiResult !== "undefined"}>
-                  <div class="h-full p-2 w-full flex flex-col gap-4">
+                  <div class="flex h-full w-full flex-col gap-4 p-2">
                     <Checkbox
                       children={
                         <span class="text-sm text-[#8A8B8F]">
@@ -298,7 +321,7 @@ const SingleEntity = (props: {
                         }
                       }}
                     />
-                    <div class="w-full h-[240px] overflow-y-auto flex flex-col gap-2">
+                    <div class="flex h-[240px] w-full flex-col gap-2 overflow-y-auto">
                       <For each={instance.multiResult}>
                         {(entry) => (
                           <SingleCheckBox
@@ -325,8 +348,8 @@ const SingleEntity = (props: {
                   </For>
                 </Match>
                 <Match when={instance.isLoading === true}>
-                  <div class="w-full h-full flex items-center justify-center">
-                    <div class="animate-spin w-10 h-10 i-formkit:spinner text-sky-800" />
+                  <div class="flex h-full w-full items-center justify-center">
+                    <div class="i-formkit:spinner h-10 w-10 animate-spin text-sky-800" />
                   </div>
                 </Match>
               </Switch>
@@ -337,7 +360,7 @@ const SingleEntity = (props: {
           </Switch>
         </div>
       </div>
-      <div class="w-full flex justify-between items-center pt-6">
+      <div class="flex w-full items-center justify-between pt-6">
         <Button
           type="secondary"
           onClick={() => {

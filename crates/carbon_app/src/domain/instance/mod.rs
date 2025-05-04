@@ -33,6 +33,7 @@ pub struct GameLogEntry {
 }
 
 pub struct InstanceDetails {
+    pub id: InstanceId,
     pub favorite: bool,
     pub name: String,
     pub version: Option<String>,

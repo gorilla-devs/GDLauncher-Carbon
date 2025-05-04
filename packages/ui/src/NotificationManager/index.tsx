@@ -9,7 +9,7 @@ import {
   Match
 } from "solid-js"
 import { createStore, produce } from "solid-js/store"
-import { Tooltip } from "../Tooltip"
+import { Tooltip, TooltipContent, TooltipTrigger } from "../Tooltip"
 import { Portal } from "solid-js/web"
 
 export type NotificationType = "success" | "warning" | "error"
@@ -226,7 +226,7 @@ const NotificationsProvider = (props: Props) => {
           <For each={Object.values(notifications)}>
             {(notification) => (
               <div
-                class="relative w-100 h-26 min-h-26 items-center bg-darkSlate-900 flex justify-between px-4 py-4 text-lightSlate-50 rounded-lg shadow-md shadow-darkSlate-900"
+                class="w-100 h-26 min-h-26 bg-darkSlate-900 text-lightSlate-50 shadow-darkSlate-900 relative flex items-center justify-between rounded-lg px-4 py-4 shadow-md"
                 style={{
                   transition: "all 0.3s ease-in-out",
                   animation: `.2s ease-in-out ${
@@ -238,7 +238,7 @@ const NotificationsProvider = (props: Props) => {
                 }}
               >
                 <div
-                  class="absolute top-0 left-0 h-1 w-full"
+                  class="absolute left-0 top-0 h-1 w-full"
                   classList={{
                     "bg-red-400": notification.type === "error",
                     "bg-yellow-400": notification.type === "warning",
@@ -254,7 +254,7 @@ const NotificationsProvider = (props: Props) => {
                 />
 
                 <div
-                  class="absolute left-4 top-4 w-6 h-6 text-darkSlate-300 hover:text-lightSlate-100 duration-100 ease-in-out"
+                  class="text-darkSlate-300 hover:text-lightSlate-100 absolute left-4 top-4 h-6 w-6 duration-100 ease-in-out"
                   classList={{
                     "i-ri:arrow-up-s-line": !notification.expanded,
                     "i-ri:arrow-down-s-line": notification.expanded
@@ -274,74 +274,79 @@ const NotificationsProvider = (props: Props) => {
                       notification.type === "warning"
                     }
                   >
-                    <div class="min-w-6 w-6 h-6 i-ri:error-warning-fill text-red-400" />
+                    <div class="i-ri:error-warning-fill h-6 w-6 min-w-6 text-red-400" />
                   </Match>
                   <Match when={notification.type === "success"}>
-                    <div class="min-w-6 w-6 h-6 i-ri:check-fill text-green-400" />
+                    <div class="i-ri:check-fill h-6 w-6 min-w-6 text-green-400" />
                   </Match>
                 </Switch>
-                <div class="w-auto h-full overflow-y-auto m-4 text-left">
-                  <div class="font-bold text-xl pb-2">{notification.name}</div>
+                <div class="m-4 h-full w-auto overflow-y-auto text-left">
+                  <div class="pb-2 text-xl font-bold">{notification.name}</div>
                   <div class="text-md">
                     {notification.content || notification.name}
                   </div>
                 </div>
-                <div class="h-full flex flex-row gap-4">
-                  <div class="min-w-[1px] w-[1px] h-full bg-darkSlate-700" />
+                <div class="flex h-full flex-row gap-4">
+                  <div class="bg-darkSlate-700 h-full w-[1px] min-w-[1px]" />
                   <div class="flex flex-col justify-between">
                     <div
-                      class="w-6 h-6 text-darkSlate-300 i-ri:close-fill hover:text-lightSlate-100 duration-100 ease-in-out"
+                      class="text-darkSlate-300 i-ri:close-fill hover:text-lightSlate-100 h-6 w-6 duration-100 ease-in-out"
                       onClick={() => {
                         removeNotification(notification.id)
                       }}
                     />
-                    <Tooltip content={"Copy"}>
-                      <div
-                        class="w-6 h-6"
-                        classList={{
-                          "text-darkSlate-300 hover:text-lightSlate-100 duration-100 ease-in-out i-ri:file-copy-2-fill":
-                            !notification.copied,
-                          "text-green-400 i-ri:checkbox-circle-fill":
-                            notification.copied
-                        }}
-                        onClick={() => {
-                          navigator.clipboard
-                            .writeText(notification.name || "")
-                            .catch(console.error)
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <div
+                          class="h-6 w-6"
+                          classList={{
+                            "text-darkSlate-300 hover:text-lightSlate-100 duration-100 ease-in-out i-ri:file-copy-2-fill":
+                              !notification.copied,
+                            "text-green-400 i-ri:checkbox-circle-fill":
+                              notification.copied
+                          }}
+                          onClick={() => {
+                            navigator.clipboard
+                              .writeText(notification.name || "")
+                              .catch(console.error)
 
-                          setNotifications(notification.id, "copied", true)
+                            setNotifications(notification.id, "copied", true)
 
-                          for (const notification of Object.values(
-                            notifications
-                          )) {
-                            if (notification.remainingDuration > 0) {
-                              pauseTimer(notification)
-                            }
-                          }
-
-                          setTimeout(() => {
-                            setNotifications(notification.id, "copied", false)
-
-                            const areAllValid = Object.values(
+                            for (const notification of Object.values(
                               notifications
-                            ).every((notification) => !notification.copied)
-
-                            if (
-                              areAllValid &&
-                              !isHovering() &&
-                              windowFocused()
-                            ) {
-                              for (const notification of Object.values(
-                                notifications
-                              )) {
-                                if (notification.remainingDuration > 0) {
-                                  resumeTimer(notification)
-                                }
+                            )) {
+                              if (notification.remainingDuration > 0) {
+                                pauseTimer(notification)
                               }
                             }
-                          }, 2000)
-                        }}
-                      />
+
+                            setTimeout(() => {
+                              setNotifications(notification.id, "copied", false)
+
+                              const areAllValid = Object.values(
+                                notifications
+                              ).every((notification) => !notification.copied)
+
+                              if (
+                                areAllValid &&
+                                !isHovering() &&
+                                windowFocused()
+                              ) {
+                                for (const notification of Object.values(
+                                  notifications
+                                )) {
+                                  if (notification.remainingDuration > 0) {
+                                    resumeTimer(notification)
+                                  }
+                                }
+                              }
+                            }, 2000)
+                          }}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Copy</p>
+                      </TooltipContent>
                     </Tooltip>
                   </div>
                 </div>

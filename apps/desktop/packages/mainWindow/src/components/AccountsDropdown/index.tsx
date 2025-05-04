@@ -121,11 +121,13 @@ export const AccountsDropdown = (props: Props) => {
     >
       <PopoverTrigger>
         <div
-          class="hover:bg-darkSlate-700 rounded-lg p-4 transition-all duration-100 ease-in-out"
+          class="group relative rounded-lg p-4 transition-all duration-100 ease-in-out"
           classList={{
             "bg-darkSlate-700": showAccountsDropdown()
           }}
         >
+          <div class="bg-darkSlate-700 -z-1 absolute left-0 top-0 h-full w-full scale-75 rounded-md opacity-0 transition-[transform,opacity] duration-150 ease-[cubic-bezier(.4,0,.2,1)] group-hover:scale-100 group-hover:opacity-100" />
+
           <div class="flex items-center gap-4">
             <img
               src={`http://127.0.0.1:${port}/account/headImage?uuid=${

@@ -1,0 +1,123 @@
+import { useGDNavigate } from "@/managers/NavigationManager"
+import { rspc } from "@/utils/rspcClient"
+import { FEUnifiedSearchResult, Modpack } from "@gd/core_module/bindings"
+import { Trans } from "@gd/i18n"
+import { Button, createNotification, Spinner } from "@gd/ui"
+import { Show, createSignal, getOwner, runWithOwner } from "solid-js"
+
+interface ModDownloadButtonProps {
+  fileId?: number | string
+  addon: FEUnifiedSearchResult
+}
+
+const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
+  const owner = getOwner()
+  const [loading, setLoading] = createSignal(false)
+
+  const navigator = useGDNavigate()
+  const addNotification = createNotification()
+
+  const prepareInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.prepareInstance"],
+    async onSuccess() {
+      setLoading(false)
+      addNotification({
+        name: "Instance successfully created.",
+        type: "success"
+      })
+
+      navigator.navigate(`/library`)
+    },
+    onError() {
+      setLoading(false)
+      addNotification({
+        name: "Error while creating the instance.",
+        type: "error"
+      })
+    }
+  }))
+
+  const loadIconMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.loadIconUrl"]
+  }))
+
+  const createInstanceMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.createInstance"],
+    onSuccess(instanceId) {
+      setLoading(true)
+      prepareInstanceMutation.mutate(instanceId)
+    },
+    onError() {
+      setLoading(false)
+      addNotification({
+        name: "Error while downloading the modpack.",
+        type: "error"
+      })
+    }
+  }))
+
+  const instanceCreationObj = (
+    fileId?: number | string,
+    projectId?: number | string
+  ) => {
+    if (!props.addon.mainFileId) {
+      throw new Error("No main file ID found")
+    }
+
+    const request =
+      props.addon.platform === "curseforge"
+        ? ({
+            type: "curseforge",
+            value: {
+              file_id:
+                (fileId as number) || Number.parseInt(props.addon.mainFileId),
+              project_id:
+                (projectId as number) || Number.parseInt(props.addon.id)
+            }
+          } satisfies Modpack)
+        : ({
+            type: "modrinth",
+            value: {
+              project_id: projectId?.toString() || props.addon.id,
+              version_id: fileId?.toString()! || props.addon.mainFileId
+            }
+          } satisfies Modpack)
+
+    return request
+  }
+
+  function handleDownload() {
+    runWithOwner(owner, async () => {
+      setLoading(true)
+
+      const imgUrl = props.addon.imageUrl
+      if (imgUrl) loadIconMutation.mutate(imgUrl)
+
+      const request = {
+        use_loaded_icon: true,
+        notes: "",
+        name: props.addon.title,
+        version: {
+          Modpack: instanceCreationObj()
+        }
+      }
+
+      createInstanceMutation.mutate(request)
+    })
+  }
+
+  return (
+    <div class="relative">
+      <Button disabled={loading()} onClick={handleDownload}>
+        <Show when={loading()}>
+          <Spinner />
+        </Show>
+        <Show when={!loading()}>
+          <Trans key="instance.download" />
+        </Show>
+      </Button>
+    </div>
+  )
+}
+
+export default ModpackDownloadButton

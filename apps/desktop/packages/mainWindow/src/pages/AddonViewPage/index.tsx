@@ -18,16 +18,17 @@ import {
   useSearchParams
 } from "@solidjs/router"
 import { For, Match, Show, Switch, createSignal } from "solid-js"
-import fetchData from "./mods.overview"
 import { format } from "date-fns"
 import Authors from "@/pages/Library/Instance/Info/Authors"
 import ExploreVersionsNavbar from "@/components/ExploreVersionsNavbar"
+
+import ModDownloadButton from "@/components/ModDownloadButton"
+import ContentWrapper from "@/components/ContentWrapper"
 import InfiniteScrollVersionsQueryWrapper, {
   useInfiniteVersionsQuery
 } from "@/components/InfiniteScrollVersionsQueryWrapper"
-import ModDownloadButton from "@/components/ModDownloadButton"
 import { rspc } from "@/utils/rspcClient"
-import ContentWrapper from "@/components/ContentWrapper"
+import { FEUnifiedPlatform } from "@gd/core_module/bindings"
 
 const getTabIndexFromPath = (path: string) => {
   if (path.match(/\/(addon)\/.+\/.+/g)) {
@@ -47,12 +48,11 @@ const getTabIndexFromPath = (path: string) => {
 
 const ModsInfiniteScrollQueryWrapper = () => {
   const params = useParams()
-  const routeData: ReturnType<typeof fetchData> = useRouteData()
-
+  const platform = () => params.platform as FEUnifiedPlatform
   return (
     <InfiniteScrollVersionsQueryWrapper
       modId={params.id}
-      modplatform={routeData.isCurseforge ? "curseforge" : "modrinth"}
+      modplatform={platform()}
     >
       <ContentWrapper zeroPadding>
         <ModExplore />
@@ -64,23 +64,29 @@ const ModsInfiniteScrollQueryWrapper = () => {
 const ModExplore = () => {
   const navigator = useGDNavigate()
   const params = useParams()
-  const routeData: ReturnType<typeof fetchData> = useRouteData()
+  const platform = () => params.platform as FEUnifiedPlatform
   const infiniteQuery = useInfiniteVersionsQuery()
-
+  const [searchParams] = useSearchParams()
   const location = useLocation()
   const indexTab = () => getTabIndexFromPath(location.pathname)
 
-  const [searchParams] = useSearchParams()
-
+  const project = rspc.createQuery(() => ({
+    queryKey: [
+      "modplatforms.unifiedGetProject",
+      platform() === "curseforge"
+        ? {
+            type: "curseforge",
+            value: parseInt(params.id, 10)
+          }
+        : {
+            type: "modrinth",
+            value: params.id
+          }
+    ]
+  }))
   const instanceId = () => parseInt(searchParams.instanceId, 10)
-
-  const instanceDetails = rspc.createQuery(() => ({
-    queryKey: ["instance.getInstanceDetails", instanceId()]
-  }))
-
-  const instanceMods = rspc.createQuery(() => ({
-    queryKey: ["instance.getInstanceMods", instanceId()]
-  }))
+  const isFetching = () => project.isLoading
+  const projectId = () => project.data?.id
 
   const instancePages = () => [
     {
@@ -104,13 +110,6 @@ const ModExplore = () => {
   let refStickyTabs: HTMLDivElement
   const [isSticky, setIsSticky] = createSignal(false)
 
-  const isFetching = () => routeData.modpackDetails?.isLoading
-
-  const projectId = () =>
-    routeData.isCurseforge
-      ? routeData.modpackDetails.data?.data.id
-      : routeData.modpackDetails.data?.id
-
   return (
     <div
       class="bg-darkSlate-800 relative h-full max-h-full"
@@ -131,11 +130,7 @@ const ModExplore = () => {
           <div
             class="absolute left-0 right-0 top-0 z-10 h-full bg-cover bg-fixed bg-center bg-no-repeat"
             style={{
-              "background-image": `url("${
-                routeData.isCurseforge
-                  ? routeData.modpackDetails.data?.data.logo?.thumbnailUrl
-                  : routeData.modpackDetails.data?.icon_url
-              }")`,
+              "background-image": `url("${project.data?.imageUrl}")`,
               "background-position": "right-5rem"
             }}
           />
@@ -155,15 +150,15 @@ const ModExplore = () => {
                   size="small"
                   type="transparent"
                   onClick={() => {
-                    if (routeData.isCurseforge) {
-                      window.openExternalLink(
-                        `https://www.curseforge.com/minecraft/mc-mods/${routeData.modpackDetails.data?.data.slug}`
-                      )
+                    let baseUrl = ""
+
+                    if (platform() === "curseforge") {
+                      baseUrl = "https://www.curseforge.com/minecraft/mc-mods/"
                     } else {
-                      window.openExternalLink(
-                        `https://modrinth.com/mod/${routeData.modpackDetails.data?.slug}`
-                      )
+                      baseUrl = "https://modrinth.com/mod/"
                     }
+
+                    window.openExternalLink(`${baseUrl}${project.data?.slug}`)
                   }}
                 >
                   <div class="i-ri:external-link-line text-xl" />
@@ -179,22 +174,14 @@ const ModExplore = () => {
               <div
                 class="bg-darkSlate-800 h-16 w-16 rounded-xl bg-cover bg-center"
                 style={{
-                  "background-image": `url("${
-                    routeData.isCurseforge
-                      ? routeData.modpackDetails.data?.data.logo?.thumbnailUrl
-                      : routeData.modpackDetails.data?.icon_url
-                  }")`
+                  "background-image": `url("${project.data?.imageUrl}")`
                 }}
               />
               <div class="flex flex-1 flex-col">
                 <div class="flex cursor-pointer items-center gap-4">
                   <Switch>
                     <Match when={!isFetching()}>
-                      <h1 class="m-0 h-9">
-                        {routeData.isCurseforge
-                          ? routeData.modpackDetails.data?.data.name
-                          : routeData.modpackDetails.data?.title}
-                      </h1>
+                      <h1 class="m-0 h-9">{project.data?.title}</h1>
                     </Match>
                     <Match when={isFetching()}>
                       <div class="h-9 w-full">
@@ -208,10 +195,7 @@ const ModExplore = () => {
                     <div class="border-darkSlate-500 border-0 p-0 lg:border-r-2 lg:pr-2">
                       <Switch>
                         <Match when={!isFetching()}>
-                          {routeData.isCurseforge
-                            ? routeData.modpackDetails.data?.data
-                                .latestFilesIndexes[0].gameVersion
-                            : routeData.modpackDetails.data?.game_versions[0]}
+                          {project.data?.minecraftVersions[0]}
                         </Match>
                         <Match when={isFetching()}>
                           <Skeleton />
@@ -222,21 +206,9 @@ const ModExplore = () => {
                       <div class="i-ri:time-fill" />
                       <Switch>
                         <Match when={!isFetching()}>
-                          <Show
-                            when={
-                              routeData.isCurseforge
-                                ? routeData.modpackDetails.data?.data
-                                    .dateCreated
-                                : routeData.modpackDetails.data?.published
-                            }
-                          >
+                          <Show when={project.data?.releaseDate}>
                             {format(
-                              new Date(
-                                routeData.isCurseforge
-                                  ? routeData.modpackDetails.data?.data
-                                      .dateCreated!
-                                  : routeData.modpackDetails.data?.published!
-                              ).getTime(),
+                              new Date(project.data?.releaseDate!).getTime(),
                               "P"
                             )}
                           </Show>
@@ -264,14 +236,7 @@ const ModExplore = () => {
                     </div>
                   </div>
                   <div class="mt-2 flex items-center gap-2 lg:mt-0">
-                    <ModDownloadButton
-                      size="large"
-                      projectId={projectId()}
-                      isCurseforge={routeData.isCurseforge}
-                      instanceId={instanceId()}
-                      instanceLocked={instanceDetails.data?.modpack?.locked}
-                      instanceMods={instanceMods.data || undefined}
-                    />
+                    <ModDownloadButton addon={project.data} />
                   </div>
                 </div>
               </div>
@@ -324,23 +289,11 @@ const ModExplore = () => {
                   </div>
                 </Tabs>
                 <Show when={isSticky()}>
-                  <ModDownloadButton
-                    size="small"
-                    projectId={projectId()}
-                    isCurseforge={routeData.isCurseforge}
-                    instanceId={instanceId()}
-                    instanceLocked={instanceDetails.data?.modpack?.locked}
-                    instanceMods={instanceMods.data || undefined}
-                  />
+                  <ModDownloadButton />
                 </Show>
               </div>
               <Show when={indexTab() === 3}>
-                <ExploreVersionsNavbar
-                  modplatform={
-                    routeData.isCurseforge ? "curseforge" : "modrinth"
-                  }
-                  type="mod"
-                />
+                <ExploreVersionsNavbar modplatform={platform()} type="mod" />
               </Show>
             </div>
             <div class="z-0">

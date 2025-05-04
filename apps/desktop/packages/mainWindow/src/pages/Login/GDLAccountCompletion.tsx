@@ -1,7 +1,7 @@
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { convertSecondsToHumanTime } from "@/utils/helpers"
 import { Trans, useTransContext } from "@gd/i18n"
-import { Input, Tooltip } from "@gd/ui"
+import { Input, Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
 import { Show } from "solid-js"
 
 interface Props {
@@ -36,13 +36,18 @@ const GDLAccountCompletion = (props: Props) => {
   }
 
   return (
-    <div class="flex-1 w-full flex flex-col justify-between items-center text-center gap-5 p-10">
-      <div class="flex flex-col w-full gap-4">
-        <div class="text-lg flex items-center gap-2">
+    <div class="flex w-full flex-1 flex-col items-center justify-between gap-5 p-10 text-center">
+      <div class="flex w-full flex-col gap-4">
+        <div class="flex items-center gap-2 text-lg">
           <Trans key="login.enter_your_recovery_email" />
 
-          <Tooltip content={<Trans key="login.recovery_email_description" />}>
-            <div class="i-ri:information-fill w-4 h-4" />
+          <Tooltip>
+            <TooltipTrigger>
+              <div class="i-ri:information-fill h-4 w-4" />
+            </TooltipTrigger>
+            <TooltipContent>
+              <Trans key="login.recovery_email_description" />
+            </TooltipContent>
           </Tooltip>
         </div>
         <Input
@@ -55,7 +60,7 @@ const GDLAccountCompletion = (props: Props) => {
           }}
         />
         <Show when={props.cooldown}>
-          <div class="text-sm text-lightSlate-500">
+          <div class="text-lightSlate-500 text-sm">
             <Trans
               key="login.new_email_request_wait"
               options={{
@@ -65,10 +70,15 @@ const GDLAccountCompletion = (props: Props) => {
           </div>
         </Show>
 
-        <div class="text-lg flex items-center gap-2">
+        <div class="flex items-center gap-2 text-lg">
           <Trans key="login.enter_your_nickname" />
-          <Tooltip content={<Trans key="login.nickname_description" />}>
-            <div class="i-ri:information-fill w-4 h-4" />
+          <Tooltip>
+            <TooltipTrigger>
+              <div class="i-ri:information-fill h-4 w-4" />
+            </TooltipTrigger>
+            <TooltipContent>
+              <Trans key="login.nickname_description" />
+            </TooltipContent>
           </Tooltip>
         </div>
         <Input

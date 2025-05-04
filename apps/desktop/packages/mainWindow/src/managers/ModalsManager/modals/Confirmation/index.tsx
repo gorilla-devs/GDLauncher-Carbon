@@ -4,7 +4,7 @@ import ModalLayout from "../../ModalLayout"
 import { Show } from "solid-js"
 import { useTransContext } from "@gd/i18n"
 import { queryClient, rspc } from "@/utils/rspcClient"
-import { instanceId } from "@/utils/browser"
+import useSearchContext from "@/components/SearchInputContext"
 
 // const [instanceState, setInstanceState] = createSignal<"unlock" | "unpair">(
 //   "unlock"
@@ -14,6 +14,7 @@ interface Props {
   instanceState: "unlock" | "unpair"
 }
 const Confirmation = (props: ModalProps) => {
+  const searchContext = useSearchContext()
   const data: () => Props = () => props.data
   const modalContext = useModal()
   const [t] = useTransContext()
@@ -52,14 +53,14 @@ const Confirmation = (props: ModalProps) => {
                   modpackLocked: {
                     Set: false
                   },
-                  instance: instanceId()!
+                  instance: searchContext?.selectedInstance.data?.id!
                 })
               } else {
                 updateInstanceMutation.mutate({
                   modpackLocked: {
                     Set: null
                   },
-                  instance: instanceId()!
+                  instance: searchContext?.selectedInstance.data?.id!
                 })
               }
               modalContext?.closeModal()

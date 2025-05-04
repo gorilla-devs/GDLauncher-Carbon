@@ -42,7 +42,6 @@ import { useModal } from "@/managers/ModalsManager"
 import { convertSecondsToHumanTime } from "@/utils/helpers"
 import Authors from "./Info/Authors"
 import { getModloaderIcon } from "@/utils/sidebar"
-import { setInstanceId } from "@/utils/browser"
 import { getInstanceIdFromPath } from "@/utils/routes"
 import {
   setPayload,
@@ -51,6 +50,7 @@ import {
 import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/atoms/ExportCheckboxParent"
 import { isFullScreen } from "./Tabs/Log"
 import FeatureStatusBadge from "@/components/FeatureStatusBadge"
+import useSearchContext from "@/components/SearchInputContext"
 
 interface InstancePage {
   label: string | JSX.Element
@@ -59,6 +59,7 @@ interface InstancePage {
 
 const Instance = () => {
   const navigator = useGDNavigate()
+  const searchContext = useSearchContext()
   const params = useParams()
   const rspcContext = rspc.useContext()
   const location = useLocation()
@@ -365,14 +366,14 @@ const Instance = () => {
       label: t("instance.export_instance"),
       action: () => {
         const instanceId = getInstanceIdFromPath(location.pathname)
-        setInstanceId(parseInt(instanceId!, 10))
+        searchContext?.setSelectedInstanceId(parseInt(instanceId!, 10))
 
         setPayload({
           target: "Curseforge",
           save_path: undefined,
           self_contained_addons_bundling: false,
           filter: { entries: {} },
-          instance_id: parseInt(instanceId!, 10)
+          instance_id: searchContext?.selectedInstance.data?.id!
         })
         setCheckedFiles([])
         setExportStep(0)
@@ -439,11 +440,11 @@ const Instance = () => {
           </div>
           <div class="absolute right-5 top-5 z-50 flex w-fit gap-2">
             <DropdownMenu placement="bottom-end">
-              <DropdownMenuTrigger class="p-0 b-0 bg-transparent">
+              <DropdownMenuTrigger class="b-0 bg-transparent p-0">
                 <Button
                   as="div"
                   rounded
-                  class="w-full h-full"
+                  class="h-full w-full"
                   size="small"
                   type="transparent"
                 >

@@ -1,4 +1,3 @@
-import { instanceId } from "@/utils/browser"
 import { rspc } from "@/utils/rspcClient"
 import { Checkbox } from "@gd/ui"
 import { createEffect, createSignal, For, Match, Show, Switch } from "solid-js"
@@ -8,6 +7,7 @@ import {
   setCheckedFiles
 } from "./ExportCheckboxParent"
 import _ from "lodash"
+import useSearchContext from "@/components/SearchInputContext"
 
 interface FileFolder {
   name?: string
@@ -66,13 +66,14 @@ const ExportCheckbox = (props: { folder: FileFolder; initialData: any }) => {
   const [isOpen, setIsOpen] = createSignal(false)
   const [contents, setContents] = createSignal<any[]>([])
   const rspcContext = rspc.useContext()
+  const searchContext = useSearchContext()
 
   createEffect(async () => {
     if (!isOpen() && contents().length === 0) {
       const res = await rspcContext.client.query([
         "instance.explore",
         {
-          instance_id: instanceId()!,
+          instance_id: searchContext?.selectedInstance.data?.id!,
           path: props.folder.path!
         }
       ])
@@ -162,7 +163,7 @@ const ExportCheckbox = (props: { folder: FileFolder; initialData: any }) => {
           </For> */}
           <For each={props.initialData || contents()}>
             {(item) => (
-              <div class="flex justify-between items-center flex-row">
+              <div class="flex flex-row items-center justify-between">
                 <Switch>
                   <Match when={item.type === "Directory"}>
                     <ExportCheckbox
@@ -176,7 +177,7 @@ const ExportCheckbox = (props: { folder: FileFolder; initialData: any }) => {
                   </Match>
                   <Match when={item.type !== "Directory"}>
                     <div class="flex items-center gap-2 p-1">
-                      <div class="w-[16px] h-[16px]" />
+                      <div class="h-[16px] w-[16px]" />
                       <FileCheckbox name={item.name} file={props.folder} />
                       {/* <Checkbox
                         checked={checkedFiles().some((checkedItem) =>

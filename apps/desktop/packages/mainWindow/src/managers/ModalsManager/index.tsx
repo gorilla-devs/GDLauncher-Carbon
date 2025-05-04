@@ -46,10 +46,6 @@ const defaultModals = {
     component: lazy(() => import("./modals/Java/AddCustomJava")),
     title: "Add java version"
   },
-  modDetails: {
-    component: lazy(() => import("./modals/ModDetails")),
-    title: "Mod Details"
-  },
   javaSetup: {
     component: lazy(() => import("./modals/Java/JavaSetup")),
     title: "Java Setup"

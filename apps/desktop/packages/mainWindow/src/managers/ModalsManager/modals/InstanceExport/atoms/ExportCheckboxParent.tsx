@@ -1,10 +1,10 @@
-import { instanceId } from "@/utils/browser"
 import { rspc } from "@/utils/rspcClient"
 import { createEffect, createSignal } from "solid-js"
 import ExportCheckbox from "./ExportCheckbox"
 import { Checkbox } from "@gd/ui"
 import { useTransContext } from "@gd/i18n"
 import _ from "lodash"
+import useSearchContext from "@/components/SearchInputContext"
 
 const [checkedFiles, setCheckedFiles] = createSignal<string[][]>([])
 export { checkedFiles, setCheckedFiles }
@@ -30,12 +30,13 @@ export function buildNestedObject(paths: string[][]) {
 const ExportCheckboxParent = () => {
   const [allSelected, setAllSelected] = createSignal(false)
   const [someSelected, setSomeSelected] = createSignal(false)
+  const searchContext = useSearchContext()
   const [t] = useTransContext()
   const explore = rspc.createQuery(() => ({
     queryKey: [
       "instance.explore",
       {
-        instance_id: instanceId()!,
+        instance_id: searchContext?.selectedInstance.data?.id!,
         path: []
       }
     ]

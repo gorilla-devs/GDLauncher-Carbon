@@ -14,8 +14,8 @@
     "dev-storybook": "cross-env-shell STORYBOOK=true vite build --watch",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "lint": "tsc && eslint . --quiet && prettier --check .",
-    "lint-fix": "tsc && eslint . --quiet --fix && prettier --write ."
+    "lint": "tsc && ../../node_modules/.bin/eslint . --quiet && ../../node_modules/.bin/prettier --check .",
+    "lint-fix": "tsc && ../../node_modules/.bin/eslint . --quiet --fix && ../../node_modules/.bin/prettier --write ."
   },
   "devDependencies": {
     "@babel/core": "^7.22.5",

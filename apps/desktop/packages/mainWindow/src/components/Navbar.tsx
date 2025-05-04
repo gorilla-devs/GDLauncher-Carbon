@@ -114,6 +114,12 @@ const AppNavbar = () => {
             onFocus={() => {
               navigator.navigate("/search")
             }}
+            onInput={(e) => {
+              searchResults?.setSearchQuery((prev) => ({
+                ...prev,
+                searchQuery: e.target.value
+              }))
+            }}
             icon={
               <div class="flex items-center gap-1">
                 <Show
@@ -135,7 +141,7 @@ const AppNavbar = () => {
                 </Show>
               </div>
             }
-          />{" "}
+          />
           <Button
             class="w-max"
             size="small"

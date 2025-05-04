@@ -3,7 +3,6 @@ import { RouteDefinition } from "@solidjs/router"
 import SettingsJavaData from "@/pages/Settings/settings.java.data"
 import SettingsGeneralData from "@/pages/Settings/settings.general.data"
 import LoginData from "@/pages/Login/auth.login.data"
-import AddonViewPageData from "@/pages/AddonViewPage/mods.overview"
 import AddonVersionsData from "@/pages/AddonViewPage/mods.versions"
 import AddonScreenshotsData from "@/pages/AddonViewPage/mods.screenshots"
 import InstanceData from "@/pages/Library/Instance/instance.data"
@@ -113,7 +112,7 @@ export const routes: RouteDefinition[] = [
         component: Search,
         children: [
           {
-            path: "/",
+            path: "/:type?",
             component: lazy(() => import("@/pages/Search/List"))
           }
         ]
@@ -121,7 +120,6 @@ export const routes: RouteDefinition[] = [
       {
         path: "addon/:id/:platform",
         component: AddonViewPage,
-        data: AddonViewPageData,
         children: [
           {
             path: "/",

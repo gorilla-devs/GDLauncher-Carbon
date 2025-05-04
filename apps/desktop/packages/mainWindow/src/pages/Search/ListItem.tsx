@@ -4,7 +4,9 @@ import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import DynamicBadgeContainer from "./DynamicBadgeContainer"
-import { Button } from "@gd/ui"
+import { Match, Switch } from "solid-js"
+import ModpackDownloadButton from "@/components/ModpackDownloadButton"
+import ModDownloadButton from "@/components/ModDownloadButton"
 
 interface SearchResultItemProps {
   result: FEUnifiedSearchResult
@@ -39,8 +41,9 @@ export function ListItem(props: SearchResultItemProps) {
           style={{
             "background-image": `url(${props.result.imageUrl || ""})`,
             "mask-image": "linear-gradient(to right, transparent 20%, black)",
-            "-webkit-mask-image": "linear-gradient(to right, transparent 20%, black)",
-            "filter": "blur(8px)",
+            "-webkit-mask-image":
+              "linear-gradient(to right, transparent 20%, black)",
+            filter: "blur(8px)",
             "-webkit-filter": "blur(8px)"
           }}
         />
@@ -77,8 +80,20 @@ export function ListItem(props: SearchResultItemProps) {
               </div>
 
               {/* Install button - hidden by default, visible on hover */}
-              <div class="absolute right-4 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                <Button size="small">Install</Button>
+              <div
+                class="absolute right-4 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                onClick={(e) => {
+                  e.stopPropagation()
+                }}
+              >
+                <Switch>
+                  <Match when={props.result.type === "modpack"}>
+                    <ModpackDownloadButton addon={props.result} />
+                  </Match>
+                  <Match when={props.result.type !== "modpack"}>
+                    <ModDownloadButton addon={props.result} />
+                  </Match>
+                </Switch>
               </div>
             </div>
           </div>

@@ -1,23 +1,29 @@
 import { rspc } from "@/utils/rspcClient"
-import { Mod } from "@gd/core_module/bindings"
 import { Trans } from "@gd/i18n"
-import { Button, Progressbar, Spinner, Tooltip } from "@gd/ui"
+import {
+  Button,
+  Progressbar,
+  Spinner,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from "@gd/ui"
 import { Match, Show, Switch, createEffect, createSignal } from "solid-js"
+import useSearchContext from "./SearchInputContext"
+import { FEUnifiedSearchResult } from "@gd/core_module/bindings"
 
 interface ModDownloadButtonProps {
-  projectId: number | string | undefined
   fileId?: number | string
-  instanceId: number | null | undefined
-  size: "small" | "medium" | "large"
-  isCurseforge: boolean
-  instanceMods: Mod[] | undefined
-  instanceLocked: boolean | undefined
+  addon: FEUnifiedSearchResult | undefined
 }
 
 const ModDownloadButton = (props: ModDownloadButtonProps) => {
   const [loading, setLoading] = createSignal(false)
   const [taskId, setTaskId] = createSignal<number | null>(null)
   const [progress, setProgress] = createSignal<number | null>(null)
+  const searchContext = useSearchContext()
+  const instanceLocked = () =>
+    searchContext?.selectedInstance?.data?.modpack?.locked
 
   const installLatestModMutation = rspc.createMutation(() => ({
     mutationKey: "instance.installLatestMod",
@@ -43,14 +49,11 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     }
   })
 
-  const installedMod = () =>
-    props.instanceMods?.find(
-      (mod) =>
-        (props.isCurseforge
-          ? mod.curseforge?.project_id
-          : mod.modrinth?.project_id
-        )?.toString() === props.projectId?.toString()
+  const installedMod = () => {
+    return searchContext?.selectedInstanceMods?.data?.find(
+      (mod) => mod.id === props.addon?.id
     )
+  }
 
   const installModMutation = rspc.createMutation(() => ({
     mutationKey: "instance.installMod"
@@ -67,54 +70,62 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   })
 
   const latestModInstallObj = () => {
-    return props.isCurseforge
+    return props.addon?.platform === "curseforge"
       ? {
-          Curseforge: parseInt(props.projectId!.toString(), 10)
+          Curseforge: parseInt(props.addon.id.toString(), 10)
         }
       : {
-          Modrinth: props.projectId!.toString()
+          Modrinth: props.addon!.id.toString()
         }
   }
 
   const modInstallObj = () => {
-    return props.isCurseforge
+    return props.addon?.platform === "curseforge"
       ? {
           Curseforge: {
-            project_id: parseInt(props.projectId!.toString(), 10),
+            project_id: parseInt(props.addon.id.toString(), 10),
             file_id: parseInt(props.fileId!.toString(), 10)
           }
         }
       : {
           Modrinth: {
-            project_id: props.projectId!.toString(),
+            project_id: props.addon!.id.toString(),
             version_id: props.fileId!.toString()
           }
         }
   }
 
   const isInstalled = () => {
-    if (!installedMod()) return false
+    const localInstalledMod = installedMod()
+
+    const addon = props.addon
+    if (!localInstalledMod || !addon) return false
 
     if (!props.fileId) {
-      return !!installedMod()
+      return !!localInstalledMod
     } else {
-      if (props.isCurseforge) {
+      if (addon.platform === "curseforge") {
         return (
-          installedMod()?.curseforge?.file_id ===
+          localInstalledMod.curseforge!.file_id ===
           parseInt(props.fileId.toString(), 10)
         )
       } else {
-        return installedMod()?.modrinth?.version_id === props.fileId.toString()
+        return (
+          localInstalledMod.modrinth!.version_id === props.fileId.toString()
+        )
       }
     }
   }
 
   const handleDownload = async () => {
-    if (!props.instanceId || isInstalled()) return
+    if (!props.addon) return
+
+    const instanceId = searchContext?.selectedInstance?.data?.id
+    if (!instanceId || isInstalled()) return
 
     if (!props.fileId) {
       await installLatestModMutation.mutateAsync({
-        instance_id: props.instanceId,
+        instance_id: instanceId,
         mod_source: latestModInstallObj()
       })
     } else {
@@ -122,7 +133,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
 
       await installModMutation.mutateAsync({
         mod_source: modInstallObj(),
-        instance_id: props.instanceId,
+        instance_id: instanceId,
         install_deps: !replacesMod,
         replaces_mod: replacesMod
       })
@@ -138,62 +149,62 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   })
 
   return (
-    <Tooltip
-      content={
-        props.instanceLocked ? (
-          <Trans key="instance.locked_cannot_apply_changes" />
-        ) : null
-      }
-    >
-      <Button
-        uppercase
-        size={props.size}
-        variant={isInstalled() ? "green" : "primary"}
-        disabled={!props.instanceId || (props.instanceLocked && !isInstalled())}
-        onClick={handleDownload}
-      >
-        <Show when={loading()}>
-          <Spinner />
-          <div
-            class="duration-100 ease-in-out transition-width"
-            classList={{
-              "w-0": progress() === null,
-              "w-14": progress() !== null
-            }}
-          >
-            <Progressbar color="bg-white" percentage={progress()!} />
-          </div>
-        </Show>
-        <Show when={!loading()}>
-          <Switch>
-            <Match when={!props.instanceId || isNaN(props.instanceId)}>
-              <Trans key="instance.no_instance_selected" />
-            </Match>
-            <Match when={isInstalled()}>
-              <Trans key="mod.downloaded" />
-            </Match>
-            <Match when={props.instanceLocked}>
-              <Trans key="instance.instance_locked" />
-            </Match>
-            <Match when={!props.instanceLocked && !props.fileId}>
-              <Trans key="instance.download_latest" />
-            </Match>
-            <Match
-              when={
-                !props.instanceLocked &&
-                props.fileId &&
-                installedMod() &&
-                !isInstalled()
-              }
+    <Tooltip>
+      <TooltipTrigger>
+        <Button
+          uppercase
+          variant={isInstalled() ? "green" : "primary"}
+          disabled={instanceLocked() && !isInstalled()}
+          onClick={handleDownload}
+        >
+          <Show when={loading()}>
+            <Spinner />
+            <div
+              class="transition-width duration-100 ease-in-out"
+              classList={{
+                "w-0": progress() === null,
+                "w-14": progress() !== null
+              }}
             >
-              <Trans key="instance.switch_version" />
-            </Match>
-            <Match when={!props.instanceLocked && props.fileId}>
-              <Trans key="instance.download_version" />
-            </Match>
-          </Switch>
-        </Show>
-      </Button>
+              <Progressbar color="bg-white" percentage={progress()!} />
+            </div>
+          </Show>
+          <Show when={!loading()}>
+            <Switch>
+              <Match when={!searchContext?.selectedInstance?.data?.id}>
+                <Trans key="instance.no_instance_selected" />
+              </Match>
+              <Match when={isInstalled()}>
+                <Trans key="mod.downloaded" />
+              </Match>
+              <Match when={instanceLocked()}>
+                <Trans key="instance.instance_locked" />
+              </Match>
+              <Match when={!instanceLocked() && !props.fileId}>
+                <Trans key="instance.download" />
+              </Match>
+              <Match
+                when={
+                  !instanceLocked() &&
+                  props.fileId &&
+                  installedMod() &&
+                  !isInstalled()
+                }
+              >
+                <Trans key="instance.switch_version" />
+              </Match>
+              <Match when={!instanceLocked() && props.fileId}>
+                <Trans key="instance.download_version" />
+              </Match>
+            </Switch>
+          </Show>
+        </Button>
+      </TooltipTrigger>
+      {instanceLocked() && (
+        <TooltipContent>
+          <Trans key="instance.locked_cannot_apply_changes" />
+        </TooltipContent>
+      )}
     </Tooltip>
   )
 }

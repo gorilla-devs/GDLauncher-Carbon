@@ -3,6 +3,7 @@ import { For, Show } from "solid-js"
 import { CategoryIcon } from "@/utils/instances"
 import { FEUnifiedCategory } from "@gd/core_module/bindings"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
+import useSearchContext from "@/components/SearchInputContext"
 
 /**
  * DynamicBadgeContainer - Shows badges that fit within available space
@@ -10,11 +11,12 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
  * This component dynamically shows category badges based on available container width.
  * It displays a maximum of 5 categories and then shows a +N badge for remaining ones.
  */
+const MAX_VISIBLE_CATEGORIES = 4
 export default function DynamicBadgeContainer(props: {
   typeBadgeContent: string
   categories: FEUnifiedCategory[]
 }) {
-  const MAX_VISIBLE_CATEGORIES = 4
+  const searchContext = useSearchContext()
 
   const visibleCategories = () =>
     props.categories.slice(0, MAX_VISIBLE_CATEGORIES)
@@ -31,6 +33,16 @@ export default function DynamicBadgeContainer(props: {
           <Badge
             variant="secondary"
             class="text-lightSlate-700 flex shrink-0 items-center gap-2"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              searchContext?.setSearchQuery((prev) => {
+                return {
+                  ...prev,
+                  categories: [...(prev.categories || []), category.id]
+                }
+              })
+            }}
           >
             <CategoryIcon
               type={category.icon?.type}
@@ -60,6 +72,19 @@ export default function DynamicBadgeContainer(props: {
                     <Badge
                       variant="secondary"
                       class="text-lightSlate-700 flex shrink-0 items-center"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        searchContext?.setSearchQuery((prev) => {
+                          return {
+                            ...prev,
+                            categories: [
+                              ...(prev.categories || []),
+                              category.id
+                            ]
+                          }
+                        })
+                      }}
                     >
                       <div class="flex items-center gap-1">
                         <CategoryIcon

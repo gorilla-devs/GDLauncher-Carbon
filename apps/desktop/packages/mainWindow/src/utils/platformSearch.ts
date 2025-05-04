@@ -52,6 +52,19 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   const [ref, setRef] = createSignal<VirtualizerHandle | null>(opts.parentRef)
 
   const [lastScrollOffset, setLastScrollOffset] = createSignal(0)
+  const [selectedInstanceId, setSelectedInstanceId] = createSignal<
+    number | null
+  >(null)
+
+  const selectedInstance = rspc.createQuery(() => ({
+    queryKey: ["instance.getInstanceDetails", selectedInstanceId()],
+    enabled: !!selectedInstanceId()
+  }))
+
+  const selectedInstanceMods = rspc.createQuery(() => ({
+    queryKey: ["instance.getInstanceMods", selectedInstanceId()],
+    enabled: !!selectedInstanceId()
+  }))
 
   const [searchQuery, setSearchQuery] = createSignal<FEUnifiedSearchParameters>(
     {
@@ -82,7 +95,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
       return rspcContext.client.query([
         "modplatforms.unifiedSearch",
         {
-          sortIndex: searchQuery().sortIndex || "totalDownloads",
+          sortIndex: searchQuery().sortIndex || "downloads",
           sortOrder: searchQuery().sortOrder || "descending",
           searchQuery: searchQuery().searchQuery,
           categories: searchQuery().categories,
@@ -259,6 +272,9 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     cfInfiniteResults,
     mrInfiniteResults,
     virtualOnScrollHandler,
-    lastScrollOffset
+    lastScrollOffset,
+    selectedInstance,
+    selectedInstanceMods,
+    setSelectedInstanceId
   }
 }

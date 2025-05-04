@@ -5,10 +5,10 @@ import { useTransContext } from "@gd/i18n"
 import { Button } from "@gd/ui"
 import { setPayload, payload, setExportStep } from ".."
 import { ExportArgs, ExportEntry } from "@gd/core_module/bindings"
-import { instanceId } from "@/utils/browser"
 import { buildNestedObject, checkedFiles } from "./ExportCheckboxParent"
 import _ from "lodash"
 import { setFailedMsg } from "./Exporting"
+import useSearchContext from "@/components/SearchInputContext"
 
 function convertNestedObject(obj: any): any {
   const result: any = {}
@@ -32,6 +32,7 @@ function convertNestedObject(obj: any): any {
 const BeginExport = () => {
   const [t] = useTransContext()
   const modalsContext = useModal()
+  const searchContext = useSearchContext()
   const exportInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.export"],
     onSuccess(taskId) {
@@ -49,7 +50,10 @@ const BeginExport = () => {
   }
 
   const handleExportInstance = () => {
-    setPayload((prev) => ({ ...prev, instance_id: instanceId() }))
+    setPayload((prev) => ({
+      ...prev,
+      instance_id: searchContext?.selectedInstance.data?.id
+    }))
     setFailedMsg(undefined)
     const obj = buildNestedObject(checkedFiles())
     const converted = convertNestedObject({ entries: obj })
@@ -69,7 +73,7 @@ const BeginExport = () => {
   }
 
   return (
-    <div class="flex justify-between items-center w-full pt-4">
+    <div class="flex w-full items-center justify-between pt-4">
       <Button
         type="secondary"
         size="large"

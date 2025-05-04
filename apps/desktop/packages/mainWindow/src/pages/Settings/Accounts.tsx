@@ -11,7 +11,9 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-  Tooltip
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
 } from "@gd/ui"
 import { port, rspc } from "@/utils/rspcClient"
 import PageTitle from "./components/PageTitle"
@@ -178,7 +180,7 @@ const Accounts = () => {
   const globalStore = useGlobalStore()
   const [t] = useTransContext()
 
-  const navigator = useGDNavigate()
+  const gdNavigator = useGDNavigate()
   const modalsContext = useModal()
   const addNotification = createNotification()
 
@@ -292,34 +294,40 @@ const Accounts = () => {
                         <i class="i-ri:alert-fill block h-6 w-6" />
                         <Trans key="settings:gdl_account_not_verified" />
                       </div>
-                      <Tooltip content={verificationContent()}>
-                        <Button
-                          disabled={!!validGDLUser()?.verificationTimeout}
-                          onClick={async () => {
-                            const uuid = globalStore.accounts.data?.find(
-                              (account) =>
-                                account.uuid ===
-                                globalStore.settings.data?.gdlAccountId
-                            )?.uuid
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Button
+                            disabled={!!validGDLUser()?.verificationTimeout}
+                            onClick={async () => {
+                              const uuid = globalStore.accounts.data?.find(
+                                (account) =>
+                                  account.uuid ===
+                                  globalStore.settings.data?.gdlAccountId
+                              )?.uuid
 
-                            if (!uuid) {
-                              throw new Error("No active gdl account")
-                            }
+                              if (!uuid) {
+                                throw new Error("No active gdl account")
+                              }
 
-                            const request =
-                              await requestNewVerificationTokenMutation.mutateAsync(
-                                uuid
-                              )
+                              const request =
+                                await requestNewVerificationTokenMutation.mutateAsync(
+                                  uuid
+                                )
 
-                            if (request.status === "failed" && request.value) {
-                              throw new Error(
-                                `Too many requests, retry in ${request.value}s`
-                              )
-                            }
-                          }}
-                        >
-                          <Trans key="settings:send_new_verification_email" />
-                        </Button>
+                              if (
+                                request.status === "failed" &&
+                                request.value
+                              ) {
+                                throw new Error(
+                                  `Too many requests, retry in ${request.value}s`
+                                )
+                              }
+                            }}
+                          >
+                            <Trans key="settings:send_new_verification_email" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>{verificationContent()}</TooltipContent>
                       </Tooltip>
                     </div>
                   </Show>
@@ -373,20 +381,23 @@ const Accounts = () => {
                   <div>
                     <Trans key="settings:request_account_deletion_description" />
                   </div>
-                  <Tooltip content={deleteAccountContent()}>
-                    <Button
-                      variant="red"
-                      size="large"
-                      disabled={!!validGDLUser()?.deletionTimeout}
-                      onClick={() => {
-                        modalsContext?.openModal({
-                          name: "confirmGDLAccountDeletion"
-                        })
-                      }}
-                    >
-                      <i class="i-ri:delete-bin-7-fill block h-6 w-6" />
-                      <Trans key="settings:request_account_deletion" />
-                    </Button>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Button
+                        variant="red"
+                        size="large"
+                        disabled={!!validGDLUser()?.deletionTimeout}
+                        onClick={() => {
+                          modalsContext?.openModal({
+                            name: "confirmGDLAccountDeletion"
+                          })
+                        }}
+                      >
+                        <i class="i-ri:delete-bin-7-fill block h-6 w-6" />
+                        <Trans key="settings:request_account_deletion" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{deleteAccountContent()}</TooltipContent>
                   </Tooltip>
                 </div>
               </Match>
@@ -400,7 +411,7 @@ const Accounts = () => {
                     type="outline"
                     onClick={async () => {
                       await removeGDLAccountMutation.mutateAsync(undefined)
-                      navigator.navigate("/")
+                      gdNavigator.navigate("/")
                     }}
                   >
                     <Trans key="settings:link_gdl_account" />
@@ -437,7 +448,7 @@ const Accounts = () => {
                 type="secondary"
                 size="small"
                 onClick={() => {
-                  navigator("/?addMicrosoftAccount=true")
+                  gdNavigator.navigate("/?addMicrosoftAccount=true")
                 }}
               >
                 <div class="i-ri:add-line" />
@@ -513,7 +524,9 @@ const Accounts = () => {
                                   <div
                                     class="i-ri:refresh-line h-4 w-4"
                                     onClick={async () => {
-                                      navigator("/?addMicrosoftAccount=true")
+                                      gdNavigator.navigate(
+                                        "/?addMicrosoftAccount=true"
+                                      )
                                     }}
                                   />
                                 </div>
@@ -545,7 +558,7 @@ const Accounts = () => {
                                       )
 
                                       if (accountsLength === 1) {
-                                        navigator.navigate("/")
+                                        gdNavigator.navigate("/")
                                       }
                                     }
                                   }}

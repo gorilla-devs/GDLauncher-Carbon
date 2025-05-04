@@ -10,13 +10,14 @@ import Title from "@/pages/Settings/components/Title"
 import Row from "@/pages/Settings/components/Row"
 import RowsContainer from "@/pages/Settings/components/RowsContainer"
 import RightHandSide from "@/pages/Settings/components/RightHandSide"
-import { setInstanceId } from "@/utils/browser"
 import { useModal } from "@/managers/ModalsManager"
 import JavaPathAutoComplete from "@/components/JavaPathAutoComplete"
+import useSearchContext from "@/components/SearchInputContext"
 
 const Settings = () => {
   const [t] = useTransContext()
   const modalsContext = useModal()
+  const searchContext = useSearchContext()
   const params = useParams()
   const updateInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.updateInstance"],
@@ -102,7 +103,7 @@ const Settings = () => {
               <Button
                 type="outline"
                 onClick={() => {
-                  setInstanceId(parseInt(params.id, 10))
+                  searchContext?.setSelectedInstanceId(parseInt(params.id, 10))
                   modalsContext?.openModal(
                     {
                       name: "unlock_confirmation"
@@ -124,7 +125,7 @@ const Settings = () => {
             <Button
               type="outline"
               onClick={() => {
-                setInstanceId(parseInt(params.id, 10))
+                searchContext?.setSelectedInstanceId(parseInt(params.id, 10))
                 modalsContext?.openModal(
                   {
                     name: "unpair_confirmation"
@@ -139,7 +140,7 @@ const Settings = () => {
             <Button
               type="outline"
               onClick={() => {
-                setInstanceId(parseInt(params.id, 10))
+                searchContext?.setSelectedInstanceId(parseInt(params.id, 10))
                 modalsContext?.openModal({
                   name: "modpack_version_update"
                 })

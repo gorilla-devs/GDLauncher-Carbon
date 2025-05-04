@@ -5,7 +5,9 @@ import {
   Progressbar,
   Skeleton,
   Switch,
-  Tooltip
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
 } from "@gd/ui"
 import { For, Show, createMemo, createSignal } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
@@ -17,7 +19,6 @@ import { createStore, produce, reconcile } from "solid-js/store"
 import fetchData from "../../instance.data"
 import { Mod as Modtype } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
-import { setLastType } from "@/components/InfiniteScrollModsQueryWrapper"
 import { useModal } from "@/managers/ModalsManager"
 
 const Mods = () => {
@@ -106,9 +107,9 @@ const Mods = () => {
 
   const NoMods = () => {
     return (
-      <div class="h-full w-full flex justify-center items-center min-h-90">
-        <div class="flex flex-col justify-center items-center text-center">
-          <img src={skull} class="w-16 h-16" />
+      <div class="min-h-90 flex h-full w-full items-center justify-center">
+        <div class="flex flex-col items-center justify-center text-center">
+          <img src={skull} class="h-16 w-16" />
           <p class="text-lightSlate-700 max-w-100">
             <Trans key="instance.no_mods_text" />
           </p>
@@ -142,17 +143,17 @@ const Mods = () => {
   return (
     <div>
       <div
-        class="flex items-center justify-between h-16 bg-darkSlate-900 shadow-md duration-100 ease-in-out border-darkSlate-700 border-solid border-1 fixed bottom-4 mx-auto left-1/2 -translate-x-1/2 rounded-md z-50 shadow-darkSlate-900 transition-transform origin-left pr-6 w-130"
+        class="bg-darkSlate-900 border-darkSlate-700 border-1 shadow-darkSlate-900 w-130 fixed bottom-4 left-1/2 z-50 mx-auto flex h-16 origin-left -translate-x-1/2 items-center justify-between rounded-md border-solid pr-6 shadow-md transition-transform duration-100 ease-in-out"
         classList={{
           "translate-y-24": selectedMods()?.length === 0
         }}
       >
-        <div class="flex items-center h-full">
+        <div class="flex h-full items-center">
           <div
-            class="flex items-center text-lightSlate-700 hover:text-lightSlate-50 h-full px-6 mr-2"
+            class="text-lightSlate-700 hover:text-lightSlate-50 mr-2 flex h-full items-center px-6"
             onClick={() => setSelectedModsMap(reconcile({}))}
           >
-            <div class="text-2xl i-ri:close-fill" />
+            <div class="i-ri:close-fill text-2xl" />
           </div>
           <div class="text-lightSlate-700">
             <Trans
@@ -166,15 +167,16 @@ const Mods = () => {
         </div>
         <div class="flex items-center gap-4">
           <Show when={isInstanceLocked()}>
-            <Tooltip
-              content={<Trans key="instance.locked_cannot_apply_changes" />}
-              placement="top"
-              class="max-w-38 text-ellipsis overflow-hidden"
-            >
-              <Switch
-                disabled
-                checked={selectedMods()?.every((mod) => mod.enabled) || false}
-              />
+            <Tooltip placement="top">
+              <TooltipTrigger>
+                <Switch
+                  disabled
+                  checked={selectedMods()?.every((mod) => mod.enabled) || false}
+                />
+              </TooltipTrigger>
+              <TooltipContent class="max-w-38 overflow-hidden text-ellipsis">
+                <Trans key="instance.locked_cannot_apply_changes" />
+              </TooltipContent>
             </Tooltip>
           </Show>
           <Show when={!isInstanceLocked()}>
@@ -224,20 +226,21 @@ const Mods = () => {
             />
           </Show>
           <Show when={isInstanceLocked()}>
-            <Tooltip
-              content={<Trans key="instance.locked_cannot_apply_changes" />}
-              placement="top"
-              class="max-w-38 text-ellipsis overflow-hidden"
-            >
-              <div class="flex items-center gap-2 cursor-pointer text-lightSlate-700">
-                <span class="text-2xl i-ri:delete-bin-2-fill" />
-                <Trans key="instance.delete_mod" />
-              </div>
+            <Tooltip placement="top">
+              <TooltipTrigger>
+                <div class="text-lightSlate-700 flex cursor-pointer items-center gap-2">
+                  <span class="i-ri:delete-bin-2-fill text-2xl" />
+                  <Trans key="instance.delete_mod" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent class="max-w-38 overflow-hidden text-ellipsis">
+                <Trans key="instance.locked_cannot_apply_changes" />
+              </TooltipContent>
             </Tooltip>
           </Show>
           <Show when={!isInstanceLocked()}>
             <div
-              class="flex items-center gap-2 cursor-pointer text-lightSlate-700 hover:text-red-500 duration-100 ease-in-out transition"
+              class="text-lightSlate-700 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out hover:text-red-500"
               onClick={() => {
                 Object.keys(selectedModsMap).forEach((mod) => {
                   deleteModMutation.mutate({
@@ -247,7 +250,7 @@ const Mods = () => {
                 })
               }}
             >
-              <span class="text-2xl i-ri:delete-bin-2-fill" />
+              <span class="i-ri:delete-bin-2-fill text-2xl" />
               <Trans key="instance.delete_mod" />
             </div>
           </Show>
@@ -255,25 +258,26 @@ const Mods = () => {
             when={selectedMods().filter((mod) => mod.has_update).length > 0}
           >
             <Show when={isInstanceLocked()}>
-              <Tooltip
-                content={<Trans key="instance.locked_cannot_apply_changes" />}
-                placement="top"
-                class="max-w-38 text-ellipsis overflow-hidden"
-              >
-                <div class="flex items-center gap-2 text-lightSlate-700">
-                  <span class="text-2xl i-ri:download-2-fill" />
-                  <Trans key="instance.update_mods" />
-                </div>
+              <Tooltip placement="top">
+                <TooltipTrigger>
+                  <div class="text-lightSlate-700 flex items-center gap-2">
+                    <span class="i-ri:download-2-fill text-2xl" />
+                    <Trans key="instance.update_mods" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent class="max-w-38 overflow-hidden text-ellipsis">
+                  <Trans key="instance.locked_cannot_apply_changes" />
+                </TooltipContent>
               </Tooltip>
             </Show>
             <Show when={!isInstanceLocked()}>
               <div
-                class="flex items-center gap-2 cursor-pointer text-lightSlate-700 hover:text-green-500 duration-100 ease-in-out transition"
+                class="text-lightSlate-700 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out hover:text-green-500"
                 onClick={() => {
                   updateSelectedMods()
                 }}
               >
-                <span class="text-2xl i-ri:download-2-fill" />
+                <span class="i-ri:download-2-fill text-2xl" />
                 <Trans key="instance.update_mods" />
               </div>
             </Show>
@@ -281,9 +285,9 @@ const Mods = () => {
         </div>
       </div>
 
-      <div class="flex flex-col duration-100 ease-in-out px-6 bg-darkSlate-800 transition-all z-10 sticky top-14">
-        <div class="flex justify-between items-center gap-1 pb-4 flex-wrap">
-          <div class="flex items-center gap-4 cursor-pointer">
+      <div class="bg-darkSlate-800 sticky top-14 z-10 flex flex-col px-6 transition-all duration-100 ease-in-out">
+        <div class="flex flex-wrap items-center justify-between gap-1 pb-4">
+          <div class="flex cursor-pointer items-center gap-4">
             <Checkbox
               indeterminate={isSelectAllIndeterminate()}
               checked={
@@ -338,14 +342,15 @@ const Mods = () => {
               <span class="text-2xl i-ri:filter-line" />
             </div> */}
             <Show when={isInstanceLocked()}>
-              <Tooltip
-                content={<Trans key="instance.locked_cannot_apply_changes" />}
-                placement="top"
-                class="max-w-38 text-ellipsis overflow-hidden"
-              >
-                <Button disabled type="outline" size="medium">
-                  <Trans key="instance.add_mod" />
-                </Button>
+              <Tooltip placement="top">
+                <TooltipTrigger>
+                  <Button disabled type="outline" size="medium">
+                    <Trans key="instance.add_mod" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent class="max-w-38 overflow-hidden text-ellipsis">
+                  <Trans key="instance.locked_cannot_apply_changes" />
+                </TooltipContent>
               </Tooltip>
             </Show>
             <Show when={!isInstanceLocked()}>
@@ -354,7 +359,6 @@ const Mods = () => {
                 type="outline"
                 size="medium"
                 onClick={() => {
-                  setLastType(null)
                   navigator.navigate(`/mods?instanceId=${params.id}`)
                 }}
               >
@@ -368,57 +372,55 @@ const Mods = () => {
                 0
               }
             >
-              <Tooltip
-                content={
-                  <>
-                    <Show when={isInstanceLocked()}>
-                      <Trans key="instance.locked_cannot_apply_changes" />
-                    </Show>
-                    <Show when={!isInstanceLocked()}>
-                      <Trans key="instance.update_all_mods" />
-                    </Show>
-                  </>
-                }
-                placement="top"
-                class="max-w-38 text-ellipsis overflow-hidden"
-              >
-                <div
-                  class="flex items-center gap-2 duration-100 ease-in-out transition hover:text-green-500 text-lightSlate-700"
-                  onClick={() => {
-                    if (isInstanceLocked()) return
-
-                    updateAllMods()
-                  }}
-                >
-                  <span class="text-2xl i-ri:download-2-fill" />
+              <Tooltip placement="top">
+                <TooltipTrigger>
                   <div
-                    classList={{
-                      "w-0": isInstanceLocked()
+                    class="text-lightSlate-700 flex items-center gap-2 transition duration-100 ease-in-out hover:text-green-500"
+                    onClick={() => {
+                      if (isInstanceLocked()) return
+
+                      updateAllMods()
                     }}
-                    class="duration-100 transition-width"
                   >
-                    <Progressbar percentage={15} />
+                    <span class="i-ri:download-2-fill text-2xl" />
+                    <div
+                      classList={{
+                        "w-0": isInstanceLocked()
+                      }}
+                      class="transition-width duration-100"
+                    >
+                      <Progressbar percentage={15} />
+                    </div>
                   </div>
-                </div>
+                </TooltipTrigger>
+                <TooltipContent class="max-w-38 overflow-hidden text-ellipsis">
+                  <Show when={isInstanceLocked()}>
+                    <Trans key="instance.locked_cannot_apply_changes" />
+                  </Show>
+                  <Show when={!isInstanceLocked()}>
+                    <Trans key="instance.update_all_mods" />
+                  </Show>
+                </TooltipContent>
               </Tooltip>
             </Show>
 
-            <Tooltip
-              content={<Trans key="instance.open_mods_folder" />}
-              placement="top"
-              class="max-w-38 text-ellipsis overflow-hidden"
-            >
-              <div
-                class="flex items-center gap-2 cursor-pointer duration-100 ease-in-out transition hover:text-lightSlate-50 text-lightSlate-700"
-                onClick={() => {
-                  openFolderMutation.mutate({
-                    folder: "Mods",
-                    instance_id: parseInt(params.id, 10)
-                  })
-                }}
-              >
-                <span class="text-2xl i-ri:folder-open-fill" />
-              </div>
+            <Tooltip placement="top">
+              <TooltipTrigger>
+                <div
+                  class="hover:text-lightSlate-50 text-lightSlate-700 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out"
+                  onClick={() => {
+                    openFolderMutation.mutate({
+                      folder: "Mods",
+                      instance_id: parseInt(params.id, 10)
+                    })
+                  }}
+                >
+                  <span class="i-ri:folder-open-fill text-2xl" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent class="max-w-38 overflow-hidden text-ellipsis">
+                <Trans key="instance.open_mods_folder" />
+              </TooltipContent>
             </Tooltip>
           </div>
         </div>

@@ -56,30 +56,19 @@ const ExploreVersionsNavbar = (props: Props) => {
   }))
 
   const modloaders = () => {
-    let res: { label: string; key: string }[] = []
-
-    if (props.modplatform === "modrinth") {
-      const results = globalStore.modloaders.data?.[props.modplatform]
-      res =
-        results?.map((v) => ({
-          label: v.toString(),
-          key: v.toString()
-        })) || []
-    } else if (props.modplatform === "curseforge") {
-      const results = globalStore.modloaders.data?.[props.modplatform]
-      res =
-        results?.map((v) => ({
-          label: v.toString(),
-          key: v.toString()
-        })) || []
-    }
+    const results = globalStore.modloaders.data
+    const coreModloaders =
+      results?.map((v) => ({
+        label: v.toString(),
+        key: v.toString()
+      })) || []
 
     return [
       {
         label: "Select a modloader",
         key: ""
       }
-    ].concat(res)
+    ].concat(coreModloaders)
   }
 
   const filteredGameVersions = createMemo(() => {
@@ -110,7 +99,7 @@ const ExploreVersionsNavbar = (props: Props) => {
       allVersionsLabel,
       ...(filteredGameVersions() || []).map((item) => ({
         label: (
-          <div class="flex justify-between w-full">
+          <div class="flex w-full justify-between">
             <span>{item.id}</span>
             {mapTypeToColor(item.type)}
           </div>
@@ -121,12 +110,12 @@ const ExploreVersionsNavbar = (props: Props) => {
   }
 
   return (
-    <div class="w-full flex gap-4 h-12 my-4">
+    <div class="my-4 flex h-12 w-full gap-4">
       <Switch>
         <Match when={!isNaN(instanceId())}>
           <div class="flex gap-2">
             <div
-              class="h-full flex-1 w-12"
+              class="h-full w-12 flex-1"
               style={{
                 "background-image": instanceDetails.data?.iconRevision
                   ? `url("${getInstanceImageUrl(
@@ -141,7 +130,7 @@ const ExploreVersionsNavbar = (props: Props) => {
             />
             <div class="flex flex-col justify-between">
               <div>{instanceDetails.data?.name}</div>
-              <div class="flex text-lightSlate-700 gap-2">
+              <div class="text-lightSlate-700 flex gap-2">
                 <Checkbox
                   checked={overrideEnabled()}
                   onChange={setOverrideEnabled}
@@ -154,7 +143,7 @@ const ExploreVersionsNavbar = (props: Props) => {
         <Match
           when={props.type === "mod" && (!instanceId || isNaN(instanceId()))}
         >
-          <div class="flex items-center text-lightSlate-700">
+          <div class="text-lightSlate-700 flex items-center">
             <Trans key="rowcontainer.no_instance_selected" />
           </div>
         </Match>

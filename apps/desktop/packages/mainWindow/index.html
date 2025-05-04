@@ -118,6 +118,11 @@
 
       * {
         font-family: var(--font);
+
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
       }
 
       /* View transition classes */
@@ -161,7 +166,7 @@
       /* Base transitions for all view transitions */
       ::view-transition-old(root),
       ::view-transition-new(root) {
-        animation-duration: 300ms;
+        animation-duration: 250ms;
         animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
         animation-fill-mode: both;
       }
@@ -185,14 +190,14 @@
 
       ::view-transition-old(slide-right-transition),
       ::view-transition-new(slide-right-transition) {
-        animation-duration: 300ms;
+        animation-duration: 250ms;
         animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
         animation-fill-mode: both;
       }
 
       ::view-transition-old(slide-left-transition),
       ::view-transition-new(slide-left-transition) {
-        animation-duration: 300ms;
+        animation-duration: 250ms;
         animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
         animation-fill-mode: both;
       }

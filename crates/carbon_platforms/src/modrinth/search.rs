@@ -4,8 +4,8 @@
 
 use super::version::HashAlgorithm;
 use super::{
-    project::{ProjectSupportRange, ProjectType},
     UtcDateTime,
+    project::{ProjectSupportRange, ProjectType},
 };
 use crate::{deserialize_from_raw_json, serialize_as_raw_json};
 use anyhow::anyhow;
@@ -95,7 +95,10 @@ impl FromStr for SearchFacet {
             "versions" => Ok(SearchFacet::Version(value.to_string())),
             "license" => Ok(SearchFacet::License(value.to_string())),
             "project_type" => Ok(SearchFacet::ProjectType(value.to_string())),
-            _ => Err(anyhow!("Invalid facet type `{}`. Expected one of `categories`, `versions`, `license`, `project_type`", facet_type))
+            _ => Err(anyhow!(
+                "Invalid facet type `{}`. Expected one of `categories`, `versions`, `license`, `project_type`",
+                facet_type
+            )),
         }
     }
 }
@@ -335,6 +338,18 @@ impl Deref for ProjectID {
     type Target = String;
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl From<String> for ProjectID {
+    fn from(value: String) -> Self {
+        ProjectID(value)
+    }
+}
+
+impl From<&str> for ProjectID {
+    fn from(value: &str) -> Self {
+        ProjectID(value.to_string())
     }
 }
 

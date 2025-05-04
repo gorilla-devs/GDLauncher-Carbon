@@ -2,12 +2,12 @@ import {
   createInfiniteQuery,
   CreateInfiniteQueryResult
 } from "@tanstack/solid-query"
-import { Accessor, createContext, Setter, useContext } from "solid-js"
+import { createContext, useContext } from "solid-js"
 import { createVirtualizer } from "@tanstack/solid-virtual"
 import { rspc } from "@/utils/rspcClient"
-import { instanceId, setInstanceId } from "@/utils/browser"
 import { useSearchParams } from "@solidjs/router"
 import useVersionsQuery from "@/pages/Mods/useVersionsQuery"
+import useSearchContext from "../SearchInputContext"
 
 export interface VersionRowType {
   data: VersionRowTypeData[]
@@ -40,8 +40,6 @@ interface InfiniteQueryType {
   rowVirtualizer: any
   setParentRef: (_el: Element | null) => void
   allRows: () => VersionRowTypeData[]
-  setInstanceId: Setter<number | undefined>
-  instanceId: Accessor<number | undefined>
 }
 
 interface Props {
@@ -60,6 +58,7 @@ export const useInfiniteVersionsQuery = () => {
 const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   const rspcContext = rspc.useContext()
   const [searchParams, _setSearchParams] = useSearchParams()
+  const searchContext = useSearchContext()
   let parentRef: HTMLDivElement | null = null
 
   const infiniteQuery = createInfiniteQuery(() => ({
@@ -174,7 +173,7 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   }
 
   const _instanceId = parseInt(searchParams.instanceId, 10)
-  setInstanceId(_instanceId)
+  searchContext?.setSelectedInstanceId(_instanceId)
 
   if (_instanceId && !isNaN(_instanceId)) {
     rspcContext.client
@@ -222,9 +221,7 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
     setParentRef: (el: Element | null) => {
       parentRef = el as HTMLDivElement
     },
-    allRows,
-    setInstanceId,
-    instanceId
+    allRows
   }
 
   return (
