@@ -11,6 +11,7 @@ use crate::{deserialize_from_raw_json, serialize_as_raw_json};
 use anyhow::anyhow;
 use carbon_macro::into_query_parameters;
 use serde::{Deserialize, Serialize};
+use std::ops::DerefMut;
 use std::{
     convert::TryFrom,
     fmt::Display,
@@ -145,6 +146,12 @@ impl<'de> Deserialize<'de> for SearchFacet {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct SearchFacetOr(Vec<SearchFacet>);
 
+impl SearchFacetOr {
+    pub fn new(facets: Vec<SearchFacet>) -> Self {
+        SearchFacetOr(facets)
+    }
+}
+
 impl From<SearchFacet> for SearchFacetOr {
     fn from(facet: SearchFacet) -> Self {
         SearchFacetOr(vec![facet])
@@ -156,6 +163,12 @@ impl Deref for SearchFacetOr {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for SearchFacetOr {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -182,6 +195,12 @@ impl FromIterator<SearchFacet> for SearchFacetOr {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct SearchFacetAnd(Vec<SearchFacetOr>);
 
+impl SearchFacetAnd {
+    pub fn new() -> Self {
+        SearchFacetAnd(Vec::new())
+    }
+}
+
 impl From<SearchFacetOr> for SearchFacetAnd {
     fn from(facets: SearchFacetOr) -> Self {
         SearchFacetAnd(vec![facets])
@@ -193,6 +212,12 @@ impl Deref for SearchFacetAnd {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl DerefMut for SearchFacetAnd {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -285,6 +310,12 @@ impl Deref for VersionID {
     }
 }
 
+impl DerefMut for VersionID {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 #[into_query_parameters]
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct VersionIDs {
@@ -300,6 +331,12 @@ impl Deref for VersionIDs {
     type Target = Vec<String>;
     fn deref(&self) -> &Self::Target {
         &self.ids
+    }
+}
+
+impl DerefMut for VersionIDs {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.ids
     }
 }
 
@@ -341,6 +378,12 @@ impl Deref for ProjectID {
     }
 }
 
+impl DerefMut for ProjectID {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 impl From<String> for ProjectID {
     fn from(value: String) -> Self {
         ProjectID(value)
@@ -367,6 +410,12 @@ impl Deref for ProjectIDs {
     type Target = Vec<String>;
     fn deref(&self) -> &Self::Target {
         &self.ids
+    }
+}
+
+impl DerefMut for ProjectIDs {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.ids
     }
 }
 
@@ -400,6 +449,12 @@ impl Deref for TeamID {
     }
 }
 
+impl DerefMut for TeamID {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
 #[into_query_parameters]
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct TeamIDs {
@@ -414,6 +469,12 @@ impl Deref for TeamIDs {
     type Target = Vec<String>;
     fn deref(&self) -> &Self::Target {
         &self.ids
+    }
+}
+
+impl DerefMut for TeamIDs {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.ids
     }
 }
 

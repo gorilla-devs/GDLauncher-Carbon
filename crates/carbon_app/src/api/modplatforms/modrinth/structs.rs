@@ -68,35 +68,6 @@ pub enum MRFEProjectType {
     Unknown,
 }
 
-impl From<ProjectType> for FEUnifiedSearchType {
-    fn from(value: ProjectType) -> Self {
-        match value {
-            ProjectType::Mod => FEUnifiedSearchType::Mod,
-            ProjectType::Modpack => FEUnifiedSearchType::Modpack,
-            ProjectType::ResourcePack => FEUnifiedSearchType::ResourcePack,
-            ProjectType::Shader => FEUnifiedSearchType::Shader,
-            ProjectType::Plugin => FEUnifiedSearchType::Plugin,
-            ProjectType::DataPack => FEUnifiedSearchType::Datapack,
-            ProjectType::Unknown => FEUnifiedSearchType::Unknown,
-        }
-    }
-}
-
-impl From<FEUnifiedSearchType> for ProjectType {
-    fn from(value: FEUnifiedSearchType) -> Self {
-        match value {
-            FEUnifiedSearchType::Mod => ProjectType::Mod,
-            FEUnifiedSearchType::Modpack => ProjectType::Modpack,
-            FEUnifiedSearchType::ResourcePack => ProjectType::ResourcePack,
-            FEUnifiedSearchType::Shader => ProjectType::Shader,
-            FEUnifiedSearchType::Plugin => ProjectType::Plugin,
-            FEUnifiedSearchType::Datapack => ProjectType::DataPack,
-            FEUnifiedSearchType::World => ProjectType::Unknown,
-            FEUnifiedSearchType::Unknown => ProjectType::Unknown,
-        }
-    }
-}
-
 impl From<ProjectType> for MRFEProjectType {
     fn from(value: ProjectType) -> Self {
         match value {

@@ -1,5 +1,7 @@
-use carbon_platforms::curseforge::{CurseForgeResponse, Mod};
+use carbon_platforms::curseforge::{CurseForgeResponse, Mod, ModLoaderType};
 use carbon_platforms::modrinth::project::{Project, ProjectType};
+use carbon_platforms::modrinth::search::ProjectSearchResult;
+use carbon_platforms::modrinth::tag::LoaderType;
 use carbon_platforms::{curseforge::ClassId, modrinth::search::ProjectSearchResponse};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
@@ -18,6 +20,83 @@ pub enum FEUnifiedSearchType {
     Plugin,
     Datapack,
     Unknown,
+}
+
+impl ToString for FEUnifiedSearchType {
+    fn to_string(&self) -> String {
+        match self {
+            FEUnifiedSearchType::Mod => "mod",
+            FEUnifiedSearchType::Modpack => "modpack",
+            FEUnifiedSearchType::ResourcePack => "resourcepack",
+            FEUnifiedSearchType::Shader => "shader",
+            FEUnifiedSearchType::World => "world",
+            FEUnifiedSearchType::Plugin => "plugin",
+            FEUnifiedSearchType::Datapack => "datapack",
+            FEUnifiedSearchType::Unknown => "unknown",
+        }
+        .to_string()
+    }
+}
+
+impl From<ProjectType> for FEUnifiedSearchType {
+    fn from(value: ProjectType) -> Self {
+        match value {
+            ProjectType::Mod => FEUnifiedSearchType::Mod,
+            ProjectType::Modpack => FEUnifiedSearchType::Modpack,
+            ProjectType::ResourcePack => FEUnifiedSearchType::ResourcePack,
+            ProjectType::Shader => FEUnifiedSearchType::Shader,
+            ProjectType::Plugin => FEUnifiedSearchType::Plugin,
+            ProjectType::DataPack => FEUnifiedSearchType::Datapack,
+            ProjectType::Unknown => FEUnifiedSearchType::Unknown,
+        }
+    }
+}
+
+impl From<FEUnifiedSearchType> for ProjectType {
+    fn from(value: FEUnifiedSearchType) -> Self {
+        match value {
+            FEUnifiedSearchType::Mod => ProjectType::Mod,
+            FEUnifiedSearchType::Modpack => ProjectType::Modpack,
+            FEUnifiedSearchType::ResourcePack => ProjectType::ResourcePack,
+            FEUnifiedSearchType::Shader => ProjectType::Shader,
+            FEUnifiedSearchType::Plugin => ProjectType::Plugin,
+            FEUnifiedSearchType::Datapack => ProjectType::DataPack,
+            FEUnifiedSearchType::World => ProjectType::Unknown,
+            FEUnifiedSearchType::Unknown => ProjectType::Unknown,
+        }
+    }
+}
+
+impl From<ClassId> for FEUnifiedSearchType {
+    fn from(value: ClassId) -> Self {
+        match value {
+            ClassId::Mods => FEUnifiedSearchType::Mod,
+            ClassId::Modpacks => FEUnifiedSearchType::Modpack,
+            ClassId::ResourcePacks => FEUnifiedSearchType::ResourcePack,
+            ClassId::Shaders => FEUnifiedSearchType::Shader,
+            ClassId::Worlds => FEUnifiedSearchType::World,
+            ClassId::BukkitPlugins => FEUnifiedSearchType::Plugin,
+            ClassId::Customizations => FEUnifiedSearchType::ResourcePack,
+            ClassId::Addons => FEUnifiedSearchType::ResourcePack,
+            ClassId::Datapacks => FEUnifiedSearchType::Datapack,
+            ClassId::Other(_) => FEUnifiedSearchType::Unknown,
+        }
+    }
+}
+
+impl From<FEUnifiedSearchType> for ClassId {
+    fn from(value: FEUnifiedSearchType) -> Self {
+        match value {
+            FEUnifiedSearchType::Mod => ClassId::Mods,
+            FEUnifiedSearchType::Modpack => ClassId::Modpacks,
+            FEUnifiedSearchType::ResourcePack => ClassId::ResourcePacks,
+            FEUnifiedSearchType::Shader => ClassId::Shaders,
+            FEUnifiedSearchType::World => ClassId::Worlds,
+            FEUnifiedSearchType::Plugin => ClassId::BukkitPlugins,
+            FEUnifiedSearchType::Datapack => ClassId::Datapacks,
+            FEUnifiedSearchType::Unknown => ClassId::Other(0),
+        }
+    }
 }
 
 #[derive(Type, Debug, Deserialize, Serialize)]
@@ -181,6 +260,107 @@ pub enum FEUnifiedModLoaderType {
     Unknown,
 }
 
+impl TryFrom<FEUnifiedModLoaderType> for ModLoaderType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: FEUnifiedModLoaderType) -> Result<Self, Self::Error> {
+        match value {
+            FEUnifiedModLoaderType::Forge => Ok(ModLoaderType::Forge),
+
+            FEUnifiedModLoaderType::NeoForge => Ok(ModLoaderType::NeoForge),
+            FEUnifiedModLoaderType::Fabric => Ok(ModLoaderType::Fabric),
+            FEUnifiedModLoaderType::Quilt => Ok(ModLoaderType::Quilt),
+            FEUnifiedModLoaderType::LiteLoader => Ok(ModLoaderType::LiteLoader),
+            FEUnifiedModLoaderType::Cauldron => Ok(ModLoaderType::Cauldron),
+            value => Err(anyhow::anyhow!(
+                "Curseforge does not support the `{}` loader",
+                value.to_string()
+            )),
+        }
+    }
+}
+
+impl TryFrom<FEUnifiedModLoaderType> for LoaderType {
+    type Error = anyhow::Error;
+
+    fn try_from(value: FEUnifiedModLoaderType) -> Result<Self, Self::Error> {
+        match value {
+            FEUnifiedModLoaderType::Forge => Ok(LoaderType::Forge),
+            FEUnifiedModLoaderType::NeoForge => Ok(LoaderType::Neoforge),
+            FEUnifiedModLoaderType::Fabric => Ok(LoaderType::Fabric),
+            FEUnifiedModLoaderType::Quilt => Ok(LoaderType::Quilt),
+            FEUnifiedModLoaderType::LiteLoader => Ok(LoaderType::Liteloader),
+            FEUnifiedModLoaderType::Bukkit => Ok(LoaderType::Bukkit),
+            FEUnifiedModLoaderType::Bungeecord => Ok(LoaderType::Bungeecord),
+            FEUnifiedModLoaderType::Canvas => Ok(LoaderType::Canvas),
+            FEUnifiedModLoaderType::Datapack => Ok(LoaderType::Datapack),
+            FEUnifiedModLoaderType::Folia => Ok(LoaderType::Folia),
+            FEUnifiedModLoaderType::Iris => Ok(LoaderType::Iris),
+            FEUnifiedModLoaderType::Minecraft => Ok(LoaderType::Minecraft),
+            FEUnifiedModLoaderType::Modloader => Ok(LoaderType::Modloader),
+            FEUnifiedModLoaderType::Optifine => Ok(LoaderType::Optifine),
+            FEUnifiedModLoaderType::Paper => Ok(LoaderType::Paper),
+            FEUnifiedModLoaderType::Purpur => Ok(LoaderType::Purpur),
+            FEUnifiedModLoaderType::Rift => Ok(LoaderType::Rift),
+            FEUnifiedModLoaderType::Spigot => Ok(LoaderType::Spigot),
+            FEUnifiedModLoaderType::Sponge => Ok(LoaderType::Sponge),
+            FEUnifiedModLoaderType::Vanilla => Ok(LoaderType::Vanilla),
+            FEUnifiedModLoaderType::Velocity => Ok(LoaderType::Velocity),
+            FEUnifiedModLoaderType::Waterfall => Ok(LoaderType::Waterfall),
+            FEUnifiedModLoaderType::Unknown => {
+                Err(anyhow::anyhow!("Can't use unknown modloader type"))
+            }
+            FEUnifiedModLoaderType::Cauldron => Err(anyhow::anyhow!(
+                "Modrinth does not support the `Cauldron` loader"
+            )),
+        }
+    }
+}
+
+impl From<LoaderType> for FEUnifiedModLoaderType {
+    fn from(value: LoaderType) -> Self {
+        match value {
+            LoaderType::Forge => FEUnifiedModLoaderType::Forge,
+            LoaderType::Neoforge => FEUnifiedModLoaderType::NeoForge,
+            LoaderType::Fabric => FEUnifiedModLoaderType::Fabric,
+            LoaderType::Quilt => FEUnifiedModLoaderType::Quilt,
+            LoaderType::Liteloader => FEUnifiedModLoaderType::LiteLoader,
+            LoaderType::Bukkit => FEUnifiedModLoaderType::Bukkit,
+            LoaderType::Bungeecord => FEUnifiedModLoaderType::Bungeecord,
+            LoaderType::Canvas => FEUnifiedModLoaderType::Canvas,
+            LoaderType::Datapack => FEUnifiedModLoaderType::Datapack,
+            LoaderType::Folia => FEUnifiedModLoaderType::Folia,
+            LoaderType::Iris => FEUnifiedModLoaderType::Iris,
+            LoaderType::Minecraft => FEUnifiedModLoaderType::Minecraft,
+            LoaderType::Modloader => FEUnifiedModLoaderType::Modloader,
+            LoaderType::Optifine => FEUnifiedModLoaderType::Optifine,
+            LoaderType::Paper => FEUnifiedModLoaderType::Paper,
+            LoaderType::Purpur => FEUnifiedModLoaderType::Purpur,
+            LoaderType::Rift => FEUnifiedModLoaderType::Rift,
+            LoaderType::Spigot => FEUnifiedModLoaderType::Spigot,
+            LoaderType::Sponge => FEUnifiedModLoaderType::Sponge,
+            LoaderType::Vanilla => FEUnifiedModLoaderType::Vanilla,
+            LoaderType::Velocity => FEUnifiedModLoaderType::Velocity,
+            LoaderType::Waterfall => FEUnifiedModLoaderType::Waterfall,
+            _ => FEUnifiedModLoaderType::Unknown,
+        }
+    }
+}
+
+impl From<ModLoaderType> for FEUnifiedModLoaderType {
+    fn from(value: ModLoaderType) -> Self {
+        match value {
+            ModLoaderType::Forge => FEUnifiedModLoaderType::Forge,
+            ModLoaderType::NeoForge => FEUnifiedModLoaderType::NeoForge,
+            ModLoaderType::Fabric => FEUnifiedModLoaderType::Fabric,
+            ModLoaderType::Quilt => FEUnifiedModLoaderType::Quilt,
+            ModLoaderType::LiteLoader => FEUnifiedModLoaderType::LiteLoader,
+            ModLoaderType::Cauldron => FEUnifiedModLoaderType::Cauldron,
+            ModLoaderType::Other(_) => FEUnifiedModLoaderType::Unknown,
+        }
+    }
+}
+
 #[derive(Type, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FEUnifiedSearchResult {
@@ -205,24 +385,187 @@ pub struct FEUnifiedSearchResult {
 
 impl From<ProjectSearchResponse> for FEUnifiedSearchResponse {
     fn from(value: ProjectSearchResponse) -> Self {
-        todo!()
+        let result_count = value.hits.len();
+
+        Self {
+            data: value.hits.into_iter().map(|hit| hit.into()).collect(),
+            pagination: Some(FEUnifiedPagination {
+                index: value.offset,
+                page_size: value.limit,
+                result_count: result_count as u32,
+                total_count: value.total_hits,
+            }),
+        }
     }
 }
 
 impl From<CurseForgeResponse<Vec<Mod>>> for FEUnifiedSearchResponse {
     fn from(value: CurseForgeResponse<Vec<Mod>>) -> Self {
-        todo!()
+        Self {
+            data: value.data.into_iter().map(|m| m.into()).collect(),
+            pagination: value.pagination.map(|pagination| FEUnifiedPagination {
+                index: pagination.index as u32,
+                page_size: pagination.page_size as u32,
+                result_count: pagination.result_count as u32,
+                total_count: pagination.total_count as u32,
+            }),
+        }
     }
 }
 
 impl From<CurseForgeResponse<Mod>> for FEUnifiedSearchResult {
     fn from(value: CurseForgeResponse<Mod>) -> Self {
-        todo!()
+        value.data.into()
+    }
+}
+
+impl From<Mod> for FEUnifiedSearchResult {
+    fn from(value: Mod) -> Self {
+        FEUnifiedSearchResult {
+            title: value.name,
+            description: value.summary,
+            slug: value.slug.clone(),
+            main_file_id: Some(value.main_file_id.to_string()),
+            image_url: value.logo.as_ref().map(|logo| logo.thumbnail_url.clone()),
+            high_res_image_url: value.logo.as_ref().map(|logo| logo.url.clone()),
+            id: value.id.to_string(),
+            release_date: value.date_created,
+            last_updated: value.date_modified.to_string(),
+            downloads_count: value.download_count,
+            platform: FEUnifiedPlatform::Curseforge,
+            r#type: value
+                .class_id
+                .map(|id| id.into())
+                .unwrap_or(FEUnifiedSearchType::Unknown),
+            authors: value
+                .authors
+                .into_iter()
+                .map(|author| FEUnifiedAuthor {
+                    name: author.name,
+                    avatar_url: author.avatar_url,
+                })
+                .collect(),
+            website_url: value.links.website_url,
+            categories: value
+                .categories
+                .into_iter()
+                .map(|category| FEUnifiedCategoryId::Curseforge(category.id))
+                .collect(),
+            screenshot_urls: value
+                .screenshots
+                .into_iter()
+                .map(|screenshot| screenshot.url)
+                .collect(),
+            minecraft_versions: {
+                let mut all_versions: Vec<String> = value
+                    .latest_files_indexes
+                    .iter()
+                    .map(|v| v.game_version.clone())
+                    .collect();
+
+                // all_versions.sort_by(|a, b| {
+                //     // Parse versions with a custom comparator that handles Minecraft versioning
+                //     let parse_version = |v: &str| -> (u32, u32, u32) {
+                //         let parts: Vec<&str> = v.split('.').collect();
+                //         let major = parts
+                //             .get(0)
+                //             .and_then(|s| s.parse::<u32>().ok())
+                //             .unwrap_or(0);
+                //         let minor = parts
+                //             .get(1)
+                //             .and_then(|s| s.parse::<u32>().ok())
+                //             .unwrap_or(0);
+                //         let patch = parts
+                //             .get(2)
+                //             .and_then(|s| s.parse::<u32>().ok())
+                //             .unwrap_or(0);
+                //         (major, minor, patch)
+                //     };
+
+                //     let a_version = parse_version(a);
+                //     let b_version = parse_version(b);
+
+                //     // Compare versions component by component
+                //     a_version.cmp(&b_version)
+                // });
+
+                all_versions.dedup();
+                all_versions
+            },
+        }
     }
 }
 
 impl From<Project> for FEUnifiedSearchResult {
     fn from(value: Project) -> Self {
-        todo!()
+        FEUnifiedSearchResult {
+            title: value.title,
+            description: value.description,
+            slug: value.slug.clone(),
+            main_file_id: value.versions.first().cloned(),
+            image_url: value.icon_url.as_ref().map(|url| url.clone()),
+            high_res_image_url: value.icon_url.map(|url| url),
+            id: value.id,
+            release_date: value.published.to_string(),
+            last_updated: value.updated.to_string(),
+            downloads_count: value.downloads,
+            platform: FEUnifiedPlatform::Modrinth,
+            r#type: value.project_type.clone().into(),
+            authors: vec![],
+            website_url: Some(format!(
+                "https://modrinth.com/{}/{}",
+                serde_plain::to_string(&value.project_type)
+                    .expect("Cannot fail as there is a default fallback"),
+                value.slug
+            )),
+            categories: value
+                .categories
+                .into_iter()
+                .map(|category| FEUnifiedCategoryId::Modrinth(category))
+                .collect(),
+            screenshot_urls: value
+                .gallery
+                .iter()
+                .map(|gallery| gallery.url.clone())
+                .collect(),
+            minecraft_versions: value.versions,
+        }
+    }
+}
+
+impl From<ProjectSearchResult> for FEUnifiedSearchResult {
+    fn from(value: ProjectSearchResult) -> Self {
+        FEUnifiedSearchResult {
+            title: value.title,
+            description: value.description,
+            slug: value.slug.clone(),
+            main_file_id: value.latest_version,
+            image_url: value.icon_url.as_ref().map(|url| url.clone()),
+            high_res_image_url: value.icon_url.map(|url| url),
+            id: value.project_id,
+            release_date: value.date_created.to_string(),
+            last_updated: value.date_modified.to_string(),
+            downloads_count: value.downloads,
+            platform: FEUnifiedPlatform::Modrinth,
+            r#type: value.project_type.clone().into(),
+            authors: vec![FEUnifiedAuthor {
+                name: value.author,
+                avatar_url: None,
+            }],
+            website_url: Some(format!(
+                "https://modrinth.com/{}/{}",
+                serde_plain::to_string(&value.project_type)
+                    .expect("Cannot fail as there is a default fallback"),
+                value.slug
+            )),
+            categories: value
+                .categories
+                .unwrap_or_default()
+                .into_iter()
+                .map(|category| FEUnifiedCategoryId::Modrinth(category))
+                .collect(),
+            screenshot_urls: value.gallery.unwrap_or_default(),
+            minecraft_versions: value.versions,
+        }
     }
 }
