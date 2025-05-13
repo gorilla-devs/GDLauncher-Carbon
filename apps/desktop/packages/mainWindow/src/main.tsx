@@ -5,6 +5,7 @@ import {
   createResource,
   createSignal,
   ErrorBoundary,
+  JSX,
   Match,
   Show,
   Switch
@@ -25,6 +26,25 @@ import GDAnimation from "./gd_logo_animation.riv"
 import { GlobalStoreProvider } from "./components/GlobalStoreContext"
 import PatternBackground from "./components/PatternBackground"
 import gdlauncherLogo from "/assets/images/gdlauncher_wide_logo_blue.svg"
+
+const ProdWrapErrorBoundary = (props: { children: JSX.Element }) => {
+  return (
+    <Switch>
+      <Match when={!import.meta.env.DEV}>
+        <ErrorBoundary
+          fallback={(err) => {
+            console.error("Window errored", err)
+            window.fatalError(err, "Window")
+            return <></>
+          }}
+        >
+          {props.children}
+        </ErrorBoundary>
+      </Match>
+      <Match when={import.meta.env.DEV}>{props.children}</Match>
+    </Switch>
+  )
+}
 
 render(() => {
   const [coreModuleProgress, setCoreModuleProgress] = createSignal<
@@ -123,15 +143,7 @@ render(() => {
   })
 
   return (
-    <ErrorBoundary
-      fallback={(err) => {
-        console.error("Window errored", err)
-
-        window.fatalError(err, "Window")
-
-        return <></>
-      }}
-    >
+    <ProdWrapErrorBoundary>
       <Switch>
         <Match when={isIntroAnimationFinished()}>
           <Switch>
@@ -189,7 +201,7 @@ render(() => {
           </div>
         </Match>
       </Switch>
-    </ErrorBoundary>
+    </ProdWrapErrorBoundary>
   )
 }, document.getElementById("root")!)
 
