@@ -56,7 +56,7 @@ export type Procedures = {
         { key: "modplatforms.modrinth.getVersion", input: MRFEVersionID, result: MRFEVersion } | 
         { key: "modplatforms.modrinth.getVersions", input: MRFEVersionIDs, result: MRFEVersionsResponse } | 
         { key: "modplatforms.modrinth.search", input: MRFEProjectSearchParameters, result: MRFEProjectSearchResponse } | 
-        { key: "modplatforms.unifiedGetProject", input: FEUnifiedProjectID, result: FEUnifiedSearchResult } | 
+        { key: "modplatforms.unifiedGetProject", input: FEUnifiedProjectID, result: FEUnifiedSearchResultWithDescription } | 
         { key: "modplatforms.unifiedSearch", input: FEUnifiedSearchParameters, result: FEUnifiedSearchResponse } | 
         { key: "modplatforms.unifiedSearchProjectType", input: never, result: FEUnifiedSearchType[] } | 
         { key: "settings.getPrivacyStatementBody", input: never, result: string } | 
@@ -205,6 +205,8 @@ export type MRFESearchFacet = { Category: string } | { Version: string } | { Lic
 export type MRFEProjectID = string
 
 export type MRFEProjectSearchParameters = { query: string | null; facets: MRFESearchFacetAnd | null; index: MRFESearchIndex | null; offset: number | null; limit: number | null; filters: string | null }
+
+export type FEUnifiedSearchResultWithDescription = ({ title: string; slug: string; description: string; imageUrl: string | null; highResImageUrl: string | null; downloadsCount: number; id: string; releaseDate: string; lastUpdated: string; platform: FEUnifiedPlatform; type: FEUnifiedSearchType; authors: FEUnifiedAuthor[]; websiteUrl: string | null; categories: FEUnifiedCategoryId[]; screenshotUrls: string[]; minecraftVersions: string[]; mainFileId: string | null }) & { fullDescriptionBody: string }
 
 export type FEInstanceModloaderType = "neoforge" | "forge" | "fabric" | "quilt"
 

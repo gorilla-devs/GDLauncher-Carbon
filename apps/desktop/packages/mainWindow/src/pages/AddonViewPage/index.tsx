@@ -14,10 +14,17 @@ import {
   Outlet,
   useLocation,
   useParams,
-  useRouteData,
   useSearchParams
 } from "@solidjs/router"
-import { For, Match, Show, Switch, createSignal } from "solid-js"
+import {
+  For,
+  Match,
+  Show,
+  Switch,
+  createEffect,
+  createResource,
+  createSignal
+} from "solid-js"
 import { format } from "date-fns"
 import Authors from "@/pages/Library/Instance/Info/Authors"
 import ExploreVersionsNavbar from "@/components/ExploreVersionsNavbar"
@@ -29,6 +36,7 @@ import InfiniteScrollVersionsQueryWrapper, {
 } from "@/components/InfiniteScrollVersionsQueryWrapper"
 import { rspc } from "@/utils/rspcClient"
 import { FEUnifiedPlatform } from "@gd/core_module/bindings"
+import { parseToHtml } from "@/utils/modplatformDescriptionConverter"
 
 const getTabIndexFromPath = (path: string) => {
   if (path.match(/\/(addon)\/.+\/.+/g)) {
@@ -84,6 +92,7 @@ const ModExplore = () => {
           }
     ]
   }))
+
   const instanceId = () => parseInt(searchParams.instanceId, 10)
   const isFetching = () => project.isLoading
   const projectId = () => project.data?.id
@@ -222,11 +231,11 @@ const ModExplore = () => {
                       <div class="flex max-w-52 gap-2 overflow-x-auto whitespace-nowrap text-sm">
                         <Switch>
                           <Match when={!isFetching()}>
-                            <Authors
+                            {/* <Authors
                               isCurseforge={routeData.isCurseforge}
                               isModrinth={routeData.isModrinth}
                               modpackDetails={routeData.modpackDetails.data}
-                            />
+                            /> */}
                           </Match>
                           <Match when={isFetching()}>
                             <Skeleton />
@@ -288,16 +297,15 @@ const ModExplore = () => {
                     </TabList>
                   </div>
                 </Tabs>
-                <Show when={isSticky()}>
-                  <ModDownloadButton />
-                </Show>
+                <Show when={isSticky()}>{/* <ModDownloadButton /> */}</Show>
               </div>
               <Show when={indexTab() === 3}>
                 <ExploreVersionsNavbar modplatform={platform()} type="mod" />
               </Show>
             </div>
             <div class="z-0">
-              <Outlet />
+              {/* <Outlet /> */}
+              <div innerHTML={parseToHtml(project.data?.fullDescriptionBody)} />
             </div>
           </div>
         </div>

@@ -569,3 +569,11 @@ impl From<ProjectSearchResult> for FEUnifiedSearchResult {
         }
     }
 }
+
+#[derive(Type, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FEUnifiedSearchResultWithDescription {
+    pub full_description_body: String,
+    #[serde(flatten)]
+    pub result: FEUnifiedSearchResult,
+}

@@ -3,7 +3,10 @@ use crate::{
     managers::App,
 };
 use carbon_platforms::{
-    curseforge::{ClassId, filters::ModParameters},
+    curseforge::{
+        ClassId,
+        filters::{ModDescriptionParameters, ModParameters},
+    },
     modrinth::project::ProjectType,
 };
 use curseforge::structs::{CFFEFile, CFFEModLoaderType};
@@ -171,20 +174,44 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         query UNIFIED_GET_PROJECT[app, project: filters::FEUnifiedProjectID] {
             let modplatforms = app.modplatforms_manager();
-            let response: responses::FEUnifiedSearchResult = match project {
+            let response: responses::FEUnifiedSearchResultWithDescription = match project {
                 filters::FEUnifiedProjectID::Curseforge(id) => {
                     let response = modplatforms.curseforge.get_mod(ModParameters {
                         mod_id: id
-                    }).await?;
-                    responses::FEUnifiedSearchResult::from(response)
+                    });
+
+                    let description = modplatforms.curseforge.get_mod_description(ModDescriptionParameters {
+                        mod_id: id
+                    });
+
+                    let (response, description) = tokio::try_join!(response, description)?;
+
+                    responses::FEUnifiedSearchResultWithDescription {
+                        result: responses::FEUnifiedSearchResult::from(response),
+                        full_description_body: description.data,
+                    }
                 }
                 filters::FEUnifiedProjectID::Modrinth(id) => {
                     let response = modplatforms.modrinth.get_project(id.into()).await?;
-                    responses::FEUnifiedSearchResult::from(response)
+
+                    // Modrinth body comes in markdown format
+                    let body = markdown::to_html_with_options(&response.body, &markdown::Options {
+                        compile: markdown::CompileOptions {
+                          allow_dangerous_html: true,
+                          allow_dangerous_protocol: true,
+                          ..markdown::CompileOptions::default()
+                        },
+                        ..markdown::Options::default()
+                    }).map_err(|e| anyhow::anyhow!("Failed to convert markdown to html: {}", e))?;
+
+                    responses::FEUnifiedSearchResultWithDescription {
+                        result: responses::FEUnifiedSearchResult::from(response),
+                        full_description_body: body,
+                    }
                 }
             };
 
-            Ok(responses::FEUnifiedSearchResult::from(response))
+            Ok(response)
         }
 
         query GET_UNIFIED_MODLOADERS[app, _args: ()] {
