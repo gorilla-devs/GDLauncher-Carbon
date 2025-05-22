@@ -51,6 +51,10 @@ const Mods = () => {
     mutationKey: ["instance.openInstanceFolder"]
   }))
 
+  const gotoSearchPage = () => {
+    navigator.navigate(`/search?instanceId=${params.id}`)
+  }
+
   const filteredMods = createMemo(() => {
     const filterName = filter().replaceAll(" ", "").toLowerCase()
 
@@ -117,7 +121,7 @@ const Mods = () => {
             type="outline"
             size="medium"
             onClick={() => {
-              navigator.navigate(`/mods?instanceId=${params.id}`)
+              gotoSearchPage()
             }}
           >
             <Trans key="instance.add_mod" />
@@ -359,7 +363,7 @@ const Mods = () => {
                 type="outline"
                 size="medium"
                 onClick={() => {
-                  navigator.navigate(`/mods?instanceId=${params.id}`)
+                  gotoSearchPage()
                 }}
               >
                 <Trans key="instance.add_mod" />

@@ -59,7 +59,7 @@
     "sanitize-html": "^2.13.1",
     "solid-js": "^1.9.3",
     "solid-transition-group": "^0.2.3",
-    "virtua": "0.40.4",
+    "virtua": "0.41.2",
     "vite": "^6.3.4",
     "vite-plugin-solid": "^2.11.6"
   },

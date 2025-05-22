@@ -26,7 +26,10 @@ export const NavigationManager = (props: { children: JSX.Element }) => {
   const navigate = useNavigate()
   const location = useLocation()
   const globalstore = useGlobalStore()
-  const [lastPathVisited, setLastPathVisited] = createSignal(location.pathname)
+  const [lastPathVisited, setLastPathVisited] = createSignal({
+    path: location.pathname,
+    searchParams: location.search
+  })
 
   const shouldTransition = () =>
     !globalstore.settings.data?.reducedMotion && document.startViewTransition
@@ -57,12 +60,15 @@ export const NavigationManager = (props: { children: JSX.Element }) => {
     }
 
     if (!options?.replace) {
-      setLastPathVisited(currentPath)
+      setLastPathVisited({
+        path: currentPath,
+        searchParams: location.search
+      })
     }
   }
 
   const prev = () => {
-    gdNavigate(lastPathVisited())
+    gdNavigate(`${lastPathVisited().path}${lastPathVisited().searchParams}`)
   }
 
   const navigationCtx = {

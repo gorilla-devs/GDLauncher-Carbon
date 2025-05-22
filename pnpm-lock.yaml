@@ -195,8 +195,8 @@ importers:
         specifier: ^0.2.3
         version: 0.2.3(solid-js@1.9.3)
       virtua:
-        specifier: 0.40.4
-        version: 0.40.4(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(solid-js@1.9.3)(vue@3.5.13(typescript@5.6.3))
+        specifier: 0.41.2
+        version: 0.41.2(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(solid-js@1.9.3)(vue@3.5.13(typescript@5.6.3))
       vite:
         specifier: ^6.3.4
         version: 6.3.4(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0)
@@ -353,7 +353,7 @@ importers:
         version: 7.6.10(react@18.2.0)
       '@storybook/addon-styling':
         specifier: ^1.3.0
-        version: 1.3.7(@types/react@18.2.48)(encoding@0.1.13)(less@4.2.0)(postcss@8.4.49)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.6.3)(webpack@5.90.0(esbuild@0.23.1))
+        version: 1.3.7(@types/react@18.2.48)(encoding@0.1.13)(less@4.2.0)(postcss@8.4.49)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.6.3)(webpack@5.90.0(esbuild@0.18.20))
       '@storybook/blocks':
         specifier: ^7.0.22
         version: 7.6.10(@types/react@18.2.48)(encoding@0.1.13)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -365,7 +365,7 @@ importers:
         version: 5.17.0
       babel-loader:
         specifier: ^9.1.2
-        version: 9.1.3(@babel/core@7.23.7)(webpack@5.90.0(esbuild@0.23.1))
+        version: 9.1.3(@babel/core@7.23.7)(webpack@5.90.0(esbuild@0.18.20))
       class-variance-authority:
         specifier: ^0.7.0
         version: 0.7.0
@@ -3776,10 +3776,10 @@ packages:
   '@storybook/builder-manager@7.6.10':
     resolution: {integrity: sha512-f+YrjZwohGzvfDtH8BHzqM3xW0p4vjjg9u7uzRorqUiNIAAKHpfNrZ/WvwPlPYmrpAHt4xX/nXRJae4rFSygPw==}
 
-  '@storybook/builder-vite@9.0.0-beta.6':
-    resolution: {integrity: sha512-eOv2hlqVdwtyMgMxTaZliEkWEKt+BoxTUZOHmw0mcY7aa6iKhegMLRMEMddr2Dqn+QuAEOCi+O3af6eQwrSm5g==}
+  '@storybook/builder-vite@9.0.0-rc.4':
+    resolution: {integrity: sha512-MUNSYSc30qO2Ppdz454PCp8IJyV56h+1DR+BjAYzLmF1857jIND3rdjGDHi/6cTjN7owlpFytSMzlQFUDgEXJg==}
     peerDependencies:
-      storybook: ^9.0.0-beta.6
+      storybook: ^9.0.0-rc.4
       vite: ^5.0.0 || ^6.0.0
 
   '@storybook/channels@7.6.10':
@@ -3813,10 +3813,10 @@ packages:
   '@storybook/csf-plugin@7.6.10':
     resolution: {integrity: sha512-Sc+zZg/BnPH2X28tthNaQBnDiFfO0QmfjVoOx0fGYM9SvY3P5ehzWwp5hMRBim6a/twOTzePADtqYL+t6GMqqg==}
 
-  '@storybook/csf-plugin@9.0.0-beta.6':
-    resolution: {integrity: sha512-dS6hgrs6z+e2He+s1mzxo669tLTkiFsDft5/suRaoM8kEKSW4Q7FSbizPC9xAhF7YJDzgBRAhMXe92ldDngmyg==}
+  '@storybook/csf-plugin@9.0.0-rc.4':
+    resolution: {integrity: sha512-ljiVNS+6Y7kYT0S5YmnLL20cVyPTwM4yUKGUbwH5xno6baS5MPAAIGrZD9zu0silC527NfEI1m3Yax8u9sSGKQ==}
     peerDependencies:
-      storybook: ^9.0.0-beta.6
+      storybook: ^9.0.0-rc.4
 
   '@storybook/csf-tools@7.6.10':
     resolution: {integrity: sha512-TnDNAwIALcN6SA4l00Cb67G02XMOrYU38bIpFJk5VMDX2dvgPjUtJNBuLmEbybGcOt7nPyyFIHzKcY5FCVGoWA==}
@@ -9637,8 +9637,8 @@ packages:
   vfile@6.0.1:
     resolution: {integrity: sha512-1bYqc7pt6NIADBJ98UiG0Bn/CHIVOoZ/IyEkqIruLg0mE1BKzkOXY2D6CSqQIcKqgadppE5lrxgWXJmXd7zZJw==}
 
-  virtua@0.40.4:
-    resolution: {integrity: sha512-eV55eOm2b5Lzc9upivqIcAFPgfBrfcVrppW9T4vhTH+QAbaxfw5ypq25apkG83T5FuiFEoQYnefix1fQyx/GXQ==}
+  virtua@0.41.2:
+    resolution: {integrity: sha512-48jgdeXKagXEVxalTFf1bJe/5JZq41QG9LcwDweFJwOZgOvIgoHhBR+IMZPOVd0AjtwvLOaS3O7MYNdti9c4VQ==}
     peerDependencies:
       react: '>=16.14.0'
       react-dom: '>=16.14.0'
@@ -14228,7 +14228,7 @@ snapshots:
       '@storybook/global': 5.0.0
       ts-dedent: 2.2.0
 
-  '@storybook/addon-styling@1.3.7(@types/react@18.2.48)(encoding@0.1.13)(less@4.2.0)(postcss@8.4.49)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.6.3)(webpack@5.90.0(esbuild@0.23.1))':
+  '@storybook/addon-styling@1.3.7(@types/react@18.2.48)(encoding@0.1.13)(less@4.2.0)(postcss@8.4.49)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(typescript@5.6.3)(webpack@5.90.0(esbuild@0.18.20))':
     dependencies:
       '@babel/template': 7.22.15
       '@babel/types': 7.23.6
@@ -14241,19 +14241,19 @@ snapshots:
       '@storybook/preview-api': 7.6.10
       '@storybook/theming': 7.6.10(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       '@storybook/types': 7.6.10
-      css-loader: 6.9.1(webpack@5.90.0(esbuild@0.23.1))
-      less-loader: 11.1.4(less@4.2.0)(webpack@5.90.0(esbuild@0.23.1))
-      postcss-loader: 7.3.4(postcss@8.4.49)(typescript@5.6.3)(webpack@5.90.0(esbuild@0.23.1))
+      css-loader: 6.9.1(webpack@5.90.0(esbuild@0.18.20))
+      less-loader: 11.1.4(less@4.2.0)(webpack@5.90.0(esbuild@0.18.20))
+      postcss-loader: 7.3.4(postcss@8.4.49)(typescript@5.6.3)(webpack@5.90.0(esbuild@0.18.20))
       prettier: 2.8.8
       resolve-url-loader: 5.0.0
-      sass-loader: 13.3.3(webpack@5.90.0(esbuild@0.23.1))
-      style-loader: 3.3.4(webpack@5.90.0(esbuild@0.23.1))
+      sass-loader: 13.3.3(webpack@5.90.0(esbuild@0.18.20))
+      style-loader: 3.3.4(webpack@5.90.0(esbuild@0.18.20))
     optionalDependencies:
       less: 4.2.0
       postcss: 8.4.49
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
-      webpack: 5.90.0(esbuild@0.23.1)
+      webpack: 5.90.0(esbuild@0.18.20)
     transitivePeerDependencies:
       - '@types/react'
       - '@types/react-dom'
@@ -14334,10 +14334,9 @@ snapshots:
       - encoding
       - supports-color
 
-  '@storybook/builder-vite@9.0.0-beta.6(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))':
+  '@storybook/builder-vite@9.0.0-rc.4(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))':
     dependencies:
-      '@storybook/csf-plugin': 9.0.0-beta.6(storybook@7.6.10(encoding@0.1.13))
-      browser-assert: 1.2.1
+      '@storybook/csf-plugin': 9.0.0-rc.4(storybook@7.6.10(encoding@0.1.13))
       storybook: 7.6.10(encoding@0.1.13)
       ts-dedent: 2.2.0
       vite: 6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0)
@@ -14529,7 +14528,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@storybook/csf-plugin@9.0.0-beta.6(storybook@7.6.10(encoding@0.1.13))':
+  '@storybook/csf-plugin@9.0.0-rc.4(storybook@7.6.10(encoding@0.1.13))':
     dependencies:
       storybook: 7.6.10(encoding@0.1.13)
       unplugin: 1.6.0
@@ -14810,11 +14809,11 @@ snapshots:
   '@types/eslint-scope@3.7.7':
     dependencies:
       '@types/eslint': 8.56.2
-      '@types/estree': 1.0.6
+      '@types/estree': 1.0.7
 
   '@types/eslint@8.56.2':
     dependencies:
-      '@types/estree': 1.0.6
+      '@types/estree': 1.0.7
       '@types/json-schema': 7.0.15
 
   '@types/estree-jsx@1.0.3':
@@ -16031,12 +16030,12 @@ snapshots:
     dependencies:
       '@babel/core': 7.25.2
 
-  babel-loader@9.1.3(@babel/core@7.23.7)(webpack@5.90.0(esbuild@0.23.1)):
+  babel-loader@9.1.3(@babel/core@7.23.7)(webpack@5.90.0(esbuild@0.18.20)):
     dependencies:
       '@babel/core': 7.23.7
       find-cache-dir: 4.0.0
       schema-utils: 4.2.0
-      webpack: 5.90.0(esbuild@0.23.1)
+      webpack: 5.90.0(esbuild@0.18.20)
 
   babel-plugin-istanbul@6.1.1:
     dependencies:
@@ -16728,7 +16727,7 @@ snapshots:
 
   crypto-random-string@2.0.0: {}
 
-  css-loader@6.9.1(webpack@5.90.0(esbuild@0.23.1)):
+  css-loader@6.9.1(webpack@5.90.0(esbuild@0.18.20)):
     dependencies:
       icss-utils: 5.1.0(postcss@8.4.49)
       postcss: 8.4.49
@@ -16738,7 +16737,7 @@ snapshots:
       postcss-modules-values: 4.0.0(postcss@8.4.49)
       postcss-value-parser: 4.2.0
       semver: 7.6.3
-      webpack: 5.90.0(esbuild@0.23.1)
+      webpack: 5.90.0(esbuild@0.18.20)
 
   css-tree@3.1.0:
     dependencies:
@@ -18840,10 +18839,10 @@ snapshots:
     dependencies:
       readable-stream: 2.3.8
 
-  less-loader@11.1.4(less@4.2.0)(webpack@5.90.0(esbuild@0.23.1)):
+  less-loader@11.1.4(less@4.2.0)(webpack@5.90.0(esbuild@0.18.20)):
     dependencies:
       less: 4.2.0
-      webpack: 5.90.0(esbuild@0.23.1)
+      webpack: 5.90.0(esbuild@0.18.20)
 
   less@4.2.0:
     dependencies:
@@ -20126,13 +20125,13 @@ snapshots:
     optionalDependencies:
       postcss: 8.4.33
 
-  postcss-loader@7.3.4(postcss@8.4.49)(typescript@5.6.3)(webpack@5.90.0(esbuild@0.23.1)):
+  postcss-loader@7.3.4(postcss@8.4.49)(typescript@5.6.3)(webpack@5.90.0(esbuild@0.18.20)):
     dependencies:
       cosmiconfig: 8.3.6(typescript@5.6.3)
       jiti: 1.21.0
       postcss: 8.4.49
       semver: 7.6.3
-      webpack: 5.90.0(esbuild@0.23.1)
+      webpack: 5.90.0(esbuild@0.18.20)
     transitivePeerDependencies:
       - typescript
 
@@ -20809,10 +20808,10 @@ snapshots:
       parse-srcset: 1.0.2
       postcss: 8.4.35
 
-  sass-loader@13.3.3(webpack@5.90.0(esbuild@0.23.1)):
+  sass-loader@13.3.3(webpack@5.90.0(esbuild@0.18.20)):
     dependencies:
       neo-async: 2.6.2
-      webpack: 5.90.0(esbuild@0.23.1)
+      webpack: 5.90.0(esbuild@0.18.20)
 
   sax@1.3.0: {}
 
@@ -21175,7 +21174,7 @@ snapshots:
 
   storybook-solidjs-vite@1.0.0-beta.2(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0)):
     dependencies:
-      '@storybook/builder-vite': 9.0.0-beta.6(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))
+      '@storybook/builder-vite': 9.0.0-rc.4(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))
     transitivePeerDependencies:
       - storybook
       - vite
@@ -21271,9 +21270,9 @@ snapshots:
 
   strnum@1.0.5: {}
 
-  style-loader@3.3.4(webpack@5.90.0(esbuild@0.23.1)):
+  style-loader@3.3.4(webpack@5.90.0(esbuild@0.18.20)):
     dependencies:
-      webpack: 5.90.0(esbuild@0.23.1)
+      webpack: 5.90.0(esbuild@0.18.20)
 
   style-to-object@0.4.4:
     dependencies:
@@ -21431,16 +21430,16 @@ snapshots:
       type-fest: 0.16.0
       unique-string: 2.0.0
 
-  terser-webpack-plugin@5.3.10(esbuild@0.23.1)(webpack@5.90.0(esbuild@0.23.1)):
+  terser-webpack-plugin@5.3.10(esbuild@0.18.20)(webpack@5.90.0(esbuild@0.18.20)):
     dependencies:
       '@jridgewell/trace-mapping': 0.3.25
       jest-worker: 27.5.1
       schema-utils: 3.3.0
       serialize-javascript: 6.0.2
       terser: 5.27.0
-      webpack: 5.90.0(esbuild@0.23.1)
+      webpack: 5.90.0(esbuild@0.18.20)
     optionalDependencies:
-      esbuild: 0.23.1
+      esbuild: 0.18.20
 
   terser@5.27.0:
     dependencies:
@@ -21970,7 +21969,7 @@ snapshots:
       unist-util-stringify-position: 4.0.0
       vfile-message: 4.0.2
 
-  virtua@0.40.4(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(solid-js@1.9.3)(vue@3.5.13(typescript@5.6.3)):
+  virtua@0.41.2(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(solid-js@1.9.3)(vue@3.5.13(typescript@5.6.3)):
     optionalDependencies:
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
@@ -22265,10 +22264,10 @@ snapshots:
 
   webpack-virtual-modules@0.6.1: {}
 
-  webpack@5.90.0(esbuild@0.23.1):
+  webpack@5.90.0(esbuild@0.18.20):
     dependencies:
       '@types/eslint-scope': 3.7.7
-      '@types/estree': 1.0.6
+      '@types/estree': 1.0.7
       '@webassemblyjs/ast': 1.11.6
       '@webassemblyjs/wasm-edit': 1.11.6
       '@webassemblyjs/wasm-parser': 1.11.6
@@ -22288,7 +22287,7 @@ snapshots:
       neo-async: 2.6.2
       schema-utils: 3.3.0
       tapable: 2.2.1
-      terser-webpack-plugin: 5.3.10(esbuild@0.23.1)(webpack@5.90.0(esbuild@0.23.1))
+      terser-webpack-plugin: 5.3.10(esbuild@0.18.20)(webpack@5.90.0(esbuild@0.18.20))
       watchpack: 2.4.0
       webpack-sources: 3.2.3
     transitivePeerDependencies:

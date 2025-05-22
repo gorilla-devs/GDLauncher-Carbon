@@ -3,6 +3,7 @@ import { VList } from "@/components/VirtuaWrapper"
 import useSearchContext from "@/components/SearchInputContext"
 import {
   Badge,
+  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
@@ -12,59 +13,69 @@ import { Tab, TabList } from "@gd/ui"
 import { For, onMount, Suspense } from "solid-js"
 import { FEUnifiedSearchType } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
-import { useParams } from "@solidjs/router"
+import { useLocation, useParams, useSearchParams } from "@solidjs/router"
 import FiltersDisplay from "./FiltersDisplay"
 import { FiltersDropdown } from "./FiltersDropdown"
-
-export const projectTypeTabs: {
-  label: string
-  value: FEUnifiedSearchType
-  icon: string
-  path: string
-}[] = [
-  {
-    label: "Modpacks",
-    value: "modpack",
-    icon: "i-ri:folder-fill",
-    path: "/search/modpack"
-  },
-  {
-    label: "Mods",
-    value: "mod",
-    icon: "i-ri:file-text-fill",
-    path: "/search/mod"
-  },
-  {
-    label: "Shaders",
-    value: "shader",
-    icon: "i-ri:paint-fill",
-    path: "/search/shader"
-  },
-  {
-    label: "Resource Packs",
-    value: "resourcePack",
-    icon: "i-ri:folder-fill",
-    path: "/search/resourcePack"
-  },
-  {
-    label: "Data Packs",
-    value: "datapack",
-    icon: "i-ri:folder-fill",
-    path: "/search/datapack"
-  },
-  {
-    label: "Worlds",
-    value: "world",
-    icon: "i-ri:folder-fill",
-    path: "/search/world"
-  }
-]
 
 export function List() {
   const searchContext = useSearchContext()
   const navigator = useGDNavigate()
   const params = useParams()
-  const type = () => params.type ?? "modpack"
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+
+  const defaultType = () => params.type ?? (instanceId() ? "mod" : "modpack")
+  const type = () => params.type ?? defaultType()
+
+  const instanceId = () => searchParams.instanceId
+
+  const projectTypeTabs: () => {
+    label: string
+    value: FEUnifiedSearchType
+    icon: string
+    path: string
+  }[] = () => [
+    ...(instanceId()
+      ? []
+      : [
+          {
+            label: "Modpacks",
+            value: "modpack" as const,
+            icon: "i-ri:folder-fill",
+            path: "/search/modpack"
+          }
+        ]),
+    {
+      label: "Mods",
+      value: "mod",
+      icon: "i-ri:file-text-fill",
+      path: "/search/mod"
+    },
+    {
+      label: "Shaders",
+      value: "shader",
+      icon: "i-ri:paint-fill",
+      path: "/search/shader"
+    },
+    {
+      label: "Resource Packs",
+      value: "resourcePack",
+      icon: "i-ri:folder-fill",
+      path: "/search/resourcePack"
+    },
+    {
+      label: "Data Packs",
+      value: "datapack",
+      icon: "i-ri:folder-fill",
+      path: "/search/datapack"
+    },
+    {
+      label: "Worlds",
+      value: "world",
+      icon: "i-ri:folder-fill",
+      path: "/search/world"
+    }
+  ]
 
   onMount(() => {
     queueMicrotask(() => {
@@ -73,26 +84,44 @@ export function List() {
   })
 
   return (
-    <div class="flex h-full flex-col py-6">
+    <div class="flex h-full flex-col pb-6">
       <FiltersDisplay />
-      <div class="flex w-full justify-between px-6">
+      <div class="flex w-full justify-between p-6">
+        <div
+          class="w-44 items-center gap-2"
+          classList={{
+            hidden: !instanceId(),
+            flex: !!instanceId()
+          }}
+        >
+          <Button
+            size="small"
+            type="outline"
+            onClick={() => {
+              navigator.navigate(`/library/${instanceId()}/mods`)
+            }}
+          >
+            <div class="i-ri:arrow-left-line" />
+            Go Back
+          </Button>
+        </div>
         <Tabs
-          defaultIndex={projectTypeTabs.findIndex(
+          defaultIndex={projectTypeTabs().findIndex(
             (tab) => tab.value === type()
           )}
         >
           <TabList aligment="between">
-            <For each={projectTypeTabs}>
+            <For each={projectTypeTabs()}>
               {(tab, index) => (
                 <Tab
                   onClick={() => {
                     if (
                       index() ===
-                      projectTypeTabs.findIndex((tab) => tab.value === type())
+                      projectTypeTabs().findIndex((tab) => tab.value === type())
                     )
                       return
 
-                    navigator.navigate(tab.path)
+                    navigator.navigate(`${tab.path}${location.search}`)
 
                     queueMicrotask(() => {
                       searchContext?.setSearchQuery((prev) => ({
@@ -108,7 +137,7 @@ export function List() {
             </For>
           </TabList>
         </Tabs>
-        <div>
+        <div class="flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger>
               <Badge>
@@ -156,7 +185,7 @@ export function List() {
                 result={result.value!}
                 onItemClick={() => {
                   navigator.navigate(
-                    `/addon/${result.value!.id}/${result.value!.platform}`
+                    `/addon/${result.value!.id}/${result.value!.platform}?instanceId=${instanceId()}`
                   )
                 }}
               />

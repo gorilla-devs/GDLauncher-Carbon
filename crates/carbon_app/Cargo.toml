@@ -3,17 +3,6 @@ name = "carbon_app"
 version = "0.0.0"
 edition = "2024"
 
-[target.aarch64-apple-darwin]
-rustflags = [
-    "-C",
-    "link-arg=-fuse-ld=/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld",
-    "-C",
-    "link-arg=-ld_new",
-]
-
-[target.x86_64-pc-windows-msvc]
-linker = "lld-link.exe"
-
 [dependencies]
 semver = "1.0.25"
 anyhow = { workspace = true }

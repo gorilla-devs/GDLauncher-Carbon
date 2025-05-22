@@ -186,7 +186,10 @@ impl From<carbon_platforms::curseforge::Category> for FEUnifiedCategory {
             id: FEUnifiedCategoryId::Curseforge(value.id),
             name: Some(value.name),
             icon: value.icon_url.map(FEUnifiedCategoryIcon::Url),
-            project_type: FEUnifiedSearchType::Mod, // Assuming default project type is Mod
+            project_type: value
+                .class_id
+                .map(|id| id.into())
+                .unwrap_or(FEUnifiedSearchType::Unknown),
             parent_id: value.parent_category_id.map(|id| id.to_string()),
         }
     }
@@ -198,9 +201,9 @@ impl From<carbon_platforms::modrinth::tag::Category> for FEUnifiedCategory {
             platform: FEUnifiedPlatform::Modrinth,
             id: FEUnifiedCategoryId::Modrinth(value.name.clone()),
             name: Some(value.name),
-            icon: value.icon.map(FEUnifiedCategoryIcon::Url),
-            project_type: FEUnifiedSearchType::Mod, // Assuming default project type is Mod
-            parent_id: None,                        // Modrinth categories don't have parent IDs
+            icon: value.icon.map(FEUnifiedCategoryIcon::Embedded),
+            project_type: value.project_type.into(),
+            parent_id: None, // Modrinth categories don't have parent IDs
         }
     }
 }

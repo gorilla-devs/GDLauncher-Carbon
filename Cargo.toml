@@ -23,7 +23,7 @@ incremental = true
 debug-assertions = true
 
 [profile.dev]
-opt-level = 1
+opt-level = 0
 
 [workspace.dependencies]
 anyhow = { version = "1.0.98", features = ["backtrace"] }

@@ -224,7 +224,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
     <ModalsContext.Provider value={manager}>
       {props.children}
       <Portal mount={document.getElementById("overlay")!}>
-        <div class="w-screen h-screen">
+        <div class="h-screen w-screen">
           <For each={modalStack()}>
             {(modal, index) => {
               const ModalComponent = defaultModals[modal.name].component
@@ -235,9 +235,9 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                 .preventClose
 
               return (
-                <div class="h-screen w-screen flex absolute inset-0">
+                <div class="absolute inset-0 flex h-screen w-screen">
                   <div
-                    class="flex h-full items-center relative flex-grow justify-center z-999"
+                    class="z-999 relative flex h-full flex-grow items-center justify-center"
                     onMouseDown={() => {
                       if (!preventClose) {
                         closeModal()
@@ -247,7 +247,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                     <div
                       style={{ "z-index": `${index() + 1}` }}
                       onMouseDown={(e) => e.stopPropagation()}
-                      class="duration-100 ease-in-out animate-enterWithOpacityChange"
+                      class="animate-enterWithOpacityChange duration-100 ease-in-out"
                     >
                       <Dynamic
                         component={ModalComponent}
@@ -256,11 +256,11 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                         title={title}
                       />
                     </div>
-                    <div class="absolute inset-0 bg-darkSlate-900 opacity-80" />
+                    <div class="bg-darkSlate-900 absolute inset-0 opacity-80" />
                   </div>
 
                   <div
-                    class="h-screen duration-100 ease-in-out text-lightSlate-50 place-items-center z-999 origin-center bg-darkSlate-900 opacity-80"
+                    class="text-lightSlate-50 z-999 bg-darkSlate-900 h-screen origin-center place-items-center opacity-80 duration-100 ease-in-out"
                     style={{
                       width: `${adSize.width}px`
                     }}

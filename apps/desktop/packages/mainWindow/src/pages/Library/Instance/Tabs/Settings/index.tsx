@@ -108,17 +108,20 @@ const Settings = () => {
                     {
                       name: "unlock_confirmation"
                     },
-                    { instanceState: "unlock" }
+                    {
+                      instanceState: "unlock",
+                      instanceId: parseInt(params.id, 10)
+                    }
                   )
                 }}
               >
-                <i class="w-5 h-5 i-ri:lock-fill" />
+                <i class="i-ri:lock-fill h-5 w-5" />
                 <Trans key="instance_settings.unlock" />
               </Button>
             </Show>
             <Show when={!routeData.instanceDetails.data?.modpack?.locked}>
               <div class="flex items-center gap-2">
-                <i class="w-5 h-5 i-ri:lock-unlock-fill" />
+                <i class="i-ri:lock-unlock-fill h-5 w-5" />
                 <Trans key="instance_settings.unlocked" />
               </div>
             </Show>
@@ -130,11 +133,14 @@ const Settings = () => {
                   {
                     name: "unpair_confirmation"
                   },
-                  { instanceState: "unpair" }
+                  {
+                    instanceState: "unpair",
+                    instanceId: parseInt(params.id, 10)
+                  }
                 )
               }}
             >
-              <i class="w-5 h-5 i-ri:git-branch-fill" />
+              <i class="i-ri:git-branch-fill h-5 w-5" />
               <Trans key="instance_settings.unpair" />
             </Button>
             <Button
@@ -146,7 +152,7 @@ const Settings = () => {
                 })
               }}
             >
-              <i class="w-5 h-5 i-ri:arrow-left-right-fill" />
+              <i class="i-ri:arrow-left-right-fill h-5 w-5" />
               <Trans key="instance_settings.change_modpack_version" />
             </Button>
           </div>
@@ -365,7 +371,7 @@ const Settings = () => {
           routeData?.instanceDetails?.data?.extraJavaArgs !== undefined
         }
       >
-        <div class="flex w-full justify-between items-center -mt-8">
+        <div class="-mt-8 flex w-full items-center justify-between">
           <h5 class="text-lightSlate-700">
             <Trans key="instance_settings.prepend_global_java_args" />
           </h5>
@@ -381,7 +387,7 @@ const Settings = () => {
             }}
           />
         </div>
-        <div class="flex w-full gap-4 items-center">
+        <div class="flex w-full items-center gap-4">
           <Show when={routeData?.instanceDetails?.data?.globalJavaArgs}>
             {"{GLOBAL_JAVA_ARGS}"}
             <div>+</div>
@@ -408,7 +414,7 @@ const Settings = () => {
               })
             }}
           >
-            <i class="w-5 h-5 i-ri:arrow-go-back-fill" />
+            <i class="i-ri:arrow-go-back-fill h-5 w-5" />
           </Button>
           <Button
             rounded={false}
@@ -422,7 +428,7 @@ const Settings = () => {
               })
             }}
           >
-            <i class="w-5 h-5 i-ri:close-fill" />
+            <i class="i-ri:close-fill h-5 w-5" />
           </Button>
         </div>
       </Show>

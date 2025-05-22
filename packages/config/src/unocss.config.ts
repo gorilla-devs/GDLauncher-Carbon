@@ -20,7 +20,15 @@ const unocssConfig = {
   safelist: [
     ...safelist,
     ...Object.keys(theme.colors).map((v) => `bg-${v}-500`),
-    ...Object.keys(theme.colors).map((v) => `hover:bg-${v}-700`)
+    ...Object.keys(theme.colors).map((v) => `hover:bg-${v}-700`),
+    ...Object.keys(theme.colors).map((v) => `border-${v}-500`),
+    ...Object.keys(theme.colors).map((v) => `hover:border-${v}-700`),
+    ...Object.keys(theme.colors).map((v) => `text-${v}-500`),
+    ...Object.keys(theme.colors).map((v) => `hover:text-${v}-700`),
+    ...Object.keys(theme.colors).map((v) => `fill-${v}-500`),
+    ...Object.keys(theme.colors).map((v) => `hover:fill-${v}-700`),
+    ...Object.keys(theme.colors).map((v) => `stroke-${v}-500`),
+    ...Object.keys(theme.colors).map((v) => `hover:stroke-${v}-700`)
   ],
   theme,
   transformers: []

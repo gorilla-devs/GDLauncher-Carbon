@@ -1,4 +1,4 @@
-import { Button, createNotification } from "@gd/ui"
+import { Button, createNotification, Spinner } from "@gd/ui"
 import {
   createSignal,
   Switch,
@@ -131,6 +131,7 @@ export default function Login() {
   let backgroundBlurRef: HTMLDivElement | undefined
   let welcomeToTextRef: HTMLDivElement | undefined
   let gdlauncherTextRef: HTMLDivElement | undefined
+  let loadingSpinnerRef: HTMLDivElement | undefined
   let videoRef: HTMLVideoElement | undefined
 
   async function transitionToLibrary() {
@@ -251,16 +252,14 @@ export default function Login() {
   })
 
   onMount(async () => {
-    requestAnimationFrame(() => {
-      handleSidebarAnimation()
-    })
-
     const activeUuid = await rspcContext.client.query(["account.getActiveUuid"])
 
     if (!globalStore.settings.data?.termsAndPrivacyAccepted) {
       setStep(Steps.TermsAndConditions)
       setIsBackButtonVisible(false)
-      return
+      return requestAnimationFrame(() => {
+        handleSidebarAnimation()
+      })
     }
 
     const accounts = await rspcContext.client.query(["account.getAccounts"])
@@ -272,7 +271,9 @@ export default function Login() {
     ) {
       setStep(Steps.Auth)
       setIsBackButtonVisible(true)
-      return
+      return requestAnimationFrame(() => {
+        handleSidebarAnimation()
+      })
     }
 
     if (isGDLAccountSet()) {
@@ -282,33 +283,47 @@ export default function Login() {
       setStep(Steps.GDLAccount)
     }
 
-    return
+    return requestAnimationFrame(() => {
+      handleSidebarAnimation()
+    })
   })
 
   async function handleSidebarAnimation() {
-    if (sidebarRef) {
-      await new Promise((resolve) => setTimeout(resolve, 300))
+    await new Promise((resolve) => setTimeout(resolve, 300))
 
-      sidebarRef.animate(
-        [{ transform: "translateX(-100%)" }, { transform: "translateX(0)" }],
-        {
-          duration: 300,
-          delay: 200,
-          easing: "cubic-bezier(0.175, 0.885, 0.32, 1)",
-          fill: "forwards"
-        }
-      )
+    sidebarRef?.animate(
+      [{ transform: "translateX(-100%)" }, { transform: "translateX(0)" }],
+      {
+        duration: 300,
+        delay: 200,
+        easing: "cubic-bezier(0.175, 0.885, 0.32, 1)",
+        fill: "forwards"
+      }
+    )
 
-      videoRef?.animate(
-        [{ transform: "translateX(0)" }, { transform: "translateX(15%)" }],
-        {
-          duration: 300,
-          delay: 200,
-          easing: "cubic-bezier(0.175, 0.885, 0.32, 1)",
-          fill: "forwards"
-        }
-      )
-    }
+    videoRef?.animate(
+      [{ transform: "translateX(0)" }, { transform: "translateX(15%)" }],
+      {
+        duration: 300,
+        delay: 200,
+        easing: "cubic-bezier(0.175, 0.885, 0.32, 1)",
+        fill: "forwards"
+      }
+    )
+
+    loadingSpinnerRef?.animate([{ opacity: 1 }, { opacity: 0 }], {
+      duration: 300,
+      delay: 0,
+      easing: "linear",
+      fill: "forwards"
+    })
+
+    backgroundBlurRef?.animate([{ opacity: 1 }, { opacity: 0 }], {
+      duration: 500,
+      delay: 0,
+      easing: "linear",
+      fill: "forwards"
+    })
   }
 
   let btnRef: HTMLDivElement | undefined
@@ -384,15 +399,15 @@ export default function Login() {
   }
 
   return (
-    <div class="flex w-full h-screen" id="main-login-page">
+    <div class="flex h-screen w-full" id="main-login-page">
       <div
         ref={sidebarRef}
-        class="z-10 absolute -translate-x-full w-100 h-full flex flex-col items-center text-lightSlate-50 rounded-md bg-darkSlate-800 z-1"
+        class="w-100 text-lightSlate-50 bg-darkSlate-800 z-1 absolute z-10 flex h-full -translate-x-full flex-col items-center rounded-md"
       >
-        <div class="flex justify-center h-30">
+        <div class="h-30 flex justify-center">
           <img class="w-60" src={Logo} />
         </div>
-        <div class="text-lg font-bold flex items-center justify-center gap-2 mb-4">
+        <div class="mb-4 flex items-center justify-center gap-2 text-lg font-bold">
           <Switch>
             <Match when={step() === Steps.TermsAndConditions}>
               <div>
@@ -413,7 +428,7 @@ export default function Login() {
               <Trans key="login.titles.sign_in_with_microsoft" />
             </Match>
             <Match when={step() === Steps.CodeStep}>
-              <i class="inline-block w-4 h-4 i-ri:microsoft-fill" />
+              <i class="i-ri:microsoft-fill inline-block h-4 w-4" />
               <Trans key="login.titles.microsoft_code_step" />
             </Match>
             <Match when={step() === Steps.GDLAccount}>
@@ -434,7 +449,7 @@ export default function Login() {
             </Match>
           </Switch>
         </div>
-        <div class="flex flex-1 w-full h-auto overflow-y-auto px-4 box-border">
+        <div class="box-border flex h-auto w-full flex-1 overflow-y-auto px-4">
           <Switch>
             <Match when={step() === Steps.TermsAndConditions}>
               <TermsAndConditions />
@@ -480,11 +495,11 @@ export default function Login() {
           </Switch>
         </div>
 
-        <div class="w-full flex flex-col items-center p-4 box-border">
-          <div class="relative flex justify-center gap-2 mb-4">
-            <div class="absolute top-1/2 left-0 -translate-y-1/2 h-4 w-full rounded-lg overflow-hidden">
+        <div class="box-border flex w-full flex-col items-center p-4">
+          <div class="relative mb-4 flex justify-center gap-2">
+            <div class="absolute left-0 top-1/2 h-4 w-full -translate-y-1/2 overflow-hidden rounded-lg">
               <div
-                class="absolute top-0 left-0 bg-darkSlate-400 h-4 w-full rounded-lg"
+                class="bg-darkSlate-400 absolute left-0 top-0 h-4 w-full rounded-lg"
                 style={{
                   transform: `translateX(calc((-100% + ${(100 * step()) / 7}%) - ${(step() === Steps.TermsAndConditions ? 9 : 7) - step()}px)`,
                   transition:
@@ -496,7 +511,7 @@ export default function Login() {
             <For each={new Array(7)}>
               {(_, i) => (
                 <div
-                  class="z-1 h-6 w-4 flex justify-center items-center group"
+                  class="z-1 group flex h-6 w-4 items-center justify-center"
                   onClick={() => {
                     if (
                       i() + 1 < step() &&
@@ -513,7 +528,7 @@ export default function Login() {
                   }}
                 >
                   <div
-                    class="h-2 w-2 bg-lightSlate-900 rounded-full"
+                    class="bg-lightSlate-900 h-2 w-2 rounded-full"
                     classList={{
                       "group-hover:bg-lightSlate-100":
                         i() + 1 < step() &&
@@ -530,7 +545,7 @@ export default function Login() {
             </For>
           </div>
 
-          <div class="flex w-full box-border">
+          <div class="box-border flex w-full">
             <div
               ref={btnRef}
               class="overflow-hidden"
@@ -801,7 +816,7 @@ export default function Login() {
                   <i class="i-ri:arrow-right-line" />
                 </Match>
                 <Match when={step() === Steps.Auth}>
-                  <i class="w-4 h-4 i-ri:microsoft-fill" />
+                  <i class="i-ri:microsoft-fill h-4 w-4" />
                   <Trans key="login.sign_in" />
                 </Match>
                 <Match
@@ -818,15 +833,15 @@ export default function Login() {
           </div>
         </div>
       </div>
-      <div class="flex-1 w-full">
+      <div class="w-full flex-1">
         <div
           ref={backgroundBlurRef}
-          class="z-1 absolute top-0 left-0 p-0 h-screen w-full opacity-0 bg-black/20"
+          class="z-1 absolute left-0 top-0 h-screen w-full bg-black/20 p-0"
           style={{
             "backdrop-filter": "blur(6px)"
           }}
         />
-        <div class="z-1 font-bold text-7xl leading-loose absolute top-0 left-0 p-0 h-screen w-full flex flex-col items-center justify-center">
+        <div class="z-1 absolute left-0 top-0 flex h-screen w-full flex-col items-center justify-center p-0 text-7xl font-bold leading-loose">
           <div ref={welcomeToTextRef} class="opacity-0">
             <Trans key="login.welcome_to" />
           </div>
@@ -834,21 +849,20 @@ export default function Login() {
             <Trans key="login.gdlauncher" />
           </div>
         </div>
+        <div class="z-1 absolute left-0 top-0 flex h-screen w-full flex-col items-center justify-center p-0 text-7xl font-bold leading-loose">
+          <div ref={loadingSpinnerRef}>
+            <Spinner class="h-10 w-10" />
+          </div>
+        </div>
         <video
           ref={videoRef}
-          class="p-0 h-screen w-full object-cover"
+          class="h-screen w-full object-cover p-0"
           src={BackgroundVideo}
           autoplay
           muted
           loop
           playsinline
         />
-        {/* <div
-              style={{
-                "mix-blend-mode": "hard-light"
-              }}
-              class="absolute left-0 right-0 bg-darkSlate-800 bottom-0 top-0 opacity-30"
-            /> */}
       </div>
     </div>
   )

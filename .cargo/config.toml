@@ -1,6 +1,29 @@
+[unstable]
+codegen-backend = true
+profile-rustflags = true
+
 [alias]
 prisma = "run -p prisma-cli --"
 [net]
 git-fetch-with-cli = true
+
+[target.'cfg(debug_assertions)']
+rustflags = ["-Z", "threads=24"]
+codegen-backend = "cranelift"
+
+
 [target.x86_64-pc-windows-msvc]
+linker = "lld-link.exe"
 rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.aarch64-apple-darwin]
+rustflags = [
+  "-C",
+  "link-arg=-fuse-ld=/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld",
+  "-C",
+  "link-arg=-ld_new",
+]
+
+[target.'cfg(debug_assertions)'.x86_64-unknown-linux-gnu]
+linker = "/usr/bin/clang"
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]

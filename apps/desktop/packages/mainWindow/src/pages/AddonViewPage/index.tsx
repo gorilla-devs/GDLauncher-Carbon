@@ -145,7 +145,9 @@ const ModExplore = () => {
           />
           <div class="sticky top-5 z-20 box-border flex w-full justify-between px-6">
             <Button
-              onClick={() => navigator.prev()}
+              onClick={() => {
+                navigator.prev()
+              }}
               icon={<div class="i-ri:arrow-drop-left-line text-2xl" />}
               size="small"
               type="secondary"

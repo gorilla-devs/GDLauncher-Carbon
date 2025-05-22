@@ -4,17 +4,12 @@ import ModalLayout from "../../ModalLayout"
 import { Show } from "solid-js"
 import { useTransContext } from "@gd/i18n"
 import { queryClient, rspc } from "@/utils/rspcClient"
-import useSearchContext from "@/components/SearchInputContext"
 
-// const [instanceState, setInstanceState] = createSignal<"unlock" | "unpair">(
-//   "unlock"
-// );
-// export { instanceState, setInstanceState };
 interface Props {
   instanceState: "unlock" | "unpair"
+  instanceId: number
 }
 const Confirmation = (props: ModalProps) => {
-  const searchContext = useSearchContext()
   const data: () => Props = () => props.data
   const modalContext = useModal()
   const [t] = useTransContext()
@@ -28,7 +23,7 @@ const Confirmation = (props: ModalProps) => {
 
   return (
     <ModalLayout noHeader={props.noHeader} title={props.title} noPadding={true}>
-      <div class="flex flex-col p-4 w-120">
+      <div class="w-120 flex flex-col p-4">
         <Show when={data().instanceState === "unlock"}>
           <p>{t("instance_unlock_confirmation")}</p>
         </Show>
@@ -53,14 +48,14 @@ const Confirmation = (props: ModalProps) => {
                   modpackLocked: {
                     Set: false
                   },
-                  instance: searchContext?.selectedInstance.data?.id!
+                  instance: data().instanceId
                 })
               } else {
                 updateInstanceMutation.mutate({
                   modpackLocked: {
                     Set: null
                   },
-                  instance: searchContext?.selectedInstance.data?.id!
+                  instance: data().instanceId
                 })
               }
               modalContext?.closeModal()

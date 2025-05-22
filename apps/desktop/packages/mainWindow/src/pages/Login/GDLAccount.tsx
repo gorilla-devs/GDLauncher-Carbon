@@ -106,16 +106,16 @@ const GDLAccount = (props: Props) => {
           />
         </div>
         <Show when={gdlUser.data}>
-          <div class="flex-1 px-4">
-            <h2>
+          <div class="flex-1 p-4">
+            <div class="text-2xl font-bold">
               <Trans
                 key="login.welcome_back_name"
                 options={{
                   name: currentlySelectedAccount()?.username
                 }}
               />
-            </h2>
-            <p class="text-lightSlate-700 text-md">
+            </div>
+            <p class="text-lightSlate-700 text-md pt-2">
               <Trans key="login.gdlauncher_account_description" />
             </p>
           </div>
