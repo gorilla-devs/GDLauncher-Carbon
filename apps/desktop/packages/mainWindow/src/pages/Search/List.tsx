@@ -16,6 +16,7 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 import { useLocation, useParams, useSearchParams } from "@solidjs/router"
 import FiltersDisplay from "./FiltersDisplay"
 import { FiltersDropdown } from "./FiltersDropdown"
+import { rspc } from "@/utils/rspcClient"
 
 export function List() {
   const searchContext = useSearchContext()
@@ -24,10 +25,17 @@ export function List() {
   const location = useLocation()
   const [searchParams] = useSearchParams()
 
-  const defaultType = () => params.type ?? (instanceId() ? "mod" : "modpack")
-  const type = () => params.type ?? defaultType()
+  const instanceId = () => Number.parseInt(searchParams.instanceId, 10)
 
-  const instanceId = () => searchParams.instanceId
+  const defaultType = () => params.type || (instanceId() ? "mod" : "modpack")
+  const type = () => (params.type ?? defaultType()) as FEUnifiedSearchType
+
+  if (type() !== searchContext?.searchQuery().projectType) {
+    searchContext?.setSearchQuery((prev) => ({
+      ...prev,
+      projectType: type()
+    }))
+  }
 
   const projectTypeTabs: () => {
     label: string
@@ -82,6 +90,32 @@ export function List() {
       searchContext?.ref()?.scrollTo(searchContext.lastScrollOffset())
     })
   })
+
+  const installedMods = rspc.createQuery(() => ({
+    queryKey: ["instance.getInstanceMods", instanceId()]
+  }))
+
+  const lookupTableInstalledMods: () => Set<string> = () => {
+    const curseforgeMods =
+      installedMods.data?.reduce((acc: string[], mod) => {
+        if (mod.curseforge?.project_id) {
+          acc.push(mod.curseforge.project_id.toString())
+        }
+        return acc
+      }, []) || []
+
+    const modrinthMods =
+      installedMods.data?.reduce((acc: string[], mod) => {
+        if (mod.modrinth?.project_id) {
+          acc.push(mod.modrinth.project_id)
+        }
+        return acc
+      }, []) || []
+
+    const map = new Set([...curseforgeMods, ...modrinthMods])
+
+    return map
+  }
 
   return (
     <div class="flex h-full flex-col pb-6">
@@ -180,9 +214,13 @@ export function List() {
                 </div>
               )
             }
+
+            const isInstalled = lookupTableInstalledMods().has(result.value!.id)
+
             return (
               <ListItem
                 result={result.value!}
+                isInstalled={isInstalled}
                 onItemClick={() => {
                   navigator.navigate(
                     `/addon/${result.value!.id}/${result.value!.platform}?instanceId=${instanceId()}`

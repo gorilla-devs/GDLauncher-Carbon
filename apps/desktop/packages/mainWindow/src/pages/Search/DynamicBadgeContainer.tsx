@@ -29,28 +29,43 @@ export default function DynamicBadgeContainer(props: {
   return (
     <div class="flex items-center gap-2 overflow-hidden">
       <For each={visibleCategories()}>
-        {(category) => (
-          <Badge
-            variant="secondary"
-            class="text-lightSlate-700 flex shrink-0 items-center gap-2"
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              searchContext?.setSearchQuery((prev) => {
-                return {
-                  ...prev,
-                  categories: [...(prev.categories || []), category.id]
+        {(category) => {
+          const isInSearchQuery = searchContext
+            ?.searchQuery()
+            .categories?.includes(category.id)
+
+          return (
+            <Badge
+              variant={isInSearchQuery ? "default" : "secondary"}
+              class="flex shrink-0 items-center gap-2"
+              classList={{
+                "text-lightSlate-700": !isInSearchQuery,
+                "text-white": isInSearchQuery
+              }}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+
+                if (isInSearchQuery) {
+                  return
                 }
-              })
-            }}
-          >
-            <CategoryIcon
-              type={category.icon?.type}
-              value={category.icon?.value}
-            />
-            {category.name}
-          </Badge>
-        )}
+
+                searchContext?.setSearchQuery((prev) => {
+                  return {
+                    ...prev,
+                    categories: [...(prev.categories || []), category.id]
+                  }
+                })
+              }}
+            >
+              <CategoryIcon
+                type={category.icon?.type}
+                value={category.icon?.value}
+              />
+              {category.name}
+            </Badge>
+          )
+        }}
       </For>
 
       <Show when={hiddenCount() > 0}>

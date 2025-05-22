@@ -11,6 +11,7 @@ import ModDownloadButton from "@/components/ModDownloadButton"
 interface SearchResultItemProps {
   result: FEUnifiedSearchResult
   onItemClick: (id: string, platform: string) => void
+  isInstalled: boolean
 }
 
 export function ListItem(props: SearchResultItemProps) {
@@ -65,7 +66,13 @@ export function ListItem(props: SearchResultItemProps) {
           <div class="ml-auto flex items-center">
             <div class="relative flex items-center">
               {/* Download count and platform icon - visible by default, hidden on hover */}
-              <div class="flex items-center gap-2 transition-opacity duration-200 group-hover:opacity-0">
+              <div
+                class="flex items-center gap-2 transition-opacity duration-200"
+                classList={{
+                  "opacity-100 group-hover:opacity-0": !props.isInstalled,
+                  "opacity-0": props.isInstalled
+                }}
+              >
                 <div class="text-lightSlate-700 text-sm">
                   {formatDownloadCount(props.result.downloadsCount)}
                 </div>
@@ -81,12 +88,22 @@ export function ListItem(props: SearchResultItemProps) {
 
               {/* Install button - hidden by default, visible on hover */}
               <div
-                class="absolute right-4 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                class="absolute right-4 flex items-center justify-center transition-opacity duration-200"
+                classList={{
+                  "opacity-0 group-hover:opacity-100": !props.isInstalled,
+                  "opacity-100": props.isInstalled
+                }}
                 onClick={(e) => {
                   e.stopPropagation()
                 }}
               >
                 <Switch>
+                  <Match when={props.isInstalled}>
+                    <div class="flex items-center gap-2 text-xl font-bold text-green-500">
+                      <i class="i-ri:check-line" />
+                      Installed
+                    </div>
+                  </Match>
                   <Match when={props.result.type === "modpack"}>
                     <ModpackDownloadButton addon={props.result} />
                   </Match>
