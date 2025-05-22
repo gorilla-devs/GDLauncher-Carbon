@@ -49,6 +49,7 @@ const AppNavbar = () => {
   const isSettings = useMatch(() => "/settings")
   const isSettingsNested = useMatch(() => "/settings/*")
   const isNews = useMatch(() => "/news/*")
+  const isSearch = useMatch(() => "/search/*")
   const selectedIndex = () => {
     if (isSettings() || isSettingsNested()) return 0
     if (isNews()) return 1
@@ -112,6 +113,10 @@ const AppNavbar = () => {
             tabIndex={0}
             value={searchResults?.searchQuery().searchQuery ?? ""}
             onFocus={() => {
+              if (isSearch()) {
+                return
+              }
+
               navigator.navigate("/search")
             }}
             onInput={(e) => {
