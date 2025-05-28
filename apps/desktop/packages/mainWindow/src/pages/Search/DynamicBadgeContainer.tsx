@@ -46,15 +46,22 @@ export default function DynamicBadgeContainer(props: {
                 e.preventDefault()
                 e.stopPropagation()
 
-                if (isInSearchQuery) {
-                  return
-                }
-
                 searchContext?.setSearchQuery((prev) => {
-                  return {
-                    ...prev,
-                    categories: [...(prev.categories || []), category.id]
+                  const newCategories = { ...prev }
+
+                  if (isInSearchQuery) {
+                    newCategories.categories =
+                      newCategories.categories?.filter(
+                        (c) => c !== category.id
+                      ) ?? null
+                  } else {
+                    newCategories.categories = [
+                      ...(newCategories.categories || []),
+                      category.id
+                    ]
                   }
+
+                  return newCategories
                 })
               }}
             >
@@ -83,33 +90,52 @@ export default function DynamicBadgeContainer(props: {
               <div class="font-medium">Hidden Categories:</div>
               <div class="flex flex-wrap gap-1">
                 <For each={hiddenCategories()}>
-                  {(category) => (
-                    <Badge
-                      variant="secondary"
-                      class="text-lightSlate-700 flex shrink-0 items-center"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        searchContext?.setSearchQuery((prev) => {
-                          return {
-                            ...prev,
-                            categories: [
-                              ...(prev.categories || []),
-                              category.id
-                            ]
-                          }
-                        })
-                      }}
-                    >
-                      <div class="flex items-center gap-1">
-                        <CategoryIcon
-                          type={category.icon?.type}
-                          value={category.icon?.value}
-                        />
-                        <span class="text-xs">{category.name}</span>
-                      </div>
-                    </Badge>
-                  )}
+                  {(category) => {
+                    const isInSearchQuery = searchContext
+                      ?.searchQuery()
+                      .categories?.includes(category.id)
+
+                    return (
+                      <Badge
+                        variant={isInSearchQuery ? "default" : "secondary"}
+                        class="flex shrink-0 items-center"
+                        classList={{
+                          "text-lightSlate-700": !isInSearchQuery,
+                          "text-white": isInSearchQuery
+                        }}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+
+                          searchContext?.setSearchQuery((prev) => {
+                            const newCategories = { ...prev }
+
+                            if (isInSearchQuery) {
+                              newCategories.categories =
+                                newCategories.categories?.filter(
+                                  (c) => c !== category.id
+                                ) ?? null
+                            } else {
+                              newCategories.categories = [
+                                ...(newCategories.categories || []),
+                                category.id
+                              ]
+                            }
+
+                            return newCategories
+                          })
+                        }}
+                      >
+                        <div class="flex items-center gap-1">
+                          <CategoryIcon
+                            type={category.icon?.type}
+                            value={category.icon?.value}
+                          />
+                          <span class="text-xs">{category.name}</span>
+                        </div>
+                      </Badge>
+                    )
+                  }}
                 </For>
               </div>
             </div>

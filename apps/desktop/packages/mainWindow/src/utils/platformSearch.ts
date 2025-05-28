@@ -3,7 +3,13 @@ import {
   FEUnifiedSearchResult
 } from "@gd/core_module/bindings"
 
-import { createEffect, createMemo, createSignal, mergeProps } from "solid-js"
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  mergeProps,
+  Setter
+} from "solid-js"
 import { rspc } from "./rspcClient"
 import { createInfiniteQuery } from "@tanstack/solid-query"
 import { VirtualizerHandle } from "virtua/lib/solid"
@@ -66,15 +72,25 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     enabled: !!selectedInstanceId()
   }))
 
-  const [searchQuery, setSearchQuery] = createSignal<FEUnifiedSearchParameters>(
-    {
-      ...defaultSearchQuery,
-      ...opts.defaultSearchQuery
-    },
-    {
-      equals: false
-    }
-  )
+  const [searchQuery, _setSearchQuery] =
+    createSignal<FEUnifiedSearchParameters>(
+      {
+        ...defaultSearchQuery,
+        ...opts.defaultSearchQuery
+      },
+      {
+        equals: false
+      }
+    )
+
+  const setSearchQuery: Setter<FEUnifiedSearchParameters> = (...args) => {
+    setLastScrollOffset(0)
+
+    const virtualizer = ref()
+    virtualizer?.scrollTo(0)
+
+    _setSearchQuery(...args)
+  }
 
   const actualPageSize = () => {
     let pageSize = searchQuery().pageSize || 40
