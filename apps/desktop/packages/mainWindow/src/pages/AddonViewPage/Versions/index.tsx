@@ -1,23 +1,24 @@
-import { useRouteData, useSearchParams } from "@solidjs/router"
-import fetchData from "../mods.versions"
+import { useSearchParams } from "@solidjs/router"
 import VersionRow from "./VersionRow"
 import { rspc } from "@/utils/rspcClient"
-import MainContainer from "@/components/Browser/MainContainer"
+import { VList } from "@/components/VirtuaWrapper"
 import { useInfiniteVersionsQuery } from "@/components/InfiniteScrollVersionsQueryWrapper"
-import { createEffect } from "solid-js"
+import { createMemo, useContext } from "solid-js"
+import { Trans } from "@gd/i18n"
+import { ModContext } from "@/pages/AddonViewPage"
+
+interface VersionItem {
+  type: "value" | "loader" | "header"
+  value?: any
+}
 
 const Versions = () => {
-  const routeData: ReturnType<typeof fetchData> = useRouteData()
-
   const [searchParams] = useSearchParams()
+  const mod = useContext(ModContext)
 
   const infiniteQuery = useInfiniteVersionsQuery()
 
   const rows = () => infiniteQuery.allRows()
-
-  const allVirtualRows = () => infiniteQuery.rowVirtualizer.getVirtualItems()
-
-  const lastItem = () => allVirtualRows()[allVirtualRows()?.length - 1]
 
   const instanceId = () => parseInt(searchParams.instanceId, 10)
 
@@ -28,25 +29,6 @@ const Versions = () => {
   const instanceDetails = rspc.createQuery(() => ({
     queryKey: ["instance.getInstanceDetails", instanceId()]
   }))
-
-  createEffect(() => {
-    if (!lastItem() || lastItem().index === infiniteQuery?.query.index) {
-      return
-    }
-
-    const lastItemIndex = infiniteQuery?.infiniteQuery.hasNextPage
-      ? lastItem().index - 1
-      : lastItem().index
-
-    if (
-      lastItemIndex >= rows().length - 1 &&
-      infiniteQuery?.infiniteQuery.hasNextPage &&
-      !infiniteQuery.infiniteQuery.isFetchingNextPage &&
-      !infiniteQuery.isLoading
-    ) {
-      infiniteQuery.infiniteQuery.fetchNextPage()
-    }
-  })
 
   const installedMod = () => {
     for (const version of rows()) {
@@ -66,24 +48,111 @@ const Versions = () => {
     }
   }
 
+  const allItems = createMemo((): VersionItem[] => {
+    const items: VersionItem[] = []
+
+    // Add header
+    items.push({ type: "header" })
+
+    // Add version rows
+    rows().forEach((version) => {
+      items.push({ type: "value", value: version })
+    })
+
+    // Add loader if loading more data
+    if (
+      infiniteQuery.infiniteQuery.isFetchingNextPage ||
+      infiniteQuery.isLoading
+    ) {
+      items.push({ type: "loader" })
+    }
+
+    return items
+  })
+
+  const virtualOnScrollHandler = () => {
+    if (!infiniteQuery || infiniteQuery.isLoading) return
+
+    const virtualizer = infiniteQuery.ref()
+    if (!virtualizer) return
+
+    // Check if we're near the bottom
+    const endIndex = virtualizer.findEndIndex()
+    const totalItems = allItems().length
+
+    // Load more when user reaches 75% from the end of current items
+    const loadThreshold = Math.ceil(totalItems - totalItems * 0.25)
+
+    if (
+      endIndex >= loadThreshold &&
+      infiniteQuery.infiniteQuery.hasNextPage &&
+      !infiniteQuery.infiniteQuery.isFetchingNextPage
+    ) {
+      infiniteQuery.infiniteQuery.fetchNextPage()
+    }
+  }
+
   return (
-    <MainContainer
-      virtualVersions={infiniteQuery?.rowVirtualizer?.getVirtualItems()}
-      measureElement={infiniteQuery?.rowVirtualizer?.measureElement}
-      totalVirtualHeight={infiniteQuery?.rowVirtualizer?.getTotalSize() || 0}
-      versions={rows()}
-      curseforgeProjectData={routeData.curseforgeGetMod?.data?.data}
-      modrinthProjectData={routeData.modrinthGetProject?.data}
-      instanceId={instanceId()}
-      installedMod={installedMod()}
-      instanceMods={instanceMods.data || undefined}
-      instanceDetails={instanceDetails?.data || undefined}
-      isCurseforge={routeData.isCurseforge}
-      isLoading={false}
-      type="mod"
-    >
-      {VersionRow}
-    </MainContainer>
+    <div class="flex h-full flex-col">
+      <VList
+        data={allItems()}
+        class="flex-1"
+        ref={(v) => {
+          if (v) {
+            infiniteQuery?.setRef(v)
+          }
+        }}
+        onScroll={virtualOnScrollHandler}
+      >
+        {(item) => {
+          if (item.type === "header") {
+            const gridCols = "grid-cols-[5fr_130px_130px_100px_50px_200px]"
+            return (
+              <div class={`mb-8 grid ${gridCols}`}>
+                <div>
+                  <Trans key="browser_table_headers.name" />
+                </div>
+                <div>
+                  <Trans key="browser_table_headers.published" />
+                </div>
+                <div>
+                  <Trans key="browser_table_headers.downloads" />
+                </div>
+                <div>
+                  <Trans key="browser_table_headers.type" />
+                </div>
+                <div>
+                  <Trans key="browser_table_headers.details" />
+                </div>
+              </div>
+            )
+          }
+
+          if (item.type === "loader") {
+            return (
+              <div class="m-4 flex h-20 items-center justify-center">
+                <div class="i-ri:loader-4-line animate-spin text-2xl" />
+              </div>
+            )
+          }
+
+          // Render version row
+          return (
+            <div class="grid grid-cols-[5fr_130px_130px_100px_50px_200px]">
+              <VersionRow
+                project={mod?.data}
+                modVersion={item.value}
+                installedFile={installedMod()}
+                instanceId={instanceId()}
+                type="mod"
+                instanceMods={instanceMods.data || undefined}
+                instanceDetails={instanceDetails.data || undefined}
+              />
+            </div>
+          )
+        }}
+      </VList>
+    </div>
   )
 }
 

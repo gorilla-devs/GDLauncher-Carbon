@@ -18,25 +18,26 @@ import {
 } from "@solidjs/router"
 import {
   For,
+  JSX,
   Match,
   Show,
   Switch,
-  createEffect,
-  createResource,
+  createContext,
   createSignal
 } from "solid-js"
 import { format } from "date-fns"
-import Authors from "@/pages/Library/Instance/Info/Authors"
 import ExploreVersionsNavbar from "@/components/ExploreVersionsNavbar"
 
 import ModDownloadButton from "@/components/ModDownloadButton"
 import ContentWrapper from "@/components/ContentWrapper"
-import InfiniteScrollVersionsQueryWrapper, {
-  useInfiniteVersionsQuery
-} from "@/components/InfiniteScrollVersionsQueryWrapper"
+import InfiniteScrollVersionsQueryWrapper from "@/components/InfiniteScrollVersionsQueryWrapper"
 import { rspc } from "@/utils/rspcClient"
-import { FEUnifiedPlatform } from "@gd/core_module/bindings"
-import { parseToHtml } from "@/utils/modplatformDescriptionConverter"
+import {
+  FEUnifiedPlatform,
+  FEUnifiedSearchResultWithDescription
+} from "@gd/core_module/bindings"
+import { CreateQueryResult } from "@tanstack/solid-query"
+import { RSPCError } from "@rspc/client"
 
 const getTabIndexFromPath = (path: string) => {
   if (path.match(/\/(addon)\/.+\/.+/g)) {
@@ -69,12 +70,26 @@ const ModsInfiniteScrollQueryWrapper = () => {
   )
 }
 
+export const ModContext = createContext<CreateQueryResult<
+  FEUnifiedSearchResultWithDescription,
+  RSPCError
+> | null>(null)
+
+const ModContextProvider = (props: {
+  mod: CreateQueryResult<FEUnifiedSearchResultWithDescription, RSPCError>
+  children: JSX.Element
+}) => {
+  return (
+    <ModContext.Provider value={props.mod}>
+      {props.children}
+    </ModContext.Provider>
+  )
+}
+
 const ModExplore = () => {
   const navigator = useGDNavigate()
   const params = useParams()
   const platform = () => params.platform as FEUnifiedPlatform
-  const infiniteQuery = useInfiniteVersionsQuery()
-  const [searchParams] = useSearchParams()
   const location = useLocation()
   const indexTab = () => getTabIndexFromPath(location.pathname)
 
@@ -93,9 +108,7 @@ const ModExplore = () => {
     ]
   }))
 
-  const instanceId = () => parseInt(searchParams.instanceId, 10)
   const isFetching = () => project.isLoading
-  const projectId = () => project.data?.id
 
   const instancePages = () => [
     {
@@ -121,12 +134,9 @@ const ModExplore = () => {
 
   return (
     <div
-      class="bg-darkSlate-800 relative h-full max-h-full"
+      class="bg-darkSlate-800 relative flex h-full max-h-full flex-col"
       style={{
         "scrollbar-gutter": "stable"
-      }}
-      ref={(el) => {
-        infiniteQuery.setParentRef(el)
       }}
       onScroll={() => {
         const rect = refStickyTabs.getBoundingClientRect()
@@ -233,11 +243,13 @@ const ModExplore = () => {
                       <div class="flex max-w-52 gap-2 overflow-x-auto whitespace-nowrap text-sm">
                         <Switch>
                           <Match when={!isFetching()}>
-                            {/* <Authors
-                              isCurseforge={routeData.isCurseforge}
-                              isModrinth={routeData.isModrinth}
-                              modpackDetails={routeData.modpackDetails.data}
-                            /> */}
+                            <div>
+                              {/* <Authors
+                                isCurseforge={routeData.isCurseforge}
+                                isModrinth={routeData.isModrinth}
+                                modpackDetails={routeData.modpackDetails.data}
+                              /> */}
+                            </div>
                           </Match>
                           <Match when={isFetching()}>
                             <Skeleton />
@@ -255,16 +267,16 @@ const ModExplore = () => {
           </div>
         </div>
       </div>
-      <div class="bg-darkSlate-800 p-6">
-        <div class="flex justify-center pb-4">
-          <div class="bg-darkSlate-800 w-full">
+      <div class="bg-darkSlate-800 flex flex-1 flex-col p-6">
+        <div class="flex flex-1 justify-center pb-4">
+          <div class="bg-darkSlate-800 flex w-full flex-1 flex-col">
             <div
               ref={(el) => {
                 refStickyTabs = el
               }}
               class="bg-darkSlate-800 sticky top-0 z-10 flex flex-col pb-0"
             >
-              <div class="flex items-center justify-between">
+              <div class="mb-4 flex items-center justify-between">
                 <Show when={isSticky()}>
                   <span class="mr-4">
                     <Button
@@ -299,15 +311,24 @@ const ModExplore = () => {
                     </TabList>
                   </div>
                 </Tabs>
-                <Show when={isSticky()}>{/* <ModDownloadButton /> */}</Show>
+                <Show when={isSticky()}>
+                  <div>{/* <ModDownloadButton /> */}</div>
+                </Show>
               </div>
-              <Show when={indexTab() === 3}>
+              <Show
+                when={
+                  indexTab() === 3 &&
+                  project.data?.type &&
+                  project.data?.type !== "modpack"
+                }
+              >
                 <ExploreVersionsNavbar modplatform={platform()} type="mod" />
               </Show>
             </div>
-            <div class="z-0">
-              {/* <Outlet /> */}
-              <div innerHTML={parseToHtml(project.data?.fullDescriptionBody)} />
+            <div class="z-0 flex-1">
+              <ModContextProvider mod={project}>
+                <Outlet />
+              </ModContextProvider>
             </div>
           </div>
         </div>

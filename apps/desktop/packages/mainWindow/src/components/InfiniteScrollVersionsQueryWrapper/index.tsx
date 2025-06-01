@@ -2,12 +2,12 @@ import {
   createInfiniteQuery,
   CreateInfiniteQueryResult
 } from "@tanstack/solid-query"
-import { createContext, useContext } from "solid-js"
-import { createVirtualizer } from "@tanstack/solid-virtual"
+import { createContext, useContext, createSignal } from "solid-js"
 import { rspc } from "@/utils/rspcClient"
 import { useSearchParams } from "@solidjs/router"
 import useVersionsQuery from "@/pages/Mods/useVersionsQuery"
 import useSearchContext from "../SearchInputContext"
+import { VirtualizerHandle } from "virtua/lib/solid"
 
 export interface VersionRowType {
   data: VersionRowTypeData[]
@@ -37,9 +37,9 @@ interface InfiniteQueryType {
   query: typeof versionsQuery
   isLoading: boolean
   setQuery: (_newValue: Partial<typeof versionsQuery>) => void
-  rowVirtualizer: any
-  setParentRef: (_el: Element | null) => void
   allRows: () => VersionRowTypeData[]
+  ref: () => VirtualizerHandle | null
+  setRef: (ref: VirtualizerHandle | null) => void
 }
 
 interface Props {
@@ -59,7 +59,7 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   const rspcContext = rspc.useContext()
   const [searchParams, _setSearchParams] = useSearchParams()
   const searchContext = useSearchContext()
-  let parentRef: HTMLDivElement | null = null
+  const [ref, setRef] = createSignal<VirtualizerHandle | null>(null)
 
   const infiniteQuery = createInfiniteQuery(() => ({
     queryKey: ["modplatforms.versions"],
@@ -122,9 +122,9 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
               : undefined,
             loaders: versionsQuery.modLoaderType
               ? [versionsQuery.modLoaderType]
-              : undefined
-            // limit: versionsQuery.pageSize,
-            // offset: versionsQuery.index
+              : undefined,
+            limit: versionsQuery.pageSize,
+            offset: versionsQuery.index
           }
         ])
 
@@ -199,15 +199,6 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   const allRows = () =>
     infiniteQuery.data ? infiniteQuery.data.pages.flatMap((d) => d.data) : []
 
-  const rowVirtualizer = createVirtualizer({
-    get count() {
-      return infiniteQuery.hasNextPage ? allRows().length + 1 : allRows().length
-    },
-    getScrollElement: () => parentRef,
-    estimateSize: () => 62,
-    overscan: 10
-  })
-
   const context = {
     infiniteQuery,
     get query() {
@@ -217,11 +208,9 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
       return infiniteQuery.isLoading
     },
     setQuery: setQueryWrapper,
-    rowVirtualizer,
-    setParentRef: (el: Element | null) => {
-      parentRef = el as HTMLDivElement
-    },
-    allRows
+    allRows,
+    ref,
+    setRef
   }
 
   return (

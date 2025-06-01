@@ -110,7 +110,7 @@ const ExploreVersionsNavbar = (props: Props) => {
   }
 
   return (
-    <div class="my-4 flex h-12 w-full gap-4">
+    <div class="mb-4 flex h-12 w-full gap-4">
       <Switch>
         <Match when={!isNaN(instanceId())}>
           <div class="flex gap-2">

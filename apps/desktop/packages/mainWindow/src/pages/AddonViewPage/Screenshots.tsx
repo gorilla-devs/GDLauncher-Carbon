@@ -1,52 +1,35 @@
 import { Trans } from "@gd/i18n"
-import { useRouteData } from "@solidjs/router"
-import { For, Match, Suspense, Switch } from "solid-js"
-import fetchData from "./mods.screenshots"
+import { For, Match, Suspense, Switch, useContext } from "solid-js"
 import { Skeleton } from "@gd/ui"
-import { CFFEModAsset } from "@gd/core_module/bindings"
+import { ModContext } from "."
 
 const Screenshots = () => {
-  const routeData: ReturnType<typeof fetchData> = useRouteData()
+  const mod = useContext(ModContext)
 
-  const screenshots = () =>
-    routeData.isCurseforge
-      ? routeData.modpackDetails.data?.data?.screenshots
-      : routeData.modpackDetails.data?.gallery
+  const screenshots = () => {
+    return mod?.data?.screenshotUrls
+  }
 
   return (
     <Suspense fallback={<Skeleton.modpackScreenshotsPage />}>
       <div>
         <Switch fallback={<Skeleton.modpackScreenshotsPage />}>
-          <Match
-            when={
-              (screenshots()?.length || 0) > 0 &&
-              !routeData.modpackDetails.isLoading
-            }
-          >
+          <Match when={(screenshots()?.length || 0) > 0 && !mod?.isLoading}>
             <div class="flex flex-col gap-4">
-              <div class="flex gap-4 flex-wrap">
+              <div class="flex flex-wrap gap-4">
                 <For each={screenshots()}>
                   {(screenshot) => (
                     <img
-                      src={
-                        routeData.isCurseforge
-                          ? (screenshot as CFFEModAsset).thumbnailUrl
-                          : screenshot.url
-                      }
-                      class="rounded-xl w-72 h-44"
-                      alt={screenshot.description || ""}
+                      src={screenshot}
+                      class="h-44 w-72 rounded-xl"
+                      alt={screenshot}
                     />
                   )}
                 </For>
               </div>
             </div>
           </Match>
-          <Match
-            when={
-              (screenshots()?.length || 0) === 0 &&
-              !routeData.modpackDetails.isLoading
-            }
-          >
+          <Match when={(screenshots()?.length || 0) === 0 && !mod?.isLoading}>
             <Trans
               key="modpack.no_screenshot"
               options={{
@@ -54,7 +37,7 @@ const Screenshots = () => {
               }}
             />
           </Match>
-          <Match when={routeData.modpackDetails.isLoading}>
+          <Match when={mod?.isLoading}>
             <Skeleton.modpackScreenshotsPage />
           </Match>
         </Switch>

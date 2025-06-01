@@ -3,8 +3,7 @@ import { RouteDefinition } from "@solidjs/router"
 import SettingsJavaData from "@/pages/Settings/settings.java.data"
 import SettingsGeneralData from "@/pages/Settings/settings.general.data"
 import LoginData from "@/pages/Login/auth.login.data"
-import AddonVersionsData from "@/pages/AddonViewPage/mods.versions"
-import AddonScreenshotsData from "@/pages/AddonViewPage/mods.screenshots"
+import AddonVersionsData from "@/pages/AddonViewPage/changelog.data"
 import InstanceData from "@/pages/Library/Instance/instance.data"
 import Login from "@/pages/Login"
 import withAdsLayout from "@/pages/withAds"
@@ -132,12 +131,12 @@ export const routes: RouteDefinition[] = [
           },
           {
             path: "/changelog",
-            component: lazy(() => import("@/pages/AddonViewPage/Changelog"))
+            component: lazy(() => import("@/pages/AddonViewPage/Changelog")),
+            data: AddonVersionsData
           },
           {
             path: "/screenshots",
-            component: lazy(() => import("@/pages/AddonViewPage/Screenshots")),
-            data: AddonScreenshotsData
+            component: lazy(() => import("@/pages/AddonViewPage/Screenshots"))
           }
         ]
       },

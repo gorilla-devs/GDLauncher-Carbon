@@ -1,4 +1,4 @@
-import { For, JSX, Suspense, onMount } from "solid-js"
+import { For, JSX, Suspense, onMount, useContext } from "solid-js"
 import { Skeleton } from "@gd/ui"
 import { Props as RowContainerProps } from "@/components/Browser/RowContainer"
 import {
@@ -9,31 +9,31 @@ import {
 } from "@gd/core_module/bindings"
 import { Trans } from "@gd/i18n"
 import { VersionRowTypeData } from "../InfiniteScrollVersionsQueryWrapper"
+import { ModContext } from "@/pages/AddonViewPage"
 
 interface Props {
   virtualVersions: any
   versions: VersionRowTypeData[]
   totalVirtualHeight: number
   measureElement: (_el: HTMLDivElement) => void
-  curseforgeProjectData: CFFEMod | undefined
-  modrinthProjectData: MRFEProject | undefined
   instanceId?: number
   installedMod?: { id: string; remoteId: string }
   instanceMods?: Mod[]
   instanceDetails?: InstanceDetails
-  isCurseforge: boolean
   isLoading: boolean
   children: (_: RowContainerProps) => JSX.Element
   type: "modpack" | "mod"
 }
 
 const MainContainer = (props: Props) => {
+  const mod = useContext(ModContext)
+
   const gridCols = "grid-cols-[5fr_130px_130px_100px_50px_200px]"
 
   return (
     <Suspense fallback={<Skeleton.modpackVersionList />}>
       <div class="w-full">
-        <div class={`grid mb-8 ${gridCols}`}>
+        <div class={`mb-8 grid ${gridCols}`}>
           <div>
             <Trans key="browser_table_headers.name" />
           </div>
@@ -79,10 +79,7 @@ const MainContainer = (props: Props) => {
                   }}
                 >
                   <props.children
-                    project={
-                      props.curseforgeProjectData || props.modrinthProjectData
-                    }
-                    isCurseforge={props.isCurseforge}
+                    project={mod?.data}
                     installedFile={props.installedMod}
                     modVersion={props.versions[modFile.index]}
                     instanceId={props.instanceId}

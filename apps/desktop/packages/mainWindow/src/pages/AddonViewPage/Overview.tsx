@@ -1,76 +1,37 @@
-/* eslint-disable solid/no-innerhtml */
-import { createEffect, createResource, Match, Suspense, Switch } from "solid-js"
+import { Match, Suspense, Switch, useContext } from "solid-js"
 import { Skeleton } from "@gd/ui"
 import { parseToHtml } from "@/utils/modplatformDescriptionConverter"
-import { FEUnifiedProjectID, MRFEProject } from "@gd/core_module/bindings"
-import { rspc } from "@/utils/rspcClient"
-import { useParams } from "@solidjs/router"
+import { ModContext } from "."
 
 const Description = () => {
-  const [data, { refetch }] = createResource(async () => {
-    const params: [string | undefined, "html" | "markdown"] = [
-      undefined,
-      "html"
-    ]
+  const mod = useContext(ModContext)
 
-    if (routeData.isCurseforge) {
-      params[0] = routeData.modpackDescription?.data?.data
-      params[1] = "html"
-    } else {
-      params[0] = routeData.modpackDetails.data?.body
-      params[1] = "markdown"
-    }
-
-    return parseToHtml(params[0], params[1])
-  })
-
-  createEffect(() => {
-    const _1 = routeData.modpackDescription?.data?.data
-    const _2 = (routeData.modpackDetails.data as MRFEProject)?.body
-    refetch()
-  })
+  const description = () => {
+    return parseToHtml(mod?.data?.fullDescriptionBody)
+  }
 
   return (
     <Suspense fallback={<Skeleton.modpackOverviewPage />}>
       <div>
-        <div class="w-full max-w-full overflow-hidden" innerHTML={data()} />
+        <div
+          class="w-full max-w-full overflow-hidden"
+          // eslint-disable-next-line solid/no-innerhtml
+          innerHTML={description()}
+        />
       </div>
     </Suspense>
   )
 }
 
 const Overview = () => {
-  const params = useParams()
-
-  const addonId = params.id
-  const platform = params.platform
-
-  const unifiedProjectId =
-    platform === "curseforge"
-      ? ({
-          type: "curseforge",
-          id: parseInt(addonId)
-        } satisfies FEUnifiedProjectID)
-      : ({
-          type: "modrinth",
-          id: addonId
-        } satisfies FEUnifiedProjectID)
-
-  const description = rspc.createQuery(() => ({
-    queryKey: [
-      "modplatforms.unifiedGetProject",
-      {
-        projectId: unifiedProjectId
-      }
-    ]
-  }))
+  const mod = useContext(ModContext)
 
   return (
     <Switch fallback={<Skeleton.modpackOverviewPage />}>
-      <Match when={!routeData.modpackDescription?.isLoading}>
+      <Match when={!mod?.isLoading}>
         <Description />
       </Match>
-      <Match when={routeData.modpackDescription?.isLoading}>
+      <Match when={mod?.isLoading}>
         <Skeleton.modpackOverviewPage />
       </Match>
     </Switch>

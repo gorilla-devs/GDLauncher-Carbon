@@ -1,7 +1,6 @@
 import {
-  CFFEMod,
+  FEUnifiedSearchResultWithDescription,
   InstanceDetails,
-  MRFEProject,
   Mod
 } from "@gd/core_module/bindings"
 import { VersionRowTypeData } from "../InfiniteScrollVersionsQueryWrapper"
@@ -23,7 +22,7 @@ import ModDownloadButton from "../ModDownloadButton"
 
 export interface Props {
   modVersion: VersionRowTypeData
-  project: CFFEMod | MRFEProject | undefined
+  project: FEUnifiedSearchResultWithDescription | undefined
   isCurseforge?: boolean
   instanceId?: number | null
   instanceDetails?: InstanceDetails
@@ -184,14 +183,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
         <div class="flex items-center">
           <Switch>
             <Match when={props.type === "mod"}>
-              <ModDownloadButton
-                projectId={props.modVersion.id}
-                fileId={props.modVersion.fileId}
-                isCurseforge={props.isCurseforge || false}
-                instanceId={props.instanceId}
-                instanceLocked={props.instanceDetails?.modpack?.locked}
-                instanceMods={props.instanceMods}
-              />
+              <ModDownloadButton addon={props.project} />
             </Match>
             <Match when={props.type === "modpack"}>
               <Button

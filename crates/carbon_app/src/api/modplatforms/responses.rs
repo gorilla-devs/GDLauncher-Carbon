@@ -383,6 +383,7 @@ pub struct FEUnifiedSearchResult {
     pub categories: Vec<FEUnifiedCategoryId>,
     pub screenshot_urls: Vec<String>,
     pub minecraft_versions: Vec<String>,
+    pub versions: Option<Vec<String>>,
     pub main_file_id: Option<String>,
 }
 
@@ -495,6 +496,13 @@ impl From<Mod> for FEUnifiedSearchResult {
                 all_versions.dedup();
                 all_versions
             },
+            versions: Some(
+                value
+                    .latest_files_indexes
+                    .iter()
+                    .map(|v| v.file_id.to_string())
+                    .collect(),
+            ),
         }
     }
 }
@@ -531,7 +539,8 @@ impl From<Project> for FEUnifiedSearchResult {
                 .iter()
                 .map(|gallery| gallery.url.clone())
                 .collect(),
-            minecraft_versions: value.versions,
+            minecraft_versions: value.game_versions,
+            versions: Some(value.versions),
         }
     }
 }
@@ -569,6 +578,7 @@ impl From<ProjectSearchResult> for FEUnifiedSearchResult {
                 .collect(),
             screenshot_urls: value.gallery.unwrap_or_default(),
             minecraft_versions: value.versions,
+            versions: None,
         }
     }
 }
