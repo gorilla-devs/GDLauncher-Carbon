@@ -104,9 +104,9 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
             status: v.fileStatus,
             mainThumbnail: project.data.logo?.url
           })),
-          index: response.pagination?.index,
-          total: response.pagination?.totalCount
-        } as VersionRowType
+          index: response.pagination?.index || 0,
+          total: response.pagination?.totalCount || 0
+        } satisfies VersionRowType
       } else {
         const project = await rspcContext.client.query([
           "modplatforms.modrinth.getProject",
@@ -140,12 +140,12 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
             fileName: v.files[0].filename,
             size: v.files[0].size,
             hash: v.files[0].hashes.sha512,
-            status: v.status,
-            mainThumbnail: project.icon_url
+            status: v.status || "",
+            mainThumbnail: project.icon_url || undefined
           })),
           index: versionsQuery.index,
           total: project.versions.length
-        } as VersionRowType
+        } satisfies VersionRowType
       }
     },
     initialPageParam: 0,

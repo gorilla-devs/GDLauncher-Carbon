@@ -1,5 +1,6 @@
 import {
   FEUnifiedSearchResultWithDescription,
+  FEUnifiedSearchType,
   InstanceDetails,
   Mod
 } from "@gd/core_module/bindings"
@@ -7,11 +8,9 @@ import { VersionRowTypeData } from "../InfiniteScrollVersionsQueryWrapper"
 import { For, Match, Show, Switch, createSignal } from "solid-js"
 import { Trans } from "@gd/i18n"
 import {
-  Button,
   Popover,
   PopoverContent,
   PopoverTrigger,
-  Spinner,
   Tooltip,
   TooltipContent,
   TooltipTrigger
@@ -19,6 +18,7 @@ import {
 import { format } from "date-fns"
 import CopyIcon from "../CopyIcon"
 import ModDownloadButton from "../ModDownloadButton"
+import ModpackDownloadButton from "../ModpackDownloadButton"
 
 export interface Props {
   modVersion: VersionRowTypeData
@@ -33,14 +33,13 @@ export interface Props {
         remoteId: string | number
       }
     | undefined
-  type: "modpack" | "mod"
+  type: FEUnifiedSearchType | undefined
 }
 
 export interface AdditionalProps {
   loading: boolean
   disabled: boolean
   isInstalled?: boolean
-  onPrimaryAction: () => void
 }
 
 const CopiableEntity = (props: {
@@ -182,43 +181,26 @@ const RowContainer = (props: Props & AdditionalProps) => {
         </div>
         <div class="flex items-center">
           <Switch>
-            <Match when={props.type === "mod"}>
-              <ModDownloadButton addon={props.project} />
-            </Match>
             <Match when={props.type === "modpack"}>
-              <Button
-                type="primary"
-                variant={props.isInstalled ? "green" : undefined}
-                rounded={false}
-                disabled={props.disabled || props.isInstalled}
-                onClick={props.onPrimaryAction}
-              >
-                <div class="flex gap-2">
-                  <Switch>
-                    <Match when={props.type === "mod" && !props.instanceId}>
-                      <Trans key="rowcontainer.no_instance_selected" />
-                    </Match>
-                    <Match when={props.loading}>
-                      <Trans key="modpack.version_downloading" />
-                      <Spinner class="h-5 w-5" />
-                    </Match>
-                    <Match when={!props.loading && !props.isInstalled}>
-                      <Switch>
-                        <Match when={props.installedFile}>
-                          <Trans key="modpack.version_switch" />
-                        </Match>
-                        <Match when={!props.installedFile}>
-                          <Trans key="modpack.version_download" />
-                        </Match>
-                      </Switch>
-                      <div class="i-ri:download-2-fill h-5 w-5" />
-                    </Match>
-                    <Match when={!props.loading && props.isInstalled}>
-                      <Trans key="modpack.version_installed" />
-                    </Match>
-                  </Switch>
-                </div>
-              </Button>
+              <ModpackDownloadButton
+                addon={props.project}
+                name={props.modVersion.name}
+                fileId={
+                  props.project?.platform === "curseforge"
+                    ? parseInt(props.modVersion.fileId, 10)
+                    : props.modVersion.fileId
+                }
+              />
+            </Match>
+            <Match when={props.type !== "modpack"}>
+              <ModDownloadButton
+                addon={props.project}
+                fileId={
+                  props.project?.platform === "curseforge"
+                    ? parseInt(props.modVersion.fileId, 10)
+                    : props.modVersion.fileId
+                }
+              />
             </Match>
           </Switch>
         </div>

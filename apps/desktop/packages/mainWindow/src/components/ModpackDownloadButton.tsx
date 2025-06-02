@@ -7,7 +7,8 @@ import { Show, createSignal, getOwner, runWithOwner } from "solid-js"
 
 interface ModDownloadButtonProps {
   fileId?: number | string
-  addon: FEUnifiedSearchResult
+  name?: string
+  addon: FEUnifiedSearchResult | undefined
 }
 
 const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
@@ -60,7 +61,7 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
     fileId?: number | string,
     projectId?: number | string
   ) => {
-    if (!props.addon.mainFileId) {
+    if (!props.addon?.mainFileId) {
       throw new Error("No main file ID found")
     }
 
@@ -70,9 +71,11 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
             type: "curseforge",
             value: {
               file_id:
-                (fileId as number) || Number.parseInt(props.addon.mainFileId),
+                Number.parseInt(fileId?.toString() || "", 10) ||
+                Number.parseInt(props.addon.mainFileId),
               project_id:
-                (projectId as number) || Number.parseInt(props.addon.id)
+                Number.parseInt(projectId?.toString() || "", 10) ||
+                Number.parseInt(props.addon.id)
             }
           } satisfies Modpack)
         : ({
@@ -90,19 +93,17 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
     runWithOwner(owner, async () => {
       setLoading(true)
 
-      const imgUrl = props.addon.imageUrl
+      const imgUrl = props.addon?.imageUrl
       if (imgUrl) loadIconMutation.mutate(imgUrl)
 
-      const request = {
+      createInstanceMutation.mutate({
         use_loaded_icon: true,
         notes: "",
-        name: props.addon.title,
+        name: props.name || props.addon?.title!,
         version: {
-          Modpack: instanceCreationObj()
+          Modpack: instanceCreationObj(props.fileId, props.addon?.id)
         }
-      }
-
-      createInstanceMutation.mutate(request)
+      })
     })
   }
 

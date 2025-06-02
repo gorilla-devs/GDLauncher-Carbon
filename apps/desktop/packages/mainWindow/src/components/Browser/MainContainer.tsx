@@ -9,7 +9,7 @@ import {
 } from "@gd/core_module/bindings"
 import { Trans } from "@gd/i18n"
 import { VersionRowTypeData } from "../InfiniteScrollVersionsQueryWrapper"
-import { ModContext } from "@/pages/AddonViewPage"
+import { AddonContext } from "@/pages/AddonViewPage"
 
 interface Props {
   virtualVersions: any
@@ -26,7 +26,7 @@ interface Props {
 }
 
 const MainContainer = (props: Props) => {
-  const mod = useContext(ModContext)
+  const mod = useContext(AddonContext)
 
   const gridCols = "grid-cols-[5fr_130px_130px_100px_50px_200px]"
 

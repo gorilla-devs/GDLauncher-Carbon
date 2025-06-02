@@ -5,7 +5,7 @@ import { VList } from "@/components/VirtuaWrapper"
 import { useInfiniteVersionsQuery } from "@/components/InfiniteScrollVersionsQueryWrapper"
 import { createMemo, useContext } from "solid-js"
 import { Trans } from "@gd/i18n"
-import { ModContext } from "@/pages/AddonViewPage"
+import { AddonContext } from "@/pages/AddonViewPage"
 
 interface VersionItem {
   type: "value" | "loader" | "header"
@@ -14,7 +14,7 @@ interface VersionItem {
 
 const Versions = () => {
   const [searchParams] = useSearchParams()
-  const mod = useContext(ModContext)
+  const mod = useContext(AddonContext)
 
   const infiniteQuery = useInfiniteVersionsQuery()
 
@@ -144,7 +144,7 @@ const Versions = () => {
                 modVersion={item.value}
                 installedFile={installedMod()}
                 instanceId={instanceId()}
-                type="mod"
+                type={mod?.data?.type}
                 instanceMods={instanceMods.data || undefined}
                 instanceDetails={instanceDetails.data || undefined}
               />

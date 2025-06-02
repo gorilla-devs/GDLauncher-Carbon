@@ -1,10 +1,10 @@
 import { Trans } from "@gd/i18n"
 import { For, Match, Suspense, Switch, useContext } from "solid-js"
 import { Skeleton } from "@gd/ui"
-import { ModContext } from "."
+import { AddonContext } from "."
 
 const Screenshots = () => {
-  const mod = useContext(ModContext)
+  const mod = useContext(AddonContext)
 
   const screenshots = () => {
     return mod?.data?.screenshotUrls

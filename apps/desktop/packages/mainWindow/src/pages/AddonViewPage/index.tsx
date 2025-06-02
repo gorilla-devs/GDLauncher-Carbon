@@ -10,12 +10,7 @@ import {
   TooltipContent,
   TooltipTrigger
 } from "@gd/ui"
-import {
-  Outlet,
-  useLocation,
-  useParams,
-  useSearchParams
-} from "@solidjs/router"
+import { Outlet, useLocation, useParams } from "@solidjs/router"
 import {
   For,
   JSX,
@@ -38,6 +33,7 @@ import {
 } from "@gd/core_module/bindings"
 import { CreateQueryResult } from "@tanstack/solid-query"
 import { RSPCError } from "@rspc/client"
+import ModpackDownloadButton from "@/components/ModpackDownloadButton"
 
 const getTabIndexFromPath = (path: string) => {
   if (path.match(/\/(addon)\/.+\/.+/g)) {
@@ -64,13 +60,13 @@ const ModsInfiniteScrollQueryWrapper = () => {
       modplatform={platform()}
     >
       <ContentWrapper zeroPadding>
-        <ModExplore />
+        <AddonExplore />
       </ContentWrapper>
     </InfiniteScrollVersionsQueryWrapper>
   )
 }
 
-export const ModContext = createContext<CreateQueryResult<
+export const AddonContext = createContext<CreateQueryResult<
   FEUnifiedSearchResultWithDescription,
   RSPCError
 > | null>(null)
@@ -80,13 +76,13 @@ const ModContextProvider = (props: {
   children: JSX.Element
 }) => {
   return (
-    <ModContext.Provider value={props.mod}>
+    <AddonContext.Provider value={props.mod}>
       {props.children}
-    </ModContext.Provider>
+    </AddonContext.Provider>
   )
 }
 
-const ModExplore = () => {
+const AddonExplore = () => {
   const navigator = useGDNavigate()
   const params = useParams()
   const platform = () => params.platform as FEUnifiedPlatform
@@ -143,7 +139,7 @@ const ModExplore = () => {
         setIsSticky(rect.top <= 104)
       }}
     >
-      <div class="h-58 flex flex-col items-stretch justify-between transition-all ease-in-out">
+      <div class="h-58 max-h-58 min-h-58 flex flex-col items-stretch justify-between transition-all ease-in-out">
         <div class="relative h-full">
           <div class="from-darkSlate-700 absolute left-0 right-0 top-0 z-20 h-full bg-gradient-to-t from-30%" />
           <div
@@ -259,7 +255,14 @@ const ModExplore = () => {
                     </div>
                   </div>
                   <div class="mt-2 flex items-center gap-2 lg:mt-0">
-                    <ModDownloadButton addon={project.data} />
+                    <Switch>
+                      <Match when={project.data?.type === "modpack"}>
+                        <ModpackDownloadButton addon={project.data} />
+                      </Match>
+                      <Match when={project.data?.type !== "modpack"}>
+                        <ModDownloadButton addon={project.data} />
+                      </Match>
+                    </Switch>
                   </div>
                 </div>
               </div>
@@ -325,7 +328,7 @@ const ModExplore = () => {
                 <ExploreVersionsNavbar modplatform={platform()} type="mod" />
               </Show>
             </div>
-            <div class="z-0 flex-1">
+            <div class="z-0 flex flex-1 flex-col">
               <ModContextProvider mod={project}>
                 <Outlet />
               </ModContextProvider>

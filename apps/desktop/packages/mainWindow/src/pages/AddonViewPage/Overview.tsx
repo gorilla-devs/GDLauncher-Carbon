@@ -1,10 +1,10 @@
 import { Match, Suspense, Switch, useContext } from "solid-js"
 import { Skeleton } from "@gd/ui"
 import { parseToHtml } from "@/utils/modplatformDescriptionConverter"
-import { ModContext } from "."
+import { AddonContext } from "."
 
 const Description = () => {
-  const mod = useContext(ModContext)
+  const mod = useContext(AddonContext)
 
   const description = () => {
     return parseToHtml(mod?.data?.fullDescriptionBody)
@@ -24,7 +24,7 @@ const Description = () => {
 }
 
 const Overview = () => {
-  const mod = useContext(ModContext)
+  const mod = useContext(AddonContext)
 
   return (
     <Switch fallback={<Skeleton.modpackOverviewPage />}>
