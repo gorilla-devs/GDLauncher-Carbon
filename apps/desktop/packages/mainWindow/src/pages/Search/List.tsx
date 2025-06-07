@@ -10,7 +10,7 @@ import {
   Tabs
 } from "@gd/ui"
 import { Tab, TabList } from "@gd/ui"
-import { For, onMount, Suspense } from "solid-js"
+import { For, onMount, Show, Suspense } from "solid-js"
 import { FEUnifiedSearchType } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useLocation, useParams, useSearchParams } from "@solidjs/router"
@@ -196,40 +196,58 @@ export function List() {
           </div>
         }
       >
-        <VList
-          data={searchContext?.allRows() || []}
-          class="flex max-w-full flex-col gap-4 overflow-x-hidden"
-          ref={(v) => {
-            if (v) {
-              searchContext?.setRef(v)
-            }
-          }}
-          onScroll={searchContext?.virtualOnScrollHandler}
+        <Show
+          when={(searchContext?.allRows() || []).length > 0}
+          fallback={
+            <div class="flex flex-col items-center justify-center px-6 py-16 text-center">
+              <div class="i-ri:search-line mb-4 text-6xl text-gray-400" />
+              <h3 class="mb-2 text-xl font-semibold text-gray-300">
+                No results found
+              </h3>
+              <p class="max-w-md text-gray-500">
+                We couldn't find any {type()}s matching your search criteria.
+                Try adjusting your filters or search terms.
+              </p>
+            </div>
+          }
         >
-          {(result) => {
-            if (result.type === "loader") {
-              return (
-                <div class="m-4 flex h-20 items-center justify-center">
-                  <div class="i-ri:loader-4-line animate-spin text-2xl" />
-                </div>
+          <VList
+            data={searchContext?.allRows() || []}
+            class="flex max-w-full flex-col gap-4 overflow-x-hidden"
+            ref={(v) => {
+              if (v) {
+                searchContext?.setRef(v)
+              }
+            }}
+            onScroll={searchContext?.virtualOnScrollHandler}
+          >
+            {(result) => {
+              if (result.type === "loader") {
+                return (
+                  <div class="m-4 flex h-20 items-center justify-center">
+                    <div class="i-ri:loader-4-line animate-spin text-2xl" />
+                  </div>
+                )
+              }
+
+              const isInstalled = lookupTableInstalledMods().has(
+                result.value!.id
               )
-            }
 
-            const isInstalled = lookupTableInstalledMods().has(result.value!.id)
-
-            return (
-              <ListItem
-                result={result.value!}
-                isInstalled={isInstalled}
-                onItemClick={() => {
-                  navigator.navigate(
-                    `/addon/${result.value!.id}/${result.value!.platform}?instanceId=${instanceId()}`
-                  )
-                }}
-              />
-            )
-          }}
-        </VList>
+              return (
+                <ListItem
+                  result={result.value!}
+                  isInstalled={isInstalled}
+                  onItemClick={() => {
+                    navigator.navigate(
+                      `/addon/${result.value!.id}/${result.value!.platform}?instanceId=${instanceId()}`
+                    )
+                  }}
+                />
+              )
+            }}
+          </VList>
+        </Show>
       </Suspense>
     </div>
   )

@@ -79,8 +79,6 @@ export function SearchCategoryDropdown(props: DropdownProps) {
   const curseforgeCategories = categories.data?.curseforge
   const modrinthCategories = categories.data?.modrinth
 
-  console.log(curseforgeCategories, modrinthCategories)
-
   const currentCategories = () => {
     const categories =
       searchResults?.searchQuery().searchApi === "curseforge"
