@@ -3,49 +3,50 @@ import useSearchContext from "@/components/SearchInputContext"
 import { CategoryIcon, getInstanceImageUrl } from "@/utils/instances"
 import { rspc } from "@/utils/rspcClient"
 import { Badge } from "@gd/ui"
-import { useSearchParams } from "@solidjs/router"
 import { For, Show } from "solid-js"
 import DefaultImg from "/assets/images/default-instance-img.png"
 
 export default function FiltersDisplay() {
   const searchContext = useSearchContext()
   const globalStore = useGlobalStore()
-  const [searchParams, setSearchParams] = useSearchParams()
-  const instanceId = () => parseInt(searchParams.instanceId, 10)
 
   const instanceDetails = rspc.createQuery(() => ({
-    queryKey: ["instance.getInstanceDetails", instanceId()]
+    queryKey: [
+      "instance.getInstanceDetails",
+      searchContext?.selectedInstanceId() ?? null
+    ]
   }))
 
   return (
     <Show
-      when={searchContext?.searchQuery().categories?.length || instanceId()}
+      when={
+        searchContext?.searchQuery().categories?.length ||
+        searchContext?.selectedInstanceId()
+      }
     >
       <div class="px-6 pt-6">
         <div class="flex items-center gap-4">
           <div>Active Filters:</div>
-          <Show when={instanceId()}>
+          <Show when={searchContext?.selectedInstanceId()}>
             <div
               class="border-1 border-darkSlate-500 group relative box-border flex h-10 items-center justify-between gap-4 overflow-hidden rounded-lg border-solid px-4"
               style={{
                 "background-image":
-                  instanceDetails.data?.iconRevision && instanceId()
+                  instanceDetails.data?.iconRevision &&
+                  searchContext?.selectedInstanceId()
                     ? `url("${getInstanceImageUrl(
-                        instanceId(),
+                        searchContext?.selectedInstanceId(),
                         instanceDetails.data?.iconRevision
                       )}")`
                     : `url("${DefaultImg}")`
               }}
               onClick={() => {
-                setSearchParams({
-                  ...searchParams,
-                  instanceId: undefined
-                })
+                searchContext?.setSelectedInstanceId(undefined)
                 searchContext?.setSearchQuery({
                   ...searchContext.searchQuery(),
                   modloaders: null,
                   gameVersions: null,
-                  categories: null
+                  projectType: "modpack"
                 })
               }}
             >
@@ -57,7 +58,7 @@ export default function FiltersDisplay() {
                   style={{
                     "background-image": instanceDetails.data?.iconRevision
                       ? `url("${getInstanceImageUrl(
-                          instanceId(),
+                          searchContext?.selectedInstanceId() ?? 0,
                           instanceDetails.data?.iconRevision
                         )}")`
                       : `url("${DefaultImg}")`

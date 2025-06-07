@@ -13,6 +13,7 @@ import {
 import { rspc } from "./rspcClient"
 import { createInfiniteQuery } from "@tanstack/solid-query"
 import { VirtualizerHandle } from "virtua/lib/solid"
+import { useSearchParams } from "@solidjs/router"
 
 const defaultSearchQuery: FEUnifiedSearchParameters = {
   searchQuery: "",
@@ -58,9 +59,19 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   const [ref, setRef] = createSignal<VirtualizerHandle | null>(opts.parentRef)
 
   const [lastScrollOffset, setLastScrollOffset] = createSignal(0)
-  const [selectedInstanceId, setSelectedInstanceId] = createSignal<
-    number | null
-  >(null)
+
+  const [searchParams, _setSearchParams] = useSearchParams()
+
+  const selectedInstanceId = () => {
+    return parseInt(searchParams.instanceId, 10)
+  }
+
+  const setSelectedInstanceId = (instanceId: number | undefined) => {
+    _setSearchParams({
+      ...searchParams,
+      instanceId
+    })
+  }
 
   const selectedInstance = rspc.createQuery(() => ({
     queryKey: ["instance.getInstanceDetails", selectedInstanceId()],
@@ -71,6 +82,26 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     queryKey: ["instance.getInstanceMods", selectedInstanceId()],
     enabled: !!selectedInstanceId()
   }))
+
+  createEffect(async () => {
+    rspcContext.queryClient.removeQueries({
+      queryKey: ["instance.getInstanceDetails"]
+    })
+    rspcContext.queryClient.removeQueries({
+      queryKey: ["instance.getInstanceMods"]
+    })
+    if (selectedInstanceId()) {
+      selectedInstanceMods.refetch()
+      const res = await selectedInstance.refetch()
+      const modloader = res.data?.modloaders[0]
+      const gameVersion = res.data?.version
+      setSearchQuery({
+        ...searchQuery(),
+        modloaders: modloader ? [modloader.type_] : null,
+        gameVersions: gameVersion ? [gameVersion] : null
+      })
+    }
+  })
 
   const [searchQuery, _setSearchQuery] =
     createSignal<FEUnifiedSearchParameters>(
@@ -291,6 +322,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     lastScrollOffset,
     selectedInstance,
     selectedInstanceMods,
-    setSelectedInstanceId
+    setSelectedInstanceId,
+    selectedInstanceId
   }
 }
