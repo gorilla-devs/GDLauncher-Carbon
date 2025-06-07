@@ -372,7 +372,9 @@ const HomeGrid = () => {
                 <DropdownMenuContent class="w-64">
                   <DropdownMenuLabel>
                     <div class="flex items-center justify-between gap-2">
-                      <div>Platform</div>
+                      <div>
+                        <Trans key="general.platform" />
+                      </div>
                       <div
                         class="text-lightSlate-900 hover:text-lightSlate-50 text-xs transition-colors duration-200 ease-[cubic-bezier(.4,0,.2,1)]"
                         onClick={() => {
@@ -405,7 +407,9 @@ const HomeGrid = () => {
                       </DropdownMenuSubTrigger>
                       <DropdownMenuPortal>
                         <DropdownMenuSubContent>
-                          <DropdownMenuLabel>Tile Size</DropdownMenuLabel>
+                          <DropdownMenuLabel>
+                            <Trans key="ui.tile_size" />
+                          </DropdownMenuLabel>
                           <DropdownMenuRadioGroup
                             value={instancesTileSize().toString()}
                           >
@@ -461,7 +465,9 @@ const HomeGrid = () => {
                       </DropdownMenuSubTrigger>
                       <DropdownMenuPortal>
                         <DropdownMenuSubContent>
-                          <DropdownMenuLabel>Sort Options</DropdownMenuLabel>
+                          <DropdownMenuLabel>
+                            <Trans key="ui.sort_options" />
+                          </DropdownMenuLabel>
                           <DropdownMenuRadioGroup
                             value={
                               globalStore.settings.data?.instancesSortBy || ""
@@ -554,7 +560,9 @@ const HomeGrid = () => {
                       </DropdownMenuSubTrigger>
                       <DropdownMenuPortal>
                         <DropdownMenuSubContent>
-                          <DropdownMenuLabel>Group Options</DropdownMenuLabel>
+                          <DropdownMenuLabel>
+                            <Trans key="ui.group_options" />
+                          </DropdownMenuLabel>
                           <DropdownMenuRadioGroup
                             value={
                               globalStore.settings.data?.instancesGroupBy || ""

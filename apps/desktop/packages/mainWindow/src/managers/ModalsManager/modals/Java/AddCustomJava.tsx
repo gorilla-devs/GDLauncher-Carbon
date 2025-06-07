@@ -1,4 +1,4 @@
-import { Trans } from "@gd/i18n"
+import { Trans, useTransContext } from "@gd/i18n"
 import { ModalProps, useModal } from "@/managers/ModalsManager"
 import ModalLayout from "@/managers/ModalsManager/ModalLayout"
 import { Button, Input, createNotification } from "@gd/ui"
@@ -8,6 +8,7 @@ import { Match, Switch, createSignal } from "solid-js"
 const AddCustomJava = (props: ModalProps) => {
   const [value, setValue] = createSignal("")
   const [validPath, setValidPath] = createSignal<boolean | null>(null)
+  const [t] = useTransContext()
   const modalsContext = useModal()
   const addNotification = createNotification()
 
@@ -28,7 +29,7 @@ const AddCustomJava = (props: ModalProps) => {
               class="w-full"
               value={value()}
               inputColor="bg-darkSlate-600"
-              placeholder="Type a custom java path"
+              placeholder={t("placeholders.type_custom_java_path")}
               icon={
                 <Switch>
                   <Match when={validateJavaPath.isPending}>
@@ -70,7 +71,7 @@ const AddCustomJava = (props: ModalProps) => {
               onClick={() => {
                 createCustomJavaVersionMutation.mutate(value())
                 addNotification({
-                  name: "Custom Java Path added successfully",
+                  name: t("notifications.custom_java_added"),
                   type: "success"
                 })
                 modalsContext?.closeModal()

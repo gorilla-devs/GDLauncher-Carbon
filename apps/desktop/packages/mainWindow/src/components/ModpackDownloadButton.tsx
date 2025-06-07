@@ -1,7 +1,7 @@
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { rspc } from "@/utils/rspcClient"
 import { FEUnifiedSearchResult, Modpack } from "@gd/core_module/bindings"
-import { Trans } from "@gd/i18n"
+import { Trans, useTransContext } from "@gd/i18n"
 import { Button, createNotification, Spinner } from "@gd/ui"
 import { Show, createSignal, getOwner, runWithOwner } from "solid-js"
 
@@ -14,6 +14,7 @@ interface ModDownloadButtonProps {
 const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
   const owner = getOwner()
   const [loading, setLoading] = createSignal(false)
+  const [t] = useTransContext()
 
   const navigator = useGDNavigate()
   const addNotification = createNotification()
@@ -23,7 +24,7 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
     async onSuccess() {
       setLoading(false)
       addNotification({
-        name: "Instance successfully created.",
+        name: t("notifications.instance_created_success"),
         type: "success"
       })
 
@@ -32,7 +33,7 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
     onError() {
       setLoading(false)
       addNotification({
-        name: "Error while creating the instance.",
+        name: t("notifications.instance_created_error"),
         type: "error"
       })
     }
@@ -51,7 +52,7 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
     onError() {
       setLoading(false)
       addNotification({
-        name: "Error while downloading the modpack.",
+        name: t("notifications.modpack_download_error"),
         type: "error"
       })
     }

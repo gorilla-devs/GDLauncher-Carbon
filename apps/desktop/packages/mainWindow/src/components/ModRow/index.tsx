@@ -1,7 +1,7 @@
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { formatDownloadCount, truncateText } from "@/utils/helpers"
 import { rspc } from "@/utils/rspcClient"
-import { Trans } from "@gd/i18n"
+import { Trans, useTransContext } from "@gd/i18n"
 import { Button, createNotification, Popover, Spinner } from "@gd/ui"
 import { formatDistanceToNowStrict } from "date-fns"
 import {
@@ -36,6 +36,7 @@ const ModRow = (props: ModRowProps) => {
   const owner = getOwner()
   const [loading, setLoading] = createSignal(false)
   const [isRowSmall, setIsRowSmall] = createSignal(false)
+  const [t] = useTransContext()
   const rspcContext = rspc.useContext()
 
   const mergedProps = mergeProps({ type: "Modpack" }, props)
@@ -47,14 +48,14 @@ const ModRow = (props: ModRowProps) => {
     onSuccess() {
       setLoading(false)
       addNotification({
-        name: "Instance successfully created.",
+        name: t("notifications.instance_created_success"),
         type: "success"
       })
     },
     onError() {
       setLoading(false)
       addNotification({
-        name: "Error while creating the instance.",
+        name: t("notifications.instance_created_error"),
         type: "error"
       })
     },
@@ -79,7 +80,7 @@ const ModRow = (props: ModRowProps) => {
     onError() {
       setLoading(false)
       addNotification({
-        name: "Error while downloading the modpack.",
+        name: t("notifications.modpack_download_error"),
         type: "error"
       })
     }

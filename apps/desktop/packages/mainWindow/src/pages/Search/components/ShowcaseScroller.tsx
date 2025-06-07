@@ -215,7 +215,9 @@ export default function ShowcaseScroller(props: ShowcaseScrollerProps) {
                 navigator.navigate("/explore/list")
               }}
             >
-              <h3 class="p-2 font-bold text-white">Show More</h3>
+              <h3 class="p-2 font-bold text-white">
+                <Trans key="search.show_more" />
+              </h3>
             </div>
           </Show>
         </div>

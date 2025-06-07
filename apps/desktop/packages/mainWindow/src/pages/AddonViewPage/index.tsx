@@ -1,5 +1,5 @@
 import { useGDNavigate } from "@/managers/NavigationManager"
-import { Trans } from "@gd/i18n"
+import { Trans, useTransContext } from "@gd/i18n"
 import {
   Button,
   Skeleton,
@@ -88,6 +88,7 @@ const AddonExplore = () => {
   const platform = () => params.platform as FEUnifiedPlatform
   const location = useLocation()
   const indexTab = () => getTabIndexFromPath(location.pathname)
+  const [t] = useTransContext()
 
   const project = rspc.createQuery(() => ({
     queryKey: [
@@ -108,19 +109,19 @@ const AddonExplore = () => {
 
   const instancePages = () => [
     {
-      label: "Overview",
+      label: t("ui.overview"),
       path: `/addon/${params.id}/${params.platform}`
     },
     {
-      label: "Changelog",
+      label: t("ui.changelog"),
       path: `/addon/${params.id}/${params.platform}/changelog`
     },
     {
-      label: "Screenshots",
+      label: t("ui.screenshots"),
       path: `/addon/${params.id}/${params.platform}/screenshots`
     },
     {
-      label: "Versions",
+      label: t("ui.versions"),
       path: `/addon/${params.id}/${params.platform}/versions`
     }
   ]

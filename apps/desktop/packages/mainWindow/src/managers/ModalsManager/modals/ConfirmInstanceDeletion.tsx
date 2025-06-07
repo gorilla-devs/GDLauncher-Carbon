@@ -13,7 +13,7 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
     mutationKey: ["instance.deleteInstance"],
     onError: (error) => {
       addNotification({
-        name: "Cannot delete instance",
+        name: t("notifications.cannot_delete_instance"),
         content: error.message,
         type: "error"
       })

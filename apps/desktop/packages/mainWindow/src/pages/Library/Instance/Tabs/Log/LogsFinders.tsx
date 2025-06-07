@@ -4,6 +4,7 @@ import { SetStoreFunction } from "solid-js/store"
 import { Match, Setter, Switch } from "solid-js"
 import { FESearchResult } from "@gd/core_module/bindings"
 import { ScrollToIndexOpts } from "virtua/lib/core"
+import { Trans, useTransContext } from "@gd/i18n"
 
 interface Props {
   setSearchInputRef: (ref: HTMLInputElement) => void
@@ -19,6 +20,8 @@ interface Props {
 }
 
 const LogsFinders = (props: Props) => {
+  const [t] = useTransContext()
+  
   const handleArrowClick = async (direction: "up" | "down") => {
     if (!props.logSearchResults?.length) return
 
@@ -142,14 +145,16 @@ const LogsFinders = (props: Props) => {
               </div>
             }
             class="h-6"
-            placeholder="Find (Ctrl+F)"
+            placeholder={t("placeholders.find_logs")}
             value={props?.query?.query ?? ""}
             onInput={(e) => props.setQuery("query", e.target.value)}
           />
           <div class="text-lightSlate-800 text-sm">
             <Switch>
               <Match when={!props.logSearchResults?.length}>
-                <div class="w-24">No results</div>
+                <div class="w-24">
+                  <Trans key="ui.no_results" />
+                </div>
               </Match>
               <Match when={props.logSearchResults?.length !== 0}>
                 <div class="w-24">

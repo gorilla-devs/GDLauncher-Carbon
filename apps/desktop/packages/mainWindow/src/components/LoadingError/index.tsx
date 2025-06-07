@@ -1,5 +1,6 @@
 import { Spinner } from "@gd/ui"
 import { Match, Switch, JSX } from "solid-js"
+import { Trans } from "@gd/i18n"
 
 interface RouteData {
   isLoading: boolean
@@ -23,7 +24,7 @@ const LoadingError = (props: Props) => {
       </Match>
       <Match when={props.routeData.data.isError}>
         <div class="flex h-full w-full items-center justify-center">
-          Some error
+          <Trans key="errors.some_error" />
         </div>
       </Match>
       <Match when={props.routeData.data.isSuccess}>{props.children}</Match>

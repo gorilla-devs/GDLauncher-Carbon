@@ -122,5 +122,9 @@
   "change_recovery_email_title": "Change Recovery Email",
   "change_recovery_email_description": "Enter the new recovery email for your GDLauncher account",
   "cancel": "Cancel",
-  "change_email": "Change Email"
+  "change_email": "Change Email",
+  "Accounts": "Accounts",
+  "Language": "Language",
+  "custom_commands": "Custom Commands",
+  "runtime_path": "Runtime Path"
 }

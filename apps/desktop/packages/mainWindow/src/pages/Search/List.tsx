@@ -17,6 +17,7 @@ import { useLocation, useParams, useSearchParams } from "@solidjs/router"
 import FiltersDisplay from "./FiltersDisplay"
 import { FiltersDropdown } from "./FiltersDropdown"
 import { rspc } from "@/utils/rspcClient"
+import { Trans, useTransContext } from "@gd/i18n"
 
 export function List() {
   const searchContext = useSearchContext()
@@ -24,6 +25,7 @@ export function List() {
   const params = useParams()
   const location = useLocation()
   const [searchParams] = useSearchParams()
+  const [t] = useTransContext()
 
   const instanceId = () => Number.parseInt(searchParams.instanceId, 10)
 
@@ -47,38 +49,38 @@ export function List() {
       ? []
       : [
           {
-            label: "Modpacks",
+            label: t("search.modpacks"),
             value: "modpack" as const,
             icon: "i-ri:folder-fill",
             path: "/search/modpack"
           }
         ]),
     {
-      label: "Mods",
+      label: t("search.mods"),
       value: "mod",
       icon: "i-ri:file-text-fill",
       path: "/search/mod"
     },
     {
-      label: "Shaders",
+      label: t("search.shaders"),
       value: "shader",
       icon: "i-ri:paint-fill",
       path: "/search/shader"
     },
     {
-      label: "Resource Packs",
+      label: t("search.resource_packs"),
       value: "resourcePack",
       icon: "i-ri:folder-fill",
       path: "/search/resourcePack"
     },
     {
-      label: "Data Packs",
+      label: t("search.data_packs"),
       value: "datapack",
       icon: "i-ri:folder-fill",
       path: "/search/datapack"
     },
     {
-      label: "Worlds",
+      label: t("search.worlds"),
       value: "world",
       icon: "i-ri:folder-fill",
       path: "/search/world"
@@ -136,7 +138,7 @@ export function List() {
             }}
           >
             <div class="i-ri:arrow-left-line" />
-            Go Back
+            <Trans key="search.go_back" />
           </Button>
         </div>
         <Tabs
@@ -176,7 +178,9 @@ export function List() {
             <DropdownMenuTrigger>
               <Badge>
                 <div class="flex items-center gap-1">
-                  <div>Filters</div>
+                  <div>
+                    <Trans key="search.filters" />
+                  </div>
                   <div class="i-ri:arrow-down-s-line text-xs" />
                 </div>
               </Badge>
@@ -202,11 +206,13 @@ export function List() {
             <div class="flex flex-col items-center justify-center px-6 py-16 text-center">
               <div class="i-ri:search-line mb-4 text-6xl text-gray-400" />
               <h3 class="mb-2 text-xl font-semibold text-gray-300">
-                No results found
+                <Trans key="search.no_results_found" />
               </h3>
               <p class="max-w-md text-gray-500">
-                We couldn't find any {type()}s matching your search criteria.
-                Try adjusting your filters or search terms.
+                <Trans
+                  key="search.no_results_description"
+                  options={{ type: type() }}
+                />
               </p>
             </div>
           }

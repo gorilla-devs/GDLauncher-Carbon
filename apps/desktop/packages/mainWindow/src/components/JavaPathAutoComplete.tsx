@@ -9,7 +9,7 @@ import {
   runWithOwner
 } from "solid-js"
 import TruncatedPath from "./TruncatePath"
-import { Trans } from "@gd/i18n"
+import { Trans, useTransContext } from "@gd/i18n"
 
 interface Props {
   defaultValue?: string
@@ -22,6 +22,7 @@ interface Props {
 const JavaPathAutoComplete = (props: Props) => {
   const owner = getOwner()
   const [value, setValue] = createSignal(props.defaultValue || "")
+  const [t] = useTransContext()
   const availableJavas = rspc.createQuery(() => ({
     queryKey: ["java.getAvailableJavas"]
   }))
@@ -129,7 +130,7 @@ const JavaPathAutoComplete = (props: Props) => {
       <Input
         value={value()}
         disabled={props.disabled}
-        placeholder="Type a java path"
+        placeholder={t("placeholders.type_java_path")}
         inputColor={props.inputColor || ""}
         icon={
           <Switch>

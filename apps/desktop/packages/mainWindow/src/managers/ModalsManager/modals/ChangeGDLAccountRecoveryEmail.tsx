@@ -35,7 +35,7 @@ const ChangeGDLAccountRecoveryEmail = () => {
             <Trans key="settings:change_recovery_email_description" />
           </div>
           <Input
-            placeholder="email@example.com"
+            placeholder={t("placeholders.email_example")}
             value={newRecoveryEmail()}
             onInput={(e) => setNewRecoveryEmail(e.currentTarget.value)}
             disabled={!!cooldown()}

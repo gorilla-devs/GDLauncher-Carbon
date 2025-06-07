@@ -205,11 +205,11 @@ const Settings = () => {
           options={[
             {
               value: "Path",
-              label: "Path"
+              label: t("ui.path")
             },
             {
               value: "Profile",
-              label: "Profile"
+              label: t("ui.profile")
             }
           ]}
         />
@@ -247,7 +247,7 @@ const Settings = () => {
               <Dropdown
                 class="min-w-100 max-w-2/3"
                 value={javaSelectedProfile()}
-                placeholder={"Select a java profile"}
+                placeholder={t("placeholders.select_java_profile")}
                 options={
                   getAllProfiles.data?.map((profile) => ({
                     key: profile.name,
@@ -461,7 +461,7 @@ const Settings = () => {
             placeholder={t("settings:resolution_presets")}
             options={[
               ...templateGameResolution(),
-              { label: "Custom", key: "custom" }
+              { label: t("ui.custom"), key: "custom" }
             ]}
             onChange={(option) => {
               let value: {

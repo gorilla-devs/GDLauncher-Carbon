@@ -18,6 +18,7 @@ import { capitalize } from "@/utils/helpers"
 import { ModloaderIcon } from "@/utils/sidebar"
 import { useGlobalStore } from "./GlobalStoreContext"
 import useSearchContext from "./SearchInputContext"
+import { Trans, useTransContext } from "@gd/i18n"
 
 interface DropdownProps {
   disabled?: boolean
@@ -25,10 +26,13 @@ interface DropdownProps {
 
 export function SearchApiDropdown() {
   const searchResults = useSearchContext()
+  const [t] = useTransContext()
 
   return (
     <>
-      <DropdownMenuLabel>Platform</DropdownMenuLabel>
+      <DropdownMenuLabel>
+        <Trans key="search.platform" />
+      </DropdownMenuLabel>
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
         <DropdownMenuRadioGroup
@@ -72,6 +76,7 @@ export function SearchApiDropdown() {
 
 export function SearchCategoryDropdown(props: DropdownProps) {
   const searchResults = useSearchContext()
+  const [t] = useTransContext()
   const categories = rspc.createQuery(() => ({
     queryKey: ["modplatforms.getUnifiedCategories"]
   }))
@@ -110,7 +115,7 @@ export function SearchCategoryDropdown(props: DropdownProps) {
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger class="w-full" disabled={props.disabled}>
-        Categories
+        <Trans key="search.categories" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent class="max-h-[300px] overflow-y-auto">
@@ -144,7 +149,9 @@ export function SearchCategoryDropdown(props: DropdownProps) {
               </For>
             </Match>
             <Match when={!currentCategories()?.length}>
-              <div class="text-lightSlate-900 text-sm">No categories found</div>
+              <div class="text-lightSlate-900 text-sm">
+                <Trans key="search.no_categories_found" />
+              </div>
             </Match>
           </Switch>
         </DropdownMenuSubContent>
@@ -156,6 +163,7 @@ export function SearchCategoryDropdown(props: DropdownProps) {
 export function SearchModloaderDropdown(props: DropdownProps) {
   const globalStore = useGlobalStore()
   const searchResults = useSearchContext()
+  const [t] = useTransContext()
 
   const currentModloaders = () => {
     return globalStore.modloaders.data?.map((modloader) => ({
@@ -168,7 +176,7 @@ export function SearchModloaderDropdown(props: DropdownProps) {
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger disabled={props.disabled}>
-        Modloaders
+        <Trans key="search.modloaders" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent>
@@ -207,7 +215,9 @@ export function SearchModloaderDropdown(props: DropdownProps) {
               </For>
             </Match>
             <Match when={!currentModloaders()?.length}>
-              <div class="text-lightSlate-900 text-sm">No modloaders found</div>
+              <div class="text-lightSlate-900 text-sm">
+                <Trans key="search.no_modloaders_found" />
+              </div>
             </Match>
           </Switch>
         </DropdownMenuSubContent>
@@ -218,11 +228,12 @@ export function SearchModloaderDropdown(props: DropdownProps) {
 
 export function SearchEnvironmentDropdown(props: DropdownProps) {
   const searchResults = useSearchContext()
+  const [t] = useTransContext()
 
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger disabled={props.disabled}>
-        Environment
+        <Trans key="search.environment" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent>
@@ -269,11 +280,12 @@ export function SearchEnvironmentDropdown(props: DropdownProps) {
 
 export function SearchSortIndexDropdown(props: DropdownProps) {
   const searchResults = useSearchContext()
+  const [t] = useTransContext()
 
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger disabled={props.disabled}>
-        Sort Index
+        <Trans key="search.sort_index" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent>
@@ -296,7 +308,7 @@ export function SearchSortIndexDropdown(props: DropdownProps) {
                 }
               }}
             >
-              Relevance
+              <Trans key="search.relevance" />
             </DropdownMenuRadioItem>
           </DropdownMenuRadioGroup>
         </DropdownMenuSubContent>
@@ -307,11 +319,12 @@ export function SearchSortIndexDropdown(props: DropdownProps) {
 
 export function SearchSortOrderDropdown(props: DropdownProps) {
   const searchResults = useSearchContext()
+  const [t] = useTransContext()
 
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger disabled={props.disabled}>
-        Sort Order
+        <Trans key="search.sort_order" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent>
@@ -349,6 +362,7 @@ export function SearchSortOrderDropdown(props: DropdownProps) {
 
 export function SearchGameVersionDropdown(props: DropdownProps) {
   const globalStore = useGlobalStore()
+  const [t] = useTransContext()
   const versions = () =>
     globalStore.minecraftVersions.data?.map((version) => ({
       label: version.id,
@@ -358,7 +372,7 @@ export function SearchGameVersionDropdown(props: DropdownProps) {
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger disabled={props.disabled}>
-        Game Versions
+        <Trans key="search.game_versions" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent class="max-h-[300px] overflow-y-auto">
@@ -377,11 +391,12 @@ export function SearchGameVersionDropdown(props: DropdownProps) {
 
 export function SearchViewModeDropdown(props: DropdownProps) {
   const searchResults = useSearchContext()
+  const [t] = useTransContext()
 
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger disabled={props.disabled}>
-        View Mode
+        <Trans key="search.view_mode" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent>

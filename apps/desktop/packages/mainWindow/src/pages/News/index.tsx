@@ -1,6 +1,7 @@
 import { createResource, For, Match, Switch } from "solid-js"
 import { initNews } from "@/utils/news"
 import { News, Skeleton } from "@gd/ui"
+import { Trans } from "@gd/i18n"
 
 const NewsPage = () => {
   const newsInitializer = initNews()
@@ -23,7 +24,9 @@ const NewsPage = () => {
         </Match>
       </Switch>
       <div class="flex flex-col gap-4 p-6">
-        <h1 class="text-2xl font-medium">Minecraft News</h1>
+        <h1 class="text-2xl font-medium">
+          <Trans key="news.minecraft_news" />
+        </h1>
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           <For each={news()}>
             {(item) => (

@@ -1,12 +1,15 @@
 import { createResource, For } from "solid-js"
 import { initNews } from "@/utils/news"
+import { Trans } from "@gd/i18n"
 
 const PageView = () => {
   const [news] = createResource(initNews)
 
   return (
     <div class="flex flex-col gap-4 p-4">
-      <h1 class="text-2xl font-medium">Minecraft News</h1>
+      <h1 class="text-2xl font-medium">
+        <Trans key="news.minecraft_news" />
+      </h1>
       <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         <For each={news()}>
           {(item) => (

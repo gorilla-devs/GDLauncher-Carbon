@@ -20,7 +20,7 @@ import updateAvailable, {
   updateDownloaded,
   updateProgress
 } from "@/utils/updater"
-import { Trans } from "@gd/i18n"
+import { Trans, useTransContext } from "@gd/i18n"
 import { useModal } from "@/managers/ModalsManager"
 import { useGlobalStore } from "./GlobalStoreContext"
 import useSearchContext from "./SearchInputContext"
@@ -42,6 +42,7 @@ const AppNavbar = () => {
   const globalStore = useGlobalStore()
   const [accounts, setAccounts] = createStore<AccountsStatus[]>([])
   const modalsContext = useModal()
+  const [t] = useTransContext()
 
   const searchResults = useSearchContext()
 
@@ -108,7 +109,7 @@ const AppNavbar = () => {
         </div>
         <div class="flex w-full items-center justify-center gap-4">
           <Input
-            placeholder="Search anything..."
+            placeholder={t("search.search_anything")}
             containerClass="px-10"
             tabIndex={0}
             value={searchResults?.searchQuery().searchQuery ?? ""}

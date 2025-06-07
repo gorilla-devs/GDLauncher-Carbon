@@ -155,7 +155,7 @@ const ResourcePacks = () => {
       <div class="flex flex-col bg-darkSlate-800 z-10 transition-all duration-100 ease-in-out sticky pt-10 top-30">
         <div class="flex justify-between items-center pb-4 flex-wrap gap-1">
           <Input
-            placeholder="Type Here"
+            placeholder={t("general.type_here")}
             icon={<div class="i-ri:search-line" />}
             class="w-full rounded-full text-lightSlate-700"
             inputClass=""
