@@ -7,6 +7,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
+  Skeleton,
   Tabs
 } from "@gd/ui"
 import { Tab, TabList } from "@gd/ui"
@@ -193,13 +194,7 @@ export function List() {
           </DropdownMenu>
         </div>
       </div>
-      <Suspense
-        fallback={
-          <div class="m-4 flex h-20 items-center justify-center">
-            <div class="i-ri:loader-4-line animate-spin text-2xl" />
-          </div>
-        }
-      >
+      <Suspense fallback={<Skeleton.searchList />}>
         <Show
           when={(searchContext?.allRows() || []).length > 0}
           fallback={
@@ -229,11 +224,7 @@ export function List() {
           >
             {(result) => {
               if (result.type === "loader") {
-                return (
-                  <div class="m-4 flex h-20 items-center justify-center">
-                    <div class="i-ri:loader-4-line animate-spin text-2xl" />
-                  </div>
-                )
+                return <Skeleton.searchListItem />
               }
 
               const isInstalled = lookupTableInstalledMods().has(

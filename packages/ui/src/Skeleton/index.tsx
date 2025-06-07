@@ -15,11 +15,11 @@ const Skeleton = (props: {
 
 const SidebarInstance = () => {
   return (
-    <div class="flex gap-2 py-2 px-4">
-      <div class="w-10 h-10 rounded-lg bg-darkSlate-500" />
-      <div class="flex flex-col space-between gap-2">
-        <div class="w-32 h-4 rounded-md bg-darkSlate-500" />
-        <div class="w-32 h-4 rounded-md bg-darkSlate-500" />
+    <div class="flex gap-2 px-4 py-2">
+      <div class="bg-darkSlate-500 h-10 w-10 rounded-lg" />
+      <div class="space-between flex flex-col gap-2">
+        <div class="bg-darkSlate-500 h-4 w-32 rounded-md" />
+        <div class="bg-darkSlate-500 h-4 w-32 rounded-md" />
       </div>
     </div>
   )
@@ -29,23 +29,23 @@ Skeleton.sidebarInstance = SidebarInstance
 
 Skeleton.sidebarInstances = () => {
   return (
-    <div class="flex flex-col gap-2 mt-10">
+    <div class="mt-10 flex flex-col gap-2">
       <For each={new Array(4)}>{() => <SidebarInstance />}</For>
     </div>
   )
 }
 
 Skeleton.sidebarInstanceSmall = () => {
-  return <div class="h-10 w-10 rounded-lg bg-darkSlate-500 py-2 px-4" />
+  return <div class="bg-darkSlate-500 h-10 w-10 rounded-lg px-4 py-2" />
 }
 
 const Instance = () => {
   return (
     <div class="flex flex-col gap-2">
-      <div class="w-38 h-38 rounded-lg bg-darkSlate-500" />
-      <div class="flex flex-col space-between gap-2">
-        <div class="w-32 h-4 rounded-md bg-darkSlate-500" />
-        <div class="w-32 h-4 rounded-md bg-darkSlate-500" />
+      <div class="w-38 h-38 bg-darkSlate-500 rounded-lg" />
+      <div class="space-between flex flex-col gap-2">
+        <div class="bg-darkSlate-500 h-4 w-32 rounded-md" />
+        <div class="bg-darkSlate-500 h-4 w-32 rounded-md" />
       </div>
     </div>
   )
@@ -56,7 +56,7 @@ Skeleton.instance = Instance
 Skeleton.instances = () => {
   return (
     <div class="flex flex-col gap-4">
-      <div class="w-full h-10 rounded-lg bg-darkSlate-500" />
+      <div class="bg-darkSlate-500 h-10 w-full rounded-lg" />
       <div class="flex gap-4">
         <For each={new Array(10)}>{() => <Instance />}</For>
       </div>
@@ -80,17 +80,17 @@ Skeleton.instances = () => {
 }
 
 Skeleton.news = () => {
-  return <div class="w-full h-24 rounded-lg bg-darkSlate-500 mb-5" />
+  return <div class="bg-darkSlate-500 mb-5 h-24 w-full rounded-lg" />
 }
 
 const Modpack = () => {
   return (
-    <div class="flex justify-between h-40 w-full rounded-xl bg-darkSlate-500 p-4 gap-4 box-border">
-      <div class="rounded-xl select-none h-30 w-30 bg-darkSlate-500" />
-      <div class="flex flex-col space-between gap-2 flex-1">
-        <div class="w-full h-4 rounded-md bg-darkSlate-500" />
-        <div class="w-full h-4 rounded-md bg-darkSlate-500" />
-        <div class="w-1/2 h-4 rounded-md bg-darkSlate-500" />
+    <div class="bg-darkSlate-500 box-border flex h-40 w-full justify-between gap-4 rounded-xl p-4">
+      <div class="h-30 w-30 bg-darkSlate-500 select-none rounded-xl" />
+      <div class="space-between flex flex-1 flex-col gap-2">
+        <div class="bg-darkSlate-500 h-4 w-full rounded-md" />
+        <div class="bg-darkSlate-500 h-4 w-full rounded-md" />
+        <div class="bg-darkSlate-500 h-4 w-1/2 rounded-md" />
       </div>
     </div>
   )
@@ -100,7 +100,7 @@ Skeleton.modpack = Modpack
 
 Skeleton.modpacksList = () => {
   return (
-    <div class="flex flex-col gap-2 w-full px-4 box-border">
+    <div class="box-border flex w-full flex-col gap-2 px-4">
       <Modpack />
       <Modpack />
       <Modpack />
@@ -110,15 +110,15 @@ Skeleton.modpacksList = () => {
 }
 const ModpackVersion = () => {
   return (
-    <div class="flex flex-col justify-between w-1/2 rounded-xl p-4 gap-4 box-border">
-      <div class="w-full h-2 rounded-md bg-darkSlate-500" />
-      <div class="w-1/2 h-2 rounded-md bg-darkSlate-500" />
+    <div class="box-border flex w-1/2 flex-col justify-between gap-4 rounded-xl p-4">
+      <div class="bg-darkSlate-500 h-2 w-full rounded-md" />
+      <div class="bg-darkSlate-500 h-2 w-1/2 rounded-md" />
     </div>
   )
 }
 Skeleton.modpackVersionList = () => {
   return (
-    <div class="flex flex-col gap-2 w-full">
+    <div class="flex w-full flex-col gap-2">
       <ModpackVersion />
       <ModpackVersion />
       <ModpackVersion />
@@ -128,18 +128,18 @@ Skeleton.modpackVersionList = () => {
 }
 Skeleton.modpackOverviewPage = () => {
   return (
-    <div class="flex flex-col gap-2 w-full">
-      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
-      <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
-      <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
-      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
-      <div class="w-full h-3 rounded-xl bg-darkSlate-500" />
+    <div class="flex w-full flex-col gap-2">
+      <div class="bg-darkSlate-500 mt-5 h-3 w-1/4 rounded-xl" />
+      <div class="bg-darkSlate-500 h-3 w-full rounded-xl" />
+      <div class="bg-darkSlate-500 mt-5 h-3 w-1/4 rounded-xl" />
+      <div class="bg-darkSlate-500 h-3 w-full rounded-xl" />
+      <div class="bg-darkSlate-500 mt-5 h-3 w-1/4 rounded-xl" />
+      <div class="bg-darkSlate-500 h-3 w-full rounded-xl" />
       <div class="mt-5 flex flex-wrap gap-4">
-        <div class="w-72 h-44 rounded-xl bg-darkSlate-500" />
-        <div class="w-72 h-44 rounded-xl bg-darkSlate-500" />
-        <div class="w-72 h-44 rounded-xl bg-darkSlate-500" />
-        <div class="w-72 h-44 rounded-xl bg-darkSlate-500" />
+        <div class="bg-darkSlate-500 h-44 w-72 rounded-xl" />
+        <div class="bg-darkSlate-500 h-44 w-72 rounded-xl" />
+        <div class="bg-darkSlate-500 h-44 w-72 rounded-xl" />
+        <div class="bg-darkSlate-500 h-44 w-72 rounded-xl" />
       </div>
     </div>
   )
@@ -148,45 +148,45 @@ Skeleton.modpackOverviewPage = () => {
 Skeleton.modpackScreenshotsPage = () => {
   return (
     <div class="mt-5 flex flex-wrap gap-4">
-      <div class="w-72 h-44 rounded-xl bg-darkSlate-500" />
-      <div class="w-72 h-44 rounded-xl bg-darkSlate-500" />
-      <div class="w-72 h-44 rounded-xl bg-darkSlate-500" />
-      <div class="w-72 h-44 rounded-xl bg-darkSlate-500" />
+      <div class="bg-darkSlate-500 h-44 w-72 rounded-xl" />
+      <div class="bg-darkSlate-500 h-44 w-72 rounded-xl" />
+      <div class="bg-darkSlate-500 h-44 w-72 rounded-xl" />
+      <div class="bg-darkSlate-500 h-44 w-72 rounded-xl" />
     </div>
   )
 }
 
 Skeleton.modpackChangelogPage = () => {
   return (
-    <div class="flex flex-col gap-2 w-full">
-      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
-      <div class="w-1/2 h-3 rounded-xl bg-darkSlate-500" />
-      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
-      <div class="w-1/2 h-3 rounded-xl bg-darkSlate-500" />
-      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
-      <div class="w-1/2 h-3 rounded-xl bg-darkSlate-500" />
-      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
-      <div class="w-1/2 h-3 rounded-xl bg-darkSlate-500" />
-      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
-      <div class="w-1/2 h-3 rounded-xl bg-darkSlate-500" />
-      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
-      <div class="w-1/2 h-3 rounded-xl bg-darkSlate-500" />
-      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
-      <div class="w-1/2 h-3 rounded-xl bg-darkSlate-500" />
-      <div class="w-1/4 h-3 rounded-xl bg-darkSlate-500 mt-5" />
-      <div class="w-1/2 h-3 rounded-xl bg-darkSlate-500" />
+    <div class="flex w-full flex-col gap-2">
+      <div class="bg-darkSlate-500 mt-5 h-3 w-1/4 rounded-xl" />
+      <div class="bg-darkSlate-500 h-3 w-1/2 rounded-xl" />
+      <div class="bg-darkSlate-500 mt-5 h-3 w-1/4 rounded-xl" />
+      <div class="bg-darkSlate-500 h-3 w-1/2 rounded-xl" />
+      <div class="bg-darkSlate-500 mt-5 h-3 w-1/4 rounded-xl" />
+      <div class="bg-darkSlate-500 h-3 w-1/2 rounded-xl" />
+      <div class="bg-darkSlate-500 mt-5 h-3 w-1/4 rounded-xl" />
+      <div class="bg-darkSlate-500 h-3 w-1/2 rounded-xl" />
+      <div class="bg-darkSlate-500 mt-5 h-3 w-1/4 rounded-xl" />
+      <div class="bg-darkSlate-500 h-3 w-1/2 rounded-xl" />
+      <div class="bg-darkSlate-500 mt-5 h-3 w-1/4 rounded-xl" />
+      <div class="bg-darkSlate-500 h-3 w-1/2 rounded-xl" />
+      <div class="bg-darkSlate-500 mt-5 h-3 w-1/4 rounded-xl" />
+      <div class="bg-darkSlate-500 h-3 w-1/2 rounded-xl" />
+      <div class="bg-darkSlate-500 mt-5 h-3 w-1/4 rounded-xl" />
+      <div class="bg-darkSlate-500 h-3 w-1/2 rounded-xl" />
     </div>
   )
 }
 
 Skeleton.modpackSidebarCategories = () => {
   return (
-    <div class="flex flex-col gap-4 w-full py-2 mt-4">
+    <div class="mt-4 flex w-full flex-col gap-4 py-2">
       <For each={new Array(16)}>
         {() => (
-          <div class="flex gap-2 items-center">
-            <div class="w-5 h-5 rounded-xl bg-darkSlate-500" />
-            <div class="w-1/2 h-3 rounded-xl bg-darkSlate-500" />
+          <div class="flex items-center gap-2">
+            <div class="bg-darkSlate-500 h-5 w-5 rounded-xl" />
+            <div class="bg-darkSlate-500 h-3 w-1/2 rounded-xl" />
           </div>
         )}
       </For>
@@ -195,7 +195,7 @@ Skeleton.modpackSidebarCategories = () => {
 }
 
 Skeleton.select = () => {
-  return <div class="w-31	h-12 rounded-full bg-darkSlate-500" />
+  return <div class="w-31	bg-darkSlate-500 h-12 rounded-full" />
 }
 
 Skeleton.filters = () => {
@@ -213,16 +213,16 @@ Skeleton.explorer = () => {
   return (
     <div class="flex flex-col gap-4">
       <div class="flex gap-4">
-        <div class="w-40 h-10 rounded-full bg-darkSlate-500" />
-        <div class="w-40 h-10 rounded-full bg-darkSlate-500" />
-        <div class="w-40 h-10 rounded-full bg-darkSlate-500" />
+        <div class="bg-darkSlate-500 h-10 w-40 rounded-full" />
+        <div class="bg-darkSlate-500 h-10 w-40 rounded-full" />
+        <div class="bg-darkSlate-500 h-10 w-40 rounded-full" />
       </div>
       <div class="flex flex-col gap-2">
-        <div class="w-100 h-36 rounded-xl bg-darkSlate-500" />
-        <div class="w-100 h-36 rounded-xl bg-darkSlate-500" />
-        <div class="w-100 h-36 rounded-xl bg-darkSlate-500" />
-        <div class="w-100 h-36 rounded-xl bg-darkSlate-500" />
-        <div class="w-100 h-36 rounded-xl bg-darkSlate-500" />
+        <div class="w-100 bg-darkSlate-500 h-36 rounded-xl" />
+        <div class="w-100 bg-darkSlate-500 h-36 rounded-xl" />
+        <div class="w-100 bg-darkSlate-500 h-36 rounded-xl" />
+        <div class="w-100 bg-darkSlate-500 h-36 rounded-xl" />
+        <div class="w-100 bg-darkSlate-500 h-36 rounded-xl" />
       </div>
     </div>
   )
@@ -230,14 +230,52 @@ Skeleton.explorer = () => {
 
 Skeleton.featuredHomeTile = () => {
   return (
-    <div class="flex flex-col gap-4 w-full">
-      <div class="flex gap-4 h-fit w-full items-end">
-        <div class="w-16 h-16 rounded-lg bg-darkSlate-500" />
-        <div class="flex flex-col gap-2 h-full">
-          <div class="w-30 h-6 rounded-full bg-darkSlate-500" />
-          <div class="w-20 h-4 rounded-full bg-darkSlate-500" />
+    <div class="flex w-full flex-col gap-4">
+      <div class="flex h-fit w-full items-end gap-4">
+        <div class="bg-darkSlate-500 h-16 w-16 rounded-lg" />
+        <div class="flex h-full flex-col gap-2">
+          <div class="w-30 bg-darkSlate-500 h-6 rounded-full" />
+          <div class="bg-darkSlate-500 h-4 w-20 rounded-full" />
         </div>
       </div>
+    </div>
+  )
+}
+
+const SearchListItem = () => {
+  return (
+    <div class="my-2 overflow-hidden rounded-md px-4">
+      <div class="relative flex h-full cursor-pointer gap-2 overflow-hidden rounded-md border border-transparent p-2">
+        <div class="relative z-10 flex w-full items-center gap-4">
+          <div class="bg-darkSlate-500 h-16 w-16 rounded-md" />
+          <div class="w-7/10 flex flex-col gap-2">
+            <div class="bg-darkSlate-500 h-6 w-3/4 rounded-md" />
+            <div class="bg-darkSlate-500 h-4 w-full rounded-md" />
+            <div class="flex gap-2">
+              <div class="bg-darkSlate-500 h-5 w-16 rounded-full" />
+              <div class="bg-darkSlate-500 h-5 w-20 rounded-full" />
+            </div>
+          </div>
+          <div class="ml-auto flex items-center">
+            <div class="relative flex items-center">
+              <div class="flex items-center gap-2">
+                <div class="bg-darkSlate-500 h-4 w-12 rounded-md" />
+                <div class="bg-darkSlate-500 h-4 w-4 rounded" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+Skeleton.searchListItem = SearchListItem
+
+Skeleton.searchList = () => {
+  return (
+    <div class="flex w-full flex-col gap-1">
+      <For each={new Array(8)}>{() => <SearchListItem />}</For>
     </div>
   )
 }
