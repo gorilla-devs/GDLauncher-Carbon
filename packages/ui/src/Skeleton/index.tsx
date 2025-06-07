@@ -244,23 +244,29 @@ Skeleton.featuredHomeTile = () => {
 
 const SearchListItem = () => {
   return (
-    <div class="my-2 overflow-hidden rounded-md px-4">
-      <div class="relative flex h-full cursor-pointer gap-2 overflow-hidden rounded-md border border-transparent p-2">
+    <div class="my-1 overflow-hidden rounded-md px-4">
+      <div class="relative flex h-full cursor-pointer gap-2 overflow-hidden rounded-md border border-transparent p-1.5">
         <div class="relative z-10 flex w-full items-center gap-4">
           <div class="bg-darkSlate-500 h-16 w-16 rounded-md" />
           <div class="w-7/10 flex flex-col gap-2">
-            <div class="bg-darkSlate-500 h-6 w-3/4 rounded-md" />
-            <div class="bg-darkSlate-500 h-4 w-full rounded-md" />
+            <div class="truncate text-left text-xl font-medium">
+              <div class="bg-darkSlate-500 h-7 w-3/4 rounded-md" />
+            </div>
+            <div class="text-lightSlate-700 truncate text-left text-sm">
+              <div class="bg-darkSlate-500 h-5 w-full rounded-md" />
+            </div>
             <div class="flex gap-2">
-              <div class="bg-darkSlate-500 h-5 w-16 rounded-full" />
-              <div class="bg-darkSlate-500 h-5 w-20 rounded-full" />
+              <div class="bg-darkSlate-500 h-5.5 w-16 rounded-md" />
+              <div class="bg-darkSlate-500 h-5.5 w-20 rounded-md" />
             </div>
           </div>
           <div class="ml-auto flex items-center">
             <div class="relative flex items-center">
               <div class="flex items-center gap-2">
-                <div class="bg-darkSlate-500 h-4 w-12 rounded-md" />
-                <div class="bg-darkSlate-500 h-4 w-4 rounded" />
+                <div class="text-lightSlate-700 text-sm">
+                  <div class="bg-darkSlate-500 h-5.5 w-14 rounded-md" />
+                </div>
+                <div class="bg-darkSlate-500 h-5.5 w-12 rounded" />
               </div>
             </div>
           </div>
@@ -275,7 +281,7 @@ Skeleton.searchListItem = SearchListItem
 Skeleton.searchList = () => {
   return (
     <div class="flex w-full flex-col gap-1">
-      <For each={new Array(8)}>{() => <SearchListItem />}</For>
+      <For each={new Array(12)}>{() => <SearchListItem />}</For>
     </div>
   )
 }
