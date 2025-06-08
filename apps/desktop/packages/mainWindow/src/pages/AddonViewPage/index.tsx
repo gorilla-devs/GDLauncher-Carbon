@@ -256,11 +256,19 @@ const AddonExplore = () => {
                     </div>
                   </div>
                   <div class="mt-2 flex items-center gap-2 lg:mt-0">
-                    <Switch>
-                      <Match when={project.data?.type === "modpack"}>
+                    <Switch fallback={<></>}>
+                      <Match
+                        when={
+                          project.data?.type && project.data?.type === "modpack"
+                        }
+                      >
                         <ModpackDownloadButton addon={project.data} />
                       </Match>
-                      <Match when={project.data?.type !== "modpack"}>
+                      <Match
+                        when={
+                          project.data?.type && project.data?.type !== "modpack"
+                        }
+                      >
                         <ModDownloadButton addon={project.data} />
                       </Match>
                     </Switch>

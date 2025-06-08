@@ -11,7 +11,7 @@ import {
   Tabs
 } from "@gd/ui"
 import { Tab, TabList } from "@gd/ui"
-import { For, onMount, Show, Suspense } from "solid-js"
+import { For, onMount, Show } from "solid-js"
 import { FEUnifiedSearchType } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useLocation, useParams, useSearchParams } from "@solidjs/router"
@@ -194,7 +194,10 @@ export function List() {
           </DropdownMenu>
         </div>
       </div>
-      <Suspense fallback={<Skeleton.searchList />}>
+      <Show
+        when={!searchContext?.isLoading()}
+        fallback={<Skeleton.searchList />}
+      >
         <Show
           when={(searchContext?.allRows() || []).length > 0}
           fallback={
@@ -245,7 +248,7 @@ export function List() {
             }}
           </VList>
         </Show>
-      </Suspense>
+      </Show>
     </div>
   )
 }
