@@ -7,11 +7,12 @@ export const modsDefaultQuery: FEUnifiedSearchParameters = {
   gameVersions: null,
   modloaders: null,
   projectType: "mod",
-  sortIndex: { curseForge: "featured" },
+  sortIndex: "relevance",
   sortOrder: "descending",
   index: 0,
   pageSize: 20,
-  searchApi: "curseforge"
+  searchApi: "curseforge",
+  environment: null
 }
 
 const useModsQuery = (

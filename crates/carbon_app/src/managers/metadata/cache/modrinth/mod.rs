@@ -1,8 +1,9 @@
 use super::{BundleSender, ModplatformCacher, UpdateNotifier};
-use crate::domain::instance::info::ModLoaderType;
 use crate::domain::instance::InstanceId;
+use crate::domain::instance::info::ModLoaderType;
 use crate::managers::App;
 use anyhow::anyhow;
+use carbon_platforms::ModChannel;
 use carbon_platforms::modrinth::search::VersionIDs;
 use carbon_platforms::modrinth::version::Version;
 use carbon_platforms::modrinth::{
@@ -11,7 +12,6 @@ use carbon_platforms::modrinth::{
     search::{ProjectIDs, TeamIDs, VersionHashesQuery},
     version::HashAlgorithm,
 };
-use carbon_platforms::ModChannel;
 use carbon_repos::db::read_filters::{DateTimeFilter, IntFilter};
 use carbon_repos::db::{
     mod_file_cache as fcdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
@@ -83,7 +83,9 @@ impl ModplatformCacher for ModrinthModCacher {
 
         if let Some((end_time, _)) = delay {
             if Instant::now() < *end_time {
-                warn!("Not attempting to cache modrinth mods for {instance_id} as too many attempts have failed recently");
+                warn!(
+                    "Not attempting to cache modrinth mods for {instance_id} as too many attempts have failed recently"
+                );
                 return Ok(());
             }
         }
@@ -139,7 +141,7 @@ impl ModplatformCacher for ModrinthModCacher {
 
                 let mpm = app.modplatforms_manager();
                 let combined_version_futures = combined_versions_list
-                    .chunks(1000) // ~13 chars per version, 1000 worked fine at time of testing
+                    .chunks(350) // ~13 chars per version, 500 worked fine at time of testing
                     .map(|chunk| async {
                         let mcm = app.meta_cache_manager();
                         let semaphore = mcm

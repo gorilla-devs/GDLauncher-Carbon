@@ -3,10 +3,7 @@ import forgeIcon from "/assets/images/icons/forge.png"
 import fabricIcon from "/assets/images/icons/fabric.png"
 import quiltIcon from "/assets/images/icons/quilt.svg"
 import vanillaIcon from "/assets/images/icons/vanilla.png"
-import {
-  FEUnifiedCategoryId,
-  FEUnifiedModLoaderType
-} from "@gd/core_module/bindings"
+import { FEUnifiedModLoaderType } from "@gd/core_module/bindings"
 
 export const getModloaderIcon = (modloader: string) => {
   switch (modloader?.toString().toLowerCase()) {

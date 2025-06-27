@@ -1,5 +1,5 @@
 import { rspc } from "@/utils/rspcClient"
-import { Input, Tooltip } from "@gd/ui"
+import { Input, Tooltip, TooltipTrigger, TooltipContent } from "@gd/ui"
 import {
   Match,
   Switch,
@@ -59,8 +59,11 @@ const JavaPathAutoComplete = (props: Props) => {
               <div class="text-lightSlate-50">{java.version}</div>
               <div>{java.type}</div>
             </div>
-            <Tooltip content={java.path}>
-              <TruncatedPath originalPath={java.path} />
+            <Tooltip>
+              <TooltipTrigger>
+                <TruncatedPath originalPath={java.path} />
+              </TooltipTrigger>
+              <TooltipContent>{java.path}</TooltipContent>
             </Tooltip>
           </div>
         )
@@ -105,8 +108,11 @@ const JavaPathAutoComplete = (props: Props) => {
                         <Trans key="java_autocomplete.create_new_custom" />
                       </div>
                     </div>
-                    <Tooltip content={value()}>
-                      <TruncatedPath originalPath={value()} />
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <TruncatedPath originalPath={value()} />
+                      </TooltipTrigger>
+                      <TooltipContent>{value()}</TooltipContent>
                     </Tooltip>
                   </div>
                 )

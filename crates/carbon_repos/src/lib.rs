@@ -1,7 +1,7 @@
 #![allow(warnings)]
 #![allow(dead_code)]
 
-use rusqlite_migration::{Migrations, M};
+use rusqlite_migration::{M, Migrations};
 
 pub mod db;
 mod models;
@@ -56,6 +56,10 @@ pub fn get_migrations() -> Migrations<'static> {
         M::up(include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/prisma/migrations/20241124163738_gdl_accounts/migration.sql"
+        ))),
+        M::up(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/prisma/migrations/20250608012843_add_addon_type_to_mod_file_cache/migration.sql"
         ))),
     ])
 }

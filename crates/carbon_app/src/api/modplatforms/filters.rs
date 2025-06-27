@@ -15,7 +15,7 @@ use std::ops::{Deref, DerefMut};
 use strum_macros::EnumIter;
 
 #[derive(Type, Debug, Deserialize, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[serde(transparent)]
 pub struct Or<T>(pub Vec<T>);
 
 impl<T> Deref for Or<T> {
@@ -53,7 +53,7 @@ impl<T> FromIterator<T> for Or<T> {
 }
 
 #[derive(Type, Debug, Deserialize, Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[serde(transparent)]
 pub struct And<T>(pub Vec<T>);
 
 impl<T> Deref for And<T> {

@@ -21,7 +21,7 @@ interface Props {
 
 const LogsFinders = (props: Props) => {
   const [t] = useTransContext()
-  
+
   const handleArrowClick = async (direction: "up" | "down") => {
     if (!props.logSearchResults?.length) return
 

@@ -2,6 +2,7 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 import { saveScrollPosition } from "@/utils/scrollRestoration"
 import { FEUnifiedSearchResult } from "@gd/core_module/bindings"
 import { Button, Skeleton } from "@gd/ui"
+import { Trans } from "@gd/i18n"
 import {
   For,
   JSX,

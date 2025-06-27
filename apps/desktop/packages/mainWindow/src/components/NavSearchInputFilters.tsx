@@ -18,7 +18,8 @@ import { capitalize } from "@/utils/helpers"
 import { ModloaderIcon } from "@/utils/sidebar"
 import { useGlobalStore } from "./GlobalStoreContext"
 import useSearchContext from "./SearchInputContext"
-import { Trans, useTransContext } from "@gd/i18n"
+import { useTransContext } from "@gd/i18n"
+import { Trans } from "@gd/i18n"
 
 interface DropdownProps {
   disabled?: boolean
@@ -26,7 +27,6 @@ interface DropdownProps {
 
 export function SearchApiDropdown() {
   const searchResults = useSearchContext()
-  const [t] = useTransContext()
 
   return (
     <>
@@ -76,7 +76,6 @@ export function SearchApiDropdown() {
 
 export function SearchCategoryDropdown(props: DropdownProps) {
   const searchResults = useSearchContext()
-  const [t] = useTransContext()
   const categories = rspc.createQuery(() => ({
     queryKey: ["modplatforms.getUnifiedCategories"]
   }))
@@ -163,7 +162,6 @@ export function SearchCategoryDropdown(props: DropdownProps) {
 export function SearchModloaderDropdown(props: DropdownProps) {
   const globalStore = useGlobalStore()
   const searchResults = useSearchContext()
-  const [t] = useTransContext()
 
   const currentModloaders = () => {
     return globalStore.modloaders.data?.map((modloader) => ({
@@ -228,7 +226,6 @@ export function SearchModloaderDropdown(props: DropdownProps) {
 
 export function SearchEnvironmentDropdown(props: DropdownProps) {
   const searchResults = useSearchContext()
-  const [t] = useTransContext()
 
   return (
     <DropdownMenuSub>
@@ -280,7 +277,6 @@ export function SearchEnvironmentDropdown(props: DropdownProps) {
 
 export function SearchSortIndexDropdown(props: DropdownProps) {
   const searchResults = useSearchContext()
-  const [t] = useTransContext()
 
   return (
     <DropdownMenuSub>
@@ -319,7 +315,6 @@ export function SearchSortIndexDropdown(props: DropdownProps) {
 
 export function SearchSortOrderDropdown(props: DropdownProps) {
   const searchResults = useSearchContext()
-  const [t] = useTransContext()
 
   return (
     <DropdownMenuSub>
@@ -362,7 +357,7 @@ export function SearchSortOrderDropdown(props: DropdownProps) {
 
 export function SearchGameVersionDropdown(props: DropdownProps) {
   const globalStore = useGlobalStore()
-  const [t] = useTransContext()
+  const [_t] = useTransContext()
   const versions = () =>
     globalStore.minecraftVersions.data?.map((version) => ({
       label: version.id,
@@ -391,7 +386,6 @@ export function SearchGameVersionDropdown(props: DropdownProps) {
 
 export function SearchViewModeDropdown(props: DropdownProps) {
   const searchResults = useSearchContext()
-  const [t] = useTransContext()
 
   return (
     <DropdownMenuSub>

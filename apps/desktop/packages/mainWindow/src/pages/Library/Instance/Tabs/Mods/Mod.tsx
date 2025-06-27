@@ -483,7 +483,7 @@ const Mod = (props: Props) => {
               <PopoverContent>
                 <div
                   class="text-lightSlate-700 bg-darkSlate-900 border-darkSlate-700 border-1 shadow-darkSlate-90 w-110 rounded-lg border-solid p-4 shadow-md"
-                  onClick={(e) => e.stopPropagation()}
+                  onClick={(e: MouseEvent) => e.stopPropagation()}
                 >
                   <div class="text-lightSlate-50 mb-4 text-xl font-bold">
                     <Trans
@@ -703,12 +703,12 @@ const Mod = (props: Props) => {
               </PopoverTrigger>
               <PopoverContent
                 class="border-darkSlate-700 bg-darkSlate-900 shadow-darkSlate-90 p-0 shadow-md"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e: MouseEvent) => e.stopPropagation()}
               >
                 <Show when={!props.isInstanceLocked}>
                   <div
                     class="text-lightSlate-700 flex flex-col rounded-lg"
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e: MouseEvent) => e.stopPropagation()}
                   >
                     <div class="text-md text-lightSlate-50 max-w-50 truncate whitespace-nowrap p-4 font-bold">
                       {props.mod.curseforge?.name ||

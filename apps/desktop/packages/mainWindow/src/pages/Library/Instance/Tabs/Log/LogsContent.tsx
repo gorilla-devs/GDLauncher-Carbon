@@ -379,12 +379,12 @@ const LogsContent = (props: Props) => {
               {(log, index) => {
                 const rowSearchResult = open()
                   ? props.logSearchResults?.filter(
-                      (result) => result.entry_index === index
+                      (result) => result.entry_index === index()
                     )
                   : undefined
 
                 const baseIndex = props.logSearchResults?.findIndex(
-                  (result) => result.entry_index === index
+                  (result) => result.entry_index === index()
                 )
 
                 let relativeCurrentResultIndex = -1
@@ -394,7 +394,7 @@ const LogsContent = (props: Props) => {
                 if (
                   currResultIndex !== null &&
                   props.logSearchResults?.[currResultIndex]?.entry_index ===
-                    index
+                    index()
                 ) {
                   // Find which result within this row matches the current global index
                   const rowResultIndex = rowSearchResult?.findIndex(
@@ -415,7 +415,7 @@ const LogsContent = (props: Props) => {
                       "py-1": logsDensity() === "high"
                     }}
                   >
-                    <span>{index}</span>
+                    <span>{index()}</span>
                     <Show when={columns().timestamp}>
                       <DateTimeFormatter
                         timestamp={log.timestamp}

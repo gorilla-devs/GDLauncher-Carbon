@@ -1,6 +1,5 @@
 import { ModRowProps } from "@/utils/mods"
 import { formatDownloadCount } from "@/utils/helpers"
-import { CategoryIcon } from "@/utils/instances"
 import { Trans } from "@gd/i18n"
 import { Badge } from "@gd/ui"
 import { formatDistanceToNowStrict } from "date-fns"
@@ -94,10 +93,9 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
           </p>
           <div class="scrollbar-hide mt-4 flex flex-wrap gap-2">
             <For each={categories().filter((cat) => cat !== undefined)}>
-              {(tag) => (
+              {(category) => (
                 <Badge class="bg-darkSlate-600 flex items-center gap-2">
-                  <CategoryIcon category={tag} />
-                  {tag.name}
+                  <span>{category?.name || ""}</span>
                 </Badge>
               )}
             </For>

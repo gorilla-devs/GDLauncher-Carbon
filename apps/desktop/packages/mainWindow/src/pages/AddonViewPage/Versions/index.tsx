@@ -23,7 +23,10 @@ const Versions = () => {
   const instanceId = () => parseInt(searchParams.instanceId, 10)
 
   const instanceMods = rspc.createQuery(() => ({
-    queryKey: ["instance.getInstanceMods", instanceId()]
+    queryKey: [
+      "instance.getInstanceMods",
+      { instance_id: instanceId(), addon_type: null }
+    ]
   }))
 
   const instanceDetails = rspc.createQuery(() => ({

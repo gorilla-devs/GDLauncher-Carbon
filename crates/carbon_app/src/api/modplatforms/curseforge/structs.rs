@@ -65,7 +65,7 @@ pub struct CFFEFile {
     pub is_early_access_content: Option<bool>,
     pub early_access_end_date: Option<String>, // Consider using a datetime library for date-time representation
     pub file_fingerprint: String,
-    pub modules: Vec<CFFEFileModule>,
+    pub modules: Option<Vec<CFFEFileModule>>,
 }
 
 impl From<mpcf::File> for CFFEFile {
@@ -105,9 +105,7 @@ impl From<mpcf::File> for CFFEFile {
             file_fingerprint: file.file_fingerprint.to_string(),
             modules: file
                 .modules
-                .into_iter()
-                .map(|module| module.into())
-                .collect(),
+                .map(|modules| modules.into_iter().map(|module| module.into()).collect()),
         }
     }
 }

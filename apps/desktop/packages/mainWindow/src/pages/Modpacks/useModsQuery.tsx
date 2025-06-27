@@ -6,12 +6,13 @@ export const modpacksDefaultQuery: FEUnifiedSearchParameters = {
   categories: null,
   gameVersions: null,
   modloaders: null,
-  projectType: "modPack",
-  sortIndex: { curseForge: "featured" },
+  projectType: "modpack",
+  sortIndex: "relevance",
   sortOrder: "descending",
   index: 0,
   pageSize: 20,
-  searchApi: "curseforge"
+  searchApi: "curseforge",
+  environment: null
 }
 
 const useModpacksQuery = (

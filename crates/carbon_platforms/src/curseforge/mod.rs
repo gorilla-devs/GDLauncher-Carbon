@@ -5,7 +5,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::{collections::HashMap, path::PathBuf};
 use tracing::info;
 
-use crate::{modrinth::UtcDateTime, ModChannel};
+use crate::{ModChannel, modrinth::UtcDateTime};
 
 pub mod filters;
 pub mod manifest;
@@ -45,7 +45,7 @@ pub struct File {
     pub is_early_access_content: Option<bool>,
     pub early_access_end_date: Option<String>, // Consider using a datetime library for date-time representation
     pub file_fingerprint: u32,
-    pub modules: Vec<FileModule>,
+    pub modules: Option<Vec<FileModule>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

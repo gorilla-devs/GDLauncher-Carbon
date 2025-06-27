@@ -189,8 +189,8 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok(result)
         }
 
-        query INSTANCE_MODS[app, id: Option<FEInstanceId>] {
-            let Some(id) = id else {
+        query INSTANCE_MODS[app, args: GetInstanceModsQuery] {
+            let Some(id) = args.instance_id else {
                 return Ok(None);
             };
 
@@ -199,7 +199,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await;
 
             let result = app.instance_manager()
-                .list_mods(id.into())
+                .list_mods(id.into(), args.addon_type)
                 .await?
                 .into_iter()
                 .map(Into::into)
@@ -756,6 +756,12 @@ struct InstanceMod {
 }
 
 #[derive(Type, Debug, Deserialize)]
+struct GetInstanceModsQuery {
+    instance_id: Option<FEInstanceId>,
+    addon_type: Option<domain::AddonType>,
+}
+
+#[derive(Type, Debug, Deserialize)]
 enum ModSource {
     Curseforge(CurseforgeMod),
     Modrinth(ModrinthMod),
@@ -1011,6 +1017,7 @@ struct Mod {
     id: String,
     filename: String,
     enabled: bool,
+    addon_type: domain::AddonType,
     metadata: Option<ModFileMetadata>,
     curseforge: Option<CurseForgeModMetadata>,
     modrinth: Option<ModrinthModMetadata>,
@@ -1462,6 +1469,7 @@ impl From<domain::Mod> for Mod {
             id: value.id,
             filename: value.filename,
             enabled: value.enabled,
+            addon_type: value.addon_type,
             metadata: value.metadata.map(Into::into),
             curseforge: value.curseforge.map(Into::into),
             modrinth: value.modrinth.map(Into::into),

@@ -1,3 +1,2 @@
 [toolchain]
-channel = "nightly-2025-05-21"
-components= ["rustc-codegen-cranelift-preview"]
+channel = "1.85.1"

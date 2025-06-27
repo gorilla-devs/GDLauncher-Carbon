@@ -1,114 +1,80 @@
-import { ModRowProps, isCurseForgeData } from "@/utils/mods"
-import { Accessor, For, Match, Show, Switch } from "solid-js"
-import { Tooltip } from "@gd/ui"
-import { CFFEModAuthor, FEUnifiedSearchResult } from "@gd/core_module/bindings"
+import { ModRowProps } from "@/utils/mods"
+import { Accessor, For, Show } from "solid-js"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@gd/ui"
+import {
+  FEUnifiedSearchResult,
+  FEUnifiedAuthor
+} from "@gd/core_module/bindings"
 
 interface Props {
   modProps: ModRowProps | FEUnifiedSearchResult
   isRowSmall?: Accessor<boolean>
 }
 
-export const getAuthors = (prop: ModRowProps | FEUnifiedSearchResult) => {
+export const getAuthors = (
+  prop: ModRowProps | FEUnifiedSearchResult
+): FEUnifiedAuthor[] => {
   const isModRow = "data" in prop
   if (isModRow) {
-    if (isCurseForgeData(prop.data)) {
-      return prop.data.curseforge.authors
-    } else return prop.data.modrinth.author
+    return prop.data.authors
   } else {
-    if (isCurseForgeData(prop)) {
-      return prop.curseforge.authors
-    } else return prop.modrinth.author
+    return prop.authors
   }
 }
 
 const Authors = (props: Props) => {
-  const isModRow = () => "data" in props.modProps
-  const modProps = () =>
-    isModRow()
-      ? (props.modProps as ModRowProps).data
-      : (props.modProps as FEUnifiedSearchResult)
+  const authors = () => getAuthors(props.modProps)
 
   return (
-    <Switch>
-      <Match when={isCurseForgeData(modProps())}>
-        <div class="text-sm flex gap-2 whitespace-nowrap">
-          <Switch>
-            <Match when={!props?.isRowSmall?.()}>
-              <For
-                each={(getAuthors(props.modProps) as CFFEModAuthor[]).slice(
-                  0,
-                  2
-                )}
-              >
-                {(author, i) => (
-                  <>
-                    <p class="m-0">{author?.name}</p>
-                    <Show
-                      when={
-                        i() !==
-                        getAuthors(props.modProps).slice(0, 2).length - 1
-                      }
-                    >
-                      <span class="text-lightSlate-100">{"•"}</span>
-                    </Show>
-                  </>
-                )}
-              </For>
-              <Show when={getAuthors(props.modProps).length > 2}>
-                <Tooltip
-                  content={
-                    <div class="flex gap-2">
-                      <For
-                        each={(
-                          getAuthors(props.modProps) as CFFEModAuthor[]
-                        ).slice(2)}
-                      >
-                        {(author) => <p class="m-0">{author?.name}</p>}
-                      </For>
-                    </div>
-                  }
-                >
-                  <p class="m-0">{`+${
-                    (getAuthors(props.modProps) as CFFEModAuthor[]).slice(2)
-                      .length
-                  }`}</p>
-                </Tooltip>
+    <div class="text-sm flex gap-2 whitespace-nowrap">
+      <Show
+        when={!props?.isRowSmall?.()}
+        fallback={
+          <>
+            <p class="m-0">{authors()[0]?.name}</p>
+            <Show when={authors().length - 1 > 0}>
+              <Tooltip>
+                <TooltipTrigger>
+                  <p class="m-0">{`+${authors().length - 1}`}</p>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div class="flex gap-2">
+                    <For each={authors().slice(1)}>
+                      {(author) => <p class="m-0">{author?.name}</p>}
+                    </For>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </Show>
+          </>
+        }
+      >
+        <For each={authors().slice(0, 2)}>
+          {(author, i) => (
+            <>
+              <p class="m-0">{author?.name}</p>
+              <Show when={i() !== authors().slice(0, 2).length - 1}>
+                <span class="text-lightSlate-100">{"•"}</span>
               </Show>
-            </Match>
-            <Match when={props?.isRowSmall?.()}>
-              <p class="m-0">
-                {(getAuthors(props.modProps) as CFFEModAuthor[])[0]?.name}
-              </p>
-              <Show when={getAuthors(props.modProps).length - 1 > 0}>
-                <Tooltip
-                  content={
-                    <div class="flex gap-2">
-                      <For
-                        each={(
-                          getAuthors(props.modProps) as CFFEModAuthor[]
-                        ).slice(1)}
-                      >
-                        {(author) => <p class="m-0">{author?.name}</p>}
-                      </For>
-                    </div>
-                  }
-                >
-                  <p class="m-0">{`+${
-                    getAuthors(props.modProps).length - 1
-                  }`}</p>
-                </Tooltip>
-              </Show>
-            </Match>
-          </Switch>
-        </div>
-      </Match>
-      <Match when={!isCurseForgeData(modProps())}>
-        <div>
-          {!isCurseForgeData(modProps()) &&
-            (getAuthors(props.modProps) as string)}
-        </div>
-      </Match>
-    </Switch>
+            </>
+          )}
+        </For>
+        <Show when={authors().length > 2}>
+          <Tooltip>
+            <TooltipTrigger>
+              <p class="m-0">{`+${authors().slice(2).length}`}</p>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div class="flex gap-2">
+                <For each={authors().slice(2)}>
+                  {(author) => <p class="m-0">{author?.name}</p>}
+                </For>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </Show>
+      </Show>
+    </div>
   )
 }
 

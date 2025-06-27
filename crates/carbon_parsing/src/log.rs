@@ -1,6 +1,5 @@
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::Reader;
-use std::io::BufReader;
 use thiserror::Error;
 
 /// Represents a parsed log4j message.

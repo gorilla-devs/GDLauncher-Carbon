@@ -915,6 +915,7 @@ impl ManagerRef<'_, MetaCacheManager> {
         mods_dir_path: &PathBuf,
         mod_filename: String,
         enabled: bool,
+        addon_type: String,
     ) -> anyhow::Result<String> {
         let mut path = mods_dir_path.join(&mod_filename);
 
@@ -1100,7 +1101,7 @@ impl ManagerRef<'_, MetaCacheManager> {
             content_len as i32,
             enabled,
             metadb::UniqueWhereParam::IdEquals(meta_id.clone()),
-            Vec::new(),
+            vec![fcdb::SetParam::SetAddonType(addon_type)],
         );
 
         debug!(
@@ -1187,62 +1188,91 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                 return Ok(());
             };
 
-            let subpath = InstancesPath::subpath()
-                .get_instance_path(&instance.shortpath)
-                .get_mods_path();
+            let instance_path = InstancesPath::subpath()
+                .get_instance_path(&instance.shortpath);
 
             drop(instances);
 
-            let mut pathbuf = PathBuf::new();
-            pathbuf.push(app.settings_manager().runtime_path.get_root().to_path());
-            pathbuf.push(&subpath);
+            let root_path = app.settings_manager().runtime_path.get_root().to_path();
+            
+            let mut modpaths = HashMap::<String, (bool, u64, String)>::new();
+            
+            // Scan all addon types
+            for addon_type in crate::domain::instance::AddonType::all() {
+                let addon_subpath = addon_type.get_folder_path(&instance_path);
+                let mut pathbuf = PathBuf::new();
+                pathbuf.push(&root_path);
+                pathbuf.push(&addon_subpath);
 
-            if !pathbuf.is_dir() {
-                info!("skipping instance {instance_id} for local caching because it does not have a mods folder");
-                return Ok(());
-            }
-
-            trace!({ dir = ?pathbuf }, "scanning mods dir for instance {instance_id}");
-            let mut modpaths = HashMap::<String, (bool, u64)>::new();
-            let mut entries = match tokio::fs::read_dir(&pathbuf).await {
-                Ok(entries) => entries,
-                Err(e) => {
-                    error!({ dir = ?pathbuf, error = ?e }, "could not read instance {instance_id} for mod scanning");
-                    return Ok(());
-                }
-            };
-
-            while let Ok(Some(entry)) = entries.next_entry().await {
-                // trace!("scanning mods folder entry `{:?}`", entry.file_name());
-                let file_name = entry.file_name();
-                let Some(mut utf8_name) = file_name.to_str() else {
+                if !pathbuf.is_dir() {
+                    trace!("skipping {addon_type:?} folder for instance {instance_id} as it does not exist");
                     continue;
+                }
+
+                trace!({ dir = ?pathbuf }, "scanning {addon_type:?} dir for instance {instance_id}");
+                let mut entries = match tokio::fs::read_dir(&pathbuf).await {
+                    Ok(entries) => entries,
+                    Err(e) => {
+                        error!({ dir = ?pathbuf, error = ?e }, "could not read {addon_type:?} folder for instance {instance_id}");
+                        continue;
+                    }
                 };
 
-                let allowed_base_ext = [".jar", ".zip"].iter().any(|&ext| utf8_name.ends_with(ext));
-                let allowed_disabled_ext = [".jar.disabled", ".zip.disabled"]
-                    .iter()
-                    .any(|&ext| utf8_name.ends_with(ext));
+                while let Ok(Some(entry)) = entries.next_entry().await {
+                    let file_name = entry.file_name();
+                    let Some(mut utf8_name) = file_name.to_str() else {
+                        continue;
+                    };
 
-                if !allowed_base_ext && !allowed_disabled_ext {
-                    continue;
+                    // Determine file extensions based on addon type
+                    let allowed_extensions = match addon_type {
+                        crate::domain::instance::AddonType::Mods => vec![".jar", ".zip"],
+                        crate::domain::instance::AddonType::ResourcePacks => vec![".zip"],
+                        crate::domain::instance::AddonType::Shaders => vec![".zip"],
+                        crate::domain::instance::AddonType::DataPacks => vec![".zip"],
+                        crate::domain::instance::AddonType::Worlds => vec![], // Worlds are directories, handled differently
+                    };
+
+                    if addon_type == crate::domain::instance::AddonType::Worlds {
+                        // For worlds, we scan directories instead of files
+                        let Ok(metadata) = entry.metadata().await else {
+                            continue;
+                        };
+                        if !metadata.is_dir() {
+                            continue;
+                        }
+                        
+                        trace!("tracking world `{utf8_name}` for instance {instance_id}");
+                        modpaths.insert(
+                            utf8_name.to_string(),
+                            (true, metadata.len(), addon_type.to_db_string().to_string()),
+                        );
+                    } else {
+                        let allowed_base_ext = allowed_extensions.iter().any(|&ext| utf8_name.ends_with(ext));
+                        let disabled_extensions: Vec<String> = allowed_extensions.iter().map(|ext| format!("{}.disabled", ext)).collect();
+                        let allowed_disabled_ext = disabled_extensions.iter().any(|ext| utf8_name.ends_with(ext));
+
+                        if !allowed_base_ext && !allowed_disabled_ext {
+                            continue;
+                        }
+
+                        utf8_name = utf8_name.strip_suffix(".disabled").unwrap_or(utf8_name);
+
+                        let Ok(metadata) = entry.metadata().await else {
+                            continue;
+                        };
+                        // file || symlink
+                        if metadata.is_dir() {
+                            continue;
+                        }
+
+                        trace!("tracking {addon_type:?} `{utf8_name}` for instance {instance_id}");
+                        modpaths.insert(
+                            utf8_name.to_string(),
+                            (!allowed_disabled_ext, metadata.len(), addon_type.to_db_string().to_string()),
+                        );
+                    }
                 }
-
-                utf8_name = utf8_name.strip_suffix(".disabled").unwrap_or(utf8_name);
-
-                let Ok(metadata) = entry.metadata().await else {
-                    continue;
-                };
-                // file || symlink
-                if metadata.is_dir() {
-                    continue;
-                }
-
-                trace!("tracking mod `{utf8_name}` for instance {instance_id}");
-                modpaths.insert(
-                    utf8_name.to_string(),
-                    (!allowed_disabled_ext, metadata.len()),
-                );
             }
 
             let mut has_outdated_entries = false;
@@ -1251,9 +1281,9 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                 has_outdated_entries = cached_entries.len() != modpaths.len();
 
                 for entry in cached_entries {
-                    if let Some((enabled, real_size)) = modpaths.get(&entry.filename) {
-                        // enabled probably shouldn't be here
-                        if *real_size == entry.filesize as u64 && *enabled == entry.enabled {
+                    if let Some((enabled, real_size, addon_type)) = modpaths.get(&entry.filename) {
+                        // Check if the entry is up to date (size, enabled status, and addon type match)
+                        if *real_size == entry.filesize as u64 && *enabled == entry.enabled && *addon_type == entry.addon_type {
                             modpaths.remove(&entry.filename);
                             // trace!(
                             //     "up to data metadata entry for mod `{}`, skipping",
@@ -1290,8 +1320,9 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
 
             let rate_limiter = Arc::new(tokio::sync::Semaphore::new(default_parallelism_approx));
 
-            let entry_futures = modpaths.into_iter().map(|(subpath, (enabled, _))| {
-                let pathbuf = &pathbuf;
+            let entry_futures = modpaths.into_iter().map(|(filename, (enabled, _, addon_type_str))| {
+                let instance_path = instance_path.clone();
+                let root_path = root_path.clone();
                 let update_notifier = &update_notifier;
 
                 let rate_limiter = Arc::clone(&rate_limiter);
@@ -1299,8 +1330,17 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                 async move {
                     let _permit = rate_limiter.acquire().await.expect("rate limiter");
 
+                    // Determine the addon type and construct the appropriate path
+                    let addon_type = crate::domain::instance::AddonType::from_db_string(&addon_type_str)
+                        .unwrap_or(crate::domain::instance::AddonType::Mods);
+                    
+                    let addon_subpath = addon_type.get_folder_path(&instance_path);
+                    let mut pathbuf = PathBuf::new();
+                    pathbuf.push(&root_path);
+                    pathbuf.push(&addon_subpath);
+
                     app.meta_cache_manager()
-                        .cache_mod_file_unchecked(instance_id, pathbuf, subpath, enabled)
+                        .cache_mod_file_unchecked(instance_id, &pathbuf, filename, enabled, addon_type_str)
                         .await?;
 
                     tokio::time::sleep(std::time::Duration::from_millis(50)).await;

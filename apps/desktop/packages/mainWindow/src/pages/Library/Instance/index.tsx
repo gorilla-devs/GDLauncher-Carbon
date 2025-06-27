@@ -197,8 +197,8 @@ const Instance = () => {
     ...(routeData.instanceDetails.data?.modloaders.length! > 0
       ? [
           {
-            label: "Mods",
-            path: `/library/${params.id}/mods`,
+            label: "Addons",
+            path: `/library/${params.id}/addons`,
             noPadding: true
           }
         ]
@@ -402,7 +402,7 @@ const Instance = () => {
       class="bg-darkSlate-800 relative flex h-full flex-col overflow-x-hidden"
       classList={{
         "overflow-hidden": isFullScreen(),
-        "overflow-x-hidden": !isFullScreen()
+        "overflow-y-auto overflow-x-hidden": !isFullScreen()
       }}
     >
       <header
@@ -763,10 +763,13 @@ const Instance = () => {
               </div>
             </div>
             <div
-              class="px-4"
+              class="px-0"
               classList={{
                 "pt-14": isFullScreen(),
-                "pt-4": !isFullScreen()
+                "pt-0":
+                  !isFullScreen() && location.pathname.includes("/addons"),
+                "pt-4 px-4":
+                  !isFullScreen() && !location.pathname.includes("/addons")
               }}
             >
               <Outlet />

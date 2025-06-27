@@ -1,12 +1,7 @@
 import { For, JSX, Suspense, onMount, useContext } from "solid-js"
 import { Skeleton } from "@gd/ui"
 import { Props as RowContainerProps } from "@/components/Browser/RowContainer"
-import {
-  CFFEMod,
-  InstanceDetails,
-  MRFEProject,
-  Mod
-} from "@gd/core_module/bindings"
+import { InstanceDetails, Mod } from "@gd/core_module/bindings"
 import { Trans } from "@gd/i18n"
 import { VersionRowTypeData } from "../InfiniteScrollVersionsQueryWrapper"
 import { AddonContext } from "@/pages/AddonViewPage"

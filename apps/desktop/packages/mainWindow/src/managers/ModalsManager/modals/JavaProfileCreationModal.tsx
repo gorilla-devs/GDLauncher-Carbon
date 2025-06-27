@@ -50,7 +50,9 @@ const JavaProfileCreationModal = (props: ModalProps) => {
             value={profileName()}
             onInput={(e) => setProfileName(e.currentTarget.value)}
             errorMessage={
-              profileAlreadyExists() ? t("errors.profile_name_exists") : undefined
+              profileAlreadyExists()
+                ? t("errors.profile_name_exists")
+                : undefined
             }
           />
           <h4>

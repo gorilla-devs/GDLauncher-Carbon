@@ -95,7 +95,10 @@ export function List() {
   })
 
   const installedMods = rspc.createQuery(() => ({
-    queryKey: ["instance.getInstanceMods", instanceId()]
+    queryKey: [
+      "instance.getInstanceMods",
+      { instance_id: instanceId(), addon_type: null }
+    ]
   }))
 
   const lookupTableInstalledMods: () => Set<string> = () => {

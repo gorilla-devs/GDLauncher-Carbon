@@ -4,7 +4,7 @@ use anyhow::{anyhow, bail};
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
 use serde::{
-    de::{DeserializeOwned, Visitor},
+    de::DeserializeOwned,
     Deserialize, Deserializer, Serialize, Serializer,
 };
 

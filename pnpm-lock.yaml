@@ -3776,10 +3776,10 @@ packages:
   '@storybook/builder-manager@7.6.10':
     resolution: {integrity: sha512-f+YrjZwohGzvfDtH8BHzqM3xW0p4vjjg9u7uzRorqUiNIAAKHpfNrZ/WvwPlPYmrpAHt4xX/nXRJae4rFSygPw==}
 
-  '@storybook/builder-vite@9.1.0-alpha.2':
-    resolution: {integrity: sha512-N4RdEjLptun71RH/h4vQA551SKRtr+gyQGx5sVCyamdE52QRPnDOyoM5Kj1IOqTtqLPjYV4D7c0WV2mDIDYazg==}
+  '@storybook/builder-vite@9.1.0-alpha.3':
+    resolution: {integrity: sha512-/wPLwYroOXTtYbgPh/xlfCqrTEEp1V6yb64OmcsvDnWnyG+foHl32YmYTMt9p+JLNNV5Zw084MYuQ+egCIhElg==}
     peerDependencies:
-      storybook: ^9.1.0-alpha.2
+      storybook: ^9.1.0-alpha.3
       vite: ^5.0.0 || ^6.0.0
 
   '@storybook/channels@7.6.10':
@@ -3813,10 +3813,10 @@ packages:
   '@storybook/csf-plugin@7.6.10':
     resolution: {integrity: sha512-Sc+zZg/BnPH2X28tthNaQBnDiFfO0QmfjVoOx0fGYM9SvY3P5ehzWwp5hMRBim6a/twOTzePADtqYL+t6GMqqg==}
 
-  '@storybook/csf-plugin@9.1.0-alpha.2':
-    resolution: {integrity: sha512-h2zb2J9lst1QMphSDpv3exNyw8fq4w8krV0aNJ+42E/GfHs11jI2zO4aamMCacWl0wSHSDeJaVxFUgXbZbLGcA==}
+  '@storybook/csf-plugin@9.1.0-alpha.3':
+    resolution: {integrity: sha512-QPjId60GgFWkpbF/RqMS1nlYJPckN/mRz5AhhEFiWCkGEDKq2HB9o6U3V591S/oSQ0nGaELose4qEXH6XWAAEQ==}
     peerDependencies:
-      storybook: ^9.1.0-alpha.2
+      storybook: ^9.1.0-alpha.3
 
   '@storybook/csf-tools@7.6.10':
     resolution: {integrity: sha512-TnDNAwIALcN6SA4l00Cb67G02XMOrYU38bIpFJk5VMDX2dvgPjUtJNBuLmEbybGcOt7nPyyFIHzKcY5FCVGoWA==}
@@ -7149,6 +7149,7 @@ packages:
 
   lodash.isequal@4.5.0:
     resolution: {integrity: sha512-pDo3lu8Jhfjqls6GkMgpahsF9kCyayhgykjyLMNFTKWrpVdAQtYyB4muAMWozBB4ig/dtWAmsMxLEI8wuz+DYQ==}
+    deprecated: This package is deprecated. Use require('node:util').isDeepStrictEqual instead.
 
   lodash.isplainobject@4.0.6:
     resolution: {integrity: sha512-oSXzaWypCMHkPC3NvBEaPHf0KsA5mvPrOPgQWDsbg8n7orZ290M0BmC/jgRZ4vcJ6DTAhjrsSYgdsW/F+MFOBA==}
@@ -8732,11 +8733,11 @@ packages:
 
   shikiji-core@0.9.19:
     resolution: {integrity: sha512-AFJu/vcNT21t0e6YrfadZ+9q86gvPum6iywRyt1OtIPjPFe25RQnYJyxHQPMLKCCWA992TPxmEmbNcOZCAJclw==}
-    deprecated: Shikiji is merged back to Shiki v1.0, please migrate over to get the latest updates
+    deprecated: Deprecated, use @shikijs/core instead
 
   shikiji@0.9.19:
     resolution: {integrity: sha512-Kw2NHWktdcdypCj1GkKpXH4o6Vxz8B8TykPlPuLHOGSV8VkhoCLcFOH4k19K4LXAQYRQmxg+0X/eM+m2sLhAkg==}
-    deprecated: Shikiji is merged back to Shiki v1.0, please migrate over to get the latest updates
+    deprecated: Deprecated, use shiki instead
 
   side-channel@1.0.4:
     resolution: {integrity: sha512-q5XPytqFEIKHkGdiMIrY10mvLRvnQh42/+GoBlFW3b2LXLE2xxJpZFdm94we0BaoV3RwJyGqg5wS7epxTv0Zvw==}
@@ -14334,9 +14335,9 @@ snapshots:
       - encoding
       - supports-color
 
-  '@storybook/builder-vite@9.1.0-alpha.2(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))':
+  '@storybook/builder-vite@9.1.0-alpha.3(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))':
     dependencies:
-      '@storybook/csf-plugin': 9.1.0-alpha.2(storybook@7.6.10(encoding@0.1.13))
+      '@storybook/csf-plugin': 9.1.0-alpha.3(storybook@7.6.10(encoding@0.1.13))
       storybook: 7.6.10(encoding@0.1.13)
       ts-dedent: 2.2.0
       vite: 6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0)
@@ -14528,7 +14529,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@storybook/csf-plugin@9.1.0-alpha.2(storybook@7.6.10(encoding@0.1.13))':
+  '@storybook/csf-plugin@9.1.0-alpha.3(storybook@7.6.10(encoding@0.1.13))':
     dependencies:
       storybook: 7.6.10(encoding@0.1.13)
       unplugin: 1.6.0
@@ -21174,7 +21175,7 @@ snapshots:
 
   storybook-solidjs-vite@1.0.0-beta.2(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0)):
     dependencies:
-      '@storybook/builder-vite': 9.1.0-alpha.2(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))
+      '@storybook/builder-vite': 9.1.0-alpha.3(storybook@7.6.10(encoding@0.1.13))(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.19.0))
     transitivePeerDependencies:
       - storybook
       - vite

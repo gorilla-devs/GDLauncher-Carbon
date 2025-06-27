@@ -155,6 +155,7 @@ model ModFileCache {
   filename      String
   filesize      Int
   enabled       Boolean
+  addonType     String      @default("mods") // "mods", "resourcepacks", "shaders", "datapacks", "worlds"
   metadataId    String
   metadata      ModMetadata @relation(fields: [metadataId], references: [id], onDelete: Restrict)
 

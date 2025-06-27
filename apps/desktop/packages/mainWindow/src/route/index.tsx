@@ -44,9 +44,9 @@ export const routes: RouteDefinition[] = [
                 )
               },
               {
-                path: "/mods",
+                path: "/addons",
                 component: lazy(
-                  () => import("@/pages/Library/Instance/Tabs/Mods")
+                  () => import("@/pages/Library/Instance/Tabs/Addons")
                 )
               },
               {

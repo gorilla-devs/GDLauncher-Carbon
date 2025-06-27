@@ -291,7 +291,7 @@ impl ManagerRef<'_, InstanceManager> {
             .watch_and_prioritize(Some(instance_id))
             .await;
 
-        let result = app.instance_manager().list_mods(instance_id).await?;
+        let result = app.instance_manager().list_mods(instance_id, None).await?;
         let msg = format!(
             "Mods ({} enabled / {} disabled): {}",
             result.iter().filter(|mod_| mod_.enabled).count(),
@@ -653,7 +653,7 @@ impl ManagerRef<'_, InstanceManager> {
 
             let mods = app
                 .instance_manager()
-                .list_mods(instance_id)
+                .list_mods(instance_id, None)
                 .await
                 .unwrap_or_default()
                 .len();
