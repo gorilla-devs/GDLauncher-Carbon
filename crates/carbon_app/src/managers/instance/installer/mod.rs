@@ -10,14 +10,15 @@ use crate::{
         vtask::VisualTaskId,
     },
     managers::{
+        AppInner,
         instance::Mod,
         vtask::{TaskState, VisualTask},
-        AppInner,
     },
 };
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use carbon_net::{Checksum, DownloadOptions, Downloadable};
 use carbon_platforms::{
+    ModChannel,
     curseforge::{
         self,
         filters::{
@@ -30,7 +31,6 @@ use carbon_platforms::{
         project::ProjectVersionsFilters,
         search::{ProjectID, VersionID},
     },
-    ModChannel,
 };
 use carbon_repos::db::{
     curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,

@@ -2,7 +2,7 @@ use crate::api::java::managed::{FEManagedJavaSetupArgs, FEManagedJavaSetupProgre
 use crate::api::managers::App;
 use crate::api::router::router;
 use crate::domain::java::{
-    JavaComponentType, JavaVendor, SystemJavaProfileName, SYSTEM_JAVA_PROFILE_NAME_PREFIX,
+    JavaComponentType, JavaVendor, SYSTEM_JAVA_PROFILE_NAME_PREFIX, SystemJavaProfileName,
 };
 use crate::{api::keys::java::*, domain::java::Java};
 use rspc::RouterBuilder;

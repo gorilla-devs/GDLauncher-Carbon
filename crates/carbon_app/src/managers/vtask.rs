@@ -2,15 +2,15 @@ use crate::api::{keys::vtask::*, translation::Translation};
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicI32, Ordering},
         Arc, Mutex,
+        atomic::{AtomicI32, Ordering},
     },
 };
 
 use anyhow::anyhow;
 
 use thiserror::Error;
-use tokio::sync::{watch, RwLock};
+use tokio::sync::{RwLock, watch};
 use tracing::error;
 
 use super::ManagerRef;

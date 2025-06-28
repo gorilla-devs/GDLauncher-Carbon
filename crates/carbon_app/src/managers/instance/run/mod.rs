@@ -11,7 +11,7 @@ use crate::{
     domain::metrics::GDLMetricsEvent,
     domain::vtask::VisualTaskId,
     managers::instance::log::{
-        format_message_as_log4j_event, GameLog, LogEntry, LogEntrySourceKind,
+        GameLog, LogEntry, LogEntrySourceKind, format_message_as_log4j_event,
     },
     managers::instance::modpack::packinfo,
     managers::instance::schema::make_instance_config,
@@ -20,19 +20,18 @@ use crate::{
     managers::minecraft::assets::get_assets_dir,
     managers::minecraft::minecraft::get_lwjgl_meta,
     managers::minecraft::modrinth,
-    managers::minecraft::{curseforge, UpdateValue},
+    managers::minecraft::{UpdateValue, curseforge},
     managers::modplatforms::curseforge::convert_cf_version_to_standard_version,
     managers::modplatforms::modrinth::convert_mr_version_to_standard_version,
     managers::vtask::Subtask,
     managers::{
-        self,
+        self, ManagerRef,
         account::FullAccount,
         vtask::{NonFailedDismissError, TaskState, VisualTask},
-        ManagerRef,
     },
     util::NormalizedWalkdir,
 };
-use anyhow::{anyhow, bail, Context};
+use anyhow::{Context, anyhow, bail};
 use carbon_net::DownloadOptions;
 use carbon_parsing::log::{LogParser, ParsedItem};
 use chrono::{DateTime, Local, Utc};
@@ -49,7 +48,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use tokio::sync::{watch, Mutex, Semaphore};
+use tokio::sync::{Mutex, Semaphore, watch};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio::{io::AsyncReadExt, sync::mpsc};
@@ -519,7 +518,9 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let (Some(stdout), Some(stderr)) = (child.stdout.take(), child.stderr.take())
                     else {
-                        panic!("stdout and stderr are not availible even though the child process was created with both enabled");
+                        panic!(
+                            "stdout and stderr are not availible even though the child process was created with both enabled"
+                        );
                     };
 
                     let mut last_stored_time = start_time;

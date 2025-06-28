@@ -3,11 +3,11 @@
 #![allow(dead_code)]
 
 use crate::managers::{
+    App, AppInner,
     java::{
         discovery::{Discovery, RealDiscovery},
         java_checker::RealJavaChecker,
     },
-    App, AppInner,
 };
 use serde_json::Value;
 use std::{path::PathBuf, sync::Arc};

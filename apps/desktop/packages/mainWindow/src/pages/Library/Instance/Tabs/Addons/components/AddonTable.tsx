@@ -4,7 +4,9 @@ import {
   onMount,
   createSignal,
   onCleanup,
-  createMemo
+  createMemo,
+  createEffect,
+  Accessor
 } from "solid-js"
 import {
   flexRender,
@@ -16,7 +18,8 @@ import {
   ColumnFiltersState,
   VisibilityState,
   ColumnDef,
-  RowSelectionState
+  RowSelectionState,
+  Table
 } from "@tanstack/solid-table"
 import {
   ContextMenu,
@@ -27,31 +30,113 @@ import {
 } from "@gd/ui"
 import { Mod as ModType } from "@gd/core_module/bindings"
 
+interface VirtualizationConfig {
+  /** Fixed row height or function to get height for each row index */
+  rowHeight?: number | ((index: number) => number)
+  /** Number of rows to render outside visible area for smoother scrolling */
+  bufferSize?: number
+  /** Enable dynamic height measurement for rows */
+  enableDynamicHeight?: boolean
+}
+
 interface AddonTableProps {
-  data: () => ModType[]
+  data: Accessor<ModType[]>
   columns: ColumnDef<ModType, any>[]
-  sorting: () => SortingState
+  sorting: Accessor<SortingState>
   setSorting: (sorting: SortingState) => void
-  columnFilters: () => ColumnFiltersState
+  columnFilters: Accessor<ColumnFiltersState>
   setColumnFilters: (filters: ColumnFiltersState) => void
-  columnVisibility: () => VisibilityState
+  columnVisibility: Accessor<VisibilityState>
   setColumnVisibility: (visibility: VisibilityState) => void
-  rowSelection: () => RowSelectionState
+  rowSelection: Accessor<RowSelectionState>
   setRowSelection: (
     selection:
       | RowSelectionState
       | ((prev: RowSelectionState) => RowSelectionState)
   ) => void
-  onTableReady?: (table: any) => void
+  onTableReady?: (table: Table<ModType>) => void
   hasBulkActions?: boolean
+  /** Optional reference to scroll container, defaults to finding closest scrollable parent */
+  scrollContainerRef?: HTMLElement
+  /** Configuration for virtualization behavior */
+  virtualizationConfig?: VirtualizationConfig
+}
+
+function throttle<T extends (...args: any[]) => any>(
+  func: T,
+  delay: number
+): (...args: Parameters<T>) => void {
+  let lastCall = 0
+  let timeout: number | null = null
+
+  return (...args: Parameters<T>) => {
+    const now = Date.now()
+
+    if (now - lastCall >= delay) {
+      lastCall = now
+      func(...args)
+    } else if (!timeout) {
+      timeout = window.setTimeout(
+        () => {
+          lastCall = Date.now()
+          func(...args)
+          timeout = null
+        },
+        delay - (now - lastCall)
+      )
+    }
+  }
+}
+
+class RowHeightCache {
+  private cache = new Map<number, number>()
+  private defaultHeight: number
+
+  constructor(defaultHeight: number) {
+    this.defaultHeight = defaultHeight
+  }
+
+  get(index: number): number {
+    return this.cache.get(index) ?? this.defaultHeight
+  }
+
+  set(index: number, height: number): void {
+    this.cache.set(index, height)
+  }
+
+  clear(): void {
+    this.cache.clear()
+  }
+
+  getOffsetForIndex(index: number): number {
+    let offset = 0
+    for (let i = 0; i < index; i++) {
+      offset += this.get(i)
+    }
+    return offset
+  }
+
+  getTotalHeight(totalRows: number): number {
+    let height = 0
+    for (let i = 0; i < totalRows; i++) {
+      height += this.get(i)
+    }
+    return height
+  }
 }
 
 export const AddonTable = (props: AddonTableProps) => {
   const [scrollTop, setScrollTop] = createSignal(0)
-  const [containerHeight, setContainerHeight] = createSignal(800)
+  const [containerHeight, setContainerHeight] = createSignal(window.innerHeight)
   let tableRef: HTMLDivElement | undefined
+  let resizeObserver: ResizeObserver | undefined
+  let scrollHandlerCleanup: (() => void) | undefined
 
-  // Drag selection state
+  const config = props.virtualizationConfig ?? {}
+  const defaultRowHeight =
+    typeof config.rowHeight === "number" ? config.rowHeight : 60
+  const rowHeightCache = new RowHeightCache(defaultRowHeight)
+
   const [isDragging, setIsDragging] = createSignal(false)
   const [dragStartRow, setDragStartRow] = createSignal<string | null>(null)
   const [dragMode, setDragMode] = createSignal<"select" | "deselect">("select")
@@ -59,7 +144,6 @@ export const AddonTable = (props: AddonTableProps) => {
     new Set()
   )
 
-  // Context menu state
   const [contextMenuSelection, setContextMenuSelection] = createSignal<
     Set<string>
   >(new Set())
@@ -119,13 +203,18 @@ export const AddonTable = (props: AddonTableProps) => {
     getRowId: (row) => row.id
   })
 
-  // Virtual scrolling calculations
-  const ROW_HEIGHT = 60
-  const BUFFER_SIZE = 5
+  const BUFFER_SIZE = config.bufferSize ?? 5
+  const enableDynamicHeight = config.enableDynamicHeight ?? false
+
+  const getRowHeight = (index: number): number => {
+    if (typeof config.rowHeight === "function") {
+      return config.rowHeight(index)
+    }
+    return rowHeightCache.get(index)
+  }
 
   const rows = createMemo(() => table.getRowModel().rows)
 
-  // Drag selection utilities
   const getRowRange = (startRowId: string, endRowId: string) => {
     const allRows = rows()
     const startIndex = allRows.findIndex((row) => row.id === startRowId)
@@ -151,35 +240,84 @@ export const AddonTable = (props: AddonTableProps) => {
   const visibleRows = createMemo(() => {
     const allRows = rows()
     const total = allRows.length
-    if (total === 0) return { start: 0, end: 0, total: 0, rows: [] }
+    if (total === 0)
+      return {
+        start: 0,
+        end: 0,
+        total: 0,
+        rows: [],
+        startOffset: 0,
+        endOffset: 0
+      }
 
     // Use scrollTop signal for reactivity
     const currentScrollTop = scrollTop()
+    const currentContainerHeight = containerHeight()
 
-    const start = Math.max(
-      0,
-      Math.floor(currentScrollTop / ROW_HEIGHT) - BUFFER_SIZE
-    )
-    const end = Math.min(
-      total,
-      Math.ceil((currentScrollTop + containerHeight()) / ROW_HEIGHT) +
-        BUFFER_SIZE
-    )
+    if (enableDynamicHeight) {
+      // Dynamic height calculation
+      let accumulatedHeight = 0
+      let start = 0
+      let end = total
 
-    console.log("Virtualization update:", {
-      scrollTop: currentScrollTop,
-      containerHeight: containerHeight(),
-      start,
-      end,
-      total,
-      visibleCount: end - start
-    })
+      // Find start index
+      for (let i = 0; i < total; i++) {
+        if (
+          accumulatedHeight >=
+          currentScrollTop - BUFFER_SIZE * defaultRowHeight
+        ) {
+          start = Math.max(0, i - BUFFER_SIZE)
+          break
+        }
+        accumulatedHeight += getRowHeight(i)
+      }
 
-    return {
-      start,
-      end,
-      total,
-      rows: allRows.slice(start, end)
+      // Find end index
+      accumulatedHeight = rowHeightCache.getOffsetForIndex(start)
+      for (let i = start; i < total; i++) {
+        if (
+          accumulatedHeight >
+          currentScrollTop +
+            currentContainerHeight +
+            BUFFER_SIZE * defaultRowHeight
+        ) {
+          end = Math.min(total, i + BUFFER_SIZE)
+          break
+        }
+        accumulatedHeight += getRowHeight(i)
+      }
+
+      return {
+        start,
+        end,
+        total,
+        rows: allRows.slice(start, end),
+        startOffset: rowHeightCache.getOffsetForIndex(start),
+        endOffset:
+          rowHeightCache.getTotalHeight(total) -
+          rowHeightCache.getOffsetForIndex(end)
+      }
+    } else {
+      // Fixed height calculation (optimized)
+      const fixedHeight = defaultRowHeight
+      const start = Math.max(
+        0,
+        Math.floor(currentScrollTop / fixedHeight) - BUFFER_SIZE
+      )
+      const end = Math.min(
+        total,
+        Math.ceil((currentScrollTop + currentContainerHeight) / fixedHeight) +
+          BUFFER_SIZE
+      )
+
+      return {
+        start,
+        end,
+        total,
+        rows: allRows.slice(start, end),
+        startOffset: start * fixedHeight,
+        endOffset: (total - end) * fixedHeight
+      }
     }
   })
 
@@ -191,7 +329,6 @@ export const AddonTable = (props: AddonTableProps) => {
         (id) => props.rowSelection()[id]
       )
       if (selectedRowIds.includes(rowId)) {
-        // This is a right-click on a selected row, don't interfere
         return
       }
     }
@@ -312,12 +449,10 @@ export const AddonTable = (props: AddonTableProps) => {
     const baseClasses =
       "border-darkSlate-600 hover:bg-darkSlate-750 flex w-full border-t group cursor-pointer"
 
-    // Context menu highlighting (highest priority)
     if (contextMenuSelection().has(rowId) && isContextMenuOpen()) {
       return `${baseClasses} bg-blue-500/10 ring-1 ring-blue-400/30`
     }
 
-    // Drag preview highlighting
     const preview = previewSelection()
     if (preview.has(rowId)) {
       const mode = dragMode()
@@ -331,63 +466,115 @@ export const AddonTable = (props: AddonTableProps) => {
     return baseClasses
   }
 
-  // Handle scroll events for virtual scrolling
+  const findScrollContainer = (): HTMLElement | null => {
+    if (props.scrollContainerRef) return props.scrollContainerRef
+
+    const byId = document.getElementById("main-container-instance-details")
+    if (byId) return byId
+
+    let parent = tableRef?.parentElement
+    while (parent) {
+      const style = window.getComputedStyle(parent)
+      if (
+        style.overflow === "auto" ||
+        style.overflow === "scroll" ||
+        style.overflowY === "auto" ||
+        style.overflowY === "scroll"
+      ) {
+        return parent
+      }
+      parent = parent.parentElement
+    }
+
+    return document.documentElement
+  }
+
+  const createScrollHandler = (container: HTMLElement) => {
+    let ticking = false
+    let cachedTableRect: DOMRect | null = null
+    let cacheTimeout: number | null = null
+
+    const updateCache = () => {
+      cachedTableRect = tableRef?.getBoundingClientRect() ?? null
+      cacheTimeout = window.setTimeout(() => {
+        cachedTableRect = null
+      }, 100)
+    }
+
+    const handleScroll = () => {
+      if (ticking || !tableRef) return
+
+      ticking = true
+      requestAnimationFrame(() => {
+        try {
+          if (!cachedTableRect) updateCache()
+          if (!cachedTableRect) return
+
+          const containerRect = container.getBoundingClientRect()
+          const tableScrollOffset = containerRect.top - cachedTableRect.top
+          const newScrollTop = Math.max(0, tableScrollOffset)
+
+          setScrollTop(newScrollTop)
+        } finally {
+          ticking = false
+        }
+      })
+    }
+
+    const throttledHandler = throttle(handleScroll, 16)
+
+    return {
+      handler: throttledHandler,
+      cleanup: () => {
+        if (cacheTimeout) clearTimeout(cacheTimeout)
+      }
+    }
+  }
+
   onMount(() => {
     if (props.onTableReady) {
       props.onTableReady(table)
     }
 
-    // Wait a tick for DOM to be ready
-    setTimeout(() => {
-      const scrollContainer = document.getElementById(
-        "main-container-instance-details"
-      )
+    createEffect(() => {
+      scrollHandlerCleanup?.()
+      resizeObserver?.disconnect()
 
-      if (!scrollContainer) {
-        console.error("Could not find main-container-instance-details")
+      const container = findScrollContainer()
+      if (!container) {
+        console.warn("AddonTable: Could not find scroll container")
         return
       }
 
-      const handleScroll = () => {
-        if (!tableRef) return
+      const { handler, cleanup } = createScrollHandler(container)
 
-        requestAnimationFrame(() => {
-          // Get the table position relative to the scrollable container
-          const tableRect = tableRef.getBoundingClientRect()
-          const containerRect = scrollContainer.getBoundingClientRect()
-
-          // Calculate how much the table has scrolled past the top of the container
-          const tableScrollOffset = containerRect.top - tableRect.top
-          const newScrollTop = Math.max(0, tableScrollOffset)
-
-          setScrollTop(newScrollTop)
-        })
-      }
-
-      const updateHeight = () => {
-        setContainerHeight(window.innerHeight)
-      }
-
-      updateHeight()
-      handleScroll() // Initial check
-
-      scrollContainer.addEventListener("scroll", handleScroll, {
-        passive: true
+      resizeObserver = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          if (entry.target === container) {
+            setContainerHeight(entry.contentRect.height)
+          }
+        }
       })
-      window.addEventListener("resize", updateHeight)
 
-      onCleanup(() => {
-        scrollContainer.removeEventListener("scroll", handleScroll)
-        window.removeEventListener("resize", updateHeight)
-      })
-    }, 100)
+      resizeObserver.observe(container)
 
-    // Global mouse event listeners for drag selection
+      setContainerHeight(container.clientHeight)
+      handler()
+
+      container.addEventListener("scroll", handler, { passive: true })
+
+      scrollHandlerCleanup = () => {
+        container.removeEventListener("scroll", handler)
+        cleanup()
+      }
+    })
+
     document.addEventListener("mouseup", handleMouseUp)
 
     onCleanup(() => {
+      scrollHandlerCleanup?.()
+      resizeObserver?.disconnect()
       document.removeEventListener("mouseup", handleMouseUp)
-      // Reset body styles if component unmounts during drag
       document.body.style.userSelect = ""
       document.body.style.cursor = ""
     })
@@ -396,7 +583,6 @@ export const AddonTable = (props: AddonTableProps) => {
   return (
     <ContextMenu onOpenChange={handleContextMenuOpenChange}>
       <ContextMenuTrigger class="border-darkSlate-600 rounded-lg border">
-        {/* Sticky Table Header - sticks below filters and optionally bulk actions */}
         <div
           class="bg-darkSlate-700 sticky z-10 rounded-t-lg"
           style={{ top: props.hasBulkActions ? "189px" : "115px" }}
@@ -451,43 +637,71 @@ export const AddonTable = (props: AddonTableProps) => {
           </For>
         </div>
 
-        {/* Table Body */}
         <div ref={tableRef}>
-          {/* Virtual spacer before visible items */}
-          <div style={{ height: `${visibleRows().start * ROW_HEIGHT}px` }} />
-
-          {/* Only render visible rows */}
-          <For each={visibleRows().rows}>
-            {(row) => (
-              <div
-                class={getRowClasses(row.id)}
-                style={{ height: `${ROW_HEIGHT}px` }}
-                data-row-id={row.id}
-                onMouseDown={(e) => handleMouseDown(row.id, e)}
-                onMouseEnter={() => handleMouseEnter(row.id)}
-                onContextMenu={(e) => handleContextMenu(row.id, e)}
-              >
-                <For each={row.getVisibleCells()}>
-                  {(cell) => (
-                    <div
-                      class="flex min-w-0 flex-1 items-center px-4 py-3 text-sm"
-                      style={{ width: `${cell.column.getSize()}px` }}
-                    >
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </div>
-                  )}
-                </For>
-              </div>
-            )}
-          </For>
-
-          {/* Virtual spacer after visible items */}
           <div
             style={{
-              height: `${(visibleRows().total - visibleRows().end) * ROW_HEIGHT}px`
+              height: `${visibleRows().startOffset}px`,
+              "will-change": "height"
+            }}
+          />
+
+          <For each={visibleRows().rows}>
+            {(row, index) => {
+              const rowIndex = () => visibleRows().start + index()
+              const rowHeight = () => getRowHeight(rowIndex())
+
+              return (
+                <div
+                  ref={(el) => {
+                    if (enableDynamicHeight && el) {
+                      const observer = new ResizeObserver((entries) => {
+                        const entry = entries[0]
+                        if (entry) {
+                          const height = entry.contentRect.height
+                          if (height > 0) {
+                            rowHeightCache.set(rowIndex(), height)
+                          }
+                        }
+                      })
+                      observer.observe(el)
+                      onCleanup(() => observer.disconnect())
+                    }
+                  }}
+                  class={getRowClasses(row.id)}
+                  style={{
+                    height: enableDynamicHeight ? "auto" : `${rowHeight()}px`,
+                    "min-height": enableDynamicHeight
+                      ? `${defaultRowHeight}px`
+                      : undefined,
+                    "will-change": "transform"
+                  }}
+                  data-row-id={row.id}
+                  onMouseDown={(e) => handleMouseDown(row.id, e)}
+                  onMouseEnter={() => handleMouseEnter(row.id)}
+                  onContextMenu={(e) => handleContextMenu(row.id, e)}
+                >
+                  <For each={row.getVisibleCells()}>
+                    {(cell) => (
+                      <div
+                        class="flex min-w-0 flex-1 items-center px-4 py-3 text-sm"
+                        style={{ width: `${cell.column.getSize()}px` }}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </div>
+                    )}
+                  </For>
+                </div>
+              )
+            }}
+          </For>
+
+          <div
+            style={{
+              height: `${visibleRows().endOffset}px`,
+              "will-change": "height"
             }}
           />
         </div>

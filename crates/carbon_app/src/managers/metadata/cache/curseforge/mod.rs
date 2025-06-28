@@ -1,19 +1,19 @@
 use super::BundleSender;
 use super::ModplatformCacher;
 use super::UpdateNotifier;
-use crate::domain::instance::info::ModLoaderType;
 use crate::domain::instance::InstanceId;
+use crate::domain::instance::info::ModLoaderType;
 use crate::managers::App;
+use carbon_platforms::ModChannel;
+use carbon_platforms::curseforge::File;
+use carbon_platforms::curseforge::FileReleaseType;
+use carbon_platforms::curseforge::FingerprintsMatchesResult;
+use carbon_platforms::curseforge::Mod;
 use carbon_platforms::curseforge::filters::ModFilesParameters;
 use carbon_platforms::curseforge::filters::ModFilesParametersQuery;
 use carbon_platforms::curseforge::filters::ModParameters;
 use carbon_platforms::curseforge::filters::ModsParameters;
 use carbon_platforms::curseforge::filters::ModsParametersBody;
-use carbon_platforms::curseforge::File;
-use carbon_platforms::curseforge::FileReleaseType;
-use carbon_platforms::curseforge::FingerprintsMatchesResult;
-use carbon_platforms::curseforge::Mod;
-use carbon_platforms::ModChannel;
 use carbon_repos::db::read_filters::DateTimeFilter;
 use carbon_repos::db::read_filters::IntFilter;
 use carbon_repos::db::{
@@ -94,7 +94,9 @@ impl ModplatformCacher for CurseforgeModCacher {
 
         if let Some((end_time, _)) = delay {
             if Instant::now() < *end_time {
-                warn!("Not attempting to cache curseforge mods for {instance_id} as too many attempts have failed recently");
+                warn!(
+                    "Not attempting to cache curseforge mods for {instance_id} as too many attempts have failed recently"
+                );
                 return Ok(());
             }
         }

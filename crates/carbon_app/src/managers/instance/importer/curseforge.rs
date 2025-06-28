@@ -1,12 +1,12 @@
 use super::{
-    ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter, InternalImportEntry,
-    InvalidImportEntry, GET_IMPORT_SCAN_STATUS,
+    GET_IMPORT_SCAN_STATUS, ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter,
+    InternalImportEntry, InvalidImportEntry,
 };
 use crate::api::translation::Translation;
 use crate::domain::instance::info::{CurseforgeModpack, GameVersion, Modpack};
+use crate::managers::AppInner;
 use crate::managers::instance::InstanceVersionSource;
 use crate::managers::modplatforms::curseforge::convert_cf_version_to_standard_version;
-use crate::managers::AppInner;
 use crate::{domain::vtask::VisualTaskId, managers::instance::anyhow};
 use carbon_platforms::curseforge::manifest::{Manifest, Minecraft, ModLoaders};
 use serde::Deserialize;

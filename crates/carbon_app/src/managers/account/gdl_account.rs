@@ -1,8 +1,8 @@
 use crate::domain::instance::info;
 use chrono::{DateTime, Utc};
 use hyper::{
-    header::{InvalidHeaderValue, AUTHORIZATION, CONTENT_TYPE},
     HeaderMap, StatusCode,
+    header::{AUTHORIZATION, CONTENT_TYPE, InvalidHeaderValue},
 };
 use reqwest::multipart::Form;
 use serde::{Deserialize, Serialize};

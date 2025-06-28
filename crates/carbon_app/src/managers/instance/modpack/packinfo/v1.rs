@@ -1,9 +1,9 @@
 use std::{array, collections::HashMap};
 
 use serde::{
+    Deserialize, Serialize, Serializer,
     de::Visitor,
     de::{self, Deserializer},
-    Deserialize, Serialize, Serializer,
 };
 
 #[derive(Serialize, Deserialize)]

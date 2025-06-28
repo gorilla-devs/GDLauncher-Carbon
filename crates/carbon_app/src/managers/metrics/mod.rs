@@ -1,5 +1,5 @@
 use crate::{domain::metrics::GDLMetricsEvent, iridium_client::get_client};
-use carbon_repos::db::{app_configuration, PrismaClient};
+use carbon_repos::db::{PrismaClient, app_configuration};
 use display_info::DisplayInfo;
 use reqwest_middleware::ClientWithMiddleware;
 use serde::Serialize;

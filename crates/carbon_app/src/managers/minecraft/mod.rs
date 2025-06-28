@@ -8,7 +8,7 @@ use carbon_net::Downloadable;
 use const_format::formatcp;
 use daedalus::{
     minecraft::{
-        DownloadType, LibraryGroup, Version, VersionInfo, VersionManifest, CURRENT_FORMAT_VERSION,
+        CURRENT_FORMAT_VERSION, DownloadType, LibraryGroup, Version, VersionInfo, VersionManifest,
     },
     modded::Manifest,
 };
@@ -16,7 +16,7 @@ use reqwest::Url;
 use tokio::{
     fs::File,
     io::AsyncWriteExt,
-    sync::{watch, Mutex},
+    sync::{Mutex, watch},
 };
 
 use crate::domain::{
@@ -30,8 +30,8 @@ use crate::domain::{
 use self::minecraft::get_lwjgl_meta;
 
 use super::{
-    instance::log::{format_message_as_log4j_event, GameLog, LogEntry},
     ManagerRef,
+    instance::log::{GameLog, LogEntry, format_message_as_log4j_event},
 };
 
 pub mod assets;

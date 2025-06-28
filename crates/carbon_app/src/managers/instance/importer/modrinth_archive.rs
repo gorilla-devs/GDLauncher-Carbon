@@ -5,8 +5,8 @@ use crate::{
         vtask::VisualTaskId,
     },
     managers::{
-        instance::InstanceVersionSource,
-        modplatforms::modrinth::convert_mr_version_to_standard_version, AppInner,
+        AppInner, instance::InstanceVersionSource,
+        modplatforms::modrinth::convert_mr_version_to_standard_version,
     },
 };
 use anyhow::anyhow;
@@ -112,7 +112,7 @@ impl ModrinthArchiveImporter {
                 return Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
                     name,
                     reason,
-                })))
+                })));
             }
         };
 

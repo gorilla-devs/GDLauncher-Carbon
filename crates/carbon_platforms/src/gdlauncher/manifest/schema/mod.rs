@@ -1,4 +1,3 @@
-
 use serde::{Deserialize, Serialize};
 
 mod v1;

@@ -187,7 +187,7 @@ impl Middleware for CacheMiddleware {
                     Err(_) => {
                         return Err(reqwest_middleware::Error::Middleware(anyhow!(
                             "could not return cached response"
-                        )))
+                        )));
                     }
                 }
             }
@@ -201,7 +201,7 @@ impl Middleware for CacheMiddleware {
 mod test {
     use std::time::SystemTime;
 
-    use axum::{http::header, routing::get, Router};
+    use axum::{Router, http::header, routing::get};
     use chrono::{Duration, Utc};
     use tokio::net::TcpListener;
 

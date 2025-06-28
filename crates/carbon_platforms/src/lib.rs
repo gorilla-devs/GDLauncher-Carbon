@@ -3,10 +3,7 @@ use std::str::FromStr;
 use anyhow::{anyhow, bail};
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
-use serde::{
-    de::DeserializeOwned,
-    Deserialize, Deserializer, Serialize, Serializer,
-};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
 
 pub mod curseforge;
 pub mod gdlauncher;

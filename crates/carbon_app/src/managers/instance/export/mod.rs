@@ -7,8 +7,8 @@ use std::{
 use itertools::Itertools;
 use tokio::sync::mpsc;
 use zip::{
-    write::{FileOptionExtension, FileOptions},
     ZipWriter,
+    write::{FileOptionExtension, FileOptions},
 };
 
 use crate::{
@@ -16,7 +16,7 @@ use crate::{
         instance::{ExportEntry, ExportTarget, InstanceId},
         vtask::VisualTaskId,
     },
-    managers::{vtask::Subtask, ManagerRef},
+    managers::{ManagerRef, vtask::Subtask},
 };
 
 mod curseforge_archive;

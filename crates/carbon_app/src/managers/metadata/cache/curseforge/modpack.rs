@@ -1,6 +1,6 @@
 use crate::{
-    domain::instance::{info::CurseforgeModpack, InstanceModpackInfo},
-    managers::{metadata::cache, App},
+    domain::instance::{InstanceModpackInfo, info::CurseforgeModpack},
+    managers::{App, metadata::cache},
 };
 use carbon_platforms::curseforge::filters::{ModFileParameters, ModParameters};
 use carbon_repos::db;

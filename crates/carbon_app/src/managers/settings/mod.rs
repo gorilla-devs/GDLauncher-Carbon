@@ -1,7 +1,7 @@
 use self::terms_and_privacy::TermsAndPrivacy;
 use super::ManagerRef;
 use crate::api::{keys::settings::*, settings::FESettingsUpdate};
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use carbon_platforms::{ModChannelWithUsage, ModPlatform};
 use carbon_repos::db::app_configuration::{self, hashed_email_accepted, last_app_version};
 use chrono::Utc;

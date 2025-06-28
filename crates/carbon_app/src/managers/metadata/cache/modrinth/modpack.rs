@@ -1,9 +1,9 @@
 use crate::{
     domain::instance::{
-        info::{CurseforgeModpack, ModrinthModpack},
         InstanceModpackInfo,
+        info::{CurseforgeModpack, ModrinthModpack},
     },
-    managers::{metadata::cache, App},
+    managers::{App, metadata::cache},
 };
 use carbon_platforms::{
     curseforge::filters::{ModFileParameters, ModParameters},

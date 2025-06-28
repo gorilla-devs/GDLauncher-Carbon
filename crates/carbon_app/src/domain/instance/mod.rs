@@ -112,10 +112,19 @@ pub enum AddonType {
 
 impl AddonType {
     pub fn all() -> Vec<Self> {
-        vec![Self::Mods, Self::ResourcePacks, Self::Shaders, Self::DataPacks, Self::Worlds]
+        vec![
+            Self::Mods,
+            Self::ResourcePacks,
+            Self::Shaders,
+            Self::DataPacks,
+            Self::Worlds,
+        ]
     }
-    
-    pub fn get_folder_path(&self, instance_path: &carbon_rt_path::InstancePath) -> std::path::PathBuf {
+
+    pub fn get_folder_path(
+        &self,
+        instance_path: &carbon_rt_path::InstancePath,
+    ) -> std::path::PathBuf {
         match self {
             Self::Mods => instance_path.get_mods_path(),
             Self::ResourcePacks => instance_path.get_resourcepacks_path(),
@@ -124,7 +133,7 @@ impl AddonType {
             Self::Worlds => instance_path.get_saves_path(),
         }
     }
-    
+
     pub fn to_db_string(&self) -> &'static str {
         match self {
             Self::Mods => "mods",
@@ -134,7 +143,7 @@ impl AddonType {
             Self::Worlds => "worlds",
         }
     }
-    
+
     pub fn from_db_string(s: &str) -> Option<Self> {
         match s {
             "mods" => Some(Self::Mods),

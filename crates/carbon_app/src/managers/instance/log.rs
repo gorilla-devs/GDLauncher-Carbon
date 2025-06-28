@@ -438,7 +438,11 @@ impl ManagerRef<'_, InstanceManager> {
 }
 
 pub fn format_message_as_log4j_event(message: &str) -> String {
-    format!("<log4j:Event logger=\"GDLAUNCHER\" timestamp=\"{}\" level=\"INFO\" thread=\"N/A\">\n\t<log4j:Message><![CDATA[{}]]></log4j:Message>\n</log4j:Event>\n", Utc::now().timestamp_millis(), message)
+    format!(
+        "<log4j:Event logger=\"GDLAUNCHER\" timestamp=\"{}\" level=\"INFO\" thread=\"N/A\">\n\t<log4j:Message><![CDATA[{}]]></log4j:Message>\n</log4j:Event>\n",
+        Utc::now().timestamp_millis(),
+        message
+    )
 }
 
 pub struct LogProcessor<'a> {

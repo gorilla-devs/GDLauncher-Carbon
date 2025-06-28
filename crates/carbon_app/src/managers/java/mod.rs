@@ -10,7 +10,7 @@ use crate::{
         instance::info::StandardVersion,
         java::{
             Java, JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaProfile, JavaVendor,
-            SystemJavaProfileName, SYSTEM_JAVA_PROFILE_NAME_PREFIX,
+            SYSTEM_JAVA_PROFILE_NAME_PREFIX, SystemJavaProfileName,
         },
     },
     managers::java::java_checker::RealJavaChecker,
@@ -18,7 +18,7 @@ use crate::{
 use anyhow::bail;
 use carbon_repos::{
     db::PrismaClient,
-    pcr::{prisma_errors::query_engine::UniqueKeyViolation, QueryError},
+    pcr::{QueryError, prisma_errors::query_engine::UniqueKeyViolation},
 };
 use std::{
     collections::HashMap,
@@ -26,7 +26,7 @@ use std::{
     sync::Arc,
 };
 use strum::IntoEnumIterator;
-use tokio::sync::{watch, Mutex};
+use tokio::sync::{Mutex, watch};
 use tracing::{debug, error, trace};
 
 mod constants;

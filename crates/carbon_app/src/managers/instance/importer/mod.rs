@@ -3,14 +3,14 @@ use std::{path::PathBuf, sync::Arc};
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
-use tokio::sync::{watch, RwLock};
+use tokio::sync::{RwLock, watch};
 use tracing::{debug, trace};
 
 use crate::{
     api::keys::instance::*,
     api::translation::Translation,
     domain::vtask::VisualTaskId,
-    managers::{modplatforms::curseforge::CurseForge, AppInner, ManagerRef},
+    managers::{AppInner, ManagerRef, modplatforms::curseforge::CurseForge},
 };
 
 use self::{
@@ -18,7 +18,7 @@ use self::{
     legacy_gdlauncher::LegacyGDLauncherImporter, modrinth_archive::ModrinthArchiveImporter,
 };
 
-use super::{export::InstanceExportManager, InstanceManager};
+use super::{InstanceManager, export::InstanceExportManager};
 
 mod curseforge;
 mod curseforge_archive;

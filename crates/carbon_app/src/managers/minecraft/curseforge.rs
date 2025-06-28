@@ -1,6 +1,6 @@
+use crate::managers::App;
 use crate::managers::instance::modpack::packinfo::PackInfo;
 use crate::managers::vtask::Subtask;
-use crate::managers::App;
 use anyhow::Context;
 use carbon_net::{DownloadOptions, Downloadable, Progress};
 use carbon_platforms::curseforge::filters::{ModsParameters, ModsParametersBody};

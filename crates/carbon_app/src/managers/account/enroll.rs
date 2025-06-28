@@ -1,8 +1,8 @@
-use crate::api::{update_core_module_status, CoreModuleStatus};
+use crate::api::{CoreModuleStatus, update_core_module_status};
 
 use super::api::{
-    get_profile, DeviceCode, DeviceCodeExpiredError, FullAccount, GetProfileError, McAccount,
-    McAuth, McEntitlementMissingError, MsAuth, XboxAuth, XboxError,
+    DeviceCode, DeviceCodeExpiredError, FullAccount, GetProfileError, McAccount, McAuth,
+    McEntitlementMissingError, MsAuth, XboxAuth, XboxError, get_profile,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;

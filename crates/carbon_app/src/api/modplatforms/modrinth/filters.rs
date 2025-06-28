@@ -70,7 +70,10 @@ impl FromStr for MRFESearchFacet {
             "versions" => Ok(MRFESearchFacet::Version(value.to_string())),
             "license" => Ok(MRFESearchFacet::License(value.to_string())),
             "project_type" => Ok(MRFESearchFacet::ProjectType(value.to_string())),
-            _ => Err(anyhow!("Invalid facet type `{}`. Expected one of `categories`, `versions`, `license`, `project_type`", facet_type))
+            _ => Err(anyhow!(
+                "Invalid facet type `{}`. Expected one of `categories`, `versions`, `license`, `project_type`",
+                facet_type
+            )),
         }
     }
 }

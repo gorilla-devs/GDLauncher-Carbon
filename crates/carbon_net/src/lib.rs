@@ -2,7 +2,7 @@ use md5::Digest as Md5Digest;
 use md5::Md5;
 use reqwest::Client;
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
-use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
+use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
 use sha1::Sha1;
 use sha2::Sha256;
 use std::collections::HashMap;

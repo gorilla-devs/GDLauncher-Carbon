@@ -8,7 +8,7 @@ use crate::domain::java::{JavaArch, JavaComponent, JavaComponentType, JavaOs, Ja
 
 use super::{
     parser::parse_cmd_output_java,
-    utils::{locate_java_check_class, JAVA_CHECK_APP_NAME},
+    utils::{JAVA_CHECK_APP_NAME, locate_java_check_class},
 };
 
 #[async_trait::async_trait]

@@ -59,7 +59,7 @@ mod test {
     use std::collections::HashSet;
 
     use crate::{
-        domain::instance::{info, ExploreEntry, ExploreEntryType},
+        domain::instance::{ExploreEntry, ExploreEntryType, info},
         managers::instance::InstanceVersionSource,
     };
 

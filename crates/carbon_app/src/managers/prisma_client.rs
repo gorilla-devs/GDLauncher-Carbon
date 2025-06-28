@@ -201,11 +201,11 @@ async fn seed_init_db(db_client: &PrismaClient, gdl_base_api: String) -> Result<
             }
 
             tracing::info!(
-                    "Should empty tos_privacy: {}, latest tos_privacy checksum: {}, current tos_privacy checksum: {:?}",
-                    should_empty_tos_privacy,
-                    latest_tos_privacy_checksum,
-                    app_config.terms_and_privacy_accepted_checksum
-                );
+                "Should empty tos_privacy: {}, latest tos_privacy checksum: {}, current tos_privacy checksum: {:?}",
+                should_empty_tos_privacy,
+                latest_tos_privacy_checksum,
+                app_config.terms_and_privacy_accepted_checksum
+            );
 
             if should_empty_tos_privacy {
                 updates.push(app_configuration::terms_and_privacy_accepted::set(false));

@@ -7,27 +7,26 @@ use crate::domain::instance::{self as domain, GameLogId, InstanceId};
 use crate::domain::java::{JavaComponent, JavaComponentType, SystemJavaProfileName};
 use crate::domain::metrics::GDLMetricsEvent;
 use crate::domain::vtask::VisualTaskId;
+use crate::managers::AppInner;
 use crate::managers::instance::log::GameLog;
-use crate::managers::instance::modpack::{packinfo, PackVersionFile};
+use crate::managers::instance::modpack::{PackVersionFile, packinfo};
 use crate::managers::instance::schema::make_instance_config;
 use crate::managers::java::java_checker::{JavaChecker, RealJavaChecker};
 use crate::managers::java::managed::Step;
-use crate::managers::minecraft::assets::{get_assets_dir, AssetsDir};
+use crate::managers::minecraft::assets::{AssetsDir, get_assets_dir};
 use crate::managers::minecraft::modrinth;
 use crate::managers::modplatforms::curseforge::convert_cf_version_to_standard_version;
 use crate::managers::modplatforms::modrinth::convert_mr_version_to_standard_version;
 use crate::managers::vtask::Subtask;
-use crate::managers::AppInner;
 use crate::{
     domain::instance::info::{GameVersion, ModLoader, ModLoaderType},
     managers::{
-        self,
+        self, ManagerRef,
         account::FullAccount,
         vtask::{NonFailedDismissError, TaskState, VisualTask},
-        ManagerRef,
     },
 };
-use anyhow::{anyhow, bail, Context};
+use anyhow::{Context, anyhow, bail};
 use carbon_net::{DownloadOptions, Downloadable};
 use carbon_parsing::log::{LogParser, ParsedItem};
 use chrono::{DateTime, Local, Utc};
@@ -43,7 +42,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use tokio::sync::{watch, Mutex, Semaphore};
+use tokio::sync::{Mutex, Semaphore, watch};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio::{io::AsyncReadExt, sync::mpsc};

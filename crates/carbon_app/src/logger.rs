@@ -2,7 +2,7 @@ use std::path::Path;
 
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{
-    prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter,
+    EnvFilter, prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt,
 };
 
 fn generate_logs_filters() -> String {

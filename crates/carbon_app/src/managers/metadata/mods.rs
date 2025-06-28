@@ -741,11 +741,11 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
 mod test {
     use std::io::{Cursor, Write};
 
-    use zip::{write::FileOptions, CompressionMethod, ZipWriter};
+    use zip::{CompressionMethod, ZipWriter, write::FileOptions};
 
     use crate::domain::instance::info::ModLoaderType;
 
-    use super::{parse_metadata, ModFileMetadata};
+    use super::{ModFileMetadata, parse_metadata};
 
     pub fn parsemeta(path: &str, content: &str) -> anyhow::Result<Option<ModFileMetadata>> {
         // write meta zip

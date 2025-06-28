@@ -9,8 +9,8 @@ use carbon_repos::db::read_filters::StringFilter;
 use carbon_repos::db::{mod_file_cache as fcdb, mod_metadata as metadb};
 use carbon_rt_path::InstancesPath;
 use curseforge::CurseforgeModCacher;
-use futures::join;
 use futures::Future;
+use futures::join;
 use image::ImageFormat;
 use itertools::Itertools;
 use md5::Digest;
@@ -26,18 +26,18 @@ use std::io::Cursor;
 use std::io::Read;
 use std::io::SeekFrom;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::atomic;
 use std::sync::atomic::AtomicI32;
-use std::sync::Arc;
 use std::thread::available_parallelism;
 use std::usize;
 use tokio::io::AsyncSeekExt;
-use tokio::sync::mpsc;
-use tokio::sync::oneshot;
-use tokio::sync::watch;
 use tokio::sync::RwLock;
 use tokio::sync::RwLockReadGuard;
 use tokio::sync::Semaphore;
+use tokio::sync::mpsc;
+use tokio::sync::oneshot;
+use tokio::sync::watch;
 use tracing::debug;
 use tracing::error;
 use tracing::info;
@@ -1188,15 +1188,14 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                 return Ok(());
             };
 
-            let instance_path = InstancesPath::subpath()
-                .get_instance_path(&instance.shortpath);
+            let instance_path = InstancesPath::subpath().get_instance_path(&instance.shortpath);
 
             drop(instances);
 
             let root_path = app.settings_manager().runtime_path.get_root().to_path();
-            
+
             let mut modpaths = HashMap::<String, (bool, u64, String)>::new();
-            
+
             // Scan all addon types
             for addon_type in crate::domain::instance::AddonType::all() {
                 let addon_subpath = addon_type.get_folder_path(&instance_path);
@@ -1205,7 +1204,9 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                 pathbuf.push(&addon_subpath);
 
                 if !pathbuf.is_dir() {
-                    trace!("skipping {addon_type:?} folder for instance {instance_id} as it does not exist");
+                    trace!(
+                        "skipping {addon_type:?} folder for instance {instance_id} as it does not exist"
+                    );
                     continue;
                 }
 
@@ -1241,16 +1242,23 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                         if !metadata.is_dir() {
                             continue;
                         }
-                        
+
                         trace!("tracking world `{utf8_name}` for instance {instance_id}");
                         modpaths.insert(
                             utf8_name.to_string(),
                             (true, metadata.len(), addon_type.to_db_string().to_string()),
                         );
                     } else {
-                        let allowed_base_ext = allowed_extensions.iter().any(|&ext| utf8_name.ends_with(ext));
-                        let disabled_extensions: Vec<String> = allowed_extensions.iter().map(|ext| format!("{}.disabled", ext)).collect();
-                        let allowed_disabled_ext = disabled_extensions.iter().any(|ext| utf8_name.ends_with(ext));
+                        let allowed_base_ext = allowed_extensions
+                            .iter()
+                            .any(|&ext| utf8_name.ends_with(ext));
+                        let disabled_extensions: Vec<String> = allowed_extensions
+                            .iter()
+                            .map(|ext| format!("{}.disabled", ext))
+                            .collect();
+                        let allowed_disabled_ext = disabled_extensions
+                            .iter()
+                            .any(|ext| utf8_name.ends_with(ext));
 
                         if !allowed_base_ext && !allowed_disabled_ext {
                             continue;
@@ -1269,7 +1277,11 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                         trace!("tracking {addon_type:?} `{utf8_name}` for instance {instance_id}");
                         modpaths.insert(
                             utf8_name.to_string(),
-                            (!allowed_disabled_ext, metadata.len(), addon_type.to_db_string().to_string()),
+                            (
+                                !allowed_disabled_ext,
+                                metadata.len(),
+                                addon_type.to_db_string().to_string(),
+                            ),
                         );
                     }
                 }
@@ -1283,7 +1295,10 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                 for entry in cached_entries {
                     if let Some((enabled, real_size, addon_type)) = modpaths.get(&entry.filename) {
                         // Check if the entry is up to date (size, enabled status, and addon type match)
-                        if *real_size == entry.filesize as u64 && *enabled == entry.enabled && *addon_type == entry.addon_type {
+                        if *real_size == entry.filesize as u64
+                            && *enabled == entry.enabled
+                            && *addon_type == entry.addon_type
+                        {
                             modpaths.remove(&entry.filename);
                             // trace!(
                             //     "up to data metadata entry for mod `{}`, skipping",
@@ -1320,36 +1335,46 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
 
             let rate_limiter = Arc::new(tokio::sync::Semaphore::new(default_parallelism_approx));
 
-            let entry_futures = modpaths.into_iter().map(|(filename, (enabled, _, addon_type_str))| {
-                let instance_path = instance_path.clone();
-                let root_path = root_path.clone();
-                let update_notifier = &update_notifier;
+            let entry_futures =
+                modpaths
+                    .into_iter()
+                    .map(|(filename, (enabled, _, addon_type_str))| {
+                        let instance_path = instance_path.clone();
+                        let root_path = root_path.clone();
+                        let update_notifier = &update_notifier;
 
-                let rate_limiter = Arc::clone(&rate_limiter);
+                        let rate_limiter = Arc::clone(&rate_limiter);
 
-                async move {
-                    let _permit = rate_limiter.acquire().await.expect("rate limiter");
+                        async move {
+                            let _permit = rate_limiter.acquire().await.expect("rate limiter");
 
-                    // Determine the addon type and construct the appropriate path
-                    let addon_type = crate::domain::instance::AddonType::from_db_string(&addon_type_str)
-                        .unwrap_or(crate::domain::instance::AddonType::Mods);
-                    
-                    let addon_subpath = addon_type.get_folder_path(&instance_path);
-                    let mut pathbuf = PathBuf::new();
-                    pathbuf.push(&root_path);
-                    pathbuf.push(&addon_subpath);
+                            // Determine the addon type and construct the appropriate path
+                            let addon_type =
+                                crate::domain::instance::AddonType::from_db_string(&addon_type_str)
+                                    .unwrap_or(crate::domain::instance::AddonType::Mods);
 
-                    app.meta_cache_manager()
-                        .cache_mod_file_unchecked(instance_id, &pathbuf, filename, enabled, addon_type_str)
-                        .await?;
+                            let addon_subpath = addon_type.get_folder_path(&instance_path);
+                            let mut pathbuf = PathBuf::new();
+                            pathbuf.push(&root_path);
+                            pathbuf.push(&addon_subpath);
 
-                    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                            app.meta_cache_manager()
+                                .cache_mod_file_unchecked(
+                                    instance_id,
+                                    &pathbuf,
+                                    filename,
+                                    enabled,
+                                    addon_type_str,
+                                )
+                                .await?;
 
-                    update_notifier.send(instance_id);
+                            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
-                    Ok(())
-                }
-            });
+                            update_notifier.send(instance_id);
+
+                            Ok(())
+                        }
+                    });
 
             let r = futures::future::join_all(entry_futures)
                 .await

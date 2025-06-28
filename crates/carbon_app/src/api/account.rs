@@ -7,10 +7,10 @@ use crate::managers::account::gdl_account::{
     GDLAccountStatus, GDLUser, RegisterAccountBody, RequestGDLAccountDeletionError,
     RequestNewEmailChangeError, RequestNewVerificationTokenError,
 };
-use crate::managers::{account, App, AppInner};
+use crate::managers::{App, AppInner, account};
 use axum::extract::{Query, State};
 use chrono::{DateTime, Utc};
-use hyper::{header, StatusCode};
+use hyper::{StatusCode, header};
 use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
 use specta::Type;
@@ -307,8 +307,8 @@ impl From<Option<domain::StatusFlags>> for StatusFlags {
 
 impl From<&account::EnrollmentStatus> for Result<EnrollmentStatus, FeError> {
     fn from(value: &account::EnrollmentStatus) -> Self {
-        use account::EnrollmentStatus as BE;
         use EnrollmentStatus as Api;
+        use account::EnrollmentStatus as BE;
 
         Ok(match value {
             BE::RefreshingMSAuth => Api::RefreshingMSAuth,

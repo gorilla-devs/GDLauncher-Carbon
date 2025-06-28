@@ -15,7 +15,7 @@ use std::{
 };
 use strum::IntoEnumIterator;
 use tokio::{
-    sync::{watch::Sender, RwLock},
+    sync::{RwLock, watch::Sender},
     task::spawn_blocking,
 };
 use tracing::{instrument, trace};

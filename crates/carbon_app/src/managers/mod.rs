@@ -10,8 +10,8 @@ use tracing::error;
 
 pub use app::AppInner;
 
-use crate::api::keys::Key;
 use crate::api::InvalidationEvent;
+use crate::api::keys::Key;
 use crate::managers::settings::SettingsManager;
 use carbon_repos::db::PrismaClient;
 
@@ -50,7 +50,7 @@ mod app {
     use tracing::{error, info};
 
     use crate::{
-        api::{update_core_module_status, CoreModuleStatus},
+        api::{CoreModuleStatus, update_core_module_status},
         cache_middleware, domain,
         iridium_client::get_client,
     };

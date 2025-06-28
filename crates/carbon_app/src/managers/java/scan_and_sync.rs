@@ -2,7 +2,7 @@ use super::{discovery::Discovery, java_checker::JavaChecker};
 use crate::domain::java::{
     JavaArch, JavaComponent, JavaComponentType, JavaVersion, SystemJavaProfileName,
 };
-use carbon_repos::db::{read_filters::StringFilter, PrismaClient};
+use carbon_repos::db::{PrismaClient, read_filters::StringFilter};
 use std::{path::PathBuf, sync::Arc};
 use strum::IntoEnumIterator;
 use tracing::{info, trace, warn};
@@ -462,13 +462,13 @@ mod test {
             JavaArch, JavaComponent, JavaComponentType, JavaOs, JavaVersion, SystemJavaProfileName,
         },
         managers::java::{
+            JavaManager,
             discovery::MockDiscovery,
             java_checker::{MockJavaChecker, MockJavaCheckerInvalid},
             scan_and_sync::{
                 scan_and_sync_custom, scan_and_sync_local, scan_and_sync_managed,
                 sync_system_java_profiles, upsert_java_component_to_db,
             },
-            JavaManager,
         },
         setup_managers_for_test,
     };
