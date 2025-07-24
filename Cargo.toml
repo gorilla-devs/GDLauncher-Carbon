@@ -112,7 +112,7 @@ strip-ansi-escapes = "0.2.1"
 trash = "5.2.2"
 uuid = "1.16.0"
 winreg = "0.55.0"
-zip = "2.6.1"
+zip = "2.4.2"
 tempfile = "3.19.1"
 sentry = { version = "0.34.0", features = [
   "panic",

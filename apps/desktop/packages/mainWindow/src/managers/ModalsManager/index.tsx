@@ -130,6 +130,14 @@ const getDefaultModals = (t: (key: string) => string) => ({
   changeGDLAccountRecoveryEmail: {
     component: lazy(() => import("./modals/ChangeGDLAccountRecoveryEmail")),
     title: t("modals.change_recovery_email")
+  },
+  modDetails: {
+    component: lazy(() => import("./modals/ModDetails")),
+    title: t("modals.mod_details")
+  },
+  confirmCacheClear: {
+    component: lazy(() => import("./modals/ConfirmCacheClear")),
+    title: t("modals.confirm_cache_clear")
   }
 })
 

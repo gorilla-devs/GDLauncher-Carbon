@@ -1,18 +1,20 @@
 import {
   Badge,
-  Button,
   Checkbox,
   Switch,
   Tooltip,
   TooltipContent,
-  TooltipTrigger
+  TooltipTrigger,
+  Spinner
 } from "@gd/ui"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
-import { Show } from "solid-js"
+import { Show, createSignal } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import { createColumnHelper } from "@tanstack/solid-table"
 import { Mod as ModType } from "@gd/core_module/bindings"
+import CopyIcon from "@/components/CopyIcon"
+import { getModImageUrl } from "@/utils/instances"
 
 interface ColumnConfig {
   isInstanceLocked: () => boolean
@@ -22,6 +24,8 @@ interface ColumnConfig {
   onToggleMod: (mod: ModType) => Promise<void>
   onUpdateMod: (mod: ModType) => Promise<void>
   onDeleteMod: (mod: ModType) => Promise<void>
+  isModUpdating: (modId: string) => boolean
+  instanceId: number
 }
 
 export const createAddonColumns = (config: ColumnConfig) => {
@@ -32,7 +36,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
     // Selection column
     columnHelper.display({
       id: "select",
-      size: 40,
+      size: 32,
       header: () => {
         const isAllSelected = () =>
           config.selectedCount() > 0 &&
@@ -45,8 +49,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
           <Checkbox
             checked={isAllSelected()}
             indeterminate={isSomeSelected()}
-            onChange={(checked) => {
-              console.log("Header checkbox onChange:", checked)
+            onChange={(_checked) => {
               config.onSelectAll()
             }}
           />
@@ -73,17 +76,93 @@ export const createAddonColumns = (config: ColumnConfig) => {
       enableHiding: false
     }),
 
+    // Icon column
+    columnHelper.display({
+      id: "icon",
+      size: 48,
+      header: "",
+      cell: (props) => {
+        const mod = props.row.original
+
+        const getModImage = () => {
+          if (mod.curseforge?.has_image) {
+            return getModImageUrl(
+              config.instanceId.toString(),
+              mod.id,
+              "curseforge"
+            )
+          } else if (mod.modrinth?.has_image) {
+            return getModImageUrl(
+              config.instanceId.toString(),
+              mod.id,
+              "modrinth"
+            )
+          } else if (mod.metadata?.has_image) {
+            return getModImageUrl(
+              config.instanceId.toString(),
+              mod.id,
+              "metadata"
+            )
+          }
+          return null
+        }
+
+        const imageUrl = getModImage()
+
+        return (
+          <div class="flex items-center justify-center">
+            <Show
+              when={imageUrl}
+              fallback={
+                <div class="h-8 w-8 rounded bg-darkSlate-600 flex items-center justify-center">
+                  <div class="i-ri:file-3-line text-lightSlate-400 text-lg" />
+                </div>
+              }
+            >
+              <div class="h-8 w-8 rounded overflow-hidden flex items-center justify-center bg-darkSlate-600">
+                <img
+                  src={imageUrl!}
+                  class="h-full w-full object-cover"
+                  alt={mod.metadata?.name || mod.filename}
+                  loading="lazy"
+                />
+              </div>
+            </Show>
+          </div>
+        )
+      },
+      enableSorting: false,
+      enableHiding: false
+    }),
+
     // Filename column
     columnHelper.accessor("filename", {
       header: t("instance.table.filename"),
-      size: 400,
       cell: (info) => {
         const mod = info.row.original
         const displayName = mod.metadata?.name || mod.filename
+        const [showCopy, setShowCopy] = createSignal(false)
+
         return (
-          <div class="flex items-center gap-2">
-            <div class="flex flex-col">
-              <span class="font-medium">{displayName}</span>
+          <div
+            class="flex items-center gap-2 group"
+            onMouseEnter={() => setShowCopy(true)}
+            onMouseLeave={() => setShowCopy(false)}
+          >
+            <div class="flex flex-col flex-1">
+              <div class="flex items-center gap-2">
+                <span class="font-medium">{displayName}</span>
+                <div
+                  class="transition-opacity duration-200"
+                  classList={{
+                    "opacity-0 invisible": !showCopy(),
+                    "opacity-100 visible": showCopy()
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                >
+                  <CopyIcon text={displayName} />
+                </div>
+              </div>
               <Show when={mod.metadata?.name}>
                 <span class="text-sm text-lightSlate-600">{mod.filename}</span>
               </Show>
@@ -97,7 +176,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
     columnHelper.display({
       id: "type",
       header: t("instance.table.type"),
-      size: 100,
+      size: 104,
       cell: (props) => {
         const mod = props.row.original
         return (
@@ -112,35 +191,16 @@ export const createAddonColumns = (config: ColumnConfig) => {
     columnHelper.display({
       id: "platform",
       header: t("instance.table.platform"),
-      size: 80,
+      size: 78,
       cell: (props) => {
         const mod = props.row.original
-        const platforms = []
-
-        if (mod.curseforge) {
-          platforms.push(
-            <Tooltip>
-              <TooltipTrigger>
-                <img src={CurseforgeLogo} class="h-4 w-4" alt="CurseForge" />
-              </TooltipTrigger>
-              <TooltipContent>CurseForge</TooltipContent>
-            </Tooltip>
-          )
-        }
-        if (mod.modrinth) {
-          platforms.push(
-            <Tooltip>
-              <TooltipTrigger>
-                <img src={ModrinthLogo} class="h-4 w-4" alt="Modrinth" />
-              </TooltipTrigger>
-              <TooltipContent>Modrinth</TooltipContent>
-            </Tooltip>
-          )
-        }
+        const hasCurseforge = !!mod.curseforge
+        const hasModrinth = !!mod.modrinth
+        const hasBoth = hasCurseforge && hasModrinth
 
         // If no platforms, show local
-        if (platforms.length === 0) {
-          platforms.push(
+        if (!hasCurseforge && !hasModrinth) {
+          return (
             <Tooltip>
               <TooltipTrigger>
                 <div class="i-ri:folder-fill text-lg text-gray-500" />
@@ -150,14 +210,120 @@ export const createAddonColumns = (config: ColumnConfig) => {
           )
         }
 
-        return <div class="flex flex-wrap gap-1">{platforms}</div>
+        // Single platform
+        if (!hasBoth) {
+          const platform = hasCurseforge ? "curseforge" : "modrinth"
+          const logo = hasCurseforge ? CurseforgeLogo : ModrinthLogo
+          return (
+            <Tooltip>
+              <TooltipTrigger>
+                <img
+                  src={logo}
+                  class="h-4 w-4"
+                  alt={t(`platforms.${platform}`)}
+                />
+              </TooltipTrigger>
+              <TooltipContent>{t(`platforms.${platform}`)}</TooltipContent>
+            </Tooltip>
+          )
+        }
+
+        // Both platforms - diagonal arrangement
+        return (
+          <div class="relative h-6 w-6">
+            <Tooltip>
+              <TooltipTrigger>
+                <div class="absolute -top-0.5 -left-0.5 h-4 w-4 rounded-full bg-darkSlate-800 p-0.5">
+                  <img
+                    src={CurseforgeLogo}
+                    class="h-full w-full"
+                    alt={t("platforms.curseforge")}
+                  />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>{t("platforms.curseforge")}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger>
+                <div class="absolute bottom-0.5 right-0.5 h-4 w-4 rounded-full bg-darkSlate-800 p-0.5 shadow-sm">
+                  <img
+                    src={ModrinthLogo}
+                    class="h-full w-full"
+                    alt={t("platforms.modrinth")}
+                  />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>{t("platforms.modrinth")}</TooltipContent>
+            </Tooltip>
+          </div>
+        )
+      }
+    }),
+
+    // Update Available column
+    columnHelper.accessor("has_update", {
+      header: t("instance.table.update"),
+      size: 120,
+      cell: (props) => {
+        const mod = props.row.original
+        const isUpdating = () => config.isModUpdating(mod.id)
+
+        const handleUpdate = async () => {
+          if (isUpdating()) return
+          await config.onUpdateMod(mod)
+        }
+
+        return (
+          <Show
+            when={mod.has_update || isUpdating()}
+            fallback={<span class="text-lightSlate-600">-</span>}
+          >
+            <Tooltip>
+              <TooltipTrigger>
+                <Badge
+                  variant={isUpdating() ? "secondary" : "success"}
+                  class="flex items-center gap-1 transition-opacity"
+                  classList={{
+                    "cursor-pointer hover:opacity-80": !isUpdating(),
+                    "opacity-70 cursor-not-allowed": isUpdating()
+                  }}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onClick={handleUpdate}
+                >
+                  <Show
+                    when={!isUpdating()}
+                    fallback={<Spinner class="h-3 w-3" />}
+                  >
+                    <div class="i-ri:download-2-fill text-xs" />
+                  </Show>
+                  <Show
+                    when={isUpdating()}
+                    fallback={
+                      <Trans key="modals.mod_details.update_available" />
+                    }
+                  >
+                    <Trans key="updating" />
+                  </Show>
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent>
+                <Show
+                  when={isUpdating()}
+                  fallback={<Trans key="instance.update_mod" />}
+                >
+                  <Trans key="updating" />
+                </Show>
+              </TooltipContent>
+            </Tooltip>
+          </Show>
+        )
       }
     }),
 
     // Status/Enable column
     columnHelper.accessor("enabled", {
       header: t("instance.table.status"),
-      size: 80,
+      size: 100,
       cell: (props) => {
         const mod = props.row.original
         return (
@@ -174,62 +340,15 @@ export const createAddonColumns = (config: ColumnConfig) => {
               </Tooltip>
             }
           >
-            <Switch
-              checked={mod.enabled}
-              onChange={() => config.onToggleMod(mod)}
-            />
+            <div onMouseDown={(e) => e.stopPropagation()}>
+              <Switch
+                checked={mod.enabled}
+                onChange={() => config.onToggleMod(mod)}
+              />
+            </div>
           </Show>
         )
       }
-    }),
-
-    // Actions column
-    columnHelper.display({
-      id: "actions",
-      header: t("instance.table.actions"),
-      size: 100,
-      cell: (props) => {
-        const mod = props.row.original
-        return (
-          <div class="flex items-center gap-2">
-            <Show when={mod.has_update}>
-              <Tooltip>
-                <TooltipTrigger>
-                  <Button
-                    size="small"
-                    disabled={config.isInstanceLocked()}
-                    onClick={() => config.onUpdateMod(mod)}
-                  >
-                    <div class="i-ri:download-2-fill" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {config.isInstanceLocked()
-                    ? t("instance.locked_cannot_apply_changes")
-                    : t("instance.update_mod")}
-                </TooltipContent>
-              </Tooltip>
-            </Show>
-            <Tooltip>
-              <TooltipTrigger>
-                <Button
-                  size="small"
-                  disabled={config.isInstanceLocked()}
-                  onClick={() => config.onDeleteMod(mod)}
-                >
-                  <div class="i-ri:delete-bin-2-fill" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                {config.isInstanceLocked()
-                  ? t("instance.locked_cannot_apply_changes")
-                  : t("instance.delete_mod")}
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        )
-      },
-      enableSorting: false
     })
   ]
 }

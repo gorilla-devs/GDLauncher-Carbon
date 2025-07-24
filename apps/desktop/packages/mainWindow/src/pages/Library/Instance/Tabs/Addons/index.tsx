@@ -1,16 +1,16 @@
 import { For, Show, createMemo } from "solid-js"
-import { useRouteData } from "@solidjs/router"
+import { useRouteData, useParams } from "@solidjs/router"
 import fetchData from "../../instance.data"
 import {
   AddonFilters,
   AddonTable,
-  BulkActions,
   NoAddons,
   createAddonColumns
 } from "./components"
 import { useAddonData, useAddonMutations } from "./hooks"
 const Addons = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData()
+  const params = useParams()
   let tableInstance: any = null
 
   // Data and state management
@@ -21,7 +21,10 @@ const Addons = () => {
     optimisticToggleAddon: addonData.optimisticToggleAddon,
     optimisticDeleteAddon: addonData.optimisticDeleteAddon,
     optimisticDeleteAddons: addonData.optimisticDeleteAddons,
-    rollbackToServerState: addonData.rollbackToServerState
+    optimisticUpdateAddon: addonData.optimisticUpdateAddon,
+    rollbackToServerState: addonData.rollbackToServerState,
+    startUpdatingMod: addonData.startUpdatingMod,
+    stopUpdatingMod: addonData.stopUpdatingMod
   })
 
   const isInstanceLocked = () =>
@@ -39,6 +42,11 @@ const Addons = () => {
   })
 
   const getSelectedRows = () => selectedRows()
+
+  // Calculate update counts
+  const updateCount = createMemo(() => {
+    return addonData.filteredAddons().filter((addon) => addon.has_update).length
+  })
 
   // Column configuration
   const columns = createAddonColumns({
@@ -61,7 +69,9 @@ const Addons = () => {
     },
     onToggleMod: addonMutations.handleToggleMod,
     onUpdateMod: addonMutations.handleUpdateMod,
-    onDeleteMod: addonMutations.handleDeleteMod
+    onDeleteMod: addonMutations.handleDeleteMod,
+    isModUpdating: addonData.isModUpdating,
+    instanceId: parseInt(params.id, 10)
   })
 
   return (
@@ -77,6 +87,10 @@ const Addons = () => {
         isInstanceLocked={isInstanceLocked}
         onAddAddons={() => addonMutations.gotoSearchPage("mods")}
         onOpenFolder={addonMutations.handleOpenFolder}
+        onUpdateAll={() =>
+          addonMutations.handleUpdateAll(addonData.filteredAddons())
+        }
+        updateCount={updateCount}
       />
 
       {/* Loading state */}
@@ -100,27 +114,6 @@ const Addons = () => {
             />
           }
         >
-          {/* Sticky BulkActions Container */}
-          <div class="sticky top-[115px] z-[12] bg-darkSlate-800 px-6">
-            <BulkActions
-              class="pt-4"
-              selectedRowsLength={() => getSelectedRows().length}
-              isInstanceLocked={isInstanceLocked}
-              onDeleteSelected={async () => {
-                const selectedRows = getSelectedRows()
-                await addonMutations.handleDeleteSelected(selectedRows)
-                if (tableInstance) {
-                  tableInstance.toggleAllRowsSelected(false)
-                }
-              }}
-              onClearSelection={() => {
-                if (tableInstance) {
-                  tableInstance.toggleAllRowsSelected(false)
-                }
-              }}
-            />
-          </div>
-
           {/* Table */}
           <div class="px-6 pb-6">
             <AddonTable
@@ -134,9 +127,17 @@ const Addons = () => {
               setColumnVisibility={addonData.setColumnVisibility}
               rowSelection={addonData.rowSelection}
               setRowSelection={addonData.setRowSelection}
-              hasBulkActions={getSelectedRows().length > 0}
               onTableReady={(table) => {
                 tableInstance = table
+              }}
+              mutations={{
+                handleToggleMod: addonMutations.handleToggleMod,
+                handleUpdateMod: addonMutations.handleUpdateMod,
+                handleDeleteMod: addonMutations.handleDeleteMod,
+                handleDeleteSelected: addonMutations.handleDeleteSelected,
+                handleUpdateSelected: addonMutations.handleUpdateSelected,
+                handleOpenFolder: addonMutations.handleOpenFolder,
+                instanceId: parseInt(params.id, 10)
               }}
             />
           </div>

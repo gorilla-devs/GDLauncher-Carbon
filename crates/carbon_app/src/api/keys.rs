@@ -125,6 +125,7 @@ keys! {
         EXPLORE                                     = "explore";
         EXPORT                                      = "export";
         GET_MODPACK_INFO                            = "getModpackInfo";
+        GET_CACHE_STATUS                            = "getCacheStatus";
     }
 
     vtask {
@@ -138,6 +139,14 @@ keys! {
         SET_SETTINGS                                = "setSettings";
         GET_TERMS_OF_SERVICE_BODY                   = "getTermsOfServiceBody";
         GET_PRIVACY_STATEMENT_BODY                  = "getPrivacyStatementBody";
+        CLEAR_CACHE                                 = "clearCache";
+    }
+
+    cache {
+        GET_CACHE_STATUS                            = "getCacheStatus";
+        GET_CACHE_HISTORY                           = "getCacheHistory";
+        GET_CACHE_STATS                             = "getCacheStats";
+        CLEAR_CACHE_HISTORY                         = "clearCacheHistory";
     }
 
     metrics {

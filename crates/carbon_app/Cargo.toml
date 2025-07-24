@@ -38,6 +38,7 @@ carbon_macro = { path = "../carbon_macro" }
 carbon_compression = { path = "../carbon_compression" }
 carbon_net = { path = "../carbon_net" }
 carbon_scheduler = { workspace = true }
+carbon_addon_cache = { path = "../carbon_addon_cache" }
 uuid = { workspace = true }
 rusqlite = { version = "0.25.4", features = ["bundled"] }
 rusqlite_migration = "1.0.2"

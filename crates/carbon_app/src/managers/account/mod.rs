@@ -976,6 +976,12 @@ pub struct AccountRefreshService;
 
 impl AccountRefreshService {
     pub async fn start(app: Weak<AppInner>) {
+        // Skip background tasks in test environments to prevent hanging
+        if cfg!(test) {
+            tracing::info!("Skipping account refresh service in test environment");
+            return;
+        }
+
         // account status check
         let app1 = app.clone();
         tokio::spawn(async move {

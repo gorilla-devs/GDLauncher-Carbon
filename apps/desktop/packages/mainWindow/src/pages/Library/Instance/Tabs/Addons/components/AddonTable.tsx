@@ -26,9 +26,18 @@ import {
   ContextMenuTrigger,
   ContextMenuContent,
   ContextMenuItem,
-  ContextMenuSeparator
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubTrigger,
+  ContextMenuSubContent,
+  ContextMenuPortal
 } from "@gd/ui"
+import { useTransContext } from "@gd/i18n"
 import { Mod as ModType } from "@gd/core_module/bindings"
+import { createNotification } from "@gd/ui"
+import { useModal } from "@/managers/ModalsManager"
+import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
+import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 
 interface VirtualizationConfig {
   /** Fixed row height or function to get height for each row index */
@@ -55,36 +64,19 @@ interface AddonTableProps {
       | ((prev: RowSelectionState) => RowSelectionState)
   ) => void
   onTableReady?: (table: Table<ModType>) => void
-  hasBulkActions?: boolean
   /** Optional reference to scroll container, defaults to finding closest scrollable parent */
   scrollContainerRef?: HTMLElement
   /** Configuration for virtualization behavior */
   virtualizationConfig?: VirtualizationConfig
-}
-
-function throttle<T extends (...args: any[]) => any>(
-  func: T,
-  delay: number
-): (...args: Parameters<T>) => void {
-  let lastCall = 0
-  let timeout: number | null = null
-
-  return (...args: Parameters<T>) => {
-    const now = Date.now()
-
-    if (now - lastCall >= delay) {
-      lastCall = now
-      func(...args)
-    } else if (!timeout) {
-      timeout = window.setTimeout(
-        () => {
-          lastCall = Date.now()
-          func(...args)
-          timeout = null
-        },
-        delay - (now - lastCall)
-      )
-    }
+  /** Mutation handlers */
+  mutations?: {
+    handleToggleMod: (mod: ModType) => Promise<void>
+    handleUpdateMod: (mod: ModType) => Promise<void>
+    handleDeleteMod: (mod: ModType) => Promise<void>
+    handleDeleteSelected: (mods: ModType[]) => Promise<void>
+    handleUpdateSelected: (mods: ModType[]) => Promise<void>
+    handleOpenFolder: () => void
+    instanceId: number
   }
 }
 
@@ -126,11 +118,17 @@ class RowHeightCache {
 }
 
 export const AddonTable = (props: AddonTableProps) => {
+  const [t] = useTransContext()
+  const addNotification = createNotification()
+  const modalsContext = useModal()
   const [scrollTop, setScrollTop] = createSignal(0)
   const [containerHeight, setContainerHeight] = createSignal(window.innerHeight)
   let tableRef: HTMLDivElement | undefined
+  let headerRef: HTMLDivElement | undefined
   let resizeObserver: ResizeObserver | undefined
   let scrollHandlerCleanup: (() => void) | undefined
+  let autoScrollInterval: number | null = null
+  let scrollContainerRef: HTMLElement | null = null
 
   const config = props.virtualizationConfig ?? {}
   const defaultRowHeight =
@@ -353,6 +351,94 @@ export const AddonTable = (props: AddonTableProps) => {
     updatePreviewSelection(rowId)
   }
 
+  // Handle mouse leave to continue selection outside viewport
+  const handleMouseLeave = (event: MouseEvent) => {
+    if (!isDragging()) return
+
+    // Continue tracking mouse position for selection updates
+    handleMouseMove(event)
+  }
+
+  // Auto-scroll when dragging near viewport edges
+  const handleMouseMove = (event: MouseEvent) => {
+    if (!isDragging() || !scrollContainerRef) return
+
+    const EDGE_THRESHOLD = 80 // Distance from edge to start scrolling
+    const SCROLL_SPEED = 15 // Max pixels per frame
+    const HEADER_OFFSET = 115 // Account for sticky header
+
+    const containerRect = scrollContainerRef.getBoundingClientRect()
+    const mouseY = event.clientY
+
+    // Clear existing interval
+    if (autoScrollInterval) {
+      clearInterval(autoScrollInterval)
+      autoScrollInterval = null
+    }
+
+    // Calculate effective boundaries accounting for sticky header
+    const effectiveTop = Math.max(containerRect.top, HEADER_OFFSET)
+    const effectiveBottom = containerRect.bottom
+
+    // Check if near top edge or above container
+    if (mouseY < effectiveTop + EDGE_THRESHOLD) {
+      const distanceFromTop = Math.max(0, mouseY - effectiveTop)
+      const intensity =
+        1 - Math.max(0, Math.min(1, distanceFromTop / EDGE_THRESHOLD))
+
+      autoScrollInterval = window.setInterval(() => {
+        if (scrollContainerRef) {
+          const currentScroll = scrollContainerRef.scrollTop
+          scrollContainerRef.scrollTop = Math.max(
+            0,
+            currentScroll - SCROLL_SPEED * intensity
+          )
+
+          // Update selection even when outside viewport
+          updateSelectionAtPosition(mouseY)
+        }
+      }, 16) // 60fps
+    }
+    // Check if near bottom edge or below container
+    else if (mouseY > effectiveBottom - EDGE_THRESHOLD) {
+      const distanceFromBottom = Math.max(0, effectiveBottom - mouseY)
+      const intensity =
+        1 - Math.max(0, Math.min(1, distanceFromBottom / EDGE_THRESHOLD))
+
+      autoScrollInterval = window.setInterval(() => {
+        if (scrollContainerRef) {
+          const currentScroll = scrollContainerRef.scrollTop
+          const maxScroll =
+            scrollContainerRef.scrollHeight - scrollContainerRef.clientHeight
+          scrollContainerRef.scrollTop = Math.min(
+            maxScroll,
+            currentScroll + SCROLL_SPEED * intensity
+          )
+
+          // Update selection even when outside viewport
+          updateSelectionAtPosition(mouseY)
+        }
+      }, 16) // 60fps
+    }
+  }
+
+  // Update selection based on mouse Y position
+  const updateSelectionAtPosition = (mouseY: number) => {
+    if (!tableRef || !isDragging()) return
+
+    const rows = tableRef.querySelectorAll("[data-row-id]")
+    for (const row of rows) {
+      const rect = row.getBoundingClientRect()
+      if (mouseY >= rect.top && mouseY <= rect.bottom) {
+        const rowId = row.getAttribute("data-row-id")
+        if (rowId) {
+          updatePreviewSelection(rowId)
+        }
+        break
+      }
+    }
+  }
+
   const handleMouseUp = () => {
     if (!isDragging()) return
 
@@ -376,6 +462,12 @@ export const AddonTable = (props: AddonTableProps) => {
 
     document.body.style.userSelect = ""
     document.body.style.cursor = ""
+
+    // Stop auto-scrolling
+    if (autoScrollInterval) {
+      clearInterval(autoScrollInterval)
+      autoScrollInterval = null
+    }
   }
 
   // Context menu event handlers
@@ -384,18 +476,13 @@ export const AddonTable = (props: AddonTableProps) => {
       (id) => props.rowSelection()[id]
     )
 
-    // Check if the clicked row is selected
     if (!selectedRowIds.includes(rowId)) {
-      // Auto-select the right-clicked row
-      const currentSelection = props.rowSelection()
-      const newSelection = { ...currentSelection, [rowId]: true }
+      // Clear all selections and select only the right-clicked item
+      const newSelection = { [rowId]: true }
       props.setRowSelection(newSelection)
-
-      // Update context menu to include the newly selected row
-      const updatedSelectedIds = [...selectedRowIds, rowId]
-      setContextMenuSelection(new Set(updatedSelectedIds))
+      setContextMenuSelection(new Set([rowId]))
     } else {
-      // Row was already selected, use existing selection
+      // Row is already selected, keep current selection
       setContextMenuSelection(new Set(selectedRowIds))
     }
 
@@ -411,38 +498,316 @@ export const AddonTable = (props: AddonTableProps) => {
     }
   }
 
-  const getContextMenuItems = () => {
+  const getContextMenuItems = (): {
+    type: "item" | "separator" | "submenu"
+    label?: string
+    action?: () => void
+    icon?: string
+    id?: string
+    destructive?: boolean
+    disabled?: boolean
+    children?: {
+      type: "item" | "separator"
+      label?: string
+      action?: () => void
+      icon?: string
+      id?: string
+      destructive?: boolean
+      disabled?: boolean
+    }[]
+  }[] => {
     const selectedCount = contextMenuSelection().size
+    const selectedIds = Array.from(contextMenuSelection())
+    const mods = rows()
+      .filter((row) => selectedIds.includes(row.id))
+      .map((row) => row.original)
 
-    return [
-      {
-        type: "item",
-        label: `Selected ${selectedCount} item${selectedCount !== 1 ? "s" : ""}`,
-        disabled: true,
-        id: "header"
-      },
-      { type: "separator" },
-      {
-        type: "item",
-        label: "Test Action 1",
-        action: () => console.log("Action 1 on", contextMenuSelection()),
-        id: "action1"
-      },
-      {
-        type: "item",
-        label: "Test Action 2",
-        action: () => console.log("Action 2 on", contextMenuSelection()),
-        id: "action2"
-      },
-      { type: "separator" },
-      {
-        type: "item",
-        label: "Delete Selected",
-        action: () => console.log("Delete", contextMenuSelection()),
+    if (selectedCount === 1 && mods.length > 0) {
+      // Single item menu
+      const mod = mods[0]
+      const displayName = mod.metadata?.name || mod.filename
+
+      const items: {
+        type: "item" | "separator" | "submenu"
+        label?: string
+        action?: () => void
+        icon?: string
+        id?: string
+        destructive?: boolean
+        disabled?: boolean
+        children?: {
+          type: "item" | "separator"
+          label?: string
+          action?: () => void
+          icon?: string
+          id?: string
+          destructive?: boolean
+          disabled?: boolean
+        }[]
+      }[] = [
+        {
+          type: "item",
+          label: t("instance.copy_name"),
+          action: () => {
+            navigator.clipboard.writeText(displayName)
+            addNotification({
+              name: t("instance.copied_to_clipboard"),
+              type: "success"
+            })
+          },
+          icon: "i-ri:clipboard-line",
+          id: "copy"
+        },
+        { type: "separator" },
+        {
+          type: "item",
+          label: mod.enabled
+            ? t("instance.disable_mod")
+            : t("instance.enable_mod"),
+          action: async () => {
+            if (props.mutations) {
+              await props.mutations.handleToggleMod(mod)
+            }
+          },
+          icon: mod.enabled ? "i-ri:toggle-fill" : "i-ri:toggle-line",
+          id: "toggle"
+        }
+      ]
+
+      if (mod.has_update) {
+        items.push({
+          type: "item",
+          label: t("instance.update_mod"),
+          action: async () => {
+            if (props.mutations) {
+              await props.mutations.handleUpdateMod(mod)
+            }
+          },
+          icon: "i-ri:download-2-fill",
+          id: "update"
+        })
+      }
+
+      items.push(
+        { type: "separator" },
+        {
+          type: "item",
+          label: t("instance.view_details"),
+          action: () => {
+            modalsContext?.openModal(
+              {
+                name: "modDetails"
+              },
+              {
+                mod,
+                instanceId: props.mutations?.instanceId
+              }
+            )
+          },
+          icon: "i-ri:information-line",
+          id: "details"
+        },
+        {
+          type: "item",
+          label: t("instance.open_folder"),
+          action: () => {
+            if (props.mutations) {
+              props.mutations.handleOpenFolder()
+            }
+          },
+          icon: "i-ri:folder-open-fill",
+          id: "folder"
+        }
+      )
+
+      if (mod.curseforge || mod.modrinth) {
+        // If both platforms exist, show them as a submenu
+        if (mod.curseforge && mod.modrinth) {
+          items.push({
+            type: "submenu",
+            label: t("instance.view_on_platform"),
+            icon: "i-ri:external-link-line",
+            id: "platform",
+            children: [
+              {
+                type: "item",
+                label: t("instance.view_on_curseforge"),
+                action: () => {
+                  const slug = mod.curseforge!.urlslug
+                  window.open(
+                    `https://www.curseforge.com/minecraft/mc-mods/${slug}`,
+                    "_blank"
+                  )
+                },
+                icon: "curseforge",
+                id: "platform-curseforge"
+              },
+              {
+                type: "item",
+                label: t("instance.view_on_modrinth"),
+                action: () => {
+                  window.open(
+                    `https://modrinth.com/mod/${mod.modrinth!.project_id}`,
+                    "_blank"
+                  )
+                },
+                icon: "modrinth",
+                id: "platform-modrinth"
+              }
+            ]
+          })
+        } else {
+          // Single platform
+          const platformName = mod.curseforge ? "curseforge" : "modrinth"
+          items.push({
+            type: "item",
+            label: t(`instance.view_on_${platformName}`),
+            action: () => {
+              if (mod.curseforge) {
+                const slug = mod.curseforge.urlslug
+                window.open(
+                  `https://www.curseforge.com/minecraft/mc-mods/${slug}`,
+                  "_blank"
+                )
+              } else if (mod.modrinth) {
+                window.open(
+                  `https://modrinth.com/mod/${mod.modrinth.project_id}`,
+                  "_blank"
+                )
+              }
+            },
+            icon: platformName,
+            id: "platform"
+          })
+        }
+      }
+
+      items.push({ type: "separator" })
+
+      // Add delete item at the end with extra separator for spacing
+      const deleteItem = {
+        type: "item" as const,
+        label: t("instance.delete_mod"),
+        action: async () => {
+          if (props.mutations) {
+            await props.mutations.handleDeleteMod(mod)
+          }
+        },
         destructive: true,
+        icon: "i-ri:delete-bin-2-fill",
         id: "delete"
       }
-    ]
+
+      // Add some spacing items if platform submenu exists
+      if (mod.curseforge || mod.modrinth) {
+        items.push({ type: "separator" })
+      }
+
+      items.push(deleteItem)
+
+      return items
+    } else {
+      // Multiple items menu
+      const allEnabled = mods.every((mod) => mod.enabled)
+      const allDisabled = mods.every((mod) => !mod.enabled)
+
+      const items: {
+        type: "item" | "separator" | "submenu"
+        label?: string
+        action?: () => void
+        icon?: string
+        id?: string
+        destructive?: boolean
+        disabled?: boolean
+        children?: {
+          type: "item" | "separator"
+          label?: string
+          action?: () => void
+          icon?: string
+          id?: string
+          destructive?: boolean
+          disabled?: boolean
+        }[]
+      }[] = [
+        {
+          type: "item",
+          label: t("instance.selected_count", { count: selectedCount }),
+          disabled: true,
+          id: "header"
+        },
+        { type: "separator" }
+      ]
+
+      if (!allEnabled) {
+        items.push({
+          type: "item",
+          label: t("instance.enable_all"),
+          action: async () => {
+            if (props.mutations) {
+              await Promise.all(
+                mods
+                  .filter((mod) => !mod.enabled)
+                  .map((mod) => props.mutations!.handleToggleMod(mod))
+              )
+            }
+          },
+          icon: "i-ri:toggle-fill",
+          id: "enable-all"
+        })
+      }
+
+      if (!allDisabled) {
+        items.push({
+          type: "item",
+          label: t("instance.disable_all"),
+          action: async () => {
+            if (props.mutations) {
+              await Promise.all(
+                mods
+                  .filter((mod) => mod.enabled)
+                  .map((mod) => props.mutations!.handleToggleMod(mod))
+              )
+            }
+          },
+          icon: "i-ri:toggle-line",
+          id: "disable-all"
+        })
+      }
+
+      // Add update option if any selected mods have updates
+      const hasUpdates = mods.some((mod) => mod.has_update)
+      if (hasUpdates) {
+        items.push({
+          type: "item",
+          label: t("instance.update_selected"),
+          action: async () => {
+            if (props.mutations) {
+              await props.mutations.handleUpdateSelected(mods)
+            }
+          },
+          icon: "i-ri:download-2-fill",
+          id: "update-selected"
+        })
+      }
+
+      items.push(
+        { type: "separator" },
+        {
+          type: "item",
+          label: t("instance.delete_selected"),
+          action: async () => {
+            if (props.mutations) {
+              await props.mutations.handleDeleteSelected(mods)
+            }
+          },
+          destructive: true,
+          icon: "i-ri:delete-bin-2-fill",
+          id: "delete"
+        }
+      )
+
+      return items
+    }
   }
 
   const getRowClasses = (rowId: string) => {
@@ -489,44 +854,52 @@ export const AddonTable = (props: AddonTableProps) => {
     return document.documentElement
   }
 
-  const createScrollHandler = (container: HTMLElement) => {
-    let ticking = false
-    let cachedTableRect: DOMRect | null = null
-    let cacheTimeout: number | null = null
+  const createScrollHandler = (_container: HTMLElement) => {
+    let animationFrameId: number | null = null
+    let lastKnownScrollTop = 0
 
-    const updateCache = () => {
-      cachedTableRect = tableRef?.getBoundingClientRect() ?? null
-      cacheTimeout = window.setTimeout(() => {
-        cachedTableRect = null
-      }, 100)
+    const updateScrollPosition = () => {
+      if (!tableRef || !headerRef) return
+
+      const headerRect = headerRef.getBoundingClientRect()
+      const tableRect = tableRef.getBoundingClientRect()
+
+      // Calculate scroll offset from the bottom of the header
+      const headerBottom = headerRect.bottom
+      const tableTop = tableRect.top
+      const scrollOffset = headerBottom - tableTop
+      const newScrollTop = Math.max(0, scrollOffset)
+
+      // Always update if there's a significant change
+      if (Math.abs(newScrollTop - lastKnownScrollTop) > 0.1) {
+        lastKnownScrollTop = newScrollTop
+        setScrollTop(newScrollTop)
+      }
     }
 
     const handleScroll = () => {
-      if (ticking || !tableRef) return
+      // Cancel any pending update
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(animationFrameId)
+      }
 
-      ticking = true
-      requestAnimationFrame(() => {
-        try {
-          if (!cachedTableRect) updateCache()
-          if (!cachedTableRect) return
+      // Schedule immediate update
+      updateScrollPosition()
 
-          const containerRect = container.getBoundingClientRect()
-          const tableScrollOffset = containerRect.top - cachedTableRect.top
-          const newScrollTop = Math.max(0, tableScrollOffset)
-
-          setScrollTop(newScrollTop)
-        } finally {
-          ticking = false
-        }
+      // Also schedule one more update after animation frame
+      // This catches any missed updates during fast scrolling
+      animationFrameId = requestAnimationFrame(() => {
+        updateScrollPosition()
+        animationFrameId = null
       })
     }
 
-    const throttledHandler = throttle(handleScroll, 16)
-
     return {
-      handler: throttledHandler,
+      handler: handleScroll,
       cleanup: () => {
-        if (cacheTimeout) clearTimeout(cacheTimeout)
+        if (animationFrameId !== null) {
+          cancelAnimationFrame(animationFrameId)
+        }
       }
     }
   }
@@ -542,9 +915,10 @@ export const AddonTable = (props: AddonTableProps) => {
 
       const container = findScrollContainer()
       if (!container) {
-        console.warn("AddonTable: Could not find scroll container")
         return
       }
+
+      scrollContainerRef = container
 
       const { handler, cleanup } = createScrollHandler(container)
 
@@ -561,22 +935,36 @@ export const AddonTable = (props: AddonTableProps) => {
       setContainerHeight(container.clientHeight)
       handler()
 
+      // Use both scroll and scrollend for better updates
       container.addEventListener("scroll", handler, { passive: true })
+
+      // scrollend fires when scrolling momentum stops - ensures final update
+      if ("onscrollend" in container) {
+        container.addEventListener("scrollend", handler, { passive: true })
+      }
 
       scrollHandlerCleanup = () => {
         container.removeEventListener("scroll", handler)
+        if ("onscrollend" in container) {
+          container.removeEventListener("scrollend", handler)
+        }
         cleanup()
       }
     })
 
     document.addEventListener("mouseup", handleMouseUp)
+    document.addEventListener("mousemove", handleMouseMove)
 
     onCleanup(() => {
       scrollHandlerCleanup?.()
       resizeObserver?.disconnect()
       document.removeEventListener("mouseup", handleMouseUp)
+      document.removeEventListener("mousemove", handleMouseMove)
       document.body.style.userSelect = ""
       document.body.style.cursor = ""
+      if (autoScrollInterval) {
+        clearInterval(autoScrollInterval)
+      }
     })
   })
 
@@ -584,8 +972,9 @@ export const AddonTable = (props: AddonTableProps) => {
     <ContextMenu onOpenChange={handleContextMenuOpenChange}>
       <ContextMenuTrigger class="border-darkSlate-600 rounded-lg border">
         <div
+          ref={headerRef}
           class="bg-darkSlate-700 sticky z-10 rounded-t-lg"
-          style={{ top: props.hasBulkActions ? "189px" : "115px" }}
+          style={{ top: "170px" }}
         >
           <For each={table.getHeaderGroups()}>
             {(headerGroup) => (
@@ -593,8 +982,17 @@ export const AddonTable = (props: AddonTableProps) => {
                 <For each={headerGroup.headers}>
                   {(header) => (
                     <div
-                      class="text-lightSlate-300 min-w-0 flex-1 px-4 py-3 text-left text-sm font-medium"
-                      style={{ width: `${header.getSize()}px` }}
+                      class="text-lightSlate-300 min-w-0 px-4 py-3 text-left text-sm font-medium"
+                      classList={{
+                        "flex-1": !header.getSize() || header.getSize() === 150,
+                        "flex-shrink-0":
+                          !!header.getSize() && header.getSize() !== 150
+                      }}
+                      style={
+                        header.getSize() && header.getSize() !== 150
+                          ? { width: `${header.getSize()}px` }
+                          : undefined
+                      }
                     >
                       <Show when={!header.isPlaceholder} fallback={null}>
                         <div
@@ -637,7 +1035,7 @@ export const AddonTable = (props: AddonTableProps) => {
           </For>
         </div>
 
-        <div ref={tableRef}>
+        <div ref={tableRef} onMouseLeave={handleMouseLeave}>
           <div
             style={{
               height: `${visibleRows().startOffset}px`,
@@ -683,8 +1081,20 @@ export const AddonTable = (props: AddonTableProps) => {
                   <For each={row.getVisibleCells()}>
                     {(cell) => (
                       <div
-                        class="flex min-w-0 flex-1 items-center px-4 py-3 text-sm"
-                        style={{ width: `${cell.column.getSize()}px` }}
+                        class="flex min-w-0 items-center px-4 py-3 text-sm"
+                        classList={{
+                          "flex-1":
+                            !cell.column.getSize() ||
+                            cell.column.getSize() === 150,
+                          "flex-shrink-0":
+                            !!cell.column.getSize() &&
+                            cell.column.getSize() !== 150
+                        }}
+                        style={
+                          cell.column.getSize() && cell.column.getSize() !== 150
+                            ? { width: `${cell.column.getSize()}px` }
+                            : undefined
+                        }
                       >
                         {flexRender(
                           cell.column.columnDef.cell,
@@ -712,17 +1122,115 @@ export const AddonTable = (props: AddonTableProps) => {
           <For each={getContextMenuItems()}>
             {(item) => (
               <Show
-                when={item.type === "separator"}
+                when={item && item.type === "separator"}
                 fallback={
-                  <ContextMenuItem
-                    disabled={item.disabled}
-                    class={
-                      item.destructive ? "text-red-400 focus:text-red-300" : ""
+                  <Show
+                    when={item && item.type === "submenu"}
+                    fallback={
+                      item && (
+                        <ContextMenuItem
+                          disabled={item.disabled}
+                          class={
+                            item.destructive
+                              ? "text-red-400 focus:text-red-300"
+                              : ""
+                          }
+                          onSelect={item.action}
+                        >
+                          <div class="flex items-center gap-2">
+                            <Show when={item.icon}>
+                              <Show
+                                when={item.icon === "curseforge"}
+                                fallback={
+                                  <Show
+                                    when={item.icon === "modrinth"}
+                                    fallback={<div class={item.icon} />}
+                                  >
+                                    <img
+                                      src={ModrinthLogo}
+                                      class="h-4 w-4"
+                                      alt="Modrinth"
+                                    />
+                                  </Show>
+                                }
+                              >
+                                <img
+                                  src={CurseforgeLogo}
+                                  class="h-4 w-4"
+                                  alt="CurseForge"
+                                />
+                              </Show>
+                            </Show>
+                            <span>{item.label}</span>
+                          </div>
+                        </ContextMenuItem>
+                      )
                     }
-                    onSelect={item.action}
                   >
-                    {item.label}
-                  </ContextMenuItem>
+                    <ContextMenuSub gutter={8} shift={-5}>
+                      <ContextMenuSubTrigger class="relative data-[state=open]:bg-darkSlate-700">
+                        <div class="flex items-center gap-2">
+                          <Show when={item.icon}>
+                            <div class={item.icon} />
+                          </Show>
+                          <span>{item.label}</span>
+                        </div>
+                      </ContextMenuSubTrigger>
+                      <ContextMenuPortal>
+                        <ContextMenuSubContent class="z-[210]">
+                          <For each={item.children || []}>
+                            {(child) => (
+                              <Show
+                                when={child.type === "separator"}
+                                fallback={
+                                  <ContextMenuItem
+                                    disabled={child.disabled}
+                                    class={
+                                      child.destructive
+                                        ? "text-red-400 focus:text-red-300"
+                                        : ""
+                                    }
+                                    onSelect={child.action}
+                                  >
+                                    <div class="flex items-center gap-2">
+                                      <Show when={child.icon}>
+                                        <Show
+                                          when={child.icon === "curseforge"}
+                                          fallback={
+                                            <Show
+                                              when={child.icon === "modrinth"}
+                                              fallback={
+                                                <div class={child.icon} />
+                                              }
+                                            >
+                                              <img
+                                                src={ModrinthLogo}
+                                                class="h-4 w-4"
+                                                alt="Modrinth"
+                                              />
+                                            </Show>
+                                          }
+                                        >
+                                          <img
+                                            src={CurseforgeLogo}
+                                            class="h-4 w-4"
+                                            alt="CurseForge"
+                                          />
+                                        </Show>
+                                      </Show>
+                                      <span>{child.label}</span>
+                                    </div>
+                                  </ContextMenuItem>
+                                }
+                              >
+                                <ContextMenuSeparator />
+                              </Show>
+                            )}
+                          </For>
+                        </ContextMenuSubContent>
+                      </ContextMenuPortal>
+                    </ContextMenuSub>
+                  </Show>
                 }
               >
                 <ContextMenuSeparator />

@@ -6,6 +6,8 @@ interface BulkActionsProps {
   selectedRowsLength: () => number
   isInstanceLocked: () => boolean
   onDeleteSelected: () => Promise<void>
+  onUpdateSelected: () => Promise<void>
+  hasUpdates: () => boolean
   onClearSelection: () => void
   class?: string
 }
@@ -24,6 +26,17 @@ export const BulkActions = (props: BulkActionsProps) => {
             />
           </span>
           <div class="flex items-center gap-2">
+            <Show when={props.hasUpdates()}>
+              <Button
+                size="small"
+                type="secondary"
+                disabled={props.isInstanceLocked()}
+                onClick={props.onUpdateSelected}
+              >
+                <div class="i-ri:download-2-fill" />
+                <Trans key="instance.update_selected" />
+              </Button>
+            </Show>
             <Button
               size="small"
               disabled={props.isInstanceLocked()}

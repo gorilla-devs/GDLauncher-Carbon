@@ -23,6 +23,8 @@ interface AddonFiltersProps {
   isInstanceLocked: () => boolean
   onAddAddons: () => void
   onOpenFolder: () => void
+  onUpdateAll: () => void
+  updateCount: () => number
 }
 
 export const AddonFilters = (props: AddonFiltersProps) => {
@@ -33,7 +35,7 @@ export const AddonFilters = (props: AddonFiltersProps) => {
   }
 
   return (
-    <div class="bg-darkSlate-800 border-darkSlate-700 sticky top-0 z-20 border-b px-6 py-4">
+    <div class="bg-darkSlate-800 border-darkSlate-700 sticky top-14 z-20 border-b px-6 py-4">
       <div class="flex flex-col gap-4">
         {/* Search and main actions */}
         <div class="flex items-center justify-between gap-4">
@@ -56,14 +58,29 @@ export const AddonFilters = (props: AddonFiltersProps) => {
                 class="bg-darkSlate-700 border-darkSlate-600 rounded border px-2 py-1 text-sm"
               >
                 <option value="all">{t("instance.filter.all")}</option>
-                <option value="curseforge">CurseForge</option>
-                <option value="modrinth">Modrinth</option>
+                <option value="curseforge">{t("platforms.curseforge")}</option>
+                <option value="modrinth">{t("platforms.modrinth")}</option>
                 <option value="local">{t("instance.filter.local")}</option>
               </select>
             </div>
           </div>
 
           <div class="flex items-center gap-2">
+            <Show when={props.updateCount() > 0}>
+              <Button
+                type="secondary"
+                size="medium"
+                onClick={props.onUpdateAll}
+                disabled={props.isInstanceLocked()}
+              >
+                <div class="i-ri:download-2-fill" />
+                <Trans
+                  key="instance.update_all_count"
+                  options={{ count: props.updateCount() }}
+                />
+              </Button>
+            </Show>
+
             <Button
               type="outline"
               size="medium"
@@ -80,31 +97,39 @@ export const AddonFilters = (props: AddonFiltersProps) => {
         </div>
 
         {/* Addon type filters */}
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="text-lightSlate-600 text-sm">
-            {t("instance.addon_types")}:
-          </span>
-          <For each={ADDON_TYPES}>
-            {(type) => (
-              <Badge
-                variant={
-                  props.enabledAddonTypes[type] ? "default" : "secondary"
-                }
-                class="cursor-pointer transition-colors"
-                onClick={() => {
-                  props.setEnabledAddonTypes(
-                    type,
-                    !props.enabledAddonTypes[type]
-                  )
-                }}
-              >
-                {getAddonTypeLabel(type)}
-                <Show when={props.enabledAddonTypes[type]}>
-                  <div class="i-ri:check-line ml-1" />
-                </Show>
-              </Badge>
-            )}
-          </For>
+        <div class="flex items-center justify-between gap-4">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-lightSlate-600 text-sm">
+              {t("instance.addon_types")}:
+            </span>
+            <For each={ADDON_TYPES}>
+              {(type) => (
+                <Badge
+                  variant={
+                    props.enabledAddonTypes[type] ? "default" : "secondary"
+                  }
+                  class="cursor-pointer transition-colors"
+                  onClick={() => {
+                    props.setEnabledAddonTypes(
+                      type,
+                      !props.enabledAddonTypes[type]
+                    )
+                  }}
+                >
+                  {getAddonTypeLabel(type)}
+                  <Show when={props.enabledAddonTypes[type]}>
+                    <div class="i-ri:check-line ml-1" />
+                  </Show>
+                </Badge>
+              )}
+            </For>
+          </div>
+          <div class="text-lightSlate-600 text-xs flex items-center gap-2">
+            <div class="i-ri:mouse-line" />
+            <span>{t("instance.right_click_hint")}</span>
+            <span class="text-lightSlate-700">•</span>
+            <span>{t("instance.multi_select_hint")}</span>
+          </div>
         </div>
       </div>
     </div>

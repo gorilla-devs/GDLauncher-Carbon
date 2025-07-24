@@ -678,7 +678,7 @@ const Instance = () => {
         >
           <div class="bg-darkSlate-800 w-full">
             <div
-              class="bg-darkSlate-800 sticky top-0 z-10 flex h-14 items-center justify-between"
+              class="bg-darkSlate-800 sticky top-0 z-30 flex h-14 items-center justify-between"
               classList={{
                 "px-6": instancePages()[selectedIndex()]?.noPadding
               }}

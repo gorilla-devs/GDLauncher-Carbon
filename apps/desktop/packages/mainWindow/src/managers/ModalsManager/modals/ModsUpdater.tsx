@@ -11,6 +11,7 @@ import { RSPCError } from "@rspc/client"
 interface Props {
   instanceId: number
   mods: Mod[]
+  onComplete?: () => void
 }
 
 const AppUpdate = (props: ModalProps) => {
@@ -57,10 +58,21 @@ const AppUpdate = (props: ModalProps) => {
       if (isDestroyed()) return
     }
 
+    // Add a delay to ensure all backend tasks complete
+    // The WebSocket invalidation will trigger the data refresh
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+
     addNotification({
       name: "Mods updated successfully!",
       type: "success"
     })
+
+    // Call the onComplete callback if provided
+    const onComplete = data().onComplete
+    if (onComplete) {
+      onComplete()
+    }
+
     modalsContext?.closeModal()
   }
 

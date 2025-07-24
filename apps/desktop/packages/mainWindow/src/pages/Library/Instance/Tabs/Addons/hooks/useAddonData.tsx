@@ -39,6 +39,11 @@ export const useAddonData = () => {
   // Reconciled store for addons to maintain stable object references
   const [addonsStore, setAddonsStore] = createStore<Mod[]>([])
 
+  // Track mods that are currently being updated
+  const [updatingModIds, setUpdatingModIds] = createSignal<Set<string>>(
+    new Set()
+  )
+
   // Fetch all addons at once
   const allAddons = rspc.createQuery(() => ({
     queryKey: [
@@ -53,7 +58,32 @@ export const useAddonData = () => {
   // Reconcile addons data to maintain stable object references
   createEffect(() => {
     if (allAddons.data) {
-      setAddonsStore(reconcile(allAddons.data, { key: "id" }))
+      // Get current updating mods to preserve their state
+      const currentlyUpdating = updatingModIds()
+
+      // Map the data to preserve optimistic updates for mods being updated
+      const dataWithOptimisticUpdates = allAddons.data.map((addon) => {
+        if (currentlyUpdating.has(addon.id)) {
+          // For mods being updated, keep showing them as not having updates
+          // This prevents the button from reappearing during the update
+          return { ...addon, has_update: false }
+        }
+        return addon
+      })
+
+      setAddonsStore(reconcile(dataWithOptimisticUpdates, { key: "id" }))
+
+      // Clean up updatingModIds for mods that truly don't have updates anymore
+      // (i.e., the update completed successfully)
+      allAddons.data.forEach((addon) => {
+        if (!addon.has_update && currentlyUpdating.has(addon.id)) {
+          setUpdatingModIds((prev) => {
+            const next = new Set(prev)
+            next.delete(addon.id)
+            return next
+          })
+        }
+      })
     }
   })
 
@@ -74,9 +104,34 @@ export const useAddonData = () => {
     setAddonsStore(reconcile(filteredAddons, { key: "id" }))
   }
 
+  const optimisticUpdateAddon = (addonId: string) => {
+    setAddonsStore((addon) => addon.id === addonId, "has_update", false)
+  }
+
+  const startUpdatingMod = (modId: string) => {
+    setUpdatingModIds((prev) => {
+      const next = new Set(prev)
+      next.add(modId)
+      return next
+    })
+  }
+
+  const stopUpdatingMod = (modId: string) => {
+    setUpdatingModIds((prev) => {
+      const next = new Set(prev)
+      next.delete(modId)
+      return next
+    })
+  }
+
+  const isModUpdating = (modId: string) => {
+    return updatingModIds().has(modId)
+  }
+
   const rollbackToServerState = () => {
     if (allAddons.data) {
       setAddonsStore(reconcile(allAddons.data, { key: "id" }))
+      setUpdatingModIds(new Set<string>())
     }
   }
 
@@ -134,6 +189,13 @@ export const useAddonData = () => {
     optimisticToggleAddon,
     optimisticDeleteAddon,
     optimisticDeleteAddons,
-    rollbackToServerState
+    optimisticUpdateAddon,
+    rollbackToServerState,
+
+    // Update state management
+    startUpdatingMod,
+    stopUpdatingMod,
+    isModUpdating,
+    updatingModIds
   }
 }

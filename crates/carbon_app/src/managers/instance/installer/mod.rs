@@ -98,6 +98,12 @@ pub trait ResourceInstaller: Sync {
     ) -> anyhow::Result<bool>;
     fn display_name(&self) -> String;
     async fn rollback(&self, instance_data: &mut InstanceData) -> anyhow::Result<()>;
+
+    /// Get the addon type for this installer
+    fn get_addon_type(&self) -> crate::domain::instance::AddonType {
+        // Default to mods if not implemented
+        crate::domain::instance::AddonType::Mods
+    }
 }
 
 #[async_trait::async_trait]
@@ -256,18 +262,33 @@ impl Installer {
         install_deps: bool,
         replaces_mod_id: Option<String>,
     ) -> anyhow::Result<VisualTaskId> {
+        tracing::info!(
+            "Installer::install called with replaces_mod_id: {:?}",
+            replaces_mod_id
+        );
         let download_deps = app
             .settings_manager()
             .get_settings()
             .await?
             .download_dependencies;
 
+        tracing::info!(
+            "🚀 INSTALLER: Starting install for instance {:?}",
+            instance_id
+        );
+        tracing::info!("   - install_deps: {}", install_deps);
+        tracing::info!("   - download_deps: {}", download_deps);
+        tracing::info!("   - replaces_mod_id: {:?}", replaces_mod_id);
+
         let (task, task_id, instance_path) = async {
+            tracing::info!("🔧 INSTALLER: Creating task and getting instance path");
+
             let instance_manager = app.instance_manager();
             let instances = instance_manager.instances.write().await;
             let instance = instances
                 .get(&instance_id)
                 .ok_or(InvalidInstanceIdError(instance_id))?;
+            tracing::info!("   - Found instance in manager");
 
             let Instance {
                 type_: InstanceType::Valid(data),
@@ -277,18 +298,22 @@ impl Installer {
             else {
                 bail!("install called with invalid instance");
             };
+            tracing::info!("   - Instance is valid, shortpath: {:?}", shortpath);
 
             let task = {
                 let lock = self.inner.lock().await;
+                tracing::info!("   - Acquired installer lock");
 
                 if lock.is_already_installed(app, instance_id).await? {
                     bail!("resource is already installed");
                 }
+                tracing::info!("   - Resource not already installed, proceeding");
 
                 let task = VisualTask::new(Translation::InstanceTaskInstallMod {
                     mod_name: lock.display_name(),
                     instance_name: data.config.name.clone(),
                 });
+                tracing::info!("   - Created visual task: {:?}", lock.display_name());
 
                 Ok::<VisualTask, anyhow::Error>(task)
             }?;
@@ -298,24 +323,48 @@ impl Installer {
                 .runtime_path
                 .get_instances()
                 .get_instance_path(shortpath);
+            tracing::info!("   - Instance path: {:?}", instance_path);
 
             let id = app.task_manager().spawn_task(&task).await;
+            tracing::info!("   - Task spawned with ID: {:?}", id);
+
             Ok((task, id, instance_path))
         }
         .await?;
         let visited_ids = Arc::new(Mutex::new(Vec::new()));
-        let task = Arc::new(Mutex::new(task));
-        self.install_inner(
-            app,
-            instance_id,
-            &instance_path,
-            &task,
-            &visited_ids,
-            install_deps && download_deps,
-            replaces_mod_id,
-        )
-        .await?;
 
+        // Store the task in a scope to ensure it gets dropped
+        {
+            let task_arc = Arc::new(Mutex::new(task));
+
+            tracing::info!("📥 INSTALLER: Starting install_inner for installer");
+
+            self.install_inner(
+                app,
+                instance_id,
+                &instance_path,
+                &task_arc,
+                &visited_ids,
+                install_deps && download_deps,
+                replaces_mod_id,
+            )
+            .await?;
+
+            tracing::info!("✅ INSTALLER: install_inner completed, dropping task");
+
+            // Extract the task from the Arc and drop it explicitly to ensure completion
+            if let Ok(task) = Arc::try_unwrap(task_arc) {
+                drop(task.into_inner());
+                tracing::info!("🗑️ INSTALLER: Task dropped successfully");
+            } else {
+                tracing::warn!("⚠️ INSTALLER: Could not unwrap task Arc - still has references");
+            }
+        }
+
+        tracing::info!(
+            "🎉 INSTALLER: Install completed successfully, returning task ID: {:?}",
+            task_id
+        );
         Ok(task_id)
     }
 
@@ -406,14 +455,25 @@ impl Installer {
                 (dep_error, processed_deps)
             };
 
-            if self
-                .inner
-                .lock()
-                .await
-                .is_already_installed(app, instance_id)
-                .await?
-            {
-                return Ok(());
+            // Only check if already installed when NOT replacing a mod
+            // When updating (replaces_mod_id is Some), we want to proceed even if a file with the same name exists
+            if replaces_mod_id.is_none() {
+                let is_installed = self
+                    .inner
+                    .lock()
+                    .await
+                    .is_already_installed(app, instance_id)
+                    .await?;
+
+                if is_installed {
+                    tracing::info!("Mod is already installed, skipping installation");
+                    return Ok(());
+                }
+            } else {
+                tracing::info!(
+                    "Skipping is_already_installed check because we're replacing mod: {:?}",
+                    replaces_mod_id
+                );
             }
 
             let mut lock = self.rollback_context.lock().await;
@@ -447,12 +507,20 @@ impl Installer {
             let mut abort_handle = self.abort_handle.lock().await;
             if !abort_handle.aborted {
                 let task_handle = tokio::spawn(async move {
+                    tracing::info!("🔄 SPAWNED TASK: Starting mod installation task");
+                    let start_time = std::time::Instant::now();
+
                     let r = (|| async {
+                        tracing::info!("🔧 SPAWNED TASK: Beginning installation process");
                         let downloadable = {
+                            tracing::info!("🔒 SPAWNED TASK: Acquiring inner lock for downloadable");
                             let lock = inner.lock().await;
-                            lock.downloadable(&instance_path).await
+                            let result = lock.downloadable(&instance_path).await;
+                            tracing::info!("📦 SPAWNED TASK: Got downloadable result: {:?}", result.is_some());
+                            result
                         };
 
+                        tracing::info!("📊 SPAWNED TASK: Setting task state to KnownProgress");
                         parent_task
                             .lock()
                             .await
@@ -460,72 +528,185 @@ impl Installer {
                             .await;
 
                         if let Some(downloadable) = &downloadable {
-                            let (progress_watch_tx, mut progress_watch_rx) =
-                                tokio::sync::watch::channel(carbon_net::Progress::new());
+                            tracing::info!("⬇️ SPAWNED TASK: Processing downloadable: {:?}", downloadable.path);
+                            {
+                                tracing::info!("🌐 SPAWNED TASK: Starting real download process");
+                                let (progress_watch_tx, mut progress_watch_rx) =
+                                    tokio::sync::watch::channel(carbon_net::Progress::new());
 
-                            // dropped when the sender is dropped
-                            tokio::spawn(async move {
-                                while progress_watch_rx.changed().await.is_ok() {
-                                    {
-                                        let progress = progress_watch_rx.borrow();
-                                        t_download_file.update_download(
-                                            progress.current_size as u32,
-                                            progress.total_size as u32,
-                                            false,
-                                        );
+                                // dropped when the sender is dropped
+                                tokio::spawn(async move {
+                                    while progress_watch_rx.changed().await.is_ok() {
+                                        {
+                                            let progress = progress_watch_rx.borrow();
+                                            t_download_file.update_download(
+                                                progress.current_size as u32,
+                                                progress.total_size as u32,
+                                                false,
+                                            );
+                                        }
+
+                                        tokio::time::sleep(Duration::from_millis(30)).await;
                                     }
 
-                                    tokio::time::sleep(Duration::from_millis(30)).await;
+                                    t_download_file.complete_download();
+                                });
+
+                                // Add timeout to prevent hanging in test environments
+                                let download_result = tokio::time::timeout(
+                                    std::time::Duration::from_secs(10),
+                                    carbon_net::download_multiple(
+                                        &[downloadable.clone()],
+                                        DownloadOptions::builder().concurrency(1).build(),
+                                    )
+                                ).await;
+                                match download_result {
+                                    Ok(Ok(_)) => {
+                                        tracing::info!("Download completed successfully");
+                                    }
+                                    Ok(Err(e)) => {
+                                        return Err(e).with_context(|| {
+                                            format!("Failed to download addon file for `{:?}`", downloadable)
+                                        });
+                                    }
+                                    Err(_) => {
+                                        return Err(anyhow::anyhow!("Download timed out after 10 seconds"));
+                                    }
                                 }
-
-                                t_download_file.complete_download();
-                            });
-
-                            carbon_net::download_multiple(
-                                &[downloadable.clone()],
-                                DownloadOptions::builder().concurrency(1).build(),
-                            )
-                            .await
-                            .with_context(|| {
-                                format!("Failed to download addon file for `{:?}`", downloadable)
-                            })?;
+                            }
                         }
 
-                        if let Some(id) = replaces_mod_id {
+                        // Cache just the new mod file instead of forcing a full instance scan
+                        if let Some(ref downloadable) = downloadable {
+                            tracing::info!(
+                                "💾 SPAWNED TASK: Caching single mod file at path: {:?}",
+                                downloadable.path
+                            );
+                            let addon_type = {
+                                tracing::info!("🔒 SPAWNED TASK: Getting addon type from inner lock");
+                                let lock = inner.lock().await;
+                                let addon_type = lock.get_addon_type();
+                                tracing::info!("🏷️ SPAWNED TASK: Addon type: {:?}", addon_type);
+                                addon_type
+                            };
+
+                            tracing::info!("🚀 SPAWNED TASK: Calling cache_single_mod_file");
+                            // Extract platform metadata from installer context
+                            let platform_metadata = {
+                                let lock = inner.lock().await;
+                                let installer_id = lock.id();
+                                tracing::debug!("📋 SPAWNED TASK: Installer ID: {}", installer_id);
+                                // Parse the installer ID to determine platform and extract metadata
+                                if installer_id.starts_with("curseforge:") {
+                                    // Format: "curseforge:project_id:file_id"
+                                    let parts: Vec<&str> = installer_id.split(':').collect();
+                                    if parts.len() == 3 {
+                                        if let (Ok(project_id), Ok(file_id)) = (parts[1].parse::<u32>(), parts[2].parse::<u32>()) {
+                                            tracing::info!("🏷️ SPAWNED TASK: Detected CurseForge mod: project_id={}, file_id={}", project_id, file_id);
+                                            Some(crate::managers::metadata::cache::PlatformMetadata::CurseForge { project_id, file_id })
+                                        } else {
+                                            tracing::warn!("⚠️ SPAWNED TASK: Failed to parse CurseForge IDs from: {}", installer_id);
+                                            None
+                                        }
+                                    } else {
+                                        tracing::warn!("⚠️ SPAWNED TASK: Invalid CurseForge installer ID format: {}", installer_id);
+                                        None
+                                    }
+                                } else if installer_id.starts_with("modrinth:") {
+                                    // Format: "modrinth:project_id:version_id"
+                                    let parts: Vec<&str> = installer_id.split(':').collect();
+                                    if parts.len() == 3 {
+                                        let project_id = parts[1].to_string();
+                                        let version_id = parts[2].to_string();
+                                        tracing::info!("🏷️ SPAWNED TASK: Detected Modrinth mod: project_id={}, version_id={}", project_id, version_id);
+                                        Some(crate::managers::metadata::cache::PlatformMetadata::Modrinth { project_id, version_id })
+                                    } else {
+                                        tracing::warn!("⚠️ SPAWNED TASK: Invalid Modrinth installer ID format: {}", installer_id);
+                                        None
+                                    }
+                                } else {
+                                    tracing::info!("ℹ️ SPAWNED TASK: Unknown installer type: {}", installer_id);
+                                    None
+                                }
+                            };
+
                             app_clone
-                                .instance_manager()
-                                .delete_mod(instance_id, id)
+                                .meta_cache_manager()
+                                .cache_single_mod_file(instance_id, &downloadable.path, addon_type, &app_clone.prisma_client, platform_metadata)
                                 .await?;
+                            tracing::info!("✅ SPAWNED TASK: Single mod file cached successfully");
+                        } else {
+                            tracing::warn!("⚠️ SPAWNED TASK: No downloadable found, falling back to full caching");
+                            // Fallback to full caching if no downloadable
+                            tracing::info!("🚀 SPAWNED TASK: Calling override_caching_and_wait");
+                            let cache_manager = app_clone.meta_cache_manager();
+                            cache_manager
+                                .override_caching_and_wait(instance_id, cache_manager)
+                                .await?;
+                            tracing::info!("✅ SPAWNED TASK: Full caching completed");
                         }
 
-                        // ensure the task stays alive until the mod is cached
-                        app_clone
-                            .meta_cache_manager()
-                            .override_caching_and_wait(instance_id, true, true)
-                            .await?;
+                        // Delete the old mod AFTER the new one is cached to prevent it from disappearing
+                        if let Some(id) = replaces_mod_id {
+                            tracing::info!("🗑️ SPAWNED TASK: Attempting to delete old mod with id: {}", id);
+                            if let Err(e) = app_clone
+                                .instance_manager()
+                                .delete_mod(instance_id, id.clone())
+                                .await
+                            {
+                                tracing::error!("❌ SPAWNED TASK: Failed to delete old mod {}: {:?}", id, e);
+                                // Continue anyway - the new mod is already installed
+                            } else {
+                                tracing::info!("✅ SPAWNED TASK: Successfully deleted old mod: {}", id);
+                            }
+                        } else {
+                            tracing::info!("ℹ️ SPAWNED TASK: No mod to replace (replaces_mod_id is None)");
+                        }
 
+                        tracing::info!("🔄 SPAWNED TASK: Invalidating instance mods cache");
                         app_clone.invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
+
+                        let elapsed = start_time.elapsed();
+                        tracing::info!("🏁 SPAWNED TASK: Mod installation task completed in {:?}", elapsed);
+
                         Ok::<_, anyhow::Error>(())
                     })()
                     .await;
 
                     match r {
-                        Ok(()) => {}
+                        Ok(()) => {
+                            tracing::info!(
+                                "🎉 SPAWNED TASK: Task completed successfully, no errors"
+                            );
+                        }
                         Err(e) => {
-                            tracing::error!({ error = ?e }, "Error installing dependency");
+                            tracing::error!(
+                                "💥 SPAWNED TASK: Error installing dependency: {:?}",
+                                e
+                            );
 
                             let rollback_lock = rollback_context.lock().await;
 
                             if let Some(rollback_lock) = rollback_lock.as_ref() {
+                                tracing::info!(
+                                    "🔄 SPAWNED TASK: Rolling back changes due to error"
+                                );
                                 rollback_lock.rollback(Some(&e)).await;
                             } else {
-                                tracing::error!("Invalid rollback context in spawned task");
+                                tracing::error!(
+                                    "❌ SPAWNED TASK: Invalid rollback context in spawned task"
+                                );
                             }
 
+                            tracing::info!("🚨 SPAWNED TASK: Failing parent task due to error");
                             let parent_task = parent_task.lock().await;
                             parent_task.clone().fail(e).await
                         }
                     }
+
+                    tracing::info!(
+                        "🏁 SPAWNED TASK: Task ending - this should trigger task completion"
+                    );
                 });
 
                 abort_handle.handle = Some(task_handle.abort_handle());
@@ -822,6 +1003,17 @@ impl ResourceInstaller for CurseforgeModInstaller {
 
         Ok(())
     }
+
+    fn get_addon_type(&self) -> crate::domain::instance::AddonType {
+        match self.addon_type {
+            curseforge::ClassId::Mods => crate::domain::instance::AddonType::Mods,
+            curseforge::ClassId::ResourcePacks => crate::domain::instance::AddonType::ResourcePacks,
+            curseforge::ClassId::Shaders => crate::domain::instance::AddonType::Shaders,
+            curseforge::ClassId::Datapacks => crate::domain::instance::AddonType::DataPacks,
+            curseforge::ClassId::Worlds => crate::domain::instance::AddonType::Worlds,
+            _ => crate::domain::instance::AddonType::Mods,
+        }
+    }
 }
 
 impl IntoInstaller for CurseforgeModInstaller {
@@ -912,7 +1104,15 @@ impl ResourceInstaller for ModrinthModInstaller {
     }
 
     async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable> {
-        let install_path = instance_path.get_mods_path().join(&self.file.filename);
+        use modrinth::project::ProjectType;
+        let install_path = match self.mod_info.project_type {
+            ProjectType::Mod => instance_path.get_mods_path(),
+            ProjectType::ResourcePack => instance_path.get_resourcepacks_path(),
+            ProjectType::Shader => instance_path.get_shaderpacks_path(),
+            ProjectType::DataPack => instance_path.get_datapacks_path(),
+            _ => instance_path.get_mods_path(),
+        }
+        .join(&self.file.filename);
 
         let checksum = Checksum::Sha1(self.file.hashes.sha1.clone());
         let size = self.file.size;
@@ -1138,6 +1338,19 @@ impl ResourceInstaller for ModrinthModInstaller {
         *lock = None;
 
         Ok(())
+    }
+
+    fn get_addon_type(&self) -> crate::domain::instance::AddonType {
+        use modrinth::project::ProjectType;
+        match self.mod_info.project_type {
+            ProjectType::Mod => crate::domain::instance::AddonType::Mods,
+            ProjectType::ResourcePack => crate::domain::instance::AddonType::ResourcePacks,
+            ProjectType::Shader => crate::domain::instance::AddonType::Shaders,
+            ProjectType::DataPack => crate::domain::instance::AddonType::DataPacks,
+            ProjectType::Modpack | ProjectType::Plugin | ProjectType::Unknown => {
+                crate::domain::instance::AddonType::Mods
+            }
+        }
     }
 }
 

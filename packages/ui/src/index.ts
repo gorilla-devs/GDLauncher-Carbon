@@ -23,6 +23,7 @@ export { Steps } from "./Steps"
 export { Radio } from "./Radio"
 export { TextArea } from "./TextArea"
 export { Skeleton } from "./Skeleton"
+export { Separator } from "./Separator"
 export {
   NotificationsProvider,
   createNotification

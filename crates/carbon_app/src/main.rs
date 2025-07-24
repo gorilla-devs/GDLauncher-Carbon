@@ -218,7 +218,9 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
 
     let _app = app2.clone();
     tokio::spawn(async move {
-        _app.meta_cache_manager().launch_background_tasks().await;
+        _app.meta_cache_manager()
+            .launch_background_tasks(_app.meta_cache_manager())
+            .await;
         _app.clone()
             .instance_manager()
             .launch_background_tasks()
@@ -249,6 +251,10 @@ impl TestEnv {
         )
         .await;
     }
+
+    pub async fn shutdown(&self) -> anyhow::Result<()> {
+        self.app.meta_cache_manager().shutdown().await
+    }
 }
 
 #[cfg(test)]
@@ -260,12 +266,14 @@ impl std::ops::Deref for TestEnv {
     }
 }
 
-// #[cfg(test)]
-// impl Drop for TestEnv {
-//     fn drop(&mut self) {
-//         let _ = std::fs::remove_dir_all(&self.tmpdir);
-//     }
-// }
+#[cfg(test)]
+impl Drop for TestEnv {
+    fn drop(&mut self) {
+        // Just clean up the temp directory - cache shutdown happens automatically
+        // when background tasks detect the app is being dropped
+        let _ = std::fs::remove_dir_all(&self.tmpdir);
+    }
+}
 
 #[cfg(test)]
 async fn setup_managers_for_test() -> TestEnv {
@@ -275,16 +283,18 @@ async fn setup_managers_for_test() -> TestEnv {
     println!("Test RTP: {}", temp_path.to_str().unwrap());
     let (invalidation_sender, invalidation_recv) = tokio::sync::broadcast::channel(200);
 
+    let app = AppInner::new(
+        invalidation_sender,
+        temp_path.clone(),
+        crate::util::base_api::get_base_api_env!(),
+    )
+    .await;
+
     TestEnv {
-        tmpdir: temp_path.clone(),
+        tmpdir: temp_path,
         // log_guard,
         invalidation_recv,
-        app: AppInner::new(
-            invalidation_sender,
-            temp_path,
-            crate::util::base_api::get_base_api_env!(),
-        )
-        .await,
+        app,
     }
 }
 

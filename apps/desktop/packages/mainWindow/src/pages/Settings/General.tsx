@@ -36,6 +36,12 @@ const General = () => {
     if (routeData.data.data) setSettings(routeData.data.data)
   })
 
+  const handleClearCache = () => {
+    modalsContext?.openModal({
+      name: "confirmCacheClear"
+    })
+  }
+
   const templateGameResolution = () => {
     return [
       { label: "854 x 480 (100%)", key: "Standard:854x480" },
@@ -415,6 +421,14 @@ const General = () => {
           <RightHandSide>
             <div>
               <div class="flex justify-end gap-4 flex-col items-center 2xl:flex-row">
+                <Button type="secondary" onClick={handleClearCache}>
+                  <div class="flex items-center gap-2">
+                    <i class="w-5 h-5 i-ri:delete-back-2-line" />
+                    <div>
+                      <Trans key="settings:clear_cache_button" />
+                    </div>
+                  </div>
+                </Button>
                 <Button
                   type="secondary"
                   onClick={() => {

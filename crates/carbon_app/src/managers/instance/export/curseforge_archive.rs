@@ -97,8 +97,44 @@ pub async fn export_curseforge(
 
                     let mods_filter = mods_filter.as_mut().map(|v| &mut v.0).unwrap();
 
-                    app.meta_cache_manager()
-                        .override_caching_and_wait(instance_id, true, false)
+                    // First ensure any mods found on filesystem are cached
+                    for (mod_filename, _) in mods_filter.iter() {
+                        let mod_path = basepath.join("mods").join(mod_filename);
+                        if mod_path.exists() {
+                            // Check if this mod is already cached in database
+                            let existing_cache = app
+                                .prisma_client
+                                .mod_file_cache()
+                                .find_first(vec![
+                                    fcdb::instance_id::equals(*instance_id),
+                                    fcdb::filename::equals(mod_filename.clone()),
+                                ])
+                                .exec()
+                                .await?;
+
+                            if existing_cache.is_none() {
+                                tracing::debug!(
+                                    "Caching uncached mod file during export: {}",
+                                    mod_filename
+                                );
+                                // Cache this mod (without CurseForge metadata since we don't have it here)
+                                app.meta_cache_manager()
+                                    .cache_single_mod_file(
+                                        instance_id,
+                                        &mod_path,
+                                        crate::domain::instance::AddonType::Mods,
+                                        &app.prisma_client,
+                                        None, // No CurseForge metadata available here
+                                    )
+                                    .await?;
+                            }
+                        }
+                    }
+
+                    // Then run the normal cache processing
+                    let cache_manager = app.meta_cache_manager();
+                    cache_manager
+                        .override_caching_and_wait(instance_id, cache_manager)
                         .await?;
 
                     let mods2 = app
@@ -107,22 +143,21 @@ pub async fn export_curseforge(
                         .find_many(vec![fcdb::instance_id::equals(*instance_id)])
                         .with(fcdb::metadata::fetch().with(metadb::curseforge::fetch()))
                         .exec()
-                        .await?
-                        .into_iter()
-                        .filter_map(|m| {
-                            let Some(metadata) = m.metadata else {
-                                return None;
-                            };
+                        .await?;
+                    let mods2 = mods2.into_iter().filter_map(|m| {
+                        let Some(metadata) = m.metadata else {
+                            return None;
+                        };
 
-                            let Some(Some(curseforge)) = metadata.curseforge else {
-                                return None;
-                            };
+                        let Some(Some(curseforge)) = metadata.curseforge else {
+                            return None;
+                        };
 
-                            match mods_filter.remove(&m.filename) {
-                                Some(_) => Some((curseforge.project_id, curseforge.file_id)),
-                                None => None,
-                            }
-                        });
+                        match mods_filter.remove(&m.filename) {
+                            Some(_) => Some((curseforge.project_id, curseforge.file_id)),
+                            None => None,
+                        }
+                    });
 
                     mods.extend(mods2);
                     t_scan.complete_opaque();
@@ -238,53 +273,37 @@ mod test {
         managers::instance::{InstanceVersionSource, export::ExportTarget},
     };
 
-    #[traced_test]
-    #[test]
-    #[flowtest]
-    fn _setup() -> anyhow::Result<(
-        Arc<tokio::runtime::Runtime>,
-        Arc<crate::TestEnv>,
-        InstanceId,
-    )> {
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .unwrap();
+    async fn setup_test_instance() -> anyhow::Result<(Arc<crate::TestEnv>, InstanceId)> {
+        let app = Arc::new(crate::setup_managers_for_test().await);
 
-        let rt = Arc::new(rt);
+        let default_group_id = app.instance_manager().get_default_group().await?;
+        let instance_id = app
+            .instance_manager()
+            .create_instance(
+                default_group_id,
+                String::from("test"),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.16.5"),
+                        modloaders: HashSet::from([info::ModLoader {
+                            type_: info::ModLoaderType::Forge,
+                            version: String::from("1.16.5-36.2.34"),
+                        }]),
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
 
-        rt.block_on(async {
-            let app = Arc::new(crate::setup_managers_for_test().await);
+        let task = app
+            .instance_manager()
+            .install_curseforge_mod(instance_id, 247560, 4024011, false, None)
+            .await?;
 
-            let default_group_id = app.instance_manager().get_default_group().await?;
-            let instance_id = app
-                .instance_manager()
-                .create_instance(
-                    default_group_id,
-                    String::from("test"),
-                    false,
-                    InstanceVersionSource::Version(info::GameVersion::Standard(
-                        info::StandardVersion {
-                            release: String::from("1.16.5"),
-                            modloaders: HashSet::from([info::ModLoader {
-                                type_: info::ModLoaderType::Forge,
-                                version: String::from("1.16.5-36.2.34"),
-                            }]),
-                        },
-                    )),
-                    String::new(),
-                )
-                .await?;
+        app.task_manager().wait_with_log(task).await?;
 
-            let task = app
-                .instance_manager()
-                .install_curseforge_mod(instance_id, 247560, 4024011, false, None)
-                .await?;
-
-            app.task_manager().wait_with_log(task).await?;
-
-            Ok((rt.clone(), app, instance_id))
-        })
+        Ok((app, instance_id))
     }
 
     async fn run_export(
@@ -344,23 +363,23 @@ mod test {
     }
 
     #[traced_test]
-    #[test]
-    #[flowtest(_setup: (rt, app, instance_id))]
-    fn export_with_folder_linked() -> anyhow::Result<()> {
-        rt.block_on(async {
-            run_export(
-                &app,
-                instance_id,
-                "folder_linked.zip",
-                ExportEntry(HashMap::from([(String::from("mods"), None)])),
-                false,
-            )
-            .await?;
+    #[tokio::test]
+    async fn export_with_folder_linked() -> anyhow::Result<()> {
+        let (app, instance_id) = setup_test_instance().await?;
 
-            check_export(&app, "folder_linked.zip", |manifest, mut zip| {
-                crate::assert_eq_display!(
-                    manifest,
-                    r#"{
+        run_export(
+            &app,
+            instance_id,
+            "folder_linked.zip",
+            ExportEntry(HashMap::from([(String::from("mods"), None)])),
+            false,
+        )
+        .await?;
+
+        check_export(&app, "folder_linked.zip", |manifest, mut zip| {
+            crate::assert_eq_display!(
+                manifest,
+                r#"{
   "minecraft": {
     "version": "1.16.5",
     "modLoaders": [
@@ -384,35 +403,35 @@ mod test {
     }
   ]
 }"#
-                );
+            );
 
-                assert!(zip.by_name("overrides/mods").is_err());
-                Ok(())
-            })
-            .await?;
-
+            assert!(zip.by_name("overrides/mods").is_err());
             Ok(())
         })
+        .await?;
+
+        app.shutdown().await?;
+        Ok(())
     }
 
     #[traced_test]
-    #[test]
-    #[flowtest(_setup: (rt, app, instance_id))]
-    fn export_with_folder_unlinked() -> anyhow::Result<()> {
-        rt.block_on(async {
-            run_export(
-                &app,
-                instance_id,
-                "folder_unlinked.zip",
-                ExportEntry(HashMap::from([(String::from("mods"), None)])),
-                true,
-            )
-            .await?;
+    #[tokio::test]
+    async fn export_with_folder_unlinked() -> anyhow::Result<()> {
+        let (app, instance_id) = setup_test_instance().await?;
 
-            check_export(&app, "folder_unlinked.zip", |manifest, mut zip| {
-                crate::assert_eq_display!(
-                    manifest,
-                    r#"{
+        run_export(
+            &app,
+            instance_id,
+            "folder_unlinked.zip",
+            ExportEntry(HashMap::from([(String::from("mods"), None)])),
+            true,
+        )
+        .await?;
+
+        check_export(&app, "folder_unlinked.zip", |manifest, mut zip| {
+            crate::assert_eq_display!(
+                manifest,
+                r#"{
   "minecraft": {
     "version": "1.16.5",
     "modLoaders": [
@@ -430,35 +449,35 @@ mod test {
   "overrides": "overrides",
   "files": []
 }"#
-                );
+            );
 
-                assert!(zip.by_name("overrides/mods/byg-1.3.6.jar").is_ok());
-                Ok(())
-            })
-            .await?;
-
+            assert!(zip.by_name("overrides/mods/byg-1.3.6.jar").is_ok());
             Ok(())
         })
+        .await?;
+
+        app.shutdown().await?;
+        Ok(())
     }
 
     #[traced_test]
-    #[test]
-    #[flowtest(_setup: (rt, app, instance_id))]
-    fn export_without_folder_linked() -> anyhow::Result<()> {
-        rt.block_on(async {
-            run_export(
-                &app,
-                instance_id,
-                "nofolder_linked.zip",
-                ExportEntry(HashMap::from([])),
-                false,
-            )
-            .await?;
+    #[tokio::test]
+    async fn export_without_folder_linked() -> anyhow::Result<()> {
+        let (app, instance_id) = setup_test_instance().await?;
 
-            check_export(&app, "nofolder_linked.zip", |manifest, mut zip| {
-                crate::assert_eq_display!(
-                    manifest,
-                    r#"{
+        run_export(
+            &app,
+            instance_id,
+            "nofolder_linked.zip",
+            ExportEntry(HashMap::from([])),
+            false,
+        )
+        .await?;
+
+        check_export(&app, "nofolder_linked.zip", |manifest, mut zip| {
+            crate::assert_eq_display!(
+                manifest,
+                r#"{
   "minecraft": {
     "version": "1.16.5",
     "modLoaders": [
@@ -476,35 +495,35 @@ mod test {
   "overrides": "overrides",
   "files": []
 }"#
-                );
+            );
 
-                assert!(zip.by_name("overrides/mods").is_err());
-                Ok(())
-            })
-            .await?;
-
+            assert!(zip.by_name("overrides/mods").is_err());
             Ok(())
         })
+        .await?;
+
+        app.shutdown().await?;
+        Ok(())
     }
 
     #[traced_test]
-    #[test]
-    #[flowtest(_setup: (rt, app, instance_id))]
-    fn export_without_folder_unlinked() -> anyhow::Result<()> {
-        rt.block_on(async {
-            run_export(
-                &app,
-                instance_id,
-                "nofolder_unlinked.zip",
-                ExportEntry(HashMap::from([])),
-                true,
-            )
-            .await?;
+    #[tokio::test]
+    async fn export_without_folder_unlinked() -> anyhow::Result<()> {
+        let (app, instance_id) = setup_test_instance().await?;
 
-            check_export(&app, "nofolder_unlinked.zip", |manifest, mut zip| {
-                crate::assert_eq_display!(
-                    manifest,
-                    r#"{
+        run_export(
+            &app,
+            instance_id,
+            "nofolder_unlinked.zip",
+            ExportEntry(HashMap::from([])),
+            true,
+        )
+        .await?;
+
+        check_export(&app, "nofolder_unlinked.zip", |manifest, mut zip| {
+            crate::assert_eq_display!(
+                manifest,
+                r#"{
   "minecraft": {
     "version": "1.16.5",
     "modLoaders": [
@@ -522,41 +541,41 @@ mod test {
   "overrides": "overrides",
   "files": []
 }"#
-                );
+            );
 
-                assert!(zip.by_name("overrides/mods").is_err());
-                Ok(())
-            })
-            .await?;
-
+            assert!(zip.by_name("overrides/mods").is_err());
             Ok(())
         })
+        .await?;
+
+        app.shutdown().await?;
+        Ok(())
     }
 
     #[traced_test]
-    #[test]
-    #[flowtest(_setup: (rt, app, instance_id))]
-    fn export_with_fake_folder_linked() -> anyhow::Result<()> {
-        rt.block_on(async {
-            run_export(
-                &app,
-                instance_id,
-                "fakefolder_linked.zip",
-                ExportEntry(HashMap::from([(
-                    String::from("mods"),
-                    Some(ExportEntry(HashMap::from([(
-                        String::from("fake-mod.jar"),
-                        None,
-                    )]))),
-                )])),
-                true,
-            )
-            .await?;
+    #[tokio::test]
+    async fn export_with_fake_folder_linked() -> anyhow::Result<()> {
+        let (app, instance_id) = setup_test_instance().await?;
 
-            check_export(&app, "fakefolder_linked.zip", |manifest, mut zip| {
-                crate::assert_eq_display!(
-                    manifest,
-                    r#"{
+        run_export(
+            &app,
+            instance_id,
+            "fakefolder_linked.zip",
+            ExportEntry(HashMap::from([(
+                String::from("mods"),
+                Some(ExportEntry(HashMap::from([(
+                    String::from("fake-mod.jar"),
+                    None,
+                )]))),
+            )])),
+            true,
+        )
+        .await?;
+
+        check_export(&app, "fakefolder_linked.zip", |manifest, mut zip| {
+            crate::assert_eq_display!(
+                manifest,
+                r#"{
   "minecraft": {
     "version": "1.16.5",
     "modLoaders": [
@@ -574,14 +593,14 @@ mod test {
   "overrides": "overrides",
   "files": []
 }"#
-                );
+            );
 
-                assert!(zip.by_name("overrides/mods").is_err());
-                Ok(())
-            })
-            .await?;
-
+            assert!(zip.by_name("overrides/mods").is_err());
             Ok(())
         })
+        .await?;
+
+        app.shutdown().await?;
+        Ok(())
     }
 }

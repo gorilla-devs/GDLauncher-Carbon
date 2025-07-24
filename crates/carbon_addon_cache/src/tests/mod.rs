@@ -1,0 +1,10 @@
+pub mod debug_test;
+pub mod e2e_tests;
+pub mod integration_tests;
+pub mod minimal_test;
+pub mod mock_storage;
+pub mod recovery_tests;
+pub mod stage_tests;
+pub mod system_integration_tests;
+pub mod ultra_minimal_test;
+pub mod unit_tests;

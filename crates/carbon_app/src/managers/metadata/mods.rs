@@ -97,6 +97,13 @@ struct ModsToml {
 }
 
 #[derive(Deserialize)]
+#[serde(untagged)]
+enum ModsTomlAuthors {
+    Single(String),
+    List(Vec<String>),
+}
+
+#[derive(Deserialize)]
 struct ModsTomlEntry {
     #[serde(rename = "modId")]
     modid: Option<String>,
@@ -104,7 +111,7 @@ struct ModsTomlEntry {
     #[serde(rename = "displayName")]
     display_name: String,
     description: Option<String>,
-    authors: Option<String>,
+    authors: Option<ModsTomlAuthors>,
     #[serde(rename = "logoFile")]
     logo_file: Option<String>,
 }
@@ -521,12 +528,17 @@ impl From<McModInfo> for ModFileMetadata {
 
 impl From<ModsTomlEntry> for ModFileMetadata {
     fn from(value: ModsTomlEntry) -> Self {
+        let authors = value.authors.map(|auth| match auth {
+            ModsTomlAuthors::Single(single) => single,
+            ModsTomlAuthors::List(list) => list.join(", "),
+        });
+
         Self {
             modid: value.modid,
             name: Some(value.display_name),
             version: Some(value.version),
             description: value.description,
-            authors: value.authors,
+            authors,
             logo_file: value.logo_file,
             modloaders: vec![ModLoaderType::Forge],
         }
@@ -972,6 +984,33 @@ displayName = "TestMod"
             description: None,
             authors: None,
             logo_file: None,
+            modloaders: vec![ModLoaderType::Forge],
+        });
+
+        let returned = parsemeta("META-INF/mods.toml", modstoml)?;
+
+        assert_eq!(returned, expected);
+        Ok(())
+    }
+
+    #[test]
+    pub fn forge_toml_authors_array() -> anyhow::Result<()> {
+        let modstoml = r#"[[mods]]
+modId = "com.test.testmod"
+version = "1.0.0"
+displayName = "TestMod"
+description = "test desc"
+authors = ["CreativeMD", "Sonicjumper"]
+logoFile = "test/logo"
+        "#;
+
+        let expected = Some(ModFileMetadata {
+            modid: Some(String::from("com.test.testmod")),
+            name: Some(String::from("TestMod")),
+            version: Some(String::from("1.0.0")),
+            description: Some(String::from("test desc")),
+            authors: Some(String::from("CreativeMD, Sonicjumper")),
+            logo_file: Some(String::from("test/logo")),
             modloaders: vec![ModLoaderType::Forge],
         });
 
