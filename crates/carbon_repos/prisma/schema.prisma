@@ -285,5 +285,3 @@ model ModrinthModpackImageCache {
 
   @@id([projectId, versionId])
 }
-
-

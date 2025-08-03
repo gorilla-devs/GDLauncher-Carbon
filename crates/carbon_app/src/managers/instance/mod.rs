@@ -161,12 +161,6 @@ fn path_length(path: &Path) -> usize {
 
 impl<'s> ManagerRef<'s, InstanceManager> {
     pub async fn launch_background_tasks(self) {
-        // Skip background tasks in test environments to prevent hanging
-        if cfg!(test) {
-            tracing::info!("Skipping instance manager background tasks in test environment");
-            return;
-        }
-
         let _ = self.scan_instances().await;
         self.import_manager().launch_background_tasks();
     }
@@ -245,7 +239,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
             self.app
                 .meta_cache_manager()
-                .queue_caching_with_app(instance_id, false, self.app.meta_cache_manager())
+                .queue_caching(instance_id, false)
                 .await;
 
             let app = self.app.clone();
@@ -1510,10 +1504,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
-        self.app
-            .meta_cache_manager()
-            .queue_caching_with_app(id, false, self.app.meta_cache_manager())
-            .await;
+        self.app.meta_cache_manager().queue_caching(id, false).await;
 
         Ok(id)
     }
@@ -1745,10 +1736,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let modpack_info = match modpack.modpack {
             info::Modpack::Curseforge(curseforge) => {
-                cache::modpack::get_curseforge_modpack_metadata(&self.app, curseforge).await?
+                cache::curseforge::modpack::get_modpack_metadata(&self.app, curseforge).await?
             }
             info::Modpack::Modrinth(modrinth) => {
-                cache::modpack::get_modrinth_modpack_metadata(&self.app, modrinth).await?
+                cache::modrinth::modpack::get_modpack_metadata(&self.app, modrinth).await?
             }
         };
 
@@ -1782,10 +1773,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let modpack_info = match modpack.modpack {
             info::Modpack::Curseforge(curseforge) => {
-                cache::modpack::get_curseforge_modpack_icon(&self.app, curseforge).await?
+                cache::curseforge::modpack::get_modpack_icon(&self.app, curseforge).await?
             }
             info::Modpack::Modrinth(modrinth) => {
-                cache::modpack::get_modrinth_modpack_icon(&self.app, modrinth).await?
+                cache::modrinth::modpack::get_modpack_icon(&self.app, modrinth).await?
             }
         };
 

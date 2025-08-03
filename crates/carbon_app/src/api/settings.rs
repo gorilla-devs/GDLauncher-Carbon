@@ -4,8 +4,7 @@ use crate::{
         keys::{
             self,
             settings::{
-                CLEAR_CACHE, GET_PRIVACY_STATEMENT_BODY, GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY,
-                SET_SETTINGS,
+                GET_PRIVACY_STATEMENT_BODY, GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY, SET_SETTINGS,
             },
         },
         router::router,
@@ -46,11 +45,6 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .terms_and_privacy
                 .fetch_privacy_statement_body()
                 .await
-        }
-
-        mutation CLEAR_CACHE[app, _args: ()] {
-            let cache_manager = app.meta_cache_manager();
-            cache_manager.clear_all_cache(cache_manager).await
         }
     }
 }

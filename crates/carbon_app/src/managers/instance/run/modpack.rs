@@ -559,10 +559,13 @@ pub async fn process_modpack(
 
         trace!("marking modpack initialization as complete");
 
-        // Don't queue caching here - files are still in staging directory
-        // Caching will be done after staging is applied
-        tracing::info!("Skipping metadata caching - will be done after staging");
+        tracing::info!("queueing metadata caching for running instance");
         t_fill_cache.start_opaque();
+
+        app.meta_cache_manager()
+            .queue_caching(instance_id, true)
+            .await;
+
         t_fill_cache.complete_opaque();
 
         trace!("queued metadata caching");
@@ -791,31 +794,6 @@ pub async fn process_modpack_staging(
         tokio::fs::remove_dir_all(staging_dir).await?;
         trace!("Staging complete");
         t_subtasks.t_apply_staging.complete_opaque();
-
-        // Now that staging is complete and files are in their final location,
-        // we need to cache the mods
-        tracing::info!("Triggering mod caching after staging completion");
-
-        // Get the instance ID from the shortpath
-        let instance_manager = app.instance_manager();
-        let instances = instance_manager.instances.read().await;
-        let instance_id = instances
-            .iter()
-            .find(|(_, instance)| instance.shortpath == instance_shortpath)
-            .map(|(id, _)| *id);
-        drop(instances);
-
-        if let Some(instance_id) = instance_id {
-            tracing::info!("Starting metadata caching for instance: {}", instance_id);
-            app.meta_cache_manager()
-                .queue_caching_with_app(instance_id, true, app.meta_cache_manager())
-                .await;
-        } else {
-            tracing::error!(
-                "Could not find instance ID for shortpath: {}",
-                instance_shortpath
-            );
-        }
 
         if instance_root.join("tmp-packinfo.json").exists() {
             tokio::fs::rename(

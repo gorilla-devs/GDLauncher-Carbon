@@ -3,8 +3,8 @@ use super::{
     installer::{CurseforgeModInstaller, IntoInstaller, ModrinthModInstaller},
 };
 use crate::api::keys::instance::INSTANCE_MODS;
-use crate::domain::instance::info::{GameVersion, ModLoader, ModLoaderType};
-use crate::domain::instance::{self as domain, AddonType, info};
+use crate::domain::instance::info::{GameVersion, ModLoaderType};
+use crate::domain::instance::{self as domain, info};
 use crate::managers::AppInner;
 use crate::managers::instance::InstanceType;
 use crate::{domain::vtask::VisualTaskId, managers::ManagerRef};
@@ -26,9 +26,7 @@ use carbon_repos::db::{
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::Future;
 use std::borrow::Cow;
-use std::collections::HashSet;
 use std::str::FromStr;
-use std::time::Instant;
 use thiserror::Error;
 
 impl ManagerRef<'_, InstanceManager> {
@@ -367,8 +365,6 @@ impl ManagerRef<'_, InstanceManager> {
     }
 
     pub async fn delete_mod(self, instance_id: InstanceId, id: String) -> anyhow::Result<()> {
-        tracing::info!("delete_mod called for instance {} mod {}", instance_id, id);
-
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
@@ -385,66 +381,32 @@ impl ManagerRef<'_, InstanceManager> {
             .find_unique(fcdb::UniqueWhereParam::IdEquals(id.clone()))
             .exec()
             .await?
-            .ok_or(InvalidInstanceModIdError(instance_id, id.clone()))?;
+            .ok_or(InvalidInstanceModIdError(instance_id, id))?;
 
-        tracing::info!(
-            "Found mod in cache: filename={}, addon_type={}",
-            m.filename,
-            m.addon_type
-        );
-
-        // Get the correct addon type folder based on the mod's addon_type
-        let addon_type = AddonType::from_db_string(&m.addon_type)
-            .ok_or_else(|| anyhow!("Invalid addon type: {}", m.addon_type))?;
-
-        let instance_path = self
+        let mut disabled_path = self
             .app
             .settings_manager()
             .runtime_path
             .get_instances()
-            .get_instance_path(shortpath);
+            .get_instance_path(shortpath)
+            .get_mods_path();
 
-        let addon_dir = addon_type.get_folder_path(&instance_path);
-        let enabled_path = addon_dir.join(&m.filename);
+        let enabled_path = disabled_path.join(&m.filename);
 
         let mut disabled = m.filename.clone();
         disabled.push_str(".disabled");
-        let disabled_path = addon_dir.join(&disabled);
-
-        tracing::info!(
-            "Looking for mod files at: enabled={:?}, disabled={:?}",
-            enabled_path,
-            disabled_path
-        );
+        disabled_path.push(disabled);
 
         if enabled_path.is_file() {
-            tracing::info!("Deleting enabled mod file: {:?}", enabled_path);
-            tokio::fs::remove_file(&enabled_path).await?;
-            tracing::info!("Successfully deleted enabled mod file");
+            tokio::fs::remove_file(enabled_path).await?;
         } else if disabled_path.is_file() {
-            tracing::info!("Deleting disabled mod file: {:?}", disabled_path);
-            tokio::fs::remove_file(&disabled_path).await?;
-            tracing::info!("Successfully deleted disabled mod file");
-        } else {
-            tracing::warn!(
-                "Mod file not found at either {:?} or {:?}",
-                enabled_path,
-                disabled_path
-            );
+            tokio::fs::remove_file(disabled_path).await?;
         }
 
-        // Delete the mod from the database cache
-        tracing::info!("Deleting mod from database cache");
         self.app
-            .prisma_client
-            .mod_file_cache()
-            .delete(fcdb::UniqueWhereParam::IdEquals(m.id))
-            .exec()
-            .await?;
-        tracing::info!("Successfully deleted mod from database cache");
-
-        // Don't queue caching after deletion - it's unnecessary work
-        // The UI will be updated via invalidation from the installer
+            .meta_cache_manager()
+            .queue_caching(instance_id, true)
+            .await;
 
         Ok(())
     }
@@ -457,12 +419,6 @@ impl ManagerRef<'_, InstanceManager> {
         install_deps: bool,
         replaces_mod_id: Option<String>,
     ) -> anyhow::Result<VisualTaskId> {
-        tracing::info!(
-            "install_curseforge_mod: project_id={}, file_id={}, replaces_mod_id={:?}",
-            project_id,
-            file_id,
-            replaces_mod_id
-        );
         self.ensure_modpack_not_locked(instance_id).await?;
 
         let installer = CurseforgeModInstaller::create(self.app, project_id, file_id)
@@ -766,23 +722,12 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         id: String,
     ) -> anyhow::Result<VisualTaskId> {
-        tracing::info!(
-            "update_mod called with instance_id: {}, mod_id: {}",
-            instance_id,
-            id
-        );
         self.ensure_modpack_not_locked(instance_id).await?;
 
         let update = self.find_mod_update(instance_id, id.clone()).await?;
 
         match update {
             Some(RemoteVersion::Curseforge(file)) => {
-                tracing::info!(
-                    "Installing CurseForge update: project_id={}, file_id={}, replaces_mod_id={}",
-                    file.mod_id,
-                    file.id,
-                    id
-                );
                 self.install_curseforge_mod(
                     instance_id,
                     file.mod_id as u32,
@@ -793,12 +738,6 @@ impl ManagerRef<'_, InstanceManager> {
                 .await
             }
             Some(RemoteVersion::Modrinth(version)) => {
-                tracing::info!(
-                    "Installing Modrinth update: project_id={}, version_id={}, replaces_mod_id={}",
-                    version.project_id,
-                    version.id,
-                    id
-                );
                 self.install_modrinth_mod(
                     instance_id,
                     version.project_id,
@@ -1084,332 +1023,6 @@ mod test {
         let mods = app.instance_manager().list_mods(instance_id, None).await?;
         dbg!(&mods);
         assert_ne!(mods[0].curseforge, None);
-
-        Ok(())
-    }
-
-    /// Comprehensive integration test for mod auto-update logic and caching system
-    /// Tests the complete flow: install -> cache -> update -> verify caching performance
-    #[tokio::test]
-    #[ignore] // Requires network access and real mod downloads
-    async fn test_mod_auto_update_with_full_caching() -> anyhow::Result<()> {
-        use std::time::Instant;
-        use tokio::time::{Duration, timeout};
-
-        println!("🧪 Starting comprehensive mod auto-update and caching test");
-
-        // Setup test environment with full app infrastructure
-        let app = crate::setup_managers_for_test().await;
-
-        // Create test instance with Forge 1.20.1 (popular for mods)
-        let group = app.instance_manager().get_default_group().await?;
-        let instance_id = app
-            .instance_manager()
-            .create_instance(
-                group,
-                String::from("ModUpdateCachingTest"),
-                false,
-                InstanceVersionSource::Version(info::GameVersion::Standard(
-                    info::StandardVersion {
-                        release: String::from("1.20.1"),
-                        modloaders: {
-                            let mut set = HashSet::new();
-                            set.insert(info::ModLoader {
-                                type_: info::ModLoaderType::Forge,
-                                version: String::from("47.2.0"),
-                            });
-                            set
-                        },
-                    },
-                )),
-                String::new(),
-            )
-            .await?;
-
-        println!("✅ Created test instance: {}", instance_id);
-
-        // Phase 1: Install initial mod version (JEI - a popular mod with frequent updates)
-        println!("\n📦 Phase 1: Installing initial mod version");
-        let install_start = Instant::now();
-
-        // Install JEI (Modrinth) - known to have multiple versions for 1.20.1
-        app.instance_manager()
-            .install_modrinth_mod(
-                instance_id,
-                "u6dRKJwZ".to_string(), // JEI project ID
-                "TDBKa9oZ".to_string(), // Specific version for 1.20.1 (older)
-                true,
-                None,
-            )
-            .await?;
-
-        let install_duration = install_start.elapsed();
-        println!("⏱️ Initial install took: {:?}", install_duration);
-
-        // Wait for local caching to complete
-        println!("⏳ Waiting for local mod caching...");
-        timeout(
-            Duration::from_secs(30),
-            app.wait_for_invalidation(INSTANCE_MODS),
-        )
-        .await
-        .expect("Local caching should complete within 30 seconds")?;
-
-        // Verify mod was cached locally
-        let mods_after_install = app.instance_manager().list_mods(instance_id, None).await?;
-        assert_eq!(
-            mods_after_install.len(),
-            1,
-            "Should have exactly 1 mod installed"
-        );
-        let initial_mod = &mods_after_install[0];
-        let initial_mod_id = initial_mod.id.clone();
-
-        println!(
-            "✅ Initial mod cached: {} (ID: {})",
-            initial_mod
-                .metadata
-                .as_ref()
-                .and_then(|m| m.name.as_deref())
-                .unwrap_or("Unknown"),
-            initial_mod_id
-        );
-
-        // Wait for platform metadata caching (this tests our V2 system)
-        println!("⏳ Waiting for platform metadata caching...");
-        let metadata_start = Instant::now();
-
-        // Poll for platform metadata with timeout
-        let mut platform_metadata_ready = false;
-        for attempt in 1..=20 {
-            tokio::time::sleep(Duration::from_millis(500)).await;
-
-            let current_mods = app.instance_manager().list_mods(instance_id, None).await?;
-            if let Some(mod_with_metadata) = current_mods.first() {
-                if mod_with_metadata.modrinth.is_some() || mod_with_metadata.curseforge.is_some() {
-                    platform_metadata_ready = true;
-                    println!(
-                        "✅ Platform metadata ready after {} attempts ({:?})",
-                        attempt,
-                        metadata_start.elapsed()
-                    );
-                    break;
-                }
-            }
-
-            if attempt % 5 == 0 {
-                println!(
-                    "⏳ Still waiting for platform metadata... attempt {}/20",
-                    attempt
-                );
-            }
-        }
-
-        if !platform_metadata_ready {
-            println!(
-                "⚠️ Platform metadata not ready after 10 seconds - this may indicate V2 caching issues"
-            );
-        }
-
-        // Phase 2: Test mod update detection
-        println!("\n🔍 Phase 2: Testing mod update detection");
-
-        let updates = app
-            .instance_manager()
-            .find_mod_update(instance_id, initial_mod_id.clone())
-            .await;
-
-        match updates {
-            Ok(Some(update_info)) => {
-                println!("✅ Found available update for mod");
-
-                // Phase 3: Perform mod update and test caching performance
-                println!(
-                    "\n🚀 Phase 3: Performing mod update with caching performance measurement"
-                );
-
-                let update_start = Instant::now();
-
-                // This tests our optimized caching method
-                let update_result = app
-                    .instance_manager()
-                    .update_mod(instance_id, initial_mod_id.clone())
-                    .await;
-
-                match update_result {
-                    Ok(task_id) => {
-                        let update_duration = update_start.elapsed();
-                        println!("⏱️ Mod update completed in: {:?}", update_duration);
-
-                        // Performance assertion - should be much faster than old system
-                        if update_duration > Duration::from_secs(10) {
-                            println!(
-                                "⚠️ Update took longer than 10 seconds - performance regression detected"
-                            );
-                        } else {
-                            println!("✅ Update performance acceptable");
-                        }
-
-                        // Wait for UI invalidation after update
-                        timeout(
-                            Duration::from_secs(15),
-                            app.wait_for_invalidation(INSTANCE_MODS),
-                        )
-                        .await
-                        .expect("UI should update within 15 seconds after mod update")?;
-
-                        // Phase 4: Verify update was successful and properly cached
-                        println!("\n✅ Phase 4: Verifying update success and caching");
-
-                        let mods_after_update =
-                            app.instance_manager().list_mods(instance_id, None).await?;
-                        assert_eq!(
-                            mods_after_update.len(),
-                            1,
-                            "Should still have exactly 1 mod after update"
-                        );
-
-                        let updated_mod = &mods_after_update[0];
-
-                        // Verify it's a different mod (updated)
-                        assert_ne!(
-                            updated_mod.id, initial_mod_id,
-                            "Mod ID should change after update"
-                        );
-
-                        // Verify metadata is preserved/updated
-                        assert!(
-                            updated_mod
-                                .metadata
-                                .as_ref()
-                                .and_then(|m| m.name.as_ref())
-                                .is_some(),
-                            "Updated mod should have name"
-                        );
-
-                        println!(
-                            "✅ Updated mod: {} (New ID: {})",
-                            updated_mod
-                                .metadata
-                                .as_ref()
-                                .and_then(|m| m.name.as_deref())
-                                .unwrap_or("Unknown"),
-                            updated_mod.id
-                        );
-
-                        // Phase 5: Test V2 caching system functionality
-                        println!("\n🔧 Phase 5: Testing V2 caching system");
-
-                        // Get V2 statistics if available
-                        if let Some(v2_stats) = app.meta_cache_manager().get_v2_stats().await {
-                            println!("📊 V2 Caching Statistics:");
-                            println!(
-                                "  - Local scans completed: {}",
-                                v2_stats.local_scans_completed
-                            );
-                            println!("  - Local scans failed: {}", v2_stats.local_scans_failed);
-                            println!("  - Images processed: {}", v2_stats.images_processed);
-                            println!(
-                                "  - Platform requests completed: {}",
-                                v2_stats.platform_requests_completed
-                            );
-                            println!(
-                                "  - Avg local scan time: {:.2}ms",
-                                v2_stats.average_local_scan_time_ms
-                            );
-
-                            // Verify V2 system is working
-                            assert!(
-                                v2_stats.local_scans_completed > 0,
-                                "V2 should have completed local scans"
-                            );
-
-                            // Performance check for hash computation
-                            if v2_stats.average_local_scan_time_ms > 1000.0 {
-                                println!(
-                                    "⚠️ Average local scan time > 1s - performance issue detected"
-                                );
-                            } else {
-                                println!("✅ V2 local scan performance good");
-                            }
-                        } else {
-                            println!(
-                                "⚠️ V2 statistics not available - V2 system may not be running"
-                            );
-                        }
-
-                        // Phase 6: Test rapid successive operations (stress test)
-                        println!("\n🎯 Phase 6: Stress testing rapid cache operations");
-
-                        let stress_start = Instant::now();
-                        let mut cache_times = Vec::new();
-
-                        // Simulate rapid mod list requests (like frontend polling)
-                        for i in 1..=5 {
-                            let cache_op_start = Instant::now();
-                            let _mods = app.instance_manager().list_mods(instance_id, None).await?;
-                            let cache_op_duration = cache_op_start.elapsed();
-                            cache_times.push(cache_op_duration);
-
-                            println!("  Cache operation {}: {:?}", i, cache_op_duration);
-
-                            // Brief delay to simulate real usage
-                            tokio::time::sleep(Duration::from_millis(100)).await;
-                        }
-
-                        let stress_total = stress_start.elapsed();
-                        let avg_cache_time =
-                            cache_times.iter().sum::<Duration>() / cache_times.len() as u32;
-
-                        println!("📊 Stress test results:");
-                        println!("  - Total time for 5 operations: {:?}", stress_total);
-                        println!("  - Average cache operation time: {:?}", avg_cache_time);
-
-                        // Performance assertions
-                        assert!(
-                            avg_cache_time < Duration::from_millis(500),
-                            "Average cache operation should be < 500ms"
-                        );
-
-                        println!("\n🎉 All phases completed successfully!");
-                        println!("✅ Mod auto-update and caching system working correctly");
-                    }
-                    Err(e) => {
-                        println!("❌ Mod update failed: {:?}", e);
-                        // For this test, we'll continue even if update fails (might be no newer version)
-                        println!("ℹ️ This might be expected if no newer version is available");
-                    }
-                }
-            }
-            Ok(None) => {
-                println!("ℹ️ No updates available for this mod - test completed with limitation");
-                println!("✅ Update detection system working (no updates found)");
-            }
-            Err(e) => {
-                println!("❌ Update detection failed: {:?}", e);
-                return Err(e);
-            }
-        }
-
-        // Final verification - ensure system is in good state
-        let final_mods = app.instance_manager().list_mods(instance_id, None).await?;
-        assert!(
-            !final_mods.is_empty(),
-            "Should have at least one mod at the end"
-        );
-
-        println!("\n🏁 Test completed successfully!");
-        println!("📊 Final summary:");
-        println!("  - Mods in instance: {}", final_mods.len());
-        println!("  - Install time: {:?}", install_duration);
-
-        if let Some(v2_stats) = app.meta_cache_manager().get_v2_stats().await {
-            println!("  - V2 local scans: {}", v2_stats.local_scans_completed);
-            println!(
-                "  - V2 platform requests: {}",
-                v2_stats.platform_requests_completed
-            );
-        }
 
         Ok(())
     }

@@ -14,7 +14,6 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 
 mod account;
-mod cache;
 pub mod instance;
 mod java;
 pub mod keys;
@@ -178,7 +177,6 @@ pub fn build_rspc_router(gdl_base_api: String) -> RouterBuilder<App> {
         .merge(keys::instance::GROUP_PREFIX, instance::mount())
         .merge(keys::modplatforms::GROUP_PREFIX, modplatforms::mount())
         .merge(keys::settings::GROUP_PREFIX, settings::mount())
-        .merge(keys::cache::GROUP_PREFIX, cache::mount())
         .merge(keys::metrics::GROUP_PREFIX, metrics::mount())
         .merge(keys::systeminfo::GROUP_PREFIX, system_info::mount())
 }

@@ -194,6 +194,10 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 return Ok(None);
             };
 
+            app.meta_cache_manager()
+                .watch_and_prioritize(Some(id.into()))
+                .await;
+
             let result = app.instance_manager()
                 .list_mods(id.into(), args.addon_type)
                 .await?
@@ -443,25 +447,6 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 ).await?;
 
             Ok(FETaskId::from(task))
-        }
-
-        query GET_CACHE_STATUS[app, instance_id: FEInstanceId] {
-            let meta_cache = app.meta_cache_manager();
-            let status = meta_cache.get_instance_cache_status(instance_id.into()).await;
-
-            // Convert the status to our frontend enum
-            // Using pattern matching via string representation
-            // This is a temporary workaround until the types are properly exposed
-            let status_str = format!("{:?}", status);
-            let fe_status = match status_str.as_str() {
-                "Idle" => FEInstanceCacheStatus::Idle,
-                "Pending" => FEInstanceCacheStatus::Pending,
-                "Loading" => FEInstanceCacheStatus::Loading,
-                "Done" => FEInstanceCacheStatus::Done,
-                _ => FEInstanceCacheStatus::Idle,
-            };
-
-            Ok(fe_status)
         }
     }
 }
@@ -1829,14 +1814,6 @@ pub struct SearchLogsQuery {
     match_case: bool,
     match_whole_word: bool,
     use_regex: bool,
-}
-
-#[derive(Debug, Type, Serialize)]
-pub enum FEInstanceCacheStatus {
-    Idle,
-    Pending,
-    Loading,
-    Done,
 }
 
 #[derive(Debug, Type, Serialize)]

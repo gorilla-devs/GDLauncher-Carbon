@@ -111,133 +111,56 @@ impl ManagerRef<'_, VisualTaskManager> {
 
     #[cfg(test)]
     pub async fn wait_with_log(self, task_id: VisualTaskId) -> anyhow::Result<()> {
-        use std::time::Duration;
-        use tracing::{error, info};
+        use tracing::info;
 
-        tracing::info!(
-            "🔍 TASK_MANAGER: Starting wait_with_log for task {:?}",
-            task_id
-        );
-
-        // Use shorter timeout in tests to prevent hanging
-        let timeout_duration = if cfg!(test) {
-            Duration::from_secs(30)
-        } else {
-            Duration::from_secs(120)
+        let tasklist = self.tasks.read().await;
+        let Some(task) = tasklist.get(&task_id) else {
+            info!("task already exited");
+            return Ok(());
         };
 
-        let result = tokio::time::timeout(timeout_duration, async {
-            let tasklist = self.tasks.read().await;
-            let Some(task) = tasklist.get(&task_id) else {
-                tracing::info!("✅ TASK_MANAGER: Task {:?} already exited", task_id);
-                return Ok(());
+        let mut notify = task.notify_rx.clone();
+
+        while notify.changed().await.is_ok() {
+            if let NotifyState::Drop = *notify.borrow() {
+                break;
+            }
+
+            let domain = task.make_domain_task().await;
+
+            let progress = match &domain.progress {
+                domain::Progress::Indeterminate => String::from("unk"),
+                domain::Progress::Known(p) => format!("{}%", p * 100.0),
+                domain::Progress::Failed(_) => String::from("fail"),
             };
 
-            // Check if task is already completed before waiting
-            let domain = task.make_domain_task().await;
-            match &domain.progress {
-                domain::Progress::Failed(e) => {
-                    error!("Task {:?} already failed: {e:?}", task_id);
-                    drop(tasklist);
-                    return Err(anyhow::anyhow!("Task already failed: {e:?}"));
-                }
-                _ => {}
-            }
+            info!(" -- Task Update ({progress}): {:?}", domain.name);
 
-            let mut notify = task.notify_rx.clone();
-            drop(tasklist);
-            tracing::info!(
-                "📡 TASK_MANAGER: Got notify receiver for task {:?}",
-                task_id
-            );
-
-            let mut iteration = 0;
-            while notify.changed().await.is_ok() {
-                iteration += 1;
-                tracing::info!(
-                    "🔄 TASK_MANAGER: Iteration {} - Got notification for task {:?}",
-                    iteration,
-                    task_id
-                );
-
-                if let NotifyState::Drop = *notify.borrow() {
-                    tracing::info!(
-                        "🏁 TASK_MANAGER: Task {:?} received Drop notification, breaking",
-                        task_id
-                    );
-                    break;
-                }
-
-                // Re-read task state to get latest info
-                let tasklist = self.tasks.read().await;
-                let Some(task) = tasklist.get(&task_id) else {
-                    tracing::info!(
-                        "✅ TASK_MANAGER: Task {:?} disappeared, assuming completed",
-                        task_id
-                    );
-                    return Ok(());
+            for task in domain.active_subtasks {
+                let progress = match task.progress {
+                    domain::SubtaskProgress::Opaque => String::from("opaque"),
+                    domain::SubtaskProgress::Download { downloaded, total } => format!(
+                        "{}kb / {}kb",
+                        downloaded as f32 * 0.001,
+                        total as f32 * 0.001
+                    ),
+                    domain::SubtaskProgress::Item { current, total } => {
+                        format!("{current} / {total}")
+                    }
                 };
 
-                let domain = task.make_domain_task().await;
-                drop(tasklist);
-
-                let progress = match &domain.progress {
-                    domain::Progress::Indeterminate => String::from("unk"),
-                    domain::Progress::Known(p) => format!("{}%", p * 100.0),
-                    domain::Progress::Failed(_) => String::from("fail"),
-                };
-
-                info!(" -- Task Update ({progress}): {:?}", domain.name);
-
-                for subtask in domain.active_subtasks {
-                    let progress = match subtask.progress {
-                        domain::SubtaskProgress::Opaque => String::from("opaque"),
-                        domain::SubtaskProgress::Download { downloaded, total } => format!(
-                            "{}kb / {}kb",
-                            downloaded as f32 * 0.001,
-                            total as f32 * 0.001
-                        ),
-                        domain::SubtaskProgress::Item { current, total } => {
-                            format!("{current} / {total}")
-                        }
-                    };
-
-                    info!("Subtask ({progress}): {:?}", subtask.name);
-                }
-
-                match &domain.progress {
-                    domain::Progress::Failed(e) => {
-                        error!("Failure: {e:?}");
-                        break;
-                    }
-                    domain::Progress::Known(p) if *p >= 1.0 => {
-                        // Task completed (100%), wait a moment for final cleanup then exit
-                        info!("Task {:?} completed (100%), exiting wait_with_log", task_id);
-                        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                        break;
-                    }
-                    _ => {}
-                }
+                info!("Subtask ({progress}): {:?}", task.name);
             }
 
-            tracing::info!("🎉 TASK_MANAGER: Task {:?} exited successfully", task_id);
-            Ok(())
-        })
-        .await;
-
-        match result {
-            Ok(inner_result) => inner_result,
-            Err(_) => {
-                error!(
-                    "⏰ TASK_MANAGER: Task {:?} wait timed out after {:?}",
-                    task_id, timeout_duration
-                );
-                Err(anyhow::anyhow!(
-                    "Task wait timed out after {:?}",
-                    timeout_duration
-                ))
+            if let domain::Progress::Failed(e) = &domain.progress {
+                error!("Failure: {e:?}");
+                break;
             }
         }
+
+        info!("task exited");
+
+        Ok(())
     }
 }
 

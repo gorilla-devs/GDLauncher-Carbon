@@ -26,7 +26,7 @@ pub mod account;
 pub mod download;
 pub mod instance;
 pub mod java;
-pub mod metadata;
+mod metadata;
 mod metrics;
 mod minecraft;
 pub mod modplatforms;
@@ -159,63 +159,53 @@ mod app {
             account::AccountRefreshService::start(Arc::downgrade(&app)).await;
             info!("Account refresh service started in {:?}", timer.elapsed());
 
-            if !cfg!(test) {
-                let _app = app.clone();
-                tokio::spawn(async move {
-                    _app.clone()
-                        .instance_manager()
-                        .launch_background_tasks()
-                        .await;
-                    _app.meta_cache_manager()
-                        .launch_background_tasks(_app.meta_cache_manager())
-                        .await;
+            let _app = app.clone();
+            tokio::spawn(async move {
+                _app.clone()
+                    .instance_manager()
+                    .launch_background_tasks()
+                    .await;
+                _app.meta_cache_manager().launch_background_tasks().await;
 
-                    update_core_module_status(CoreModuleStatus::LaunchBackgroundTasks);
-                });
-            }
+                update_core_module_status(CoreModuleStatus::LaunchBackgroundTasks);
+            });
 
-            if !cfg!(test) {
-                let _app = app.clone();
-                tokio::spawn(async move {
-                    let settings = _app.settings_manager().get_settings().await;
+            let _app = app.clone();
+            tokio::spawn(async move {
+                let settings = _app.settings_manager().get_settings().await;
 
-                    match settings {
-                        Ok(settings) => {
-                            let show_app_close_warning = settings.show_app_close_warning;
-                            info!("_SHOW_APP_CLOSE_WARNING_:{}", show_app_close_warning);
-                            println!("_SHOW_APP_CLOSE_WARNING_:{}", show_app_close_warning);
-                            info!("_POTATO_PC_MODE_:{}", settings.reduced_motion);
-                            println!("_POTATO_PC_MODE_:{}", settings.reduced_motion);
-                        }
-                        Err(e) => {
-                            error!("Error getting settings: {e}");
-                        }
-                    };
-                });
-            }
+                match settings {
+                    Ok(settings) => {
+                        let show_app_close_warning = settings.show_app_close_warning;
+                        info!("_SHOW_APP_CLOSE_WARNING_:{}", show_app_close_warning);
+                        println!("_SHOW_APP_CLOSE_WARNING_:{}", show_app_close_warning);
+                        info!("_POTATO_PC_MODE_:{}", settings.reduced_motion);
+                        println!("_POTATO_PC_MODE_:{}", settings.reduced_motion);
+                    }
+                    Err(e) => {
+                        error!("Error getting settings: {e}");
+                    }
+                };
+            });
 
-            if !cfg!(test) {
-                let _app = app.clone();
-                tokio::spawn(async move {
-                    let _ = _app.clone().rich_presence_manager().start_presence().await;
-                });
-            }
+            let _app = app.clone();
+            tokio::spawn(async move {
+                let _ = _app.clone().rich_presence_manager().start_presence().await;
+            });
 
-            if !cfg!(test) {
-                let _app = app.clone();
-                tokio::spawn(async move {
-                    let _ = _app
-                        .reqwest_client
-                        .get(format!("{}/v1/announcement", gdl_base_api))
-                        .send()
-                        .await;
+            let _app = app.clone();
+            tokio::spawn(async move {
+                let _ = _app
+                    .reqwest_client
+                    .get(format!("{}/v1/announcement", gdl_base_api))
+                    .send()
+                    .await;
 
-                    let _ = _app
-                        .metrics_manager()
-                        .track_event(domain::metrics::GDLMetricsEvent::LauncherStarted)
-                        .await;
-                });
-            }
+                let _ = _app
+                    .metrics_manager()
+                    .track_event(domain::metrics::GDLMetricsEvent::LauncherStarted)
+                    .await;
+            });
 
             app
         }
