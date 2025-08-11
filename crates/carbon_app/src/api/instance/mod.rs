@@ -189,17 +189,13 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok(result)
         }
 
-        query INSTANCE_MODS[app, args: GetInstanceModsQuery] {
-            let Some(id) = args.instance_id else {
-                return Ok(None);
-            };
-
+        query INSTANCE_MODS[app, instance_id: FEInstanceId] {
             app.meta_cache_manager()
-                .watch_and_prioritize(Some(id.into()))
+                .watch_and_prioritize(Some(instance_id.into()))
                 .await;
 
             let result = app.instance_manager()
-                .list_mods(id.into(), args.addon_type)
+                .list_mods(instance_id.into(), None)
                 .await?
                 .into_iter()
                 .map(Into::into)
@@ -753,12 +749,6 @@ struct SetFavorite {
 struct InstanceMod {
     instance_id: FEInstanceId,
     mod_id: String,
-}
-
-#[derive(Type, Debug, Deserialize)]
-struct GetInstanceModsQuery {
-    instance_id: Option<FEInstanceId>,
-    addon_type: Option<domain::AddonType>,
 }
 
 #[derive(Type, Debug, Deserialize)]

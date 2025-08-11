@@ -20,7 +20,7 @@ const fetchData = ({ params }) => {
   const _instanceMods = rspc.createQuery(() => ({
     queryKey: [
       "instance.getInstanceMods",
-      { instance_id: parseInt(params.id, 10), addon_type: null }
+      parseInt(params.id, 10)
     ]
   }))
 

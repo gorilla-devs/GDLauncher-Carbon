@@ -5,9 +5,9 @@ import { Trans } from "@gd/i18n"
 import CacheStatusPopover from "./CacheStatusPopover"
 
 export const CacheStatusIcon = () => {
-  // Use RSPC query for cache status
-  const cacheStatusQuery = rspc.createQuery(() => ({
-    queryKey: ["cache.getCacheStatus"]
+  // Use RSPC query for tasks status (replaces cache status)
+  const tasksQuery = rspc.createQuery(() => ({
+    queryKey: ["vtask.getTasks"]
   }))
 
   let intervalId: NodeJS.Timeout | undefined
@@ -16,10 +16,10 @@ export const CacheStatusIcon = () => {
     // Poll for updates every 2 seconds when there are active tasks
     intervalId = setInterval(() => {
       if (
-        cacheStatusQuery.data?.currentTasks &&
-        cacheStatusQuery.data.currentTasks.length > 0
+        tasksQuery.data &&
+        tasksQuery.data.length > 0
       ) {
-        cacheStatusQuery.refetch()
+        tasksQuery.refetch()
       }
     }, 2000)
   })
@@ -31,13 +31,13 @@ export const CacheStatusIcon = () => {
   })
 
   const getCurrentTasksCount = () => {
-    return cacheStatusQuery.data?.currentTasks?.length || 0
+    return tasksQuery.data?.length || 0
   }
 
   const hasActiveTasks = () => getCurrentTasksCount() > 0
 
   return (
-    <Show when={cacheStatusQuery.data || cacheStatusQuery.isLoading}>
+    <Show when={tasksQuery.data || tasksQuery.isLoading}>
       <CacheStatusPopover>
         <Tab ignored>
           <Tooltip>

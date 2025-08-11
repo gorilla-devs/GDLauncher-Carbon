@@ -25,7 +25,7 @@ const Versions = () => {
   const instanceMods = rspc.createQuery(() => ({
     queryKey: [
       "instance.getInstanceMods",
-      { instance_id: instanceId(), addon_type: null }
+      instanceId()
     ]
   }))
 

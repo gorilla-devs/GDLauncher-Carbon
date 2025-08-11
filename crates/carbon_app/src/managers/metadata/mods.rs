@@ -6,10 +6,29 @@ use std::{
 };
 
 use anyhow::{anyhow, bail};
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use zip::read::ZipFile;
 
 use crate::domain::instance::{self as domain, info::ModLoaderType};
+
+fn deserialize_authors_flexible<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum AuthorsField {
+        String(String),
+        Array(Vec<String>),
+    }
+
+    let authors = Option::<AuthorsField>::deserialize(deserializer)?;
+    Ok(match authors {
+        Some(AuthorsField::String(s)) => Some(s),
+        Some(AuthorsField::Array(vec)) => Some(vec.join(", ")),
+        None => None,
+    })
+}
 
 #[derive(Deserialize)]
 #[serde(untagged)]
@@ -104,6 +123,7 @@ struct ModsTomlEntry {
     #[serde(rename = "displayName")]
     display_name: String,
     description: Option<String>,
+    #[serde(deserialize_with = "deserialize_authors_flexible")]
     authors: Option<String>,
     #[serde(rename = "logoFile")]
     logo_file: Option<String>,

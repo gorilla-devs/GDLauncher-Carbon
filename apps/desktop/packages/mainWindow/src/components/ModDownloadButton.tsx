@@ -44,15 +44,30 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
       createEffect(() => {
         if (task?.data?.progress.type === "Known") {
           setProgress(Math.round(task?.data?.progress.value * 100))
+        } else if (task?.data === null && taskId() !== null) {
+          // Task was completed and removed from task manager
+          // Refetch the instance mods to update installation status
+          searchContext?.selectedInstanceMods?.refetch()
+          setLoading(false)
+          setTaskId(null)
+          setProgress(null)
         }
       })
     }
   })
 
   const installedMod = () => {
-    return searchContext?.selectedInstanceMods?.data?.find(
-      (mod) => mod.id === props.addon?.id
-    )
+    return searchContext?.selectedInstanceMods?.data?.find((mod) => {
+      if (!props.addon) return false
+      
+      if (props.addon.platform === "curseforge") {
+        return mod.curseforge?.project_id === parseInt(props.addon.id.toString(), 10)
+      } else if (props.addon.platform === "modrinth") {
+        return mod.modrinth?.project_id === props.addon.id.toString()
+      }
+      
+      return false
+    })
   }
 
   const installModMutation = rspc.createMutation(() => ({

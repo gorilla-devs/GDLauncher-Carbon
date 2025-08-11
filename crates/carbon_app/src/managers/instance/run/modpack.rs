@@ -596,6 +596,7 @@ pub async fn process_modpack(
 // the instance will be in an inconsistent state.
 pub async fn process_modpack_staging(
     app: Arc<AppInner>,
+    instance_id: InstanceId,
     instance_shortpath: String,
     t_subtasks: &TSubtasks,
 ) -> anyhow::Result<()> {
@@ -804,6 +805,11 @@ pub async fn process_modpack_staging(
         }
 
         tokio::fs::write(setup_path.join("modpack-complete"), "").await?;
+        
+        // Trigger caching now that modpack installation is complete
+        app.meta_cache_manager()
+            .watch_and_prioritize(Some(instance_id))
+            .await;
     }
 
     Ok(())

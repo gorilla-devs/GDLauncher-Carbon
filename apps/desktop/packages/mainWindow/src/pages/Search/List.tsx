@@ -11,7 +11,7 @@ import {
   Tabs
 } from "@gd/ui"
 import { Tab, TabList } from "@gd/ui"
-import { For, onMount, Show } from "solid-js"
+import { For, onMount, Show, createMemo } from "solid-js"
 import { FEUnifiedSearchType } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useLocation, useParams, useSearchParams } from "@solidjs/router"
@@ -95,13 +95,11 @@ export function List() {
   })
 
   const installedMods = rspc.createQuery(() => ({
-    queryKey: [
-      "instance.getInstanceMods",
-      { instance_id: instanceId(), addon_type: null }
-    ]
+    queryKey: ["instance.getInstanceMods", instanceId()],
+    enabled: !isNaN(instanceId()) && instanceId() > 0
   }))
 
-  const lookupTableInstalledMods: () => Set<string> = () => {
+  const lookupTableInstalledMods = createMemo(() => {
     const curseforgeMods =
       installedMods.data?.reduce((acc: string[], mod) => {
         if (mod.curseforge?.project_id) {
@@ -121,7 +119,7 @@ export function List() {
     const map = new Set([...curseforgeMods, ...modrinthMods])
 
     return map
-  }
+  })
 
   return (
     <div class="flex h-full flex-col pb-6">
@@ -138,7 +136,7 @@ export function List() {
             size="small"
             type="outline"
             onClick={() => {
-              navigator.navigate(`/library/${instanceId()}/mods`)
+              navigator.navigate(`/library/${instanceId()}/addons`)
             }}
           >
             <div class="i-ri:arrow-left-line" />
@@ -233,14 +231,14 @@ export function List() {
                 return <Skeleton.searchListItem />
               }
 
-              const isInstalled = lookupTableInstalledMods().has(
-                result.value!.id
+              const isInstalled = createMemo(() =>
+                lookupTableInstalledMods().has(result.value!.id)
               )
 
               return (
                 <ListItem
                   result={result.value!}
-                  isInstalled={isInstalled}
+                  isInstalled={isInstalled()}
                   onItemClick={() => {
                     navigator.navigate(
                       `/addon/${result.value!.id}/${result.value!.platform}?instanceId=${instanceId()}`

@@ -48,10 +48,7 @@ export const useAddonData = () => {
   const allAddons = rspc.createQuery(() => ({
     queryKey: [
       "instance.getInstanceMods",
-      {
-        instance_id: parseInt(params.id, 10),
-        addon_type: null
-      }
+      parseInt(params.id, 10)
     ]
   }))
 

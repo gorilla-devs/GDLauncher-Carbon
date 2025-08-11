@@ -75,7 +75,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   const selectedInstanceMods = rspc.createQuery(() => ({
     queryKey: [
       "instance.getInstanceMods",
-      { instance_id: selectedInstanceId(), addon_type: null }
+      selectedInstanceId()
     ],
     enabled: !!selectedInstanceId()
   }))

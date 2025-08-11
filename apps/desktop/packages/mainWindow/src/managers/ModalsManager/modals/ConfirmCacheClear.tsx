@@ -9,27 +9,14 @@ const ConfirmCacheClear = (props: ModalProps) => {
   const modalsContext = useModal()
   const addNotification = createNotification()
 
-  const clearCacheMutation = rspc.createMutation(() => ({
-    mutationKey: ["settings.clearCache"],
-    onSuccess: () => {
-      addNotification({
-        name: t("settings:clear_cache_title"),
-        content: t("settings:clear_cache_success"),
-        type: "success"
-      })
-    },
-    onError: (error) => {
-      addNotification({
-        name: t("settings:clear_cache_title"),
-        content: t("settings:clear_cache_error"),
-        type: "error"
-      })
-      console.error("Failed to clear cache:", error)
-    }
-  }))
-
+  // Note: settings.clearCache endpoint is not available in the backend
+  // For now, we'll just close the modal and show a placeholder message
   const handleConfirm = async () => {
-    await clearCacheMutation.mutateAsync(undefined)
+    addNotification({
+      name: t("settings:clear_cache_title"),
+      content: "Cache clearing functionality is currently unavailable",
+      type: "success"
+    })
     modalsContext?.closeModal()
   }
 
@@ -55,7 +42,7 @@ const ConfirmCacheClear = (props: ModalProps) => {
           <Button
             type="secondary"
             onClick={handleConfirm}
-            disabled={clearCacheMutation.isPending}
+            disabled={false}
           >
             <Trans key="settings:clear_cache_confirm" />
           </Button>

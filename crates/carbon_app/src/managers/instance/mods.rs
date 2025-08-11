@@ -223,23 +223,21 @@ impl ManagerRef<'_, InstanceManager> {
                             .flatten()
                             .is_some(),
                     }),
-                    modrinth: m.metadata.and_then(|m| m.modrinth).flatten().map(|m| {
-                        domain::ModrinthModMetadata {
-                            project_id: m.project_id,
-                            version_id: m.version_id,
-                            title: m.title,
-                            version: m.version,
-                            urlslug: m.urlslug,
-                            description: m.description,
-                            authors: m.authors,
-                            has_image: m
-                                .logo_image
-                                .flatten()
-                                .as_ref()
-                                .map(|row| row.data.as_ref().map(|_| ()))
-                                .flatten()
-                                .is_some(),
-                        }
+                    modrinth: mr.map(|m| domain::ModrinthModMetadata {
+                        project_id: m.project_id,
+                        version_id: m.version_id,
+                        title: m.title,
+                        version: m.version,
+                        urlslug: m.urlslug,
+                        description: m.description,
+                        authors: m.authors,
+                        has_image: m
+                            .logo_image
+                            .flatten()
+                            .as_ref()
+                            .map(|row| row.data.as_ref().map(|_| ()))
+                            .flatten()
+                            .is_some(),
                     }),
                     has_update: has_curseforge_update || has_modrinth_update,
                 }

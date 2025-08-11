@@ -26,19 +26,31 @@ const switchStyles = cva(
 )
 
 const toggleStyles = cva(
-  "absolute content-[] w-4 h-4 bottom-0.5 rounded-full transition-all duration-100 ease-in-out",
+  "absolute content-[] w-4 h-4 bottom-0.5 left-0.5 rounded-full transition-all duration-100 ease-in-out",
   {
     variants: {
       position: {
-        start: "translate-x-0.5 bg-darkSlate-800",
-        middle: "translate-x-3 bg-white",
-        end: "translate-x-5 bg-white"
+        start: "translate-x-0",
+        middle: "translate-x-2.5",
+        end: "translate-x-4.5"
       },
       disabled: {
         true: "bg-darkSlate-50",
         false: ""
       }
     },
+    compoundVariants: [
+      {
+        position: "start",
+        disabled: false,
+        class: "bg-darkSlate-800"
+      },
+      {
+        position: ["middle", "end"],
+        disabled: false,
+        class: "bg-white"
+      }
+    ],
     defaultVariants: {
       position: "start",
       disabled: false

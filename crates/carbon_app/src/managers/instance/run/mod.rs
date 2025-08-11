@@ -286,9 +286,6 @@ impl ManagerRef<'_, InstanceManager> {
             None => None,
         };
 
-        app.meta_cache_manager()
-            .watch_and_prioritize(Some(instance_id))
-            .await;
 
         let result = app.instance_manager().list_mods(instance_id, None).await?;
         let msg = format!(
@@ -340,6 +337,7 @@ impl ManagerRef<'_, InstanceManager> {
                 .await?;
                 modpack::process_modpack_staging(
                     Arc::clone(&app),
+                    instance_id,
                     instance_shortpath.clone(),
                     &t_subtasks,
                 )

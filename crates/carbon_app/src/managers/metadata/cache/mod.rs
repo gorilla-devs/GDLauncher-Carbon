@@ -29,12 +29,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic;
 use std::sync::atomic::AtomicI32;
+use tokio::sync::Semaphore;
 use std::thread::available_parallelism;
 use std::usize;
 use tokio::io::AsyncSeekExt;
 use tokio::sync::RwLock;
 use tokio::sync::RwLockReadGuard;
-use tokio::sync::Semaphore;
 use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::sync::watch;
@@ -60,7 +60,6 @@ pub struct MetaCacheManager {
     local_targets: LockNotify<CacheTargets>,
     curseforge_targets: LockNotify<CacheTargets>,
     modrinth_targets: LockNotify<CacheTargets>,
-    targets_semaphore: Semaphore,
     image_scale_semaphore: Semaphore,
     image_download_semaphore: Semaphore,
     watched_instance: watch::Sender<Option<InstanceId>>,
@@ -81,13 +80,13 @@ impl MetaCacheManager {
             local_targets: LockNotify::new(CacheTargets::new()),
             curseforge_targets: LockNotify::new(CacheTargets::new()),
             modrinth_targets: LockNotify::new(CacheTargets::new()),
-            targets_semaphore: Semaphore::new(20),
             image_scale_semaphore: Semaphore::new(1),
             image_download_semaphore: Semaphore::new(10),
             watched_instance: watch::channel(None).0,
             pause_caching: watch::channel(false).0,
         }
     }
+
 }
 
 #[derive(Clone)]
@@ -98,11 +97,11 @@ struct UpdateNotifier {
 
 impl UpdateNotifier {
     fn send(&self, instance_id: InstanceId) {
-        let target = self.target.load(atomic::Ordering::SeqCst);
+        // let target = self.target.load(atomic::Ordering::SeqCst);
 
-        if target == *instance_id {
+        // if target == *instance_id {
             let _ = self.sender.send(());
-        }
+        // }
     }
 }
 
@@ -571,14 +570,16 @@ fn cache_modplatform<C: ModplatformCacher>(
                     };
 
                     let do_caching = async {
-                        debug!({ is_priority, is_override }, "Beginning {} mod caching for instance {instance_id}", C::NAME);
+                        info!({ is_priority, is_override }, "Starting {} mod caching for instance {}", C::NAME, instance_id);
 
                         // true could be optimized to "if there is a callback" if this is a bottleneck
                         let mut sender = BundleSender::new(instance_id, true, is_priority, batch_tx);
                         let r = C::query_platform(&app, instance_id, &mut sender).await;
 
                         if let Err(e) = &r {
-                            tracing::error!({ error = ?e }, "Could not query {} mod metadata for instance {instance_id}", C::NAME);
+                            tracing::error!({ error = ?e }, "Could not query {} mod metadata for instance {}", C::NAME, instance_id);
+                        } else {
+                            info!("Completed {} mod caching for instance {}", C::NAME, instance_id);
                         }
 
                         sender.wait().await;
@@ -588,11 +589,12 @@ fn cache_modplatform<C: ModplatformCacher>(
 
                     tokio::select! {
                         _ = wait_for_pause => {
-                            tracing::info!("Remote mod caching paused");
+                            info!("Remote {} mod caching paused for instance {instance_id} - waiting for unpause", C::NAME);
 
                             // wait for unpause
                             loop {
                                 if !*pause.borrow() {
+                                    info!("Remote {} mod caching unpaused for instance {instance_id} - resuming", C::NAME);
                                     break;
                                 }
 
@@ -633,9 +635,10 @@ fn cache_modplatform<C: ModplatformCacher>(
 
         let mut image_loop_watcher = LoopWatcher::new(image_rx).await;
         let image_loop = image_loop_watcher.loop_interrupt(|instance_id| async move {
-            debug!("Caching {} mod icons for instance {instance_id}", C::NAME);
+            info!("Starting {} mod icon caching for instance {instance_id}", C::NAME);
 
             C::cache_icons(&app, instance_id, &update_notifier).await;
+            info!("Completed {} mod icon caching for instance {instance_id}", C::NAME);
 
             |_: &mut Option<InstanceId>| false
         });
@@ -806,15 +809,23 @@ impl ManagerRef<'_, MetaCacheManager> {
     }
 
     pub async fn watch_and_prioritize(self, instance_id: Option<InstanceId>) {
-        let _ = self.watched_instance.send(instance_id);
-
-        if let Some(instance_id) = instance_id {
-            self.cache_with_priority(instance_id).await;
+        match instance_id {
+            Some(id) => {
+                info!("Switching cache priority to instance {id}");
+                let _ = self.watched_instance.send(instance_id);
+                self.cache_with_priority(id).await;
+            }
+            None => {
+                info!("Clearing cache priority - no instance being watched");
+                let _ = self.watched_instance.send(instance_id);
+            }
         }
     }
 
     pub async fn queue_caching(self, instance_id: InstanceId, _force: bool) {
         // TODO: make track scanned instances for _force
+        info!("Queuing mod caching for instance {}", instance_id);
+        
         self.local_targets
             .send_modify_always(|targets| {
                 targets.waiting.push_back(instance_id);
@@ -832,6 +843,12 @@ impl ManagerRef<'_, MetaCacheManager> {
 
             loop {
                 let any_instance_running = *any_instance_changed_watcher.borrow();
+
+                if any_instance_running {
+                    info!("Pausing mod caching - instance is running");
+                } else {
+                    info!("Resuming mod caching - no instances running");
+                }
 
                 app_pause
                     .meta_cache_manager()
@@ -1000,7 +1017,7 @@ impl ManagerRef<'_, MetaCacheManager> {
         let meta = match meta {
             Ok(meta) => meta,
             Err(e) => {
-                warn!({ error = ?e }, "could not parse mod metadata for {}", mod_filename);
+                debug!({ error = ?e }, "could not parse mod metadata for {}", mod_filename);
                 None
             }
         };
@@ -1090,33 +1107,38 @@ impl ManagerRef<'_, MetaCacheManager> {
             }
         };
 
-        let filecache_delete = self.app.prisma_client.mod_file_cache().delete_many(vec![
-            fcdb::WhereParam::InstanceId(IntFilter::Equals(*instance_id)),
-            fcdb::WhereParam::Filename(StringFilter::Equals(mod_filename.to_string())),
-        ]);
-
-        let filecache_insert = self.app.prisma_client.mod_file_cache().create(
-            carbon_repos::db::instance::UniqueWhereParam::IdEquals(*instance_id),
-            mod_filename.to_string(),
-            content_len as i32,
-            enabled,
-            metadb::UniqueWhereParam::IdEquals(meta_id.clone()),
-            vec![fcdb::SetParam::SetAddonType(addon_type)],
-        );
-
-        debug!(
-            "updating metadata entries for {}/{mod_filename}",
-            *instance_id
-        );
+        if let Some(meta_insert) = meta_insert {
+            meta_insert.exec().await?;
+        }
+        
+        if let Some(logo_insert) = logo_insert {
+            logo_insert.exec().await?;
+        }
 
         self.app
             .prisma_client
-            ._batch((
-                meta_insert.into_iter().collect::<Vec<_>>(),
-                logo_insert.into_iter().collect::<Vec<_>>(),
-                filecache_delete,
-                filecache_insert,
-            ))
+            .mod_file_cache()
+            .upsert(
+                fcdb::UniqueWhereParam::InstanceIdFilenameEquals(
+                    *instance_id,
+                    mod_filename.to_string(),
+                ),
+                fcdb::create(
+                    carbon_repos::db::instance::UniqueWhereParam::IdEquals(*instance_id),
+                    mod_filename.to_string(),
+                    content_len as i32,
+                    enabled,
+                    metadb::UniqueWhereParam::IdEquals(meta_id.clone()),
+                    vec![fcdb::SetParam::SetAddonType(addon_type.clone())],
+                ),
+                vec![
+                    fcdb::SetParam::SetFilesize(content_len as i32),
+                    fcdb::SetParam::SetEnabled(enabled),
+                    fcdb::SetParam::SetMetadataId(meta_id.clone()),
+                    fcdb::SetParam::SetAddonType(addon_type),
+                ],
+            )
+            .exec()
             .await?;
 
         Ok(meta_id)
@@ -1191,10 +1213,13 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
             let instance_path = InstancesPath::subpath().get_instance_path(&instance.shortpath);
 
             drop(instances);
+            
+            info!("Starting local mod caching for instance {}", instance_id);
 
             let root_path = app.settings_manager().runtime_path.get_root().to_path();
 
             let mut modpaths = HashMap::<String, (bool, u64, String)>::new();
+            let mut total_files_scanned = 0;
 
             // Scan all addon types
             for addon_type in crate::domain::instance::AddonType::all() {
@@ -1204,13 +1229,12 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                 pathbuf.push(&addon_subpath);
 
                 if !pathbuf.is_dir() {
-                    trace!(
-                        "skipping {addon_type:?} folder for instance {instance_id} as it does not exist"
-                    );
+                    debug!("Skipping {:?} directory for instance {} - does not exist: {}", addon_type, instance_id, pathbuf.display());
                     continue;
                 }
+                
+                debug!("Scanning {:?} directory for instance {}: {}", addon_type, instance_id, pathbuf.display());
 
-                trace!({ dir = ?pathbuf }, "scanning {addon_type:?} dir for instance {instance_id}");
                 let mut entries = match tokio::fs::read_dir(&pathbuf).await {
                     Ok(entries) => entries,
                     Err(e) => {
@@ -1243,11 +1267,11 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                             continue;
                         }
 
-                        trace!("tracking world `{utf8_name}` for instance {instance_id}");
                         modpaths.insert(
                             utf8_name.to_string(),
                             (true, metadata.len(), addon_type.to_db_string().to_string()),
                         );
+                        total_files_scanned += 1;
                     } else {
                         let allowed_base_ext = allowed_extensions
                             .iter()
@@ -1274,7 +1298,6 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                             continue;
                         }
 
-                        trace!("tracking {addon_type:?} `{utf8_name}` for instance {instance_id}");
                         modpaths.insert(
                             utf8_name.to_string(),
                             (
@@ -1283,11 +1306,15 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                                 addon_type.to_db_string().to_string(),
                             ),
                         );
+                        total_files_scanned += 1;
                     }
                 }
             }
+            
+            debug!("File scanning complete for instance {}: found {} files total", instance_id, total_files_scanned);
 
             let mut has_outdated_entries = false;
+            let files_needing_update_count = modpaths.len();
 
             if let Ok(Ok(cached_entries)) = cached_entries.await {
                 has_outdated_entries = cached_entries.len() != modpaths.len();
@@ -1300,22 +1327,10 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                             && *addon_type == entry.addon_type
                         {
                             modpaths.remove(&entry.filename);
-                            // trace!(
-                            //     "up to data metadata entry for mod `{}`, skipping",
-                            //     &entry.filename
-                            // );
                             continue;
                         }
 
-                        trace!(
-                            "outdated metadata entry for mod `{}`, adding to update list",
-                            &entry.filename
-                        );
                     } else {
-                        trace!(
-                            "removed metadata entry for mod `{}`, removing",
-                            &entry.filename
-                        );
 
                         app.prisma_client
                             .mod_file_cache()
@@ -1381,13 +1396,24 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                 .into_iter()
                 .collect::<anyhow::Result<()>>();
 
-            if let Err(e) = r {
-                error!({ error = ?e }, "could not store mod scan results for instance {instance_id} in db");
-            }
+            let success_count = match &r {
+                Ok(_) => files_needing_update_count,
+                Err(e) => {
+                    error!({ error = ?e }, "could not store mod scan results for instance {instance_id} in db");
+                    0
+                }
+            };
 
             if has_outdated_entries {
                 let _ = update_notifier.send(instance_id);
             }
+
+            info!(
+                "Completed local mod caching for instance {}: scanned {} files, updated {} entries",
+                instance_id,
+                total_files_scanned,
+                success_count
+            );
 
             Ok(())
         };
@@ -1415,7 +1441,7 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                     };
 
                     let do_caching = async {
-                        debug!("Beginning local mod caching for instance {instance_id}");
+                        info!("Beginning local mod caching for instance {instance_id}");
 
                         let r = cache_instance(instance_id).await;
 
@@ -1425,6 +1451,7 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
 
                         // waiting list targets cascade into curseforge and modrinth caching.
                         if !is_override && !is_priority {
+                            info!("Cascading to platform caching for instance {}", instance_id);
                             let mcm = app.meta_cache_manager();
 
                             join!(
@@ -1438,11 +1465,12 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
 
                     tokio::select! {
                         _ = wait_for_pause => {
-                            tracing::info!("Local mod caching paused");
+                            info!("Local mod caching paused for instance {instance_id} - waiting for unpause");
 
                             // wait for unpause
                             loop {
                                 if !*pause.borrow() {
+                                    info!("Local mod caching unpaused for instance {instance_id} - resuming");
                                     break;
                                 }
 
