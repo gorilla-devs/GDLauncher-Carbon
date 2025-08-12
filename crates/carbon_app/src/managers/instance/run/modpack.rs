@@ -805,7 +805,7 @@ pub async fn process_modpack_staging(
         }
 
         tokio::fs::write(setup_path.join("modpack-complete"), "").await?;
-        
+
         // Trigger caching now that modpack installation is complete
         app.meta_cache_manager()
             .watch_and_prioritize(Some(instance_id))

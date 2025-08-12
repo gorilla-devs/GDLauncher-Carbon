@@ -90,7 +90,10 @@ impl ModplatformCacher for CurseforgeModCacher {
         }
 
         let total_mod_count = modlist.len();
-        debug!("Found {} mods to process for CurseForge caching", total_mod_count);
+        debug!(
+            "Found {} mods to process for CurseForge caching",
+            total_mod_count
+        );
 
         let failed_instances = mcm.failed_cf_instances.read().await;
         let delay = failed_instances.get(&instance_id);
@@ -363,7 +366,6 @@ async fn cache_curseforge_meta_unchecked(
     modinfo: &Mod,
     mod_files: &[File],
 ) -> anyhow::Result<()> {
-
     // This is undocumented, we're guessing what the valid values here are.
     // It seems to contain both game versions and modloaders
     fn parse_update_paths(file_info: &File) -> Vec<(String, ModLoaderType, ModChannel)> {
@@ -435,7 +437,9 @@ async fn cache_curseforge_meta_unchecked(
     if let Ok(Some(existing_entry)) = app
         .prisma_client
         .curse_forge_mod_cache()
-        .find_unique(cfdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()))
+        .find_unique(cfdb::UniqueWhereParam::MetadataIdEquals(
+            metadata_id.clone(),
+        ))
         .exec()
         .await
     {
@@ -444,7 +448,8 @@ async fn cache_curseforge_meta_unchecked(
         }
     }
 
-    let cache_result = app.prisma_client
+    let cache_result = app
+        .prisma_client
         .curse_forge_mod_cache()
         .upsert(
             cfdb::UniqueWhereParam::ProjectIdFileIdEquals(modinfo.id as i32, fileinfo.id as i32),
@@ -481,7 +486,8 @@ async fn cache_curseforge_meta_unchecked(
         .await?;
 
     if let Some(logo) = &modinfo.logo {
-        if let Err(e) = app.prisma_client
+        if let Err(e) = app
+            .prisma_client
             .curse_forge_mod_image_cache()
             .upsert(
                 cfimgdb::UniqueWhereParam::MetadataIdEquals(cache_result.metadata_id.clone()),
@@ -499,12 +505,14 @@ async fn cache_curseforge_meta_unchecked(
                 ],
             )
             .exec()
-            .await 
+            .await
         {
-            warn!("Failed to upsert curseforge image for metadata_id {}: {:?}", cache_result.metadata_id, e);
+            warn!(
+                "Failed to upsert curseforge image for metadata_id {}: {:?}",
+                cache_result.metadata_id, e
+            );
         }
     }
-
 
     Ok(())
 }

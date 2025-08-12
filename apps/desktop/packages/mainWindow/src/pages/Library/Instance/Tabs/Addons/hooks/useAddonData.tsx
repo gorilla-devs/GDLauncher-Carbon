@@ -1,4 +1,4 @@
-import { createSignal, createMemo, createEffect } from "solid-js"
+import { createSignal, createMemo, createEffect, onMount } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
 import { useParams } from "@solidjs/router"
 import { rspc } from "@/utils/rspcClient"
@@ -44,13 +44,26 @@ export const useAddonData = () => {
     new Set()
   )
 
-  // Fetch all addons at once
+  const [cachePrioritized, setCachePrioritized] = createSignal(false)
+
   const allAddons = rspc.createQuery(() => ({
     queryKey: [
       "instance.getInstanceMods",
       parseInt(params.id, 10)
     ]
   }))
+
+  const prioritizeCache = rspc.createMutation(() => ({
+    mutationKey: ["instance.prioritizeInstanceCache"]
+  }))
+
+  onMount(() => {
+    const instanceId = parseInt(params.id, 10)
+    if (!isNaN(instanceId) && !cachePrioritized()) {
+      setCachePrioritized(true)
+      prioritizeCache.mutate(instanceId)
+    }
+  })
 
   // Reconcile addons data to maintain stable object references
   createEffect(() => {

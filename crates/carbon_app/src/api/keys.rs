@@ -101,6 +101,7 @@ keys! {
         SET_FAVORITE                                = "setFavorite";
         INSTANCE_DETAILS                            = "getInstanceDetails";
         INSTANCE_MODS                               = "getInstanceMods";
+        PRIORITIZE_INSTANCE_CACHE                   = "prioritizeInstanceCache";
         PREPARE_INSTANCE                            = "prepareInstance";
         LAUNCH_INSTANCE                             = "launchInstance";
         KILL_INSTANCE                               = "killInstance";

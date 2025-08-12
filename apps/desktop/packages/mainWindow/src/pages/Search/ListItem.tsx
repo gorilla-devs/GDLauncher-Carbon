@@ -65,11 +65,11 @@ export function ListItem(props: SearchResultItemProps) {
 
           <div class="ml-auto flex items-center">
             <div class="relative flex items-center">
-              {/* Download count and platform icon - visible by default, hidden on hover */}
+              {/* Download count and platform icon - visible by default, slides right on hover */}
               <div
-                class="flex items-center gap-2 transition-opacity duration-200"
+                class="flex items-center gap-2 transition-all duration-200"
                 classList={{
-                  "opacity-100 group-hover:opacity-0": !props.isInstalled,
+                  "opacity-100 translate-x-0 group-hover:opacity-0 group-hover:translate-x-8": !props.isInstalled,
                   "opacity-0": props.isInstalled
                 }}
               >
@@ -86,12 +86,12 @@ export function ListItem(props: SearchResultItemProps) {
                 />
               </div>
 
-              {/* Install button - hidden by default, visible on hover */}
+              {/* Install button - slides in from left on hover */}
               <div
-                class="absolute right-4 flex items-center justify-center transition-opacity duration-200"
+                class="absolute right-0 flex items-center justify-center transition-all duration-200"
                 classList={{
-                  "opacity-0 group-hover:opacity-100": !props.isInstalled,
-                  "opacity-100": props.isInstalled
+                  "opacity-0 -translate-x-16 group-hover:opacity-100 group-hover:translate-x-0": !props.isInstalled,
+                  "opacity-100 translate-x-0": props.isInstalled
                 }}
                 onClick={(e) => {
                   e.stopPropagation()

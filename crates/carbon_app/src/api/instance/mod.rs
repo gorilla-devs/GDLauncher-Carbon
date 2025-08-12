@@ -190,10 +190,6 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         query INSTANCE_MODS[app, instance_id: FEInstanceId] {
-            app.meta_cache_manager()
-                .watch_and_prioritize(Some(instance_id.into()))
-                .await;
-
             let result = app.instance_manager()
                 .list_mods(instance_id.into(), None)
                 .await?
@@ -202,6 +198,14 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .collect::<Vec<Mod>>();
 
             Ok(Some(result))
+        }
+
+        mutation PRIORITIZE_INSTANCE_CACHE[app, instance_id: Option<FEInstanceId>] {
+            app.meta_cache_manager()
+                .watch_and_prioritize(instance_id.map(|id| id.into()))
+                .await;
+
+            Ok(())
         }
 
         mutation PREPARE_INSTANCE[app, id: FEInstanceId] {

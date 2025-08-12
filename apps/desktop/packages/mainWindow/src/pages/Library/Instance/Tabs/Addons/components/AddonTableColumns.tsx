@@ -269,9 +269,11 @@ export const createAddonColumns = (config: ColumnConfig) => {
         const isUpdating = () => config.isModUpdating(mod.id)
 
         const handleUpdate = async () => {
-          if (isUpdating()) return
+          if (isUpdating() || config.isInstanceLocked()) return
           await config.onUpdateMod(mod)
         }
+
+        const isDisabled = () => isUpdating() || config.isInstanceLocked()
 
         return (
           <Show
@@ -284,8 +286,8 @@ export const createAddonColumns = (config: ColumnConfig) => {
                   variant={isUpdating() ? "secondary" : "success"}
                   class="flex items-center gap-1 transition-opacity"
                   classList={{
-                    "cursor-pointer hover:opacity-80": !isUpdating(),
-                    "opacity-70 cursor-not-allowed": isUpdating()
+                    "cursor-pointer hover:opacity-80": !isDisabled(),
+                    "opacity-70 cursor-not-allowed": isDisabled()
                   }}
                   onMouseDown={(e) => e.stopPropagation()}
                   onClick={handleUpdate}
@@ -308,10 +310,17 @@ export const createAddonColumns = (config: ColumnConfig) => {
               </TooltipTrigger>
               <TooltipContent>
                 <Show
-                  when={isUpdating()}
-                  fallback={<Trans key="instance.update_mod" />}
+                  when={config.isInstanceLocked()}
+                  fallback={
+                    <Show
+                      when={isUpdating()}
+                      fallback={<Trans key="instance.update_mod" />}
+                    >
+                      <Trans key="updating" />
+                    </Show>
+                  }
                 >
-                  <Trans key="updating" />
+                  <Trans key="instance.locked_cannot_apply_changes" />
                 </Show>
               </TooltipContent>
             </Tooltip>

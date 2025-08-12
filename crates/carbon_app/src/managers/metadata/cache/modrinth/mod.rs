@@ -79,7 +79,10 @@ impl ModplatformCacher for ModrinthModCacher {
         }
 
         let total_mod_count = modlist.len();
-        debug!("Found {} mods to process for Modrinth caching", total_mod_count);
+        debug!(
+            "Found {} mods to process for Modrinth caching",
+            total_mod_count
+        );
 
         let failed_instances = mcm.failed_mr_instances.read().await;
         let delay = failed_instances.get(&instance_id);
@@ -231,8 +234,7 @@ impl ModplatformCacher for ModrinthModCacher {
         let combined_versions = &combined_versions;
         let futures = batch.into_iter().filter_map(|(metadata_id, sha512)| {
             let sha512_match = matches.remove(&sha512);
-            sha512_match.map(|(project, team, version)| {
-                async move {
+            sha512_match.map(|(project, team, version)| async move {
                 let file = version
                     .files
                     .iter()
@@ -265,7 +267,6 @@ impl ModplatformCacher for ModrinthModCacher {
 
                 if let Err(e) = r {
                     error!({ error = ?e }, "Could not store modrinth mod metadata");
-                }
                 }
             })
         });
@@ -414,7 +415,6 @@ async fn cache_modrinth_meta_unchecked(
     authors: String,
     versions: &[Version],
 ) -> anyhow::Result<()> {
-
     let mut file_update_paths = HashSet::<(&str, ModLoaderType, ModChannel)>::new();
 
     let mut versions_sorted = versions.iter().collect::<Vec<_>>();
@@ -460,7 +460,9 @@ async fn cache_modrinth_meta_unchecked(
     if let Ok(Some(existing_entry)) = app
         .prisma_client
         .modrinth_mod_cache()
-        .find_unique(mrdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()))
+        .find_unique(mrdb::UniqueWhereParam::MetadataIdEquals(
+            metadata_id.clone(),
+        ))
         .exec()
         .await
     {
@@ -469,10 +471,14 @@ async fn cache_modrinth_meta_unchecked(
         }
     }
 
-    let cache_result = app.prisma_client
+    let cache_result = app
+        .prisma_client
         .modrinth_mod_cache()
         .upsert(
-            mrdb::UniqueWhereParam::ProjectIdVersionIdEquals(project.id.clone(), version.id.clone()),
+            mrdb::UniqueWhereParam::ProjectIdVersionIdEquals(
+                project.id.clone(),
+                version.id.clone(),
+            ),
             mrdb::create(
                 sha512.clone(),
                 project.id.clone(),
@@ -510,7 +516,8 @@ async fn cache_modrinth_meta_unchecked(
         .await?;
 
     if let Some(icon_url) = &project.icon_url {
-        if let Err(e) = app.prisma_client
+        if let Err(e) = app
+            .prisma_client
             .modrinth_mod_image_cache()
             .upsert(
                 mrimgdb::UniqueWhereParam::MetadataIdEquals(cache_result.metadata_id.clone()),
@@ -528,12 +535,14 @@ async fn cache_modrinth_meta_unchecked(
                 ],
             )
             .exec()
-            .await 
+            .await
         {
-            warn!("Failed to upsert modrinth image for metadata_id {}: {:?}", cache_result.metadata_id, e);
+            warn!(
+                "Failed to upsert modrinth image for metadata_id {}: {:?}",
+                cache_result.metadata_id, e
+            );
         }
     }
-
 
     Ok(())
 }

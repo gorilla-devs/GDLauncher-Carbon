@@ -216,15 +216,6 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
         }
     });
 
-    let _app = app2.clone();
-    tokio::spawn(async move {
-        _app.meta_cache_manager().launch_background_tasks().await;
-        _app.clone()
-            .instance_manager()
-            .launch_background_tasks()
-            .await;
-    });
-
     axum::serve(listener, app.into_make_service())
         .await
         .unwrap();

@@ -130,6 +130,7 @@ const Addons = () => {
               onTableReady={(table) => {
                 tableInstance = table
               }}
+              isInstanceLocked={isInstanceLocked}
               mutations={{
                 handleToggleMod: addonMutations.handleToggleMod,
                 handleUpdateMod: addonMutations.handleUpdateMod,

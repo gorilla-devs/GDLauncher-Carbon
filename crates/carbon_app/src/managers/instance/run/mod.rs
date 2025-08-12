@@ -286,7 +286,6 @@ impl ManagerRef<'_, InstanceManager> {
             None => None,
         };
 
-
         let result = app.instance_manager().list_mods(instance_id, None).await?;
         let msg = format!(
             "Mods ({} enabled / {} disabled): {}",

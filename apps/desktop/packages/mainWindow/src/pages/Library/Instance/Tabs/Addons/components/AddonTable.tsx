@@ -68,6 +68,7 @@ interface AddonTableProps {
   scrollContainerRef?: HTMLElement
   /** Configuration for virtualization behavior */
   virtualizationConfig?: VirtualizationConfig
+  isInstanceLocked: () => boolean
   /** Mutation handlers */
   mutations?: {
     handleToggleMod: (mod: ModType) => Promise<void>
@@ -570,7 +571,8 @@ export const AddonTable = (props: AddonTableProps) => {
             }
           },
           icon: mod.enabled ? "i-ri:toggle-fill" : "i-ri:toggle-line",
-          id: "toggle"
+          id: "toggle",
+          disabled: props.isInstanceLocked()
         }
       ]
 
@@ -584,7 +586,8 @@ export const AddonTable = (props: AddonTableProps) => {
             }
           },
           icon: "i-ri:download-2-fill",
-          id: "update"
+          id: "update",
+          disabled: props.isInstanceLocked()
         })
       }
 
@@ -695,7 +698,8 @@ export const AddonTable = (props: AddonTableProps) => {
         },
         destructive: true,
         icon: "i-ri:delete-bin-2-fill",
-        id: "delete"
+        id: "delete",
+        disabled: props.isInstanceLocked()
       }
 
       // Add some spacing items if platform submenu exists
@@ -752,7 +756,8 @@ export const AddonTable = (props: AddonTableProps) => {
             }
           },
           icon: "i-ri:toggle-fill",
-          id: "enable-all"
+          id: "enable-all",
+          disabled: props.isInstanceLocked()
         })
       }
 
@@ -770,7 +775,8 @@ export const AddonTable = (props: AddonTableProps) => {
             }
           },
           icon: "i-ri:toggle-line",
-          id: "disable-all"
+          id: "disable-all",
+          disabled: props.isInstanceLocked()
         })
       }
 
@@ -786,7 +792,8 @@ export const AddonTable = (props: AddonTableProps) => {
             }
           },
           icon: "i-ri:download-2-fill",
-          id: "update-selected"
+          id: "update-selected",
+          disabled: props.isInstanceLocked()
         })
       }
 
@@ -802,7 +809,8 @@ export const AddonTable = (props: AddonTableProps) => {
           },
           destructive: true,
           icon: "i-ri:delete-bin-2-fill",
-          id: "delete"
+          id: "delete",
+          disabled: props.isInstanceLocked()
         }
       )
 
