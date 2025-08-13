@@ -113,20 +113,33 @@ impl ManagerRef<'_, VisualTaskManager> {
     pub async fn wait_with_log(self, task_id: VisualTaskId) -> anyhow::Result<()> {
         use tracing::info;
 
-        let tasklist = self.tasks.read().await;
-        let Some(task) = tasklist.get(&task_id) else {
-            info!("task already exited");
-            return Ok(());
-        };
+        let mut notify = {
+            let tasklist = self.tasks.read().await;
+            let Some(task) = tasklist.get(&task_id) else {
+                info!("task already exited");
+                return Ok(());
+            };
 
-        let mut notify = task.notify_rx.clone();
+            let notify = task.notify_rx.clone();
+            notify
+        }; // tasklist is dropped here, releasing the strong reference to the task
 
         while notify.changed().await.is_ok() {
             if let NotifyState::Drop = *notify.borrow() {
+                info!("Received Drop notification, exiting wait_with_log");
                 break;
             }
 
-            let domain = task.make_domain_task().await;
+            // For logging, we need to get the task again, but only temporarily
+            let domain = {
+                let tasklist = self.tasks.read().await;
+                if let Some(task) = tasklist.get(&task_id) {
+                    task.make_domain_task().await
+                } else {
+                    // Task was removed from the list, exit
+                    break;
+                }
+            };
 
             let progress = match &domain.progress {
                 domain::Progress::Indeterminate => String::from("unk"),
@@ -193,6 +206,7 @@ enum NotifyState {
 impl Drop for VisualTask {
     fn drop(&mut self) {
         if self.owner {
+            tracing::info!("VisualTask owner dropped, sending Drop notification");
             let _ = self.notify_tx.send(NotifyState::Drop);
         }
     }
@@ -527,6 +541,7 @@ mod test {
     use crate::managers::vtask::{TaskState, VisualTask};
 
     #[tokio::test]
+    #[tracing_test::traced_test]
     async fn test() {
         let app = crate::setup_managers_for_test().await;
 

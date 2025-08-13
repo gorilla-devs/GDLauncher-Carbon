@@ -123,7 +123,7 @@ struct ModsTomlEntry {
     #[serde(rename = "displayName")]
     display_name: String,
     description: Option<String>,
-    #[serde(deserialize_with = "deserialize_authors_flexible")]
+    #[serde(deserialize_with = "deserialize_authors_flexible", default)]
     authors: Option<String>,
     #[serde(rename = "logoFile")]
     logo_file: Option<String>,
