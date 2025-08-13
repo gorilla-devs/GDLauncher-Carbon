@@ -69,7 +69,8 @@ export function ListItem(props: SearchResultItemProps) {
               <div
                 class="flex items-center gap-2 transition-all duration-200"
                 classList={{
-                  "opacity-100 translate-x-0 group-hover:opacity-0 group-hover:translate-x-8": !props.isInstalled,
+                  "opacity-100 translate-x-0 group-hover:opacity-0 group-hover:translate-x-8":
+                    !props.isInstalled,
                   "opacity-0": props.isInstalled
                 }}
               >
@@ -90,7 +91,8 @@ export function ListItem(props: SearchResultItemProps) {
               <div
                 class="absolute right-0 flex items-center justify-center transition-all duration-200"
                 classList={{
-                  "opacity-0 -translate-x-16 group-hover:opacity-100 group-hover:translate-x-0": !props.isInstalled,
+                  "opacity-0 -translate-x-16 group-hover:opacity-100 group-hover:translate-x-0":
+                    !props.isInstalled,
                   "opacity-100 translate-x-0": props.isInstalled
                 }}
                 onClick={(e) => {

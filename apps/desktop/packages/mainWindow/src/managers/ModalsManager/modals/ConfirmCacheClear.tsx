@@ -1,4 +1,3 @@
-import { rspc } from "@/utils/rspcClient"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
 import { Button, createNotification } from "@gd/ui"
@@ -39,11 +38,7 @@ const ConfirmCacheClear = (props: ModalProps) => {
           >
             <Trans key="settings:clear_cache_cancel" />
           </Button>
-          <Button
-            type="secondary"
-            onClick={handleConfirm}
-            disabled={false}
-          >
+          <Button type="secondary" onClick={handleConfirm} disabled={false}>
             <Trans key="settings:clear_cache_confirm" />
           </Button>
         </div>

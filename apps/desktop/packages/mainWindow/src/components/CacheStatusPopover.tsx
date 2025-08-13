@@ -1,19 +1,6 @@
-import {
-  Component,
-  Show,
-  For,
-  onMount,
-  onCleanup
-} from "solid-js"
+import { Component, Show, For, onMount, onCleanup } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
-import {
-  Button,
-  Badge,
-  Progressbar,
-  Popover,
-  PopoverTrigger,
-  PopoverContent
-} from "@gd/ui"
+import { Progressbar, Popover, PopoverTrigger, PopoverContent } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
 
 interface CacheStatusPopoverProps {
@@ -26,7 +13,6 @@ const CacheStatusPopover: Component<CacheStatusPopoverProps> = (props) => {
   const tasksQuery = rspc.createQuery(() => ({
     queryKey: ["vtask.getTasks"]
   }))
-  
 
   let intervalId: NodeJS.Timeout | undefined
 
@@ -44,11 +30,11 @@ const CacheStatusPopover: Component<CacheStatusPopoverProps> = (props) => {
 
   const formatTaskName = (task: any): string => {
     if (!task?.name) return "Unknown task"
-    
-    if (typeof task.name === 'object') {
+
+    if (typeof task.name === "object") {
       const translation = task.name.translation
       const args = task.name.args
-      
+
       if (translation === "CacheTaskLocal" && args?.instance_name) {
         return `🗂️ Local cache: ${args.instance_name}`
       }
@@ -58,27 +44,32 @@ const CacheStatusPopover: Component<CacheStatusPopoverProps> = (props) => {
       if (translation === "CacheTaskModrinth" && args?.instance_name) {
         return `🟢 Modrinth: ${args.instance_name}`
       }
-      
+
       if (translation) {
-        return translation.replace(/([A-Z])/g, ' $1').replace(/^./, (str: string) => str.toUpperCase()).trim()
+        return translation
+          .replace(/([A-Z])/g, " $1")
+          .replace(/^./, (str: string) => str.toUpperCase())
+          .trim()
       }
     }
-    
+
     return String(task.name)
   }
 
   const formatSubtaskName = (subtask: any): string => {
     if (!subtask?.name) return "Unknown subtask"
-    
-    if (typeof subtask.name === 'object') {
+
+    if (typeof subtask.name === "object") {
       const translation = subtask.name.translation
       const args = subtask.name.args
-      
+
       if (translation === "CacheSubtaskScanningFiles") {
         return t("CacheSubtaskScanningDirectories")
       }
       if (translation === "CacheSubtaskQueryingPlatform" && args?.platform) {
-        return t("CacheSubtaskQueryingPlatformDatabase", { platform: args.platform })
+        return t("CacheSubtaskQueryingPlatformDatabase", {
+          platform: args.platform
+        })
       }
       if (translation === "CacheSubtaskDownloadingImages") {
         return t("CacheSubtaskDownloadingThumbnails")
@@ -86,33 +77,44 @@ const CacheStatusPopover: Component<CacheStatusPopoverProps> = (props) => {
       if (translation === "CacheSubtaskFinalizingCache") {
         return t("CacheSubtaskProcessingFiles")
       }
-      
+
       if (translation) {
-        return translation.replace(/([A-Z])/g, ' $1').replace(/^./, (str: string) => str.toUpperCase()).trim()
+        return translation
+          .replace(/([A-Z])/g, " $1")
+          .replace(/^./, (str: string) => str.toUpperCase())
+          .trim()
       }
     }
-    
+
     return String(subtask.name)
   }
 
   const getSubtaskProgress = (subtask: any): string => {
     if (!subtask?.progress) return ""
-    
+
     const progress = subtask.progress
-    
+
     if (progress.current !== undefined && progress.total !== undefined) {
       return `${progress.current}/${progress.total}`
     }
-    
-    if (progress.Item && progress.Item.current !== undefined && progress.Item.total !== undefined) {
+
+    if (
+      progress.Item &&
+      progress.Item.current !== undefined &&
+      progress.Item.total !== undefined
+    ) {
       return `${progress.Item.current}/${progress.Item.total}`
     }
-    
-    if (progress.item && progress.item.current !== undefined && progress.item.total !== undefined) {
+
+    if (
+      progress.item &&
+      progress.item.current !== undefined &&
+      progress.item.total !== undefined
+    ) {
       const current = progress.item.current
       const total = progress.item.total
-      
-      if (typeof subtask.name === 'object' && subtask.name.translation) {
+
+      if (typeof subtask.name === "object" && subtask.name.translation) {
         const translation = subtask.name.translation
         if (translation === "CacheSubtaskScanningFiles") {
           return t("CacheProgressDirectories", { current, total })
@@ -123,29 +125,37 @@ const CacheStatusPopover: Component<CacheStatusPopoverProps> = (props) => {
       }
       return `${current}/${total}`
     }
-    
+
     if (progress.downloaded !== undefined && progress.total !== undefined) {
       return `${Math.round(progress.downloaded / 1024 / 1024)}MB / ${Math.round(progress.total / 1024 / 1024)}MB`
     }
-    
-    if (progress.Download && progress.Download.downloaded !== undefined && progress.Download.total !== undefined) {
+
+    if (
+      progress.Download &&
+      progress.Download.downloaded !== undefined &&
+      progress.Download.total !== undefined
+    ) {
       return `${Math.round(progress.Download.downloaded / 1024 / 1024)}MB / ${Math.round(progress.Download.total / 1024 / 1024)}MB`
     }
-    
-    if (progress.download && progress.download.downloaded !== undefined && progress.download.total !== undefined) {
+
+    if (
+      progress.download &&
+      progress.download.downloaded !== undefined &&
+      progress.download.total !== undefined
+    ) {
       return `${Math.round(progress.download.downloaded / 1024 / 1024)}MB / ${Math.round(progress.download.total / 1024 / 1024)}MB`
     }
-    
+
     return ""
   }
 
   const getProgressPercentage = (task: any): number => {
     if (!task?.progress) return 0
-    
+
     if (task.progress.type === "Known") {
       return Math.round(task.progress.value * 100)
     }
-    
+
     return 0
   }
 
@@ -157,13 +167,15 @@ const CacheStatusPopover: Component<CacheStatusPopoverProps> = (props) => {
             <h4 class="font-medium text-lightSlate-50 text-sm truncate mb-1">
               {formatTaskName(task)}
             </h4>
-            <Show when={task.active_subtasks && task.active_subtasks.length > 0}>
+            <Show
+              when={task.active_subtasks && task.active_subtasks.length > 0}
+            >
               <p class="text-xs text-lightSlate-400 truncate">
                 {formatSubtaskName(task.active_subtasks[0])}
               </p>
             </Show>
           </div>
-          
+
           <div class="flex items-center gap-2 ml-3">
             <Show when={task.progress?.type === "Failed"}>
               <div class="flex items-center gap-1 px-2 py-1 bg-red-500/20 text-red-300 rounded-md text-xs">
@@ -179,7 +191,7 @@ const CacheStatusPopover: Component<CacheStatusPopoverProps> = (props) => {
             </Show>
           </div>
         </div>
-        
+
         <Show when={task.progress?.type === "Known"}>
           <div class="mb-3">
             <div class="flex items-center justify-between mb-1">
@@ -191,13 +203,14 @@ const CacheStatusPopover: Component<CacheStatusPopoverProps> = (props) => {
             <Progressbar percentage={getProgressPercentage(task)} />
           </div>
         </Show>
-        
+
         <Show when={task.downloaded && task.download_total}>
           <div class="mb-3">
             <div class="flex items-center justify-between text-xs">
               <span class="text-lightSlate-400">Downloaded</span>
               <span class="text-lightSlate-300 font-mono">
-                {Math.round(task.downloaded / 1024 / 1024)}MB / {Math.round(task.download_total / 1024 / 1024)}MB
+                {Math.round(task.downloaded / 1024 / 1024)}MB /{" "}
+                {Math.round(task.download_total / 1024 / 1024)}MB
               </span>
             </div>
           </div>
@@ -239,9 +252,7 @@ const CacheStatusPopover: Component<CacheStatusPopoverProps> = (props) => {
 
   return (
     <Popover>
-      <PopoverTrigger>
-        {props.children}
-      </PopoverTrigger>
+      <PopoverTrigger>{props.children}</PopoverTrigger>
       <PopoverContent class="w-[420px] bg-darkSlate-900/95 backdrop-blur-xl border-darkSlate-600/50 shadow-2xl">
         <div class="p-5">
           <div class="flex items-center justify-between mb-6">
@@ -255,15 +266,19 @@ const CacheStatusPopover: Component<CacheStatusPopoverProps> = (props) => {
                 </h3>
                 <Show when={tasksQuery.data && tasksQuery.data.length > 0}>
                   <p class="text-xs text-lightSlate-400 mt-0.5">
-                    <Trans 
-                      key={tasksQuery.data?.length === 1 ? "TaskStatusActiveCount_one" : "TaskStatusActiveCount_other"} 
-                      options={{ count: tasksQuery.data?.length }} 
+                    <Trans
+                      key={
+                        tasksQuery.data?.length === 1
+                          ? "TaskStatusActiveCount_one"
+                          : "TaskStatusActiveCount_other"
+                      }
+                      options={{ count: tasksQuery.data?.length }}
                     />
                   </p>
                 </Show>
               </div>
             </div>
-            
+
             <Show when={tasksQuery.data && tasksQuery.data.length > 0}>
               <div class="flex items-center gap-1 px-2 py-1 bg-green-500/10 text-green-400 rounded-md text-xs">
                 <div class="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />

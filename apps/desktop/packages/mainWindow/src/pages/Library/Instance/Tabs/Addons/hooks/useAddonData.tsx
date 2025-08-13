@@ -47,10 +47,7 @@ export const useAddonData = () => {
   const [cachePrioritized, setCachePrioritized] = createSignal(false)
 
   const allAddons = rspc.createQuery(() => ({
-    queryKey: [
-      "instance.getInstanceMods",
-      parseInt(params.id, 10)
-    ]
+    queryKey: ["instance.getInstanceMods", parseInt(params.id, 10)]
   }))
 
   const prioritizeCache = rspc.createMutation(() => ({

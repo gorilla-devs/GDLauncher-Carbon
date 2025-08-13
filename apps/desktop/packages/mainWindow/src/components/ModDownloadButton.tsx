@@ -59,13 +59,15 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   const installedMod = () => {
     return searchContext?.selectedInstanceMods?.data?.find((mod) => {
       if (!props.addon) return false
-      
+
       if (props.addon.platform === "curseforge") {
-        return mod.curseforge?.project_id === parseInt(props.addon.id.toString(), 10)
+        return (
+          mod.curseforge?.project_id === parseInt(props.addon.id.toString(), 10)
+        )
       } else if (props.addon.platform === "modrinth") {
         return mod.modrinth?.project_id === props.addon.id.toString()
       }
-      
+
       return false
     })
   }

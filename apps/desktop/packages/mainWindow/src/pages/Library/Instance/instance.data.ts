@@ -18,10 +18,7 @@ const fetchData = ({ params }) => {
   }))
 
   const _instanceMods = rspc.createQuery(() => ({
-    queryKey: [
-      "instance.getInstanceMods",
-      parseInt(params.id, 10)
-    ]
+    queryKey: ["instance.getInstanceMods", parseInt(params.id, 10)]
   }))
 
   const [instanceMods, setInstanceMods] = createStore({

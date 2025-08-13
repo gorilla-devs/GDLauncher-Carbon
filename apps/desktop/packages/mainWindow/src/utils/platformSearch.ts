@@ -73,10 +73,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   }))
 
   const selectedInstanceMods = rspc.createQuery(() => ({
-    queryKey: [
-      "instance.getInstanceMods",
-      selectedInstanceId()
-    ],
+    queryKey: ["instance.getInstanceMods", selectedInstanceId()],
     enabled: !!selectedInstanceId()
   }))
 
@@ -293,6 +290,15 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     }
   }
 
+  const isInitialLoading = createMemo(() => {
+    if (searchQuery().searchApi === "curseforge") {
+      return cfInfiniteResults.isLoading
+    } else if (searchQuery().searchApi === "modrinth") {
+      return mrInfiniteResults.isLoading
+    }
+    return cfInfiniteResults.isLoading || mrInfiniteResults.isLoading
+  })
+
   const isLoading = createMemo(() => {
     if (searchQuery().searchApi === "curseforge") {
       return cfInfiniteResults.isLoading || cfInfiniteResults.isFetching
@@ -310,6 +316,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   return {
     allRows,
     isLoading,
+    isInitialLoading,
     hasNextPage,
     viewMode,
     setViewMode,

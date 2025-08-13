@@ -196,7 +196,7 @@ export function List() {
         </div>
       </div>
       <Show
-        when={!searchContext?.isLoading()}
+        when={!searchContext?.isInitialLoading()}
         fallback={<Skeleton.searchList />}
       >
         <Show

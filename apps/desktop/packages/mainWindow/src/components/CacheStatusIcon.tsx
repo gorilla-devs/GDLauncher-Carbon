@@ -49,7 +49,7 @@ export const CacheStatusIcon = () => {
     if (cacheTaskCount > 0) {
       return otherTaskCount > 0
         ? `${cacheTaskCount} cache + ${otherTaskCount} other tasks`
-        : cacheTaskCount === 1 
+        : cacheTaskCount === 1
           ? t("TaskStatusActiveTasks_one")
           : t("TaskStatusActiveTasks_other", { count: cacheTaskCount })
     }
@@ -81,7 +81,11 @@ export const CacheStatusIcon = () => {
                   when={getCacheTaskSummary()}
                   fallback={
                     <Trans
-                      key={getCurrentTasksCount() === 1 ? "TaskStatusActiveTasks_one" : "TaskStatusActiveTasks_other"}
+                      key={
+                        getCurrentTasksCount() === 1
+                          ? "TaskStatusActiveTasks_one"
+                          : "TaskStatusActiveTasks_other"
+                      }
                       options={{ count: getCurrentTasksCount() }}
                     />
                   }
