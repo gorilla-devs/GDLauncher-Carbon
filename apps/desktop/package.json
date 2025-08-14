@@ -17,8 +17,8 @@
     "build-electron": "cross-env-shell DEBUG=electron-builder ow-electron-builder --config .electron-builder.config.cjs",
     "build": "pnpm patch-version && pnpm build-vite && pnpm build-electron",
     "clean": "node scripts/cleanReleaseFolder.mjs",
-    "lint": "tsc && ../../node_modules/.bin/eslint . --quiet && ../../node_modules/.bin/prettier --check .",
-    "lint-fix": "tsc && ../../node_modules/.bin/eslint . --quiet --fix && ../../node_modules/.bin/prettier --write .",
+    "lint": "tsc && pnpm --dir ../.. exec eslint apps/desktop --quiet && pnpm --dir ../.. exec prettier --check apps/desktop",
+    "lint-fix": "tsc && pnpm --dir ../.. exec eslint apps/desktop --quiet --fix && pnpm --dir ../.. exec prettier --write apps/desktop",
     "release": "node scripts/releaseDraft.mjs"
   },
   "devDependencies": {
