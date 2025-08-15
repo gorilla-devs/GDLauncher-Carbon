@@ -15,7 +15,7 @@ interface Props {
   max: number
   min: number
   steps?: number | null
-  marks: Marks
+  marks?: Marks
   value?: number
   noLabels?: boolean
   noTooltip?: boolean
@@ -80,11 +80,15 @@ function Slider(props: Props) {
       val = props.max
     }
 
-    const points = Object.keys(props.marks).map(parseFloat)
+    const points = props.marks ? Object.keys(props.marks).map(parseFloat) : []
     if (props.steps !== null && props.steps !== undefined) {
       const closestStep =
         Math.round((val - props.min) / props.steps) * props.steps + props.min
       points.push(closestStep)
+    }
+
+    if (points.length === 0) {
+      return val
     }
 
     const diffs = points.map((point) => Math.abs(val - point))
@@ -204,81 +208,83 @@ function Slider(props: Props) {
             "h-full": props.vertical
           }}
         >
-          <For each={Object.entries(props.marks)}>
-            {([value, label], i) => (
-              <>
-                <div
-                  class="w-2 h-2 rounded-full border-4 border-solid"
-                  style={{
-                    position: "absolute",
+          <Show when={props.marks}>
+            <For each={Object.entries(props.marks!)}>
+              {([value, label], i) => (
+                <>
+                  <div
+                    class="w-2 h-2 rounded-full border-4 border-solid"
+                    style={{
+                      position: "absolute",
 
-                    ...(props.vertical
-                      ? {
-                          top: `${calcOffset(parseInt(value, 10))}%`,
-                          "margin-top": -(16 / 2) + "px"
-                        }
-                      : {
-                          left: `${calcOffset(parseInt(value, 10))}%`,
-                          "margin-left": -(16 / 2) + "px"
-                        })
-                  }}
-                  classList={{
-                    "bg-darkSlate-800 border-darkSlate-600":
-                      calcOffset(parseInt(value, 10)) >=
-                      calcOffset(currentValue()),
-                    "bg-primary-500 border-primary-500":
-                      calcOffset(parseInt(value, 10)) <=
-                        calcOffset(currentValue()) && !showTooptip(),
-                    "bg-accent border-accent":
-                      calcOffset(parseInt(value, 10)) <=
-                        calcOffset(currentValue()) && showTooptip(),
-                    "-top-1": !props.vertical,
-                    "-right-1": props.vertical
-                  }}
-                />
-                <p
-                  class="flex flex-col mb-0 text-xs text-darkGray-300 font-semibold"
-                  classList={{
-                    "-ml-2 mt-2 max-w-25": !props.vertical,
-                    "-mt-2 mr-2": props.vertical
-                  }}
-                  style={{
-                    position: "absolute",
-                    ...(props.vertical
-                      ? {
-                          right: "10px",
-                          top: `calc(${calcOffset(parseInt(value, 10))}% -  ${
-                            i() === Object.entries(props.marks).length - 1
-                              ? "10px"
-                              : "0px"
-                          })`
-                        }
-                      : {
-                          top: "10px",
-                          left: `calc(${calcOffset(parseInt(value, 10))}% -  ${
-                            i() === Object.entries(props.marks).length - 1
-                              ? "10px"
-                              : "0px"
-                          })`
-                        })
-                  }}
-                >
-                  <Switch>
-                    <Match
-                      when={typeof label === "string" && !mergedProps.noLabels}
-                    >
-                      {label as string}
-                    </Match>
-                    <Match
-                      when={typeof label === "object" && !mergedProps.noLabels}
-                    >
-                      {(label as { label: string }).label}
-                    </Match>
-                  </Switch>
-                </p>
-              </>
-            )}
-          </For>
+                      ...(props.vertical
+                        ? {
+                            top: `${calcOffset(parseInt(value, 10))}%`,
+                            "margin-top": -(16 / 2) + "px"
+                          }
+                        : {
+                            left: `${calcOffset(parseInt(value, 10))}%`,
+                            "margin-left": -(16 / 2) + "px"
+                          })
+                    }}
+                    classList={{
+                      "bg-darkSlate-800 border-darkSlate-600":
+                        calcOffset(parseInt(value, 10)) >=
+                        calcOffset(currentValue()),
+                      "bg-primary-500 border-primary-500":
+                        calcOffset(parseInt(value, 10)) <=
+                          calcOffset(currentValue()) && !showTooptip(),
+                      "bg-accent border-accent":
+                        calcOffset(parseInt(value, 10)) <=
+                          calcOffset(currentValue()) && showTooptip(),
+                      "-top-1": !props.vertical,
+                      "-right-1": props.vertical
+                    }}
+                  />
+                  <p
+                    class="flex flex-col mb-0 text-xs text-darkGray-300 font-semibold"
+                    classList={{
+                      "-ml-2 mt-2 max-w-25": !props.vertical,
+                      "-mt-2 mr-2": props.vertical
+                    }}
+                    style={{
+                      position: "absolute",
+                      ...(props.vertical
+                        ? {
+                            right: "10px",
+                            top: `calc(${calcOffset(parseInt(value, 10))}% -  ${
+                              i() === Object.entries(props.marks!).length - 1
+                                ? "10px"
+                                : "0px"
+                            })`
+                          }
+                        : {
+                            top: "10px",
+                            left: `calc(${calcOffset(parseInt(value, 10))}% -  ${
+                              i() === Object.entries(props.marks!).length - 1
+                                ? "10px"
+                                : "0px"
+                            })`
+                          })
+                    }}
+                  >
+                    <Switch>
+                      <Match
+                        when={typeof label === "string" && !mergedProps.noLabels}
+                      >
+                        {label as string}
+                      </Match>
+                      <Match
+                        when={typeof label === "object" && !mergedProps.noLabels}
+                      >
+                        {(label as { label: string }).label}
+                      </Match>
+                    </Switch>
+                  </p>
+                </>
+              )}
+            </For>
+          </Show>
           <div
             ref={setHandleRef}
             class="w-4 h-4 bg-darkSlate-800 rounded-full border-4 border-solid border-primary-500 cursor-pointer z-20"
