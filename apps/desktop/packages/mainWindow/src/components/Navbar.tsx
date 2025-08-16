@@ -112,6 +112,7 @@ const AppNavbar = () => {
           <Input
             placeholder={t("search.search_anything")}
             containerClass="px-10"
+            class="w-80"
             tabIndex={0}
             value={searchResults?.searchQuery().searchQuery ?? ""}
             onFocus={() => {

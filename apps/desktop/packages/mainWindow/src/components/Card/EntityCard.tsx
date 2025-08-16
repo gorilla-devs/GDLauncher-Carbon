@@ -15,7 +15,7 @@ const EntityCard = (props: EntityCardProps) => {
   const [t] = useTransContext()
   return (
     <li
-      class={`rounded-lg p-4 text-center ${
+      class={`h-32 w-32 rounded-lg p-4 text-center ${
         props.entity.supported ? "cursor-pointer" : ""
       } gap-3 shadow-md  transform flex-col ${
         props.entity.selection_type ? "hover:bg-[#1d2029ca]" : ""

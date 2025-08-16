@@ -800,7 +800,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             </div>
           </Show>
         </div>
-        <div class="flex w-full justify-between">
+        <div class="flex w-full justify-between mt-8">
           <Button
             type="secondary"
             style={{ width: "100%", "max-width": "200px" }}
