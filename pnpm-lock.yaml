@@ -102,8 +102,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ui
       '@overwolf/ow-electron':
-        specifier: 34.5.5
-        version: 34.5.5
+        specifier: 34.5.7
+        version: 34.5.7
       '@overwolf/ow-electron-builder':
         specifier: ^24.13.8
         version: 24.13.8(electron-builder-squirrel-windows@25.0.5)
@@ -162,8 +162,8 @@ importers:
         specifier: ^16.3.1
         version: 16.4.0
       electron:
-        specifier: 34.5.5
-        version: 34.5.5
+        specifier: 34.5.7
+        version: 34.5.7
       electron-log:
         specifier: ^5.1.1
         version: 5.1.1
@@ -383,7 +383,7 @@ importers:
         version: 2.6.0
       tailwindcss-animate:
         specifier: ^1.0.7
-        version: 1.0.7
+        version: 1.0.7(tailwindcss@3.4.1)
       unocss:
         specifier: ^0.65.1
         version: 0.65.1(postcss@8.5.3)(rollup@4.40.1)(vite@6.0.3(@types/node@20.11.6)(jiti@1.21.6)(less@4.2.0)(terser@5.27.0)(tsx@4.20.4))(vue@3.5.13(typescript@5.6.3))
@@ -2194,8 +2194,8 @@ packages:
     engines: {node: '>=14.0.0'}
     hasBin: true
 
-  '@overwolf/ow-electron@34.5.5':
-    resolution: {integrity: sha512-xKxb2jjmqxKs+Uy7/1dNhWJ9nUYXnuQ8pcTAaBsT4V06E49+TWPTTXb982eAIo30qhfdmLM30FBI/3RLp1mexA==}
+  '@overwolf/ow-electron@34.5.7':
+    resolution: {integrity: sha512-zogfbWO4kSpAHaYj0vmPv/rVI7uFM2aBKhacjavjF2pu/KKaQIG4L5wDVrveyMd82cS72DqvUZyVHwJTb51z3Q==}
     engines: {node: '>= 10.17.0'}
     hasBin: true
 
@@ -4488,8 +4488,8 @@ packages:
   electron-updater@6.3.9:
     resolution: {integrity: sha512-2PJNONi+iBidkoC5D1nzT9XqsE8Q1X28Fn6xRQhO3YX8qRRyJ3mkV4F1aQsuRnYPqq6Hw+E51y27W75WgDoofw==}
 
-  electron@34.5.5:
-    resolution: {integrity: sha512-GgXnW+/Gxsl/BOyvTJUm99j7eSDOgdWeugsKfb3MmblySa9EWWhyAUfU6qugspA9j3g/0secgypY4yp/whJv7A==}
+  electron@34.5.7:
+    resolution: {integrity: sha512-kEONTRPq7uj9cJ8X4b9Tj+sboqA6k172bOxEpFXwOEMkg5aTqdplXRUqkk7o0J92S5W6q5laba0pzCXJ6fxfxw==}
     engines: {node: '>= 12.20.55'}
     hasBin: true
 
@@ -10330,7 +10330,7 @@ snapshots:
       - electron-builder-squirrel-windows
       - supports-color
 
-  '@overwolf/ow-electron@34.5.5':
+  '@overwolf/ow-electron@34.5.7':
     dependencies:
       '@electron/get': 1.14.1
       '@types/node': 16.18.75
@@ -13269,7 +13269,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  electron@34.5.5:
+  electron@34.5.7:
     dependencies:
       '@electron/get': 2.0.3
       '@types/node': 20.11.6
@@ -16746,7 +16746,9 @@ snapshots:
 
   tailwind-merge@2.6.0: {}
 
-  tailwindcss-animate@1.0.7: {}
+  tailwindcss-animate@1.0.7(tailwindcss@3.4.1):
+    dependencies:
+      tailwindcss: 3.4.1
 
   tailwindcss@3.4.1:
     dependencies:
