@@ -1,4 +1,4 @@
-import { Progressbar, createNotification } from "@gd/ui"
+import { Progress, createNotification } from "@gd/ui"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
 import { Trans } from "@gd/i18n"
@@ -99,8 +99,8 @@ const AppUpdate = (props: ModalProps) => {
               }}
             />
           </div>
-          <Progressbar
-            percentage={(modsUpdated() / data().mods.length) * 100}
+          <Progress
+            value={(modsUpdated() / data().mods.length) * 100}
           />
         </div>
         <div class="flex flex-col items-center text-xl mt-20">

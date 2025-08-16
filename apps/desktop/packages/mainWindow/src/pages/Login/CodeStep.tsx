@@ -1,6 +1,6 @@
 import {
   Button,
-  LoadingBar,
+  Progress,
   Popover,
   PopoverContent,
   PopoverTrigger
@@ -272,7 +272,7 @@ const CodeStep = (props: Props) => {
             </Match>
           </Switch>
         </span>
-        <LoadingBar />
+        <Progress />
       </div>
     </div>
   )

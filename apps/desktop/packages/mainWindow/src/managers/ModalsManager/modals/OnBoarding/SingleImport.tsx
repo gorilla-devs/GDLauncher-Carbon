@@ -1,7 +1,7 @@
 import { setTaskIds } from "@/utils/import"
 import { taskIds } from "@/utils/import"
 import { rspc } from "@/utils/rspcClient"
-import { Progressbar } from "@gd/ui"
+import { Progress } from "@gd/ui"
 import { Match, Switch, createEffect, createSignal } from "solid-js"
 
 const [isDownloaded, setIsDownloaded] = createSignal(false)
@@ -59,7 +59,7 @@ const SingleImport = (props: {
         </Match>
         <Match when={state() === "idle"}>
           <div class="flex w-30 items-center gap-4">
-            <Progressbar percentage={progress()} />
+            <Progress value={progress()} />
             <div class="font-semibold">{progress()}%</div>
           </div>
         </Match>

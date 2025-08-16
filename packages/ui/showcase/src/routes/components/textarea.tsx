@@ -1,21 +1,27 @@
+import { createFileRoute } from "@tanstack/solid-router"
+import { TextArea } from "../../../../src"
+import ComponentDemo from "../../components/ComponentDemo"
+import { createSignal } from "solid-js"
 
-import { createFileRoute } from '@tanstack/solid-router';
-import { TextArea } from '../../../../src';
-import ComponentDemo from '../../components/ComponentDemo';
-import { createSignal } from 'solid-js';
-
-export const Route = createFileRoute('/components/textarea')({
-  component: TextAreaPage,
-});
+export const Route = createFileRoute("/components/textarea")({
+  component: TextAreaPage
+})
 
 function TextAreaPage() {
-  const [value1, setValue1] = createSignal('');
-  const [value2, setValue2] = createSignal('This textarea has initial content that you can edit.');
+  const [value1, setValue1] = createSignal("")
+  const [value2, setValue2] = createSignal(
+    "This textarea has initial content that you can edit."
+  )
 
   return (
     <div class="max-w-4xl">
       <div class="mb-8">
-        <h1 class="text-4xl font-bold mb-4" style={`color: rgb(var(--lightSlate-50))`}>TextArea</h1>
+        <h1
+          class="text-4xl font-bold mb-4"
+          style={`color: rgb(var(--lightSlate-50))`}
+        >
+          TextArea
+        </h1>
         <p class="text-xl" style={`color: rgb(var(--lightSlate-300))`}>
           Multi-line text input component for larger text content.
         </p>
@@ -26,7 +32,7 @@ function TextAreaPage() {
         description="Simple multi-line text input"
       >
         <div class="space-y-4">
-          <TextArea 
+          <TextArea
             placeholder="Enter your message here..."
             value={value1()}
             onInput={(e) => setValue1(e.target.value)}
@@ -41,7 +47,7 @@ function TextAreaPage() {
         title="TextArea with Initial Content"
         description="TextArea with predefined content"
       >
-        <TextArea 
+        <TextArea
           value={value2()}
           onInput={(e) => setValue2(e.target.value)}
           rows={4}
@@ -62,11 +68,8 @@ function TextAreaPage() {
         title="Disabled TextArea"
         description="TextArea in disabled state"
       >
-        <TextArea 
-          disabled={true}
-          value="This textarea is disabled"
-        />
+        <TextArea disabled={true} value="This textarea is disabled" />
       </ComponentDemo>
     </div>
-  );
+  )
 }

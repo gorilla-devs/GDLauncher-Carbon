@@ -1,6 +1,6 @@
 import { Component, Show, For, onMount, onCleanup } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
-import { Progressbar, Popover, PopoverTrigger, PopoverContent } from "@gd/ui"
+import { Progress, Popover, PopoverTrigger, PopoverContent } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
 
 interface CacheStatusPopoverProps {
@@ -200,7 +200,7 @@ const CacheStatusPopover: Component<CacheStatusPopoverProps> = (props) => {
                 {getProgressPercentage(task)}%
               </span>
             </div>
-            <Progressbar percentage={getProgressPercentage(task)} />
+            <Progress value={getProgressPercentage(task)} />
           </div>
         </Show>
 

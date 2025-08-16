@@ -1,17 +1,21 @@
+import { createFileRoute } from "@tanstack/solid-router"
+import { Separator } from "../../../../src"
+import ComponentDemo from "../../components/ComponentDemo"
 
-import { createFileRoute } from '@tanstack/solid-router';
-import { Separator } from '../../../../src';
-import ComponentDemo from '../../components/ComponentDemo';
-
-export const Route = createFileRoute('/components/separator')({
-  component: SeparatorPage,
-});
+export const Route = createFileRoute("/components/separator")({
+  component: SeparatorPage
+})
 
 function SeparatorPage() {
   return (
     <div class="max-w-4xl">
       <div class="mb-8">
-        <h1 class="text-4xl font-bold mb-4" style={`color: rgb(var(--lightSlate-50))`}>Separator</h1>
+        <h1
+          class="text-4xl font-bold mb-4"
+          style={`color: rgb(var(--lightSlate-50))`}
+        >
+          Separator
+        </h1>
         <p class="text-xl" style={`color: rgb(var(--lightSlate-300))`}>
           Visual divider component to separate content sections.
         </p>
@@ -44,13 +48,21 @@ function SeparatorPage() {
         description="Separator with label or text in the middle"
       >
         <div class="space-y-4">
-          <div style={`color: rgb(var(--lightSlate-100))`}>Sign in with email</div>
+          <div style={`color: rgb(var(--lightSlate-100))`}>
+            Sign in with email
+          </div>
           <Separator>
-            <span style={`color: rgb(var(--lightSlate-300)); background-color: rgb(var(--darkSlate-700)); padding: 0 1rem`}>OR</span>
+            <span
+              style={`color: rgb(var(--lightSlate-300)); background-color: rgb(var(--darkSlate-700)); padding: 0 1rem`}
+            >
+              OR
+            </span>
           </Separator>
-          <div style={`color: rgb(var(--lightSlate-100))`}>Sign in with Google</div>
+          <div style={`color: rgb(var(--lightSlate-100))`}>
+            Sign in with Google
+          </div>
         </div>
       </ComponentDemo>
     </div>
-  );
+  )
 }

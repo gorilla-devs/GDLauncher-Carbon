@@ -1,16 +1,16 @@
-import { createFileRoute } from '@tanstack/solid-router';
-import { Switch } from '../../../../src';
-import { createSignal } from 'solid-js';
-import ComponentDemo from '../../components/ComponentDemo';
+import { createFileRoute } from "@tanstack/solid-router"
+import { Switch } from "../../../../src"
+import { createSignal } from "solid-js"
+import ComponentDemo from "../../components/ComponentDemo"
 
-export const Route = createFileRoute('/components/switch')({
-  component: SwitchPage,
-});
+export const Route = createFileRoute("/components/switch")({
+  component: SwitchPage
+})
 
 function SwitchPage() {
-  const [enabled1, setEnabled1] = createSignal(false);
-  const [enabled2, setEnabled2] = createSignal(true);
-  const [enabled3, setEnabled3] = createSignal(false);
+  const [enabled1, setEnabled1] = createSignal(false)
+  const [enabled2, setEnabled2] = createSignal(true)
+  const [enabled3, setEnabled3] = createSignal(false)
 
   return (
     <div class="max-w-4xl">
@@ -27,16 +27,13 @@ function SwitchPage() {
       >
         <div class="space-y-4">
           <div class="flex items-center space-x-3">
-            <Switch 
-              checked={enabled1()} 
-              onChange={setEnabled1}
-            />
+            <Switch checked={enabled1()} onChange={setEnabled1} />
             <span class="text-sm text-gray-700">
-              Notifications {enabled1() ? 'enabled' : 'disabled'}
+              Notifications {enabled1() ? "enabled" : "disabled"}
             </span>
           </div>
           <div class="text-sm text-gray-600">
-            Current state: {enabled1() ? 'ON' : 'OFF'}
+            Current state: {enabled1() ? "ON" : "OFF"}
           </div>
         </div>
       </ComponentDemo>
@@ -47,18 +44,15 @@ function SwitchPage() {
       >
         <div class="space-y-4">
           <div class="flex items-center space-x-3">
-            <Switch 
-              checked={enabled2()} 
-              onChange={setEnabled2}
-            />
+            <Switch checked={enabled2()} onChange={setEnabled2} />
             <span class="text-sm text-gray-700">Interactive switch</span>
           </div>
-          
+
           <div class="flex items-center space-x-3">
             <Switch checked={true} disabled />
             <span class="text-sm text-gray-500">Disabled (ON)</span>
           </div>
-          
+
           <div class="flex items-center space-x-3">
             <Switch checked={false} disabled />
             <span class="text-sm text-gray-500">Disabled (OFF)</span>
@@ -75,38 +69,35 @@ function SwitchPage() {
             <div class="flex items-center justify-between">
               <div>
                 <div class="font-medium text-gray-900">Push Notifications</div>
-                <div class="text-sm text-gray-500">Receive notifications on your device</div>
+                <div class="text-sm text-gray-500">
+                  Receive notifications on your device
+                </div>
               </div>
-              <Switch 
-                checked={enabled1()} 
-                onChange={setEnabled1}
-              />
+              <Switch checked={enabled1()} onChange={setEnabled1} />
             </div>
-            
+
             <div class="flex items-center justify-between">
               <div>
                 <div class="font-medium text-gray-900">Auto-save</div>
-                <div class="text-sm text-gray-500">Automatically save changes</div>
+                <div class="text-sm text-gray-500">
+                  Automatically save changes
+                </div>
               </div>
-              <Switch 
-                checked={enabled2()} 
-                onChange={setEnabled2}
-              />
+              <Switch checked={enabled2()} onChange={setEnabled2} />
             </div>
-            
+
             <div class="flex items-center justify-between">
               <div>
                 <div class="font-medium text-gray-900">Analytics</div>
-                <div class="text-sm text-gray-500">Help improve our service</div>
+                <div class="text-sm text-gray-500">
+                  Help improve our service
+                </div>
               </div>
-              <Switch 
-                checked={enabled3()} 
-                onChange={setEnabled3}
-              />
+              <Switch checked={enabled3()} onChange={setEnabled3} />
             </div>
           </div>
         </div>
       </ComponentDemo>
     </div>
-  );
+  )
 }

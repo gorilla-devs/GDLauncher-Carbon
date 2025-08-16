@@ -2,7 +2,7 @@ import { rspc } from "@/utils/rspcClient"
 import { Trans } from "@gd/i18n"
 import {
   Button,
-  Progressbar,
+  Progress,
   Spinner,
   Tooltip,
   TooltipContent,
@@ -183,7 +183,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
                 "w-14": progress() !== null
               }}
             >
-              <Progressbar color="bg-white" percentage={progress()!} />
+              <Progress color="bg-white" value={progress()!} />
             </div>
           </Show>
           <Show when={!loading()}>

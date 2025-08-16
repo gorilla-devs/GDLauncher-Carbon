@@ -1,4 +1,4 @@
-import { Button, Progressbar } from "@gd/ui"
+import { Button, Progress } from "@gd/ui"
 import { ModalProps } from ".."
 import ModalLayout from "../ModalLayout"
 import { Trans } from "@gd/i18n"
@@ -75,7 +75,7 @@ const AppUpdate = (props: ModalProps) => {
           </div>
           <hr class="w-full border-darkSlate-50 mt-8" />
           <Show when={Boolean(updateProgress())}>
-            <Progressbar percentage={updateProgress()} />
+            <Progress value={updateProgress()} />
           </Show>
           <div class="flex items-center justify-center flex-1 mb-4 mt-20">
             <Button

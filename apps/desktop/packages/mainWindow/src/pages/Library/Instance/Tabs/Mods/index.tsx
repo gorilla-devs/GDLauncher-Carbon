@@ -2,7 +2,7 @@ import {
   Button,
   Checkbox,
   Input,
-  Progressbar,
+  Progress,
   Skeleton,
   Switch,
   Tooltip,
@@ -393,7 +393,7 @@ const Mods = () => {
                       }}
                       class="transition-width duration-100"
                     >
-                      <Progressbar percentage={15} />
+                      <Progress value={15} />
                     </div>
                   </div>
                 </TooltipTrigger>

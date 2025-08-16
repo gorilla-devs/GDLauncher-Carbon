@@ -22,18 +22,16 @@ import { Route as ComponentsSkeletonRouteImport } from './routes/components/skel
 import { Route as ComponentsSeparatorRouteImport } from './routes/components/separator'
 import { Route as ComponentsSelectRouteImport } from './routes/components/select'
 import { Route as ComponentsRadioRouteImport } from './routes/components/radio'
-import { Route as ComponentsProgressbarRouteImport } from './routes/components/progressbar'
+import { Route as ComponentsProgressRouteImport } from './routes/components/progress'
 import { Route as ComponentsPopoverRouteImport } from './routes/components/popover'
 import { Route as ComponentsNotificationmanagerRouteImport } from './routes/components/notificationmanager'
 import { Route as ComponentsNewsRouteImport } from './routes/components/news'
 import { Route as ComponentsMenuRouteImport } from './routes/components/menu'
-import { Route as ComponentsLoadingbarRouteImport } from './routes/components/loadingbar'
 import { Route as ComponentsInputRouteImport } from './routes/components/input'
 import { Route as ComponentsDropdownmenuRouteImport } from './routes/components/dropdownmenu'
 import { Route as ComponentsDropdownRouteImport } from './routes/components/dropdown'
 import { Route as ComponentsCollapsableRouteImport } from './routes/components/collapsable'
 import { Route as ComponentsCheckboxRouteImport } from './routes/components/checkbox'
-import { Route as ComponentsCarouselRouteImport } from './routes/components/carousel'
 import { Route as ComponentsButtonRouteImport } from './routes/components/button'
 import { Route as ComponentsBadgeRouteImport } from './routes/components/badge'
 
@@ -102,9 +100,9 @@ const ComponentsRadioRoute = ComponentsRadioRouteImport.update({
   path: '/components/radio',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ComponentsProgressbarRoute = ComponentsProgressbarRouteImport.update({
-  id: '/components/progressbar',
-  path: '/components/progressbar',
+const ComponentsProgressRoute = ComponentsProgressRouteImport.update({
+  id: '/components/progress',
+  path: '/components/progress',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ComponentsPopoverRoute = ComponentsPopoverRouteImport.update({
@@ -126,11 +124,6 @@ const ComponentsNewsRoute = ComponentsNewsRouteImport.update({
 const ComponentsMenuRoute = ComponentsMenuRouteImport.update({
   id: '/components/menu',
   path: '/components/menu',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ComponentsLoadingbarRoute = ComponentsLoadingbarRouteImport.update({
-  id: '/components/loadingbar',
-  path: '/components/loadingbar',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ComponentsInputRoute = ComponentsInputRouteImport.update({
@@ -158,11 +151,6 @@ const ComponentsCheckboxRoute = ComponentsCheckboxRouteImport.update({
   path: '/components/checkbox',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ComponentsCarouselRoute = ComponentsCarouselRouteImport.update({
-  id: '/components/carousel',
-  path: '/components/carousel',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ComponentsButtonRoute = ComponentsButtonRouteImport.update({
   id: '/components/button',
   path: '/components/button',
@@ -178,18 +166,16 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/components/badge': typeof ComponentsBadgeRoute
   '/components/button': typeof ComponentsButtonRoute
-  '/components/carousel': typeof ComponentsCarouselRoute
   '/components/checkbox': typeof ComponentsCheckboxRoute
   '/components/collapsable': typeof ComponentsCollapsableRoute
   '/components/dropdown': typeof ComponentsDropdownRoute
   '/components/dropdownmenu': typeof ComponentsDropdownmenuRoute
   '/components/input': typeof ComponentsInputRoute
-  '/components/loadingbar': typeof ComponentsLoadingbarRoute
   '/components/menu': typeof ComponentsMenuRoute
   '/components/news': typeof ComponentsNewsRoute
   '/components/notificationmanager': typeof ComponentsNotificationmanagerRoute
   '/components/popover': typeof ComponentsPopoverRoute
-  '/components/progressbar': typeof ComponentsProgressbarRoute
+  '/components/progress': typeof ComponentsProgressRoute
   '/components/radio': typeof ComponentsRadioRoute
   '/components/select': typeof ComponentsSelectRoute
   '/components/separator': typeof ComponentsSeparatorRoute
@@ -207,18 +193,16 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/components/badge': typeof ComponentsBadgeRoute
   '/components/button': typeof ComponentsButtonRoute
-  '/components/carousel': typeof ComponentsCarouselRoute
   '/components/checkbox': typeof ComponentsCheckboxRoute
   '/components/collapsable': typeof ComponentsCollapsableRoute
   '/components/dropdown': typeof ComponentsDropdownRoute
   '/components/dropdownmenu': typeof ComponentsDropdownmenuRoute
   '/components/input': typeof ComponentsInputRoute
-  '/components/loadingbar': typeof ComponentsLoadingbarRoute
   '/components/menu': typeof ComponentsMenuRoute
   '/components/news': typeof ComponentsNewsRoute
   '/components/notificationmanager': typeof ComponentsNotificationmanagerRoute
   '/components/popover': typeof ComponentsPopoverRoute
-  '/components/progressbar': typeof ComponentsProgressbarRoute
+  '/components/progress': typeof ComponentsProgressRoute
   '/components/radio': typeof ComponentsRadioRoute
   '/components/select': typeof ComponentsSelectRoute
   '/components/separator': typeof ComponentsSeparatorRoute
@@ -237,18 +221,16 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/components/badge': typeof ComponentsBadgeRoute
   '/components/button': typeof ComponentsButtonRoute
-  '/components/carousel': typeof ComponentsCarouselRoute
   '/components/checkbox': typeof ComponentsCheckboxRoute
   '/components/collapsable': typeof ComponentsCollapsableRoute
   '/components/dropdown': typeof ComponentsDropdownRoute
   '/components/dropdownmenu': typeof ComponentsDropdownmenuRoute
   '/components/input': typeof ComponentsInputRoute
-  '/components/loadingbar': typeof ComponentsLoadingbarRoute
   '/components/menu': typeof ComponentsMenuRoute
   '/components/news': typeof ComponentsNewsRoute
   '/components/notificationmanager': typeof ComponentsNotificationmanagerRoute
   '/components/popover': typeof ComponentsPopoverRoute
-  '/components/progressbar': typeof ComponentsProgressbarRoute
+  '/components/progress': typeof ComponentsProgressRoute
   '/components/radio': typeof ComponentsRadioRoute
   '/components/select': typeof ComponentsSelectRoute
   '/components/separator': typeof ComponentsSeparatorRoute
@@ -268,18 +250,16 @@ export interface FileRouteTypes {
     | '/'
     | '/components/badge'
     | '/components/button'
-    | '/components/carousel'
     | '/components/checkbox'
     | '/components/collapsable'
     | '/components/dropdown'
     | '/components/dropdownmenu'
     | '/components/input'
-    | '/components/loadingbar'
     | '/components/menu'
     | '/components/news'
     | '/components/notificationmanager'
     | '/components/popover'
-    | '/components/progressbar'
+    | '/components/progress'
     | '/components/radio'
     | '/components/select'
     | '/components/separator'
@@ -297,18 +277,16 @@ export interface FileRouteTypes {
     | '/'
     | '/components/badge'
     | '/components/button'
-    | '/components/carousel'
     | '/components/checkbox'
     | '/components/collapsable'
     | '/components/dropdown'
     | '/components/dropdownmenu'
     | '/components/input'
-    | '/components/loadingbar'
     | '/components/menu'
     | '/components/news'
     | '/components/notificationmanager'
     | '/components/popover'
-    | '/components/progressbar'
+    | '/components/progress'
     | '/components/radio'
     | '/components/select'
     | '/components/separator'
@@ -326,18 +304,16 @@ export interface FileRouteTypes {
     | '/'
     | '/components/badge'
     | '/components/button'
-    | '/components/carousel'
     | '/components/checkbox'
     | '/components/collapsable'
     | '/components/dropdown'
     | '/components/dropdownmenu'
     | '/components/input'
-    | '/components/loadingbar'
     | '/components/menu'
     | '/components/news'
     | '/components/notificationmanager'
     | '/components/popover'
-    | '/components/progressbar'
+    | '/components/progress'
     | '/components/radio'
     | '/components/select'
     | '/components/separator'
@@ -356,18 +332,16 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ComponentsBadgeRoute: typeof ComponentsBadgeRoute
   ComponentsButtonRoute: typeof ComponentsButtonRoute
-  ComponentsCarouselRoute: typeof ComponentsCarouselRoute
   ComponentsCheckboxRoute: typeof ComponentsCheckboxRoute
   ComponentsCollapsableRoute: typeof ComponentsCollapsableRoute
   ComponentsDropdownRoute: typeof ComponentsDropdownRoute
   ComponentsDropdownmenuRoute: typeof ComponentsDropdownmenuRoute
   ComponentsInputRoute: typeof ComponentsInputRoute
-  ComponentsLoadingbarRoute: typeof ComponentsLoadingbarRoute
   ComponentsMenuRoute: typeof ComponentsMenuRoute
   ComponentsNewsRoute: typeof ComponentsNewsRoute
   ComponentsNotificationmanagerRoute: typeof ComponentsNotificationmanagerRoute
   ComponentsPopoverRoute: typeof ComponentsPopoverRoute
-  ComponentsProgressbarRoute: typeof ComponentsProgressbarRoute
+  ComponentsProgressRoute: typeof ComponentsProgressRoute
   ComponentsRadioRoute: typeof ComponentsRadioRoute
   ComponentsSelectRoute: typeof ComponentsSelectRoute
   ComponentsSeparatorRoute: typeof ComponentsSeparatorRoute
@@ -475,11 +449,11 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof ComponentsRadioRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/components/progressbar': {
-      id: '/components/progressbar'
-      path: '/components/progressbar'
-      fullPath: '/components/progressbar'
-      preLoaderRoute: typeof ComponentsProgressbarRouteImport
+    '/components/progress': {
+      id: '/components/progress'
+      path: '/components/progress'
+      fullPath: '/components/progress'
+      preLoaderRoute: typeof ComponentsProgressRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/components/popover': {
@@ -508,13 +482,6 @@ declare module '@tanstack/solid-router' {
       path: '/components/menu'
       fullPath: '/components/menu'
       preLoaderRoute: typeof ComponentsMenuRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/components/loadingbar': {
-      id: '/components/loadingbar'
-      path: '/components/loadingbar'
-      fullPath: '/components/loadingbar'
-      preLoaderRoute: typeof ComponentsLoadingbarRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/components/input': {
@@ -552,13 +519,6 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof ComponentsCheckboxRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/components/carousel': {
-      id: '/components/carousel'
-      path: '/components/carousel'
-      fullPath: '/components/carousel'
-      preLoaderRoute: typeof ComponentsCarouselRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/components/button': {
       id: '/components/button'
       path: '/components/button'
@@ -580,18 +540,16 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ComponentsBadgeRoute: ComponentsBadgeRoute,
   ComponentsButtonRoute: ComponentsButtonRoute,
-  ComponentsCarouselRoute: ComponentsCarouselRoute,
   ComponentsCheckboxRoute: ComponentsCheckboxRoute,
   ComponentsCollapsableRoute: ComponentsCollapsableRoute,
   ComponentsDropdownRoute: ComponentsDropdownRoute,
   ComponentsDropdownmenuRoute: ComponentsDropdownmenuRoute,
   ComponentsInputRoute: ComponentsInputRoute,
-  ComponentsLoadingbarRoute: ComponentsLoadingbarRoute,
   ComponentsMenuRoute: ComponentsMenuRoute,
   ComponentsNewsRoute: ComponentsNewsRoute,
   ComponentsNotificationmanagerRoute: ComponentsNotificationmanagerRoute,
   ComponentsPopoverRoute: ComponentsPopoverRoute,
-  ComponentsProgressbarRoute: ComponentsProgressbarRoute,
+  ComponentsProgressRoute: ComponentsProgressRoute,
   ComponentsRadioRoute: ComponentsRadioRoute,
   ComponentsSelectRoute: ComponentsSelectRoute,
   ComponentsSeparatorRoute: ComponentsSeparatorRoute,

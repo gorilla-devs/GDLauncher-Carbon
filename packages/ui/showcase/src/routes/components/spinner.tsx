@@ -1,19 +1,19 @@
-import { createFileRoute } from '@tanstack/solid-router';
-import { Spinner } from '../../../../src';
-import { createSignal } from 'solid-js';
-import ComponentDemo from '../../components/ComponentDemo';
+import { createFileRoute } from "@tanstack/solid-router"
+import { Spinner } from "../../../../src"
+import { createSignal } from "solid-js"
+import ComponentDemo from "../../components/ComponentDemo"
 
-export const Route = createFileRoute('/components/spinner')({
-  component: SpinnerPage,
-});
+export const Route = createFileRoute("/components/spinner")({
+  component: SpinnerPage
+})
 
 function SpinnerPage() {
-  const [loading, setLoading] = createSignal(false);
+  const [loading, setLoading] = createSignal(false)
 
   const simulateLoading = () => {
-    setLoading(true);
-    setTimeout(() => setLoading(false), 3000);
-  };
+    setLoading(true)
+    setTimeout(() => setLoading(false), 3000)
+  }
 
   return (
     <div class="max-w-4xl">
@@ -24,10 +24,7 @@ function SpinnerPage() {
         </p>
       </div>
 
-      <ComponentDemo
-        title="Basic Spinner"
-        description="Simple loading spinner"
-      >
+      <ComponentDemo title="Basic Spinner" description="Simple loading spinner">
         <div class="flex items-center justify-center h-20">
           <Spinner />
         </div>
@@ -39,15 +36,15 @@ function SpinnerPage() {
       >
         <div class="flex items-center space-x-8">
           <div class="text-center">
-            <Spinner size="small" />
+            <Spinner class="h-4 w-4" />
             <div class="text-xs text-gray-500 mt-2">Small</div>
           </div>
           <div class="text-center">
-            <Spinner size="medium" />
+            <Spinner class="h-6 w-6" />
             <div class="text-xs text-gray-500 mt-2">Medium</div>
           </div>
           <div class="text-center">
-            <Spinner size="large" />
+            <Spinner class="h-8 w-8" />
             <div class="text-xs text-gray-500 mt-2">Large</div>
           </div>
         </div>
@@ -62,21 +59,21 @@ function SpinnerPage() {
             onClick={simulateLoading}
             disabled={loading()}
             class={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${
-              loading() 
-                ? 'bg-gray-400 cursor-not-allowed' 
-                : 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
+              loading()
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             }`}
           >
             {loading() ? (
               <>
-                <Spinner size="small" />
+                <Spinner class="h-4 w-4" />
                 <span class="ml-2">Loading...</span>
               </>
             ) : (
-              'Start Loading'
+              "Start Loading"
             )}
           </button>
-          
+
           {loading() && (
             <div class="text-sm text-gray-600">
               Simulating a 3-second loading process...
@@ -91,9 +88,11 @@ function SpinnerPage() {
       >
         <div class="bg-gray-50 rounded-lg">
           <div class="flex flex-col items-center justify-center py-12">
-            <Spinner size="large" />
+            <Spinner class="h-8 w-8" />
             <p class="mt-4 text-gray-600">Loading content...</p>
-            <p class="mt-2 text-sm text-gray-500">Please wait while we fetch your data</p>
+            <p class="mt-2 text-sm text-gray-500">
+              Please wait while we fetch your data
+            </p>
           </div>
         </div>
       </ComponentDemo>
@@ -104,21 +103,21 @@ function SpinnerPage() {
       >
         <div class="space-y-4">
           <div class="flex items-center space-x-2">
-            <Spinner size="small" />
+            <Spinner class="h-4 w-4" />
             <span class="text-gray-700">Processing your request...</span>
           </div>
-          
+
           <div class="flex items-center space-x-2">
-            <Spinner size="small" />
+            <Spinner class="h-4 w-4" />
             <span class="text-gray-700">Saving changes...</span>
           </div>
-          
+
           <div class="flex items-center space-x-2">
-            <Spinner size="small" />
+            <Spinner class="h-4 w-4" />
             <span class="text-gray-700">Uploading file...</span>
           </div>
         </div>
       </ComponentDemo>
     </div>
-  );
+  )
 }

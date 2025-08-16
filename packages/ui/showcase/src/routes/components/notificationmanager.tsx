@@ -1,5 +1,9 @@
 import { createFileRoute } from "@tanstack/solid-router"
-import { NotificationsProvider, createNotification, Button } from "../../../../src"
+import {
+  NotificationsProvider,
+  createNotification,
+  Button
+} from "../../../../src"
 import ComponentDemo from "../../components/ComponentDemo"
 
 export const Route = createFileRoute("/components/notificationmanager")({
@@ -47,7 +51,8 @@ function NotificationDemo() {
   const showLongContentNotification = () => {
     addNotification({
       name: "Long notification",
-      content: "This is a notification with a very long content that demonstrates how the notification expands when there's more content to display. Click the arrow to expand or collapse the notification.",
+      content:
+        "This is a notification with a very long content that demonstrates how the notification expands when there's more content to display. Click the arrow to expand or collapse the notification.",
       type: "success",
       duration: 8000
     })
@@ -65,9 +70,12 @@ function NotificationDemo() {
   return (
     <div class="max-w-4xl">
       <div class="mb-8">
-        <h1 class="text-4xl font-bold text-gray-900 mb-4">Notification Manager</h1>
+        <h1 class="text-4xl font-bold text-gray-900 mb-4">
+          Notification Manager
+        </h1>
         <p class="text-xl text-gray-600">
-          Toast notification system with different types, expandable content, and progress indicators.
+          Toast notification system with different types, expandable content,
+          and progress indicators.
         </p>
       </div>
 
@@ -112,8 +120,9 @@ function NotificationDemo() {
       >
         <div class="bg-gray-50 p-4 rounded-lg">
           <p class="text-gray-700">
-            Remember to add a div with id="notifications" to your HTML for the portal to render notifications.
-            Notifications appear in the top-right corner and support hover-to-pause functionality.
+            Remember to add a div with id="notifications" to your HTML for the
+            portal to render notifications. Notifications appear in the
+            top-right corner and support hover-to-pause functionality.
           </p>
         </div>
       </ComponentDemo>

@@ -1,4 +1,4 @@
-import { Carousel, News, Skeleton } from "@gd/ui"
+import { News, Skeleton } from "@gd/ui"
 import { For, Match, Show, Suspense, Switch, createResource } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import InstanceTile from "@/components/InstanceTile"
@@ -19,7 +19,7 @@ const HomeWithSidebar = () => {
 
   return (
     <div>
-      <div class="overflow-hidden">
+      {/* <div class="overflow-hidden">
         <UnstableCard />
         <Show when={routeData.settings.data?.showNews}>
           <div class="flex gap-4">
@@ -150,7 +150,7 @@ const HomeWithSidebar = () => {
             </div>
           </Match>
         </Switch>
-      </div>
+      </div> */}
     </div>
   )
 }

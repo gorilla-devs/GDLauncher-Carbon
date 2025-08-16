@@ -17,7 +17,7 @@ import App from "@/app"
 import { ModalProvider } from "@/managers/ModalsManager"
 import "virtual:uno.css"
 import "@gd/ui/style.css"
-import { ContextMenuProvider, NotificationsProvider, Progressbar } from "@gd/ui"
+import { ContextMenuProvider, NotificationsProvider, Progress } from "@gd/ui"
 import "@unocss/reset/tailwind.css"
 import { NavigationManager } from "./managers/NavigationManager"
 // import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
@@ -180,9 +180,9 @@ render(() => {
                       "opacity-0": coreModuleProgress() === undefined
                     }}
                   >
-                    <Progressbar
+                    <Progress
                       color="bg-blue-500"
-                      percentage={coreModuleProgress() ?? 0}
+                      value={coreModuleProgress() ?? 0}
                     />
                   </div>
                 </div>

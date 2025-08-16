@@ -1,36 +1,36 @@
+import { createFileRoute } from "@tanstack/solid-router"
+import { createSignal } from "solid-js"
+import { Dropdown } from "../../../../src"
+import ComponentDemo from "../../components/ComponentDemo"
 
-import { createFileRoute } from '@tanstack/solid-router';
-import { createSignal } from 'solid-js';
-import { Dropdown } from '../../../../src';
-import ComponentDemo from '../../components/ComponentDemo';
-
-export const Route = createFileRoute('/components/dropdown')({
-  component: DropdownPage,
-});
+export const Route = createFileRoute("/components/dropdown")({
+  component: DropdownPage
+})
 
 function DropdownPage() {
   const basicOptions = [
-    { label: 'Option 1', key: '1' },
-    { label: 'Option 2', key: '2' },
-    { label: 'Option 3', key: '3' },
-  ];
+    { label: "Option 1", key: "1" },
+    { label: "Option 2", key: "2" },
+    { label: "Option 3", key: "3" }
+  ]
 
   const fruitOptions = [
-    { label: 'Apple', key: 'apple' },
-    { label: 'Banana', key: 'banana' },
-    { label: 'Orange', key: 'orange' },
-    { label: 'Grape', key: 'grape' },
-    { label: 'Strawberry', key: 'strawberry' },
-  ];
+    { label: "Apple", key: "apple" },
+    { label: "Banana", key: "banana" },
+    { label: "Orange", key: "orange" },
+    { label: "Grape", key: "grape" },
+    { label: "Strawberry", key: "strawberry" }
+  ]
 
-  const [selectedValue, setSelectedValue] = createSignal('apple');
+  const [selectedValue, setSelectedValue] = createSignal("apple")
 
   return (
     <div class="max-w-4xl">
       <div class="mb-8">
         <h1 class="text-4xl font-bold text-gray-900 mb-4">Dropdown</h1>
         <p class="text-xl text-gray-600">
-          Interactive dropdown component with various configurations and options.
+          Interactive dropdown component with various configurations and
+          options.
         </p>
       </div>
 
@@ -53,14 +53,12 @@ function DropdownPage() {
         description="Dropdown with controlled value and change handler"
       >
         <div class="space-y-4">
-          <Dropdown 
+          <Dropdown
             options={fruitOptions}
             value={selectedValue()}
             onChange={(option) => setSelectedValue(option.key.toString())}
           />
-          <div class="text-gray-600">
-            Selected: {selectedValue()}
-          </div>
+          <div class="text-gray-600">Selected: {selectedValue()}</div>
         </div>
       </ComponentDemo>
 
@@ -86,11 +84,11 @@ function DropdownPage() {
           options={fruitOptions}
           value={selectedValue()}
           onChange={(option) => setSelectedValue(option.key.toString())}
-          onClick={() => alert('Button clicked!')}
+          onClick={() => alert("Button clicked!")}
         >
           Action
         </Dropdown.button>
       </ComponentDemo>
     </div>
-  );
+  )
 }

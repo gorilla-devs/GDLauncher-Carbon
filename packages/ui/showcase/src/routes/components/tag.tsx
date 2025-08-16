@@ -1,19 +1,24 @@
+import { createFileRoute } from "@tanstack/solid-router"
+import { Tag } from "../../../../src"
+import ComponentDemo from "../../components/ComponentDemo"
 
-import { createFileRoute } from '@tanstack/solid-router';
-import { Tag } from '../../../../src';
-import ComponentDemo from '../../components/ComponentDemo';
-
-export const Route = createFileRoute('/components/tag')({
-  component: TagPage,
-});
+export const Route = createFileRoute("/components/tag")({
+  component: TagPage
+})
 
 function TagPage() {
   return (
     <div class="max-w-4xl">
       <div class="mb-8">
-        <h1 class="text-4xl font-bold mb-4" style={`color: rgb(var(--lightSlate-50))`}>Tag</h1>
+        <h1
+          class="text-4xl font-bold mb-4"
+          style={`color: rgb(var(--lightSlate-50))`}
+        >
+          Tag
+        </h1>
         <p class="text-xl" style={`color: rgb(var(--lightSlate-300))`}>
-          Compact label component for categorizing, filtering, or displaying metadata.
+          Compact label component for categorizing, filtering, or displaying
+          metadata.
         </p>
       </div>
 
@@ -22,37 +27,55 @@ function TagPage() {
         description="Simple tags with different content"
       >
         <div class="flex flex-wrap gap-2">
-          <Tag>JavaScript</Tag>
-          <Tag>React</Tag>
-          <Tag>SolidJS</Tag>
-          <Tag>TypeScript</Tag>
-          <Tag>Vite</Tag>
+          <Tag name="JavaScript" />
+          <Tag name="React" />
+          <Tag name="SolidJS" />
+          <Tag name="TypeScript" />
+          <Tag name="Vite" />
+        </div>
+      </ComponentDemo>
+
+      <ComponentDemo title="Tag Sizes" description="Different tag sizes">
+        <div class="flex flex-wrap gap-2 items-center">
+          <Tag name="Small Tag" size="small" />
+          <Tag name="Medium Tag" size="medium" />
         </div>
       </ComponentDemo>
 
       <ComponentDemo
-        title="Tag Variants"
-        description="Different tag styles and colors"
+        title="Tags with Images"
+        description="Tags can include icons or images"
       >
         <div class="flex flex-wrap gap-2">
-          <Tag variant="primary">Primary</Tag>
-          <Tag variant="secondary">Secondary</Tag>
-          <Tag variant="success">Success</Tag>
-          <Tag variant="warning">Warning</Tag>
-          <Tag variant="error">Error</Tag>
+          <Tag
+            name="JavaScript"
+            img="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/javascript/javascript-original.svg"
+          />
+          <Tag
+            name="React"
+            img="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg"
+          />
+          <Tag
+            name="TypeScript"
+            img="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/typescript/typescript-original.svg"
+          />
         </div>
       </ComponentDemo>
 
       <ComponentDemo
-        title="Removable Tags"
-        description="Tags with close button for removal"
+        title="Fixed vs Default Tags"
+        description="Different tag types - fixed tags cannot be removed"
       >
         <div class="flex flex-wrap gap-2">
-          <Tag removable onRemove={() => alert('Tag removed!')}>Click to remove</Tag>
-          <Tag removable>Another removable tag</Tag>
-          <Tag removable variant="primary">Primary removable</Tag>
+          <Tag
+            name="Removable Tag"
+            type="default"
+            onClose={(name) => alert(`Removed: ${name}`)}
+          />
+          <Tag name="Fixed Tag" type="fixed" />
+          <Tag name="Another Removable" type="default" />
         </div>
       </ComponentDemo>
     </div>
-  );
+  )
 }

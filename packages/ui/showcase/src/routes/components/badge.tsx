@@ -1,10 +1,10 @@
-import { createFileRoute } from '@tanstack/solid-router';
-import { Badge } from '../../../../src';
-import ComponentDemo from '../../components/ComponentDemo';
+import { createFileRoute } from "@tanstack/solid-router"
+import { Badge } from "../../../../src"
+import ComponentDemo from "../../components/ComponentDemo"
 
-export const Route = createFileRoute('/components/badge')({
-  component: BadgePage,
-});
+export const Route = createFileRoute("/components/badge")({
+  component: BadgePage
+})
 
 function BadgePage() {
   return (
@@ -39,7 +39,9 @@ function BadgePage() {
             <Badge>3</Badge>
           </div>
           <div class="relative inline-block">
-            <button class="px-4 py-2 bg-gray-100 rounded-md">Notifications</button>
+            <button class="px-4 py-2 bg-gray-100 rounded-md">
+              Notifications
+            </button>
             <Badge>12</Badge>
           </div>
           <div class="relative inline-block">
@@ -49,5 +51,5 @@ function BadgePage() {
         </div>
       </ComponentDemo>
     </div>
-  );
+  )
 }

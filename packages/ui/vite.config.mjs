@@ -13,7 +13,8 @@ export default defineConfig({
   plugins: [
     dts({
       insertTypesEntry: false,
-      tsConfigFilePath: resolve(__dirname, "tsconfig.json")
+      tsConfigFilePath: resolve(__dirname, "tsconfig.build.json"),
+      exclude: ["showcase/**/*"]
     }),
     solidPlugin(),
     Unocss(unocssConfig)

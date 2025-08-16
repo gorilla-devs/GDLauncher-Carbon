@@ -1,23 +1,27 @@
+import { createFileRoute } from "@tanstack/solid-router"
+import {
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  PopoverTitle,
+  PopoverDescription
+} from "../../../../src"
+import ComponentDemo from "../../components/ComponentDemo"
 
-import { createFileRoute } from '@tanstack/solid-router';
-import { 
-  Popover, 
-  PopoverTrigger, 
-  PopoverContent, 
-  PopoverTitle, 
-  PopoverDescription 
-} from '../../../../src';
-import ComponentDemo from '../../components/ComponentDemo';
-
-export const Route = createFileRoute('/components/popover')({
-  component: PopoverPage,
-});
+export const Route = createFileRoute("/components/popover")({
+  component: PopoverPage
+})
 
 function PopoverPage() {
   return (
     <div class="max-w-4xl">
       <div class="mb-8">
-        <h1 class="text-4xl font-bold mb-4" style={`color: rgb(var(--lightSlate-50))`}>Popover</h1>
+        <h1
+          class="text-4xl font-bold mb-4"
+          style={`color: rgb(var(--lightSlate-50))`}
+        >
+          Popover
+        </h1>
         <p class="text-xl" style={`color: rgb(var(--lightSlate-300))`}>
           Floating content container that appears relative to a trigger element.
         </p>
@@ -30,14 +34,14 @@ function PopoverPage() {
         <div class="flex justify-center">
           <Popover>
             <PopoverTrigger>
-              <button 
-                class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors"
-              >
+              <button class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors">
                 Click me
               </button>
             </PopoverTrigger>
             <PopoverContent>
-              <PopoverTitle class="font-semibold mb-2">Popover Title</PopoverTitle>
+              <PopoverTitle class="font-semibold mb-2">
+                Popover Title
+              </PopoverTitle>
               <PopoverDescription class="text-sm">
                 This is the popover content that appears when triggered.
               </PopoverDescription>
@@ -63,7 +67,7 @@ function PopoverPage() {
               </PopoverContent>
             </Popover>
           </div>
-          
+
           <div class="flex justify-center">
             <Popover placement="bottom">
               <PopoverTrigger>
@@ -76,7 +80,7 @@ function PopoverPage() {
               </PopoverContent>
             </Popover>
           </div>
-          
+
           <div class="flex justify-center">
             <Popover placement="left">
               <PopoverTrigger>
@@ -89,7 +93,7 @@ function PopoverPage() {
               </PopoverContent>
             </Popover>
           </div>
-          
+
           <div class="flex justify-center">
             <Popover placement="right">
               <PopoverTrigger>
@@ -117,7 +121,9 @@ function PopoverPage() {
               </button>
             </PopoverTrigger>
             <PopoverContent class="w-56">
-              <PopoverTitle class="font-semibold mb-3">Settings Menu</PopoverTitle>
+              <PopoverTitle class="font-semibold mb-3">
+                Settings Menu
+              </PopoverTitle>
               <div class="space-y-1">
                 <button class="block w-full text-left px-3 py-2 rounded text-sm hover:bg-gray-600 transition-colors">
                   Profile Settings
@@ -150,9 +156,12 @@ function PopoverPage() {
               </button>
             </PopoverTrigger>
             <PopoverContent hideCloseButton class="w-80 p-6">
-              <PopoverTitle class="text-lg font-bold mb-2">Information Panel</PopoverTitle>
+              <PopoverTitle class="text-lg font-bold mb-2">
+                Information Panel
+              </PopoverTitle>
               <PopoverDescription class="text-sm mb-4">
-                This popover demonstrates custom styling and content layout without a close button.
+                This popover demonstrates custom styling and content layout
+                without a close button.
               </PopoverDescription>
               <div class="space-y-2">
                 <div class="flex justify-between text-sm">
@@ -173,5 +182,5 @@ function PopoverPage() {
         </div>
       </ComponentDemo>
     </div>
-  );
+  )
 }

@@ -1,16 +1,16 @@
-import { createFileRoute } from '@tanstack/solid-router';
-import { Input } from '../../../../src';
-import { createSignal } from 'solid-js';
-import ComponentDemo from '../../components/ComponentDemo';
+import { createFileRoute } from "@tanstack/solid-router"
+import { Input } from "../../../../src"
+import { createSignal } from "solid-js"
+import ComponentDemo from "../../components/ComponentDemo"
 
-export const Route = createFileRoute('/components/input')({
-  component: InputPage,
-});
+export const Route = createFileRoute("/components/input")({
+  component: InputPage
+})
 
 function InputPage() {
-  const [value, setValue] = createSignal('');
-  const [emailValue, setEmailValue] = createSignal('');
-  const [passwordValue, setPasswordValue] = createSignal('');
+  const [value, setValue] = createSignal("")
+  const [emailValue, setEmailValue] = createSignal("")
+  const [passwordValue, setPasswordValue] = createSignal("")
 
   return (
     <div class="max-w-4xl">
@@ -25,14 +25,12 @@ function InputPage() {
         title="Basic Input"
         description="Simple text input with placeholder"
       >
-        <Input 
+        <Input
           placeholder="Enter text here..."
           value={value()}
           onInput={(e) => setValue(e.target.value)}
         />
-        <div class="mt-2 text-sm text-gray-600">
-          Current value: {value()}
-        </div>
+        <div class="mt-2 text-sm text-gray-600">Current value: {value()}</div>
       </ComponentDemo>
 
       <ComponentDemo
@@ -40,14 +38,14 @@ function InputPage() {
         description="Different input types for various use cases"
       >
         <div class="space-y-4">
-          <Input 
-            type="email" 
+          <Input
+            type="email"
             placeholder="Email address"
             value={emailValue()}
             onInput={(e) => setEmailValue(e.target.value)}
           />
-          <Input 
-            type="password" 
+          <Input
+            type="password"
             placeholder="Password"
             value={passwordValue()}
             onInput={(e) => setPasswordValue(e.target.value)}
@@ -79,7 +77,7 @@ function InputPage() {
             </label>
             <Input placeholder="John Doe" />
           </div>
-          
+
           <div class="space-y-2">
             <label class="block text-sm font-medium text-gray-700">
               Email Address
@@ -89,5 +87,5 @@ function InputPage() {
         </div>
       </ComponentDemo>
     </div>
-  );
+  )
 }

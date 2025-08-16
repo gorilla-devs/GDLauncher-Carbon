@@ -270,12 +270,16 @@ function Slider(props: Props) {
                   >
                     <Switch>
                       <Match
-                        when={typeof label === "string" && !mergedProps.noLabels}
+                        when={
+                          typeof label === "string" && !mergedProps.noLabels
+                        }
                       >
                         {label as string}
                       </Match>
                       <Match
-                        when={typeof label === "object" && !mergedProps.noLabels}
+                        when={
+                          typeof label === "object" && !mergedProps.noLabels
+                        }
                       >
                         {(label as { label: string }).label}
                       </Match>

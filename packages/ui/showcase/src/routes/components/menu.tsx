@@ -1,19 +1,30 @@
+import { createFileRoute } from "@tanstack/solid-router"
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator
+} from "../../../../src"
+import ComponentDemo from "../../components/ComponentDemo"
 
-import { createFileRoute } from '@tanstack/solid-router';
-import { ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator } from '../../../../src';
-import ComponentDemo from '../../components/ComponentDemo';
-
-export const Route = createFileRoute('/components/menu')({
-  component: MenuPage,
-});
+export const Route = createFileRoute("/components/menu")({
+  component: MenuPage
+})
 
 function MenuPage() {
   return (
     <div class="max-w-4xl">
       <div class="mb-8">
-        <h1 class="text-4xl font-bold mb-4" style={`color: rgb(var(--lightSlate-50))`}>ContextMenu</h1>
+        <h1
+          class="text-4xl font-bold mb-4"
+          style={`color: rgb(var(--lightSlate-50))`}
+        >
+          ContextMenu
+        </h1>
         <p class="text-xl" style={`color: rgb(var(--lightSlate-300))`}>
-          Right-click contextual menu component for actions and navigation options.
+          Right-click contextual menu component for actions and navigation
+          options.
         </p>
       </div>
 
@@ -24,7 +35,7 @@ function MenuPage() {
         <div class="flex justify-center">
           <ContextMenu>
             <ContextMenuTrigger>
-              <div 
+              <div
                 class="p-8 border-2 border-dashed rounded-lg text-center cursor-context-menu"
                 style={`border-color: rgb(var(--darkSlate-600)); color: rgb(var(--lightSlate-300))`}
               >
@@ -32,13 +43,13 @@ function MenuPage() {
               </div>
             </ContextMenuTrigger>
             <ContextMenuContent>
-              <ContextMenuItem onSelect={() => alert('New File')}>
+              <ContextMenuItem onSelect={() => alert("New File")}>
                 New File
               </ContextMenuItem>
-              <ContextMenuItem onSelect={() => alert('Open')}>
+              <ContextMenuItem onSelect={() => alert("Open")}>
                 Open
               </ContextMenuItem>
-              <ContextMenuItem onSelect={() => alert('Save')}>
+              <ContextMenuItem onSelect={() => alert("Save")}>
                 Save
               </ContextMenuItem>
             </ContextMenuContent>
@@ -53,7 +64,7 @@ function MenuPage() {
         <div class="flex justify-center">
           <ContextMenu>
             <ContextMenuTrigger>
-              <div 
+              <div
                 class="p-8 border-2 border-dashed rounded-lg text-center cursor-context-menu"
                 style={`border-color: rgb(var(--primary-500)); color: rgb(var(--lightSlate-300))`}
               >
@@ -61,21 +72,21 @@ function MenuPage() {
               </div>
             </ContextMenuTrigger>
             <ContextMenuContent>
-              <ContextMenuItem onSelect={() => alert('Cut')}>
+              <ContextMenuItem onSelect={() => alert("Cut")}>
                 Cut
               </ContextMenuItem>
-              <ContextMenuItem onSelect={() => alert('Copy')}>
+              <ContextMenuItem onSelect={() => alert("Copy")}>
                 Copy
               </ContextMenuItem>
-              <ContextMenuItem onSelect={() => alert('Paste')}>
+              <ContextMenuItem onSelect={() => alert("Paste")}>
                 Paste
               </ContextMenuItem>
               <ContextMenuSeparator />
-              <ContextMenuItem onSelect={() => alert('Select All')}>
+              <ContextMenuItem onSelect={() => alert("Select All")}>
                 Select All
               </ContextMenuItem>
               <ContextMenuSeparator />
-              <ContextMenuItem onSelect={() => alert('Find')}>
+              <ContextMenuItem onSelect={() => alert("Find")}>
                 Find
               </ContextMenuItem>
             </ContextMenuContent>
@@ -90,7 +101,7 @@ function MenuPage() {
         <div class="flex justify-center">
           <ContextMenu>
             <ContextMenuTrigger>
-              <button 
+              <button
                 class="px-6 py-3 rounded-md transition-colors cursor-context-menu"
                 style={`background-color: rgb(var(--green-600)); color: white`}
               >
@@ -98,17 +109,17 @@ function MenuPage() {
               </button>
             </ContextMenuTrigger>
             <ContextMenuContent>
-              <ContextMenuItem onSelect={() => alert('Dashboard')}>
+              <ContextMenuItem onSelect={() => alert("Dashboard")}>
                 📊 Dashboard
               </ContextMenuItem>
-              <ContextMenuItem onSelect={() => alert('Profile')}>
+              <ContextMenuItem onSelect={() => alert("Profile")}>
                 👤 Profile
               </ContextMenuItem>
-              <ContextMenuItem onSelect={() => alert('Settings')}>
+              <ContextMenuItem onSelect={() => alert("Settings")}>
                 ⚙️ Settings
               </ContextMenuItem>
               <ContextMenuSeparator />
-              <ContextMenuItem onSelect={() => alert('Logout')}>
+              <ContextMenuItem onSelect={() => alert("Logout")}>
                 💪 Logout
               </ContextMenuItem>
             </ContextMenuContent>
@@ -116,5 +127,5 @@ function MenuPage() {
         </div>
       </ComponentDemo>
     </div>
-  );
+  )
 }

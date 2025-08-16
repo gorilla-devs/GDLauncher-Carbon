@@ -1,6 +1,6 @@
 import { useTransContext } from "@gd/i18n"
 import LoadingGif from "/assets/images/image.gif"
-import { Progressbar } from "@gd/ui"
+import { Progress } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
 import { createEffect, createSignal } from "solid-js"
 import { setTaskId, taskId } from "@/utils/import"
@@ -41,7 +41,7 @@ export default function Exporting() {
     <div class="w-full gap-4 h-full flex flex-col items-center justify-center">
       <img src={LoadingGif} class="w-40 h-40" alt="loading" />
       <span>{t("instance.exporting_instance")}</span>
-      <Progressbar color="bg-primary-500" percentage={progress()} />
+      <Progress color="bg-primary-500" value={progress()} />
       <span>{`${progress()}% ${t("instance.export_completed")}`}</span>
     </div>
   )
