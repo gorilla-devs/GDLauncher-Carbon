@@ -146,6 +146,9 @@ importers:
       '@tanstack/solid-virtual':
         specifier: 3.4.0
         version: 3.4.0(solid-js@1.9.3)
+      '@types/lodash':
+        specifier: ^4.17.20
+        version: 4.17.20
       '@types/marked':
         specifier: ^5.0.2
         version: 5.0.2
@@ -179,6 +182,9 @@ importers:
       jsdom:
         specifier: ^25.0.1
         version: 25.0.1
+      lodash:
+        specifier: ^4.17.21
+        version: 4.17.21
       marked:
         specifier: ^15.0.3
         version: 15.0.3
@@ -3205,6 +3211,9 @@ packages:
 
   '@types/keyv@3.1.4':
     resolution: {integrity: sha512-BQ5aZNSCpj7D6K2ksrRCTmKRLEpnPvWDiLPfoGyhZ++8YtiK9d/3DBKPJgry359X/P1PfruyYwvnvwFjuEiEIg==}
+
+  '@types/lodash@4.17.20':
+    resolution: {integrity: sha512-H3MHACvFUEiujabxhaI/ImO6gUrd8oOurg7LQtS7mbwIXA/cUqWrvBsaeJ23aZEPk1TAYkurjfMbSELfoCXlGA==}
 
   '@types/marked@5.0.2':
     resolution: {integrity: sha512-OucS4KMHhFzhz27KxmWg7J+kIYqyqoW5kdIEI319hqARQQUTqhao3M/F+uFnDXD0Rg72iDDZxZNxq5gvctmLlg==}
@@ -11510,6 +11519,8 @@ snapshots:
     dependencies:
       '@types/node': 20.11.6
 
+  '@types/lodash@4.17.20': {}
+
   '@types/marked@5.0.2': {}
 
   '@types/mdast@4.0.3':
@@ -12016,7 +12027,7 @@ snapshots:
 
   '@vue/compiler-core@3.5.13':
     dependencies:
-      '@babel/parser': 7.25.6
+      '@babel/parser': 7.28.3
       '@vue/shared': 3.5.13
       entities: 4.5.0
       estree-walker: 2.0.2
@@ -14540,7 +14551,7 @@ snapshots:
 
   jest-message-util@29.7.0:
     dependencies:
-      '@babel/code-frame': 7.23.5
+      '@babel/code-frame': 7.27.1
       '@jest/types': 29.6.3
       '@types/stack-utils': 2.0.3
       chalk: 4.1.2

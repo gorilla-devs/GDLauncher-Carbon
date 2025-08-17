@@ -99,9 +99,7 @@ const AppUpdate = (props: ModalProps) => {
               }}
             />
           </div>
-          <Progress
-            value={(modsUpdated() / data().mods.length) * 100}
-          />
+          <Progress value={(modsUpdated() / data().mods.length) * 100} />
         </div>
         <div class="flex flex-col items-center text-xl mt-20">
           <Trans
