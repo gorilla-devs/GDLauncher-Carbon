@@ -729,6 +729,26 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
         mod_metadata = merge_mod_metadata(mod_metadata, metadata);
     }
 
+    'neoforge_mods_toml: {
+        let Ok(mut file) = zip.by_name("META-INF/neoforge.mods.toml") else {
+            break 'neoforge_mods_toml;
+        };
+        let mut content = String::with_capacity(file.size() as usize);
+        file.read_to_string(&mut content)?;
+
+        let modstoml = toml::from_str::<ModsToml>(&content)?;
+
+        let mut metadata: ModFileMetadata = modstoml.into();
+        match metadata.version {
+            Some(version) if version == "${file.jarVersion}" => {
+                metadata.version = None;
+            }
+            _ => (),
+        }
+
+        mod_metadata = merge_mod_metadata(mod_metadata, metadata);
+    }
+
     'fabric_mod_json: {
         let Ok(mut file) = zip.by_name("fabric.mod.json") else {
             break 'fabric_mod_json;
