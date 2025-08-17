@@ -372,14 +372,11 @@ importers:
       jsdom:
         specifier: ^25.0.1
         version: 25.0.1
-      postcss:
-        specifier: ^8.4.32
-        version: 8.5.3
       solid-floating-ui:
         specifier: ^0.3.1
         version: 0.3.1(@floating-ui/dom@1.5.4)(solid-js@1.9.9)
       solid-js:
-        specifier: ^1.9.5
+        specifier: ^1.9.3
         version: 1.9.9
       solid-testing-library:
         specifier: ^0.5.0

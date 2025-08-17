@@ -740,6 +740,11 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
 
         let sanitized_content = sanitize_json_content(&content);
         let modstoml = toml::from_str::<ModsToml>(&sanitized_content)?;
+        let mut modstoml = modstoml
+            .mods
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow!("neoforge.mods.toml contained no mod entries"))?;
 
         let mut metadata: ModFileMetadata = modstoml.into();
         match metadata.version {
