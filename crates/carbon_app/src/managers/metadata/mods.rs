@@ -5,6 +5,12 @@ use std::{
     num::ParseIntError,
 };
 
+fn sanitize_json_content(content: &str) -> String {
+    content.chars()
+        .filter(|c| !c.is_control() || *c == '\t' || *c == '\n' || *c == '\r')
+        .collect()
+}
+
 use anyhow::{anyhow, bail};
 use serde::{Deserialize, Deserializer};
 use zip::read::ZipFile;
@@ -295,6 +301,9 @@ struct FabricModJsonEntry {
     contributors: Option<Vec<FabricAuthor>>,
     license: Option<FabricLicense>,
     icon: Option<FabricIcon>,
+    #[serde(rename = "accessWidener")]
+    access_widener: Option<String>,
+    custom: Option<serde_json::Value>,
 }
 
 fn fabric_mod_json_schema_version_default() -> u32 {
@@ -709,7 +718,8 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
         let mut content = String::with_capacity(file.size() as usize);
         file.read_to_string(&mut content)?;
 
-        let fabric_mod_json = serde_json::from_str::<FabricModJson>(&content)?;
+        let sanitized_content = sanitize_json_content(&content);
+        let fabric_mod_json = serde_json::from_str::<FabricModJson>(&sanitized_content)?;
 
         mod_metadata = merge_mod_metadata(mod_metadata, fabric_mod_json.try_into()?);
     }
@@ -721,7 +731,8 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
         let mut content = String::with_capacity(file.size() as usize);
         file.read_to_string(&mut content)?;
 
-        let quilt_mod_json = serde_json::from_str::<QuiltModJson>(&content)?;
+        let sanitized_content = sanitize_json_content(&content);
+        let quilt_mod_json = serde_json::from_str::<QuiltModJson>(&sanitized_content)?;
 
         mod_metadata = merge_mod_metadata(mod_metadata, quilt_mod_json.into());
     }
@@ -745,11 +756,15 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
             break 'mcmodinfo;
         }
 
-        let mcmod: McModInfo =
-            serde_json::from_reader::<_, McModInfoContainer>(file.expect("we just checked this"))
-                .unwrap_or_default()
-                .try_into()
-                .unwrap_or_default();
+        let mut file = file.expect("we just checked this");
+        let mut content = String::with_capacity(file.size() as usize);
+        file.read_to_string(&mut content).unwrap_or_default();
+
+        let sanitized_content = sanitize_json_content(&content);
+        let mcmod: McModInfo = serde_json::from_str::<McModInfoContainer>(&sanitized_content)
+            .unwrap_or_default()
+            .try_into()
+            .unwrap_or_default();
 
         mod_metadata = merge_mod_metadata(mod_metadata, mcmod.into());
     }
