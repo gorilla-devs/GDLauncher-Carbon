@@ -6,7 +6,8 @@ use std::{
 };
 
 fn sanitize_json_content(content: &str) -> String {
-    content.chars()
+    content
+        .chars()
         .filter(|c| !c.is_control() || *c == '\t' || *c == '\n' || *c == '\r')
         .collect()
 }
@@ -220,6 +221,10 @@ enum FabricAuthor {
     NameContact {
         name: String,
         contact: Option<String>,
+    },
+    NameContactObject {
+        name: String,
+        contact: Option<FabricContact>,
     },
 }
 
@@ -574,6 +579,19 @@ impl TryFrom<FabricModJson> for ModFileMetadata {
                     FabricAuthor::NameContact { name, contact } => {
                         if let Some(contact) = contact {
                             format!("{} <{}>", name, contact)
+                        } else {
+                            name
+                        }
+                    }
+                    FabricAuthor::NameContactObject { name, contact } => {
+                        if let Some(contact_obj) = contact {
+                            if let Some(email) = &contact_obj.email {
+                                format!("{} <{}>", name, email)
+                            } else if let Some(homepage) = &contact_obj.homepage {
+                                format!("{} <{}>", name, homepage)
+                            } else {
+                                name
+                            }
                         } else {
                             name
                         }
@@ -1078,6 +1096,30 @@ displayName = "TestMod"
         let returned = parsemeta("fabric.mod.json", modjson)?;
 
         assert_eq!(returned, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn fabric_author_contact_object_test() -> anyhow::Result<()> {
+        let modjson = r#"{
+  "schemaVersion": 1,
+  "id": "testmod",
+  "version": "1.0.0",
+  "name": "Test Mod",
+  "authors": [
+    {
+      "name": "Test Author",
+      "contact": {
+        "email": "test@example.com"
+      }
+    }
+  ]
+}
+        "#;
+
+        let returned = parsemeta("fabric.mod.json", modjson)?;
+        assert!(returned.is_some());
 
         Ok(())
     }
