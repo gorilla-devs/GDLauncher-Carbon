@@ -696,7 +696,9 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
         };
         let mut content = String::with_capacity(file.size() as usize);
         file.read_to_string(&mut content)?;
-        let modstoml = toml::from_str::<ModsToml>(&content)?;
+
+        let sanitized_content = sanitize_json_content(&content);
+        let modstoml = toml::from_str::<ModsToml>(&sanitized_content)?;
         let mut modstoml = modstoml
             .mods
             .into_iter()
@@ -736,7 +738,8 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
         let mut content = String::with_capacity(file.size() as usize);
         file.read_to_string(&mut content)?;
 
-        let modstoml = toml::from_str::<ModsToml>(&content)?;
+        let sanitized_content = sanitize_json_content(&content);
+        let modstoml = toml::from_str::<ModsToml>(&sanitized_content)?;
 
         let mut metadata: ModFileMetadata = modstoml.into();
         match metadata.version {
