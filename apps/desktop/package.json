@@ -22,7 +22,7 @@
     "release": "node scripts/releaseDraft.mjs"
   },
   "devDependencies": {
-    "@electron/notarize": "^2.5.0",
+    "@electron/notarize": "^3.0.2",
     "@formkit/auto-animate": "^0.8.2",
     "@gd/config": "workspace:*",
     "@gd/core_module": "workspace:*",

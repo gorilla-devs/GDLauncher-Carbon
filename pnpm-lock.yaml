@@ -84,8 +84,8 @@ importers:
   apps/desktop:
     devDependencies:
       '@electron/notarize':
-        specifier: ^2.5.0
-        version: 2.5.0
+        specifier: ^3.0.2
+        version: 3.0.2
       '@formkit/auto-animate':
         specifier: ^0.8.2
         version: 0.8.2
@@ -1061,9 +1061,9 @@ packages:
     resolution: {integrity: sha512-zfayxCe19euNwRycCty1C7lF7snk9YwfRpB5M8GLr1a4ICH63znxaPNAubrMvj0yDvVozqfgsdYpXVUnpWBDpg==}
     engines: {node: '>= 10.0.0'}
 
-  '@electron/notarize@2.5.0':
-    resolution: {integrity: sha512-jNT8nwH1f9X5GEITXaQ8IF/KdskvIkOFfB2CvwumsveVidzpSc+mvhhTMdAGSYF3O+Nq49lJ7y+ssODRXu06+A==}
-    engines: {node: '>= 10.0.0'}
+  '@electron/notarize@3.0.2':
+    resolution: {integrity: sha512-3LCARsJXOxEzzbmKFu/I2oq1eroyLdLBY2/J5ysCiPQ8i58TVIpQ7UdOZmthpppy1aBEiy+YGLUkxz5UMDRfgg==}
+    engines: {node: '>= 22.12.0'}
 
   '@electron/osx-sign@1.0.5':
     resolution: {integrity: sha512-k9ZzUQtamSoweGQDV2jILiRIHUu7lYlJ3c6IEmjv1hC17rclE+eb9U+f6UFlOOETo0JzY1HNlXy4YOlCvl+Lww==}
@@ -9412,10 +9412,9 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@electron/notarize@2.5.0':
+  '@electron/notarize@3.0.2':
     dependencies:
-      debug: 4.3.7
-      fs-extra: 9.1.0
+      debug: 4.4.0
       promise-retry: 2.0.1
     transitivePeerDependencies:
       - supports-color

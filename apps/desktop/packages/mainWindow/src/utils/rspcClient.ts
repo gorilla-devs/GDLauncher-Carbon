@@ -29,7 +29,7 @@ export default function initRspc(_port: number) {
   const client = createClient<Procedures>({
     transport,
     onError: (error) => {
-      console.error("RSPC error:", error)
+      console.trace("RSPC error:", error)
 
       try {
         const parsed = JSON.parse(error.message) as {
