@@ -215,7 +215,6 @@ struct FESettings {
     download_dependencies: bool,
     launcher_action_on_game_launch: FELauncherActionOnGameLaunch,
     show_app_close_warning: bool,
-    show_news: bool,
     show_featured: bool,
     instances_sort_by: InstancesSortBy,
     instances_sort_by_asc: bool,
@@ -251,7 +250,6 @@ impl TryFrom<carbon_repos::db::app_configuration::Data> for FESettings {
             last_app_version: data.last_app_version,
             concurrent_downloads: data.concurrent_downloads,
             download_dependencies: data.download_dependencies,
-            show_news: data.show_news,
             show_featured: data.show_featured,
             instances_sort_by: data.instances_sort_by.try_into()?,
             instances_sort_by_asc: data.instances_sort_by_asc,
@@ -369,8 +367,6 @@ pub struct FESettingsUpdate {
     pub instances_tile_size: Option<Set<i32>>,
     #[specta(optional)]
     pub deletion_through_recycle_bin: Option<Set<bool>>,
-    #[specta(optional)]
-    pub show_news: Option<Set<bool>>,
     #[specta(optional)]
     pub show_featured: Option<Set<bool>>,
     #[specta(optional)]

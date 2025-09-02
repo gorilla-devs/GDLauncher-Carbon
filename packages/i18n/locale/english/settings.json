@@ -18,8 +18,6 @@
   "resolution_presets": "presets",
   "instance_sorting_title": "Instance Sorting",
   "instance_sorting_text": "Select the method by which instances should be sorted.",
-  "show_news_title": "Show News",
-  "show_news_text": "Show news in the library page, as well as suggestions.",
   "discord_integration_title": "Discord Integration",
   "discord_integration_text": "Enable or disable Discord integration. This displays what you are playing in Discord.",
   "launcher_action_on_game_launch_title": "Launcher Action on Game Launch",

@@ -79,8 +79,45 @@ Skeleton.instances = () => {
   )
 }
 
+const NewsItem = () => {
+  return (
+    <div class="cursor-pointer">
+      <div class="bg-darkSlate-500 aspect-video w-full rounded-lg" />
+      <div class="p-4 space-y-2">
+        <div class="bg-darkSlate-500 h-6 w-3/4 rounded-md" />
+        <div class="bg-darkSlate-500 h-4 w-full rounded-md" />
+        <div class="bg-darkSlate-500 h-4 w-2/3 rounded-md" />
+      </div>
+    </div>
+  )
+}
+
+Skeleton.newsCarousel = () => {
+  return (
+    <div class="bg-darkSlate-500 relative h-84 overflow-hidden rounded-lg mb-5">
+      <div class="absolute bottom-0 left-0 p-8 space-y-2">
+        <div class="bg-darkSlate-400 h-8 w-80 rounded-md" />
+        <div class="bg-darkSlate-400 h-6 w-96 rounded-md" />
+        <div class="bg-darkSlate-400 h-4 w-24 rounded-md mt-4" />
+      </div>
+      <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+        <div class="bg-darkSlate-400 h-2 w-2 rounded-full opacity-100" />
+        <div class="bg-darkSlate-400 h-2 w-2 rounded-full opacity-30" />
+        <div class="bg-darkSlate-400 h-2 w-2 rounded-full opacity-30" />
+      </div>
+    </div>
+  )
+}
+
 Skeleton.news = () => {
-  return <div class="bg-darkSlate-500 mb-5 h-24 w-full rounded-lg" />
+  return (
+    <div class="flex flex-col gap-4 p-6">
+      <div class="bg-darkSlate-500 h-8 w-48 rounded-md" />
+      <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <For each={new Array(6)}>{() => <NewsItem />}</For>
+      </div>
+    </div>
+  )
 }
 
 const Modpack = () => {

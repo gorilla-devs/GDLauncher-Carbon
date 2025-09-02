@@ -212,23 +212,6 @@ const General = () => {
           </RightHandSide>
         </Row>
         <Row>
-          <Title description={<Trans key="settings:show_news_text" />}>
-            <Trans key="settings:show_news_title" />
-          </Title>
-          <RightHandSide>
-            <Switch
-              checked={settings.showNews}
-              onChange={(e) => {
-                settingsMutation.mutate({
-                  showNews: {
-                    Set: e.currentTarget.checked
-                  }
-                })
-              }}
-            />
-          </RightHandSide>
-        </Row>
-        <Row>
           <Title
             description={
               <Trans

@@ -26,7 +26,6 @@ model AppConfiguration {
   instancesGroupByAsc             Boolean  @default(true)
   instancesSortBy                 String   @default("name")
   instancesSortByAsc              Boolean  @default(true)
-  showNews                        Boolean  @default(true)
   showFeatured                    Boolean  @default(true)
   // Other settings
   deletionThroughRecycleBin       Boolean  @default(true)

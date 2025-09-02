@@ -20,7 +20,7 @@ const NewsPage = () => {
           />
         </Match>
         <Match when={news.length === 0}>
-          <Skeleton.news />
+          <Skeleton.newsCarousel />
         </Match>
       </Switch>
       <div class="flex flex-col gap-4 p-6">

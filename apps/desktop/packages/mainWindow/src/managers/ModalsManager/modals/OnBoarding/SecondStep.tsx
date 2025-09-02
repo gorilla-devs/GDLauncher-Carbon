@@ -44,23 +44,6 @@ const SecondStep = (props: Props) => {
           </RightHandSide>
         </Row>
         <Row>
-          <Title description={<Trans key="settings:show_news_text" />}>
-            <Trans key="settings:show_news_title" />
-          </Title>
-          <RightHandSide>
-            <Switch
-              checked={settings.data?.showNews}
-              onChange={(e) => {
-                settingsMutation.mutate({
-                  showNews: {
-                    Set: e.currentTarget.checked
-                  }
-                })
-              }}
-            />
-          </RightHandSide>
-        </Row>
-        <Row>
           <Title
             description={
               <Trans key="settings:deletion_through_recycle_bin_text" />

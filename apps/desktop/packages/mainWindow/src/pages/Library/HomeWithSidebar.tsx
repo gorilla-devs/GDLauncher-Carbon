@@ -3,28 +3,6 @@ const HomeWithSidebar = () => {
     <div>
       {/* <div class="overflow-hidden">
         <UnstableCard />
-        <Show when={routeData.settings.data?.showNews}>
-          <div class="flex gap-4">
-            <div class="flex-1 flex-grow">
-              <Switch>
-                <Match when={(news()?.length || 0) > 0}>
-                  <News
-                    slides={news()}
-                    onClick={(news) => {
-                      window.openExternalLink(news.url || "")
-                    }}
-                    fallBackImg={DefaultImg}
-                  />
-                </Match>
-                <Match when={news.length === 0 || routeData.settings.isLoading}>
-                  <Skeleton.news />
-                </Match>
-              </Switch>
-            </div>
-            <div class="h-auto w-[1px] bg-darkSlate-400" />
-            <FeaturedModpackTile />
-          </div>
-        </Show>
         <Switch>
           <Match
             when={
