@@ -76,7 +76,6 @@ struct NewMcModInfoObj {
 struct McModInfo {
     modid: Option<String>,
     name: Option<String>,
-    #[serde(alias = "mcversion")] // cccmod.info uses mcversion instead of version
     version: Option<String>,
     description: Option<String>,
     #[serde(alias = "authorList")] // cccmod.info uses authorList instead of authors
@@ -1211,6 +1210,45 @@ displayName = "TestMod"
 
         assert_eq!(returned, expected);
 
+        Ok(())
+    }
+
+    #[test]
+    pub fn xaero_minimap_mcmod() -> anyhow::Result<()> {
+        let mcmodinfo = r#"
+[
+{
+	"logoFile": "",
+	"credits": "",
+	"authorList": [
+		"TestAuthor"
+	],
+	"updateUrl": "",
+	"name": "TestMod",
+	"description": "The most typical testmod.",
+	"version": "23.4.0",
+	"modid": "testmod",
+	"mcversion": "1.12.2",
+	"url": "",
+	"screenshots": [],
+	"dependencies": []
+}
+]
+        "#;
+
+        let expected = Some(ModFileMetadata {
+            modid: Some(String::from("testmod")),
+            name: Some(String::from("TestMod")),
+            version: Some(String::from("23.4.0")),
+            description: Some(String::from("The most typical testmod.")),
+            authors: Some(String::from("TestAuthor")),
+            logo_file: Some(String::from("")),
+            modloaders: vec![ModLoaderType::Forge],
+        });
+
+        let returned = parsemeta("mcmod.info", mcmodinfo)?;
+
+        assert_eq!(returned, expected);
         Ok(())
     }
 }
