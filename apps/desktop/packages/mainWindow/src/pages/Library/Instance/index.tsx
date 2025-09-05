@@ -51,6 +51,7 @@ import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/
 import { isFullScreen } from "./Tabs/Log"
 import FeatureStatusBadge from "@/components/FeatureStatusBadge"
 import useSearchContext from "@/components/SearchInputContext"
+import { useGlobalStore } from "@/components/GlobalStoreContext"
 
 interface InstancePage {
   label: string | JSX.Element
@@ -120,9 +121,9 @@ const Instance = () => {
       obj
     ): Promise<
       | {
-          instancesUngrouped: ListInstance[]
-          instanceDetails: InstanceDetails
-        }
+        instancesUngrouped: ListInstance[]
+        instanceDetails: InstanceDetails
+      }
       | undefined
     > => {
       await queryClient.cancelQueries({
@@ -168,9 +169,9 @@ const Instance = () => {
       _variables,
       context:
         | {
-            instancesUngrouped: ListInstance[]
-            instanceDetails: InstanceDetails
-          }
+          instancesUngrouped: ListInstance[]
+          instanceDetails: InstanceDetails
+        }
         | undefined
     ) {
       if (context?.instanceDetails) {
@@ -196,12 +197,12 @@ const Instance = () => {
 
     ...(routeData.instanceDetails.data?.modloaders.length! > 0
       ? [
-          {
-            label: "Addons",
-            path: `/library/${params.id}/addons`,
-            noPadding: true
-          }
-        ]
+        {
+          label: "Addons",
+          path: `/library/${params.id}/addons`,
+          noPadding: true
+        }
+      ]
       : []),
     {
       label: "Settings",
@@ -244,6 +245,30 @@ const Instance = () => {
   const killInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.killInstance"]
   }))
+
+  const globalStore = useGlobalStore()
+  const handlePlay = () => {
+    const parsedInstanceId = parseInt(params.id, 10)
+    if (isRunning()) {
+      killInstanceMutation.mutate(parsedInstanceId)
+      return
+    }
+    if (
+      globalStore.currentlySelectedAccount()?.status === "expired" ||
+      globalStore.currentlySelectedAccount()?.status === "invalid"
+    ) {
+      modalsContext?.openModal(
+        {
+          name: "accountExpired"
+        },
+        {
+          id: parsedInstanceId
+        }
+      )
+      return
+    }
+    launchInstanceMutation.mutate(parsedInstanceId)
+  }
 
   const isRunning = () =>
     routeData.instanceDetails.data?.state &&
@@ -335,9 +360,9 @@ const Instance = () => {
           routeData.instanceDetails.data?.modloaders[0]?.version,
         img: routeData.instanceDetails.data?.iconRevision
           ? getInstanceImageUrl(
-              params.id,
-              routeData.instanceDetails.data?.iconRevision
-            )
+            params.id,
+            routeData.instanceDetails.data?.iconRevision
+          )
           : null
       }
     )
@@ -415,9 +440,9 @@ const Instance = () => {
           src={
             routeData.instanceDetails.data?.iconRevision
               ? getInstanceImageUrl(
-                  params.id,
-                  routeData.instanceDetails.data?.iconRevision
-                )
+                params.id,
+                routeData.instanceDetails.data?.iconRevision
+              )
               : DefaultImg
           }
           alt="Instance cover"
@@ -492,9 +517,9 @@ const Instance = () => {
                     src={
                       routeData.instanceDetails.data?.iconRevision
                         ? getInstanceImageUrl(
-                            params.id,
-                            routeData.instanceDetails.data?.iconRevision
-                          )
+                          params.id,
+                          routeData.instanceDetails.data?.iconRevision
+                        )
                         : DefaultImg
                     }
                     alt="Instance icon"
@@ -637,17 +662,7 @@ const Instance = () => {
                             "view-transition-name": `instance-tile-play-button`,
                             contain: "layout"
                           }}
-                          onClick={() => {
-                            if (isRunning()) {
-                              killInstanceMutation.mutate(
-                                parseInt(params.id, 10)
-                              )
-                            } else {
-                              launchInstanceMutation.mutate(
-                                parseInt(params.id, 10)
-                              )
-                            }
-                          }}
+                          onClick={handlePlay}
                         >
                           <Switch>
                             <Match when={!isRunning()}>
@@ -741,13 +756,7 @@ const Instance = () => {
                   size="small"
                   variant={isRunning() && "red"}
                   loading={isPreparing() !== undefined}
-                  onClick={() => {
-                    if (isRunning()) {
-                      killInstanceMutation.mutate(parseInt(params.id, 10))
-                    } else {
-                      launchInstanceMutation.mutate(parseInt(params.id, 10))
-                    }
-                  }}
+                  onClick={handlePlay}
                 >
                   <Switch>
                     <Match when={!isRunning()}>
