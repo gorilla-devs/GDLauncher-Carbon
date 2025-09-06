@@ -78,12 +78,6 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   }))
 
   createEffect(async () => {
-    rspcContext.queryClient.removeQueries({
-      queryKey: ["instance.getInstanceDetails"]
-    })
-    rspcContext.queryClient.removeQueries({
-      queryKey: ["instance.getInstanceMods"]
-    })
     if (selectedInstanceId()) {
       selectedInstanceMods.refetch()
       const res = await selectedInstance.refetch()
