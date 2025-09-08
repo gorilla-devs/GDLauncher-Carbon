@@ -68,7 +68,7 @@ impl ManagerRef<'_, VisualTaskManager> {
         let tasklist = self.tasks.read().await;
         let mut tasks = tasklist
             .iter()
-            .map(|(i, task)| (i, task.make_domain_task()))
+            .map(|(i, task)| (i, task.make_domain_task(*i)))
             .collect::<Vec<_>>();
         tasks.sort_by(|(a, _), (b, _)| Ord::cmp(a, b));
 
@@ -86,7 +86,7 @@ impl ManagerRef<'_, VisualTaskManager> {
         let task = tasklist.get(&task_id);
 
         match task {
-            Some(task) => Some(task.make_domain_task().await),
+            Some(task) => Some(task.make_domain_task(task_id).await),
             None => None,
         }
     }
@@ -134,7 +134,7 @@ impl ManagerRef<'_, VisualTaskManager> {
             let domain = {
                 let tasklist = self.tasks.read().await;
                 if let Some(task) = tasklist.get(&task_id) {
-                    task.make_domain_task().await
+                    task.make_domain_task(task_id).await
                 } else {
                     // Task was removed from the list, exit
                     break;
@@ -337,7 +337,7 @@ impl VisualTask {
             .fold((0, 0), |(ad, at), (d, t)| (ad + d, at + t))
     }
 
-    pub async fn make_domain_task(&self) -> domain::Task {
+    pub async fn make_domain_task(&self, id: VisualTaskId) -> domain::Task {
         let (name, state) = {
             let data = self.data.read().await;
             (data.name.clone(), data.state.clone())
@@ -346,6 +346,7 @@ impl VisualTask {
         let (downloaded, download_total) = self.downloaded_bytes().await;
 
         domain::Task {
+            id,
             name: name.into(),
             progress: match state {
                 TaskState::Indeterminate => domain::Progress::Indeterminate,
@@ -553,6 +554,7 @@ mod test {
         subtask.start_opaque();
 
         let mut tasks = vec![domain::Task {
+            id,
             name: Translation::Test,
             progress: domain::Progress::Indeterminate,
             downloaded: 0,

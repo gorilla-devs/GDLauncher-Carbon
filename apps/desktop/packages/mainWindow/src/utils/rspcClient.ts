@@ -74,7 +74,6 @@ export default function initRspc(_port: number) {
         if (data.args !== null) {
           key.push(data.args)
         }
-        // console.log("Invalidations channel", key, data.args);
         context.queryClient
           .invalidateQueries({
             queryKey: key

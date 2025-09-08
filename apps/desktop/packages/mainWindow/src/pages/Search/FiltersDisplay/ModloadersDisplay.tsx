@@ -12,11 +12,13 @@ export default function ModloadersDisplay() {
         return (
           <FilterBadge
             onClick={() => {
-              searchContext?.setSearchQuery((prev) => ({
-                ...prev,
-                modloaders:
-                  prev.modloaders?.filter((m) => m !== modloader) ?? null
-              }))
+              searchContext?.setSearchQuery((prev) => {
+                const filteredModloaders = prev.modloaders?.filter((m) => m !== modloader) || []
+                return {
+                  ...prev,
+                  modloaders: filteredModloaders.length === 0 ? null : filteredModloaders
+                }
+              })
             }}
           >
             <div class="flex items-center gap-1">

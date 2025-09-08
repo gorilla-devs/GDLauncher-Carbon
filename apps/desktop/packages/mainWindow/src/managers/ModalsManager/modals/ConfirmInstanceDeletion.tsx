@@ -3,11 +3,13 @@ import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
 import { Button, createNotification } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
+import { useGDNavigate } from "@/managers/NavigationManager"
 
 const ConfirmInstanceDeletion = (props: ModalProps) => {
   const [t] = useTransContext()
   const modalsContext = useModal()
   const addNotification = createNotification()
+  const navigator = useGDNavigate()
 
   const deleteInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.deleteInstance"],

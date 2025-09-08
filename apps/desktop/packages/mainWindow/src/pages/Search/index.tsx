@@ -4,7 +4,9 @@ import { Outlet } from "@solidjs/router"
 export function Search() {
   return (
     <ContentWrapper zeroPadding>
-      <Outlet />
+      <div class="h-full overflow-hidden">
+        <Outlet />
+      </div>
     </ContentWrapper>
   )
 }

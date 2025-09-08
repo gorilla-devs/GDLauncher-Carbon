@@ -4,7 +4,13 @@ import { Trans, useTransContext } from "@gd/i18n"
 import { Button, Dropdown, Input, Radio, Slider, Switch } from "@gd/ui"
 import { useParams, useRouteData } from "@solidjs/router"
 import fetchData from "../../instance.data"
-import { Match, Show, createMemo, Switch as SolidSwitch } from "solid-js"
+import {
+  Match,
+  Show,
+  createMemo,
+  Switch as SolidSwitch,
+  createEffect
+} from "solid-js"
 import { InstanceDetails } from "@gd/core_module/bindings"
 import Title from "@/pages/Settings/components/Title"
 import Row from "@/pages/Settings/components/Row"
@@ -20,11 +26,12 @@ const Settings = () => {
   const searchContext = useSearchContext()
   const params = useParams()
   const updateInstanceMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.updateInstance"],
-    onMutate: (newData: any) => {
-      queryClient.setQueryData(["instance.getInstanceDetails"], newData)
-    }
+    mutationKey: ["instance.updateInstance"]
   }))
+
+  createEffect(() => {
+    console.log("LOCKED", routeData.instanceDetails.data?.modpack?.locked)
+  })
 
   const getAllProfiles = rspc.createQuery(() => ({
     queryKey: ["java.getJavaProfiles"]
@@ -104,15 +111,21 @@ const Settings = () => {
                 type="outline"
                 onClick={() => {
                   searchContext?.setSelectedInstanceId(parseInt(params.id, 10))
-                  modalsContext?.openModal(
-                    {
-                      name: "unlock_confirmation"
+                  // modalsContext?.openModal(
+                  //   {
+                  //     name: "unlock_confirmation"
+                  //   },
+                  //   {
+                  //     instanceState: "unlock",
+                  //     instanceId: parseInt(params.id, 10)
+                  //   }
+                  // )
+                  updateInstanceMutation.mutate({
+                    modpackLocked: {
+                      Set: false
                     },
-                    {
-                      instanceState: "unlock",
-                      instanceId: parseInt(params.id, 10)
-                    }
-                  )
+                    instance: parseInt(params.id, 10)
+                  })
                 }}
               >
                 <i class="i-ri:lock-fill h-5 w-5" />

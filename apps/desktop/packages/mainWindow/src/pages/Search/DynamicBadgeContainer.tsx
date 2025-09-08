@@ -9,9 +9,9 @@ import useSearchContext from "@/components/SearchInputContext"
  * DynamicBadgeContainer - Shows badges that fit within available space
  *
  * This component dynamically shows category badges based on available container width.
- * It displays a maximum of 5 categories and then shows a +N badge for remaining ones.
+ * It displays a maximum of 3 categories and then shows a +N badge for remaining ones.
  */
-const MAX_VISIBLE_CATEGORIES = 4
+const MAX_VISIBLE_CATEGORIES = 3
 export default function DynamicBadgeContainer(props: {
   typeBadgeContent: string
   categories: FEUnifiedCategory[]

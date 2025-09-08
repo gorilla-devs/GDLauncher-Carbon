@@ -121,9 +121,9 @@ const Instance = () => {
       obj
     ): Promise<
       | {
-        instancesUngrouped: ListInstance[]
-        instanceDetails: InstanceDetails
-      }
+          instancesUngrouped: ListInstance[]
+          instanceDetails: InstanceDetails
+        }
       | undefined
     > => {
       await queryClient.cancelQueries({
@@ -169,9 +169,9 @@ const Instance = () => {
       _variables,
       context:
         | {
-          instancesUngrouped: ListInstance[]
-          instanceDetails: InstanceDetails
-        }
+            instancesUngrouped: ListInstance[]
+            instanceDetails: InstanceDetails
+          }
         | undefined
     ) {
       if (context?.instanceDetails) {
@@ -195,14 +195,14 @@ const Instance = () => {
       path: `/library/${params.id}`
     },
 
-    ...(routeData.instanceDetails.data?.modloaders.length! > 0
+    ...((routeData.instanceDetails.data?.modloaders?.length || 0) > 0
       ? [
-        {
-          label: "Addons",
-          path: `/library/${params.id}/addons`,
-          noPadding: true
-        }
-      ]
+          {
+            label: "Addons",
+            path: `/library/${params.id}/addons`,
+            noPadding: true
+          }
+        ]
       : []),
     {
       label: "Settings",
@@ -360,9 +360,9 @@ const Instance = () => {
           routeData.instanceDetails.data?.modloaders[0]?.version,
         img: routeData.instanceDetails.data?.iconRevision
           ? getInstanceImageUrl(
-            params.id,
-            routeData.instanceDetails.data?.iconRevision
-          )
+              params.id,
+              routeData.instanceDetails.data?.iconRevision
+            )
           : null
       }
     )
@@ -373,6 +373,18 @@ const Instance = () => {
       instance_id: parseInt(params.id, 10),
       folder: "Root"
     })
+  }
+
+  const handleDelete = () => {
+    modalsContext?.openModal(
+      {
+        name: "confirmInstanceDeletion"
+      },
+      {
+        id: parseInt(params.id, 10),
+        name: routeData.instanceDetails.data?.name
+      }
+    )
   }
 
   const menuItems = () => [
@@ -407,6 +419,11 @@ const Instance = () => {
           name: "exportInstance"
         })
       }
+    },
+    {
+      icon: "i-ri:delete-bin-2-fill",
+      label: t("instance.action_delete"),
+      action: handleDelete
     }
   ]
 
@@ -440,9 +457,9 @@ const Instance = () => {
           src={
             routeData.instanceDetails.data?.iconRevision
               ? getInstanceImageUrl(
-                params.id,
-                routeData.instanceDetails.data?.iconRevision
-              )
+                  params.id,
+                  routeData.instanceDetails.data?.iconRevision
+                )
               : DefaultImg
           }
           alt="Instance cover"
@@ -517,9 +534,9 @@ const Instance = () => {
                     src={
                       routeData.instanceDetails.data?.iconRevision
                         ? getInstanceImageUrl(
-                          params.id,
-                          routeData.instanceDetails.data?.iconRevision
-                        )
+                            params.id,
+                            routeData.instanceDetails.data?.iconRevision
+                          )
                         : DefaultImg
                     }
                     alt="Instance icon"

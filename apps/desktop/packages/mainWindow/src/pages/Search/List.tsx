@@ -122,9 +122,8 @@ export function List() {
   })
 
   return (
-    <div class="flex h-full flex-col pb-6">
-      <FiltersDisplay />
-      <div class="flex w-full justify-between p-6">
+    <div class="flex h-full flex-col overflow-hidden">
+      <div class="flex w-full justify-between p-6 flex-shrink-0">
         <div
           class="w-44 items-center gap-2"
           classList={{
@@ -178,78 +177,80 @@ export function List() {
         <div class="flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger>
-              <Badge>
+              <Button type="glass" size="small" class="text-xs">
                 <div class="flex items-center gap-1">
+                  <div class="i-ri:filter-3-line" />
                   <div>
                     <Trans key="search.filters" />
                   </div>
                   <div class="i-ri:arrow-down-s-line text-xs" />
                 </div>
-              </Badge>
+              </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <FiltersDropdown
-                disabled={!searchContext?.searchQuery().searchApi}
-              />
+              <FiltersDropdown disabled={false} />
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
-      <Show
-        when={!searchContext?.isInitialLoading()}
-        fallback={<Skeleton.searchList />}
-      >
+      <FiltersDisplay />
+      <div class="flex-1 overflow-hidden">
         <Show
-          when={(searchContext?.allRows() || []).length > 0}
-          fallback={
-            <div class="flex flex-col items-center justify-center px-6 py-16 text-center">
-              <div class="i-ri:search-line mb-4 text-6xl text-gray-400" />
-              <h3 class="mb-2 text-xl font-semibold text-gray-300">
-                <Trans key="search.no_results_found" />
-              </h3>
-              <p class="max-w-md text-gray-500">
-                <Trans
-                  key="search.no_results_description"
-                  options={{ type: type() }}
-                />
-              </p>
-            </div>
-          }
+          when={!searchContext?.isInitialLoading()}
+          fallback={<Skeleton.searchList />}
         >
-          <VList
-            data={searchContext?.allRows() || []}
-            class="flex max-w-full flex-col gap-4 overflow-x-hidden"
-            ref={(v) => {
-              if (v) {
-                searchContext?.setRef(v)
-              }
-            }}
-            onScroll={searchContext?.virtualOnScrollHandler}
+          <Show
+            when={(searchContext?.allRows() || []).length > 0}
+            fallback={
+              <div class="flex flex-col items-center justify-center px-6 py-16 text-center">
+                <div class="i-ri:search-line mb-4 text-6xl text-gray-400" />
+                <h3 class="mb-2 text-xl font-semibold text-gray-300">
+                  <Trans key="search.no_results_found" />
+                </h3>
+                <p class="max-w-md text-gray-500">
+                  <Trans
+                    key="search.no_results_description"
+                    options={{ type: type() }}
+                  />
+                </p>
+              </div>
+            }
           >
-            {(result) => {
-              if (result.type === "loader") {
-                return <Skeleton.searchListItem />
-              }
+            <VList
+              data={searchContext?.allRows() || []}
+              class="h-full flex max-w-full flex-col gap-4 overflow-auto px-6 pb-6"
+              ref={(v) => {
+                if (v) {
+                  searchContext?.setRef(v)
+                }
+              }}
+              onScroll={searchContext?.virtualOnScrollHandler}
+            >
+              {(result) => {
+                if (result.type === "loader") {
+                  return <Skeleton.searchListItem />
+                }
 
-              const isInstalled = createMemo(() =>
-                lookupTableInstalledMods().has(result.value!.id)
-              )
+                const isInstalled = createMemo(() =>
+                  lookupTableInstalledMods().has(result.value!.id)
+                )
 
-              return (
-                <ListItem
-                  result={result.value!}
-                  isInstalled={isInstalled()}
-                  onItemClick={() => {
-                    navigator.navigate(
-                      `/addon/${result.value!.id}/${result.value!.platform}?instanceId=${instanceId()}`
-                    )
-                  }}
-                />
-              )
-            }}
-          </VList>
+                return (
+                  <ListItem
+                    result={result.value!}
+                    isInstalled={isInstalled()}
+                    onItemClick={() => {
+                      navigator.navigate(
+                        `/addon/${result.value!.id}/${result.value!.platform}?instanceId=${instanceId()}`
+                      )
+                    }}
+                  />
+                )
+              }}
+            </VList>
+          </Show>
         </Show>
-      </Show>
+      </div>
     </div>
   )
 }

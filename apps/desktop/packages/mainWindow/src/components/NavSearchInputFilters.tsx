@@ -8,11 +8,21 @@ import {
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
-  DropdownMenuSubTrigger
+  DropdownMenuSubTrigger,
+  Input
 } from "@gd/ui"
+import { VList } from "./VirtuaWrapper"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
-import { For, Match, Switch } from "solid-js"
+import {
+  For,
+  Match,
+  Switch,
+  Show,
+  createSignal,
+  createMemo,
+  createEffect
+} from "solid-js"
 import { rspc } from "@/utils/rspcClient"
 import { capitalize } from "@/utils/helpers"
 import { ModloaderIcon } from "@/utils/sidebar"
@@ -46,14 +56,12 @@ export function SearchApiDropdown() {
                   if (value === searchResults?.searchQuery().searchApi) {
                     searchResults?.setSearchQuery((prev) => ({
                       ...prev,
-                      searchApi: null,
-                      sortIndex: null
+                      searchApi: null
                     }))
                   } else {
                     searchResults?.setSearchQuery((prev) => ({
                       ...prev,
-                      searchApi: value,
-                      sortIndex: "relevance"
+                      searchApi: value
                     }))
                   }
                 }}
@@ -83,32 +91,37 @@ export function SearchCategoryDropdown(props: DropdownProps) {
   const curseforgeCategories = categories.data?.curseforge
   const modrinthCategories = categories.data?.modrinth
 
-  const currentCategories = () => {
-    const categories =
-      searchResults?.searchQuery().searchApi === "curseforge"
-        ? Object.values(curseforgeCategories ?? {})
-            ?.filter(
-              (v) => v.projectType === searchResults?.searchQuery().projectType
-            )
-            .map((category) => ({
-              label: category.name,
-              value: category.id,
-              icon: <img src={category.icon?.value ?? ""} class="h-4 w-4" />
-            }))
-        : Object.values(modrinthCategories ?? {})
-            ?.filter(
-              (v) => v.projectType === searchResults?.searchQuery().projectType
-            )
-            .map((category) => ({
-              label: category.name,
-              value: category.id,
-              icon: (
-                // eslint-disable-next-line solid/no-innerhtml
-                <div class="h-4 w-4" innerHTML={category.icon?.value ?? ""} />
-              )
-            }))
+  const getCurseforgeCategories = () => {
+    return Object.values(curseforgeCategories ?? {})
+      ?.filter(
+        (v) => v.projectType === searchResults?.searchQuery().projectType
+      )
+      .map((category) => ({
+        label: category.name,
+        value: category.id,
+        icon: <img src={category.icon?.value ?? ""} class="h-4 w-4" />
+      }))
+  }
 
-    return categories
+  const getModrinthCategories = () => {
+    return Object.values(modrinthCategories ?? {})
+      ?.filter(
+        (v) => v.projectType === searchResults?.searchQuery().projectType
+      )
+      .map((category) => ({
+        label: category.name,
+        value: category.id,
+        icon: (
+          // eslint-disable-next-line solid/no-innerhtml
+          <div class="h-4 w-4" innerHTML={category.icon?.value ?? ""} />
+        )
+      }))
+  }
+
+  const selectedApi = () => searchResults?.searchQuery().searchApi
+  const isApiSelected = (api: "curseforge" | "modrinth") => {
+    const selected = selectedApi()
+    return !selected || selected === api
   }
 
   return (
@@ -118,41 +131,115 @@ export function SearchCategoryDropdown(props: DropdownProps) {
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent class="max-h-[300px] overflow-y-auto">
-          <Switch>
-            <Match when={currentCategories()?.length}>
-              <For each={currentCategories()}>
-                {(category) => (
-                  <DropdownMenuCheckboxItem
-                    checked={searchResults
-                      ?.searchQuery()
-                      .categories?.some((v) => v === category.value)}
-                    onChange={(checked) => {
-                      searchResults?.setSearchQuery((prev) => {
-                        return {
-                          ...prev,
-                          categories: checked
-                            ? [...(prev.categories || []), category.value]
-                            : (prev.categories || []).filter(
-                                (v) => v !== category.value
-                              )
-                        }
-                      })
-                    }}
-                  >
-                    <div class="flex items-center gap-2">
-                      <div class="h-4 w-4">{category.icon}</div>
-                      <span>{category.label}</span>
-                    </div>
-                  </DropdownMenuCheckboxItem>
-                )}
-              </For>
-            </Match>
-            <Match when={!currentCategories()?.length}>
-              <div class="text-lightSlate-900 text-sm">
-                <Trans key="search.no_categories_found" />
+          {/* CurseForge Categories Submenu */}
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger
+              class="w-full"
+              disabled={!isApiSelected("curseforge")}
+              classList={{
+                "opacity-50 cursor-not-allowed": !isApiSelected("curseforge")
+              }}
+            >
+              <div class="flex items-center gap-2">
+                <img src={CurseforgeLogo} class="h-4 w-4" />
+                CurseForge
               </div>
-            </Match>
-          </Switch>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuPortal>
+              <DropdownMenuSubContent class="max-h-[300px] overflow-y-auto">
+                <Switch>
+                  <Match when={getCurseforgeCategories()?.length}>
+                    <For each={getCurseforgeCategories()}>
+                      {(category) => (
+                        <DropdownMenuCheckboxItem
+                          checked={searchResults
+                            ?.searchQuery()
+                            .categories?.some((v) => v === category.value)}
+                          onChange={(checked) => {
+                            searchResults?.setSearchQuery((prev) => {
+                              return {
+                                ...prev,
+                                categories: checked
+                                  ? [...(prev.categories || []), category.value]
+                                  : (prev.categories || []).filter(
+                                      (v) => v !== category.value
+                                    )
+                              }
+                            })
+                          }}
+                        >
+                          <div class="flex items-center gap-2">
+                            <div class="h-4 w-4">{category.icon}</div>
+                            <span>{category.label}</span>
+                          </div>
+                        </DropdownMenuCheckboxItem>
+                      )}
+                    </For>
+                  </Match>
+                  <Match when={!getCurseforgeCategories()?.length}>
+                    <div class="text-lightSlate-900 text-sm">
+                      <Trans key="search.no_categories_found" />
+                    </div>
+                  </Match>
+                </Switch>
+              </DropdownMenuSubContent>
+            </DropdownMenuPortal>
+          </DropdownMenuSub>
+
+          {/* Modrinth Categories Submenu */}
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger
+              class="w-full"
+              disabled={!isApiSelected("modrinth")}
+              classList={{
+                "opacity-50 cursor-not-allowed": !isApiSelected("modrinth")
+              }}
+            >
+              <div class="flex items-center gap-2">
+                <img src={ModrinthLogo} class="h-4 w-4" />
+                Modrinth
+              </div>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuPortal>
+              <DropdownMenuSubContent class="max-h-[300px] overflow-y-auto">
+                <Switch>
+                  <Match when={getModrinthCategories()?.length}>
+                    <For each={getModrinthCategories()}>
+                      {(category) => (
+                        <DropdownMenuCheckboxItem
+                          checked={searchResults
+                            ?.searchQuery()
+                            .categories?.some((v) => v === category.value)}
+                          onChange={(checked) => {
+                            searchResults?.setSearchQuery((prev) => {
+                              return {
+                                ...prev,
+                                categories: checked
+                                  ? [...(prev.categories || []), category.value]
+                                  : (prev.categories || []).filter(
+                                      (v) => v !== category.value
+                                    )
+                              }
+                            })
+                          }}
+                        >
+                          <div class="flex items-center gap-2">
+                            <div class="h-4 w-4">{category.icon}</div>
+                            <span>{category.label}</span>
+                          </div>
+                        </DropdownMenuCheckboxItem>
+                      )}
+                    </For>
+                  </Match>
+                  <Match when={!getModrinthCategories()?.length}>
+                    <div class="text-lightSlate-900 text-sm">
+                      <Trans key="search.no_categories_found" />
+                    </div>
+                  </Match>
+                </Switch>
+              </DropdownMenuSubContent>
+            </DropdownMenuPortal>
+          </DropdownMenuSub>
         </DropdownMenuSubContent>
       </DropdownMenuPortal>
     </DropdownMenuSub>
@@ -177,30 +264,43 @@ export function SearchModloaderDropdown(props: DropdownProps) {
         <Trans key="search.modloaders" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
-        <DropdownMenuSubContent>
+        <DropdownMenuSubContent class="max-h-[300px] overflow-y-auto">
           <Switch>
             <Match when={currentModloaders()?.length}>
               <For each={currentModloaders()}>
                 {(modloader) => (
                   <DropdownMenuCheckboxItem
-                    checked={searchResults
-                      ?.searchQuery()
-                      .modloaders?.includes(modloader.value)}
+                    checked={(() => {
+                      // Force fresh computation on each render
+                      const modloaders = searchResults?.searchQuery().modloaders
+                      return modloaders?.includes(modloader.value) ?? false
+                    })()}
                     onChange={(checked) => {
                       searchResults?.setSearchQuery((prev) => {
                         const prevModloaders = prev.modloaders || []
-                        const filteredModloaders = prevModloaders.filter(
-                          (m) => m !== modloader.value
-                        )
-                        const newModloaders = checked
-                          ? [...prevModloaders, modloader.value]
-                          : filteredModloaders
 
-                        return {
-                          ...prev,
-                          modloaders:
-                            newModloaders.length === 0 ? null : newModloaders
+                        if (checked) {
+                          // Add modloader
+                          if (!prevModloaders.includes(modloader.value)) {
+                            return {
+                              ...prev,
+                              modloaders: [...prevModloaders, modloader.value]
+                            }
+                          }
+                        } else {
+                          // Remove modloader
+                          const filteredModloaders = prevModloaders.filter(
+                            (m) => m !== modloader.value
+                          )
+                          return {
+                            ...prev,
+                            modloaders:
+                              filteredModloaders.length === 0
+                                ? null
+                                : filteredModloaders
+                          }
                         }
+                        return prev
                       })
                     }}
                   >
@@ -278,34 +378,46 @@ export function SearchEnvironmentDropdown(props: DropdownProps) {
 export function SearchSortIndexDropdown(props: DropdownProps) {
   const searchResults = useSearchContext()
 
+  const sortOptions = [
+    { value: "relevance", key: "search.relevance" },
+    { value: "downloads", key: "search.downloads" },
+    { value: "lastUpdated", key: "search.last_updated" }
+  ] as const
+
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger disabled={props.disabled}>
-        <Trans key="search.sort_index" />
+        <Trans key="search.sort_by" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent>
           <DropdownMenuRadioGroup
-            value={searchResults?.searchQuery().sortIndex?.toString()}
+            value={searchResults?.searchQuery().sortIndex ?? ""}
           >
-            <DropdownMenuRadioItem
-              value="relevance"
-              onSelect={() => {
-                if ("relevance" === searchResults?.searchQuery().sortIndex) {
-                  searchResults?.setSearchQuery((prev) => ({
-                    ...prev,
-                    sortIndex: null
-                  }))
-                } else {
-                  searchResults?.setSearchQuery((prev) => ({
-                    ...prev,
-                    sortIndex: "relevance"
-                  }))
-                }
-              }}
-            >
-              <Trans key="search.relevance" />
-            </DropdownMenuRadioItem>
+            <For each={sortOptions}>
+              {(option) => (
+                <DropdownMenuRadioItem
+                  value={option.value}
+                  onSelect={() => {
+                    if (
+                      option.value === searchResults?.searchQuery().sortIndex
+                    ) {
+                      searchResults?.setSearchQuery((prev) => ({
+                        ...prev,
+                        sortIndex: null
+                      }))
+                    } else {
+                      searchResults?.setSearchQuery((prev) => ({
+                        ...prev,
+                        sortIndex: option.value
+                      }))
+                    }
+                  }}
+                >
+                  <Trans key={option.key} />
+                </DropdownMenuRadioItem>
+              )}
+            </For>
           </DropdownMenuRadioGroup>
         </DropdownMenuSubContent>
       </DropdownMenuPortal>
@@ -319,7 +431,7 @@ export function SearchSortOrderDropdown(props: DropdownProps) {
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger disabled={props.disabled}>
-        <Trans key="search.sort_order" />
+        <Trans key="search.order" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent>
@@ -357,12 +469,115 @@ export function SearchSortOrderDropdown(props: DropdownProps) {
 
 export function SearchGameVersionDropdown(props: DropdownProps) {
   const globalStore = useGlobalStore()
+  const searchResults = useSearchContext()
   const [_t] = useTransContext()
-  const versions = () =>
-    globalStore.minecraftVersions.data?.map((version) => ({
-      label: version.id,
-      value: version.id
-    }))
+  const [searchQuery, setSearchQuery] = createSignal("")
+  const [debouncedQuery, setDebouncedQuery] = createSignal("")
+  let inputRef: HTMLInputElement | undefined
+
+  // Debounce search query to prevent UI freezing
+  createEffect(() => {
+    const query = searchQuery()
+    const timeoutId = setTimeout(() => {
+      setDebouncedQuery(query)
+    }, 150) // 150ms debounce
+
+    return () => clearTimeout(timeoutId)
+  })
+
+  // Auto-focus input when dropdown content becomes visible
+  createEffect(() => {
+    // Focus the input after a short delay to ensure the dropdown is rendered
+    const timer = setTimeout(() => {
+      if (inputRef) {
+        inputRef.focus()
+        // Clear any existing search when dropdown opens
+        if (searchQuery()) {
+          setSearchQuery("")
+        }
+      }
+    }, 10) // Very short delay just for DOM rendering
+
+    return () => clearTimeout(timer)
+  })
+
+  // Memoized versions list
+  const versions = createMemo(
+    () =>
+      globalStore.minecraftVersions.data?.map((version) => ({
+        label: version.id,
+        value: version.id
+      })) || []
+  )
+
+  // Optimized filtering with early return and memoization
+  const filteredVersions = createMemo(() => {
+    const query = debouncedQuery().toLowerCase().trim()
+    const versionsList = versions()
+
+    if (!query) return versionsList // Show all versions when no search query
+
+    // Fast filtering - no limit on search results since user is actively searching
+    return versionsList.filter((version) =>
+      version.label.toLowerCase().includes(query)
+    )
+  })
+
+  const shouldVirtualize = () => filteredVersions().length > 100
+
+  const renderVersion = (version: { label: string; value: string }) => {
+    // Create a reactive memo for the checked state to ensure VList re-renders
+    const isChecked = createMemo(() => {
+      const gameVersions = searchResults?.searchQuery().gameVersions
+      return gameVersions?.includes(version.value) ?? false
+    })
+
+    const handleToggle = () => {
+      searchResults?.setSearchQuery((prev) => {
+        const prevGameVersions = prev.gameVersions || []
+        const checked = !isChecked()
+
+        if (checked) {
+          // Add version - but check it's not already there
+          if (!prevGameVersions.includes(version.value)) {
+            return {
+              ...prev,
+              gameVersions: [...prevGameVersions, version.value]
+            }
+          }
+        } else {
+          // Remove version
+          const filteredGameVersions = prevGameVersions.filter(
+            (v) => v !== version.value
+          )
+          return {
+            ...prev,
+            gameVersions:
+              filteredGameVersions.length === 0 ? null : filteredGameVersions
+          }
+        }
+        return prev
+      })
+    }
+
+    // Mimic DropdownMenuCheckboxItem styling for virtualized items
+    return (
+      <div
+        class="relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors hover:bg-darkSlate-700 focus:bg-darkSlate-700 data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+        onClick={handleToggle}
+      >
+        {/* Custom checkbox styled like DropdownMenuCheckboxItem */}
+        <span class="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+          <Show when={isChecked()}>
+            <div class="i-ri:check-line h-4 w-4" />
+          </Show>
+        </span>
+        <div class="flex items-center gap-2">
+          <span>{version.label}</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <DropdownMenuSub>
@@ -370,14 +585,123 @@ export function SearchGameVersionDropdown(props: DropdownProps) {
         <Trans key="search.game_versions" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
-        <DropdownMenuSubContent class="max-h-[300px] overflow-y-auto">
-          <For each={versions()}>
-            {(version) => (
-              <DropdownMenuCheckboxItem>
-                {version.label}
-              </DropdownMenuCheckboxItem>
-            )}
-          </For>
+        <DropdownMenuSubContent class="p-0 w-64">
+          {/* Search Input */}
+          <div
+            class="p-2 border-b border-darkSlate-600"
+            onClick={(e) => {
+              e.stopPropagation()
+              if (inputRef) {
+                inputRef.focus()
+              }
+            }}
+            onKeyDown={(e) => {
+              // Prevent dropdown menu from handling these keys
+              e.stopPropagation()
+            }}
+            onKeyUp={(e) => {
+              // Prevent dropdown menu from handling these keys
+              e.stopPropagation()
+            }}
+          >
+            <div style="height: 32px;">
+              <Input
+                ref={inputRef}
+                placeholder="Search versions..."
+                value={searchQuery()}
+                onInput={(e) => {
+                  setSearchQuery(e.target.value)
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (inputRef) {
+                    inputRef.focus()
+                  }
+                }}
+                onKeyDown={(e) => {
+                  // Prevent dropdown menu from handling these keys
+                  e.stopPropagation()
+                }}
+                onKeyUp={(e) => {
+                  // Prevent dropdown menu from handling these keys
+                  e.stopPropagation()
+                }}
+                icon={<div class="i-ri:search-line h-4 w-4" />}
+                variant="transparent"
+                class="h-full"
+              />
+            </div>
+          </div>
+
+          {/* Options List */}
+          <Show
+            when={filteredVersions().length > 0}
+            fallback={
+              <div class="px-2 py-3 text-sm text-lightSlate-400 text-center">
+                No versions found
+              </div>
+            }
+          >
+            <Show
+              when={shouldVirtualize()}
+              fallback={
+                <div class="max-h-[250px] overflow-y-auto">
+                  <For each={filteredVersions()}>
+                    {(version) => (
+                      <DropdownMenuCheckboxItem
+                        checked={(() => {
+                          // Force fresh computation on each render
+                          const gameVersions =
+                            searchResults?.searchQuery().gameVersions
+                          return gameVersions?.includes(version.value) ?? false
+                        })()}
+                        onChange={(checked) => {
+                          searchResults?.setSearchQuery((prev) => {
+                            const prevGameVersions = prev.gameVersions || []
+
+                            if (checked) {
+                              // Add version - but check it's not already there
+                              if (!prevGameVersions.includes(version.value)) {
+                                return {
+                                  ...prev,
+                                  gameVersions: [
+                                    ...prevGameVersions,
+                                    version.value
+                                  ]
+                                }
+                              }
+                            } else {
+                              // Remove version
+                              const filteredGameVersions =
+                                prevGameVersions.filter(
+                                  (v) => v !== version.value
+                                )
+                              return {
+                                ...prev,
+                                gameVersions:
+                                  filteredGameVersions.length === 0
+                                    ? null
+                                    : filteredGameVersions
+                              }
+                            }
+                            return prev
+                          })
+                        }}
+                      >
+                        {version.label}
+                      </DropdownMenuCheckboxItem>
+                    )}
+                  </For>
+                </div>
+              }
+            >
+              <div class="h-[250px] overflow-hidden">
+                <VList data={filteredVersions()} class="h-full w-full">
+                  {(item) => renderVersion(item)}
+                </VList>
+              </div>
+            </Show>
+          </Show>
         </DropdownMenuSubContent>
       </DropdownMenuPortal>
     </DropdownMenuSub>

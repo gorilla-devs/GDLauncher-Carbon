@@ -1677,12 +1677,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             name: instance.config.name.clone(),
             version: mc_version,
             modpack: instance.config.modpack.clone(),
-            locked: instance
-                .config
-                .modpack
-                .as_ref()
-                .map(|x| x.locked)
-                .unwrap_or(false),
             global_java_args: instance.config.game_configuration.global_java_args,
             extra_java_args: instance.config.game_configuration.extra_java_args.clone(),
             memory: instance.config.game_configuration.memory,

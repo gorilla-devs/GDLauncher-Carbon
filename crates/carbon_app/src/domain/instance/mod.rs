@@ -38,7 +38,6 @@ pub struct InstanceDetails {
     pub name: String,
     pub version: Option<String>,
     pub modpack: Option<info::ModpackInfo>,
-    pub locked: bool,
     pub global_java_args: bool,
     pub extra_java_args: Option<String>,
     pub memory: Option<(u16, u16)>,

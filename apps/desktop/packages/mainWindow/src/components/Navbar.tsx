@@ -110,7 +110,7 @@ const AppNavbar = () => {
         </div>
         <div class="flex w-full items-center justify-center gap-4">
           <Input
-            placeholder={t("search.search_anything")}
+            placeholder={t("search.search_discover_anything")}
             containerClass="px-10"
             class="w-80"
             tabIndex={0}

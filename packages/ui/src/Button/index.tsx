@@ -17,6 +17,7 @@ type Type =
   | "glow"
   | "outline"
   | "transparent"
+  | "glass"
   | "text"
 
 interface Props
@@ -155,6 +156,23 @@ const getVariant = (
       "text-lightSlate-50": true,
       "hover:bg-darkSlate-900": true,
       "border-0": true
+    },
+    glass: {
+      ...commonStyle,
+      "bg-darkSlate-800/80": !isDisabled,
+      "backdrop-blur-sm": !isDisabled,
+      "border-1": true,
+      "border-white/10": !isDisabled,
+      "hover:bg-darkSlate-700/90": !isDisabled,
+      "hover:border-white/20": !isDisabled,
+      "hover:backdrop-blur-md": !isDisabled,
+      "text-lightSlate-50": !isDisabled,
+      "text-lightSlate-700": isDisabled,
+      "bg-darkSlate-700": isDisabled,
+      "border-darkSlate-500": isDisabled,
+      "transition-all": true,
+      "duration-200": true,
+      "ease-out": true
     }
   }
 

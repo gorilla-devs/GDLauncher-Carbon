@@ -4,7 +4,7 @@ import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import DynamicBadgeContainer from "./DynamicBadgeContainer"
-import { Match, Switch } from "solid-js"
+import { createEffect, createSignal, Match, Switch } from "solid-js"
 import ModpackDownloadButton from "@/components/ModpackDownloadButton"
 import ModDownloadButton from "@/components/ModDownloadButton"
 
@@ -15,6 +15,7 @@ interface SearchResultItemProps {
 }
 
 export function ListItem(props: SearchResultItemProps) {
+  const [isHoverActive, setIsHoverActive] = createSignal(false)
   const globalStore = useGlobalStore()
 
   const cats =
@@ -27,11 +28,15 @@ export function ListItem(props: SearchResultItemProps) {
     .filter((cat) => cat !== undefined)
 
   return (
-    <div class="my-1 overflow-hidden rounded-md px-4">
+    <div class="my-1 overflow-hidden rounded-md">
       <div
-        class="group relative flex h-full cursor-pointer gap-2 overflow-hidden rounded-md border border-transparent p-2 transition-all duration-100 hover:scale-[1.02] hover:border-white/10 hover:bg-white/5 hover:shadow-lg hover:shadow-black/10"
+        class="group relative flex h-full cursor-pointer gap-2 overflow-hidden rounded-md border border-transparent py-4 px-8 transition-all duration-100 hover:scale-[1.02] hover:border-white/10 hover:bg-white/5 hover:shadow-lg hover:shadow-black/10"
         style={{
           isolation: "isolate"
+        }}
+        classList={{
+          "scale-[1.02] border-white/10 bg-white/5 shadow-lg shadow-black/10":
+            isHoverActive()
         }}
         onClick={() =>
           props.onItemClick(props.result.id, props.result.platform)
@@ -39,6 +44,10 @@ export function ListItem(props: SearchResultItemProps) {
       >
         <div
           class="absolute inset-0 z-0 bg-cover bg-center opacity-20 transition-opacity duration-100 group-hover:opacity-30"
+          classList={{
+            "opacity-30": isHoverActive(),
+            "opacity-20": !isHoverActive()
+          }}
           style={{
             "background-image": `url(${props.result.imageUrl || ""})`,
             "mask-image": "linear-gradient(to right, transparent 20%, black)",
@@ -70,8 +79,8 @@ export function ListItem(props: SearchResultItemProps) {
                 class="flex items-center gap-2 transition-all duration-200"
                 classList={{
                   "opacity-100 translate-x-0 group-hover:opacity-0 group-hover:translate-x-8":
-                    !props.isInstalled,
-                  "opacity-0": props.isInstalled
+                    !props.isInstalled && !isHoverActive(),
+                  "opacity-0": props.isInstalled || isHoverActive()
                 }}
               >
                 <div class="text-lightSlate-700 text-sm">
@@ -92,8 +101,9 @@ export function ListItem(props: SearchResultItemProps) {
                 class="absolute right-0 flex items-center justify-center transition-all duration-200"
                 classList={{
                   "opacity-0 -translate-x-16 group-hover:opacity-100 group-hover:translate-x-0":
-                    !props.isInstalled,
-                  "opacity-100 translate-x-0": props.isInstalled
+                    !props.isInstalled && !isHoverActive(),
+                  "opacity-100 translate-x-0":
+                    props.isInstalled || isHoverActive()
                 }}
                 onClick={(e) => {
                   e.stopPropagation()
@@ -110,7 +120,16 @@ export function ListItem(props: SearchResultItemProps) {
                     <ModpackDownloadButton addon={props.result} />
                   </Match>
                   <Match when={props.result.type !== "modpack"}>
-                    <ModDownloadButton addon={props.result} />
+                    <ModDownloadButton
+                      addon={props.result}
+                      onDropdownOpenChange={(isOpen) => {
+                        if (isOpen) {
+                          setIsHoverActive(true)
+                        } else {
+                          setIsHoverActive(false)
+                        }
+                      }}
+                    />
                   </Match>
                 </Switch>
               </div>

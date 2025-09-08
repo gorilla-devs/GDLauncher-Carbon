@@ -33,18 +33,28 @@ const input = cva(
       hasIcon: {
         true: "",
         false: "px-4"
+      },
+      variant: {
+        default: "",
+        transparent: "!bg-transparent !border-0 !border-transparent hover:!border-transparent active:!border-transparent focus:!border-transparent focus-visible:!border-transparent focus:!outline-none focus-visible:!outline-none hover:!outline-none"
       }
     },
     compoundVariants: [
       {
         hasIcon: true,
         class: "bg-darkSlate-700"
+      },
+      {
+        hasIcon: true,
+        variant: "transparent",
+        class: "!bg-transparent"
       }
     ],
     defaultVariants: {
       errorMessage: false,
       disabled: false,
-      hasIcon: false
+      hasIcon: false,
+      variant: "default"
     }
   }
 )
@@ -56,10 +66,15 @@ const container = cva(
       hasIcon: {
         true: "flex items-center px-4 bg-darkSlate-700",
         false: ""
+      },
+      variant: {
+        default: "",
+        transparent: "!outline-none hover:!outline-none has-[:focus-visible]:!outline-none !bg-transparent"
       }
     },
     defaultVariants: {
-      hasIcon: false
+      hasIcon: false,
+      variant: "default"
     }
   }
 )
@@ -76,6 +91,7 @@ interface Props
   containerClass?: string
   disabled?: boolean
   errorMessage?: string
+  variant?: "default" | "transparent"
   ref?: HTMLInputElement | ((el: HTMLInputElement) => void)
 }
 
@@ -91,6 +107,7 @@ function Input(props: Props) {
     "onInput",
     "onMouseDown",
     "onSearch",
+    "variant",
     "ref"
   ])
 
@@ -155,6 +172,7 @@ function Input(props: Props) {
       <div
         class={container({
           hasIcon: !!local.icon,
+          variant: local.variant,
           class: `${local.class || ""} ${local.inputColor || ""}`
         })}
         ref={setInputContainerRef}
@@ -172,6 +190,7 @@ function Input(props: Props) {
             errorMessage: !!props.errorMessage,
             disabled: !!local.disabled,
             hasIcon: !!local.icon,
+            variant: local.variant,
             class: `${local.inputClass || ""} ${
               local.inputColor || "bg-darkSlate-600"
             }`

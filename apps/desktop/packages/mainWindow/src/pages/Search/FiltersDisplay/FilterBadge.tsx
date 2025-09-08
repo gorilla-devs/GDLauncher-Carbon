@@ -12,7 +12,7 @@ export function FilterBadge(props: Props) {
   return (
     <Badge
       variant="secondary"
-      class={`group flex h-10 items-center gap-4 px-4 text-sm ${props.class ?? ""}`}
+      class={`group flex h-8 items-center gap-2 px-3 text-sm hover:bg-darkSlate-600 transition-colors ${props.class ?? ""}`}
       style={props.style}
       onClick={(e) => {
         e.preventDefault()
@@ -21,7 +21,7 @@ export function FilterBadge(props: Props) {
       }}
     >
       {props.children}
-      <i class="i-ri:close-fill text-lightSlate-700 group-hover:text-lightSlate-50 h-5 w-5 transition-colors" />
+      <i class="i-ri:close-fill text-lightSlate-600 group-hover:text-lightSlate-300 h-4 w-4 transition-colors" />
     </Badge>
   )
 }

@@ -66,7 +66,7 @@ const Overview = () => {
         <Show
           when={
             routeData.instanceMods &&
-            (routeData.instanceDetails.data?.modloaders.length || 0) > 0
+            (routeData.instanceDetails.data?.modloaders?.length || 0) > 0
           }
         >
           <Card

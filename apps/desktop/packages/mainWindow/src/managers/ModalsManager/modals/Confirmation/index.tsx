@@ -14,11 +14,7 @@ const Confirmation = (props: ModalProps) => {
   const modalContext = useModal()
   const [t] = useTransContext()
   const updateInstanceMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.updateInstance"],
-
-    onMutate: (newData) => {
-      queryClient.setQueryData(["instance.getInstanceDetails"], newData)
-    }
+    mutationKey: ["instance.updateInstance"]
   }))
 
   return (
@@ -31,7 +27,7 @@ const Confirmation = (props: ModalProps) => {
           <p>{t("instance_unpair_confirmation")}</p>
         </Show>
         <p>{t("instance_confirm_continue")}</p>
-        <div class="flex justify-between">
+        <div class="flex justify-between mt-8">
           <Button
             type="primary"
             onClick={() => {
