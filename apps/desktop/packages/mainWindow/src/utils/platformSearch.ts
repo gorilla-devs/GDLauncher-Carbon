@@ -1,6 +1,7 @@
 import {
   FEUnifiedSearchParameters,
-  FEUnifiedSearchResult
+  FEUnifiedSearchResult,
+  FEUnifiedSearchType
 } from "@gd/core_module/bindings"
 
 import { createEffect, createMemo, createSignal, mergeProps } from "solid-js"
@@ -139,7 +140,9 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
           searchQuery: searchQuery().searchQuery,
           categories: searchQuery().categories,
           gameVersions: searchQuery().gameVersions,
-          modloaders: searchQuery().modloaders,
+          modloaders: !shouldBypassModloaderFilter(searchQuery().projectType)
+            ? searchQuery().modloaders
+            : null,
           pageSize: actualPageSize(),
           projectType: searchQuery().projectType,
           index: ctx.pageParam,
@@ -171,7 +174,9 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
           searchQuery: searchQuery().searchQuery,
           categories: searchQuery().categories,
           gameVersions: searchQuery().gameVersions,
-          modloaders: searchQuery().modloaders,
+          modloaders: !shouldBypassModloaderFilter(searchQuery().projectType)
+            ? searchQuery().modloaders
+            : null,
           pageSize: actualPageSize(),
           projectType: searchQuery().projectType,
           index: ctx.pageParam,
@@ -327,4 +332,12 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     setSelectedInstanceId,
     selectedInstanceId
   }
+}
+
+export function shouldBypassModloaderFilter(
+  addonType: FEUnifiedSearchType | null
+) {
+  if (!addonType) return false
+
+  return addonType !== "mod" && addonType !== "modpack"
 }

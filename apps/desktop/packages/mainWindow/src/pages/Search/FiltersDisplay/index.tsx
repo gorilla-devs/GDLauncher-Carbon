@@ -37,7 +37,7 @@ export default function FiltersDisplay() {
       sortIndex: null,
       sortOrder: null
     }))
-    searchContext?.setSelectedInstanceId(null)
+    searchContext?.setSelectedInstanceId(undefined)
   }
 
   return (

@@ -12,7 +12,7 @@ export function FilterBadge(props: Props) {
   return (
     <Badge
       variant="secondary"
-      class={`group flex h-8 items-center gap-2 px-3 text-sm hover:bg-darkSlate-600 transition-colors ${props.class ?? ""}`}
+      class={`relative group flex h-8 items-center gap-2 px-3 text-sm hover:bg-darkSlate-600 transition-colors ${props.class ?? ""}`}
       style={props.style}
       onClick={(e) => {
         e.preventDefault()

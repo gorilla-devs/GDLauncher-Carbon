@@ -17,12 +17,11 @@ interface ModDownloadButtonProps {
 
 const ModDownloadButton = (props: ModDownloadButtonProps) => {
   const [taskId, setTaskId] = createSignal<number | null>(null)
-    
+
   const searchContext = useSearchContext()
 
   const instanceLocked = () =>
     searchContext?.selectedInstance?.data?.modpack?.locked || false
-
 
   const {
     instanceLoadingStates,
@@ -44,12 +43,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     shouldVirtualize
   } = useInstanceSearch()
 
-  const {
-    loading,
-    setLoading,
-    progress,
-    setProgress
-  } = useTaskProgress(
+  const { loading, setLoading, progress, setProgress } = useTaskProgress(
     instanceTaskIds,
     clearInstanceLoadingState
   )
@@ -95,7 +89,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
 
   const installedMod = createMemo(() => {
     const mods = searchContext?.selectedInstanceMods?.data || []
-    
+
     const found = mods.find((mod) => {
       if (!props.addon) return false
 
@@ -109,13 +103,13 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
 
       return false
     })
-    
+
     return found
   })
 
   const isInstalled = createMemo(() => {
     const localInstalledMod = installedMod()
-    
+
     if (!localInstalledMod || !props.addon) return false
 
     if (!props.fileId) {

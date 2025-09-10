@@ -40,7 +40,7 @@
     "@solid-primitives/keyboard": "^1.2.6",
     "@solid-primitives/map": "^0.4.8",
     "@solidjs/router": "^0.9.1",
-    "@tanstack/solid-query": "^5.87.1",
+    "@tanstack/solid-query": "^5.30.6",
     "@tanstack/solid-table": "^8.20.5",
     "@tanstack/solid-virtual": "3.4.0",
     "@types/lodash": "^4.17.20",
