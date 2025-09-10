@@ -469,6 +469,20 @@ impl ManagerRef<'_, InstanceManager> {
             }
         };
 
+        let project = self
+            .app
+            .modplatforms_manager()
+            .curseforge
+            .get_mod(ModParameters {
+                mod_id: project_id.try_into()?,
+            })
+            .await?;
+
+        let modloader = match project.data.class_id {
+            Some(carbon_platforms::curseforge::ClassId::Mods) | None => Some(modloader.into()),
+            _ => None,
+        };
+
         let file_id = self
             .app
             .modplatforms_manager()
@@ -478,7 +492,7 @@ impl ManagerRef<'_, InstanceManager> {
                 query: ModFilesParametersQuery {
                     game_version: Some(version.clone()),
                     game_version_type_id: None,
-                    mod_loader_type: Some(modloader.into()),
+                    mod_loader_type: modloader,
                     index: None,
                     page_size: Some(200),
                 },
@@ -557,6 +571,18 @@ impl ManagerRef<'_, InstanceManager> {
             }
         };
 
+        let project = self
+            .app
+            .modplatforms_manager()
+            .modrinth
+            .get_project(ProjectID(project_id.clone()))
+            .await?;
+
+        let loaders = match project.project_type {
+            carbon_platforms::modrinth::project::ProjectType::Mod => Some(vec![modloader]),
+            _ => None,
+        };
+
         let version_id = self
             .app
             .modplatforms_manager()
@@ -564,7 +590,7 @@ impl ManagerRef<'_, InstanceManager> {
             .get_project_versions(ProjectVersionsFilters {
                 project_id: ProjectID(project_id.clone()),
                 game_versions: Some(Vec::from([version.clone()])),
-                loaders: Some(Vec::from([modloader])),
+                loaders,
                 limit: None,
                 offset: None,
             })
