@@ -118,7 +118,7 @@ importers:
         version: 0.2.0
       '@rspc/solid':
         specifier: 0.2.0
-        version: 0.2.0(@tanstack/solid-query@5.87.1(solid-js@1.9.3))(solid-js@1.9.3)
+        version: 0.2.0(@tanstack/solid-query@5.30.6(solid-js@1.9.3))(solid-js@1.9.3)
       '@sentry/electron':
         specifier: ^4.23.0
         version: 4.23.0
@@ -139,7 +139,7 @@ importers:
         version: 0.9.1(solid-js@1.9.3)
       '@tanstack/solid-query':
         specifier: ^5.30.6
-        version: 5.87.1(solid-js@1.9.3)
+        version: 5.30.6(solid-js@1.9.3)
       '@tanstack/solid-table':
         specifier: ^8.20.5
         version: 8.20.5(solid-js@1.9.3)
@@ -3035,8 +3035,8 @@ packages:
     resolution: {integrity: sha512-cs1WKawpXIe+vSTeiZUuSBy8JFjEuDgdMKZFRLKwQysKo8y2q6Q1HvS74Yw+m5IhOW1nTZooa6rlgdfXcgFAaw==}
     engines: {node: '>=12'}
 
-  '@tanstack/query-core@5.87.1':
-    resolution: {integrity: sha512-HOFHVvhOCprrWvtccSzc7+RNqpnLlZ5R6lTmngb8aq7b4rc2/jDT0w+vLdQ4lD9bNtQ+/A4GsFXy030Gk4ollA==}
+  '@tanstack/query-core@5.29.0':
+    resolution: {integrity: sha512-WgPTRs58hm9CMzEr5jpISe8HXa3qKQ8CxewdYZeVnA54JrPY9B1CZiwsCoLpLkf0dGRZq+LcX5OiJb0bEsOFww==}
 
   '@tanstack/router-core@1.131.7':
     resolution: {integrity: sha512-NpFfAG1muv4abrCij6sEtRrVzlU+xYpY30NAgquHNhMMMNIiN7djzsaGV+vCJdR4u5mi13+f0c3f+f9MdekY5A==}
@@ -3075,8 +3075,8 @@ packages:
     resolution: {integrity: sha512-DvHZDtLQ4T8lTa8yfTvMaq51c1BIwej3Brkb9r9bq49VQw7v0bW4TODieLyNA4OX1wNaSPbYwd6pH2mySPWEug==}
     engines: {node: '>=12'}
 
-  '@tanstack/solid-query@5.87.1':
-    resolution: {integrity: sha512-ETm+gX1vG8I3nta+u+D68+0VLKMEJsSWantDUPIJLIGjuWmPOWe7ex9HcxRU6HwYHar7kvscY5Uv7msjaa6Bdg==}
+  '@tanstack/solid-query@5.30.6':
+    resolution: {integrity: sha512-HiqmW4WnXifB8NIMM8ZnZkWq1Fp1IVghygizGAdLjts+gm8x1IHvCZpf80mLzzvvBGIsZJeCX0UH55Vs5RMDMg==}
     peerDependencies:
       solid-js: ^1.6.0
 
@@ -10536,10 +10536,10 @@ snapshots:
 
   '@rspc/client@0.2.0': {}
 
-  '@rspc/solid@0.2.0(@tanstack/solid-query@5.87.1(solid-js@1.9.3))(solid-js@1.9.3)':
+  '@rspc/solid@0.2.0(@tanstack/solid-query@5.30.6(solid-js@1.9.3))(solid-js@1.9.3)':
     dependencies:
       '@rspc/client': 0.2.0
-      '@tanstack/solid-query': 5.87.1(solid-js@1.9.3)
+      '@tanstack/solid-query': 5.30.6(solid-js@1.9.3)
       solid-js: 1.9.3
 
   '@rushstack/node-core-library@5.10.0(@types/node@20.11.6)':
@@ -11289,7 +11289,7 @@ snapshots:
 
   '@tanstack/history@1.131.2': {}
 
-  '@tanstack/query-core@5.87.1': {}
+  '@tanstack/query-core@5.29.0': {}
 
   '@tanstack/router-core@1.131.7':
     dependencies:
@@ -11358,9 +11358,9 @@ snapshots:
       - vite-plugin-solid
       - webpack
 
-  '@tanstack/solid-query@5.87.1(solid-js@1.9.3)':
+  '@tanstack/solid-query@5.30.6(solid-js@1.9.3)':
     dependencies:
-      '@tanstack/query-core': 5.87.1
+      '@tanstack/query-core': 5.29.0
       solid-js: 1.9.3
 
   '@tanstack/solid-router@1.131.9(solid-js@1.9.9)':
