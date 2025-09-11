@@ -31,8 +31,26 @@ import useSearchContext from "./SearchInputContext"
 import { useTransContext } from "@gd/i18n"
 import { Trans } from "@gd/i18n"
 
-interface DropdownProps {
-  disabled?: boolean
+interface DropdownProps {}
+
+// Helper function to check if an instance is selected
+function shouldShowCompatibilityWarning(
+  searchContext: ReturnType<typeof useSearchContext>
+) {
+  return !!searchContext?.selectedInstanceId()
+}
+
+function FilterWarning() {
+  return (
+    <div class="px-3 py-2 mx-2 mb-2 bg-yellow-900/20 border border-yellow-600/30 rounded-md">
+      <div class="flex items-start gap-2 text-sm text-yellow-200">
+        <div class="i-ri:alert-fill h-4 w-4 text-yellow-500 flex-shrink-0 mt-0.5" />
+        <span class="leading-relaxed">
+          <Trans key="search.instance_compatibility_warning" />
+        </span>
+      </div>
+    </div>
+  )
 }
 
 export function SearchApiDropdown() {
@@ -126,7 +144,7 @@ export function SearchCategoryDropdown(props: DropdownProps) {
 
   return (
     <DropdownMenuSub>
-      <DropdownMenuSubTrigger class="w-full" disabled={props.disabled}>
+      <DropdownMenuSubTrigger class="w-full">
         <Trans key="search.categories" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
@@ -249,25 +267,131 @@ export function SearchCategoryDropdown(props: DropdownProps) {
 export function SearchModloaderDropdown(props: DropdownProps) {
   const globalStore = useGlobalStore()
   const searchResults = useSearchContext()
+  const [searchQuery, setSearchQuery] = createSignal("")
+  const [debouncedQuery, setDebouncedQuery] = createSignal("")
+  let inputRef: HTMLInputElement | undefined
 
-  const currentModloaders = () => {
-    return globalStore.modloaders.data?.map((modloader) => ({
-      label: capitalize(modloader),
-      value: modloader,
-      icon: <ModloaderIcon modloader={modloader} />
-    }))
-  }
+  // Debounce search query to prevent UI freezing
+  createEffect(() => {
+    const query = searchQuery()
+    const timeoutId = setTimeout(() => {
+      setDebouncedQuery(query)
+    }, 150) // 150ms debounce
+
+    return () => clearTimeout(timeoutId)
+  })
+
+  // Auto-focus input when dropdown content becomes visible
+  createEffect(() => {
+    // Focus the input after a short delay to ensure the dropdown is rendered
+    const timer = setTimeout(() => {
+      if (inputRef) {
+        inputRef.focus()
+        // Clear any existing search when dropdown opens
+        if (searchQuery()) {
+          setSearchQuery("")
+        }
+      }
+    }, 10) // Very short delay just for DOM rendering
+
+    return () => clearTimeout(timer)
+  })
+
+  // Memoized modloaders list
+  const modloaders = createMemo(
+    () =>
+      globalStore.modloaders.data?.map((modloader) => ({
+        label: capitalize(modloader),
+        value: modloader,
+        icon: <ModloaderIcon modloader={modloader} />
+      })) || []
+  )
+
+  // Optimized filtering with early return and memoization
+  const filteredModloaders = createMemo(() => {
+    const query = debouncedQuery().toLowerCase().trim()
+    const modloadersList = modloaders()
+
+    if (!query) return modloadersList // Show all modloaders when no search query
+
+    // Fast filtering
+    return modloadersList.filter((modloader) =>
+      modloader.label.toLowerCase().includes(query)
+    )
+  })
+
+  const showWarning = () => shouldShowCompatibilityWarning(searchResults)
 
   return (
     <DropdownMenuSub>
-      <DropdownMenuSubTrigger disabled={props.disabled}>
+      <DropdownMenuSubTrigger>
         <Trans key="search.modloaders" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
-        <DropdownMenuSubContent class="max-h-[300px] overflow-y-auto">
-          <Switch>
-            <Match when={currentModloaders()?.length}>
-              <For each={currentModloaders()}>
+        <DropdownMenuSubContent class="p-0 w-64">
+          {/* Search Input */}
+          <div
+            class="p-2 border-b border-darkSlate-600"
+            onClick={(e) => {
+              e.stopPropagation()
+              if (inputRef) {
+                inputRef.focus()
+              }
+            }}
+            onKeyDown={(e) => {
+              // Prevent dropdown menu from handling these keys
+              e.stopPropagation()
+            }}
+            onKeyUp={(e) => {
+              // Prevent dropdown menu from handling these keys
+              e.stopPropagation()
+            }}
+          >
+            <div style="height: 32px;">
+              <Input
+                ref={inputRef}
+                placeholder="Search modloaders..."
+                value={searchQuery()}
+                onInput={(e) => {
+                  setSearchQuery(e.target.value)
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (inputRef) {
+                    inputRef.focus()
+                  }
+                }}
+                onKeyDown={(e) => {
+                  // Prevent dropdown menu from handling these keys
+                  e.stopPropagation()
+                }}
+                onKeyUp={(e) => {
+                  // Prevent dropdown menu from handling these keys
+                  e.stopPropagation()
+                }}
+                icon={<div class="i-ri:search-line h-4 w-4" />}
+                variant="transparent"
+                class="h-full"
+              />
+            </div>
+          </div>
+
+          {/* Compatibility Warning */}
+          <Show when={showWarning()}>
+            <FilterWarning />
+          </Show>
+
+          {/* Options List */}
+          <Show
+            when={filteredModloaders().length > 0}
+            fallback={
+              <div class="px-2 py-3 text-sm text-lightSlate-400 text-center">
+                No modloaders found
+              </div>
+            }
+          >
+            <div class="max-h-[250px] overflow-y-auto">
+              <For each={filteredModloaders()}>
                 {(modloader) => (
                   <DropdownMenuCheckboxItem
                     checked={(() => {
@@ -280,7 +404,7 @@ export function SearchModloaderDropdown(props: DropdownProps) {
                         const prevModloaders = prev.modloaders || []
 
                         if (checked) {
-                          // Add modloader
+                          // Add modloader - but check it's not already there
                           if (!prevModloaders.includes(modloader.value)) {
                             return {
                               ...prev,
@@ -311,13 +435,8 @@ export function SearchModloaderDropdown(props: DropdownProps) {
                   </DropdownMenuCheckboxItem>
                 )}
               </For>
-            </Match>
-            <Match when={!currentModloaders()?.length}>
-              <div class="text-lightSlate-900 text-sm">
-                <Trans key="search.no_modloaders_found" />
-              </div>
-            </Match>
-          </Switch>
+            </div>
+          </Show>
         </DropdownMenuSubContent>
       </DropdownMenuPortal>
     </DropdownMenuSub>
@@ -329,7 +448,7 @@ export function SearchEnvironmentDropdown(props: DropdownProps) {
 
   return (
     <DropdownMenuSub>
-      <DropdownMenuSubTrigger disabled={props.disabled}>
+      <DropdownMenuSubTrigger>
         <Trans key="search.environment" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
@@ -386,7 +505,7 @@ export function SearchSortIndexDropdown(props: DropdownProps) {
 
   return (
     <DropdownMenuSub>
-      <DropdownMenuSubTrigger disabled={props.disabled}>
+      <DropdownMenuSubTrigger>
         <Trans key="search.sort_by" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
@@ -430,7 +549,7 @@ export function SearchSortOrderDropdown(props: DropdownProps) {
 
   return (
     <DropdownMenuSub>
-      <DropdownMenuSubTrigger disabled={props.disabled}>
+      <DropdownMenuSubTrigger>
         <Trans key="search.order" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
@@ -524,6 +643,7 @@ export function SearchGameVersionDropdown(props: DropdownProps) {
   })
 
   const shouldVirtualize = () => filteredVersions().length > 100
+  const showWarning = () => shouldShowCompatibilityWarning(searchResults)
 
   const renderVersion = (version: { label: string; value: string }) => {
     // Create a reactive memo for the checked state to ensure VList re-renders
@@ -581,7 +701,7 @@ export function SearchGameVersionDropdown(props: DropdownProps) {
 
   return (
     <DropdownMenuSub>
-      <DropdownMenuSubTrigger disabled={props.disabled}>
+      <DropdownMenuSubTrigger>
         <Trans key="search.game_versions" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
@@ -632,6 +752,11 @@ export function SearchGameVersionDropdown(props: DropdownProps) {
               />
             </div>
           </div>
+
+          {/* Compatibility Warning */}
+          <Show when={showWarning()}>
+            <FilterWarning />
+          </Show>
 
           {/* Options List */}
           <Show
@@ -713,7 +838,7 @@ export function SearchViewModeDropdown(props: DropdownProps) {
 
   return (
     <DropdownMenuSub>
-      <DropdownMenuSubTrigger disabled={props.disabled}>
+      <DropdownMenuSubTrigger>
         <Trans key="search.view_mode" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>

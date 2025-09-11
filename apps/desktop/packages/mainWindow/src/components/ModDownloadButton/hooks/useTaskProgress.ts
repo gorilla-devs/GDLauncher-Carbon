@@ -8,7 +8,6 @@ export const useTaskProgress = (
 ) => {
   const [loading, setLoading] = createSignal(false)
   const [progress, setProgress] = createSignal<number | null>(null)
-  const searchContext = useSearchContext()
 
   // Monitor all tasks for completion
   const allTasksQuery = rspc.createQuery(() => ({

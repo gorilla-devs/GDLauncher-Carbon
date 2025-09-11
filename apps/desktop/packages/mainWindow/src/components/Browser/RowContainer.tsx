@@ -194,6 +194,8 @@ const RowContainer = (props: Props & AdditionalProps) => {
             </Match>
             <Match when={props.type !== "modpack"}>
               <ModDownloadButton
+                selectedInstanceId={props.instanceId ?? undefined}
+                selectedInstanceMods={props.instanceMods}
                 addon={props.project}
                 fileId={
                   props.project?.platform === "curseforge"

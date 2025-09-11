@@ -1,10 +1,10 @@
-import { FEUnifiedSearchResult } from "@gd/core_module/bindings"
+import { FEUnifiedSearchResult, Mod } from "@gd/core_module/bindings"
 import { formatDownloadCount } from "@/utils/helpers"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import DynamicBadgeContainer from "./DynamicBadgeContainer"
-import { createEffect, createSignal, Match, Switch } from "solid-js"
+import { createSignal, Match, Switch } from "solid-js"
 import ModpackDownloadButton from "@/components/ModpackDownloadButton"
 import ModDownloadButton from "@/components/ModDownloadButton"
 
@@ -12,6 +12,8 @@ interface SearchResultItemProps {
   result: FEUnifiedSearchResult
   onItemClick: (id: string, platform: string) => void
   isInstalled: boolean
+  instanceId?: number
+  instanceMods?: Mod[]
 }
 
 export function ListItem(props: SearchResultItemProps) {
@@ -121,6 +123,8 @@ export function ListItem(props: SearchResultItemProps) {
                   </Match>
                   <Match when={props.result.type !== "modpack"}>
                     <ModDownloadButton
+                      selectedInstanceId={props.instanceId}
+                      selectedInstanceMods={props.instanceMods}
                       addon={props.result}
                       onDropdownOpenChange={(isOpen) => {
                         if (isOpen) {

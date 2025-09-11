@@ -10,22 +10,22 @@ import {
 } from "@/components/NavSearchInputFilters"
 import { Trans } from "@gd/i18n"
 
-export function FiltersDropdown(props: { disabled?: boolean }) {
+export function FiltersDropdown() {
   return (
     <>
       <SearchApiDropdown />
       <DropdownMenuSeparator />
-      <SearchCategoryDropdown disabled={props.disabled} />
-      <SearchModloaderDropdown disabled={props.disabled} />
-      <SearchGameVersionDropdown disabled={props.disabled} />
+      <SearchCategoryDropdown />
+      <SearchModloaderDropdown />
+      <SearchGameVersionDropdown />
       <DropdownMenuSeparator />
-      <SearchEnvironmentDropdown disabled={props.disabled} />
+      <SearchEnvironmentDropdown />
       <DropdownMenuSeparator />
       <DropdownMenuLabel>
         <Trans key="search.sorting" />
       </DropdownMenuLabel>
-      <SearchSortIndexDropdown disabled={props.disabled} />
-      <SearchSortOrderDropdown disabled={props.disabled} />
+      <SearchSortIndexDropdown />
+      <SearchSortOrderDropdown />
     </>
   )
 }

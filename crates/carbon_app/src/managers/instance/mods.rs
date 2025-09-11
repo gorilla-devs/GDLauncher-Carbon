@@ -456,19 +456,6 @@ impl ManagerRef<'_, InstanceManager> {
                 .clone()
         };
 
-        let (version, modloader) = match version {
-            domain::info::GameVersion::Custom(_) => todo!("Unsupported"),
-            domain::info::GameVersion::Standard(version) => {
-                let modloader = version
-                    .modloaders
-                    .iter()
-                    .next()
-                    .ok_or(anyhow!("No modloader available"))?;
-
-                (version.release.clone(), modloader.type_)
-            }
-        };
-
         let project = self
             .app
             .modplatforms_manager()
@@ -478,9 +465,18 @@ impl ManagerRef<'_, InstanceManager> {
             })
             .await?;
 
-        let modloader = match project.data.class_id {
-            Some(carbon_platforms::curseforge::ClassId::Mods) | None => Some(modloader.into()),
-            _ => None,
+        let (version, modloader) = match version {
+            domain::info::GameVersion::Custom(_) => todo!("Unsupported"),
+            domain::info::GameVersion::Standard(version) => {
+                let first_modloader = version.modloaders.iter().next();
+
+                let modloader = match project.data.class_id {
+                    Some(carbon_platforms::curseforge::ClassId::Mods) | None => first_modloader,
+                    _ => None,
+                };
+
+                (version.release.clone(), modloader.map(|v| v.type_.into()))
+            }
         };
 
         let file_id = self
@@ -558,19 +554,6 @@ impl ManagerRef<'_, InstanceManager> {
                 .clone()
         };
 
-        let (version, modloader) = match version {
-            domain::info::GameVersion::Custom(_) => todo!("Unsupported"),
-            domain::info::GameVersion::Standard(version) => {
-                let modloader = version
-                    .modloaders
-                    .iter()
-                    .next()
-                    .ok_or(anyhow!("No modloader available"))?;
-
-                (version.release.clone(), modloader.type_.to_string())
-            }
-        };
-
         let project = self
             .app
             .modplatforms_manager()
@@ -578,9 +561,21 @@ impl ManagerRef<'_, InstanceManager> {
             .get_project(ProjectID(project_id.clone()))
             .await?;
 
-        let loaders = match project.project_type {
-            carbon_platforms::modrinth::project::ProjectType::Mod => Some(vec![modloader]),
-            _ => None,
+        let (version, modloader) = match version {
+            domain::info::GameVersion::Custom(_) => todo!("Unsupported"),
+            domain::info::GameVersion::Standard(version) => {
+                let first_modloader = version.modloaders.iter().next();
+
+                let modloader = match project.project_type {
+                    carbon_platforms::modrinth::project::ProjectType::Mod => first_modloader,
+                    _ => None,
+                };
+
+                (
+                    version.release.clone(),
+                    modloader.map(|v| vec![v.type_.to_string()]),
+                )
+            }
         };
 
         let version_id = self
@@ -590,7 +585,7 @@ impl ManagerRef<'_, InstanceManager> {
             .get_project_versions(ProjectVersionsFilters {
                 project_id: ProjectID(project_id.clone()),
                 game_versions: Some(Vec::from([version.clone()])),
-                loaders,
+                loaders: modloader,
                 limit: None,
                 offset: None,
             })

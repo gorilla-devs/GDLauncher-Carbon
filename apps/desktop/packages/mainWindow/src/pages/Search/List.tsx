@@ -2,7 +2,6 @@ import { ListItem } from "./ListItem"
 import { VList } from "@/components/VirtuaWrapper"
 import useSearchContext from "@/components/SearchInputContext"
 import {
-  Badge,
   Button,
   DropdownMenu,
   DropdownMenuContent,
@@ -14,24 +13,50 @@ import { Tab, TabList } from "@gd/ui"
 import { For, onMount, Show, createMemo } from "solid-js"
 import { FEUnifiedSearchType } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
-import { useLocation, useParams, useSearchParams } from "@solidjs/router"
+import { useLocation, useParams } from "@solidjs/router"
 import FiltersDisplay from "./FiltersDisplay"
 import { FiltersDropdown } from "./FiltersDropdown"
 import { rspc } from "@/utils/rspcClient"
 import { Trans, useTransContext } from "@gd/i18n"
+import { useGlobalStore } from "@/components/GlobalStoreContext"
+
+type SearchTab = {
+  label: string
+  value: FEUnifiedSearchType
+  icon: string
+  path: string
+}
 
 export function List() {
   const searchContext = useSearchContext()
   const navigator = useGDNavigate()
   const params = useParams()
   const location = useLocation()
-  const [searchParams] = useSearchParams()
   const [t] = useTransContext()
+  const globalStore = useGlobalStore()
 
-  const instanceId = () => Number.parseInt(searchParams.instanceId, 10)
+  const instanceId = () => searchContext?.selectedInstanceId() || NaN
+  const instanceMods = () => searchContext?.selectedInstanceMods
 
-  const defaultType = () => params.type || (instanceId() ? "mod" : "modpack")
-  const type = () => (params.type ?? defaultType()) as FEUnifiedSearchType
+  const instance = rspc.createQuery(() => ({
+    queryKey: ["instance.getInstanceDetails", instanceId()],
+    enabled: !isNaN(instanceId()) && instanceId() > 0
+  }))
+
+  const defaultFallbackType: () => FEUnifiedSearchType = () => {
+    if (!instanceId()) {
+      return "modpack"
+    }
+
+    if (instance?.data?.modloaders?.length ?? 0 > 0) {
+      return "mod"
+    }
+
+    return "shader"
+  }
+
+  const type = () =>
+    (params.type || defaultFallbackType()) as FEUnifiedSearchType
 
   if (type() !== searchContext?.searchQuery().projectType) {
     searchContext?.setSearchQuery((prev) => ({
@@ -40,53 +65,85 @@ export function List() {
     }))
   }
 
-  const projectTypeTabs: () => {
-    label: string
-    value: FEUnifiedSearchType
-    icon: string
-    path: string
-  }[] = () => [
-    ...(instanceId()
-      ? []
-      : [
-          {
-            label: t("search.modpacks"),
-            value: "modpack" as const,
-            icon: "i-ri:folder-fill",
-            path: "/search/modpack"
-          }
-        ]),
-    {
-      label: t("search.mods"),
-      value: "mod",
-      icon: "i-ri:file-text-fill",
-      path: "/search/mod"
-    },
-    {
-      label: t("search.shaders"),
-      value: "shader",
-      icon: "i-ri:paint-fill",
-      path: "/search/shader"
-    },
-    {
-      label: t("search.resource_packs"),
-      value: "resourcePack",
-      icon: "i-ri:folder-fill",
-      path: "/search/resourcePack"
-    },
-    {
-      label: t("search.data_packs"),
-      value: "datapack",
-      icon: "i-ri:folder-fill",
-      path: "/search/datapack"
-    },
-    {
+  const shouldShowDataPackTab = createMemo(() => {
+    if (!instanceId() || !searchContext?.selectedInstance?.data) {
+      return null
+    }
+
+    const instanceVersion = searchContext.selectedInstance.data.version
+    const instanceMCVersionPos = globalStore.minecraftVersions.data?.findIndex(
+      (v) => v.id === instanceVersion
+    )
+
+    const Pos1_13 = globalStore.minecraftVersions.data?.findIndex(
+      (v) => v.id === "1.13"
+    )
+
+    // Check version requirements for different addon types
+    if ((instanceMCVersionPos ?? 0) > (Pos1_13 ?? 0)) {
+      return false
+    }
+
+    return true
+  })
+
+  const projectTypeTabs: () => SearchTab[] = () => {
+    let tabs: SearchTab[] = []
+
+    if (!instanceId()) {
+      tabs.push({
+        label: t("search.modpacks"),
+        value: "modpack",
+        icon: "i-ri:folder-fill",
+        path: "/search/modpack"
+      })
+    }
+
+    if (
+      !instanceId() ||
+      (instanceId() && (instance.data?.modloaders?.length ?? 0) > 0)
+    ) {
+      tabs.push({
+        label: t("search.mods"),
+        value: "mod",
+        icon: "i-ri:file-text-fill",
+        path: "/search/mod"
+      })
+    }
+
+    tabs = tabs.concat([
+      {
+        label: t("search.shaders"),
+        value: "shader",
+        icon: "i-ri:paint-fill",
+        path: "/search/shader"
+      },
+      {
+        label: t("search.resource_packs"),
+        value: "resourcePack",
+        icon: "i-ri:folder-fill",
+        path: "/search/resourcePack"
+      }
+    ])
+
+    if (shouldShowDataPackTab()) {
+      tabs.push({
+        label: t("search.data_packs"),
+        value: "datapack",
+        icon: "i-ri:folder-fill",
+        path: "/search/datapack"
+      })
+    }
+
+    tabs.push({
       label: t("search.worlds"),
       value: "world",
       icon: "i-ri:folder-fill",
       path: "/search/world"
-    }
-  ]
+    })
+
+    return tabs
+  }
 
   onMount(() => {
     queueMicrotask(() => {
@@ -123,9 +180,9 @@ export function List() {
 
   return (
     <div class="flex h-full flex-col overflow-hidden">
-      <div class="flex w-full justify-between p-6 flex-shrink-0">
+      <div class="flex w-full p-6 gap-8">
         <div
-          class="w-44 items-center gap-2"
+          class="w-48 items-center"
           classList={{
             hidden: !instanceId(),
             flex: !!instanceId()
@@ -188,7 +245,7 @@ export function List() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
-              <FiltersDropdown disabled={false} />
+              <FiltersDropdown />
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -237,6 +294,8 @@ export function List() {
 
                 return (
                   <ListItem
+                    instanceMods={instanceMods()?.data ?? undefined}
+                    instanceId={instanceId()}
                     result={result.value!}
                     isInstalled={isInstalled()}
                     onItemClick={() => {

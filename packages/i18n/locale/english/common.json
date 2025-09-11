@@ -664,8 +664,6 @@
   "search.game_versions": "Game Versions",
   "search.view_mode": "View Mode",
   "search.instance_compatibility_warning": "Changing these filters might show addons incompatible with the selected instance",
-  "search.datapack_version_warning": "Data packs require Minecraft 1.13 or later. Your selected instance ({{version}}) doesn't support data packs.",
-  "search.resourcepack_version_warning": "Resource packs require Minecraft 1.6.1 or later. Your selected instance ({{version}}) doesn't support resource packs.",
   "search.modpacks": "Modpacks",
   "search.mods": "Mods",
   "search.shaders": "Shaders",

@@ -194,16 +194,11 @@ const Instance = () => {
       label: "Overview",
       path: `/library/${params.id}`
     },
-
-    ...((routeData.instanceDetails.data?.modloaders?.length || 0) > 0
-      ? [
-          {
-            label: "Addons",
-            path: `/library/${params.id}/addons`,
-            noPadding: true
-          }
-        ]
-      : []),
+    {
+      label: "Addons",
+      path: `/library/${params.id}/addons`,
+      noPadding: true
+    },
     {
       label: "Settings",
       path: `/library/${params.id}/settings`
@@ -217,10 +212,6 @@ const Instance = () => {
       ),
       path: `/library/${params.id}/logs`
     }
-    // {
-    //   label: "Resource Packs",
-    //   path: `/library/${params.id}/resourcepacks`,
-    // },
     // {
     //   label: "Screenshots",
     //   path: `/library/${params.id}/screenshots`,

@@ -113,8 +113,24 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     const virtualizer = ref()
     virtualizer?.scrollTo(0)
 
-    _setSearchQuery(value as any)
+    _setSearchQuery(value)
   }
+
+  // When the instanceId changes, reset the search query to default with instance filters
+  createEffect((prevInstanceId: number) => {
+    if (
+      !selectedInstanceId() &&
+      prevInstanceId !== selectedInstanceId() &&
+      !Object.is(prevInstanceId, selectedInstanceId())
+    ) {
+      setSearchQuery({
+        ...defaultSearchQuery,
+        ...opts.defaultSearchQuery
+      })
+    }
+
+    return selectedInstanceId()
+  }, selectedInstanceId())
 
   const actualPageSize = () => {
     let pageSize = searchQuery().pageSize || 40

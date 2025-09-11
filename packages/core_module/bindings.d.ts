@@ -217,6 +217,8 @@ export type ModrinthModpack = { project_id: string; version_id: string }
 
 export type MRFESearchFacet = { Category: string } | { Version: string } | { License: string } | { ProjectType: string }
 
+export type McType = "old_alpha" | "old_beta" | "release" | "snapshot"
+
 export type FEInstanceModloaderType = "neoforge" | "forge" | "fabric" | "quilt"
 
 export type FEManagedJavaVersion = { id: string; name: string; downloadUrl: string; javaVersion: string }
@@ -326,8 +328,6 @@ export type GameLogEntry = { id: GameLogId; instance_id: FEInstanceId; active: b
 export type CurseForgeModMetadata = { project_id: number; file_id: number; name: string; version: string; urlslug: string; summary: string; authors: string; has_image: boolean }
 
 export type CFFEModStatus = "new" | "changesRequired" | "underSoftReview" | "approved" | "rejected" | "changesMade" | "inactive" | "abandoned" | "deleted" | "underReview"
-
-export type McType = "old_alpha" | "old_beta" | "release" | "snapshot"
 
 export type FEUploadProfileIcon = { uuid: string; iconPath: string }
 
@@ -559,7 +559,7 @@ export type InstancesGroupBy = "group" | "modloader" | "gameVersion" | "modplatf
 
 export type FEManagedJavaSetupArgs = { os: FEManagedJavaOs; arch: FEManagedJavaArch; vendor: FEVendor; id: string }
 
-export type ManifestVersion = { id: string; type: McType }
+export type ManifestVersion = { id: string; type: McType; release_time: string }
 
 export type FEManagedJavaSetupProgress = "idle" | { downloading: [string, string] } | { extracting: [string, string] } | "done"
 

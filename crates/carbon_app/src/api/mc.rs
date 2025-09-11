@@ -88,6 +88,7 @@ pub struct ManifestVersion {
     pub id: String,
     #[serde(rename = "type")]
     pub type_: McType,
+    pub release_time: chrono::DateTime<chrono::Utc>,
 }
 
 impl From<minecraft::Version> for ManifestVersion {
@@ -95,6 +96,7 @@ impl From<minecraft::Version> for ManifestVersion {
         ManifestVersion {
             id: value.id,
             type_: value.type_.into(),
+            release_time: value.release_time,
         }
     }
 }

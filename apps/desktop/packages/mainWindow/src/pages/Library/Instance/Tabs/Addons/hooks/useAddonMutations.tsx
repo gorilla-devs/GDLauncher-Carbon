@@ -153,15 +153,15 @@ export const useAddonMutations = (
     })
   }
 
-  const gotoSearchPage = (type: AddonType) => {
+  const gotoSearchPage = (type?: AddonType) => {
     const searchParam = {
       mods: "mod",
       shaders: "shader",
       resourcepacks: "resource-pack",
       datapacks: "datapack",
       worlds: "world"
-    }[type]
-    navigator.navigate(`/search/${searchParam}?instanceId=${params.id}`)
+    }?.[type!]
+    navigator.navigate(`/search/${searchParam ?? ""}?instanceId=${params.id}`)
   }
 
   const handleUpdateSelected = async (selectedMods: ModType[]) => {

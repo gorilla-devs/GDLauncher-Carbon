@@ -9,7 +9,6 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
   const [t] = useTransContext()
   const modalsContext = useModal()
   const addNotification = createNotification()
-  const navigator = useGDNavigate()
 
   const deleteInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.deleteInstance"],
@@ -53,8 +52,8 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
           <Button
             type="secondary"
             onClick={() => {
-              deleteInstanceMutation.mutate(props?.data?.id)
               modalsContext?.closeModal()
+              deleteInstanceMutation.mutate(props?.data?.id)
             }}
           >
             {t("instance_confirm_deletion.delete")}

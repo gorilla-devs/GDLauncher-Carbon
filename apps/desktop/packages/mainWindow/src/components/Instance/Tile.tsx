@@ -139,7 +139,6 @@ const Tile = (props: Props) => {
   }
 
   const handleDelete = () => {
-    // deleteInstanceMutation.mutate(props.instance.id);
     modalsContext?.openModal(
       {
         name: "confirmInstanceDeletion"
@@ -371,7 +370,10 @@ const Tile = (props: Props) => {
                 }
               }}
             >
-              <Tooltip>
+              <Tooltip
+                open={props.failError ? undefined : false}
+                placement="top"
+              >
                 <TooltipTrigger>
                   <div class="relative box-border overflow-hidden rounded-2xl p-[2px]">
                     <div
@@ -636,48 +638,44 @@ const Tile = (props: Props) => {
                   </div>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <Show when={props.failError}>
-                    <div class="b-1 border-solid border-white p-4">
-                      <div class="flex w-full justify-between pb-4 text-xl">
-                        <div>
-                          <Trans key="error" />
-                        </div>
-                        <div>
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <div
-                                class="h-6 w-6"
-                                classList={{
-                                  "text-lightSlate-700 hover:text-lightSlate-100 duration-100 ease-in-out i-ri:file-copy-2-fill":
-                                    !copiedError(),
-                                  "text-green-400 i-ri:checkbox-circle-fill":
-                                    copiedError()
-                                }}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  navigator.clipboard.writeText(
-                                    props.failError!
-                                  )
-
-                                  setCopiedError(true)
-
-                                  setTimeout(() => {
-                                    setCopiedError(false)
-                                  }, 2000)
-                                }}
-                              />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {copiedError()
-                                ? t("copied_to_clipboard")
-                                : t("Copy")}
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
+                  <div class="b-1 border-solid border-white p-4">
+                    <div class="flex w-full justify-between pb-4 text-xl">
+                      <div>
+                        <Trans key="error" />
                       </div>
-                      <div>{props.failError}</div>
+                      <div>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <div
+                              class="h-6 w-6"
+                              classList={{
+                                "text-lightSlate-700 hover:text-lightSlate-100 duration-100 ease-in-out i-ri:file-copy-2-fill":
+                                  !copiedError(),
+                                "text-green-400 i-ri:checkbox-circle-fill":
+                                  copiedError()
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                navigator.clipboard.writeText(props.failError!)
+
+                                setCopiedError(true)
+
+                                setTimeout(() => {
+                                  setCopiedError(false)
+                                }, 2000)
+                              }}
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {copiedError()
+                              ? t("copied_to_clipboard")
+                              : t("Copy")}
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
                     </div>
-                  </Show>
+                    <div>{props.failError}</div>
+                  </div>
                 </TooltipContent>
               </Tooltip>
 
@@ -703,13 +701,14 @@ const Tile = (props: Props) => {
                     : {}
                 }
               >
-                <Tooltip placement="top">
+                <Tooltip
+                  open={props.instance.name.length > 20 ? undefined : false}
+                  placement="top"
+                >
                   <TooltipTrigger class="w-full overflow-hidden text-ellipsis">
                     {props.instance.name}
                   </TooltipTrigger>
-                  <TooltipContent>
-                    {props.instance.name.length > 20 ? props.instance.name : ""}
-                  </TooltipContent>
+                  <TooltipContent>{props.instance.name}</TooltipContent>
                 </Tooltip>
               </h4>
               <Switch>

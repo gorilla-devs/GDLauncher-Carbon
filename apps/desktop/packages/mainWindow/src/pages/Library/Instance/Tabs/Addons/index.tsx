@@ -85,7 +85,7 @@ const Addons = () => {
         platformFilter={addonData.platformFilter}
         setPlatformFilter={addonData.setPlatformFilter}
         isInstanceLocked={isInstanceLocked}
-        onAddAddons={() => addonMutations.gotoSearchPage("mods")}
+        onAddAddons={() => addonMutations.gotoSearchPage()}
         onOpenFolder={addonMutations.handleOpenFolder}
         onUpdateAll={() =>
           addonMutations.handleUpdateAll(addonData.filteredAddons())
@@ -109,9 +109,7 @@ const Addons = () => {
         <Show
           when={addonData.filteredAddons().length > 0}
           fallback={
-            <NoAddons
-              onAddAddons={() => addonMutations.gotoSearchPage("mods")}
-            />
+            <NoAddons onAddAddons={() => addonMutations.gotoSearchPage()} />
           }
         >
           {/* Table */}

@@ -1,27 +1,23 @@
 import { rspc } from "@/utils/rspcClient"
 import { Switch, Match, createSignal, createEffect, createMemo } from "solid-js"
-import { FEUnifiedSearchResult } from "@gd/core_module/bindings"
-import useSearchContext from "@/components/SearchInputContext"
+import { FEUnifiedSearchResult, Mod } from "@gd/core_module/bindings"
 import { useModInstallation } from "./hooks/useModInstallation"
 import { useInstanceSearch } from "./hooks/useInstanceSearch"
 import { useTaskProgress } from "./hooks/useTaskProgress"
 import { InstanceDropdown } from "./components/InstanceDropdown"
 import { InstallButton } from "./components/InstallButton"
-import { isModInstalledInInstance } from "./utils/instanceHelpers"
 
 interface ModDownloadButtonProps {
   fileId?: number | string
   addon: FEUnifiedSearchResult | undefined
   onDropdownOpenChange?: (isOpen: boolean) => void
+  selectedInstanceId?: number
+  selectedInstanceMods?: Mod[]
+  instanceLocked?: boolean
 }
 
 const ModDownloadButton = (props: ModDownloadButtonProps) => {
   const [taskId, setTaskId] = createSignal<number | null>(null)
-
-  const searchContext = useSearchContext()
-
-  const instanceLocked = () =>
-    searchContext?.selectedInstance?.data?.modpack?.locked || false
 
   const {
     instanceLoadingStates,
@@ -88,7 +84,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   })
 
   const installedMod = createMemo(() => {
-    const mods = searchContext?.selectedInstanceMods?.data || []
+    const mods = props.selectedInstanceMods || []
 
     const found = mods.find((mod) => {
       if (!props.addon) return false
@@ -133,7 +129,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   const handleDownload = async () => {
     if (!props.addon) return
 
-    const instanceId = searchContext?.selectedInstance?.data?.id
+    const instanceId = props.selectedInstanceId
     if (!instanceId || isInstalled()) return
 
     if (!props.fileId) {
@@ -164,7 +160,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
 
   return (
     <Switch>
-      <Match when={!searchContext?.selectedInstance?.data?.id}>
+      <Match when={!props.selectedInstanceId}>
         <InstanceDropdown
           addon={props.addon}
           filteredInstances={filteredInstances}
@@ -179,12 +175,12 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
           onDropdownOpenChange={props.onDropdownOpenChange}
         />
       </Match>
-      <Match when={searchContext?.selectedInstance?.data?.id}>
+      <Match when={props.selectedInstanceId}>
         <InstallButton
           loading={loading}
           progress={progress}
           isInstalled={isInstalled}
-          instanceLocked={instanceLocked}
+          instanceLocked={() => props.instanceLocked ?? false}
           fileId={props.fileId}
           installedMod={installedMod}
           onDownload={handleDownload}
