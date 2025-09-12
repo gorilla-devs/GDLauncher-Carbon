@@ -121,9 +121,9 @@ const Instance = () => {
       obj
     ): Promise<
       | {
-          instancesUngrouped: ListInstance[]
-          instanceDetails: InstanceDetails
-        }
+        instancesUngrouped: ListInstance[]
+        instanceDetails: InstanceDetails
+      }
       | undefined
     > => {
       await queryClient.cancelQueries({
@@ -169,9 +169,9 @@ const Instance = () => {
       _variables,
       context:
         | {
-            instancesUngrouped: ListInstance[]
-            instanceDetails: InstanceDetails
-          }
+          instancesUngrouped: ListInstance[]
+          instanceDetails: InstanceDetails
+        }
         | undefined
     ) {
       if (context?.instanceDetails) {
@@ -351,9 +351,9 @@ const Instance = () => {
           routeData.instanceDetails.data?.modloaders[0]?.version,
         img: routeData.instanceDetails.data?.iconRevision
           ? getInstanceImageUrl(
-              params.id,
-              routeData.instanceDetails.data?.iconRevision
-            )
+            params.id,
+            routeData.instanceDetails.data?.iconRevision
+          )
           : null
       }
     )
@@ -377,6 +377,21 @@ const Instance = () => {
       }
     )
   }
+
+  const handleFixDuplicateMods = () => {
+    if (routeData.checkDuplicateMods.data && Object.keys(routeData.checkDuplicateMods.data).length > 0) {
+      modalsContext?.openModal(
+        {
+          name: "duplicateModsResolution"
+        },
+        {
+          instanceId: parseInt(params.id, 10),
+          duplicateMods: routeData.checkDuplicateMods.data
+        }
+      )
+    }
+  }
+
 
   const menuItems = () => [
     {
@@ -448,9 +463,9 @@ const Instance = () => {
           src={
             routeData.instanceDetails.data?.iconRevision
               ? getInstanceImageUrl(
-                  params.id,
-                  routeData.instanceDetails.data?.iconRevision
-                )
+                params.id,
+                routeData.instanceDetails.data?.iconRevision
+              )
               : DefaultImg
           }
           alt="Instance cover"
@@ -525,9 +540,9 @@ const Instance = () => {
                     src={
                       routeData.instanceDetails.data?.iconRevision
                         ? getInstanceImageUrl(
-                            params.id,
-                            routeData.instanceDetails.data?.iconRevision
-                          )
+                          params.id,
+                          routeData.instanceDetails.data?.iconRevision
+                        )
                         : DefaultImg
                     }
                     alt="Instance icon"
@@ -779,6 +794,18 @@ const Instance = () => {
                 </Button>
               </div>
             </div>
+            <Show when={routeData.checkDuplicateMods.data && Object.keys(routeData.checkDuplicateMods.data).length > 0}>
+              <div class="bg-yellow-500 justify-between flex items-center p-2">
+                <div class="flex gap-2">
+                  <div class="i-ri:alert-fill bg-black h-6 w-6">
+                  </div>
+                  <p class="text-black">Duplicate mods exist in this instance</p>
+                </div>
+                <Button size="small" type="secondary" onClick={handleFixDuplicateMods}>
+                  Fix Now
+                </Button>
+              </div>
+            </Show>
             <div
               class="px-0"
               classList={{

@@ -21,6 +21,10 @@ const fetchData = ({ params }) => {
     queryKey: ["instance.getInstanceMods", parseInt(params.id, 10)]
   }))
 
+  const checkDuplicateMods = rspc.createQuery(() => ({
+    queryKey: ["instance.checkDuplicateAddons", parseInt(params.id, 10)]
+  }))
+
   const [instanceMods, setInstanceMods] = createStore({
     mods: [] as Mod[]
   })
@@ -38,6 +42,7 @@ const fetchData = ({ params }) => {
     instanceDetails,
     modpackInfo,
     instanceMods: instanceMods.mods,
+    checkDuplicateMods,
     instancesUngrouped,
     totalRam
   }

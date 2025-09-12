@@ -109,6 +109,7 @@ keys! {
         SEARCH_LOGS                                 = "searchLogs";
         DELETE_LOG                                  = "deleteLog";
         OPEN_INSTANCE_FOLDER                        = "openInstanceFolder";
+        CHECK_DUPLICATE_ADDONS                      = "checkDuplicateAddons";
         ENABLE_MOD                                  = "enableMod";
         DISABLE_MOD                                 = "disableMod";
         DELETE_MOD                                  = "deleteMod";

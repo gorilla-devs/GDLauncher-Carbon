@@ -15,6 +15,7 @@ use crate::domain::instance::{
 use crate::domain::java::{SYSTEM_JAVA_PROFILE_NAME_PREFIX, SystemJavaProfileName};
 use crate::domain::vtask::VisualTaskId;
 use crate::livenesstracker::LivenessTracker;
+use crate::managers;
 use crate::managers::instance::modpack::PackVersionFile;
 use anyhow::bail;
 use anyhow::{Context, anyhow};
@@ -920,6 +921,35 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         Ok((format!("icon.{extension}"), data.to_vec()))
+    }
+
+    pub async fn check_duplicate_addons(
+        self,
+        instance: InstanceId,
+    ) -> anyhow::Result<HashMap<String, Vec<domain::Mod>>> {
+        let instance_data = self
+            .list_mods(instance, Some(domain::AddonType::Mods))
+            .await?;
+
+        let mut mod_map: HashMap<String, Vec<domain::Mod>> = HashMap::new();
+        for addon in instance_data {
+            if let Some(m) = addon.metadata.as_ref() {
+                if let Some(modid) = m.modid.as_ref() {
+                    mod_map
+                        .entry(modid.clone())
+                        .or_insert_with(Vec::new)
+                        .push(addon.clone());
+                }
+            }
+        }
+
+        // Keep only entries that have more than one mod (duplicates)
+        let duplicates: HashMap<String, Vec<domain::Mod>> = mod_map
+            .into_iter()
+            .filter(|(_, mods)| mods.len() > 1)
+            .collect();
+
+        Ok(duplicates)
     }
 
     pub async fn set_loaded_icon(self, icon: (String, Vec<u8>)) {
