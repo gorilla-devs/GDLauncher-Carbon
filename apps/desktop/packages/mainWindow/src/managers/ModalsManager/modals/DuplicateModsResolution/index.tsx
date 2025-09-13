@@ -44,20 +44,32 @@ const DuplicateModsResolution = (props: ModalProps) => {
     }))
 
     const handleRemoveSelectedMods = async () => {
-        // Get all the selected mods
-        const modsToDelete = Object.entries(selectedMods())
-            .filter(([_, selected]) => selected)
-            .map(([modId]) => modId)
+        try {
+            const modsToDelete = Object.entries(selectedMods())
+                .filter(([_, selected]) => selected)
+                .map(([modId]) => modId)
 
-        // Delete each selected mod
-        for (const modId of modsToDelete) {
-            await deleteModMutation.mutate({
-                instance_id: instanceId,
-                mod_id: modId
+            for (const modId of modsToDelete) {
+                await deleteModMutation.mutate({
+                    instance_id: instanceId,
+                    mod_id: modId
+                })
+            }
+
+            const remainingDuplicates = await queryClient.fetchQuery({
+                queryKey: ["instance.checkDuplicateAddons", instanceId]
             })
-        }
 
-        // Close the modal
+            if (!remainingDuplicates || Object.keys(remainingDuplicates).length === 0) {
+                document.querySelector('[aria-label="Close modal"]')?.dispatchEvent(
+                    new MouseEvent('click', { bubbles: true })
+                )
+            } else {
+                setSelectedMods({})
+            }
+        } catch (error) {
+            console.error("Error removing duplicate mods:", error)
+        }
         const closeButton = document.querySelector('[aria-label="Close modal"]') as HTMLButtonElement
         if (closeButton) {
             closeButton.click()
