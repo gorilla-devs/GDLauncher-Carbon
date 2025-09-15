@@ -41,7 +41,8 @@ export function SearchableDropdown(props: SearchableDropdownProps) {
 
   const shouldVirtualize = () => {
     const threshold = props.virtualizationThreshold ?? 100
-    const useVirtualization = props.virtualized ?? filteredOptions().length > threshold
+    const useVirtualization =
+      props.virtualized ?? filteredOptions().length > threshold
     return useVirtualization
   }
 
@@ -91,7 +92,7 @@ export function SearchableDropdown(props: SearchableDropdownProps) {
 
       <Show when={isOpen()}>
         <div class="absolute top-full left-0 right-0 z-50 mt-1 rounded-md border border-darkSlate-600 bg-darkSlate-800 shadow-lg">
-          <div 
+          <div
             class="p-2 border-b border-darkSlate-600"
             onClick={(e) => {
               e.stopPropagation()
@@ -117,7 +118,11 @@ export function SearchableDropdown(props: SearchableDropdownProps) {
           </div>
 
           <div
-            class={shouldVirtualize() ? "p-1 max-h-[200px]" : "max-h-[200px] overflow-y-auto p-1"}
+            class={
+              shouldVirtualize()
+                ? "p-1 max-h-[200px]"
+                : "max-h-[200px] overflow-y-auto p-1"
+            }
             style={props.maxHeight ? { "max-height": props.maxHeight } : {}}
           >
             <Show

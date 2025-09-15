@@ -1,4 +1,11 @@
-import { For, Show, createEffect, createMemo, createSignal, Accessor } from "solid-js"
+import {
+  For,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  Accessor
+} from "solid-js"
 import { Trans } from "@gd/i18n"
 import {
   Button,
@@ -31,28 +38,29 @@ interface InstanceDropdownProps {
 export const InstanceDropdown = (props: InstanceDropdownProps) => {
   let inputRef: HTMLInputElement | undefined
   const [isDropdownOpen, setIsDropdownOpen] = createSignal(false)
-  
+
   // Create a helper function to get instance mods for a specific instance
   const getInstanceModsQuery = (instanceId: number) => {
     return rspc.createQuery(() => ({
       queryKey: ["instance.getInstanceMods", instanceId],
-      enabled: isDropdownOpen() && props.filteredInstances().some(inst => inst.id === instanceId)
+      enabled:
+        isDropdownOpen() &&
+        props.filteredInstances().some((inst) => inst.id === instanceId)
     }))
   }
-  
-  
+
   // Watch for installation completion and clear loading states reactively
   // This prevents the gap between "Installing" and "Installed"
   createEffect(() => {
     if (isDropdownOpen() && props.addon) {
-      props.filteredInstances().forEach(instance => {
+      props.filteredInstances().forEach((instance) => {
         const instanceQuery = getInstanceModsQuery(instance.id)
         const isLoading = props.instanceLoadingStates().get(instance.id)
-        
+
         if (isLoading && instanceQuery.data) {
           const mods = instanceQuery.data || []
           const isNowInstalled = !!isModInstalledInInstance(mods, props.addon)
-          
+
           if (isNowInstalled) {
             props.clearInstanceLoadingState(instance.id)
           }
@@ -84,26 +92,26 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
     iconUrl: string | null
   }) => {
     // Create memos inside render function for proper reactivity (critical for SolidJS)
-    const isLoading = createMemo(() => 
-      props.instanceLoadingStates().get(instance.id) || false
+    const isLoading = createMemo(
+      () => props.instanceLoadingStates().get(instance.id) || false
     )
 
     // Get the query for this specific instance
     const instanceQuery = getInstanceModsQuery(instance.id)
-    
+
     const isInstalled = createMemo(() => {
       if (!instanceQuery || !props.addon) {
         return false
       }
-      
+
       const mods = instanceQuery.data || []
       const isLoading = instanceQuery.isLoading
       const error = instanceQuery.error
-      
+
       if (isLoading || error) {
         return false
       }
-      
+
       return !!isModInstalledInInstance(mods, props.addon)
     })
 

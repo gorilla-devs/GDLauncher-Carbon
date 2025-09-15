@@ -12,10 +12,14 @@ export default function GameVersionsDisplay() {
           <FilterBadge
             onClick={() => {
               searchContext?.setSearchQuery((prev) => {
-                const filteredGameVersions = prev.gameVersions?.filter((g) => g !== gameVersion) || []
+                const filteredGameVersions =
+                  prev.gameVersions?.filter((g) => g !== gameVersion) || []
                 return {
                   ...prev,
-                  gameVersions: filteredGameVersions.length === 0 ? null : filteredGameVersions
+                  gameVersions:
+                    filteredGameVersions.length === 0
+                      ? null
+                      : filteredGameVersions
                 }
               })
             }}

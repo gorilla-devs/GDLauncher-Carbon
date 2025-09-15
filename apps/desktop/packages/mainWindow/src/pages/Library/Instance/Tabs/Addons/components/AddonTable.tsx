@@ -34,7 +34,7 @@ import {
 } from "@gd/ui"
 import { useTransContext } from "@gd/i18n"
 import { Mod as ModType } from "@gd/core_module/bindings"
-import { createNotification } from "@gd/ui"
+import { toast } from "@gd/ui"
 import { useModal } from "@/managers/ModalsManager"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
@@ -120,7 +120,6 @@ class RowHeightCache {
 
 export const AddonTable = (props: AddonTableProps) => {
   const [t] = useTransContext()
-  const addNotification = createNotification()
   const modalsContext = useModal()
   const [scrollTop, setScrollTop] = createSignal(0)
   const [containerHeight, setContainerHeight] = createSignal(window.innerHeight)
@@ -551,10 +550,7 @@ export const AddonTable = (props: AddonTableProps) => {
           label: t("instance.copy_name"),
           action: () => {
             navigator.clipboard.writeText(displayName)
-            addNotification({
-              name: t("instance.copied_to_clipboard"),
-              type: "success"
-            })
+            toast.success(t("instance.copied_to_clipboard"))
           },
           icon: "i-ri:clipboard-line",
           id: "copy"

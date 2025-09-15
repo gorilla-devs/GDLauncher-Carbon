@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router"
-import { SonnerDemo, Toaster } from "../../../../src"
+import { Toaster } from "../../../../src"
 import { toast } from "somoto"
 import { Button } from "../../../../src"
 import ComponentDemo from "../../components/ComponentDemo"
@@ -13,9 +13,15 @@ function SonnerPage() {
     <div class="max-w-4xl">
       <Toaster />
       <div class="mb-8">
-        <h1 class="text-4xl font-bold mb-4" style="color: rgb(var(--lightSlate-50))">Sonner</h1>
+        <h1
+          class="text-4xl font-bold mb-4"
+          style="color: rgb(var(--lightSlate-50))"
+        >
+          Sonner
+        </h1>
         <p class="text-xl" style="color: rgb(var(--lightSlate-300))">
-          An opinionated toast component for Solid with beautiful animations, custom icons, and rich features that matches your UI theme.
+          An opinionated toast component for Solid with beautiful animations,
+          custom icons, and rich features that matches your UI theme.
         </p>
       </div>
 
@@ -23,10 +29,7 @@ function SonnerPage() {
         title="Basic Toast"
         description="Simple toast notification"
       >
-        <Button
-          type="primary"
-          onClick={() => toast("Hello World!")}
-        >
+        <Button type="primary" onClick={() => toast("Hello World!")}>
           Show Toast
         </Button>
       </ComponentDemo>
@@ -39,7 +42,7 @@ function SonnerPage() {
           type="secondary"
           onClick={() =>
             toast("Event has been created", {
-              description: "Sunday, December 03, 2023 at 9:00 AM",
+              description: "Sunday, December 03, 2023 at 9:00 AM"
             })
           }
         >
@@ -51,7 +54,20 @@ function SonnerPage() {
         title="Toast with Action"
         description="Toast with action button"
       >
-        <SonnerDemo />
+        <Button
+          type="outline"
+          onClick={() =>
+            toast("Event has been created", {
+              description: "Sunday, December 03, 2023 at 9:00 AM",
+              action: {
+                label: "Undo",
+                onClick: () => console.log("Undo")
+              }
+            })
+          }
+        >
+          Show Toast
+        </Button>
       </ComponentDemo>
 
       <ComponentDemo
@@ -61,33 +77,41 @@ function SonnerPage() {
         <div class="flex flex-wrap gap-4">
           <Button
             type="primary"
-            onClick={() => toast.success("Operation completed successfully!", {
-              description: "Your changes have been saved"
-            })}
+            onClick={() =>
+              toast.success("Operation completed successfully!", {
+                description: "Your changes have been saved"
+              })
+            }
           >
             Success Toast
           </Button>
           <Button
             type="secondary"
-            onClick={() => toast.error("Something went wrong!", {
-              description: "Please try again later"
-            })}
+            onClick={() =>
+              toast.error("Something went wrong!", {
+                description: "Please try again later"
+              })
+            }
           >
             Error Toast
           </Button>
           <Button
             type="outline"
-            onClick={() => toast.warning("This is a warning!", {
-              description: "Please review your changes"
-            })}
+            onClick={() =>
+              toast.warning("This is a warning!", {
+                description: "Please review your changes"
+              })
+            }
           >
             Warning Toast
           </Button>
           <Button
             type="transparent"
-            onClick={() => toast.info("Here's some helpful info", {
-              description: "This feature has been updated"
-            })}
+            onClick={() =>
+              toast.info("Here's some helpful info", {
+                description: "This feature has been updated"
+              })
+            }
           >
             Info Toast
           </Button>
@@ -101,19 +125,23 @@ function SonnerPage() {
         <div class="flex flex-wrap gap-4">
           <Button
             type="primary"
-            onClick={() => toast("Quick toast", {
-              duration: 1000,
-              description: "This will disappear quickly"
-            })}
+            onClick={() =>
+              toast("Quick toast", {
+                duration: 1000,
+                description: "This will disappear quickly"
+              })
+            }
           >
             1 Second
           </Button>
           <Button
             type="secondary"
-            onClick={() => toast("Long toast", {
-              duration: 10000,
-              description: "This will stay for a while"
-            })}
+            onClick={() =>
+              toast("Long toast", {
+                duration: 10000,
+                description: "This will stay for a while"
+              })
+            }
           >
             10 Seconds
           </Button>
@@ -142,9 +170,11 @@ function SonnerPage() {
           </Button>
           <Button
             type="glass"
-            onClick={() => toast.loading("Processing...", {
-              description: "Please wait while we process your request"
-            })}
+            onClick={() =>
+              toast.loading("Processing...", {
+                description: "Please wait while we process your request"
+              })
+            }
           >
             Loading Toast
           </Button>

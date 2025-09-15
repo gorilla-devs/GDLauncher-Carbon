@@ -5,7 +5,7 @@ export * from "./Badge"
 export * from "./Popover"
 export * from "./Select"
 export * from "./Tooltip"
-export { Toaster, SonnerDemo, toast } from "./Sonner"
+export { Toaster, toast } from "./Sonner"
 
 export { Button } from "./Button"
 export { Input } from "./Input"
@@ -23,10 +23,6 @@ export { Radio } from "./Radio"
 export { TextArea } from "./TextArea"
 export { Skeleton } from "./Skeleton"
 export { Separator } from "./Separator"
-export {
-  NotificationsProvider,
-  createNotification
-} from "./NotificationManager"
 export { Dropdown } from "./Dropdown"
 export { ContextMenuProvider, useContextMenu } from "./Menu/ContextMenuContext"
 export * from "./themes"

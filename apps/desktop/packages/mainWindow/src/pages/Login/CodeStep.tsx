@@ -16,7 +16,7 @@ import {
 import { msToMinutes, msToSeconds, parseTwoDigitNumber } from "@/utils/helpers"
 import { Setter } from "solid-js"
 import { DeviceCode } from "@/components/CodeInput"
-import { createNotification } from "@gd/ui"
+import { toast } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
 import { DeviceCodeObjectType } from "."
@@ -122,23 +122,17 @@ const CodeStep = (props: Props) => {
     if (isCodeExpired) {
       handleRefersh()
     } else if (typeof error === "string") {
-      addNotification({
-        name: "Authentication Error",
-        content: t(`error.${error}`),
-        type: "error"
+      toast.error("Authentication Error", {
+        description: t(`error.${error}`)
       })
     } else {
       if (typeof error.xboxAccount === "string")
-        addNotification({
-          name: "Authentication Error",
-          content: t(`error.xbox_${error.xboxAccount}`),
-          type: "error"
+        toast.error("Authentication Error", {
+          description: t(`error.xbox_${error.xboxAccount}`)
         })
       else {
-        addNotification({
-          name: "Authentication Error",
-          content: `${t("error.xbox_code")} ${error.xboxAccount.unknown}`,
-          type: "error"
+        toast.error("Authentication Error", {
+          description: `${t("error.xbox_code")} ${error.xboxAccount.unknown}`
         })
       }
     }
@@ -153,8 +147,6 @@ const CodeStep = (props: Props) => {
   })
 
   onCleanup(() => clearInterval(interval))
-
-  const addNotification = createNotification()
 
   return (
     <div class="relative flex flex-col items-center justify-between text-center">
@@ -181,10 +173,7 @@ const CodeStep = (props: Props) => {
                 class="text-lightSlate-600 hover:text-lightSlate-50 flex items-center gap-2"
                 onClick={() => {
                   navigator.clipboard.writeText(deviceCodeLink()!)
-                  addNotification({
-                    name: "The link has been copied",
-                    type: "success"
-                  })
+                  toast.success("The link has been copied")
                 }}
               >
                 <div class="i-ri:link h-4 w-4" />

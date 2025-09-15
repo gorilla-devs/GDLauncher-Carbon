@@ -36,7 +36,9 @@ export const InstanceItem = (props: InstanceItemProps) => {
         "opacity-50 cursor-not-allowed": isDisabled(),
         "bg-green-900/20": props.isInstalled && !props.isLoading
       }}
-      onMouseEnter={() => !isDisabled() && props.onMouseEnter(props.instance.id)}
+      onMouseEnter={() =>
+        !isDisabled() && props.onMouseEnter(props.instance.id)
+      }
       onMouseLeave={() => props.onMouseLeave()}
     >
       <div class="flex items-center gap-2 w-full">
@@ -54,7 +56,11 @@ export const InstanceItem = (props: InstanceItemProps) => {
             <Show when={props.instance.locked}>
               <span class="text-orange-400 ml-1">• Locked modpack</span>
             </Show>
-            <Show when={props.isInstalled && !props.isLoading && !props.instance.locked}>
+            <Show
+              when={
+                props.isInstalled && !props.isLoading && !props.instance.locked
+              }
+            >
               <span class="text-green-400 ml-1">• Installed</span>
             </Show>
             <Show when={props.isLoading && !props.instance.locked}>

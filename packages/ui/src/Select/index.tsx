@@ -4,7 +4,7 @@ import {
   Select as SelectPrimitive,
   type SelectContentProps,
   type SelectItemProps,
-  type SelectTriggerProps,
+  type SelectTriggerProps
 } from "@kobalte/core/select"
 
 import { cn } from "../util"
@@ -98,7 +98,7 @@ export const SelectItem = <T extends ValidComponent = "li">(
 ) => {
   const [local, rest] = splitProps(props as selectItemProps, [
     "class",
-    "children",
+    "children"
   ])
 
   return (

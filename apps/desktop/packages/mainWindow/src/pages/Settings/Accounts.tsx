@@ -7,7 +7,7 @@ import {
 import { Trans, useTransContext } from "@gd/i18n"
 import {
   Button,
-  createNotification,
+  toast,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -33,8 +33,6 @@ const GDLAccountRowItem = (props: {
   children?: JSX.Element
   onEdit?: () => void
 }) => {
-  const addNotification = createNotification()
-
   return (
     <div class="flex items-center justify-between">
       <div
@@ -44,10 +42,7 @@ const GDLAccountRowItem = (props: {
 
           navigator.clipboard.writeText(props.value)
 
-          addNotification({
-            name: "Copied to clipboard",
-            type: "success"
-          })
+          toast.success("Copied to clipboard")
         }}
       >
         <Show when={props.title}>
@@ -182,7 +177,6 @@ const Accounts = () => {
 
   const gdNavigator = useGDNavigate()
   const modalsContext = useModal()
-  const addNotification = createNotification()
 
   const removeGDLAccountMutation = rspc.createMutation(() => ({
     mutationKey: ["account.removeGdlAccount"]
@@ -509,10 +503,7 @@ const Accounts = () => {
                               cell.getValue() as string
                             )
 
-                            addNotification({
-                              name: "Copied to clipboard",
-                              type: "success"
-                            })
+                            toast.success("Copied to clipboard")
                           }
                         }}
                       >

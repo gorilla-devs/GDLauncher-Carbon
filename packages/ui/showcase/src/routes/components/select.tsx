@@ -20,22 +20,51 @@ function SelectPage() {
   const [selectedModCategory, setSelectedModCategory] = createSignal("")
   const [selectedInstanceType, setSelectedInstanceType] = createSignal("modded")
   const [selectedJavaVersion, setSelectedJavaVersion] = createSignal("")
-  const [selectedMemoryAllocation, setSelectedMemoryAllocation] = createSignal("")
+  const [selectedMemoryAllocation, setSelectedMemoryAllocation] =
+    createSignal("")
 
   const minecraftVersions = ["1.21.4", "1.21.3", "1.21.1", "1.20.1", "1.19.2"]
   const modLoaders = [
     { value: "fabric", label: "Fabric", description: "Lightweight and fast" },
     { value: "forge", label: "Forge", description: "Most popular mod loader" },
-    { value: "quilt", label: "Quilt", description: "Fabric fork with enhancements" },
-    { value: "neoforge", label: "NeoForge", description: "Modern Forge alternative" },
+    {
+      value: "quilt",
+      label: "Quilt",
+      description: "Fabric fork with enhancements"
+    },
+    {
+      value: "neoforge",
+      label: "NeoForge",
+      description: "Modern Forge alternative"
+    },
     { value: "vanilla", label: "Vanilla", description: "No mods" }
   ]
   const modCategories = [
-    { value: "technology", label: "Technology", color: "bg-blue-500", icon: "⚙️" },
+    {
+      value: "technology",
+      label: "Technology",
+      color: "bg-blue-500",
+      icon: "⚙️"
+    },
     { value: "magic", label: "Magic", color: "bg-purple-500", icon: "✨" },
-    { value: "adventure", label: "Adventure", color: "bg-green-500", icon: "🗡️" },
-    { value: "decoration", label: "Decoration", color: "bg-yellow-500", icon: "🎨" },
-    { value: "optimization", label: "Optimization", color: "bg-red-500", icon: "⚡" }
+    {
+      value: "adventure",
+      label: "Adventure",
+      color: "bg-green-500",
+      icon: "🗡️"
+    },
+    {
+      value: "decoration",
+      label: "Decoration",
+      color: "bg-yellow-500",
+      icon: "🎨"
+    },
+    {
+      value: "optimization",
+      label: "Optimization",
+      color: "bg-red-500",
+      icon: "⚡"
+    }
   ]
 
   const javaVersions = ["Java 8", "Java 11", "Java 17", "Java 21"]
@@ -51,7 +80,8 @@ function SelectPage() {
           Select
         </h1>
         <p class="text-xl" style={`color: rgb(var(--lightSlate-300))`}>
-          A powerful dropdown selection component built with Kobalte primitives, now with a working implementation!
+          A powerful dropdown selection component built with Kobalte primitives,
+          now with a working implementation!
         </p>
       </div>
 
@@ -71,7 +101,13 @@ function SelectPage() {
             )}
           >
             <SelectTrigger>
-              <SelectValue<string>>{(state) => state.selectedOption() ? `Minecraft ${state.selectedOption()}` : "Select version"}</SelectValue>
+              <SelectValue<string>>
+                {(state) =>
+                  state.selectedOption()
+                    ? `Minecraft ${state.selectedOption()}`
+                    : "Select version"
+                }
+              </SelectValue>
             </SelectTrigger>
             <SelectContent />
           </Select>
@@ -92,10 +128,18 @@ function SelectPage() {
             class="w-full px-3 py-2 text-sm border rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500"
             style="background-color: rgb(var(--darkSlate-800)); border-color: rgb(var(--darkSlate-600)); color: rgb(var(--lightSlate-50))"
           >
-            <option value="" style="background-color: rgb(var(--darkSlate-700))">Select version</option>
+            <option
+              value=""
+              style="background-color: rgb(var(--darkSlate-700))"
+            >
+              Select version
+            </option>
             <For each={minecraftVersions}>
               {(version) => (
-                <option value={version} style="background-color: rgb(var(--darkSlate-700)); color: rgb(var(--lightSlate-50))">
+                <option
+                  value={version}
+                  style="background-color: rgb(var(--darkSlate-700)); color: rgb(var(--lightSlate-50))"
+                >
                   Minecraft {version}
                 </option>
               )}
@@ -110,32 +154,42 @@ function SelectPage() {
       >
         <div class="w-64">
           <Select
-            options={modLoaders.map(ml => ml.value)}
+            options={modLoaders.map((ml) => ml.value)}
             value={selectedModLoader()}
             onChange={setSelectedModLoader}
             itemComponent={(props) => {
-              const modLoader = modLoaders.find(ml => ml.value === props.item.rawValue)
+              const modLoader = modLoaders.find(
+                (ml) => ml.value === props.item.rawValue
+              )
               return (
                 <SelectItem item={props.item}>
                   <div class="flex flex-col">
                     <div class="font-medium">{modLoader?.label}</div>
-                    <div class="text-xs opacity-75">{modLoader?.description}</div>
+                    <div class="text-xs opacity-75">
+                      {modLoader?.description}
+                    </div>
                   </div>
                 </SelectItem>
               )
             }}
           >
             <SelectTrigger>
-              <SelectValue<string>>{(state) => {
-                const modLoader = modLoaders.find(ml => ml.value === state.selectedOption())
-                return modLoader?.label || "Choose mod loader"
-              }}</SelectValue>
+              <SelectValue<string>>
+                {(state) => {
+                  const modLoader = modLoaders.find(
+                    (ml) => ml.value === state.selectedOption()
+                  )
+                  return modLoader?.label || "Choose mod loader"
+                }}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent />
           </Select>
         </div>
         <p class="mt-2 text-sm" style={`color: rgb(var(--lightSlate-400))`}>
-          Selected: {modLoaders.find(ml => ml.value === selectedModLoader())?.label || "None"}
+          Selected:{" "}
+          {modLoaders.find((ml) => ml.value === selectedModLoader())?.label ||
+            "None"}
         </p>
       </ComponentDemo>
 
@@ -145,16 +199,20 @@ function SelectPage() {
       >
         <div class="w-64">
           <Select
-            options={modCategories.map(cat => cat.value)}
+            options={modCategories.map((cat) => cat.value)}
             value={selectedModCategory()}
             onChange={setSelectedModCategory}
             itemComponent={(props) => {
-              const category = modCategories.find(cat => cat.value === props.item.rawValue)
+              const category = modCategories.find(
+                (cat) => cat.value === props.item.rawValue
+              )
               return (
                 <SelectItem item={props.item}>
                   <div class="flex items-center gap-2">
                     <span class="text-base">{category?.icon}</span>
-                    <div class={`w-3 h-3 rounded-full ${category?.color}`}></div>
+                    <div
+                      class={`w-3 h-3 rounded-full ${category?.color}`}
+                    ></div>
                     {category?.label}
                   </div>
                 </SelectItem>
@@ -162,16 +220,24 @@ function SelectPage() {
             }}
           >
             <SelectTrigger>
-              <SelectValue<string>>{(state) => {
-                const category = modCategories.find(cat => cat.value === state.selectedOption())
-                return category ? (
-                  <div class="flex items-center gap-2">
-                    <span class="text-base">{category.icon}</span>
-                    <div class={`w-3 h-3 rounded-full ${category.color}`}></div>
-                    {category.label}
-                  </div>
-                ) : "Select mod category"
-              }}</SelectValue>
+              <SelectValue<string>>
+                {(state) => {
+                  const category = modCategories.find(
+                    (cat) => cat.value === state.selectedOption()
+                  )
+                  return category ? (
+                    <div class="flex items-center gap-2">
+                      <span class="text-base">{category.icon}</span>
+                      <div
+                        class={`w-3 h-3 rounded-full ${category.color}`}
+                      ></div>
+                      {category.label}
+                    </div>
+                  ) : (
+                    "Select mod category"
+                  )
+                }}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent />
           </Select>
@@ -193,7 +259,9 @@ function SelectPage() {
             )}
           >
             <SelectTrigger>
-              <SelectValue<string>>{() => "Instance is running..."}</SelectValue>
+              <SelectValue<string>>
+                {() => "Instance is running..."}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent />
           </Select>
@@ -215,18 +283,28 @@ function SelectPage() {
             itemComponent={(props) => {
               const getDescription = (type: string) => {
                 switch (type) {
-                  case "vanilla": return "Pure Minecraft experience"
-                  case "modded": return "Custom mods collection"
-                  case "modpack": return "Pre-configured mod bundle"
-                  case "snapshot": return "Latest experimental features"
-                  default: return ""
+                  case "vanilla":
+                    return "Pure Minecraft experience"
+                  case "modded":
+                    return "Custom mods collection"
+                  case "modpack":
+                    return "Pre-configured mod bundle"
+                  case "snapshot":
+                    return "Latest experimental features"
+                  default:
+                    return ""
                 }
               }
               return (
                 <SelectItem item={props.item}>
                   <div class="flex flex-col">
-                    <div class="font-medium">{props.item.rawValue.charAt(0).toUpperCase() + props.item.rawValue.slice(1)}</div>
-                    <div class="text-xs opacity-75">{getDescription(props.item.rawValue)}</div>
+                    <div class="font-medium">
+                      {props.item.rawValue.charAt(0).toUpperCase() +
+                        props.item.rawValue.slice(1)}
+                    </div>
+                    <div class="text-xs opacity-75">
+                      {getDescription(props.item.rawValue)}
+                    </div>
                   </div>
                 </SelectItem>
               )
@@ -237,10 +315,14 @@ function SelectPage() {
               class="w-full p-3 text-sm border-2 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary-400"
               style="background-color: rgba(var(--primary-500), 0.1); border-color: rgb(var(--primary-500)); color: rgb(var(--lightSlate-50))"
             >
-              <SelectValue<string>>{(state) => {
-                const type = state.selectedOption()
-                return type ? type.charAt(0).toUpperCase() + type.slice(1) + " Instance" : "Choose instance type"
-              }}</SelectValue>
+              <SelectValue<string>>
+                {(state) => {
+                  const type = state.selectedOption()
+                  return type
+                    ? type.charAt(0).toUpperCase() + type.slice(1) + " Instance"
+                    : "Choose instance type"
+                }}
+              </SelectValue>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="1em"
@@ -269,7 +351,10 @@ function SelectPage() {
       >
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-lg">
           <div class="space-y-2">
-            <label class="text-sm font-medium" style={`color: rgb(var(--lightSlate-200))`}>
+            <label
+              class="text-sm font-medium"
+              style={`color: rgb(var(--lightSlate-200))`}
+            >
               Java Version
             </label>
             <Select
@@ -277,20 +362,23 @@ function SelectPage() {
               value={selectedJavaVersion()}
               onChange={setSelectedJavaVersion}
               itemComponent={(props) => (
-                <SelectItem item={props.item}>
-                  {props.item.rawValue}
-                </SelectItem>
+                <SelectItem item={props.item}>{props.item.rawValue}</SelectItem>
               )}
             >
               <SelectTrigger>
-                <SelectValue<string>>{(state) => state.selectedOption() || "Auto-detect"}</SelectValue>
+                <SelectValue<string>>
+                  {(state) => state.selectedOption() || "Auto-detect"}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent />
             </Select>
           </div>
 
           <div class="space-y-2">
-            <label class="text-sm font-medium" style={`color: rgb(var(--lightSlate-200))`}>
+            <label
+              class="text-sm font-medium"
+              style={`color: rgb(var(--lightSlate-200))`}
+            >
               Memory Allocation
             </label>
             <Select
@@ -298,23 +386,31 @@ function SelectPage() {
               value={selectedMemoryAllocation()}
               onChange={setSelectedMemoryAllocation}
               itemComponent={(props) => (
-                <SelectItem item={props.item}>
-                  {props.item.rawValue}
-                </SelectItem>
+                <SelectItem item={props.item}>{props.item.rawValue}</SelectItem>
               )}
             >
               <SelectTrigger>
-                <SelectValue<string>>{(state) => state.selectedOption() || "4GB (Recommended)"}</SelectValue>
+                <SelectValue<string>>
+                  {(state) => state.selectedOption() || "4GB (Recommended)"}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent />
             </Select>
           </div>
         </div>
-        <div class="mt-4 p-3 rounded-md" style="background-color: rgb(var(--darkSlate-700)); border: 1px solid rgb(var(--darkSlate-600))">
-          <div class="text-sm font-medium mb-1" style="color: rgb(var(--lightSlate-200))">Configuration Summary:</div>
+        <div
+          class="mt-4 p-3 rounded-md"
+          style="background-color: rgb(var(--darkSlate-700)); border: 1px solid rgb(var(--darkSlate-600))"
+        >
+          <div
+            class="text-sm font-medium mb-1"
+            style="color: rgb(var(--lightSlate-200))"
+          >
+            Configuration Summary:
+          </div>
           <div class="text-sm" style="color: rgb(var(--lightSlate-400))">
-            Java: {selectedJavaVersion() || "Auto-detect"} |
-            Memory: {selectedMemoryAllocation() || "4GB (Default)"}
+            Java: {selectedJavaVersion() || "Auto-detect"} | Memory:{" "}
+            {selectedMemoryAllocation() || "4GB (Default)"}
           </div>
         </div>
       </ComponentDemo>

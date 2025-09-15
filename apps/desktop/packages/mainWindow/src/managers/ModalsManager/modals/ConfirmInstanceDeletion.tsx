@@ -1,22 +1,18 @@
 import { rspc } from "@/utils/rspcClient"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
-import { Button, createNotification } from "@gd/ui"
+import { Button, toast } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
-import { useGDNavigate } from "@/managers/NavigationManager"
 
 const ConfirmInstanceDeletion = (props: ModalProps) => {
   const [t] = useTransContext()
   const modalsContext = useModal()
-  const addNotification = createNotification()
 
   const deleteInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.deleteInstance"],
     onError: (error) => {
-      addNotification({
-        name: t("notifications.cannot_delete_instance"),
-        content: error.message,
-        type: "error"
+      toast.error(t("notifications.cannot_delete_instance"), {
+        description: error.message
       })
     }
   }))

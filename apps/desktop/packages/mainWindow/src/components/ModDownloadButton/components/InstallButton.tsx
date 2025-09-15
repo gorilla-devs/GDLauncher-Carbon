@@ -1,6 +1,13 @@
 import { Show, Switch, Match, Accessor } from "solid-js"
 import { Trans } from "@gd/i18n"
-import { Button, Tooltip, TooltipContent, TooltipTrigger, Spinner, Progress } from "@gd/ui"
+import {
+  Button,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  Spinner,
+  Progress
+} from "@gd/ui"
 
 interface InstallButtonProps {
   loading: Accessor<boolean>

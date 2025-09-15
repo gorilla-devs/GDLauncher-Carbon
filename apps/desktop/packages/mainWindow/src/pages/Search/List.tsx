@@ -20,7 +20,7 @@ import { rspc } from "@/utils/rspcClient"
 import { Trans, useTransContext } from "@gd/i18n"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 
-type SearchTab = {
+interface SearchTab {
   label: string
   value: FEUnifiedSearchType
   icon: string

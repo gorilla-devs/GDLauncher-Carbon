@@ -1,4 +1,4 @@
-import { Progress, createNotification } from "@gd/ui"
+import { Progress, toast } from "@gd/ui"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
 import { Trans } from "@gd/i18n"
@@ -16,7 +16,6 @@ interface Props {
 
 const AppUpdate = (props: ModalProps) => {
   const data: () => Props = () => props?.data
-  const addNotification = createNotification()
   const modalsContext = useModal()
   const [modsUpdated, setModsUpdated] = createSignal(0)
   const [isDestroyed, setIsDestroyed] = createSignal(false)
@@ -29,11 +28,7 @@ const AppUpdate = (props: ModalProps) => {
     mutationKey: ["instance.updateMod"],
     onError: (err) => {
       console.error(err)
-      addNotification({
-        name: `Error updating mod`,
-        content: err?.message,
-        type: "error"
-      })
+      toast.error(`Error updating mod: ${err?.message}`)
     }
   }))
 
@@ -46,11 +41,7 @@ const AppUpdate = (props: ModalProps) => {
         })
       } catch (err) {
         console.error(err)
-        addNotification({
-          name: `Error updating mod`,
-          content: (err as RSPCError)?.message,
-          type: "error"
-        })
+        toast.error(`Error updating mod: ${(err as RSPCError)?.message}`)
       } finally {
         setModsUpdated((prev) => prev + 1)
       }
@@ -62,10 +53,7 @@ const AppUpdate = (props: ModalProps) => {
     // The WebSocket invalidation will trigger the data refresh
     await new Promise((resolve) => setTimeout(resolve, 2000))
 
-    addNotification({
-      name: "Mods updated successfully!",
-      type: "success"
-    })
+    toast.success("Mods updated successfully!")
 
     // Call the onComplete callback if provided
     const onComplete = data().onComplete

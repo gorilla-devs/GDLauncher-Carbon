@@ -2,7 +2,7 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 import { rspc } from "@/utils/rspcClient"
 import { FEUnifiedSearchResult, Modpack } from "@gd/core_module/bindings"
 import { Trans, useTransContext } from "@gd/i18n"
-import { Button, createNotification, Spinner } from "@gd/ui"
+import { Button, toast, Spinner } from "@gd/ui"
 import { Show, createSignal, getOwner, runWithOwner } from "solid-js"
 
 interface ModDownloadButtonProps {
@@ -17,25 +17,18 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
   const [t] = useTransContext()
 
   const navigator = useGDNavigate()
-  const addNotification = createNotification()
 
   const prepareInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.prepareInstance"],
     async onSuccess() {
       setLoading(false)
-      addNotification({
-        name: t("notifications.instance_created_success"),
-        type: "success"
-      })
+      toast.success(t("notifications.instance_created_success"))
 
       navigator.navigate(`/library`)
     },
     onError() {
       setLoading(false)
-      addNotification({
-        name: t("notifications.instance_created_error"),
-        type: "error"
-      })
+      toast.error(t("notifications.instance_created_error"))
     }
   }))
 
@@ -51,10 +44,7 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
     },
     onError() {
       setLoading(false)
-      addNotification({
-        name: t("notifications.modpack_download_error"),
-        type: "error"
-      })
+      toast.error(t("notifications.modpack_download_error"))
     }
   }))
 

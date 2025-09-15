@@ -9,17 +9,17 @@ import {
   createSignal,
   createMemo
 } from "solid-js"
-import { Dropdown, Skeleton } from "@gd/ui"
+import { Dropdown } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
 import fetchData from "./changelog.data"
 import { CFFEFile, CFFEFileIndex } from "@gd/core_module/bindings"
 import { sortArrayByGameVersion } from "@/utils/mods"
 import { format, formatDistanceToNowStrict } from "date-fns"
 
-const ChangelogCard = (props: { 
+const ChangelogCard = (props: {
   content: string
-  type: 'html' | 'text'
-  platform: 'curseforge' | 'modrinth'
+  type: "html" | "text"
+  platform: "curseforge" | "modrinth"
   releaseDate?: string
 }) => {
   return (
@@ -28,27 +28,38 @@ const ChangelogCard = (props: {
         <div class="flex items-center gap-3">
           <div class="w-1 h-6 bg-blue-500 rounded-full flex-shrink-0"></div>
           <div>
-            <h3 class="font-semibold text-lightSlate-50 text-sm sm:text-base">Release Notes</h3>
-            <Show when={props.releaseDate} fallback={
-              <p class="text-xs text-lightSlate-600">No release date available</p>
-            }>
+            <h3 class="font-semibold text-lightSlate-50 text-sm sm:text-base">
+              Release Notes
+            </h3>
+            <Show
+              when={props.releaseDate}
+              fallback={
+                <p class="text-xs text-lightSlate-600">
+                  No release date available
+                </p>
+              }
+            >
               <div class="flex items-center gap-2 text-xs text-lightSlate-600">
                 <div class="i-ri:calendar-line flex-shrink-0"></div>
                 <span>{format(new Date(props.releaseDate!), "PPP")}</span>
                 <span class="text-lightSlate-700">•</span>
-                <span class="text-lightSlate-500">{formatDistanceToNowStrict(new Date(props.releaseDate!), { addSuffix: true })}</span>
+                <span class="text-lightSlate-500">
+                  {formatDistanceToNowStrict(new Date(props.releaseDate!), {
+                    addSuffix: true
+                  })}
+                </span>
               </div>
             </Show>
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <Show when={props.platform === 'curseforge'}>
+          <Show when={props.platform === "curseforge"}>
             <div class="flex items-center gap-1.5 text-orange-500 bg-orange-500/10 px-2 py-1 rounded-full text-xs">
               <div class="i-simple-icons:curseforge w-3 h-3 flex-shrink-0"></div>
               <span class="font-medium">CurseForge</span>
             </div>
           </Show>
-          <Show when={props.platform === 'modrinth'}>
+          <Show when={props.platform === "modrinth"}>
             <div class="flex items-center gap-1.5 text-green-500 bg-green-500/10 px-2 py-1 rounded-full text-xs">
               <div class="i-simple-icons:modrinth w-3 h-3 flex-shrink-0"></div>
               <span class="font-medium">Modrinth</span>
@@ -56,10 +67,10 @@ const ChangelogCard = (props: {
           </Show>
         </div>
       </div>
-      
+
       <div class="p-4 sm:p-6">
-        <Show when={props.type === 'html'}>
-          <div 
+        <Show when={props.type === "html"}>
+          <div
             class="prose prose-invert max-w-none prose-sm sm:prose-base
                    prose-headings:text-lightSlate-100 prose-headings:font-semibold
                    prose-p:text-lightSlate-300 prose-p:leading-relaxed prose-p:mb-4
@@ -76,7 +87,7 @@ const ChangelogCard = (props: {
             innerHTML={props.content}
           />
         </Show>
-        <Show when={props.type === 'text'}>
+        <Show when={props.type === "text"}>
           <pre class="whitespace-pre-wrap text-lightSlate-300 leading-relaxed font-mono text-xs sm:text-sm bg-darkSlate-600 p-3 sm:p-4 rounded-lg border border-darkSlate-500 overflow-x-auto">
             {props.content}
           </pre>
@@ -123,8 +134,8 @@ const EmptyChangelogState = () => {
         No changelog available
       </h3>
       <p class="text-lightSlate-600 max-w-md leading-relaxed text-sm sm:text-base">
-        This version doesn't have any changelog information available. 
-        Try selecting a different version or check back later.
+        This version doesn't have any changelog information available. Try
+        selecting a different version or check back later.
       </p>
       <div class="mt-6 sm:mt-8 p-3 sm:p-4 bg-darkSlate-700 rounded-lg border border-darkSlate-600 text-left max-w-md w-full">
         <div class="flex items-center gap-2 text-lightSlate-400 text-sm mb-2">
@@ -132,8 +143,9 @@ const EmptyChangelogState = () => {
           <span class="font-medium">Tip</span>
         </div>
         <p class="text-xs sm:text-sm text-lightSlate-600 leading-relaxed">
-          Some mod authors don't provide detailed changelogs for every release. 
-          You can check the mod's project page for more information about updates.
+          Some mod authors don't provide detailed changelogs for every release.
+          You can check the mod's project page for more information about
+          updates.
         </p>
       </div>
     </div>
@@ -158,8 +170,11 @@ const Changelog = () => {
     undefined
   )
   const [changeLog, setChangelog] = createSignal<string | undefined>(undefined)
-  const [releaseDate, setReleaseDate] = createSignal<string | undefined>(undefined)
-  const [isLoadingChangelog, setIsLoadingChangelog] = createSignal<boolean>(false)
+  const [releaseDate, setReleaseDate] = createSignal<string | undefined>(
+    undefined
+  )
+  const [isLoadingChangelog, setIsLoadingChangelog] =
+    createSignal<boolean>(false)
 
   createEffect(() => {
     if (!routeData.modpackDetails.data) return
@@ -184,7 +199,7 @@ const Changelog = () => {
       setChangelog(undefined)
       setReleaseDate(undefined)
       setIsLoadingChangelog(false)
-      
+
       setOptions(
         (sortedVersions as CFFEFileIndex[]).map((file) => ({
           key: file.fileId.toString(),
@@ -205,9 +220,10 @@ const Changelog = () => {
         setIsLoadingChangelog(true)
         setChangelog(undefined)
         setReleaseDate(undefined)
-        
+
         try {
-          const targetFileId = parseInt(fileId() as string, 10) || (lastFile() as CFFEFile).id
+          const targetFileId =
+            parseInt(fileId() as string, 10) || (lastFile() as CFFEFile).id
           const changelogQuery = await rspcContext.client.query([
             "modplatforms.curseforge.getModFileChangelog",
             {
@@ -216,13 +232,15 @@ const Changelog = () => {
             }
           ])
           setChangelog(changelogQuery.data)
-          const fileData = routeData.modpackDetails.data?.data.latestFiles.find(
-            (file) => file.id === targetFileId
-          ) || routeData.modpackDetails.data?.data.latestFilesIndexes.find(
-            (file) => file.fileId === targetFileId
-          )
-          
-          if (fileData && 'fileDate' in fileData) {
+          const fileData =
+            routeData.modpackDetails.data?.data.latestFiles.find(
+              (file) => file.id === targetFileId
+            ) ||
+            routeData.modpackDetails.data?.data.latestFilesIndexes.find(
+              (file) => file.fileId === targetFileId
+            )
+
+          if (fileData && "fileDate" in fileData) {
             setReleaseDate(fileData.fileDate)
           } else {
             setReleaseDate(undefined)
@@ -244,7 +262,7 @@ const Changelog = () => {
         setIsLoadingChangelog(true)
         setChangelog(undefined)
         setReleaseDate(undefined)
-        
+
         try {
           const changelogQuery = await rspcContext.client.query([
             "modplatforms.modrinth.getVersion",
@@ -271,7 +289,7 @@ const Changelog = () => {
   })
 
   const isLoading = createMemo(() => isLoadingChangelog())
-  
+
   const hasContent = createMemo(() => changeLog() && changeLog()?.trim() !== "")
 
   return (
@@ -281,15 +299,21 @@ const Changelog = () => {
           <div class="flex flex-col gap-4 p-4 md:p-6">
             <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
-                <h1 class="text-xl md:text-2xl font-bold text-lightSlate-50 mb-1">Changelog</h1>
+                <h1 class="text-xl md:text-2xl font-bold text-lightSlate-50 mb-1">
+                  Changelog
+                </h1>
                 <p class="text-sm text-lightSlate-600">
                   View version history and updates
                 </p>
               </div>
               <Show when={routeData.modpackDetails.data}>
                 <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-                  <span class="text-sm font-medium text-lightSlate-400 sm:hidden">Version:</span>
-                  <span class="hidden sm:inline text-sm font-medium text-lightSlate-400">Version:</span>
+                  <span class="text-sm font-medium text-lightSlate-400 sm:hidden">
+                    Version:
+                  </span>
+                  <span class="hidden sm:inline text-sm font-medium text-lightSlate-400">
+                    Version:
+                  </span>
                   <div class="w-full sm:min-w-48 sm:w-auto">
                     <Dropdown
                       options={options()}
@@ -314,16 +338,16 @@ const Changelog = () => {
               <EmptyChangelogState />
             </Match>
             <Match when={hasContent() && routeData.isCurseforge}>
-              <ChangelogCard 
-                content={changeLog()!} 
+              <ChangelogCard
+                content={changeLog()!}
                 type="html"
                 platform="curseforge"
                 releaseDate={releaseDate()}
               />
             </Match>
             <Match when={hasContent() && !routeData.isCurseforge}>
-              <ChangelogCard 
-                content={changeLog()!} 
+              <ChangelogCard
+                content={changeLog()!}
                 type="text"
                 platform="modrinth"
                 releaseDate={releaseDate()}

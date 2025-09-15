@@ -620,6 +620,7 @@ struct ListInstance {
     date_created: DateTime<Utc>,
     date_updated: DateTime<Utc>,
     seconds_played: u32,
+    locked: bool,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -1379,6 +1380,7 @@ impl From<manager::ListInstance> for ListInstance {
             date_created: value.date_created,
             date_updated: value.date_updated,
             seconds_played: value.seconds_played,
+            locked: value.locked,
         }
     }
 }

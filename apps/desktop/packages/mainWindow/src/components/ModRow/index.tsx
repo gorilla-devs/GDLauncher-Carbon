@@ -4,7 +4,7 @@ import { rspc } from "@/utils/rspcClient"
 import { Trans, useTransContext } from "@gd/i18n"
 import {
   Button,
-  createNotification,
+  toast,
   Popover,
   PopoverTrigger,
   PopoverContent,
@@ -38,23 +38,16 @@ const ModRow = (props: ModRowProps) => {
 
   const mergedProps = mergeProps({ type: "Mod" as const }, props)
   const navigator = useGDNavigate()
-  const addNotification = createNotification()
 
   const prepareInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.prepareInstance"],
     onSuccess() {
       setLoading(false)
-      addNotification({
-        name: t("notifications.instance_created_success"),
-        type: "success"
-      })
+      toast.success(t("notifications.instance_created_success"))
     },
     onError() {
       setLoading(false)
-      addNotification({
-        name: t("notifications.instance_created_error"),
-        type: "error"
-      })
+      toast.error(t("notifications.instance_created_error"))
     },
     onSettled() {
       setLoading(false)
@@ -76,10 +69,7 @@ const ModRow = (props: ModRowProps) => {
     },
     onError() {
       setLoading(false)
-      addNotification({
-        name: t("notifications.modpack_download_error"),
-        type: "error"
-      })
+      toast.error(t("notifications.modpack_download_error"))
     }
   }))
 

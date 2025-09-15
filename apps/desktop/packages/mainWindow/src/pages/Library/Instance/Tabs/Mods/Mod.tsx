@@ -12,7 +12,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-  createNotification
+  toast
 } from "@gd/ui"
 import { useLocation, useParams } from "@solidjs/router"
 import { SetStoreFunction, produce } from "solid-js/store"
@@ -105,7 +105,6 @@ const Mod = (props: Props) => {
 
   const navigator = useGDNavigate()
   const params = useParams()
-  const addNotification = createNotification()
   const location = useLocation()
   const instanceId = () => getInstanceIdFromPath(location.pathname)
 
@@ -120,11 +119,7 @@ const Mod = (props: Props) => {
     },
     onError: (err) => {
       console.error(err)
-      addNotification({
-        name: `Error updating mod`,
-        content: err.message,
-        type: "error"
-      })
+      toast.error(`Error updating mod: ${err.message}`)
     }
   }))
 
@@ -132,14 +127,12 @@ const Mod = (props: Props) => {
     if (task.data === null) {
       setUpdateModTaskId(null)
     } else if (task.data?.progress.type === "Failed") {
-      addNotification({
-        name: `Error updating mod`,
-        content: task.data?.progress.value.cause.reduce(
+      toast.error(
+        `Error updating mod: ${task.data?.progress.value.cause.reduce(
           (acc, val) => acc + val.display + "\n",
           ""
-        ),
-        type: "error"
-      })
+        )}`
+      )
     }
   })
 

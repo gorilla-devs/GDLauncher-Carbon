@@ -1,4 +1,4 @@
-import { Button, Checkbox, createNotification, Dropdown, Input } from "@gd/ui"
+import { Button, Checkbox, toast, Dropdown, Input } from "@gd/ui"
 import { ModalProps, useModal } from "../.."
 import { Trans, useTransContext } from "@gd/i18n"
 import {
@@ -85,7 +85,6 @@ const Custom = (props: Pick<ModalProps, "data">) => {
   const fabricHashmap = new ReactiveMap()
   const quiltHashmap = new ReactiveMap()
 
-  const addNotification = createNotification()
   const modalsContext = useModal()
   const globalStore = useGlobalStore()
   const navigator = useGDNavigate()
@@ -410,17 +409,11 @@ const Custom = (props: Pick<ModalProps, "data">) => {
 
         modalsContext?.closeModal()
         navigator.navigate(`/library`)
-        addNotification({
-          name: "Instance successfully created.",
-          type: "success"
-        })
+        toast.success("Instance successfully created.")
       } catch (err) {
         console.error(err)
         modalsContext?.closeModal()
-        addNotification({
-          name: "Error while creating the instance.",
-          type: "error"
-        })
+        toast.error("Error while creating the instance.")
       } finally {
         setError("")
         setCustomTitle("")
@@ -465,17 +458,11 @@ const Custom = (props: Pick<ModalProps, "data">) => {
         })
 
         modalsContext?.closeModal()
-        addNotification({
-          name: "Instance successfully updated.",
-          type: "success"
-        })
+        toast.success("Instance successfully updated.")
       } catch (err) {
         console.error(err)
         modalsContext?.closeModal()
-        addNotification({
-          name: "Error while creating the instance.",
-          type: "error"
-        })
+        toast.error("Error while creating the instance.")
       } finally {
         setError("")
         setCustomTitle("")

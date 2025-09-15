@@ -1,4 +1,4 @@
-import { Button, createNotification, Spinner } from "@gd/ui"
+import { Button, toast, Spinner } from "@gd/ui"
 import {
   createSignal,
   Switch,
@@ -187,8 +187,6 @@ export default function Login() {
     })
   }
 
-  const addNotification = createNotification()
-
   createEffect(() => {
     handleStatus(routeData.status, {
       onPolling: async (info) => {
@@ -203,11 +201,7 @@ export default function Login() {
         }
       },
       async onError(error) {
-        if (error)
-          addNotification({
-            name: parseError(error),
-            type: "error"
-          })
+        if (error) toast.error(parseError(error))
         setStep(Steps.Auth)
         setLoadingButton(false)
       },
@@ -388,10 +382,7 @@ export default function Login() {
       setRetry((prev) => prev + 1)
     }
     if (retry() > 3) {
-      addNotification({
-        name: "Something went wrong while logging in, try again!",
-        type: "error"
-      })
+      toast.error("Something went wrong while logging in, try again!")
       if (routeData.status.data) {
         accountEnrollCancelMutation.mutate(undefined)
       }
@@ -622,10 +613,8 @@ export default function Login() {
                     })
                   } catch (err) {
                     console.log(err)
-                    addNotification({
-                      name: "Error while accepting terms and conditions",
-                      content: "Check the console for more information.",
-                      type: "error"
+                    toast.error("Error while accepting terms and conditions", {
+                      description: "Check the console for more information."
                     })
                   }
 
@@ -753,10 +742,8 @@ export default function Login() {
                         }
                       } catch (e) {
                         console.error(e)
-                        addNotification({
-                          name: "Error while requesting email change",
-                          content: (e as any).message,
-                          type: "error"
+                        toast.error("Error while requesting email change", {
+                          description: (e as any).message
                         })
                       }
                     } else if (existingGDLUser?.isEmailVerified) {

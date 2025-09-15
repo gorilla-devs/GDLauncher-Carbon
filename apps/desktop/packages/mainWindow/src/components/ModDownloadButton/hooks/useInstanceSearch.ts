@@ -5,7 +5,9 @@ import { getInstanceImageUrl } from "@/utils/instances"
 export const useInstanceSearch = () => {
   const [searchQuery, setSearchQuery] = createSignal("")
   const [debouncedQuery, setDebouncedQuery] = createSignal("")
-  const [hoveredInstanceId, setHoveredInstanceId] = createSignal<number | null>(null)
+  const [hoveredInstanceId, setHoveredInstanceId] = createSignal<number | null>(
+    null
+  )
   const globalStore = useGlobalStore()
 
   createEffect(() => {
@@ -29,7 +31,7 @@ export const useInstanceSearch = () => {
           name: instance.name,
           gameVersion: validInstance?.mc_version || "",
           modloader: validInstance?.modloader || "vanilla",
-          locked: validInstance?.modpack?.locked || false,
+          locked: instance.locked,
           iconRevision: instance.icon_revision,
           iconUrl: instance.icon_revision
             ? getInstanceImageUrl(instance.id, instance.icon_revision)

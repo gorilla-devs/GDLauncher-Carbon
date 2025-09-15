@@ -91,7 +91,7 @@ export const useModInstallation = (props: UseModInstallationProps) => {
         newMap.set(instanceId, taskId)
         return newMap
       })
-    } catch (error) {
+    } catch (_error) {
       setInstanceLoadingStates((prev) => {
         const newMap = new Map(prev)
         newMap.delete(instanceId)

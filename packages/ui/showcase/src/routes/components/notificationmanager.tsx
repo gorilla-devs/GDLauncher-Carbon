@@ -1,9 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router"
-import {
-  NotificationsProvider,
-  createNotification,
-  Button
-} from "../../../../src"
+import { toast, Button } from "../../../../src"
 import ComponentDemo from "../../components/ComponentDemo"
 
 export const Route = createFileRoute("/components/notificationmanager")({
@@ -11,58 +7,42 @@ export const Route = createFileRoute("/components/notificationmanager")({
 })
 
 function NotificationManagerPage() {
-  return (
-    <NotificationsProvider>
-      <NotificationDemo />
-    </NotificationsProvider>
-  )
+  return <NotificationDemo />
 }
 
 function NotificationDemo() {
-  const addNotification = createNotification()
-
   const showSuccessNotification = () => {
-    addNotification({
-      name: "Success!",
-      content: "Your action completed successfully.",
-      type: "success",
+    toast.success("Success!", {
+      description: "Your action completed successfully.",
       duration: 5000
     })
   }
 
   const showWarningNotification = () => {
-    addNotification({
-      name: "Warning",
-      content: "Please review your settings before continuing.",
-      type: "warning",
+    toast.warning("Warning", {
+      description: "Please review your settings before continuing.",
       duration: 7000
     })
   }
 
   const showErrorNotification = () => {
-    addNotification({
-      name: "Error occurred",
-      content: "Something went wrong. Please try again later.",
-      type: "error",
+    toast.error("Error occurred", {
+      description: "Something went wrong. Please try again later.",
       duration: 10000
     })
   }
 
   const showLongContentNotification = () => {
-    addNotification({
-      name: "Long notification",
-      content:
+    toast.success("Long notification", {
+      description:
         "This is a notification with a very long content that demonstrates how the notification expands when there's more content to display. Click the arrow to expand or collapse the notification.",
-      type: "success",
       duration: 8000
     })
   }
 
   const showCustomDurationNotification = () => {
-    addNotification({
-      name: "Custom duration",
-      content: "This notification will disappear after 3 seconds.",
-      type: "success",
+    toast.success("Custom duration", {
+      description: "This notification will disappear after 3 seconds.",
       duration: 3000
     })
   }
@@ -70,12 +50,15 @@ function NotificationDemo() {
   return (
     <div class="max-w-4xl">
       <div class="mb-8">
-        <h1 class="text-4xl font-bold text-gray-900 mb-4">
-          Notification Manager
+        <h1
+          class="text-4xl font-bold mb-4"
+          style={`color: rgb(var(--lightSlate-50))`}
+        >
+          Sonner Toasts
         </h1>
-        <p class="text-xl text-gray-600">
-          Toast notification system with different types, expandable content,
-          and progress indicators.
+        <p class="text-xl" style={`color: rgb(var(--lightSlate-300))`}>
+          Toast notification system powered by Sonner with different types and
+          custom durations.
         </p>
       </div>
 
@@ -115,20 +98,20 @@ function NotificationDemo() {
       </ComponentDemo>
 
       <ComponentDemo
-        title="Provider Setup"
-        description="Wrap your app with NotificationsProvider to enable notifications"
+        title="Setup"
+        description="Add Toaster component to your app root to enable toast notifications"
       >
-        <div class="bg-gray-50 p-4 rounded-lg">
-          <p class="text-gray-700">
-            Remember to add a div with id="notifications" to your HTML for the
-            portal to render notifications. Notifications appear in the
-            top-right corner and support hover-to-pause functionality.
+        <div
+          class="p-4 rounded-lg"
+          style="background-color: rgb(var(--darkSlate-700)); border: 1px solid rgb(var(--darkSlate-600))"
+        >
+          <p style="color: rgb(var(--lightSlate-300))">
+            Simply add {"<Toaster />"} to your app root. Toasts appear in the
+            bottom-left corner and automatically handle positioning and
+            stacking.
           </p>
         </div>
       </ComponentDemo>
-
-      {/* Add a notifications container for the portal */}
-      <div id="notifications" class="fixed top-0 right-0 z-50" />
     </div>
   )
 }

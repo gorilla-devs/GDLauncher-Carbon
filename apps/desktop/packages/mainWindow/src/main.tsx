@@ -17,7 +17,7 @@ import App from "@/app"
 import { ModalProvider } from "@/managers/ModalsManager"
 import "virtual:uno.css"
 import "@gd/ui/style.css"
-import { ContextMenuProvider, NotificationsProvider, Progress, Toaster } from "@gd/ui"
+import { ContextMenuProvider, Progress, Toaster } from "@gd/ui"
 import "@unocss/reset/tailwind.css"
 import { NavigationManager } from "./managers/NavigationManager"
 // import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
@@ -148,10 +148,8 @@ render(() => {
         <Match when={isIntroAnimationFinished()}>
           <Switch>
             <Match when={isReady()}>
-              <NotificationsProvider>
-                <InnerApp port={coreModuleLoaded() as unknown as number} />
-                <Toaster />
-              </NotificationsProvider>
+              <InnerApp port={coreModuleLoaded() as unknown as number} />
+              <Toaster />
             </Match>
             <Match when={!isReady()}>
               <PatternBackground>

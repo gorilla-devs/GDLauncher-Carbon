@@ -1,4 +1,4 @@
-import { Badge, Button, Input } from "@gd/ui"
+import { Badge, Button } from "@gd/ui"
 import { For, Show } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import { AddonType } from "@gd/core_module/bindings"

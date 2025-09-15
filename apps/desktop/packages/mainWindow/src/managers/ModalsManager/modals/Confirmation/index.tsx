@@ -3,7 +3,7 @@ import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { Show } from "solid-js"
 import { useTransContext } from "@gd/i18n"
-import { queryClient, rspc } from "@/utils/rspcClient"
+import { rspc } from "@/utils/rspcClient"
 
 interface Props {
   instanceState: "unlock" | "unpair"

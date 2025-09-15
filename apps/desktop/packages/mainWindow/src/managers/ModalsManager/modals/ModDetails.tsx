@@ -95,8 +95,6 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
     return null
   }
 
-  // Removed unused formatFileSize function
-
   const tabs = [
     { label: t("modals.mod_details.overview") },
     { label: t("modals.mod_details.technical") }

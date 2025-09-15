@@ -7,7 +7,10 @@ const Skeleton = (props: {
 }) => {
   return (
     <div
-      class={cn("w-1/3 h-4 rounded-md bg-darkSlate-500 skeleton-shimmer", props.class)}
+      class={cn(
+        "w-1/3 h-4 rounded-md bg-darkSlate-500 skeleton-shimmer",
+        props.class
+      )}
       style={props.style}
     />
   )
@@ -36,7 +39,9 @@ Skeleton.sidebarInstances = () => {
 }
 
 Skeleton.sidebarInstanceSmall = () => {
-  return <div class="bg-darkSlate-500 skeleton-shimmer h-10 w-10 rounded-lg px-4 py-2 skeleton-shimmer" />
+  return (
+    <div class="bg-darkSlate-500 skeleton-shimmer h-10 w-10 rounded-lg px-4 py-2 skeleton-shimmer" />
+  )
 }
 
 const Instance = () => {

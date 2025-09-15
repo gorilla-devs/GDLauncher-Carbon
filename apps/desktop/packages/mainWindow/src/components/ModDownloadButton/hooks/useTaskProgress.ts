@@ -1,10 +1,9 @@
 import { rspc } from "@/utils/rspcClient"
 import { createSignal, createEffect, Accessor } from "solid-js"
-import useSearchContext from "@/components/SearchInputContext"
 
 export const useTaskProgress = (
   instanceTaskIds: Accessor<Map<number, number>>,
-  clearInstanceLoadingState: (instanceId: number) => void
+  _clearInstanceLoadingState: (instanceId: number) => void
 ) => {
   const [loading, setLoading] = createSignal(false)
   const [progress, setProgress] = createSignal<number | null>(null)
@@ -19,7 +18,7 @@ export const useTaskProgress = (
     const allTasks = allTasksQuery.data || []
     const activeTaskIds = new Set(allTasks.map((task) => task.id))
 
-    taskIds.forEach((taskId, instanceId) => {
+    taskIds.forEach((taskId, _instanceId) => {
       if (!activeTaskIds.has(taskId)) {
         // Don't clear loading state immediately - let the InstanceDropdown handle it
         // when it detects the mod is actually installed via the reactive effect

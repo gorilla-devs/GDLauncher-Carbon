@@ -1,20 +1,16 @@
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
-import { Button, createNotification } from "@gd/ui"
+import { Button, toast } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 
 const ConfirmCacheClear = (props: ModalProps) => {
   const [t] = useTransContext()
   const modalsContext = useModal()
-  const addNotification = createNotification()
-
   // Note: settings.clearCache endpoint is not available in the backend
   // For now, we'll just close the modal and show a placeholder message
   const handleConfirm = async () => {
-    addNotification({
-      name: t("settings:clear_cache_title"),
-      content: "Cache clearing functionality is currently unavailable",
-      type: "success"
+    toast.success(t("settings:clear_cache_title"), {
+      description: "Cache clearing functionality is currently unavailable"
     })
     modalsContext?.closeModal()
   }

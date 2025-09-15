@@ -100,7 +100,7 @@ export function SearchApiDropdown() {
   )
 }
 
-export function SearchCategoryDropdown(props: DropdownProps) {
+export function SearchCategoryDropdown(_props: DropdownProps) {
   const searchResults = useSearchContext()
   const categories = rspc.createQuery(() => ({
     queryKey: ["modplatforms.getUnifiedCategories"]
@@ -264,7 +264,7 @@ export function SearchCategoryDropdown(props: DropdownProps) {
   )
 }
 
-export function SearchModloaderDropdown(props: DropdownProps) {
+export function SearchModloaderDropdown(_props: DropdownProps) {
   const globalStore = useGlobalStore()
   const searchResults = useSearchContext()
   const [searchQuery, setSearchQuery] = createSignal("")
@@ -443,7 +443,7 @@ export function SearchModloaderDropdown(props: DropdownProps) {
   )
 }
 
-export function SearchEnvironmentDropdown(props: DropdownProps) {
+export function SearchEnvironmentDropdown(_props: DropdownProps) {
   const searchResults = useSearchContext()
 
   return (
@@ -494,7 +494,7 @@ export function SearchEnvironmentDropdown(props: DropdownProps) {
   )
 }
 
-export function SearchSortIndexDropdown(props: DropdownProps) {
+export function SearchSortIndexDropdown(_props: DropdownProps) {
   const searchResults = useSearchContext()
 
   const sortOptions = [
@@ -544,7 +544,7 @@ export function SearchSortIndexDropdown(props: DropdownProps) {
   )
 }
 
-export function SearchSortOrderDropdown(props: DropdownProps) {
+export function SearchSortOrderDropdown(_props: DropdownProps) {
   const searchResults = useSearchContext()
 
   return (
@@ -586,7 +586,7 @@ export function SearchSortOrderDropdown(props: DropdownProps) {
   )
 }
 
-export function SearchGameVersionDropdown(props: DropdownProps) {
+export function SearchGameVersionDropdown(_props: DropdownProps) {
   const globalStore = useGlobalStore()
   const searchResults = useSearchContext()
   const [_t] = useTransContext()
@@ -833,7 +833,7 @@ export function SearchGameVersionDropdown(props: DropdownProps) {
   )
 }
 
-export function SearchViewModeDropdown(props: DropdownProps) {
+export function SearchViewModeDropdown(_props: DropdownProps) {
   const searchResults = useSearchContext()
 
   return (

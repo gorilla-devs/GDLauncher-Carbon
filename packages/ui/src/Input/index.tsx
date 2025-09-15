@@ -36,7 +36,8 @@ const input = cva(
       },
       variant: {
         default: "",
-        transparent: "!bg-transparent !border-0 !border-transparent hover:!border-transparent active:!border-transparent focus:!border-transparent focus-visible:!border-transparent focus:!outline-none focus-visible:!outline-none hover:!outline-none"
+        transparent:
+          "!bg-transparent !border-0 !border-transparent hover:!border-transparent active:!border-transparent focus:!border-transparent focus-visible:!border-transparent focus:!outline-none focus-visible:!outline-none hover:!outline-none"
       }
     },
     compoundVariants: [
@@ -69,7 +70,8 @@ const container = cva(
       },
       variant: {
         default: "",
-        transparent: "!outline-none hover:!outline-none has-[:focus-visible]:!outline-none !bg-transparent"
+        transparent:
+          "!outline-none hover:!outline-none has-[:focus-visible]:!outline-none !bg-transparent"
       }
     },
     defaultVariants: {
