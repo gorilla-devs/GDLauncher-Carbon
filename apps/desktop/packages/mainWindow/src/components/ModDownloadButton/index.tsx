@@ -6,6 +6,7 @@ import { useInstanceSearch } from "./hooks/useInstanceSearch"
 import { useTaskProgress } from "./hooks/useTaskProgress"
 import { InstanceDropdown } from "./components/InstanceDropdown"
 import { InstallButton } from "./components/InstallButton"
+import { toast } from "@gd/ui"
 
 interface ModDownloadButtonProps {
   fileId?: number | string
@@ -150,8 +151,35 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   }
 
   // Watch for installation completion and clear states reactively
+  const [wasInstalled, setWasInstalled] = createSignal(false)
+  const [wasLoading, setWasLoading] = createSignal(false)
+
   createEffect(() => {
-    if (isInstalled()) {
+    const installed = isInstalled()
+    const isCurrentlyLoading = loading()
+    const isWorld = props.addon?.type === "world"
+
+    // For worlds: show toast when loading finishes (since they never show as "installed")
+    if (isWorld && wasLoading() && !isCurrentlyLoading && taskId() === null) {
+      toast.success(`${props.addon?.title || "World"} installed successfully`, {
+        duration: 2000
+      })
+    }
+
+    // For other addon types: show toast when transitioning from not installed to installed
+    if (!isWorld && installed && !wasInstalled()) {
+      toast.success(`${props.addon?.title || "Addon"} installed successfully`, {
+        duration: 2000
+      })
+      setWasInstalled(true)
+    } else if (!installed) {
+      setWasInstalled(false)
+    }
+
+    // Track loading state changes
+    setWasLoading(isCurrentlyLoading)
+
+    if (installed) {
       setLoading(false)
       setTaskId(null)
       setProgress(null)

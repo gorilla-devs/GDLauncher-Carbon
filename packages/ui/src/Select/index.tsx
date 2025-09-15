@@ -1,13 +1,13 @@
-import { cn } from "../util"
+import { splitProps, type ParentProps, type ValidComponent } from "solid-js"
 import type { PolymorphicProps } from "@kobalte/core/polymorphic"
-import type {
-  SelectContentProps,
-  SelectItemProps,
-  SelectTriggerProps
+import {
+  Select as SelectPrimitive,
+  type SelectContentProps,
+  type SelectItemProps,
+  type SelectTriggerProps,
 } from "@kobalte/core/select"
-import { Select as SelectPrimitive } from "@kobalte/core/select"
-import type { ParentProps, ValidComponent } from "solid-js"
-import { splitProps } from "solid-js"
+
+import { cn } from "../util"
 
 export const Select = SelectPrimitive
 export const SelectValue = SelectPrimitive.Value
@@ -78,7 +78,7 @@ export const SelectContent = <T extends ValidComponent = "div">(
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         class={cn(
-          "relative z-210 min-w-[8rem] overflow-hidden rounded-md border border-darkSlate-600 bg-darkSlate-800 text-lightSlate-100 shadow-md data-[expanded]:animate-selectEnter data-[closed]:animate-selectLeave",
+          "relative z-50 min-w-[8rem] overflow-hidden rounded-md border border-darkSlate-600 bg-darkSlate-800 text-lightSlate-100 shadow-md data-[expanded]:animate-in data-[expanded]:fade-in-0 data-[expanded]:zoom-in-95 data-[closed]:animate-out data-[closed]:fade-out-0 data-[closed]:zoom-out-95",
           local.class
         )}
         {...rest}
@@ -98,7 +98,7 @@ export const SelectItem = <T extends ValidComponent = "li">(
 ) => {
   const [local, rest] = splitProps(props as selectItemProps, [
     "class",
-    "children"
+    "children",
   ])
 
   return (

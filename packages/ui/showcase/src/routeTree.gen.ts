@@ -17,6 +17,7 @@ import { Route as ComponentsTabsRouteImport } from './routes/components/tabs'
 import { Route as ComponentsSwitchRouteImport } from './routes/components/switch'
 import { Route as ComponentsStepsRouteImport } from './routes/components/steps'
 import { Route as ComponentsSpinnerRouteImport } from './routes/components/spinner'
+import { Route as ComponentsSonnerRouteImport } from './routes/components/sonner'
 import { Route as ComponentsSliderRouteImport } from './routes/components/slider'
 import { Route as ComponentsSkeletonRouteImport } from './routes/components/skeleton'
 import { Route as ComponentsSeparatorRouteImport } from './routes/components/separator'
@@ -73,6 +74,11 @@ const ComponentsStepsRoute = ComponentsStepsRouteImport.update({
 const ComponentsSpinnerRoute = ComponentsSpinnerRouteImport.update({
   id: '/components/spinner',
   path: '/components/spinner',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ComponentsSonnerRoute = ComponentsSonnerRouteImport.update({
+  id: '/components/sonner',
+  path: '/components/sonner',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ComponentsSliderRoute = ComponentsSliderRouteImport.update({
@@ -181,6 +187,7 @@ export interface FileRoutesByFullPath {
   '/components/separator': typeof ComponentsSeparatorRoute
   '/components/skeleton': typeof ComponentsSkeletonRoute
   '/components/slider': typeof ComponentsSliderRoute
+  '/components/sonner': typeof ComponentsSonnerRoute
   '/components/spinner': typeof ComponentsSpinnerRoute
   '/components/steps': typeof ComponentsStepsRoute
   '/components/switch': typeof ComponentsSwitchRoute
@@ -208,6 +215,7 @@ export interface FileRoutesByTo {
   '/components/separator': typeof ComponentsSeparatorRoute
   '/components/skeleton': typeof ComponentsSkeletonRoute
   '/components/slider': typeof ComponentsSliderRoute
+  '/components/sonner': typeof ComponentsSonnerRoute
   '/components/spinner': typeof ComponentsSpinnerRoute
   '/components/steps': typeof ComponentsStepsRoute
   '/components/switch': typeof ComponentsSwitchRoute
@@ -236,6 +244,7 @@ export interface FileRoutesById {
   '/components/separator': typeof ComponentsSeparatorRoute
   '/components/skeleton': typeof ComponentsSkeletonRoute
   '/components/slider': typeof ComponentsSliderRoute
+  '/components/sonner': typeof ComponentsSonnerRoute
   '/components/spinner': typeof ComponentsSpinnerRoute
   '/components/steps': typeof ComponentsStepsRoute
   '/components/switch': typeof ComponentsSwitchRoute
@@ -265,6 +274,7 @@ export interface FileRouteTypes {
     | '/components/separator'
     | '/components/skeleton'
     | '/components/slider'
+    | '/components/sonner'
     | '/components/spinner'
     | '/components/steps'
     | '/components/switch'
@@ -292,6 +302,7 @@ export interface FileRouteTypes {
     | '/components/separator'
     | '/components/skeleton'
     | '/components/slider'
+    | '/components/sonner'
     | '/components/spinner'
     | '/components/steps'
     | '/components/switch'
@@ -319,6 +330,7 @@ export interface FileRouteTypes {
     | '/components/separator'
     | '/components/skeleton'
     | '/components/slider'
+    | '/components/sonner'
     | '/components/spinner'
     | '/components/steps'
     | '/components/switch'
@@ -347,6 +359,7 @@ export interface RootRouteChildren {
   ComponentsSeparatorRoute: typeof ComponentsSeparatorRoute
   ComponentsSkeletonRoute: typeof ComponentsSkeletonRoute
   ComponentsSliderRoute: typeof ComponentsSliderRoute
+  ComponentsSonnerRoute: typeof ComponentsSonnerRoute
   ComponentsSpinnerRoute: typeof ComponentsSpinnerRoute
   ComponentsStepsRoute: typeof ComponentsStepsRoute
   ComponentsSwitchRoute: typeof ComponentsSwitchRoute
@@ -412,6 +425,13 @@ declare module '@tanstack/solid-router' {
       path: '/components/spinner'
       fullPath: '/components/spinner'
       preLoaderRoute: typeof ComponentsSpinnerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/components/sonner': {
+      id: '/components/sonner'
+      path: '/components/sonner'
+      fullPath: '/components/sonner'
+      preLoaderRoute: typeof ComponentsSonnerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/components/slider': {
@@ -555,6 +575,7 @@ const rootRouteChildren: RootRouteChildren = {
   ComponentsSeparatorRoute: ComponentsSeparatorRoute,
   ComponentsSkeletonRoute: ComponentsSkeletonRoute,
   ComponentsSliderRoute: ComponentsSliderRoute,
+  ComponentsSonnerRoute: ComponentsSonnerRoute,
   ComponentsSpinnerRoute: ComponentsSpinnerRoute,
   ComponentsStepsRoute: ComponentsStepsRoute,
   ComponentsSwitchRoute: ComponentsSwitchRoute,

@@ -5,6 +5,7 @@ export * from "./Badge"
 export * from "./Popover"
 export * from "./Select"
 export * from "./Tooltip"
+export { Toaster, SonnerDemo, toast } from "./Sonner"
 
 export { Button } from "./Button"
 export { Input } from "./Input"

@@ -18,6 +18,7 @@ const components = [
   { name: "Separator", path: "/components/separator" },
   { name: "Skeleton", path: "/components/skeleton" },
   { name: "Slider", path: "/components/slider" },
+  { name: "Sonner", path: "/components/sonner" },
   { name: "Spinner", path: "/components/spinner" },
   { name: "Steps", path: "/components/steps" },
   { name: "Switch", path: "/components/switch" },

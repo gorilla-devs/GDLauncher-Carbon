@@ -381,6 +381,9 @@ importers:
       solid-testing-library:
         specifier: ^0.5.0
         version: 0.5.1(solid-js@1.9.9)
+      somoto:
+        specifier: ^0.0.2
+        version: 0.0.2(solid-js@1.9.9)
       tailwind-merge:
         specifier: ^2.6.0
         version: 2.6.0
@@ -7047,6 +7050,12 @@ packages:
     engines: {node: '>=18.0.0', pnpm: '>=8.6.0'}
     peerDependencies:
       solid-js: ^1.6.12
+
+  somoto@0.0.2:
+    resolution: {integrity: sha512-2e7V2O16D+DkE3z0kBdA4AnVYOi4yLLwIrKe3SE1kRAicwALrw+kx57/SRqSbEXaIsZrIPhGfL7VcRQE+tI0Bg==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      solid-js: '>=1.6.0'
 
   source-map-js@1.0.2:
     resolution: {integrity: sha512-R0XvVJ9WusLiqTCEiGCmICCMplcCkIwwR11mOSD9CR5u+IXYdiseeEuXCVAjS54zqwkLcPNnmU4OeJ6tUrWhDw==}
@@ -16581,6 +16590,10 @@ snapshots:
       '@solid-primitives/refs': 1.0.6(solid-js@1.9.3)
       '@solid-primitives/transition-group': 1.0.4(solid-js@1.9.3)
       solid-js: 1.9.3
+
+  somoto@0.0.2(solid-js@1.9.9):
+    dependencies:
+      solid-js: 1.9.9
 
   source-map-js@1.0.2: {}
 
