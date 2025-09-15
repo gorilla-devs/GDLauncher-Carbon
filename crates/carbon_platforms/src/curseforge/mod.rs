@@ -257,7 +257,7 @@ pub struct Mod {
     pub thumbs_up_count: i32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(u16)]
 pub enum ClassId {
     Mods = 6,

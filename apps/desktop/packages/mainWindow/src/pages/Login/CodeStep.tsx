@@ -209,7 +209,7 @@ const CodeStep = (props: Props) => {
           </Show>
         </div>
         <Show when={!expired()}>
-          <p class="text-lightSlate-700 text-sm">
+          <p class="text-lightSlate-700 text-sm mt-2">
             <span class="text-lightSlate-500 mr-1">{countDown()}</span>
             <Trans key="login.before_expiring" />
           </p>
@@ -226,8 +226,9 @@ const CodeStep = (props: Props) => {
           <Trans key="login.enter_code_in_browser" />
         </p>
         <Button
+          uppercase
           id="login-btn"
-          class="normal-case"
+          class="mt-12 normal-case"
           onClick={() => {
             setLoading(true)
             navigator.clipboard.writeText(userCode() || "")

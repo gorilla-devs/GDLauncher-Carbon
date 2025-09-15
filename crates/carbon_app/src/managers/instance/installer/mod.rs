@@ -38,7 +38,7 @@ use carbon_repos::db::{
 };
 use carbon_rt_path::InstancePath;
 use futures::future::Future;
-use std::{ops::Deref, pin::Pin, sync::Arc, time::Duration};
+use std::{ops::Deref, path::PathBuf, pin::Pin, sync::Arc, time::Duration};
 use tokio::{sync::Mutex, task::AbortHandle};
 
 type BoxedResourceInstaller = Box<dyn ResourceInstaller + Send>;
@@ -84,6 +84,8 @@ pub trait ResourceInstaller: Sync {
     /// a unique ID to identify dependency loops
     fn id(&self) -> String;
     async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable>;
+    fn get_install_path(&self, instance_path: &InstancePath) -> PathBuf;
+    async fn post_process(&self, instance_path: &InstancePath) -> Result<(), anyhow::Error>;
     fn dependencies(
         &self,
         app: &Arc<AppInner>,
@@ -110,6 +112,16 @@ impl<I: ResourceInstaller + ?Sized + Send> ResourceInstaller for Box<I> {
     #[inline]
     async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable> {
         (**self).downloadable(instance_path).await
+    }
+
+    #[inline]
+    fn get_install_path(&self, instance_path: &InstancePath) -> PathBuf {
+        (**self).get_install_path(instance_path)
+    }
+
+    #[inline]
+    async fn post_process(&self, instance_path: &InstancePath) -> Result<(), anyhow::Error> {
+        (**self).post_process(instance_path).await
     }
 
     #[inline]
@@ -489,6 +501,11 @@ impl Installer {
                             .with_context(|| {
                                 format!("Failed to download addon file for `{:?}`", downloadable)
                             })?;
+
+                            {
+                                let lock = inner.lock().await;
+                                lock.post_process(&instance_path).await?;
+                            }
                         }
 
                         if let Some(id) = replaces_mod_id {
@@ -599,8 +616,8 @@ impl ResourceInstaller for CurseforgeModInstaller {
         format!("curseforge:{}:{}", &self.file.mod_id, &self.file.id)
     }
 
-    async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable> {
-        let install_path = match self.addon_type {
+    fn get_install_path(&self, instance_path: &InstancePath) -> PathBuf {
+        match self.addon_type {
             curseforge::ClassId::Mods => instance_path.get_mods_path(),
             curseforge::ClassId::ResourcePacks => instance_path.get_resourcepacks_path(),
             curseforge::ClassId::Worlds => instance_path.get_saves_path(),
@@ -608,7 +625,11 @@ impl ResourceInstaller for CurseforgeModInstaller {
             curseforge::ClassId::Datapacks => instance_path.get_datapacks_path(),
             _ => instance_path.get_mods_path(),
         }
-        .join(&self.file.file_name);
+        .join(&self.file.file_name)
+    }
+
+    async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable> {
+        let install_path = self.get_install_path(instance_path);
 
         let checksums = &self
             .file
@@ -627,6 +648,19 @@ impl ResourceInstaller for CurseforgeModInstaller {
                 .with_checksum(checksums.get(0).cloned())
                 .with_size(*size as u64),
         )
+    }
+
+    async fn post_process(&self, instance_path: &InstancePath) -> Result<(), anyhow::Error> {
+        if self.addon_type == curseforge::ClassId::Worlds {
+            let original_path = self.get_install_path(instance_path);
+            let dest_folder = original_path
+                .parent()
+                .ok_or_else(|| anyhow::anyhow!("Can't find instance path parent folder"))?;
+
+            carbon_compression::decompress(&original_path, dest_folder).await?;
+            tokio::fs::remove_file(&original_path).await?;
+        }
+        Ok(())
     }
 
     fn dependencies(
@@ -911,8 +945,19 @@ impl ResourceInstaller for ModrinthModInstaller {
         format!("modrinth:{}:{}", &self.version.project_id, &self.version.id)
     }
 
+    fn get_install_path(&self, instance_path: &InstancePath) -> PathBuf {
+        match self.mod_info.project_type {
+            modrinth::project::ProjectType::Mod => instance_path.get_mods_path(),
+            modrinth::project::ProjectType::ResourcePack => instance_path.get_resourcepacks_path(),
+            modrinth::project::ProjectType::Shader => instance_path.get_shaderpacks_path(),
+            modrinth::project::ProjectType::DataPack => instance_path.get_datapacks_path(),
+            _ => instance_path.get_mods_path(),
+        }
+        .join(&self.file.filename)
+    }
+
     async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable> {
-        let install_path = instance_path.get_mods_path().join(&self.file.filename);
+        let install_path = self.get_install_path(instance_path);
 
         let checksum = Checksum::Sha1(self.file.hashes.sha1.clone());
         let size = self.file.size;
@@ -922,6 +967,11 @@ impl ResourceInstaller for ModrinthModInstaller {
                 .with_checksum(Some(checksum))
                 .with_size(size as u64),
         )
+    }
+
+    async fn post_process(&self, instance_path: &InstancePath) -> Result<(), anyhow::Error> {
+        // No post-processing required for modrinth
+        Ok(())
     }
 
     fn dependencies(
