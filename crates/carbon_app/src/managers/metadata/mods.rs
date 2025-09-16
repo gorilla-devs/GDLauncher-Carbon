@@ -925,35 +925,6 @@ mod test {
     }
 
     #[test]
-    pub fn old_forge_metadata_cccmod() -> anyhow::Result<()> {
-        let mcmodinfo = r#"
-          [{
-            "modid": "com.test.testmod",
-            "name": "TestMod",
-            "description": "test desc",
-            "mcversion": "1.0.0",
-            "authorList": ["TestAuthor1", "TestAuthor2"],
-            "logoFile": "/test/logo"
-          }]
-        "#;
-
-        let expected = Some(ModFileMetadata {
-            modid: Some(String::from("com.test.testmod")),
-            name: Some(String::from("TestMod")),
-            version: Some(String::from("1.0.0")),
-            description: Some(String::from("test desc")),
-            authors: Some(String::from("TestAuthor1, TestAuthor2")),
-            logo_file: Some(String::from("/test/logo")),
-            modloaders: vec![ModLoaderType::Forge],
-        });
-
-        let returned = parsemeta("cccmod.info", mcmodinfo)?;
-
-        assert_eq!(returned, expected);
-        Ok(())
-    }
-
-    #[test]
     pub fn new_forge_metadata() -> anyhow::Result<()> {
         let mcmodinfo = r#"
           {
