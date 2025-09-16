@@ -135,7 +135,6 @@ impl ManagerRef<'_, SettingsManager> {
             ));
         }
 
-
         if let Some(show_featured) = incoming_settings.show_featured {
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
