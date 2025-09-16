@@ -30,6 +30,9 @@ const Addons = () => {
   const isInstanceLocked = () =>
     !!routeData.instanceDetails.data?.modpack?.locked
 
+  const hasModloaders = () =>
+    (routeData.instanceDetails.data?.modloaders?.length || 0) > 0
+
   // Get selected rows reactively using row selection state
   const selectedRows = createMemo(() => {
     const rowSelectionState = addonData.rowSelection()
@@ -91,6 +94,7 @@ const Addons = () => {
           addonMutations.handleUpdateAll(addonData.filteredAddons())
         }
         updateCount={updateCount}
+        hasModloaders={hasModloaders}
       />
 
       {/* Loading state */}

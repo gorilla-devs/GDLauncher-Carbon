@@ -25,6 +25,7 @@ interface AddonFiltersProps {
   onOpenFolder: () => void
   onUpdateAll: () => void
   updateCount: () => number
+  hasModloaders: () => boolean
 }
 
 export const AddonFilters = (props: AddonFiltersProps) => {
@@ -32,6 +33,15 @@ export const AddonFilters = (props: AddonFiltersProps) => {
 
   const getAddonTypeLabel = (type: AddonType) => {
     return t(`instance.tabs.${type}`)
+  }
+
+  const visibleAddonTypes = () => {
+    return ADDON_TYPES.filter((type) => {
+      if (type === "mods" && !props.hasModloaders()) {
+        return false
+      }
+      return true
+    })
   }
 
   return (
@@ -102,7 +112,7 @@ export const AddonFilters = (props: AddonFiltersProps) => {
             <span class="text-lightSlate-600 text-sm">
               {t("instance.addon_types")}:
             </span>
-            <For each={ADDON_TYPES}>
+            <For each={visibleAddonTypes()}>
               {(type) => (
                 <Badge
                   variant={

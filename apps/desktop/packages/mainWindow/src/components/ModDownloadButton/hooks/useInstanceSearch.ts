@@ -2,7 +2,11 @@ import { createSignal, createMemo, createEffect } from "solid-js"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { getInstanceImageUrl } from "@/utils/instances"
 
-export const useInstanceSearch = () => {
+interface UseInstanceSearchOptions {
+  addonType?: string
+}
+
+export const useInstanceSearch = (options?: UseInstanceSearchOptions) => {
   const [searchQuery, setSearchQuery] = createSignal("")
   const [debouncedQuery, setDebouncedQuery] = createSignal("")
   const [hoveredInstanceId, setHoveredInstanceId] = createSignal<number | null>(
@@ -37,6 +41,14 @@ export const useInstanceSearch = () => {
             ? getInstanceImageUrl(instance.id, instance.icon_revision)
             : null
         }
+      })
+      .filter((instance) => {
+        // For mods, only show instances with modloaders
+        if (options?.addonType === "mod") {
+          return instance.modloader !== "vanilla"
+        }
+        // For all other addon types, show all instances
+        return true
       })
   })
 

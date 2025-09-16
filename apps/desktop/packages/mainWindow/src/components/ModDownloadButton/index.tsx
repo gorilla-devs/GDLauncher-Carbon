@@ -38,7 +38,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     setHoveredInstanceId,
     filteredInstances,
     shouldVirtualize
-  } = useInstanceSearch()
+  } = useInstanceSearch({ addonType: props.addon?.type })
 
   const { loading, setLoading, progress, setProgress } = useTaskProgress(
     instanceTaskIds,
