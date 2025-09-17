@@ -192,10 +192,12 @@ pub(super) fn mount() -> RouterBuilder<App> {
                     }
                 }
                 filters::FEUnifiedProjectID::Modrinth(id) => {
-                    let response = modplatforms.modrinth.get_project(id.into()).await?;
+                    let project_response = modplatforms.modrinth.get_project(id.into());
+                    let project = project_response.await?;
 
-                    // Modrinth body comes in markdown format
-                    let body = markdown::to_html_with_options(&response.body, &markdown::Options {
+                    let team_response = modplatforms.modrinth.get_team(modrinth::filters::MRFETeamID(project.team.clone()).into()).await.ok();
+
+                    let body = markdown::to_html_with_options(&project.body, &markdown::Options {
                         compile: markdown::CompileOptions {
                           allow_dangerous_html: true,
                           allow_dangerous_protocol: true,
@@ -205,7 +207,10 @@ pub(super) fn mount() -> RouterBuilder<App> {
                     }).map_err(|e| anyhow::anyhow!("Failed to convert markdown to html: {}", e))?;
 
                     responses::FEUnifiedSearchResultWithDescription {
-                        result: responses::FEUnifiedSearchResult::from(response),
+                        result: responses::FEUnifiedSearchResult::from_project_with_team(
+                            project,
+                            team_response.map(|tr| tr.into_iter().map(|member| member.into()).collect())
+                        ),
                         full_description_body: body,
                     }
                 }

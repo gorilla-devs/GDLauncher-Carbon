@@ -1,4 +1,4 @@
-import { Badge, Button } from "@gd/ui"
+import { Badge, Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
 import { For, Show } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import { AddonType } from "@gd/core_module/bindings"
@@ -62,47 +62,145 @@ export const AddonFilters = (props: AddonFiltersProps) => {
               <span class="text-lightSlate-600 text-sm">
                 {t("instance.platform_filter")}:
               </span>
-              <select
+              <Select
                 value={props.platformFilter()}
-                onChange={(e) => props.setPlatformFilter(e.target.value as any)}
-                class="bg-darkSlate-700 border-darkSlate-600 rounded border px-2 py-1 text-sm"
+                onChange={props.setPlatformFilter}
+                options={["all", "curseforge", "modrinth", "local"]}
+                placeholder=""
+                disallowEmptySelection={true}
+                selectionBehavior="replace"
+                itemComponent={(itemProps) => {
+                  const getLabel = (value: string) => {
+                    switch (value) {
+                      case "all":
+                        return t("instance.filter.all")
+                      case "curseforge":
+                        return t("platforms.curseforge")
+                      case "modrinth":
+                        return t("platforms.modrinth")
+                      case "local":
+                        return t("instance.filter.local")
+                      default:
+                        return value
+                    }
+                  }
+                  const getIcon = (value: string) => {
+                    switch (value) {
+                      case "all":
+                        return <div class="i-ri:global-line w-4 h-4" />
+                      case "curseforge":
+                        return <div class="i-simple-icons:curseforge w-4 h-4" />
+                      case "modrinth":
+                        return <div class="i-simple-icons:modrinth w-4 h-4" />
+                      case "local":
+                        return <div class="i-ri:folder-line w-4 h-4" />
+                      default:
+                        return null
+                    }
+                  }
+                  return (
+                    <SelectItem item={itemProps.item}>
+                      <div class="flex items-center gap-2">
+                        {getIcon(itemProps.item.rawValue)}
+                        {getLabel(itemProps.item.rawValue)}
+                      </div>
+                    </SelectItem>
+                  )
+                }}
               >
-                <option value="all">{t("instance.filter.all")}</option>
-                <option value="curseforge">{t("platforms.curseforge")}</option>
-                <option value="modrinth">{t("platforms.modrinth")}</option>
-                <option value="local">{t("instance.filter.local")}</option>
-              </select>
+                <SelectTrigger class="w-40">
+                  <SelectValue<string>>{(state) => {
+                    const getLabel = (value: string) => {
+                      switch (value) {
+                        case "all":
+                          return t("instance.filter.all")
+                        case "curseforge":
+                          return t("platforms.curseforge")
+                        case "modrinth":
+                          return t("platforms.modrinth")
+                        case "local":
+                          return t("instance.filter.local")
+                        default:
+                          return value
+                      }
+                    }
+                    const getIcon = (value: string) => {
+                      switch (value) {
+                        case "all":
+                          return <div class="i-ri:global-line w-4 h-4" />
+                        case "curseforge":
+                          return <div class="i-simple-icons:curseforge w-4 h-4" />
+                        case "modrinth":
+                          return <div class="i-simple-icons:modrinth w-4 h-4" />
+                        case "local":
+                          return <div class="i-ri:folder-line w-4 h-4" />
+                        default:
+                          return null
+                      }
+                    }
+                    const selectedValue = state.selectedOption()
+                    return (
+                      <div class="flex items-center gap-2">
+                        {getIcon(selectedValue)}
+                        {getLabel(selectedValue)}
+                      </div>
+                    )
+                  }}</SelectValue>
+                </SelectTrigger>
+                <SelectContent />
+              </Select>
             </div>
           </div>
 
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-3">
             <Show when={props.updateCount() > 0}>
-              <Button
-                type="secondary"
-                size="medium"
-                onClick={props.onUpdateAll}
-                disabled={props.isInstanceLocked()}
-              >
-                <div class="i-ri:download-2-fill" />
-                <Trans
-                  key="instance.update_all_count"
-                  options={{ count: props.updateCount() }}
-                />
-              </Button>
+              <Tooltip open={props.isInstanceLocked() ? undefined : false}>
+                <TooltipTrigger>
+                  <Button
+                    type="outline"
+                    size="small"
+                    onClick={props.onUpdateAll}
+                    disabled={props.isInstanceLocked()}
+                    class="text-xs"
+                  >
+                    <div class="i-ri:download-2-fill text-sm" />
+                    <Trans
+                      key="instance.update_all_count"
+                      options={{ count: props.updateCount() }}
+                    />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <Trans key="instance.locked_cannot_apply_changes" />
+                </TooltipContent>
+              </Tooltip>
             </Show>
 
             <Button
-              type="outline"
-              size="medium"
-              onClick={props.onAddAddons}
-              disabled={props.isInstanceLocked()}
+              type="secondary"
+              size="small"
+              onClick={props.onOpenFolder}
+              class="px-3"
             >
-              <Trans key="instance.add_addons" />
-            </Button>
-
-            <Button size="medium" onClick={props.onOpenFolder}>
               <div class="i-ri:folder-open-fill" />
             </Button>
+
+            <Tooltip open={props.isInstanceLocked() ? undefined : false}>
+              <TooltipTrigger>
+                <Button
+                  type="primary"
+                  size="small"
+                  onClick={props.onAddAddons}
+                  disabled={props.isInstanceLocked()}
+                  class="font-semibold"
+                >
+                  <Trans key="instance.add_addons" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <Trans key="instance.locked_cannot_apply_changes" />
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
 

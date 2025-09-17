@@ -263,7 +263,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
     // Update Available column
     columnHelper.accessor("has_update", {
       header: t("instance.table.update"),
-      size: 120,
+      size: 80,
       cell: (props) => {
         const mod = props.row.original
         const isUpdating = () => config.isModUpdating(mod.id)
@@ -278,35 +278,24 @@ export const createAddonColumns = (config: ColumnConfig) => {
         return (
           <Show
             when={mod.has_update || isUpdating()}
-            fallback={<span class="text-lightSlate-600">-</span>}
+            fallback={<span class="text-lightSlate-600 text-center">-</span>}
           >
             <Tooltip>
               <TooltipTrigger>
-                <Badge
-                  variant={isUpdating() ? "secondary" : "success"}
-                  class="flex items-center gap-1 transition-opacity"
-                  classList={{
-                    "cursor-pointer hover:opacity-80": !isDisabled(),
-                    "opacity-70 cursor-not-allowed": isDisabled()
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={handleUpdate}
+                <Show
+                  when={!isUpdating()}
+                  fallback={<Spinner class="h-5 w-5 text-blue-400" />}
                 >
-                  <Show
-                    when={!isUpdating()}
-                    fallback={<Spinner class="h-3 w-3" />}
-                  >
-                    <div class="i-ri:download-2-fill text-xs" />
-                  </Show>
-                  <Show
-                    when={isUpdating()}
-                    fallback={
-                      <Trans key="modals.mod_details.update_available" />
-                    }
-                  >
-                    <Trans key="updating" />
-                  </Show>
-                </Badge>
+                  <div
+                    class="i-ri:download-2-fill text-lg transition-colors cursor-pointer"
+                    classList={{
+                      "text-green-500 hover:text-green-400": !isDisabled(),
+                      "text-gray-400 cursor-not-allowed": isDisabled()
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={handleUpdate}
+                  />
+                </Show>
               </TooltipTrigger>
               <TooltipContent>
                 <Show

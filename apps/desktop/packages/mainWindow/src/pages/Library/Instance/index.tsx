@@ -628,7 +628,7 @@ const Instance = () => {
                               <>
                                 <Show when={modloader.type_}>
                                   <img
-                                    class="h-4 w-4"
+                                    class="h-5 w-5"
                                     src={getModloaderIcon(modloader.type_)}
                                     alt="Modloader icon"
                                   />
@@ -646,7 +646,7 @@ const Instance = () => {
                           }
                         >
                           <div class="flex items-center gap-2">
-                            <div class="i-ri:time-fill" />
+                            <div class="i-ri:time-fill text-lg" />
                             <span class="whitespace-nowrap">
                               {convertSecondsToHumanTime(
                                 routeData.instanceDetails.data!.secondsPlayed

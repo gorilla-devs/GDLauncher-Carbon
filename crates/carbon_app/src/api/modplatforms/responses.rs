@@ -545,6 +545,56 @@ impl From<Project> for FEUnifiedSearchResult {
     }
 }
 
+impl FEUnifiedSearchResult {
+    pub fn from_project_with_team(value: Project, team: Option<Vec<carbon_platforms::modrinth::user::TeamMember>>) -> Self {
+        let authors = if let Some(team_members) = team {
+            team_members
+                .into_iter()
+                .map(|member| FEUnifiedAuthor {
+                    name: member.user.name.unwrap_or(member.user.username),
+                    avatar_url: member.user.avatar_url,
+                })
+                .collect()
+        } else {
+            vec![]
+        };
+
+        FEUnifiedSearchResult {
+            title: value.title,
+            description: value.description,
+            slug: value.slug.clone(),
+            main_file_id: value.versions.first().cloned(),
+            image_url: value.icon_url.as_ref().map(|url| url.clone()),
+            high_res_image_url: value.icon_url.map(|url| url),
+            id: value.id,
+            release_date: value.published.to_string(),
+            last_updated: value.updated.to_string(),
+            downloads_count: value.downloads,
+            platform: FEUnifiedPlatform::Modrinth,
+            r#type: value.project_type.clone().into(),
+            authors,
+            website_url: Some(format!(
+                "https://modrinth.com/{}/{}",
+                serde_plain::to_string(&value.project_type)
+                    .expect("Cannot fail as there is a default fallback"),
+                value.slug
+            )),
+            categories: value
+                .categories
+                .into_iter()
+                .map(|category| FEUnifiedCategoryId::Modrinth(category))
+                .collect(),
+            screenshot_urls: value
+                .gallery
+                .iter()
+                .map(|gallery| gallery.url.clone())
+                .collect(),
+            minecraft_versions: value.game_versions,
+            versions: Some(value.versions),
+        }
+    }
+}
+
 impl From<ProjectSearchResult> for FEUnifiedSearchResult {
     fn from(value: ProjectSearchResult) -> Self {
         FEUnifiedSearchResult {

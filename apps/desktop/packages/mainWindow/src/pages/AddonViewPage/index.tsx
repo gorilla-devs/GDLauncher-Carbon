@@ -1,6 +1,7 @@
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { Trans, useTransContext } from "@gd/i18n"
 import {
+  AuthorsSkeleton,
   Button,
   Skeleton,
   Tab,
@@ -34,6 +35,7 @@ import {
 import { CreateQueryResult } from "@tanstack/solid-query"
 import { RSPCError } from "@rspc/client"
 import ModpackDownloadButton from "@/components/ModpackDownloadButton"
+import AuthorAvatars, { Author } from "@/components/AuthorAvatars"
 
 const getTabIndexFromPath = (path: string) => {
   if (path.match(/\/(addon)\/.+\/.+/g)) {
@@ -221,7 +223,7 @@ const AddonExplore = () => {
                       </Switch>
                     </div>
                     <div class="border-darkSlate-500 flex items-center gap-2 border-0 p-0 lg:border-r-2 lg:px-2">
-                      <div class="i-ri:time-fill" />
+                      <div class="i-ri:time-fill text-lg" />
                       <Switch>
                         <Match when={!isFetching()}>
                           <Show when={project.data?.releaseDate}>
@@ -237,19 +239,23 @@ const AddonExplore = () => {
                       </Switch>
                     </div>
                     <div class="flex items-center gap-2 p-0 lg:px-2">
-                      <div class="flex max-w-52 gap-2 overflow-x-auto whitespace-nowrap text-sm">
+                      <div class="flex gap-2 text-sm">
                         <Switch>
-                          <Match when={!isFetching()}>
-                            <div>
-                              {/* <Authors
-                                isCurseforge={routeData.isCurseforge}
-                                isModrinth={routeData.isModrinth}
-                                modpackDetails={routeData.modpackDetails.data}
-                              /> */}
-                            </div>
+                          <Match when={!isFetching() && project.data?.authors && project.data.authors.length > 0}>
+                            <AuthorAvatars
+                              authors={project.data!.authors.map((author): Author => ({
+                                name: author.name,
+                                avatarUrl: author.avatarUrl,
+                                id: author.name, // Use name as ID since FEUnifiedAuthor doesn't have separate ID
+                                platform: project.data!.platform,
+                                url: null // FEUnifiedAuthor doesn't include profile URLs
+                              }))}
+                              maxDisplay={4}
+                              size="md"
+                            />
                           </Match>
                           <Match when={isFetching()}>
-                            <Skeleton />
+                            <AuthorsSkeleton count={3} size="md" />
                           </Match>
                         </Switch>
                       </div>
