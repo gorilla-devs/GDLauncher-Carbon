@@ -148,6 +148,69 @@ impl From<FEUnifiedModSearchSortOrder> for ModSearchSortOrder {
 
 #[derive(Type, Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub enum FECurseforgeSearchSortField {
+    Featured,
+    Popularity,
+    TotalDownloads,
+    LastUpdated,
+    Name,
+    Author,
+    Category,
+    GameVersion,
+}
+
+impl From<FECurseforgeSearchSortField> for ModSearchSortField {
+    fn from(value: FECurseforgeSearchSortField) -> Self {
+        match value {
+            FECurseforgeSearchSortField::Featured => ModSearchSortField::Featured,
+            FECurseforgeSearchSortField::Popularity => ModSearchSortField::Popularity,
+            FECurseforgeSearchSortField::TotalDownloads => ModSearchSortField::TotalDownloads,
+            FECurseforgeSearchSortField::LastUpdated => ModSearchSortField::LastUpdated,
+            FECurseforgeSearchSortField::Name => ModSearchSortField::Name,
+            FECurseforgeSearchSortField::Author => ModSearchSortField::Author,
+            FECurseforgeSearchSortField::Category => ModSearchSortField::Category,
+            FECurseforgeSearchSortField::GameVersion => ModSearchSortField::GameVersion,
+        }
+    }
+}
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum FEModrinthSearchIndex {
+    Relevance,
+    Downloads,
+    Follows,
+    Newest,
+    Updated,
+}
+
+impl From<FEModrinthSearchIndex> for SearchIndex {
+    fn from(value: FEModrinthSearchIndex) -> Self {
+        match value {
+            FEModrinthSearchIndex::Relevance => SearchIndex::Relevance,
+            FEModrinthSearchIndex::Downloads => SearchIndex::Downloads,
+            FEModrinthSearchIndex::Follows => SearchIndex::Follows,
+            FEModrinthSearchIndex::Newest => SearchIndex::Newest,
+            FEModrinthSearchIndex::Updated => SearchIndex::Updated,
+        }
+    }
+}
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "platform", content = "filters")]
+pub enum FEPlatformFilters {
+    Curseforge {
+        sort_field: Option<FECurseforgeSearchSortField>,
+        sort_order: Option<FEUnifiedModSearchSortOrder>,
+    },
+    Modrinth {
+        sort_index: Option<FEModrinthSearchIndex>,
+    },
+}
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct FEUnifiedSearchParameters {
     pub search_query: Option<String>,
     // Technically modrinth supports [AND[OR[category]]] but since curseforge doesn't, we will just support ANDs
@@ -155,8 +218,7 @@ pub struct FEUnifiedSearchParameters {
     pub game_versions: Option<Or<String>>,
     pub modloaders: Option<Or<FEUnifiedModLoaderType>>,
     pub project_type: Option<FEUnifiedSearchType>,
-    pub sort_index: Option<FEUnifiedModSortIndex>,
-    pub sort_order: Option<FEUnifiedModSearchSortOrder>,
+    pub platform_filters: Option<FEPlatformFilters>,
     pub index: Option<u32>,
     pub page_size: Option<u32>,
     pub search_api: Option<FEUnifiedPlatform>,
@@ -193,6 +255,13 @@ impl From<FEUnifiedSearchParameters> for ProjectSearchParameters {
                 project_type.to_string(),
             )]));
         }
+
+        // Extract Modrinth-specific sorting from platform filters, default to Downloads
+        let sort_index = match &value.platform_filters {
+            Some(FEPlatformFilters::Modrinth { sort_index }) => sort_index.as_ref().map(|idx| idx.clone().into()),
+            _ => Some(SearchIndex::Downloads), // Default to Downloads when no platform filters
+        };
+
         ProjectSearchParameters {
             query: value.search_query,
             facets: if facets.is_empty() {
@@ -200,10 +269,7 @@ impl From<FEUnifiedSearchParameters> for ProjectSearchParameters {
             } else {
                 Some(facets)
             },
-            index: match value.sort_index {
-                Some(index) => Some(index.into()),
-                _ => None,
-            },
+            index: sort_index,
             offset: value.index,
             limit: value.page_size,
             filters: None,
@@ -213,6 +279,14 @@ impl From<FEUnifiedSearchParameters> for ProjectSearchParameters {
 
 impl From<FEUnifiedSearchParameters> for ModSearchParameters {
     fn from(value: FEUnifiedSearchParameters) -> Self {
+        // Extract Curseforge-specific sorting from platform filters, default to TotalDownloads DESC
+        let (sort_field, sort_order) = match &value.platform_filters {
+            Some(FEPlatformFilters::Curseforge { sort_field, sort_order }) => {
+                (sort_field.as_ref().map(|f| f.clone().into()), sort_order.as_ref().map(|o| o.clone().into()))
+            },
+            _ => (Some(ModSearchSortField::TotalDownloads), Some(ModSearchSortOrder::Descending)), // Default to TotalDownloads DESC
+        };
+
         ModSearchParameters {
             query: ModSearchParametersQuery {
                 game_id: 432,
@@ -231,11 +305,8 @@ impl From<FEUnifiedSearchParameters> for ModSearchParameters {
                         })
                         .collect()
                 }),
-                sort_order: value.sort_order.map(|order| order.into()),
-                sort_field: match value.sort_index {
-                    Some(value) => Some(value.into()),
-                    _ => None,
-                },
+                sort_order,
+                sort_field,
                 class_id: value.project_type.map(Into::into),
                 mod_loader_types: value.modloaders.map(|loaders| {
                     loaders

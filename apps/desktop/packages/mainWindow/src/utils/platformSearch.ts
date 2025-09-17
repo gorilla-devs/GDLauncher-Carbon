@@ -16,8 +16,7 @@ const defaultSearchQuery: FEUnifiedSearchParameters = {
   gameVersions: null,
   modloaders: null,
   projectType: "modpack",
-  sortIndex: null,
-  sortOrder: null,
+  platformFilters: null,
   index: 0,
   pageSize: 40,
   searchApi: null,
@@ -151,8 +150,6 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
       return rspcContext.client.query([
         "modplatforms.unifiedSearch",
         {
-          sortIndex: searchQuery().sortIndex || "downloads",
-          sortOrder: searchQuery().sortOrder || "descending",
           searchQuery: searchQuery().searchQuery,
           categories: searchQuery().categories,
           gameVersions: searchQuery().gameVersions,
@@ -163,7 +160,8 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
           projectType: searchQuery().projectType,
           index: ctx.pageParam,
           searchApi: "curseforge",
-          environment: searchQuery().environment
+          environment: searchQuery().environment,
+          platformFilters: searchQuery().platformFilters
         }
       ])
     },
@@ -185,8 +183,6 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
       return rspcContext.client.query([
         "modplatforms.unifiedSearch",
         {
-          sortIndex: searchQuery().sortIndex || "downloads",
-          sortOrder: searchQuery().sortOrder || "descending",
           searchQuery: searchQuery().searchQuery,
           categories: searchQuery().categories,
           gameVersions: searchQuery().gameVersions,
@@ -197,7 +193,8 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
           projectType: searchQuery().projectType,
           index: ctx.pageParam,
           searchApi: "modrinth",
-          environment: searchQuery().environment
+          environment: searchQuery().environment,
+          platformFilters: searchQuery().platformFilters
         }
       ])
     },

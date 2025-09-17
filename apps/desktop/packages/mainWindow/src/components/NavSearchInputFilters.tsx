@@ -494,14 +494,135 @@ export function SearchEnvironmentDropdown(_props: DropdownProps) {
   )
 }
 
-export function SearchSortIndexDropdown(_props: DropdownProps) {
+export function CurseforgeFiltersDropdown(_props: DropdownProps) {
+  const searchResults = useSearchContext()
+
+  const sortFieldOptions = [
+    { value: "featured", key: "search.featured" },
+    { value: "popularity", key: "search.popularity" },
+    { value: "totalDownloads", key: "search.downloads" },
+    { value: "lastUpdated", key: "search.last_updated" },
+    { value: "name", key: "search.name" },
+    { value: "author", key: "search.author" }
+  ] as const
+
+  const currentFilters = () => {
+    const filters = searchResults?.searchQuery().platformFilters
+    if (filters?.platform === "curseforge") {
+      return filters.filters
+    }
+    return { sort_field: null, sort_order: null }
+  }
+
+  const updateCurseforgeFilters = (updates: Partial<typeof currentFilters>) => {
+    searchResults?.setSearchQuery((prev) => ({
+      ...prev,
+      platformFilters: {
+        platform: "curseforge" as const,
+        filters: {
+          ...currentFilters(),
+          ...updates
+        }
+      }
+    }))
+  }
+
+  return (
+    <>
+      <DropdownMenuSub>
+        <DropdownMenuSubTrigger>
+          <Trans key="search.sort_by" />
+        </DropdownMenuSubTrigger>
+        <DropdownMenuPortal>
+          <DropdownMenuSubContent>
+            <DropdownMenuRadioGroup
+              value={currentFilters().sort_field ?? ""}
+            >
+              <For each={sortFieldOptions}>
+                {(option) => (
+                  <DropdownMenuRadioItem
+                    value={option.value}
+                    onSelect={() => {
+                      if (option.value === currentFilters().sort_field) {
+                        updateCurseforgeFilters({ sort_field: null })
+                      } else {
+                        updateCurseforgeFilters({ sort_field: option.value })
+                      }
+                    }}
+                  >
+                    <Trans key={option.key} />
+                  </DropdownMenuRadioItem>
+                )}
+              </For>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuPortal>
+      </DropdownMenuSub>
+
+      <DropdownMenuSub>
+        <DropdownMenuSubTrigger>
+          <Trans key="search.order" />
+        </DropdownMenuSubTrigger>
+        <DropdownMenuPortal>
+          <DropdownMenuSubContent>
+            <DropdownMenuRadioGroup
+              value={currentFilters().sort_order ?? ""}
+            >
+              <For each={["ascending", "descending"] as const}>
+                {(value) => (
+                  <DropdownMenuRadioItem
+                    value={value}
+                    onSelect={() => {
+                      if (value === currentFilters().sort_order) {
+                        updateCurseforgeFilters({ sort_order: null })
+                      } else {
+                        updateCurseforgeFilters({ sort_order: value })
+                      }
+                    }}
+                  >
+                    {capitalize(value)}
+                  </DropdownMenuRadioItem>
+                )}
+              </For>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuPortal>
+      </DropdownMenuSub>
+    </>
+  )
+}
+
+export function ModrinthFiltersDropdown(_props: DropdownProps) {
   const searchResults = useSearchContext()
 
   const sortOptions = [
     { value: "relevance", key: "search.relevance" },
     { value: "downloads", key: "search.downloads" },
-    { value: "lastUpdated", key: "search.last_updated" }
+    { value: "follows", key: "search.follows" },
+    { value: "newest", key: "search.newest" },
+    { value: "updated", key: "search.updated" }
   ] as const
+
+  const currentFilters = () => {
+    const filters = searchResults?.searchQuery().platformFilters
+    if (filters?.platform === "modrinth") {
+      return filters.filters
+    }
+    return { sort_index: null }
+  }
+
+  const updateModrinthFilters = (updates: Partial<typeof currentFilters>) => {
+    searchResults?.setSearchQuery((prev) => ({
+      ...prev,
+      platformFilters: {
+        platform: "modrinth" as const,
+        filters: {
+          ...currentFilters(),
+          ...updates
+        }
+      }
+    }))
+  }
 
   return (
     <DropdownMenuSub>
@@ -511,71 +632,21 @@ export function SearchSortIndexDropdown(_props: DropdownProps) {
       <DropdownMenuPortal>
         <DropdownMenuSubContent>
           <DropdownMenuRadioGroup
-            value={searchResults?.searchQuery().sortIndex ?? ""}
+            value={currentFilters().sort_index ?? ""}
           >
             <For each={sortOptions}>
               {(option) => (
                 <DropdownMenuRadioItem
                   value={option.value}
                   onSelect={() => {
-                    if (
-                      option.value === searchResults?.searchQuery().sortIndex
-                    ) {
-                      searchResults?.setSearchQuery((prev) => ({
-                        ...prev,
-                        sortIndex: null
-                      }))
+                    if (option.value === currentFilters().sort_index) {
+                      updateModrinthFilters({ sort_index: null })
                     } else {
-                      searchResults?.setSearchQuery((prev) => ({
-                        ...prev,
-                        sortIndex: option.value
-                      }))
+                      updateModrinthFilters({ sort_index: option.value })
                     }
                   }}
                 >
                   <Trans key={option.key} />
-                </DropdownMenuRadioItem>
-              )}
-            </For>
-          </DropdownMenuRadioGroup>
-        </DropdownMenuSubContent>
-      </DropdownMenuPortal>
-    </DropdownMenuSub>
-  )
-}
-
-export function SearchSortOrderDropdown(_props: DropdownProps) {
-  const searchResults = useSearchContext()
-
-  return (
-    <DropdownMenuSub>
-      <DropdownMenuSubTrigger>
-        <Trans key="search.order" />
-      </DropdownMenuSubTrigger>
-      <DropdownMenuPortal>
-        <DropdownMenuSubContent>
-          <DropdownMenuRadioGroup
-            value={searchResults?.searchQuery().sortOrder ?? ""}
-          >
-            <For each={["ascending", "descending"] as const}>
-              {(value) => (
-                <DropdownMenuRadioItem
-                  value={value}
-                  onSelect={() => {
-                    if (value === searchResults?.searchQuery().sortOrder) {
-                      searchResults?.setSearchQuery((prev) => ({
-                        ...prev,
-                        sortOrder: null
-                      }))
-                    } else {
-                      searchResults?.setSearchQuery((prev) => ({
-                        ...prev,
-                        sortOrder: value
-                      }))
-                    }
-                  }}
-                >
-                  {capitalize(value)}
                 </DropdownMenuRadioItem>
               )}
             </For>
@@ -864,5 +935,34 @@ export function SearchViewModeDropdown(_props: DropdownProps) {
         </DropdownMenuSubContent>
       </DropdownMenuPortal>
     </DropdownMenuSub>
+  )
+}
+
+export function PlatformSpecificFilters(_props: DropdownProps) {
+  const searchResults = useSearchContext()
+  const selectedApi = () => searchResults?.searchQuery().searchApi
+
+  return (
+    <Show when={selectedApi()}>
+      <DropdownMenuSeparator />
+      <DropdownMenuLabel>
+        <div class="flex items-center gap-2">
+          <img
+            src={selectedApi() === "curseforge" ? CurseforgeLogo : ModrinthLogo}
+            class="h-4 w-4"
+          />
+          {capitalize(selectedApi()!)} Filters
+        </div>
+      </DropdownMenuLabel>
+      <DropdownMenuSeparator />
+      <Switch>
+        <Match when={selectedApi() === "curseforge"}>
+          <CurseforgeFiltersDropdown />
+        </Match>
+        <Match when={selectedApi() === "modrinth"}>
+          <ModrinthFiltersDropdown />
+        </Match>
+      </Switch>
+    </Show>
   )
 }
