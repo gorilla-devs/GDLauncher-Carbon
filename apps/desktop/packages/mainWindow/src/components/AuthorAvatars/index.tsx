@@ -31,21 +31,21 @@ const AuthorAvatars = (props: AuthorAvatarsProps) => {
     switch (size()) {
       case "sm":
         return {
+          avatar: "w-4 h-4",
+          text: "text-xs",
+          overlap: "-ml-0.5"
+        }
+      case "lg":
+        return {
           avatar: "w-6 h-6",
           text: "text-xs",
           overlap: "-ml-1"
         }
-      case "lg":
-        return {
-          avatar: "w-8 h-8",
-          text: "text-sm",
-          overlap: "-ml-2"
-        }
       default: // md
         return {
-          avatar: "w-7 h-7",
+          avatar: "w-5 h-5",
           text: "text-xs",
-          overlap: "-ml-1.5"
+          overlap: "-ml-1"
         }
     }
   })
@@ -75,10 +75,6 @@ const AuthorAvatars = (props: AuthorAvatarsProps) => {
         <TooltipTrigger>
           <div
             class={`${sizeClasses().avatar} ${index > 0 ? sizeClasses().overlap : ""} relative z-10 transition-all duration-200 hover:z-20 hover:scale-110`}
-            classList={{
-              "cursor-pointer": author.platform === "modrinth" && author.url,
-              "cursor-default": author.platform === "curseforge" || !author.url
-            }}
             style={{ "z-index": `${10 + index}` }}
             onClick={() => handleAuthorClick(author)}
           >
