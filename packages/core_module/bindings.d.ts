@@ -140,6 +140,8 @@ export type FERequestNewVerificationTokenStatus = { status: "success" } | { stat
 
 export type InstanceFolder = "Root" | "Data" | "Mods" | "Configs" | "Screenshots" | "Saves" | "Logs" | "CrashReports" | "ResourcePacks" | "TexturePacks" | "ShaderPacks"
 
+export type FEUnifiedSearchResultWithDescription = ({ title: string; slug: string; description: string; imageUrl: string | null; highResImageUrl: string | null; downloadsCount: number; id: string; releaseDate: string; lastUpdated: string; platform: FEUnifiedPlatform; type: FEUnifiedSearchType; authors: FEUnifiedAuthor[]; websiteUrl: string | null; categories: FEUnifiedCategoryId[]; screenshotUrls: string[]; minecraftVersions: string[]; versions: string[] | null; mainFileId: string | null }) & { fullDescriptionBody: string }
+
 export type CFFEModSearchParameters = { query: CFFEModSearchParametersQuery }
 
 export type FEMetricsEvent = { event_name: "page_view"; data: string } | { event_name: "featured_modpack_installed"; data: { campaign_id: string; item_id: string } } | { event_name: "changelog_viewed" }
@@ -349,6 +351,8 @@ export type EnrollmentStatus = "refreshingMSAuth" | "requestingCode" | { polling
 
 export type FESubtask = { name: Translation; progress: FESubtaskProgress }
 
+export type FEUnifiedProjectID = { type: "curseforge"; value: number } | { type: "modrinth"; value: string }
+
 export type FELauncherActionOnGameLaunch = "quitApp" | "closeWindow" | "minimizeWindow" | "hideWindow" | "none"
 
 export type CFFEFileHash = { value: string; algo: CFFEHashAlgo }
@@ -401,8 +405,6 @@ export type MRFEVersionID = string
 
 export type And<T> = T[]
 
-export type FEUnifiedProjectID = { type: "curseforge"; value: number } | { type: "modrinth"; value: string }
-
 export type LatestModSource = { Curseforge: number } | { Modrinth: string }
 
 export type FEModdedManifestLoaderVersion = { id: string }
@@ -450,8 +452,6 @@ export type MRFEUser = { username: string; name: string | null; email: string | 
 export type ExportEntry = { entries: { [key: string]: ExportEntry | null } }
 
 export type ModrinthMod = { project_id: string; version_id: string }
-
-export type FEUnifiedSearchResultWithDescription = ({ title: string; slug: string; description: string; imageUrl: string | null; highResImageUrl: string | null; downloadsCount: number; id: string; releaseDate: string; lastUpdated: string; platform: FEUnifiedPlatform; type: FEUnifiedSearchType; authors: FEUnifiedAuthor[]; websiteUrl: string | null; categories: FEUnifiedCategoryId[]; screenshotUrls: string[]; minecraftVersions: string[]; versions: string[] | null; mainFileId: string | null }) & { fullDescriptionBody: string }
 
 export type AccountType = { type: "microsoft"; value: { email: string | null } } | { type: "offline" }
 

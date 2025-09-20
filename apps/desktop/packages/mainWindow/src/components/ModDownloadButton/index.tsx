@@ -42,7 +42,8 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
 
   const { loading, setLoading, progress, setProgress } = useTaskProgress(
     instanceTaskIds,
-    clearInstanceLoadingState
+    clearInstanceLoadingState,
+    props.addon
   )
 
   createEffect(() => {
@@ -179,7 +180,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     // Track loading state changes
     setWasLoading(isCurrentlyLoading)
 
-    if (installed) {
+    if (installed || (isWorld && taskId() === null)) {
       setLoading(false)
       setTaskId(null)
       setProgress(null)

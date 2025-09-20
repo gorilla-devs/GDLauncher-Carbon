@@ -1,9 +1,11 @@
 import { rspc } from "@/utils/rspcClient"
 import { createSignal, createEffect, Accessor } from "solid-js"
+import { toast } from "@gd/ui"
 
 export const useTaskProgress = (
   instanceTaskIds: Accessor<Map<number, number>>,
-  _clearInstanceLoadingState: (instanceId: number) => void
+  clearInstanceLoadingState: (instanceId: number) => void,
+  addon?: { title?: string; type?: string }
 ) => {
   const [loading, setLoading] = createSignal(false)
   const [progress, setProgress] = createSignal<number | null>(null)
@@ -18,11 +20,19 @@ export const useTaskProgress = (
     const allTasks = allTasksQuery.data || []
     const activeTaskIds = new Set(allTasks.map((task) => task.id))
 
-    taskIds.forEach((taskId, _instanceId) => {
+    taskIds.forEach((taskId, instanceId) => {
       if (!activeTaskIds.has(taskId)) {
-        // Don't clear loading state immediately - let the InstanceDropdown handle it
-        // when it detects the mod is actually installed via the reactive effect
-        // This prevents the gap between "Installing" and "Installed"
+        // Clear loading state when task completes
+        // For regular mods, InstanceDropdown will also handle this via installation detection
+        // For worlds, this is the only way to clear loading state since they don't appear in mods list
+        clearInstanceLoadingState(instanceId)
+
+        // Show success toast for dropdown installations
+        if (addon) {
+          toast.success(`${addon.title || "Addon"} installed successfully`, {
+            duration: 2000
+          })
+        }
       }
     })
   })

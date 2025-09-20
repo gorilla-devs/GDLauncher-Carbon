@@ -53,6 +53,12 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
   // This prevents the gap between "Installing" and "Installed"
   createEffect(() => {
     if (isDropdownOpen() && props.addon) {
+      // Skip installation detection for worlds since they don't appear in mods list
+      // and would cause infinite refetching
+      if (props.addon.type === "world") {
+        return
+      }
+
       props.filteredInstances().forEach((instance) => {
         const instanceQuery = getInstanceModsQuery(instance.id)
         const isLoading = props.instanceLoadingStates().get(instance.id)
