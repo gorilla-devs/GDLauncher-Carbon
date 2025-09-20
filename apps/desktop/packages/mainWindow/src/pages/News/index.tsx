@@ -31,6 +31,14 @@ const NewsPage = () => {
     }
   })
 
+  const handleTabChange = (newTab: number) => {
+    setSelectedTab(newTab)
+    // Reset scroll position to top when switching tabs
+    if (scrollContainer) {
+      scrollContainer.scrollTop = 0
+    }
+  }
+
   const saveStateForNewsDetail = () => {
     if (scrollContainer) {
       newsContext.setScrollPosition(scrollContainer.scrollTop)
@@ -45,7 +53,7 @@ const NewsPage = () => {
         <Tabs
           orientation="horizontal"
           index={selectedTab()}
-          onChange={setSelectedTab}
+          onChange={handleTabChange}
         >
           <div class="sticky top-0 z-50 bg-darkSlate-800 px-6 flex-shrink-0">
             <TabList>
