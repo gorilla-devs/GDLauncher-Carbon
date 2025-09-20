@@ -323,7 +323,7 @@ const Tile = (props: Props) => {
                     <ContextMenuItem
                       class="flex items-center gap-2"
                       onClick={() => {
-                        navigate.navigate(`/library/${props.instance.id}/mods`)
+                        navigate.navigate(`/library/${props.instance.id}/addons`)
                       }}
                     >
                       <div class="i-ri:list-check h-4 w-4" />

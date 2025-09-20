@@ -70,7 +70,7 @@ const FeaturedModpackTile = () => {
             }}
             onClick={() => {
               navigator.navigate(
-                `/modpacks/${HEXING_TALES_MODPACK_ID}/curseforge`
+                `/addon/${HEXING_TALES_MODPACK_ID}/curseforge`
               )
             }}
           >
