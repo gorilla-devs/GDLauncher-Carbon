@@ -132,7 +132,7 @@ const fetchNews = async (): Promise<ContentItem[]> => {
 
 export const useNews = () => {
   return createQuery(() => ({
-    queryKey: ['news'],
+    queryKey: ["news"],
     queryFn: fetchNews,
     staleTime: 15 * 60 * 1000, // 15 minutes
     gcTime: 30 * 60 * 1000 // 30 minutes
@@ -141,10 +141,9 @@ export const useNews = () => {
 
 export const usePatchNotes = () => {
   return createQuery(() => ({
-    queryKey: ['patchNotes'],
+    queryKey: ["patchNotes"],
     queryFn: fetchPatchNotes,
     staleTime: 15 * 60 * 1000, // 15 minutes
     gcTime: 30 * 60 * 1000 // 30 minutes
   }))
 }
-

@@ -258,7 +258,9 @@ impl From<FEUnifiedSearchParameters> for ProjectSearchParameters {
 
         // Extract Modrinth-specific sorting from platform filters, default to Downloads
         let sort_index = match &value.platform_filters {
-            Some(FEPlatformFilters::Modrinth { sort_index }) => sort_index.as_ref().map(|idx| idx.clone().into()),
+            Some(FEPlatformFilters::Modrinth { sort_index }) => {
+                sort_index.as_ref().map(|idx| idx.clone().into())
+            }
             _ => Some(SearchIndex::Downloads), // Default to Downloads when no platform filters
         };
 
@@ -281,10 +283,17 @@ impl From<FEUnifiedSearchParameters> for ModSearchParameters {
     fn from(value: FEUnifiedSearchParameters) -> Self {
         // Extract Curseforge-specific sorting from platform filters, default to TotalDownloads DESC
         let (sort_field, sort_order) = match &value.platform_filters {
-            Some(FEPlatformFilters::Curseforge { sort_field, sort_order }) => {
-                (sort_field.as_ref().map(|f| f.clone().into()), sort_order.as_ref().map(|o| o.clone().into()))
-            },
-            _ => (Some(ModSearchSortField::TotalDownloads), Some(ModSearchSortOrder::Descending)), // Default to TotalDownloads DESC
+            Some(FEPlatformFilters::Curseforge {
+                sort_field,
+                sort_order,
+            }) => (
+                sort_field.as_ref().map(|f| f.clone().into()),
+                sort_order.as_ref().map(|o| o.clone().into()),
+            ),
+            _ => (
+                Some(ModSearchSortField::TotalDownloads),
+                Some(ModSearchSortOrder::Descending),
+            ), // Default to TotalDownloads DESC
         };
 
         ModSearchParameters {

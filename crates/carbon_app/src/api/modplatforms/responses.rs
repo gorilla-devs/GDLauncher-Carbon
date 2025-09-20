@@ -546,7 +546,10 @@ impl From<Project> for FEUnifiedSearchResult {
 }
 
 impl FEUnifiedSearchResult {
-    pub fn from_project_with_team(value: Project, team: Option<Vec<carbon_platforms::modrinth::user::TeamMember>>) -> Self {
+    pub fn from_project_with_team(
+        value: Project,
+        team: Option<Vec<carbon_platforms::modrinth::user::TeamMember>>,
+    ) -> Self {
         let authors = if let Some(team_members) = team {
             team_members
                 .into_iter()

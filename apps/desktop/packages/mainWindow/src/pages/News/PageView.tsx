@@ -38,134 +38,138 @@ const PageView = () => {
   }
 
   const patchContent = createQuery(() => ({
-    queryKey: ['patchContent', currentArticle()?.contentPath],
+    queryKey: ["patchContent", currentArticle()?.contentPath],
     queryFn: () => fetchPatchContent(currentArticle()!.contentPath!),
-    enabled: !!currentArticle()?.contentPath && currentArticle()?.type === "patch",
+    enabled:
+      !!currentArticle()?.contentPath && currentArticle()?.type === "patch",
     staleTime: 30 * 60 * 1000 // 30 minutes
   }))
 
   return (
     <div class="max-w-4xl mx-auto p-6">
-        <Show
-          when={!news.isPending && !patchNotes.isPending && currentArticle()}
-          fallback={
-            <div class="text-center py-20">
-              <div class="bg-darkSlate-700 rounded-2xl p-12 border border-darkSlate-600">
-                <Show
-                  when={news.isPending || patchNotes.isPending}
-                  fallback={
-                    <>
-                      <h1 class="text-3xl font-bold mb-6 text-white">
-                        Article not found
-                      </h1>
-                      <p class="text-lightSlate-400 mb-8">
-                        The article you're looking for doesn't exist or has been
-                        removed.
-                      </p>
-                      <Button
-                        onClick={() => navigator.navigate("/news")}
-                        class="px-8 py-3"
-                      >
-                        Back to News
-                      </Button>
-                    </>
-                  }
-                >
-                  <div class="flex items-center justify-center gap-3 text-lightSlate-400">
-                    <div class="animate-spin i-ri:loader-4-line text-2xl" />
-                    <span class="text-xl">Loading article...</span>
-                  </div>
-                </Show>
-              </div>
+      <Show
+        when={!news.isPending && !patchNotes.isPending && currentArticle()}
+        fallback={
+          <div class="text-center py-20">
+            <div class="bg-darkSlate-700 rounded-2xl p-12 border border-darkSlate-600">
+              <Show
+                when={news.isPending || patchNotes.isPending}
+                fallback={
+                  <>
+                    <h1 class="text-3xl font-bold mb-6 text-white">
+                      Article not found
+                    </h1>
+                    <p class="text-lightSlate-400 mb-8">
+                      The article you're looking for doesn't exist or has been
+                      removed.
+                    </p>
+                    <Button
+                      onClick={() => navigator.navigate("/news")}
+                      class="px-8 py-3"
+                    >
+                      Back to News
+                    </Button>
+                  </>
+                }
+              >
+                <div class="flex items-center justify-center gap-3 text-lightSlate-400">
+                  <div class="animate-spin i-ri:loader-4-line text-2xl" />
+                  <span class="text-xl">Loading article...</span>
+                </div>
+              </Show>
             </div>
-          }
-        >
-          {(article) => (
-            <article class="flex flex-col gap-8">
-              <style>
-                {`
+          </div>
+        }
+      >
+        {(article) => (
+          <article class="flex flex-col gap-8">
+            <style>
+              {`
                   #news_article_content *::selection {
                     background: rgb(var(--primary-500) / 0.3);
                     color: rgb(var(--lightSlate-50));
                   }
                 `}
-              </style>
-              {/* Navigation */}
-              <button
-                onClick={() => navigator.navigate("/news")}
-                class="self-start text-lightSlate-400 hover:text-lightSlate-200 flex items-center gap-3 mb-2 transition-colors group"
-              >
-                <div class="i-ri:arrow-left-line group-hover:transform group-hover:-translate-x-1 transition-transform" />
-                <span class="font-medium">Back to News</span>
-              </button>
+            </style>
+            {/* Navigation */}
+            <button
+              onClick={() => navigator.navigate("/news")}
+              class="self-start text-lightSlate-400 hover:text-lightSlate-200 flex items-center gap-3 mb-2 transition-colors group"
+            >
+              <div class="i-ri:arrow-left-line group-hover:transform group-hover:-translate-x-1 transition-transform" />
+              <span class="font-medium">Back to News</span>
+            </button>
 
-              {/* Hero Image */}
-              <div class="relative overflow-hidden rounded-2xl shadow-2xl">
-                <img
-                  src={article().image}
-                  alt={article().title}
-                  class="w-full h-96 object-cover"
-                />
-                <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+            {/* Hero Image */}
+            <div class="relative overflow-hidden rounded-2xl shadow-2xl">
+              <img
+                src={article().image}
+                alt={article().title}
+                class="w-full h-96 object-cover"
+              />
+              <div class="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+            </div>
+
+            {/* Header */}
+            <header class="flex flex-col gap-6 bg-darkSlate-700 rounded-2xl p-8 border border-darkSlate-600">
+              <div class="flex items-start justify-between gap-4">
+                <h1 class="text-5xl font-bold leading-tight text-white">
+                  {article().title}
+                </h1>
+                {article().type === "patch" && (
+                  <div class="flex flex-col gap-2 items-end">
+                    <span class="text-sm bg-primary-600/20 text-primary-300 px-4 py-2 rounded-full border border-primary-600/30 font-semibold">
+                      Patch Notes
+                    </span>
+                    {article().version && (
+                      <span class="text-xs text-lightSlate-400 font-mono">
+                        v{article().version}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
-              {/* Header */}
-              <header class="flex flex-col gap-6 bg-darkSlate-700 rounded-2xl p-8 border border-darkSlate-600">
-                <div class="flex items-start justify-between gap-4">
-                  <h1 class="text-5xl font-bold leading-tight text-white">
-                    {article().title}
-                  </h1>
-                  {article().type === "patch" && (
-                    <div class="flex flex-col gap-2 items-end">
-                      <span class="text-sm bg-primary-600/20 text-primary-300 px-4 py-2 rounded-full border border-primary-600/30 font-semibold">
-                        Patch Notes
-                      </span>
-                      {article().version && (
-                        <span class="text-xs text-lightSlate-400 font-mono">
-                          v{article().version}
-                        </span>
-                      )}
-                    </div>
-                  )}
+              <div class="flex items-center gap-4 text-lightSlate-300">
+                <div class="flex items-center gap-2">
+                  <i class="i-ri:calendar-line text-primary-400" />
+                  <time class="text-lg font-medium">
+                    {new Date(article().date).toLocaleDateString(undefined, {
+                      year: "numeric",
+                      month: "long",
+                      day: "numeric"
+                    })}
+                  </time>
                 </div>
+                <div class="w-1 h-1 bg-lightSlate-500 rounded-full" />
+                <span class="text-sm capitalize font-medium text-lightSlate-400">
+                  {article().type === "patch"
+                    ? "Minecraft Patch"
+                    : "Minecraft News"}
+                </span>
+              </div>
+            </header>
 
-                <div class="flex items-center gap-4 text-lightSlate-300">
-                  <div class="flex items-center gap-2">
-                    <i class="i-ri:calendar-line text-primary-400" />
-                    <time class="text-lg font-medium">
-                      {new Date(article().date).toLocaleDateString(undefined, {
-                        year: "numeric",
-                        month: "long",
-                        day: "numeric"
-                      })}
-                    </time>
-                  </div>
-                  <div class="w-1 h-1 bg-lightSlate-500 rounded-full" />
-                  <span class="text-sm capitalize font-medium text-lightSlate-400">
-                    {article().type === "patch"
-                      ? "Minecraft Patch"
-                      : "Minecraft News"}
-                  </span>
-                </div>
-              </header>
-
-              {/* Content */}
-              <div id="news_article_content" class="bg-darkSlate-700 rounded-2xl p-8 border border-darkSlate-600">
-                {article().type === "patch" ? (
-                  <Show
-                    when={patchContent.data}
-                    fallback={
-                      <div class="flex items-center justify-center py-16">
-                        <div class="flex items-center gap-3 text-lightSlate-400">
-                          <div class="animate-spin i-ri:loader-4-line text-xl" />
-                          <span class="text-lg">Loading patch content...</span>
-                        </div>
+            {/* Content */}
+            <div
+              id="news_article_content"
+              class="bg-darkSlate-700 rounded-2xl p-8 border border-darkSlate-600"
+            >
+              {article().type === "patch" ? (
+                <Show
+                  when={patchContent.data}
+                  fallback={
+                    <div class="flex items-center justify-center py-16">
+                      <div class="flex items-center gap-3 text-lightSlate-400">
+                        <div class="animate-spin i-ri:loader-4-line text-xl" />
+                        <span class="text-lg">Loading patch content...</span>
                       </div>
-                    }
-                  >
-                    <div class="patch-content">
-                      <style>
-                        {`
+                    </div>
+                  }
+                >
+                  <div class="patch-content">
+                    <style>
+                      {`
                           .patch-content h1, .patch-content h2, .patch-content h3, .patch-content h4, .patch-content h5, .patch-content h6 {
                             font-weight: 700;
                             margin: 1.5rem 0 1rem 0;
@@ -274,40 +278,40 @@ const PageView = () => {
                             font-weight: 600;
                           }
                         `}
-                      </style>
-                      <div
-                        class="text-lightSlate-100 leading-relaxed prose prose-lg prose-invert max-w-none"
-                        // eslint-disable-next-line solid/no-innerhtml
-                        innerHTML={parseToHtml(patchContent.data!)}
-                      />
-                    </div>
-                  </Show>
-                ) : (
-                  <div class="prose prose-xl prose-invert max-w-none">
-                    <p class="text-lightSlate-100 leading-relaxed first-letter:text-6xl first-letter:font-bold first-letter:text-primary-400 first-letter:float-left first-letter:mr-3 first-letter:mt-1">
-                      {article().description}
-                    </p>
+                    </style>
+                    <div
+                      class="text-lightSlate-100 leading-relaxed prose prose-lg prose-invert max-w-none"
+                      // eslint-disable-next-line solid/no-innerhtml
+                      innerHTML={parseToHtml(patchContent.data!)}
+                    />
                   </div>
-                )}
-              </div>
+                </Show>
+              ) : (
+                <div class="prose prose-xl prose-invert max-w-none">
+                  <p class="text-lightSlate-100 leading-relaxed first-letter:text-6xl first-letter:font-bold first-letter:text-primary-400 first-letter:float-left first-letter:mr-3 first-letter:mt-1">
+                    {article().description}
+                  </p>
+                </div>
+              )}
+            </div>
 
-              {/* Action Button */}
-              <div class="flex justify-center pt-4">
-                <Button
-                  onClick={() => window.openExternalLink(article().url)}
-                  class="flex items-center gap-3 px-8 py-4 text-lg font-semibold bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-500 hover:to-primary-600 border border-primary-500/50 shadow-lg hover:shadow-primary-500/25 transition-all duration-300"
-                >
-                  <span>
-                    {article().type === "patch"
-                      ? "Read Full Patch Notes"
-                      : "Read Full Article"}
-                  </span>
-                  <div class="i-ri:external-link-line text-xl" />
-                </Button>
-              </div>
-            </article>
-          )}
-        </Show>
+            {/* Action Button */}
+            <div class="flex justify-center pt-4">
+              <Button
+                onClick={() => window.openExternalLink(article().url)}
+                class="flex items-center gap-3 px-8 py-4 text-lg font-semibold bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-500 hover:to-primary-600 border border-primary-500/50 shadow-lg hover:shadow-primary-500/25 transition-all duration-300"
+              >
+                <span>
+                  {article().type === "patch"
+                    ? "Read Full Patch Notes"
+                    : "Read Full Article"}
+                </span>
+                <div class="i-ri:external-link-line text-xl" />
+              </Button>
+            </div>
+          </article>
+        )}
+      </Show>
     </div>
   )
 }

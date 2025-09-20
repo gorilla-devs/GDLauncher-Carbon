@@ -29,4 +29,3 @@ export const isNewsPath = (path: string | number) => {
 export const isNewsDetailPath = (path: string | number) => {
   return /^\/news\/[^/]+$/.exec(path.toString())
 }
-
