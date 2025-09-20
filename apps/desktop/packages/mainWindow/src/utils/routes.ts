@@ -21,3 +21,12 @@ export const isSearchPath = (path: string | number) => {
 export const isAddonPath = (path: string | number) => {
   return path.toString().startsWith("/addon")
 }
+
+export const isNewsPath = (path: string | number) => {
+  return path.toString().startsWith("/news")
+}
+
+export const isNewsDetailPath = (path: string | number) => {
+  return /^\/news\/[^/]+$/.exec(path.toString())
+}
+

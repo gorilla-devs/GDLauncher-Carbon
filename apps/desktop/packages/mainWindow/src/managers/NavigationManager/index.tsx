@@ -1,5 +1,10 @@
 import { useGlobalStore } from "@/components/GlobalStoreContext"
-import { isAddonPath, isSearchPath } from "@/utils/routes"
+import {
+  isAddonPath,
+  isSearchPath,
+  isNewsPath,
+  isNewsDetailPath
+} from "@/utils/routes"
 import { useLocation, useNavigate } from "@solidjs/router"
 import { JSX, createContext, createSignal, useContext } from "solid-js"
 
@@ -7,6 +12,18 @@ const getTransitionClassToApply = (from: string, to: string) => {
   if (isSearchPath(from) && isAddonPath(to)) {
     return "slide-right-transition"
   } else if (isAddonPath(from) && isSearchPath(to)) {
+    return "slide-left-transition"
+  } else if (
+    isNewsPath(from) &&
+    !isNewsDetailPath(from) &&
+    isNewsDetailPath(to)
+  ) {
+    return "slide-right-transition"
+  } else if (
+    isNewsDetailPath(from) &&
+    isNewsPath(to) &&
+    !isNewsDetailPath(to)
+  ) {
     return "slide-left-transition"
   }
 }
@@ -18,6 +35,7 @@ interface NavigateOptions {
 interface NavigationContext {
   navigate: (_path: string, _options?: NavigateOptions) => void
   prev: () => void
+  lastPathVisited: () => { path: string; searchParams: string }
 }
 
 const NavigationContext = createContext<NavigationContext>()
@@ -73,7 +91,8 @@ export const NavigationManager = (props: { children: JSX.Element }) => {
 
   const navigationCtx = {
     navigate: gdNavigate,
-    prev
+    prev,
+    lastPathVisited
   }
 
   return (

@@ -13,7 +13,6 @@ export const saveScrollPosition = (
 ) => {
   if (!element) return
   const key = generateScrollKey(element, additionalKey)
-  console.log("Saving scroll position for", key, element.scrollTop)
   scrollPositions.set(key, element.scrollTop)
 }
 
@@ -24,7 +23,6 @@ export const restoreScrollPosition = (
   if (!element) return
   const key = generateScrollKey(element, additionalKey)
   const savedPosition = scrollPositions.get(key)
-  console.log("Restoring scroll position for", key, savedPosition)
   if (savedPosition !== undefined) {
     element.scrollTop = savedPosition
   }

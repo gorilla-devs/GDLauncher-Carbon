@@ -1,67 +1,86 @@
-import { createResource, For, Match, Switch } from "solid-js"
-import { initNews } from "@/utils/news"
-import { News, Skeleton } from "@gd/ui"
+import { onMount, createSignal } from "solid-js"
+import { Tab, TabList, Tabs, TabPanel } from "@gd/ui"
 import { Trans } from "@gd/i18n"
+import { isNewsDetailPath } from "@/utils/routes"
+import { useNewsContext } from "@/components/NewsContext"
+import { useGDNavigate } from "@/managers/NavigationManager"
+import NewsTab from "./NewsTab"
+import PatchesTab from "./PatchesTab"
 
 const NewsPage = () => {
-  const newsInitializer = initNews()
+  let scrollContainer: HTMLDivElement | undefined
+  const newsContext = useNewsContext()
+  const navigation = useGDNavigate()
 
-  const [news] = createResource(() => newsInitializer)
+  const isComingFromNewsDetail = () => {
+    const lastPath = navigation.lastPathVisited().path
+    return isNewsDetailPath(lastPath)
+  }
+
+  const shouldLoadSavedTab = isComingFromNewsDetail()
+  const defaultTab = shouldLoadSavedTab ? newsContext.selectedTab() : 0
+  const [selectedTab, setSelectedTab] = createSignal(defaultTab)
+
+  onMount(() => {
+    if (scrollContainer && shouldLoadSavedTab) {
+      setTimeout(() => {
+        if (scrollContainer) {
+          scrollContainer.scrollTop = newsContext.scrollPosition()
+        }
+      }, 50)
+    }
+  })
+
+  const saveStateForNewsDetail = () => {
+    if (scrollContainer) {
+      newsContext.setScrollPosition(scrollContainer.scrollTop)
+    }
+    newsContext.setSelectedTab(selectedTab())
+    newsContext.setIsNavigatingToDetail(true)
+  }
+
   return (
-    <div>
-      <Switch>
-        <Match when={(news()?.length || 0) > 0}>
-          <News
-            slides={news()}
-            disableAutoRotation
-            onClick={(news) => {
-              window.openExternalLink(news.url || "")
-            }}
-          />
-        </Match>
-        <Match when={news() === undefined || news().length === 0}>
-          <Skeleton.newsCarousel />
-        </Match>
-      </Switch>
-      <Switch>
-        <Match when={news() !== undefined && (news()?.length || 0) > 0}>
-          <div class="flex flex-col gap-4 p-6">
-            <h1 class="text-2xl font-medium">
-              <Trans key="news.minecraft_news" />
-            </h1>
-            <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <For each={news()}>
-                {(item) => (
-                  <div
-                    onClick={() => window.open(item.url, "_blank")}
-                    class="cursor-pointer transition-transform hover:scale-[1.02]"
-                  >
-                    <img
-                      src={item.image}
-                      alt={item.title}
-                      class="aspect-video w-full object-cover"
-                    />
-                    <div class="p-4">
-                      <h2 class="mb-2 text-lg font-medium">{item.title}</h2>
-                      <p class="text-lightSlate-400 text-sm mb-2">{item.description}</p>
-                      <p class="text-lightSlate-500 text-xs">
-                        {new Date(item.date).toLocaleDateString(undefined, {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric"
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </For>
-            </div>
+    <div class="h-full flex flex-col">
+      <div class="h-full flex flex-col">
+        <Tabs
+          orientation="horizontal"
+          index={selectedTab()}
+          onChange={setSelectedTab}
+        >
+          <div class="sticky top-0 z-50 bg-darkSlate-800 px-6 flex-shrink-0">
+            <TabList>
+              <Tab>
+                <div class="flex items-center gap-2 py-3">
+                  <i class="i-ri:newspaper-line w-5 h-5" />
+                  <Trans key="news.minecraft_news">News</Trans>
+                </div>
+              </Tab>
+              <Tab>
+                <div class="flex items-center gap-2 py-3">
+                  <i class="i-ri:file-text-line w-5 h-5" />
+                  <Trans key="news.minecraft_patches">Patch Notes</Trans>
+                </div>
+              </Tab>
+            </TabList>
           </div>
-        </Match>
-        <Match when={news() === undefined}>
-          <Skeleton.news />
-        </Match>
-      </Switch>
+
+          <div ref={scrollContainer} class="flex-1 overflow-y-auto">
+            <TabPanel>
+              <NewsTab
+                scrollContainer={scrollContainer}
+                onNavigateToDetail={saveStateForNewsDetail}
+              />
+            </TabPanel>
+
+            <TabPanel>
+              <PatchesTab
+                scrollContainer={scrollContainer}
+                onNavigateToDetail={saveStateForNewsDetail}
+              />
+            </TabPanel>
+          </div>
+        </Tabs>
+      </div>
     </div>
   )
 }
