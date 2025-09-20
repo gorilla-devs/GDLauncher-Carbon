@@ -74,7 +74,8 @@ export function SearchApiDropdown() {
                   if (value === searchResults?.searchQuery().searchApi) {
                     searchResults?.setSearchQuery((prev) => ({
                       ...prev,
-                      searchApi: null
+                      searchApi: null,
+                      platformFilters: null
                     }))
                   } else {
                     searchResults?.setSearchQuery((prev) => ({
