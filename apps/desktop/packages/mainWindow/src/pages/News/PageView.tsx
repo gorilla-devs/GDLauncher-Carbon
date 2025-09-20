@@ -282,7 +282,7 @@ const PageView = () => {
                     <div
                       class="text-lightSlate-100 leading-relaxed prose prose-lg prose-invert max-w-none"
                       // eslint-disable-next-line solid/no-innerhtml
-                      innerHTML={parseToHtml(patchContent.data!)}
+                      innerHTML={parseToHtml(patchContent.data)}
                     />
                   </div>
                 </Show>
