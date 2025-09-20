@@ -145,16 +145,16 @@ const PatchesTab = (props: PatchesTabProps) => {
               {() => (
                 <div class="relative flex mb-8">
                   <div class="relative flex flex-col items-center mr-8">
-                    <div class="w-16 h-16 bg-lightSlate-700 rounded-full animate-pulse"></div>
+                    <div class="w-16 h-16 bg-darkSlate-500 skeleton-shimmer rounded-full"></div>
                   </div>
-                  <div class="flex-1 p-6 rounded-xl border border-lightSlate-700/50 bg-lightSlate-900/30">
+                  <div class="flex-1 p-6 rounded-xl border border-darkSlate-600 bg-darkSlate-700">
                     <div class="flex gap-4">
-                      <div class="w-20 h-20 bg-lightSlate-700 rounded-lg animate-pulse"></div>
+                      <div class="w-20 h-20 bg-darkSlate-500 skeleton-shimmer rounded-lg"></div>
                       <div class="flex-1 space-y-3">
-                        <div class="h-6 bg-lightSlate-700 rounded animate-pulse w-3/4"></div>
-                        <div class="h-4 bg-lightSlate-700 rounded animate-pulse w-full"></div>
-                        <div class="h-4 bg-lightSlate-700 rounded animate-pulse w-2/3"></div>
-                        <div class="h-4 bg-lightSlate-700 rounded animate-pulse w-1/3"></div>
+                        <div class="h-6 bg-darkSlate-500 skeleton-shimmer rounded w-3/4"></div>
+                        <div class="h-4 bg-darkSlate-500 skeleton-shimmer rounded w-full"></div>
+                        <div class="h-4 bg-darkSlate-500 skeleton-shimmer rounded w-2/3"></div>
+                        <div class="h-4 bg-darkSlate-500 skeleton-shimmer rounded w-1/3"></div>
                       </div>
                     </div>
                   </div>
