@@ -288,7 +288,7 @@ const PageView = () => {
                 </Show>
               ) : (
                 <div class="prose prose-xl prose-invert max-w-none">
-                  <p class="text-lightSlate-100 leading-relaxed first-letter:text-6xl first-letter:font-bold first-letter:text-primary-400 first-letter:float-left first-letter:mr-3 first-letter:mt-1">
+                  <p class="text-lightSlate-100 leading-relaxed">
                     {article().description}
                   </p>
                 </div>
