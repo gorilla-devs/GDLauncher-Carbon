@@ -55,7 +55,7 @@ const Authors = (props: Props) => {
     if (!rawAuthors) return []
 
     if (props.isCurseforge) {
-      return (rawAuthors as CFFEModAuthor[]).map(author => ({
+      return (rawAuthors as CFFEModAuthor[]).map((author) => ({
         name: author.name,
         avatarUrl: author.avatarUrl,
         url: author.url,
@@ -63,7 +63,7 @@ const Authors = (props: Props) => {
         platform: "curseforge" as const
       }))
     } else if (props.isModrinth) {
-      return (rawAuthors as MRFETeamMember[]).map(member => ({
+      return (rawAuthors as MRFETeamMember[]).map((member) => ({
         name: member.user.name || member.user.username,
         avatarUrl: member.user.avatar_url,
         role: member.role,

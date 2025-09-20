@@ -1,4 +1,15 @@
-import { Badge, Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
+import {
+  Badge,
+  Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from "@gd/ui"
 import { For, Show } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import { AddonType } from "@gd/core_module/bindings"
@@ -64,7 +75,7 @@ export const AddonFilters = (props: AddonFiltersProps) => {
               </span>
               <Select
                 value={props.platformFilter()}
-                onChange={props.setPlatformFilter}
+                onChange={(value) => value && props.setPlatformFilter(value)}
                 options={["all", "curseforge", "modrinth", "local"]}
                 placeholder=""
                 disallowEmptySelection={true}
@@ -109,43 +120,49 @@ export const AddonFilters = (props: AddonFiltersProps) => {
                 }}
               >
                 <SelectTrigger class="w-40">
-                  <SelectValue<string>>{(state) => {
-                    const getLabel = (value: string) => {
-                      switch (value) {
-                        case "all":
-                          return t("instance.filter.all")
-                        case "curseforge":
-                          return t("platforms.curseforge")
-                        case "modrinth":
-                          return t("platforms.modrinth")
-                        case "local":
-                          return t("instance.filter.local")
-                        default:
-                          return value
+                  <SelectValue<string>>
+                    {(state) => {
+                      const getLabel = (value: string) => {
+                        switch (value) {
+                          case "all":
+                            return t("instance.filter.all")
+                          case "curseforge":
+                            return t("platforms.curseforge")
+                          case "modrinth":
+                            return t("platforms.modrinth")
+                          case "local":
+                            return t("instance.filter.local")
+                          default:
+                            return value
+                        }
                       }
-                    }
-                    const getIcon = (value: string) => {
-                      switch (value) {
-                        case "all":
-                          return <div class="i-ri:global-line w-4 h-4" />
-                        case "curseforge":
-                          return <div class="i-simple-icons:curseforge w-4 h-4" />
-                        case "modrinth":
-                          return <div class="i-simple-icons:modrinth w-4 h-4" />
-                        case "local":
-                          return <div class="i-ri:folder-line w-4 h-4" />
-                        default:
-                          return null
+                      const getIcon = (value: string) => {
+                        switch (value) {
+                          case "all":
+                            return <div class="i-ri:global-line w-4 h-4" />
+                          case "curseforge":
+                            return (
+                              <div class="i-simple-icons:curseforge w-4 h-4" />
+                            )
+                          case "modrinth":
+                            return (
+                              <div class="i-simple-icons:modrinth w-4 h-4" />
+                            )
+                          case "local":
+                            return <div class="i-ri:folder-line w-4 h-4" />
+                          default:
+                            return null
+                        }
                       }
-                    }
-                    const selectedValue = state.selectedOption()
-                    return (
-                      <div class="flex items-center gap-2">
-                        {getIcon(selectedValue)}
-                        {getLabel(selectedValue)}
-                      </div>
-                    )
-                  }}</SelectValue>
+                      const selectedValue = state.selectedOption()
+                      return (
+                        <div class="flex items-center gap-2">
+                          {getIcon(selectedValue)}
+                          {getLabel(selectedValue)}
+                        </div>
+                      )
+                    }}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent />
               </Select>

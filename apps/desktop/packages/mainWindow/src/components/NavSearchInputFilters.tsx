@@ -316,7 +316,7 @@ export function SearchModloaderDropdown(_props: DropdownProps) {
 
     // Fast filtering
     return modloadersList.filter((modloader) =>
-      modloader.label.toLowerCase().includes(query)
+      modloader.label?.toLowerCase().includes(query)
     )
   })
 
@@ -535,9 +535,7 @@ export function CurseforgeFiltersDropdown(_props: DropdownProps) {
         </DropdownMenuSubTrigger>
         <DropdownMenuPortal>
           <DropdownMenuSubContent>
-            <DropdownMenuRadioGroup
-              value={currentFilters().sort_field ?? ""}
-            >
+            <DropdownMenuRadioGroup value={currentFilters().sort_field ?? ""}>
               <For each={sortFieldOptions}>
                 {(option) => (
                   <DropdownMenuRadioItem
@@ -565,9 +563,7 @@ export function CurseforgeFiltersDropdown(_props: DropdownProps) {
         </DropdownMenuSubTrigger>
         <DropdownMenuPortal>
           <DropdownMenuSubContent>
-            <DropdownMenuRadioGroup
-              value={currentFilters().sort_order ?? ""}
-            >
+            <DropdownMenuRadioGroup value={currentFilters().sort_order ?? ""}>
               <For each={["ascending", "descending"] as const}>
                 {(value) => (
                   <DropdownMenuRadioItem
@@ -631,9 +627,7 @@ export function ModrinthFiltersDropdown(_props: DropdownProps) {
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent>
-          <DropdownMenuRadioGroup
-            value={currentFilters().sort_index ?? ""}
-          >
+          <DropdownMenuRadioGroup value={currentFilters().sort_index ?? ""}>
             <For each={sortOptions}>
               {(option) => (
                 <DropdownMenuRadioItem
@@ -951,7 +945,7 @@ export function PlatformSpecificFilters(_props: DropdownProps) {
             src={selectedApi() === "curseforge" ? CurseforgeLogo : ModrinthLogo}
             class="h-4 w-4"
           />
-          {capitalize(selectedApi()!)} Filters
+          {capitalize(selectedApi())} Filters
         </div>
       </DropdownMenuLabel>
       <DropdownMenuSeparator />

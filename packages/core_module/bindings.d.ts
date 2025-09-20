@@ -132,8 +132,6 @@ export type MRFELicense = { id: string; name: string; url: string | null }
 
 export type SetFavorite = { instance: FEInstanceId; favorite: boolean }
 
-export type FEUnifiedSearchResultWithDescription = ({ title: string; slug: string; description: string; imageUrl: string | null; highResImageUrl: string | null; downloadsCount: number; id: string; releaseDate: string; lastUpdated: string; platform: FEUnifiedPlatform; type: FEUnifiedSearchType; authors: FEUnifiedAuthor[]; websiteUrl: string | null; categories: FEUnifiedCategoryId[]; screenshotUrls: string[]; minecraftVersions: string[]; versions: string[] | null; mainFileId: string | null }) & { fullDescriptionBody: string }
-
 export type CFFEModAuthor = { id: number; name: string; url: string; avatarUrl: string | null }
 
 export type FEUnifiedModLoaders = FEUnifiedModLoaderType[]
@@ -190,6 +188,8 @@ export type CFFEModAsset = { id: number; modId: number; title: string; descripti
 export type FEUnifiedAuthor = { name: string; avatarUrl: string | null }
 
 export type XboxError = "noAccount" | "xboxServicesBanned" | "adultVerificationRequired" | "childAccount" | { unknown: number }
+
+export type FEModrinthSearchIndex = "relevance" | "downloads" | "follows" | "newest" | "updated"
 
 export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: FEReleaseChannel; lastAppVersion: string | null; concurrentDownloads: number; downloadDependencies: boolean; launcherActionOnGameLaunch: FELauncherActionOnGameLaunch; showAppCloseWarning: boolean; showFeatured: boolean; instancesSortBy: InstancesSortBy; instancesSortByAsc: boolean; instancesGroupBy: InstancesGroupBy; instancesGroupByAsc: boolean; instancesTileSize: number; deletionThroughRecycleBin: boolean; xmx: number; xms: number; preLaunchHook: string | null; wrapperCommand: string | null; postExitHook: string | null; isFirstLaunch: boolean; gameResolution: GameResolution | null; javaCustomArgs: string; autoManageJavaSystemProfiles: boolean; modSources: ModSources; termsAndPrivacyAccepted: boolean; hashedEmailAccepted: boolean; gdlAccountId: string | null }
 
@@ -253,6 +253,8 @@ export type MRFEProjectID = string
 
 export type MRFEVersionIDs = string[]
 
+export type FEPlatformFilters = { platform: "curseforge"; filters: { sort_field: FECurseforgeSearchSortField | null; sort_order: FEUnifiedModSearchSortOrder | null } } | { platform: "modrinth"; filters: { sort_index: FEModrinthSearchIndex | null } }
+
 export type MRFEModeratorMessage = { message: string; body: string | null }
 
 export type CFFEModDescriptionParameters = { modId: number }
@@ -266,10 +268,6 @@ export type FEChangeGdlAccountNickname = { uuid: string; nickname: string }
 export type FEGDLAccountStatus = { status: "valid"; value: FEGDLAccount } | { status: "invalid" } | { status: "skipped" } | { status: "unset" }
 
 export type FEReleaseChannel = "stable" | "alpha" | "beta"
-
-export type FEUnifiedModSortIndex = "relevance" | "downloads" | "lastUpdated"
-
-export type FEUnifiedProjectID = { type: "curseforge"; value: number } | { type: "modrinth"; value: string }
 
 export type MRFEProjectSearchResult = { slug: string; title: string; description: string; categories: string[] | null; client_side: MRFEProjectSupportRange; server_side: MRFEProjectSupportRange; project_type: MRFEProjectType; downloads: number; icon_url: string | null; color: number | null; project_id: string; author: string; display_categories: string[] | null; versions: string[]; follows: number; date_created: string; date_modified: string; latest_version: string | null; license: string; gallery: string[] | null; featured_gallery: string | null }
 
@@ -308,6 +306,8 @@ export type CFFEFile = { id: number; gameId: number; modId: number; isAvailable:
 export type MRFEProjectsResponse = MRFEProject[]
 
 export type FEFilesResponse = { data: CFFEFile[]; pagination: CFFEPagination | null }
+
+export type FEUnifiedSearchParameters = { searchQuery: string | null; categories: And<FEUnifiedCategoryId> | null; gameVersions: Or<string> | null; modloaders: Or<FEUnifiedModLoaderType> | null; projectType: FEUnifiedSearchType | null; platformFilters: FEPlatformFilters | null; index: number | null; pageSize: number | null; searchApi: FEUnifiedPlatform | null; environment: FEUnifiedEnvironment | null }
 
 export type FEUnifiedCategoryId = number | string
 
@@ -401,6 +401,8 @@ export type MRFEVersionID = string
 
 export type And<T> = T[]
 
+export type FEUnifiedProjectID = { type: "curseforge"; value: number } | { type: "modrinth"; value: string }
+
 export type LatestModSource = { Curseforge: number } | { Modrinth: string }
 
 export type FEModdedManifestLoaderVersion = { id: string }
@@ -449,6 +451,8 @@ export type ExportEntry = { entries: { [key: string]: ExportEntry | null } }
 
 export type ModrinthMod = { project_id: string; version_id: string }
 
+export type FEUnifiedSearchResultWithDescription = ({ title: string; slug: string; description: string; imageUrl: string | null; highResImageUrl: string | null; downloadsCount: number; id: string; releaseDate: string; lastUpdated: string; platform: FEUnifiedPlatform; type: FEUnifiedSearchType; authors: FEUnifiedAuthor[]; websiteUrl: string | null; categories: FEUnifiedCategoryId[]; screenshotUrls: string[]; minecraftVersions: string[]; versions: string[] | null; mainFileId: string | null }) & { fullDescriptionBody: string }
+
 export type AccountType = { type: "microsoft"; value: { email: string | null } } | { type: "offline" }
 
 export type FEUnifiedCategory = { platform: FEUnifiedPlatform; id: FEUnifiedCategoryId; name: string | null; icon: FEUnifiedCategoryIcon | null; projectType: FEUnifiedSearchType; parentId: string | null }
@@ -474,8 +478,6 @@ export type CFFEModSearchSortOrder = "ascending" | "descending"
 export type CFFEModLoaderType = "forge" | "neoforge" | "cauldron" | "liteloader" | "fabric" | "quilt" | "unknown"
 
 export type MRFEVersionsResponse = MRFEVersion[]
-
-export type FEUnifiedSearchParameters = { searchQuery: string | null; categories: And<FEUnifiedCategoryId> | null; gameVersions: Or<string> | null; modloaders: Or<FEUnifiedModLoaderType> | null; projectType: FEUnifiedSearchType | null; sortIndex: FEUnifiedModSortIndex | null; sortOrder: FEUnifiedModSearchSortOrder | null; index: number | null; pageSize: number | null; searchApi: FEUnifiedPlatform | null; environment: FEUnifiedEnvironment | null }
 
 export type CFFEFileIndex = { gameVersion: string; fileId: number; filename: string; releaseType: CFFEFileReleaseType; gameVersionTypeId: number | null; modLoader: CFFEModLoaderType | null }
 
@@ -566,3 +568,5 @@ export type MRFEUserRole = "developer" | "moderator" | "admin"
 export type FERegisterAccount = { email: string; nickname: string; uuid: string }
 
 export type ExportTarget = "Curseforge" | "Modrinth"
+
+export type FECurseforgeSearchSortField = "featured" | "popularity" | "totalDownloads" | "lastUpdated" | "name" | "author" | "category" | "gameVersion"

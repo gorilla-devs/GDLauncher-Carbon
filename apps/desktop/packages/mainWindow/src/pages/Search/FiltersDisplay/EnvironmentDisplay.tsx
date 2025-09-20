@@ -24,7 +24,7 @@ export default function EnvironmentDisplay() {
                 : "i-ri:computer-line"
             }`}
           />
-          {capitalize(searchContext?.searchQuery().environment!)}
+          {capitalize(searchContext?.searchQuery().environment)}
         </div>
       </FilterBadge>
     </Show>

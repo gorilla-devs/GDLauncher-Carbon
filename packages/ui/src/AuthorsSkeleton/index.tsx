@@ -44,10 +44,10 @@ export const AuthorsSkeleton = (props: AuthorsSkeletonProps) => {
               <div
                 class="absolute rounded-full border-4 border-darkSlate-800"
                 style={{
-                  "width": `calc(${sizeClasses().avatar.split(' ')[0].replace('w-', '')} * 0.25rem + 8px)`,
-                  "height": `calc(${sizeClasses().avatar.split(' ')[1].replace('h-', '')} * 0.25rem + 8px)`,
-                  "left": "-4px",
-                  "top": "-4px",
+                  width: `calc(${sizeClasses().avatar.split(" ")[0].replace("w-", "")} * 0.25rem + 8px)`,
+                  height: `calc(${sizeClasses().avatar.split(" ")[1].replace("h-", "")} * 0.25rem + 8px)`,
+                  left: "-4px",
+                  top: "-4px",
                   "z-index": "-1"
                 }}
               />

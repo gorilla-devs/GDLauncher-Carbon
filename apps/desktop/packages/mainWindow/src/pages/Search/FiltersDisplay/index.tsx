@@ -20,8 +20,7 @@ export default function FiltersDisplay() {
       query?.gameVersions?.length ||
       query?.searchApi ||
       query?.environment ||
-      query?.sortIndex ||
-      query?.sortOrder ||
+      query?.platformFilters ||
       searchContext?.selectedInstanceId()
     )
   }

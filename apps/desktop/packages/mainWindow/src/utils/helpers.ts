@@ -198,6 +198,8 @@ export const parseError = (error: RSPCError) => {
   return parsedError.cause[0].display
 }
 
-export const capitalize = (word: string) => {
-  return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+export const capitalize = (word: string | null | undefined) => {
+  if (!word) return word
+
+  return word?.charAt(0).toUpperCase() + word?.slice(1).toLowerCase()
 }

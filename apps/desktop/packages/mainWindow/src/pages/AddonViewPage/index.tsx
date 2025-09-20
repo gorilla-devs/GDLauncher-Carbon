@@ -241,15 +241,23 @@ const AddonExplore = () => {
                     <div class="flex items-center gap-2 p-0 lg:px-2">
                       <div class="flex gap-2 text-sm">
                         <Switch>
-                          <Match when={!isFetching() && project.data?.authors && project.data.authors.length > 0}>
+                          <Match
+                            when={
+                              !isFetching() &&
+                              project.data?.authors &&
+                              project.data.authors.length > 0
+                            }
+                          >
                             <AuthorAvatars
-                              authors={project.data!.authors.map((author): Author => ({
-                                name: author.name,
-                                avatarUrl: author.avatarUrl,
-                                id: author.name, // Use name as ID since FEUnifiedAuthor doesn't have separate ID
-                                platform: project.data!.platform,
-                                url: null // FEUnifiedAuthor doesn't include profile URLs
-                              }))}
+                              authors={project.data!.authors.map(
+                                (author): Author => ({
+                                  name: author.name,
+                                  avatarUrl: author.avatarUrl,
+                                  id: author.name, // Use name as ID since FEUnifiedAuthor doesn't have separate ID
+                                  platform: project.data!.platform,
+                                  url: null // FEUnifiedAuthor doesn't include profile URLs
+                                })
+                              )}
                               maxDisplay={4}
                               size="md"
                             />

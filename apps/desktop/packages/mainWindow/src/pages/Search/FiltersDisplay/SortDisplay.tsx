@@ -15,37 +15,58 @@ export default function SortDisplay() {
     }))
   }
 
+  const getCurseforgeSortField = () => {
+    const filters = platformFilters()
+    return (
+      (filters?.platform === "curseforge" && filters.filters.sort_field) || null
+    )
+  }
+
+  const getCurseforgeSortOrder = () => {
+    const filters = platformFilters()
+    return (
+      (filters?.platform === "curseforge" && filters.filters.sort_order) || null
+    )
+  }
+
+  const getModrinthSortIndex = () => {
+    const filters = platformFilters()
+    return (
+      (filters?.platform === "modrinth" && filters.filters.sort_index) || null
+    )
+  }
+
   return (
     <>
-      <Show when={platformFilters()?.platform === "curseforge" && platformFilters()?.filters.sort_field}>
+      <Show when={getCurseforgeSortField()}>
         <FilterBadge onClick={clearPlatformFilters}>
           <div class="flex items-center gap-2">
             <div class="i-ri:sort-asc h-4 w-4" />
-            Sort: {capitalize(platformFilters()!.filters.sort_field!)}
+            Sort: {capitalize(getCurseforgeSortField())}
           </div>
         </FilterBadge>
       </Show>
 
-      <Show when={platformFilters()?.platform === "curseforge" && platformFilters()?.filters.sort_order}>
+      <Show when={getCurseforgeSortOrder()}>
         <FilterBadge onClick={clearPlatformFilters}>
           <div class="flex items-center gap-2">
             <div
               class={`h-4 w-4 ${
-                platformFilters()!.filters.sort_order === "ascending"
+                getCurseforgeSortOrder() === "ascending"
                   ? "i-ri:sort-asc"
                   : "i-ri:sort-desc"
               }`}
             />
-            Order: {capitalize(platformFilters()!.filters.sort_order!)}
+            Order: {capitalize(getCurseforgeSortOrder())}
           </div>
         </FilterBadge>
       </Show>
 
-      <Show when={platformFilters()?.platform === "modrinth" && platformFilters()?.filters.sort_index}>
+      <Show when={getModrinthSortIndex()}>
         <FilterBadge onClick={clearPlatformFilters}>
           <div class="flex items-center gap-2">
             <div class="i-ri:sort-asc h-4 w-4" />
-            Sort: {capitalize(platformFilters()!.filters.sort_index!)}
+            Sort: {capitalize(getModrinthSortIndex())}
           </div>
         </FilterBadge>
       </Show>

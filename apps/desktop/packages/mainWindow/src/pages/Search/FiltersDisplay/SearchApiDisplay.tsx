@@ -27,7 +27,7 @@ export default function SearchApiDisplay() {
             }
             class="h-4 w-4"
           />
-          {capitalize(searchContext?.searchQuery().searchApi!)}
+          {capitalize(searchContext?.searchQuery().searchApi)}
         </div>
       </FilterBadge>
     </Show>

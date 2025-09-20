@@ -5,12 +5,6 @@ import {
   Mod,
   MRFEVersion
 } from "@gd/core_module/bindings"
-import useModpacksQuery from "@/pages/Modpacks/useModsQuery"
-import useModsQuery from "@/pages/Mods/useModsQuery"
-
-export const [modpacksQuery, setModpacksQuery] = useModpacksQuery()
-
-export const [modsQuery, setModsQuery] = useModsQuery()
 
 interface BaseProps {
   data: FEUnifiedSearchResult

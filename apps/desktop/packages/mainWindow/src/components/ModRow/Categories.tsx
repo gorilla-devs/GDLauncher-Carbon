@@ -21,7 +21,7 @@ const Categories = (props: Props) => {
               <Tooltip>
                 <TooltipTrigger>
                   <Tag
-                    name={capitalize(String(categories()[0]))}
+                    name={capitalize(String(categories()[0])) ?? undefined}
                     type="fixed"
                   />
                 </TooltipTrigger>
@@ -39,7 +39,10 @@ const Categories = (props: Props) => {
                   <div class="flex gap-2">
                     <For each={categories().slice(1)}>
                       {(category) => (
-                        <Tag name={capitalize(String(category))} type="fixed" />
+                        <Tag
+                          name={capitalize(String(category)) ?? undefined}
+                          type="fixed"
+                        />
                       )}
                     </For>
                   </div>
@@ -53,7 +56,10 @@ const Categories = (props: Props) => {
           {(category) => (
             <Tooltip>
               <TooltipTrigger>
-                <Tag name={capitalize(String(category))} type="fixed" />
+                <Tag
+                  name={capitalize(String(category)) ?? undefined}
+                  type="fixed"
+                />
               </TooltipTrigger>
               <TooltipContent>{capitalize(String(category))}</TooltipContent>
             </Tooltip>
