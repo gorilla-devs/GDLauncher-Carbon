@@ -69,9 +69,7 @@ const FeaturedModpackTile = () => {
                 !!hexingTales()?.data
             }}
             onClick={() => {
-              navigator.navigate(
-                `/addon/${HEXING_TALES_MODPACK_ID}/curseforge`
-              )
+              navigator.navigate(`/addon/${HEXING_TALES_MODPACK_ID}/curseforge`)
             }}
           >
             <div
