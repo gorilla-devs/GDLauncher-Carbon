@@ -75,7 +75,7 @@ const DuplicateModsResolution = (props: ModalProps) => {
 
         // Delete each selected mod
         for (const modId of modsToDelete) {
-            await deleteModMutation.mutate({
+            deleteModMutation.mutate({
                 instance_id: instanceId,
                 mod_id: modId
             })
@@ -108,10 +108,6 @@ const DuplicateModsResolution = (props: ModalProps) => {
     }
 
     const isLoading = () => deleteModMutation.isPending
-
-    if (!currentStep()) {
-        return null
-    }
 
     return (
         <ModalLayout title={props.title}>
