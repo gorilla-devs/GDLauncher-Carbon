@@ -216,17 +216,27 @@ pub fn chain_lwjgl_libs_with_base_libs(
                         if let Some(classifier) = classifiers.get(&native_key) {
                             classifier.path.clone()
                         } else {
-                            tracing::warn!("Library {} has classifier but missing native key {}", library.name, native_key);
+                            tracing::warn!(
+                                "Library {} has classifier but missing native key {}",
+                                library.name,
+                                native_key
+                            );
                             return None;
                         }
                     } else {
-                        tracing::warn!("Library {} has downloads but no artifact or classifier", library.name);
+                        tracing::warn!(
+                            "Library {} has downloads but no artifact or classifier",
+                            library.name
+                        );
                         return None;
                     }
                 } else if library.url.is_some() {
                     library.name.into_path().to_string_lossy().to_string()
                 } else {
-                    tracing::warn!("Library {} has no method of retrieval (no downloads or url)", library.name);
+                    tracing::warn!(
+                        "Library {} has no method of retrieval (no downloads or url)",
+                        library.name
+                    );
                     return None;
                 }
             });

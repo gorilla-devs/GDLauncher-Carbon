@@ -8,8 +8,8 @@ pub fn get_client(gdl_base_api: String) -> reqwest_middleware::ClientBuilder {
         gdl_api_base_host: url::Url,
     };
 
-    let gdl_api_base_host = url::Url::parse(&gdl_base_api)
-        .expect("Failed to parse GDLauncher API base URL");
+    let gdl_api_base_host =
+        url::Url::parse(&gdl_base_api).expect("Failed to parse GDLauncher API base URL");
 
     #[async_trait::async_trait]
     impl Middleware for AddHeaderMiddleware {
@@ -29,31 +29,44 @@ pub fn get_client(gdl_base_api: String) -> reqwest_middleware::ClientBuilder {
                 let api_key = option_env!("CURSEFORGE_API_KEY")
                     .expect("CURSEFORGE_API_KEY environment variable not set. Please set it to use CurseForge features.");
 
-                let api_key_header = api_key.parse()
+                let api_key_header = api_key
+                    .parse()
                     .expect("Failed to parse CURSEFORGE_API_KEY as header value");
 
                 req.headers_mut().insert("x-api-key", api_key_header);
 
-                req.headers_mut()
-                    .insert("Content-Type", "application/json".parse()
-                        .expect("Failed to parse Content-Type header"));
+                req.headers_mut().insert(
+                    "Content-Type",
+                    "application/json"
+                        .parse()
+                        .expect("Failed to parse Content-Type header"),
+                );
 
-                req.headers_mut()
-                    .insert("Accept", "application/json".parse()
-                        .expect("Failed to parse Accept header"));
+                req.headers_mut().insert(
+                    "Accept",
+                    "application/json"
+                        .parse()
+                        .expect("Failed to parse Accept header"),
+                );
             }
 
-            let modrinth_api_base = url::Url::parse(MODRINTH_API_BASE)
-                .expect("Failed to parse MODRINTH_API_BASE URL");
+            let modrinth_api_base =
+                url::Url::parse(MODRINTH_API_BASE).expect("Failed to parse MODRINTH_API_BASE URL");
 
             if req.url().host_str() == modrinth_api_base.host_str() {
-                req.headers_mut()
-                    .insert("Content-Type", "application/json".parse()
-                        .expect("Failed to parse Content-Type header"));
+                req.headers_mut().insert(
+                    "Content-Type",
+                    "application/json"
+                        .parse()
+                        .expect("Failed to parse Content-Type header"),
+                );
 
-                req.headers_mut()
-                    .insert("Accept", "application/json".parse()
-                        .expect("Failed to parse Accept header"));
+                req.headers_mut().insert(
+                    "Accept",
+                    "application/json"
+                        .parse()
+                        .expect("Failed to parse Accept header"),
+                );
             }
 
             // Continue with the modified request.

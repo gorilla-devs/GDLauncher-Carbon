@@ -140,9 +140,13 @@ async fn get_available_port() -> TcpListener {
         }
     }
 
-    tracing::error!("No available port found in range 1025-65535. Please close some applications and try again.");
+    tracing::error!(
+        "No available port found in range 1025-65535. Please close some applications and try again."
+    );
 
-    panic!("No available port found in range 1025-65535. All ports appear to be in use. Please close some applications that may be using network ports and try again.");
+    panic!(
+        "No available port found in range 1025-65535. All ports appear to be in use. Please close some applications that may be using network ports and try again."
+    );
 }
 
 async fn start_router(runtime_path: PathBuf, base_api_override: String, listener: TcpListener) {
@@ -188,7 +192,8 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
         .layer(cors)
         .with_state(app1);
 
-    let port = listener.local_addr()
+    let port = listener
+        .local_addr()
         .expect("Failed to get local address from TCP listener")
         .port();
 
@@ -201,8 +206,12 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
             counter += 1;
             // If we've waited for 40 seconds, give up
             if counter > 200 {
-                tracing::error!("Server failed to start within 40 seconds. This may indicate a system issue or insufficient resources.");
-                panic!("Server failed to start within 40 seconds. Please check system logs for errors and ensure sufficient system resources are available.");
+                tracing::error!(
+                    "Server failed to start within 40 seconds. This may indicate a system issue or insufficient resources."
+                );
+                panic!(
+                    "Server failed to start within 40 seconds. Please check system logs for errors and ensure sufficient system resources are available."
+                );
             }
 
             interval.tick().await;
