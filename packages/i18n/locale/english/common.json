@@ -262,6 +262,9 @@
   "instance.more_options": "More options",
   "instance.add_favorite": "Add favorite",
   "instance.remove_favorite": "Remove favorite",
+  "instance.duplicate_mods_description": "Select which duplicate mods to remove. These mods have the same mod ID and may cause conflicts.",
+  "instance.mods_selected_for_removal": "mods selected for removal",
+  "instance.remove_selected": "Remove Selected",
   "instance.import_select_all_instances": "Select All",
   "instance.import_deselect_all_instances": "Deselect All",
   "instance.error_invalid": "Instance Invalid or corrupted, try repairing it!",
@@ -622,7 +625,6 @@
   "account_expired.expiration_description": "You can still use GDLauncher and launch instances, but you might not be able to join any servers or play multiplayer. Also, if you have a GDL account linked to this account, it won't sync.",
   "account_expired.back_to_login": "Back to login",
   "account_expired.launch_anyway": "Launch anyway",
-
   "logs_density": "Logs Density",
   "logs_density.low": "Low",
   "logs_density.comfortable": "Comfortable",
@@ -634,13 +636,10 @@
   "columns.thread_name": "Thread Name",
   "columns.level": "Log Level",
   "font_size": "Font Size",
-
   "modals.title.new_instance": "New Instance",
   "modals.title.modify_instance": "Modify Instance",
-
   "modals.bisectHosting.promotion": "Grab a server from our official partner <0>BisectHosting</0> for effortless modded server installs and updates. New customers can save <1>25%</1> off their first month using the promo code <2>GDL</2> at checkout.",
   "modals.bisectHosting.buttonText": "Go to BisectHosting.com",
-
   "search.search_discover_anything": "Click to discover or search anything...",
   "search.no_results_found": "No results found",
   "search.no_results_description": "We couldn't find any {type}s matching your search criteria. Try adjusting your filters or search terms.",
@@ -678,22 +677,18 @@
   "search.newest": "Newest",
   "search.updated": "Updated",
   "search.universal_filters": "Universal Filters",
-
   "notifications.instance_created_success": "Instance successfully created.",
   "notifications.instance_created_error": "Error while creating the instance.",
   "notifications.modpack_download_error": "Error while downloading the modpack.",
   "notifications.cannot_delete_instance": "Cannot delete instance",
   "notifications.custom_java_added": "Custom Java Path added successfully",
-
   "placeholders.type_java_path": "Type a java path",
   "placeholders.type_profile_name": "Type a profile name",
   "placeholders.type_custom_java_path": "Type a custom java path",
   "placeholders.select_java_profile": "Select a java profile",
   "placeholders.find_logs": "Find (Ctrl+F)",
   "placeholders.email_example": "email@example.com",
-
   "errors.profile_name_exists": "Profile name already exists",
-
   "ui.path": "Path",
   "ui.profile": "Profile",
   "ui.custom": "Custom",
@@ -706,9 +701,7 @@
   "ui.changelog": "Changelog",
   "ui.screenshots": "Screenshots",
   "ui.versions": "Versions",
-
   "news.minecraft_news": "Minecraft News",
-
   "modals.privacy_statement": "Privacy Statement",
   "modals.terms_and_conditions": "Terms and Conditions",
   "modals.add_java_version": "Add java version",
@@ -733,7 +726,7 @@
   "modals.bisecthosting_affiliate": "BisectHosting Affiliate",
   "modals.change_recovery_email": "Change GDLAccount Recovery Email",
   "modals.confirm_cache_clear": "Clear Addon Cache",
-
+  "modals.duplicate_mods_resolution": "Duplicate Mods Found",
   "modals.mod_details.overview": "Overview",
   "modals.mod_details.technical": "Technical",
   "modals.mod_details.version": "Version",
@@ -757,6 +750,5 @@
   "modals.mod_details.sha512": "SHA-512",
   "modals.mod_details.murmur2_signed": "Murmur2 (Signed)",
   "modals.mod_details.murmur2_unsigned": "Murmur2 (Unsigned)",
-
   "errors.some_error": "Some error occurred"
 }

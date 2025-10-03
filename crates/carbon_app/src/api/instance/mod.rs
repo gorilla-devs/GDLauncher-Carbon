@@ -448,6 +448,20 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
             Ok(FETaskId::from(task))
         }
+        query CHECK_DUPLICATE_ADDONS[app, instance_id: FEInstanceId] {
+            let duplicate_mods = app.instance_manager()
+                .check_duplicate_addons(instance_id.into())
+                .await?;
+
+            let result: HashMap<String, Vec<Mod>> = duplicate_mods
+                .into_iter()
+                .map(|(modid, addons)| {
+                    (modid, addons.into_iter().map(Mod::from).collect())
+                })
+                .collect();
+
+            Ok(result)
+        }
     }
 }
 

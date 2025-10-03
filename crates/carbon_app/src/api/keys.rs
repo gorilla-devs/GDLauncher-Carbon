@@ -110,6 +110,7 @@ keys! {
         DELETE_LOG                                  = "deleteLog";
         OPEN_INSTANCE_FOLDER                        = "openInstanceFolder";
         ENABLE_MOD                                  = "enableMod";
+        CHECK_DUPLICATE_ADDONS                      = "checkDuplicateAddons";
         DISABLE_MOD                                 = "disableMod";
         DELETE_MOD                                  = "deleteMod";
         INSTALL_MOD                                 = "installMod";

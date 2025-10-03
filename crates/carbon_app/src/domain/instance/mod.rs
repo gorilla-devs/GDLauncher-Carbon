@@ -97,7 +97,9 @@ pub enum LaunchState {
     Deleting,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, specta::Type)]
+#[derive(
+    Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, specta::Type, Hash,
+)]
 #[serde(rename_all = "lowercase")]
 pub enum AddonType {
     Mods,
@@ -155,7 +157,7 @@ impl AddonType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Mod {
     pub id: String,
     pub filename: String,
@@ -167,7 +169,7 @@ pub struct Mod {
     pub has_update: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ModFileMetadata {
     pub id: String,
     pub modid: Option<String>,
@@ -182,7 +184,7 @@ pub struct ModFileMetadata {
     pub has_image: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CurseForgeModMetadata {
     pub project_id: u32,
     pub file_id: u32,
@@ -194,7 +196,7 @@ pub struct CurseForgeModMetadata {
     pub has_image: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ModrinthModMetadata {
     pub project_id: String,
     pub version_id: String,

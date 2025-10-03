@@ -138,6 +138,10 @@ const getDefaultModals = (t: (key: string) => string) => ({
   confirmCacheClear: {
     component: lazy(() => import("./modals/ConfirmCacheClear")),
     title: t("modals.confirm_cache_clear")
+  },
+  duplicateModsResolution: {
+    component: lazy(() => import("./modals/DuplicateModsResolution")),
+    title: t("modals.duplicate_mods_resolution")
   }
 })
 
