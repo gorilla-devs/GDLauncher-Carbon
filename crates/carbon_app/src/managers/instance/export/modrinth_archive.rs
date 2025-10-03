@@ -2,16 +2,16 @@ use crate::{
     api::translation::Translation,
     domain::{
         instance::{
-            info::{GameVersion, ModLoaderType},
             ExportEntry, InstanceId,
+            info::{GameVersion, ModLoaderType},
         },
         vtask::VisualTaskId,
     },
     managers::{
+        AppInner,
         instance::{InstanceType, InvalidInstanceIdError},
         modplatforms::modrinth::convert_standard_version_to_mr_version,
         vtask::{TaskState, VisualTask},
-        AppInner,
     },
 };
 use anyhow::anyhow;
@@ -251,8 +251,8 @@ mod test {
     use zip::ZipArchive;
 
     use crate::{
-        domain::instance::{info, ExportEntry, InstanceId},
-        managers::instance::{export::ExportTarget, InstanceVersionSource},
+        domain::instance::{ExportEntry, InstanceId, info},
+        managers::instance::{InstanceVersionSource, export::ExportTarget},
     };
 
     #[traced_test]
@@ -450,9 +450,10 @@ mod test {
 }"#
                 );
 
-                assert!(zip
-                    .by_name("overrides/mods/NaturesCompass-1.16.5-1.9.1-forge.jar")
-                    .is_ok());
+                assert!(
+                    zip.by_name("overrides/mods/NaturesCompass-1.16.5-1.9.1-forge.jar")
+                        .is_ok()
+                );
                 Ok(())
             })
             .await?;

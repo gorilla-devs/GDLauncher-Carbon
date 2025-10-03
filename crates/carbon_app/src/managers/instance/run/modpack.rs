@@ -7,32 +7,31 @@ use crate::domain::instance::{self as domain, GameLogId, InstanceId};
 use crate::domain::java::{JavaComponent, JavaComponentType, SystemJavaProfileName};
 use crate::domain::metrics::GDLMetricsEvent;
 use crate::domain::vtask::VisualTaskId;
+use crate::managers::AppInner;
 use crate::managers::instance::log::{
-    format_message_as_log4j_event, GameLog, LogEntry, LogEntrySourceKind,
+    GameLog, LogEntry, LogEntrySourceKind, format_message_as_log4j_event,
 };
-use crate::managers::instance::modpack::{packinfo, PackVersionFile};
+use crate::managers::instance::modpack::{PackVersionFile, packinfo};
 use crate::managers::instance::schema::make_instance_config;
 use crate::managers::java::java_checker::{JavaChecker, RealJavaChecker};
 use crate::managers::java::managed::Step;
 use crate::managers::minecraft::assets::get_assets_dir;
 use crate::managers::minecraft::minecraft::get_lwjgl_meta;
 use crate::managers::minecraft::modrinth;
-use crate::managers::minecraft::{curseforge, UpdateValue};
+use crate::managers::minecraft::{UpdateValue, curseforge};
 use crate::managers::modplatforms::curseforge::convert_cf_version_to_standard_version;
 use crate::managers::modplatforms::modrinth::convert_mr_version_to_standard_version;
 use crate::managers::vtask::Subtask;
-use crate::managers::AppInner;
 use crate::util::NormalizedWalkdir;
 use crate::{
     domain::instance::info::{GameVersion, ModLoader, ModLoaderType},
     managers::{
-        self,
+        self, ManagerRef,
         account::FullAccount,
         vtask::{NonFailedDismissError, TaskState, VisualTask},
-        ManagerRef,
     },
 };
-use anyhow::{anyhow, bail, Context};
+use anyhow::{Context, anyhow, bail};
 use carbon_net::{DownloadOptions, Downloadable};
 use carbon_parsing::log::{LogParser, ParsedItem};
 use carbon_platforms::curseforge::filters::ModFileParameters;
@@ -50,7 +49,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use tokio::sync::{watch, Mutex, Semaphore};
+use tokio::sync::{Mutex, Semaphore, watch};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio::{io::AsyncReadExt, sync::mpsc};
@@ -597,6 +596,7 @@ pub async fn process_modpack(
 // the instance will be in an inconsistent state.
 pub async fn process_modpack_staging(
     app: Arc<AppInner>,
+    instance_id: InstanceId,
     instance_shortpath: String,
     t_subtasks: &TSubtasks,
 ) -> anyhow::Result<()> {
@@ -748,13 +748,19 @@ pub async fn process_modpack_staging(
 
             for (file, reason) in skipped_replacements {
                 match reason {
-                    SkipReplaceReason::DeletedByUser => audit_txt += &format!(" - {file}: deleted by user\n"),
-                    SkipReplaceReason::ModifiedByUser(original, current) => audit_txt += &format!(
-                        " - {file}: modified by user\n     original md5: {}\n     current md5:  {}\n",
-                        hex::encode(original),
-                        hex::encode(current),
-                    ),
-                    SkipReplaceReason::InSaveFolder => audit_txt += &format!(" - {file}: files in /saves will never be modified\n"),
+                    SkipReplaceReason::DeletedByUser => {
+                        audit_txt += &format!(" - {file}: deleted by user\n")
+                    }
+                    SkipReplaceReason::ModifiedByUser(original, current) => {
+                        audit_txt += &format!(
+                            " - {file}: modified by user\n     original md5: {}\n     current md5:  {}\n",
+                            hex::encode(original),
+                            hex::encode(current),
+                        )
+                    }
+                    SkipReplaceReason::InSaveFolder => {
+                        audit_txt += &format!(" - {file}: files in /saves will never be modified\n")
+                    }
                 }
             }
         }
@@ -799,6 +805,11 @@ pub async fn process_modpack_staging(
         }
 
         tokio::fs::write(setup_path.join("modpack-complete"), "").await?;
+
+        // Trigger caching now that modpack installation is complete
+        app.meta_cache_manager()
+            .watch_and_prioritize(Some(instance_id))
+            .await;
     }
 
     Ok(())

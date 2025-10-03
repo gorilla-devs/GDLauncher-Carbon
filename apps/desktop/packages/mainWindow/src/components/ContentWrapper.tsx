@@ -4,14 +4,15 @@ interface Props {
 }
 const ContentWrapper = (props: Props) => {
   return (
-    <div class="flex justify-center text-lightSlate-50 w-full flex-1 box-border p-4 bg-darkSlate-700 overflow-auto max-h-full min-h-full pb-0 h-content">
+    <div class="text-lightSlate-50 bg-darkSlate-700 h-content box-border flex max-h-full min-h-full w-full flex-1 justify-center overflow-hidden p-4 pb-0">
       <div
-        class="w-full flex-1 box-border overflow-auto flex bg-darkSlate-800 relative flex-col h-auto rounded-2xl rounded-b-none"
+        id="gdl-content-wrapper"
+        class="bg-darkSlate-800 relative box-border flex h-auto w-full flex-1 flex-col overflow-auto rounded-2xl rounded-b-none"
         classList={{
-          "px-6": !props.zeroPadding
+          "p-6": !props.zeroPadding
         }}
         style={{
-          "scrollbar-gutter": "stable"
+          "scrollbar-gutter": !props.zeroPadding ? "stable" : undefined
         }}
       >
         {props.children}

@@ -1,7 +1,7 @@
 use crate::util::base_api::get_base_api_env;
 use std::{env, fs};
 
-pub(crate) async fn get_base_api_override() -> String {
+pub(crate) fn get_base_api_override() -> String {
     #[allow(unused_assignments)]
     let mut base_api: String = String::from(get_base_api_env!());
 

@@ -3,11 +3,11 @@
 #![allow(dead_code)]
 
 use crate::managers::{
+    App, AppInner,
     java::{
         discovery::{Discovery, RealDiscovery},
         java_checker::RealJavaChecker,
     },
-    App, AppInner,
 };
 use serde_json::Value;
 use std::{path::PathBuf, sync::Arc};
@@ -37,7 +37,7 @@ pub fn main() {
     {
         let mut args = std::env::args();
         if args.any(|arg| arg == "--generate-ts-bindings") {
-            crate::api::build_rspc_router()
+            crate::api::build_rspc_router(String::new())
                 .config(
                     rspc::Config::new().export_ts_bindings(
                         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -98,7 +98,7 @@ pub fn main() {
 
             info!("Initializing runtime path");
             let runtime_path = runtime_path_override::get_runtime_path_override().await;
-            let base_api_override = base_api_override::get_base_api_override().await;
+            let base_api_override = base_api_override::get_base_api_override();
 
             let _guard = logger::setup_logger(&runtime_path).await;
 
@@ -140,16 +140,18 @@ async fn get_available_port() -> TcpListener {
         }
     }
 
-    info!("No available port found");
+    tracing::error!("No available port found in range 1025-65535. Please close some applications and try again.");
 
-    panic!("No available port found");
+    panic!("No available port found in range 1025-65535. All ports appear to be in use. Please close some applications that may be using network ports and try again.");
 }
 
 async fn start_router(runtime_path: PathBuf, base_api_override: String, listener: TcpListener) {
     info!("Starting router");
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(1000);
 
-    let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router().build().arced();
+    let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router(base_api_override.clone())
+        .build()
+        .arced();
 
     // We disable CORS because this is just an example. DON'T DO THIS IN PRODUCTION!
     let cors = CorsLayer::new()
@@ -177,7 +179,8 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
 
     let app1 = app.clone();
     let app2 = app.clone();
-    let rspc_axum_router: axum::Router<Arc<AppInner>> = rspc_axum::endpoint(router, move || app);
+    let rspc_axum_router: axum::Router<Arc<AppInner>> =
+        rspc_axum::endpoint(router, move || app.clone());
 
     let app = axum::Router::new()
         .nest("/", crate::api::build_axum_vanilla_router())
@@ -185,7 +188,9 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
         .layer(cors)
         .with_state(app1);
 
-    let port = listener.local_addr().unwrap().port();
+    let port = listener.local_addr()
+        .expect("Failed to get local address from TCP listener")
+        .port();
 
     // As soon as the server is ready, notify via stdout
     tokio::spawn(async move {
@@ -196,7 +201,8 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
             counter += 1;
             // If we've waited for 40 seconds, give up
             if counter > 200 {
-                panic!("Server failed to start in time");
+                tracing::error!("Server failed to start within 40 seconds. This may indicate a system issue or insufficient resources.");
+                panic!("Server failed to start within 40 seconds. Please check system logs for errors and ensure sufficient system resources are available.");
             }
 
             interval.tick().await;
@@ -211,15 +217,6 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
                 break;
             }
         }
-    });
-
-    let _app = app2.clone();
-    tokio::spawn(async move {
-        _app.meta_cache_manager().launch_background_tasks().await;
-        _app.clone()
-            .instance_manager()
-            .launch_background_tasks()
-            .await;
     });
 
     axum::serve(listener, app.into_make_service())
@@ -266,7 +263,7 @@ impl std::ops::Deref for TestEnv {
 
 #[cfg(test)]
 async fn setup_managers_for_test() -> TestEnv {
-    let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
+    let temp_dir = tempfile::tempdir().unwrap();
     let temp_path = dunce::canonicalize(temp_dir.into_path()).unwrap();
     //let log_guard = logger::setup_logger(&temp_path).await;
     println!("Test RTP: {}", temp_path.to_str().unwrap());
@@ -328,7 +325,7 @@ mod test {
     async fn test_router() {
         let tcp_listener = get_available_port().await;
         let port = &tcp_listener.local_addr().unwrap().port();
-        let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
         let server = tokio::spawn(async move {
             super::start_router(
                 temp_dir.into_path(),

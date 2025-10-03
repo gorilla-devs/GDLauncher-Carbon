@@ -65,7 +65,7 @@ pub struct CFFEFile {
     pub is_early_access_content: Option<bool>,
     pub early_access_end_date: Option<String>, // Consider using a datetime library for date-time representation
     pub file_fingerprint: String,
-    pub modules: Vec<CFFEFileModule>,
+    pub modules: Option<Vec<CFFEFileModule>>,
 }
 
 impl From<mpcf::File> for CFFEFile {
@@ -105,9 +105,7 @@ impl From<mpcf::File> for CFFEFile {
             file_fingerprint: file.file_fingerprint.to_string(),
             modules: file
                 .modules
-                .into_iter()
-                .map(|module| module.into())
-                .collect(),
+                .map(|modules| modules.into_iter().map(|module| module.into()).collect()),
         }
     }
 }
@@ -641,7 +639,40 @@ pub enum CFFEClassId {
     Worlds,
     Addons,
     Shaders,
+    Datapacks,
     Other(u16),
+}
+
+impl From<FEUnifiedSearchType> for CFFEClassId {
+    fn from(value: FEUnifiedSearchType) -> Self {
+        match value {
+            FEUnifiedSearchType::Mod => CFFEClassId::Mods,
+            FEUnifiedSearchType::Modpack => CFFEClassId::Modpacks,
+            FEUnifiedSearchType::ResourcePack => CFFEClassId::ResourcePacks,
+            FEUnifiedSearchType::Shader => CFFEClassId::Shaders,
+            FEUnifiedSearchType::World => CFFEClassId::Worlds,
+            FEUnifiedSearchType::Plugin => CFFEClassId::BukkitPlugins,
+            FEUnifiedSearchType::Datapack => CFFEClassId::Datapacks,
+            FEUnifiedSearchType::Unknown => CFFEClassId::Other(0),
+        }
+    }
+}
+
+impl From<CFFEClassId> for FEUnifiedSearchType {
+    fn from(value: CFFEClassId) -> Self {
+        match value {
+            CFFEClassId::Mods => FEUnifiedSearchType::Mod,
+            CFFEClassId::ResourcePacks => FEUnifiedSearchType::ResourcePack,
+            CFFEClassId::Modpacks => FEUnifiedSearchType::Modpack,
+            CFFEClassId::Customizations => FEUnifiedSearchType::Unknown,
+            CFFEClassId::BukkitPlugins => FEUnifiedSearchType::Plugin,
+            CFFEClassId::Worlds => FEUnifiedSearchType::World,
+            CFFEClassId::Addons => FEUnifiedSearchType::Unknown,
+            CFFEClassId::Shaders => FEUnifiedSearchType::Shader,
+            CFFEClassId::Datapacks => FEUnifiedSearchType::Datapack,
+            CFFEClassId::Other(other) => FEUnifiedSearchType::Unknown,
+        }
+    }
 }
 
 impl From<mpcf::ClassId> for CFFEClassId {
@@ -655,6 +686,7 @@ impl From<mpcf::ClassId> for CFFEClassId {
             mpcf::ClassId::Worlds => CFFEClassId::Worlds,
             mpcf::ClassId::Addons => CFFEClassId::Addons,
             mpcf::ClassId::Shaders => CFFEClassId::Shaders,
+            mpcf::ClassId::Datapacks => CFFEClassId::Datapacks,
             mpcf::ClassId::Other(other) => CFFEClassId::Other(other),
         }
     }
@@ -671,6 +703,7 @@ impl From<CFFEClassId> for mpcf::ClassId {
             CFFEClassId::Worlds => mpcf::ClassId::Worlds,
             CFFEClassId::Addons => mpcf::ClassId::Addons,
             CFFEClassId::Shaders => mpcf::ClassId::Shaders,
+            CFFEClassId::Datapacks => mpcf::ClassId::Datapacks,
             CFFEClassId::Other(other) => mpcf::ClassId::Other(other),
         }
     }
@@ -973,6 +1006,9 @@ pub enum CFFEModStatus {
 }
 
 use mpcf::ModStatus as CFModStatus;
+
+use crate::api::modplatforms::FEUnifiedSearchType;
+
 impl From<CFModStatus> for CFFEModStatus {
     fn from(minecraft_mod_status: CFModStatus) -> Self {
         match minecraft_mod_status {
@@ -1000,7 +1036,7 @@ pub struct CFFECategory {
     pub icon_url: Option<String>,
     pub date_modified: String,
     pub is_class: Option<bool>,
-    pub class_id: Option<i32>,
+    pub class_id: Option<FEUnifiedSearchType>,
     pub parent_category_id: Option<i32>,
     pub display_index: Option<i32>,
 }
@@ -1015,7 +1051,9 @@ impl From<mpcf::Category> for CFFECategory {
             icon_url: minecraft_category.icon_url,
             date_modified: minecraft_category.date_modified,
             is_class: minecraft_category.is_class,
-            class_id: minecraft_category.class_id,
+            class_id: minecraft_category
+                .class_id
+                .map(|class_id| CFFEClassId::from(class_id).into()),
             parent_category_id: minecraft_category.parent_category_id,
             display_index: minecraft_category.display_index,
         }
@@ -1028,6 +1066,7 @@ pub struct CFFEModAuthor {
     pub id: i32,
     pub name: String,
     pub url: String,
+    pub avatar_url: Option<String>,
 }
 
 impl From<mpcf::ModAuthor> for CFFEModAuthor {
@@ -1036,6 +1075,7 @@ impl From<mpcf::ModAuthor> for CFFEModAuthor {
             id: minecraft_mod_author.id,
             name: minecraft_mod_author.name,
             url: minecraft_mod_author.url,
+            avatar_url: minecraft_mod_author.avatar_url,
         }
     }
 }

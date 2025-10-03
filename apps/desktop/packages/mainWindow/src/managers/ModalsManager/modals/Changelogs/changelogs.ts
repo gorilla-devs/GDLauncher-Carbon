@@ -12,128 +12,127 @@ export interface Changelog {
 const changelogs: Changelog = {
   new: [
     {
-      title: "GDL accounts are now live.",
+      title: "New Themes",
       description:
-        "A GDL account is just an entry in our database that is linked to a Microsoft account ID (UUID). We use your token to authenticate you, your password is NEVER stored. Having a GDL account will give you access to some new features."
+        "Added three new themes: Inferno (fiery crimson theme), Aether (ethereal void theme with purples), and Frost (icy arctic theme with cool blues)."
     },
     {
-      title: "Redesigned the whole authentication flow.",
+      title: "Unified Search & Discovery System",
       description:
-        "It now features a more user-friendly interface, better error handling, and a better UX overall."
+        "Complete overhaul replacing separate mod and modpack pages with a unified search experience supporting all addon types."
     },
     {
-      title: "Reworked theming system.",
+      title: "Multiple Addon Type Support",
       description:
-        "It now features 3 hand-picked themes. Custom themes are on the way as well."
+        "Expanded beyond mods and modpacks to support shaders, resource packs, data packs, and worlds with type-aware installation and management."
     },
     {
-      title:
-        "As part of the GDL accounts, we also redesigned the accounts management system.",
+      title: "Advanced Search Filters",
       description:
-        'We added an "Accounts" tab in the settings to easily manage your accounts, as well as your GDL account.'
+        "Enhanced filtering system with visual filter badges, platform-specific filters, game version filtering, modloader filtering, category filtering, and environment filtering."
     },
     {
-      title: "A whole new logs page just dropped in!",
+      title: "Redesigned Instance Addons Management",
       description:
-        "The old one was more of a placeholder. This page is still under heavy development, but it's already a lot better than the old one."
+        "New unified Addons tab replacing the separate Mods tab, featuring a comprehensive addon table with bulk operations, multi-select support, and enhanced addon information display."
     },
     {
-      title: "Library featured modpack can now be hidden.",
-      description: "By clicking the eye icon in the top right corner."
-    },
-    {
-      title:
-        "Added confirmation dialog when trying to launch an instance with an expired or invalid account."
-    },
-    {
-      title: 'Added "Add new instance" context menu to instances page',
+      title: "Logs Finder",
       description:
-        "You can access it by right-clicking in any blank space in the instances page."
+        "New logs finder functionality for easier log file navigation and analysis with search and filtering capabilities."
+    },
+    {
+      title: "News & Updates System",
+      description:
+        "Dedicated news page with latest Minecraft updates and patch notes."
+    },
+    {
+      title: "Author Avatars",
+      description: "now displayed throughout the interface."
+    },
+    {
+      title: "Enhanced Addon Details",
+      description:
+        "Improved addon detail pages with better metadata display, author information, version tracking, and platform integration."
+    },
+    {
+      title: "Bulk Addon Operations",
+      description:
+        "Multi-select support in addon tables with bulk update, enable, disable, and delete operations."
     }
   ],
   fixed: [
     {
-      title:
-        "Fixed instances crashing when having names with precomposed UNICODE characters.",
+      title: "Fixed authentication issues with GDL accounts.",
+      description: "The token is now refreshed before opening the app window."
+    },
+    {
+      title: "Removed LWJGL debug mode.",
       description:
-        "You can now use any character in instance names, including Japanese characters, emoji, and any other Unicode characters."
+        "It was causing issues with some mods (e.g. CustomLoadingScreen)."
     },
     {
-      title:
-        "Fixed a bug where an instance modloader version would not be updated when changing the modloader."
-    },
-    {
-      title:
-        "Fixed microphone not being allowed to be used in instances on MacOS."
-    },
-    {
-      title:
-        "Fixed Minecraft 1.21.2+ not working with fabric and other modloaders."
-    },
-    {
-      title: "Fixed tabs always being flagged as selected by default."
-    },
-    {
-      title:
-        "Fixed infinite calls sometimes being made to the API from the instance page resulting in errors."
-    },
-    {
-      title: "Fixed the modpack updater.",
+      title: "Fixed macOS Sequoia (15.0) display crashes",
       description:
-        "While the overall logic should now be more stable, it is still being worked on and may still have some bugs."
+        "Resolved display-info crashes that were occurring on macOS Sequoia (version 15.0)."
+    },
+    {
+      title: "Fixed expired account detection"
+    },
+    {
+      title: "Enhanced mod metadata parsing",
+      description:
+        "Fixed edge cases in Fabric and NeoForge mod metadata parsing with control character sanitization."
+    },
+    {
+      title: "Fixed search navigation loops",
+      description:
+        "Prevented duplicate search page navigation and improved search flow."
+    },
+    {
+      title: "Fixed virtual scrolling in addon lists",
+      description: "Resolved issues with virtual items in addon list displays."
+    },
+    {
+      title: "Fixed loading states for mod installations",
+      description:
+        "Improved loading state handling during mod installation processes."
+    },
+    {
+      title:
+        "Fixed caching errors that were causing the cache subroutine to hang/crash"
     }
   ],
   improved: [
     {
-      title: "Instances searchbar is now sticky."
-    },
-    {
-      title: "Updated dependencies & toolchain.",
+      title: "Complete UI Component System Overhaul",
       description:
-        "This basically means more stability and performance, as well as fewer bugs and security issues."
+        "Redesigned notification system, enhanced select components, new progress indicators, improved skeleton loading patterns, and better popover positioning."
     },
     {
-      title: "Added a small transition when switching between pages."
-    },
-    {
-      title:
-        "Internal technical change that should improve performance across pages in some cases."
-    },
-    {
-      title: "Added many micro-transitions (not transactions!).",
-      description: "To various parts of the app, like the instances page."
-    },
-    {
-      title: "Redesigned news component.",
+      title: "Better Platform Integration",
       description:
-        "It now takes up less space, and accommodates for a smaller featured tile. While it's static for now, we're working on a dynamic featured tile."
+        "Improved integration between CurseForge and Modrinth with unified addon linking and cross-platform compatibility."
     },
     {
-      title: "Improved network download performance.",
+      title: "Improved Addon Table Experience",
       description:
-        "We've made some changes to the way we download files, which should improve performance and, more importantly, make them more reliable."
+        "Enhanced addon tables with sortable columns, better information display, right-click context menus, and improved selection handling."
     },
     {
-      title: "Improved runtime path migration.",
+      title: "Enhanced NeoForge Support",
       description:
-        "We've made some changes to the way we migrate the runtime path. The UI now shows the current progress of the operation and will display an error message if the migration fails."
+        "Improved support for NeoForge mods with better metadata detection and parsing."
     },
     {
-      title: "Potato PC mode now also disables hardware acceleration."
+      title: "Better Installation Flow",
+      description:
+        "Streamlined addon installation process with improved instance selection and better progress tracking."
     },
     {
-      title: "Fully reworked how consents are handled.",
-      description: "Resulting in a deeper compliance with GDPR and CCPA."
-    },
-    {
-      title: "Updated terms of service and privacy statement."
-    },
-    {
-      title: "Added a parallax effect to the instance cover image."
-    },
-    {
-      title: "Reworked context menus and dropdown menus",
-      description: "now being more accessible and easier to use."
+      title: "Updated Electron and dependencies",
+      description:
+        "Updated to Electron 37.2.6 and Node.js 22.12.0 for better performance and security."
     }
   ]
 }

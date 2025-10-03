@@ -7,6 +7,7 @@ pub struct VisualTaskId(pub i32);
 
 #[derive(Debug, PartialEq)]
 pub struct Task {
+    pub id: VisualTaskId,
     pub name: Translation,
     pub progress: Progress,
     pub downloaded: u32,

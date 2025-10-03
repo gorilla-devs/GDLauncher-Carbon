@@ -15,6 +15,12 @@ pub struct InstanceId(pub i32);
 #[derive(Copy, Clone, PartialEq, Eq, Debug, Hash, PartialOrd, Ord)]
 pub struct GameLogId(pub i32);
 
+impl From<i32> for GameLogId {
+    fn from(id: i32) -> Self {
+        GameLogId(id)
+    }
+}
+
 #[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub struct InstanceModId(pub Uuid);
 
@@ -27,11 +33,11 @@ pub struct GameLogEntry {
 }
 
 pub struct InstanceDetails {
+    pub id: InstanceId,
     pub favorite: bool,
     pub name: String,
     pub version: Option<String>,
     pub modpack: Option<info::ModpackInfo>,
-    pub locked: bool,
     pub global_java_args: bool,
     pub extra_java_args: Option<String>,
     pub memory: Option<(u16, u16)>,
@@ -91,11 +97,70 @@ pub enum LaunchState {
     Deleting,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "lowercase")]
+pub enum AddonType {
+    Mods,
+    #[serde(rename = "resourcepacks")]
+    ResourcePacks,
+    Shaders,
+    #[serde(rename = "datapacks")]
+    DataPacks,
+    Worlds,
+}
+
+impl AddonType {
+    pub fn all() -> Vec<Self> {
+        vec![
+            Self::Mods,
+            Self::ResourcePacks,
+            Self::Shaders,
+            Self::DataPacks,
+            Self::Worlds,
+        ]
+    }
+
+    pub fn get_folder_path(
+        &self,
+        instance_path: &carbon_rt_path::InstancePath,
+    ) -> std::path::PathBuf {
+        match self {
+            Self::Mods => instance_path.get_mods_path(),
+            Self::ResourcePacks => instance_path.get_resourcepacks_path(),
+            Self::Shaders => instance_path.get_shaderpacks_path(),
+            Self::DataPacks => instance_path.get_datapacks_path(),
+            Self::Worlds => instance_path.get_saves_path(),
+        }
+    }
+
+    pub fn to_db_string(&self) -> &'static str {
+        match self {
+            Self::Mods => "mods",
+            Self::ResourcePacks => "resourcepacks",
+            Self::Shaders => "shaders",
+            Self::DataPacks => "datapacks",
+            Self::Worlds => "worlds",
+        }
+    }
+
+    pub fn from_db_string(s: &str) -> Option<Self> {
+        match s {
+            "mods" => Some(Self::Mods),
+            "resourcepacks" => Some(Self::ResourcePacks),
+            "shaders" => Some(Self::Shaders),
+            "datapacks" => Some(Self::DataPacks),
+            "worlds" => Some(Self::Worlds),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Mod {
     pub id: String,
     pub filename: String,
     pub enabled: bool,
+    pub addon_type: AddonType,
     pub metadata: Option<ModFileMetadata>,
     pub curseforge: Option<CurseForgeModMetadata>,
     pub modrinth: Option<ModrinthModMetadata>,
@@ -172,6 +237,7 @@ pub enum ExploreEntryType {
 pub enum ExportTarget {
     Curseforge,
     Modrinth,
+    Gdlauncher,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

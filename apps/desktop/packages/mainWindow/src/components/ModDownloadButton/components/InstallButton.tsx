@@ -1,0 +1,81 @@
+import { Show, Switch, Match, Accessor } from "solid-js"
+import { Trans } from "@gd/i18n"
+import {
+  Button,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  Spinner,
+  Progress
+} from "@gd/ui"
+
+interface InstallButtonProps {
+  loading: Accessor<boolean>
+  progress: Accessor<number | null>
+  isInstalled: () => boolean
+  instanceLocked: () => boolean
+  fileId?: number | string
+  installedMod: () => any
+  onDownload: () => void
+  size?: "small" | "medium" | "large"
+}
+
+export const InstallButton = (props: InstallButtonProps) => {
+  return (
+    <Tooltip>
+      <TooltipTrigger>
+        <Button
+          uppercase
+          variant={props.isInstalled() ? "green" : "primary"}
+          disabled={props.instanceLocked() && !props.isInstalled()}
+          size={props.size || "medium"}
+          onClick={props.onDownload}
+        >
+          <Show when={props.loading()}>
+            <Spinner />
+            <div
+              class="transition-width duration-100 ease-in-out"
+              classList={{
+                "w-0": props.progress() === null,
+                "w-14": props.progress() !== null
+              }}
+            >
+              <Progress color="bg-white" value={props.progress()!} />
+            </div>
+          </Show>
+          <Show when={!props.loading()}>
+            <Switch>
+              <Match when={props.isInstalled()}>
+                <Trans key="mod.downloaded" />
+              </Match>
+              <Match when={props.instanceLocked()}>
+                <Trans key="instance.instance_locked" />
+              </Match>
+              <Match when={!props.instanceLocked() && !props.fileId}>
+                <Trans key="instance.download" />
+              </Match>
+              <Match
+                when={
+                  !props.instanceLocked() &&
+                  props.fileId &&
+                  props.installedMod() &&
+                  !props.isInstalled()
+                }
+              >
+                <Trans key="instance.switch_version" />
+              </Match>
+              <Match when={!props.instanceLocked() && props.fileId}>
+                <Trans key="instance.download_version" />
+              </Match>
+            </Switch>
+          </Show>
+        </Button>
+      </TooltipTrigger>
+      {props.instanceLocked() && (
+        <TooltipContent>
+          <Trans key="instance.locked_cannot_apply_changes" />
+        </TooltipContent>
+      )}
+    </Tooltip>
+  )
+}

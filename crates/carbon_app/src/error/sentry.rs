@@ -11,7 +11,10 @@ pub fn report_volatile_error(ty: &'static str, error: anyhow::Error) -> anyhow::
 
     let error = error.context(format!("Caught volatile error: '{ty}'"));
 
-    let mut tracker_lock = TRACKER.lock().unwrap();
+    let mut tracker_lock = TRACKER.lock().unwrap_or_else(|poisoned| {
+        tracing::warn!("TRACKER mutex was poisoned, recovering");
+        poisoned.into_inner()
+    });
     if tracker_lock.is_none() {
         *tracker_lock = Some(HashMap::new());
     }

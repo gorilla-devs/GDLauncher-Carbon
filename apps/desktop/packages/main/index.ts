@@ -32,7 +32,10 @@ import getAdSize from "./adSize"
 import handleUncaughtException from "./handleUncaughtException"
 import initAutoUpdater from "./autoUpdater"
 import "./appMenu"
-import { FELauncherActionOnGameLaunch } from "@gd/core_module/bindings"
+import {
+  CoreModuleStatus,
+  FELauncherActionOnGameLaunch
+} from "@gd/core_module/bindings"
 
 console.log("Modules imported successfully")
 
@@ -42,6 +45,10 @@ const RUNTIME_PATH_DEFAULT_NAME = "data"
 export let CURRENT_RUNTIME_PATH: string | null = null
 
 let win: BrowserWindow | null = null
+
+const getWin = () => {
+  return win
+}
 
 let isGameRunning = false
 let showAppCloseWarning = true
@@ -335,18 +342,51 @@ const loadCoreModule: CoreModule = () =>
 
       for (const row of rows) {
         if (row.startsWith("_STATUS_:")) {
-          const port: number = row.split("|")[1]
-          console.log(`[CORE] Port: ${port}`)
+          const rightPart = row.split(":")[1]
+          const event = rightPart.split("|")[0]
+          const port: number = rightPart.split("|")[1]
+          console.log(`[CORE] Event: ${event}, Port: ${port}`)
 
-          started = true
-
-          resolve({
-            type: "success",
-            result: {
-              port,
-              kill: () => coreModule?.kill()
+          if (event === "READY") {
+            started = true
+            resolve({
+              type: "success",
+              result: {
+                port,
+                kill: () => coreModule?.kill()
+              }
+            })
+          } else {
+            let progress = 0
+            switch (event as CoreModuleStatus) {
+              case "LoadAndMigrate":
+                progress = 10
+                break
+              case "RefreshMSAuth":
+                progress = 25
+                break
+              case "XboxAuth":
+                progress = 35
+                break
+              case "McLogin":
+                progress = 50
+                break
+              case "MCEntitlements":
+                progress = 65
+                break
+              case "McProfile":
+                progress = 80
+                break
+              case "AccountRefreshComplete":
+                progress = 90
+                break
+              case "LaunchBackgroundTasks":
+                progress = 100
+                break
             }
-          })
+
+            getWin()?.webContents.send("coreModuleProgress", progress)
+          }
         } else if (row.startsWith("_INSTANCE_STATE_:")) {
           const rightPart = row.split(":")[1]
           const event = rightPart.split("|")[0]
@@ -589,12 +629,6 @@ async function createWindow(): Promise<BrowserWindow> {
   win.on("ready-to-show", () => {
     isSpawningWindow = false
     console.log("Window is ready to show")
-
-    coreModule.finally(() => {
-      if (win && !win?.isDestroyed()) {
-        win?.show()
-      }
-    })
 
     function upsertKeyValue(obj: any, keyToChange: string, value: any) {
       const keyToChangeLower = keyToChange.toLowerCase()

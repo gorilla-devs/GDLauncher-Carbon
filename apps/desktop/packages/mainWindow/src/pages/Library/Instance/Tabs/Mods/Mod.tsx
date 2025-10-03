@@ -1,27 +1,22 @@
 import { getInstanceIdFromPath } from "@/utils/routes"
 import { queryClient, rspc } from "@/utils/rspcClient"
-import { getCFModloaderIcon } from "@/utils/sidebar"
-import { CFFEFile, MRFEVersion, Mod as ModType } from "@gd/core_module/bindings"
+import { getModloaderIcon } from "@/utils/sidebar"
+import { Mod as ModType } from "@gd/core_module/bindings"
 import {
   Button,
   Checkbox,
   Popover,
-  Spinner,
+  PopoverContent,
+  PopoverTrigger,
   Switch,
   Tooltip,
-  createNotification
+  TooltipContent,
+  TooltipTrigger,
+  toast
 } from "@gd/ui"
 import { useLocation, useParams } from "@solidjs/router"
 import { SetStoreFunction, produce } from "solid-js/store"
-import {
-  For,
-  Match,
-  Switch as SolidSwitch,
-  Show,
-  Suspense,
-  createEffect,
-  createSignal
-} from "solid-js"
+import { For, Show, createEffect, createSignal } from "solid-js"
 import { getModImageUrl, getModpackPlatformIcon } from "@/utils/instances"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
@@ -40,16 +35,17 @@ const CopiableEntity = (props: {
   text: string | undefined | null | number
 }) => {
   return (
-    <div class="text-lightSlate-200 flex items-center w-60">
+    <div class="text-lightSlate-200 flex w-60 items-center">
       <div class="truncate">
-        <Tooltip
-          content={<div class="max-w-110 break-all">{props.text || "-"}</div>}
-        >
-          {props.text || "-"}
+        <Tooltip>
+          <TooltipTrigger>{props.text || "-"}</TooltipTrigger>
+          <TooltipContent>
+            <div class="max-w-110 break-all">{props.text || "-"}</div>
+          </TooltipContent>
         </Tooltip>
       </div>
       <Show when={props.text}>
-        <div class="flex-shrink-0 ml-2">
+        <div class="ml-2 flex-shrink-0">
           <CopyIcon text={props.text} />
         </div>
       </Show>
@@ -57,48 +53,48 @@ const CopiableEntity = (props: {
   )
 }
 
-const ModUpdateTooltip = (props: {
-  modId: string
-  modName: string
-  instanceId: number
-}) => {
-  const updatePreview = rspc.createQuery(() => ({
-    queryKey: [
-      "instance.findModUpdate",
-      {
-        instance_id: props.instanceId,
-        mod_id: props.modId
-      }
-    ]
-  }))
+// const ModUpdateTooltip = (props: {
+//   modId: string
+//   modName: string
+//   instanceId: number
+// }) => {
+//   const updatePreview = rspc.createQuery(() => ({
+//     queryKey: [
+//       "instance.findModUpdate",
+//       {
+//         instance_id: props.instanceId,
+//         mod_id: props.modId
+//       }
+//     ]
+//   }))
 
-  return (
-    <div class="text-lightSlate-200 h-40 flex flex-col items-center gap-4 w-80">
-      <div class="text-lg mb-4">
-        <Trans
-          key="instance.update_available_from"
-          options={{
-            platform: updatePreview.data?.platform
-          }}
-        />
-      </div>
-      <Suspense fallback={<Spinner />}>
-        <div>
-          <div class="text-sm text-lightSlate-200">{props.modName}</div>
-        </div>
-        <div class="w-5 h-5 text-lightSlate-200 i-ri:arrow-down-s-line" />
-        <SolidSwitch>
-          <Match when={updatePreview.data?.platform === "Curseforge"}>
-            {(updatePreview.data as CFFEFile).displayName}
-          </Match>
-          <Match when={updatePreview.data?.platform === "Modrinth"}>
-            {(updatePreview.data as MRFEVersion).name}
-          </Match>
-        </SolidSwitch>
-      </Suspense>
-    </div>
-  )
-}
+//   return (
+//     <div class="text-lightSlate-200 h-40 flex flex-col items-center gap-4 w-80">
+//       <div class="text-lg mb-4">
+//         <Trans
+//           key="instance.update_available_from"
+//           options={{
+//             platform: updatePreview.data?.platform
+//           }}
+//         />
+//       </div>
+//       <Suspense fallback={<Spinner />}>
+//         <div>
+//           <div class="text-sm text-lightSlate-200">{props.modName}</div>
+//         </div>
+//         <div class="w-5 h-5 text-lightSlate-200 i-ri:arrow-down-s-line" />
+//         <SolidSwitch>
+//           <Match when={updatePreview.data?.platform === "Curseforge"}>
+//             {(updatePreview.data as CFFEFile).displayName}
+//           </Match>
+//           <Match when={updatePreview.data?.platform === "Modrinth"}>
+//             {(updatePreview.data as MRFEVersion).name}
+//           </Match>
+//         </SolidSwitch>
+//       </Suspense>
+//     </div>
+//   )
+// }
 
 const Mod = (props: Props) => {
   const [isHoveringInfoCard, setIsHoveringInfoCard] = createSignal(false)
@@ -107,9 +103,8 @@ const Mod = (props: Props) => {
     null
   )
 
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const params = useParams()
-  const addNotification = createNotification()
   const location = useLocation()
   const instanceId = () => getInstanceIdFromPath(location.pathname)
 
@@ -124,11 +119,7 @@ const Mod = (props: Props) => {
     },
     onError: (err) => {
       console.error(err)
-      addNotification({
-        name: `Error updating mod`,
-        content: err.message,
-        type: "error"
-      })
+      toast.error(`Error updating mod: ${err.message}`)
     }
   }))
 
@@ -136,14 +127,12 @@ const Mod = (props: Props) => {
     if (task.data === null) {
       setUpdateModTaskId(null)
     } else if (task.data?.progress.type === "Failed") {
-      addNotification({
-        name: `Error updating mod`,
-        content: task.data?.progress.value.cause.reduce(
+      toast.error(
+        `Error updating mod: ${task.data?.progress.value.cause.reduce(
           (acc, val) => acc + val.display + "\n",
           ""
-        ),
-        type: "error"
-      })
+        )}`
+      )
     }
   })
 
@@ -279,7 +268,7 @@ const Mod = (props: Props) => {
 
   return (
     <div
-      class="w-full flex items-center py-2 px-6 box-border h-14 group hover:bg-darkSlate-700"
+      class="hover:bg-darkSlate-700 group box-border flex h-14 w-full items-center px-6 py-2"
       classList={{
         "bg-darkSlate-700": isHoveringInfoCard() || isHoveringOptionsCard()
       }}
@@ -292,10 +281,10 @@ const Mod = (props: Props) => {
         )
       }}
     >
-      <div class="flex justify-between items-center w-full gap-4">
-        <div class="flex gap-4 justify-between items-center">
+      <div class="flex w-full items-center justify-between gap-4">
+        <div class="flex items-center justify-between gap-4">
           <div
-            class="duration-100 ease-in-out opacity-0 group-hover:opacity-100 transition-opacity"
+            class="opacity-0 transition-opacity duration-100 ease-in-out group-hover:opacity-100"
             classList={{
               "opacity-100":
                 props.selectMods[props.mod.id] ||
@@ -306,7 +295,7 @@ const Mod = (props: Props) => {
             <Checkbox checked={props.selectMods[props.mod.id]} />
           </div>
           <div class="flex items-center gap-2">
-            <div class="flex items-center justify-center h-10 w-10 rounded-xl border-solid overflow-hidden border-darkSlate-500 border">
+            <div class="border-darkSlate-500 flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-solid">
               <Show
                 when={
                   props.mod.curseforge?.has_image ||
@@ -323,7 +312,7 @@ const Mod = (props: Props) => {
                 }
               >
                 <img
-                  class="w-full h-full"
+                  class="h-full w-full"
                   src={getModImageUrl(params.id, props.mod.id, imagePlatform())}
                 />
               </Show>
@@ -335,14 +324,15 @@ const Mod = (props: Props) => {
             </div>
           </div>
         </div>
-        <span class="flex gap-4 justify-center items-center">
+        <span class="flex items-center justify-center gap-4">
           <Show when={props.mod.has_update && props.isInstanceLocked}>
-            <Tooltip
-              content={<Trans key="instance.locked_cannot_apply_changes" />}
-              placement="top"
-              class="flex max-w-38 text-ellipsis overflow-hidden"
-            >
-              <i class="w-5 h-5 text-lightSlate-700 i-ri:download-2-fill" />
+            <Tooltip>
+              <TooltipTrigger class="max-w-38 flex overflow-hidden text-ellipsis">
+                <i class="text-lightSlate-700 i-ri:download-2-fill h-5 w-5" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <Trans key="instance.locked_cannot_apply_changes" />
+              </TooltipContent>
             </Tooltip>
           </Show>
           <Show when={props.mod.has_update && !props.isInstanceLocked}>
@@ -350,7 +340,7 @@ const Mod = (props: Props) => {
               when={updateModTaskId() !== null || updateModMutation.isPending}
             >
               <i
-                class="flex w-5 h-5"
+                class="flex h-5 w-5"
                 classList={{
                   "i-ri:download-2-fill text-lightSlate-700 hover:text-green-500":
                     updateModTaskId() === null,
@@ -369,7 +359,7 @@ const Mod = (props: Props) => {
             <Show
               when={updateModTaskId() === null && !updateModMutation.isPending}
             >
-              <Tooltip
+              {/* <Tooltip
                 content={
                   <ModUpdateTooltip
                     modId={props.mod.id}
@@ -382,34 +372,35 @@ const Mod = (props: Props) => {
                     instanceId={parseInt(instanceId()!, 10)}
                   />
                 }
-              >
-                <i
-                  class="flex w-5 h-5"
-                  classList={{
-                    "i-ri:download-2-fill text-lightSlate-700 hover:text-green-500":
-                      updateModTaskId() === null,
-                    "i-ri:loader-4-line animate-spin text-green-500":
-                      updateModTaskId() !== null || updateModMutation.isPending
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    updateModMutation.mutate({
-                      instance_id: parseInt(params.id, 10),
-                      mod_id: props.mod.id
-                    })
-                  }}
-                />
-              </Tooltip>
+              > */}
+              <i
+                class="flex h-5 w-5"
+                classList={{
+                  "i-ri:download-2-fill text-lightSlate-700 hover:text-green-500":
+                    updateModTaskId() === null,
+                  "i-ri:loader-4-line animate-spin text-green-500":
+                    updateModTaskId() !== null || updateModMutation.isPending
+                }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  updateModMutation.mutate({
+                    instance_id: parseInt(params.id, 10),
+                    mod_id: props.mod.id
+                  })
+                }}
+              />
+              {/* </Tooltip> */}
             </Show>
             <Show when={updateModTaskId() !== null}>{updateModStatus()}</Show>
           </Show>
           <Show when={props.isInstanceLocked}>
-            <Tooltip
-              content={<Trans key="instance.locked_cannot_apply_changes" />}
-              placement="top"
-              class="max-w-38 text-ellipsis overflow-hidden"
-            >
-              <Switch disabled checked={props.mod.enabled} />
+            <Tooltip>
+              <TooltipTrigger>
+                <Switch disabled checked={props.mod.enabled} />
+              </TooltipTrigger>
+              <TooltipContent class="max-w-38 overflow-hidden text-ellipsis">
+                <Trans key="instance.locked_cannot_apply_changes" />
+              </TooltipContent>
             </Tooltip>
           </Show>
           <Show when={!props.isInstanceLocked}>
@@ -433,29 +424,30 @@ const Mod = (props: Props) => {
             />
           </Show>
           <Show when={props.isInstanceLocked}>
-            <Tooltip
-              content={<Trans key="instance.locked_cannot_apply_changes" />}
-              placement="top"
-              class="max-w-38 text-ellipsis overflow-hidden"
-            >
-              <div
-                class="text-2xl text-lightSlate-700 duration-100 ease-in-out i-ri:delete-bin-2-fill"
-                onClick={(e) => {
-                  e.stopPropagation()
+            <Tooltip>
+              <TooltipTrigger>
+                <div
+                  class="text-lightSlate-700 i-ri:delete-bin-2-fill text-2xl duration-100 ease-in-out"
+                  onClick={(e) => {
+                    e.stopPropagation()
 
-                  if (props.isInstanceLocked) return
+                    if (props.isInstanceLocked) return
 
-                  deleteModMutation.mutate({
-                    instance_id: parseInt(params.id, 10),
-                    mod_id: props.mod.id
-                  })
-                }}
-              />
+                    deleteModMutation.mutate({
+                      instance_id: parseInt(params.id, 10),
+                      mod_id: props.mod.id
+                    })
+                  }}
+                />
+              </TooltipTrigger>
+              <TooltipContent class="max-w-38 overflow-hidden text-ellipsis">
+                <Trans key="instance.locked_cannot_apply_changes" />
+              </TooltipContent>
             </Tooltip>
           </Show>
           <Show when={!props.isInstanceLocked}>
             <div
-              class="text-2xl text-lightSlate-700 duration-100 ease-in-out i-ri:delete-bin-2-fill transition-color hover:text-red-500"
+              class="text-lightSlate-700 i-ri:delete-bin-2-fill transition-color text-2xl duration-100 ease-in-out hover:text-red-500"
               onClick={(e) => {
                 e.stopPropagation()
 
@@ -470,16 +462,23 @@ const Mod = (props: Props) => {
           </Show>
           <div onClick={(e) => e.stopPropagation()}>
             <Popover
-              noPadding
-              noTip
-              onOpen={() => setIsHoveringInfoCard(true)}
-              onClose={() => setIsHoveringInfoCard(false)}
-              content={() => (
+              onOpenChange={(value) => setIsHoveringInfoCard(value)}
+              placement="left-end"
+            >
+              <PopoverTrigger>
                 <div
-                  class="p-4 text-lightSlate-700 bg-darkSlate-900 rounded-lg border-darkSlate-700 border-solid border-1 shadow-md shadow-darkSlate-90 w-110"
-                  onClick={(e) => e.stopPropagation()}
+                  class="text-lightSlate-700 i-ri:information-fill transition-color hover:text-lightSlate-50 cursor-pointer text-2xl duration-100 ease-in-out"
+                  classList={{
+                    "text-lightSlate-50": isHoveringInfoCard()
+                  }}
+                />
+              </PopoverTrigger>
+              <PopoverContent>
+                <div
+                  class="text-lightSlate-700 bg-darkSlate-900 border-darkSlate-700 border-1 shadow-darkSlate-90 w-110 rounded-lg border-solid p-4 shadow-md"
+                  onClick={(e: MouseEvent) => e.stopPropagation()}
                 >
-                  <div class="text-xl text-lightSlate-50 font-bold mb-4">
+                  <div class="text-lightSlate-50 mb-4 text-xl font-bold">
                     <Trans
                       key="instance.mods_technical_info_for"
                       options={{
@@ -493,14 +492,14 @@ const Mod = (props: Props) => {
                       <span class="italic">{""}</span>
                     </Trans>
                   </div>
-                  <div class="flex flex-col w-full">
-                    <div class="flex justify-between w-full text-sm">
+                  <div class="flex w-full flex-col">
+                    <div class="flex w-full justify-between text-sm">
                       <div class="w-50">
                         <Trans key="instance.id" />
                       </div>
                       <CopiableEntity text={props.mod.id} />
                     </div>
-                    <div class="flex justify-between w-full text-sm">
+                    <div class="flex w-full justify-between text-sm">
                       <div class="w-50">
                         <Trans key="instance.file_name" />
                       </div>
@@ -508,63 +507,63 @@ const Mod = (props: Props) => {
                     </div>
 
                     <Show when={props.mod.metadata}>
-                      <div class="text-xl text-lightSlate-50 mt-4">
+                      <div class="text-lightSlate-50 mt-4 text-xl">
                         <Trans key="instance.local_metadata" />
                       </div>
-                      <div class="flex justify-between w-full text-sm">
+                      <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
                           <Trans key="instance.metadata_id" />
                         </div>
                         <CopiableEntity text={props.mod.metadata?.id} />
                       </div>
-                      <div class="flex justify-between w-full text-sm">
+                      <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
                           <Trans key="instance.metadata_name" />
                         </div>
                         <CopiableEntity text={props.mod.metadata?.modid} />
                       </div>
-                      <div class="flex justify-between w-full text-sm">
+                      <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
                           <Trans key="instance.metadata_version" />
                         </div>
                         <CopiableEntity text={props.mod.metadata?.version} />
                       </div>
-                      <div class="flex justify-between w-full text-sm">
+                      <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
                           <Trans key="instance.metadata_sha_1" />
                         </div>
                         <CopiableEntity text={props.mod.metadata?.sha_1} />
                       </div>
-                      <div class="flex justify-between w-full text-sm">
+                      <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
                           <Trans key="instance.metadata_sha_512" />
                         </div>
                         <CopiableEntity text={props.mod.metadata?.sha_512} />
                       </div>
-                      <div class="flex justify-between w-full text-sm">
+                      <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
                           <Trans key="instance.metadata_murmur_2" />
                         </div>
                         <CopiableEntity text={props.mod.metadata?.murmur_2} />
                       </div>
-                      <div class="flex justify-between w-full text-sm">
+                      <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
                           <Trans key="instance.metadata_murmur_2_unsigned" />
                         </div>
                         <CopiableEntity text={unsigned_murmur2()} />
                       </div>
-                      <div class="flex justify-between w-full text-sm">
+                      <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
                           <Trans key="instance.metadata_modloaders" />
                         </div>
-                        <div class="gap-2 text-lightSlate-200 flex items-center w-60">
+                        <div class="text-lightSlate-200 flex w-60 items-center gap-2">
                           <For each={props.mod.metadata?.modloaders}>
                             {(modloader, _) => (
                               <>
                                 <Show when={modloader}>
                                   <img
-                                    class="w-4 h-4"
-                                    src={getCFModloaderIcon(modloader)}
+                                    class="h-4 w-4"
+                                    src={getModloaderIcon(modloader)}
                                   />
                                 </Show>
                                 <div class="text-sm">{modloader}</div>
@@ -576,13 +575,13 @@ const Mod = (props: Props) => {
                     </Show>
 
                     <Show when={props.mod.curseforge}>
-                      <div class="flex items-center justify-between text-xl mt-4">
-                        <div class="flex items-center text-lightSlate-50">
+                      <div class="mt-4 flex items-center justify-between text-xl">
+                        <div class="text-lightSlate-50 flex items-center">
                           <Trans key="instance.curseforge" />
-                          <img src={CurseforgeLogo} class="w-4 h-4 ml-2" />
+                          <img src={CurseforgeLogo} class="ml-2 h-4 w-4" />
                         </div>
                       </div>
-                      <div class="flex justify-between w-full text-sm">
+                      <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
                           <Trans key="instance.curseforge_project_id" />
                         </div>
@@ -590,19 +589,19 @@ const Mod = (props: Props) => {
                           text={props.mod.curseforge?.project_id}
                         />
                       </div>
-                      <div class="flex justify-between w-full text-sm">
+                      <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
                           <Trans key="instance.curseforge_file_id" />
                         </div>
                         <CopiableEntity text={props.mod.curseforge?.file_id} />
                       </div>
-                      <div class="flex w-full my-4 gap-4">
+                      <div class="my-4 flex w-full gap-4">
                         <Button
                           type="outline"
                           rounded={false}
                           size="small"
                           onClick={() => {
-                            navigate(
+                            navigator.navigate(
                               `/mods/${
                                 props.mod.curseforge?.project_id
                               }/curseforge?instanceId=${instanceId()}`
@@ -629,31 +628,31 @@ const Mod = (props: Props) => {
                     </Show>
 
                     <Show when={props.mod.modrinth}>
-                      <div class="flex items-center justify-between text-xl mt-4">
-                        <div class="flex items-center text-lightSlate-50">
+                      <div class="mt-4 flex items-center justify-between text-xl">
+                        <div class="text-lightSlate-50 flex items-center">
                           <Trans key="instance.modrinth" />
-                          <img src={ModrinthLogo} class="w-4 h-4 ml-2" />
+                          <img src={ModrinthLogo} class="ml-2 h-4 w-4" />
                         </div>
                       </div>
-                      <div class="flex justify-between w-full text-sm">
+                      <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
                           <Trans key="instance.modrinth_project_id" />
                         </div>
                         <CopiableEntity text={props.mod.modrinth?.project_id} />
                       </div>
-                      <div class="flex justify-between w-full text-sm">
+                      <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
                           <Trans key="instance.modrinth_version_id" />
                         </div>
                         <CopiableEntity text={props.mod.modrinth?.version_id} />
                       </div>
-                      <div class="flex w-full my-4 gap-4">
+                      <div class="my-4 flex w-full gap-4">
                         <Button
                           type="outline"
                           rounded={false}
                           size="small"
                           onClick={() => {
-                            navigate(
+                            navigator.navigate(
                               `/mods/${
                                 props.mod.modrinth?.project_id
                               }/modrith?instanceId=${instanceId()}`
@@ -680,92 +679,81 @@ const Mod = (props: Props) => {
                     </Show>
                   </div>
                 </div>
-              )}
-              trigger="click"
-              placement="left-end"
-              color="bg-darkSlate-900"
-            >
-              <div
-                class="text-2xl text-lightSlate-700 duration-100 ease-in-out cursor-pointer i-ri:information-fill transition-color hover:text-lightSlate-50"
-                classList={{
-                  "text-lightSlate-50": isHoveringInfoCard()
-                }}
-              />
+              </PopoverContent>
             </Popover>
           </div>
           <div onClick={(e) => e.stopPropagation()}>
-            <Popover
-              noPadding
-              noTip
-              onOpen={() => setIsHoveringOptionsCard(true)}
-              onClose={() => setIsHoveringOptionsCard(false)}
-              trigger="click"
-              content={() => (
-                <>
-                  <Show when={!props.isInstanceLocked}>
-                    <div
-                      class="flex flex-col text-lightSlate-700 bg-darkSlate-900 rounded-lg border-darkSlate-700 border-solid border-1 shadow-md shadow-darkSlate-90"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div class="p-4 text-md text-lightSlate-50 font-bold max-w-50 truncate whitespace-nowrap">
-                        {props.mod.curseforge?.name ||
-                          props.mod.metadata?.name ||
-                          props.mod.filename}
-                      </div>
-                      <Show when={props.mod.modrinth}>
-                        <div
-                          class="p-4 text-md flex gap-4 justify-between hover:bg-darkSlate-800"
-                          onClick={() => {
-                            navigate(
-                              `/mods/${
-                                props.mod.modrinth?.project_id
-                              }/modrinth/versions?instanceId=${instanceId()}`
-                            )
-                          }}
-                        >
-                          <div>
-                            <Trans key="instance.switch_version" />
-                          </div>
-                          <div class="flex justify-center items-center">
-                            <img src={ModrinthLogo} class="w-4 h-4" />
-                          </div>
-                        </div>
-                      </Show>
-                      <Show when={props.mod.curseforge}>
-                        <div
-                          class="hover:bg-darkSlate-800 p-4 text-md flex gap-4 justify-between"
-                          onClick={() => {
-                            navigate(
-                              `/mods/${
-                                props.mod.curseforge?.project_id
-                              }/curseforge/versions?instanceId=${instanceId()}`
-                            )
-                          }}
-                        >
-                          <div>
-                            <Trans key="instance.switch_version" />
-                          </div>
-                          <div class="flex justify-center items-center">
-                            <img src={CurseforgeLogo} class="w-4 h-4" />
-                          </div>
-                        </div>
-                      </Show>
+            <Popover placement="left">
+              <PopoverTrigger>
+                <div
+                  class="text-lightSlate-700 transition-color hover:text-lightSlate-50 i-ri:more-2-fill cursor-pointer text-2xl duration-100 ease-in-out"
+                  classList={{
+                    "text-lightSlate-50": isHoveringOptionsCard()
+                  }}
+                  onMouseEnter={() => setIsHoveringOptionsCard(true)}
+                  onMouseLeave={() => setIsHoveringOptionsCard(false)}
+                />
+              </PopoverTrigger>
+              <PopoverContent
+                class="border-darkSlate-700 bg-darkSlate-900 shadow-darkSlate-90 p-0 shadow-md"
+                onClick={(e: MouseEvent) => e.stopPropagation()}
+              >
+                <Show when={!props.isInstanceLocked}>
+                  <div
+                    class="text-lightSlate-700 flex flex-col rounded-lg"
+                    onClick={(e: MouseEvent) => e.stopPropagation()}
+                  >
+                    <div class="text-md text-lightSlate-50 max-w-50 truncate whitespace-nowrap p-4 font-bold">
+                      {props.mod.curseforge?.name ||
+                        props.mod.metadata?.name ||
+                        props.mod.filename}
                     </div>
-                  </Show>
-                  <Show when={props.isInstanceLocked}>
+                    <Show when={props.mod.modrinth}>
+                      <div
+                        class="text-md hover:bg-darkSlate-800 flex justify-between gap-4 p-4"
+                        onClick={() => {
+                          navigator.navigate(
+                            `/mods/${
+                              props.mod.modrinth?.project_id
+                            }/modrinth/versions?instanceId=${instanceId()}`
+                          )
+                        }}
+                      >
+                        <div>
+                          <Trans key="instance.switch_version" />
+                        </div>
+                        <div class="flex items-center justify-center">
+                          <img src={ModrinthLogo} class="h-4 w-4" />
+                        </div>
+                      </div>
+                    </Show>
+                    <Show when={props.mod.curseforge}>
+                      <div
+                        class="hover:bg-darkSlate-800 text-md flex justify-between gap-4 p-4"
+                        onClick={() => {
+                          navigator.navigate(
+                            `/mods/${
+                              props.mod.curseforge?.project_id
+                            }/curseforge/versions?instanceId=${instanceId()}`
+                          )
+                        }}
+                      >
+                        <div>
+                          <Trans key="instance.switch_version" />
+                        </div>
+                        <div class="flex items-center justify-center">
+                          <img src={CurseforgeLogo} class="h-4 w-4" />
+                        </div>
+                      </div>
+                    </Show>
+                  </div>
+                </Show>
+                <Show when={props.isInstanceLocked}>
+                  <div class="p-4">
                     <Trans key="instance.locked_cannot_apply_changes" />
-                  </Show>
-                </>
-              )}
-              placement="left-end"
-              color="bg-darkSlate-900"
-            >
-              <div
-                class="text-2xl text-lightSlate-700 duration-100 ease-in-out cursor-pointer transition-color hover:text-lightSlate-50 i-ri:more-2-fill"
-                classList={{
-                  "text-lightSlate-50": isHoveringOptionsCard()
-                }}
-              />
+                  </div>
+                </Show>
+              </PopoverContent>
             </Popover>
           </div>
         </span>

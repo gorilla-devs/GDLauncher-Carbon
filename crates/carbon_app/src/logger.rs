@@ -2,7 +2,7 @@ use std::path::Path;
 
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{
-    prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt, EnvFilter,
+    EnvFilter, prelude::__tracing_subscriber_SubscriberExt, util::SubscriberInitExt,
 };
 
 fn generate_logs_filters() -> String {
@@ -18,10 +18,13 @@ fn generate_logs_filters() -> String {
         "hyper_util::client::legacy::pool=warn",
         "hyper_util::client::legacy::connect::http=warn",
         "hyper_util::client::legacy::connect::dns=warn",
+        "hyper_util::client::legacy::client=warn",
         "reqwest::async_impl::client=warn",
         "hyper::client::connect::http=warn",
         "hyper::client::connect::dns=warn",
         "quaint::pooled::manager=warn",
+        "query_core::interactive_transactions::actors=warn",
+        "query_core::executor::interpreting_executor=warn",
         "rustls::client::hs=warn",
         "rustls::client::tls13=warn",
         "h2::client=warn",

@@ -63,3 +63,18 @@ a {
     opacity: 0;
   }
 }
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.skeleton-shimmer {
+  background: rgb(var(--darkSlate-500));
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
+}

@@ -1,251 +1,75 @@
-import {
-  JSX,
-  createSignal,
-  Show,
-  createEffect,
-  onMount,
-  onCleanup,
-  mergeProps
-} from "solid-js"
-import { Portal } from "solid-js/web"
-import { useFloating } from "solid-floating-ui"
-import {
-  offset,
-  shift,
-  autoUpdate,
-  hide,
-  size,
-  Placement,
-  autoPlacement
-} from "@floating-ui/dom"
+import { cn } from "../util"
+import type { PolymorphicProps } from "@kobalte/core/polymorphic"
+import type {
+  PopoverContentProps,
+  PopoverRootProps
+} from "@kobalte/core/popover"
+import { Popover as PopoverPrimitive } from "@kobalte/core/popover"
+import type { ParentProps, ValidComponent } from "solid-js"
+import { mergeProps, splitProps } from "solid-js"
 
-interface Props {
-  children: JSX.Element
-  content: (close: () => void) => JSX.Element | string | number
-  trigger?: "click" | "hover"
-  placement?: Placement
-  color?: string
-  noTip?: boolean
-  noPadding?: boolean
-  opened?: boolean
-  onOpen?: () => void
-  onClose?: () => void
-  noShadow?: boolean
+export const PopoverTrigger = PopoverPrimitive.Trigger
+export const PopoverTitle = PopoverPrimitive.Title
+export const PopoverDescription = PopoverPrimitive.Description
+
+export const Popover = (props: PopoverRootProps) => {
+  const merge = mergeProps<PopoverRootProps[]>(
+    {
+      gutter: 4,
+      flip: false
+    },
+    props
+  )
+
+  return <PopoverPrimitive {...merge} />
 }
 
-interface Point {
-  x: number
-  y: number
-}
-
-function isPointInTriangle(
-  pt: Point,
-  v1: Point,
-  v2: Point,
-  v3: Point
-): boolean {
-  const dX = pt.x - v3.x
-  const dY = pt.y - v3.y
-  const dX21 = v3.x - v2.x
-  const dY12 = v2.y - v3.y
-  const D = dY12 * (v1.x - v3.x) + dX21 * (v1.y - v3.y)
-  const s = dY12 * dX + dX21 * dY
-  const t = (v3.y - v1.y) * dX + (v1.x - v3.x) * dY
-  if (D < 0) return s <= 0 && t <= 0 && s + t >= D
-  return s >= 0 && t >= 0 && s + t <= D
-}
-
-const Popover = (_props: Props) => {
-  const props: Props = mergeProps({ trigger: "hover" as const }, _props)
-
-  const [isHoveringCard, setSsHoveringCard] = createSignal(false)
-  const [PopoverOpened, setPopoverOpened] = createSignal(false)
-  const [elementRef, setElementRef] = createSignal<HTMLDivElement>()
-  const [PopoverRef, setPopoverRef] = createSignal<HTMLDivElement>()
-  const [triangleStart, setTriangleStart] = createSignal({ x: 0, y: 0 })
-  const [openTimer, setOpenTimer] =
-    createSignal<ReturnType<typeof setTimeout>>()
-
-  const open = () => {
-    if (props.trigger === "click") {
-      document.addEventListener("click", onClickWindow)
-    }
-    setPopoverOpened(true)
-    props.onOpen?.()
+type popoverContentProps<T extends ValidComponent = "div"> = ParentProps<
+  PopoverContentProps<T> & {
+    class?: string
+    hideCloseButton?: boolean
   }
+>
 
-  const close = () => {
-    if (props.trigger === "click") {
-      document.removeEventListener("click", onClickWindow)
-    }
-    setPopoverOpened(false)
-    props.onClose?.()
-  }
-
-  const menuRect = () => {
-    if (!PopoverRef()) return
-    const popover = PopoverRef()!
-    return popover && popover.offsetWidth > 0 && popover.offsetHeight > 0
-      ? popover.getBoundingClientRect()
-      : undefined
-  }
-
-  const trackMouse = (e: MouseEvent) => {
-    if (!menuRect()) return
-    const b = {
-      x: menuRect()!.left,
-      y: menuRect()!.top
-    }
-    const c = {
-      x: menuRect()!.left,
-      y: menuRect()!.bottom
-    }
-
-    const a = triangleStart()
-
-    if (
-      !isPointInTriangle({ x: e.clientX, y: e.clientY }, a, b, c) &&
-      !isHoveringCard()
-    ) {
-      close()
-    } else {
-      open()
-    }
-  }
-
-  let debounceTimeout: ReturnType<typeof setTimeout> | null = null
-
-  const debouncedTrackMouse = (e: MouseEvent) => {
-    if (debounceTimeout) clearTimeout(debounceTimeout)
-
-    debounceTimeout = setTimeout(() => {
-      trackMouse(e)
-    }, 50)
-  }
-
-  const onClickWindow = () => {
-    close()
-  }
-
-  onMount(() => {
-    if (props.trigger === "hover") {
-      window.addEventListener("mousemove", debouncedTrackMouse)
-    }
-  })
-
-  onCleanup(() => {
-    if (props.trigger === "hover") {
-      window.removeEventListener("mousemove", debouncedTrackMouse)
-    }
-  })
-
-  const position = useFloating(elementRef, PopoverRef, {
-    ...(props.placement && { placement: props.placement }),
-    middleware: [
-      offset(10),
-      shift(),
-      hide(),
-      size(),
-      !props.placement
-        ? autoPlacement({
-            padding: {
-              top: 0,
-              right: 200
-            }
-          })
-        : undefined
-    ],
-    whileElementsMounted: (reference, floating, update) =>
-      autoUpdate(reference, floating, update, {
-        animationFrame: true
-      })
-  })
-
-  createEffect(() => {
-    if (position.middlewareData.hide?.referenceHidden) {
-      close()
-    }
-  })
+export const PopoverContent = <T extends ValidComponent = "div">(
+  props: PolymorphicProps<T, popoverContentProps<T>>
+) => {
+  const [local, rest] = splitProps(props as popoverContentProps, [
+    "class",
+    "children",
+    "hideCloseButton"
+  ])
 
   return (
-    <>
-      <Show when={(props.opened || PopoverOpened()) && props.content(close)}>
-        <Portal>
-          <div
-            onMouseEnter={() => {
-              setSsHoveringCard(true)
-            }}
-            onMouseLeave={() => {
-              setSsHoveringCard(false)
-            }}
-            ref={setPopoverRef}
-            class={`rounded-lg will-change z-100 ${props.color || ""} ${
-              props.noShadow ? "" : "shadow-lg shadow-darkSlate-900"
-            }`}
-            style={{
-              position: "absolute",
-              top: `${position.y ?? 0}px`,
-              left: `${position.x ?? 0}px`
-            }}
-            classList={{
-              "bg-darkSlate-900": !props.color,
-              "px-2 py-1": !props.noPadding
-            }}
-            onClick={(e) => {
-              e.stopImmediatePropagation()
-              e.stopPropagation()
-            }}
-          >
-            <div class="relative">{props.content(close)}</div>
-            <Show when={!props.noTip}>
-              <div
-                class={`absolute w-4 h-4 rotate-45 z-10 ${props.color || ""}`}
-                classList={{
-                  "bg-darkSlate-900": !props.color,
-                  "left-1/2 -translate-x-1/2 -bottom-1":
-                    props.placement?.includes("top") || !props.placement,
-                  "top-1/2 -translate-y-1/2 -left-1":
-                    props.placement?.includes("right")
-                }}
-              />
-            </Show>
-          </div>
-        </Portal>
-      </Show>
-
-      <div
-        ref={setElementRef}
-        onMouseEnter={(e) => {
-          setTriangleStart({ x: e.clientX, y: e.clientY })
-          setSsHoveringCard(true)
-          if (props.trigger === "hover") {
-            setOpenTimer(
-              setTimeout(() => {
-                open()
-              }, 300)
-            )
-          }
-        }}
-        onMouseLeave={() => {
-          if (props.trigger === "hover") {
-            clearTimeout(openTimer())
-          }
-          setSsHoveringCard(false)
-        }}
-        onClick={() => {
-          if (props.trigger === "click") {
-            if (PopoverOpened()) {
-              close()
-            } else {
-              open()
-            }
-          }
-        }}
+    <PopoverPrimitive.Portal>
+      <PopoverPrimitive.Content
+        class={cn(
+          "z-200 w-72 rounded-md border border-solid border-darkSlate-600 bg-darkSlate-800 p-4 text-lightSlate-200 shadow-md outline-none data-[expanded]:animate-popoverEnter data-[closed]:animate-popoverLeave",
+          local.class
+        )}
+        {...rest}
       >
-        {props.children}
-      </div>
-    </>
+        {local.children}
+        {!local.hideCloseButton && (
+          <PopoverPrimitive.CloseButton class="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-[1.5px] focus:ring-darkSlate-600 focus:ring-offset-2 disabled:pointer-events-none">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              class="h-4 w-4"
+            >
+              <path
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M18 6L6 18M6 6l12 12"
+              />
+              <title>Close</title>
+            </svg>
+          </PopoverPrimitive.CloseButton>
+        )}
+      </PopoverPrimitive.Content>
+    </PopoverPrimitive.Portal>
   )
 }
-
-export { Popover }

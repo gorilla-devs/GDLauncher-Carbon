@@ -1,23 +1,23 @@
 use super::{
-    installer::{CurseforgeModInstaller, IntoInstaller, ModrinthModInstaller},
     InstanceId, InstanceManager, InvalidInstanceIdError,
+    installer::{CurseforgeModInstaller, IntoInstaller, ModrinthModInstaller},
 };
 use crate::api::keys::instance::INSTANCE_MODS;
 use crate::domain::instance::info::{GameVersion, ModLoaderType};
 use crate::domain::instance::{self as domain, info};
-use crate::managers::instance::InstanceType;
 use crate::managers::AppInner;
+use crate::managers::instance::InstanceType;
 use crate::{domain::vtask::VisualTaskId, managers::ManagerRef};
 use anyhow::{anyhow, bail};
+use carbon_platforms::curseforge::FileReleaseType;
 use carbon_platforms::curseforge::filters::{
     ModFilesParameters, ModFilesParametersQuery, ModParameters,
 };
-use carbon_platforms::curseforge::FileReleaseType;
 use carbon_platforms::modrinth::project::ProjectVersionsFilters;
 use carbon_platforms::modrinth::search::ProjectID;
 use carbon_platforms::modrinth::version::VersionType;
 use carbon_platforms::{
-    curseforge, modrinth, ModChannel, ModChannelWithUsage, ModPlatform, ModSources, RemoteVersion,
+    ModChannel, ModChannelWithUsage, ModPlatform, ModSources, RemoteVersion, curseforge, modrinth,
 };
 use carbon_repos::db::{
     curse_forge_mod_cache as cfdb, mod_file_cache as fcdb, mod_metadata as metadb,
@@ -45,7 +45,11 @@ impl ManagerRef<'_, InstanceManager> {
         Ok(())
     }
 
-    pub async fn list_mods(self, instance_id: InstanceId) -> anyhow::Result<Vec<domain::Mod>> {
+    pub async fn list_mods(
+        self,
+        instance_id: InstanceId,
+        addon_type: Option<domain::AddonType>,
+    ) -> anyhow::Result<Vec<domain::Mod>> {
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
@@ -107,11 +111,19 @@ impl ManagerRef<'_, InstanceManager> {
                     .is_some()
             };
 
+        let mut query_filters = vec![fcdb::instance_id::equals(*instance_id)];
+
+        if let Some(addon_type) = addon_type {
+            query_filters.push(fcdb::addon_type::equals(
+                addon_type.to_db_string().to_string(),
+            ));
+        }
+
         let mods = self
             .app
             .prisma_client
             .mod_file_cache()
-            .find_many(vec![fcdb::instance_id::equals(*instance_id)])
+            .find_many(query_filters)
             .with(
                 fcdb::metadata::fetch()
                     .with(metadb::logo_image::fetch())
@@ -170,6 +182,8 @@ impl ManagerRef<'_, InstanceManager> {
                     id: m.id,
                     filename: m.filename,
                     enabled: m.enabled,
+                    addon_type: domain::AddonType::from_db_string(&m.addon_type)
+                        .unwrap_or(domain::AddonType::Mods),
                     metadata: m.metadata.as_ref().map(|m| domain::ModFileMetadata {
                         id: m.id.clone(),
                         modid: m.modid.clone(),
@@ -209,23 +223,21 @@ impl ManagerRef<'_, InstanceManager> {
                             .flatten()
                             .is_some(),
                     }),
-                    modrinth: m.metadata.and_then(|m| m.modrinth).flatten().map(|m| {
-                        domain::ModrinthModMetadata {
-                            project_id: m.project_id,
-                            version_id: m.version_id,
-                            title: m.title,
-                            version: m.version,
-                            urlslug: m.urlslug,
-                            description: m.description,
-                            authors: m.authors,
-                            has_image: m
-                                .logo_image
-                                .flatten()
-                                .as_ref()
-                                .map(|row| row.data.as_ref().map(|_| ()))
-                                .flatten()
-                                .is_some(),
-                        }
+                    modrinth: mr.map(|m| domain::ModrinthModMetadata {
+                        project_id: m.project_id,
+                        version_id: m.version_id,
+                        title: m.title,
+                        version: m.version,
+                        urlslug: m.urlslug,
+                        description: m.description,
+                        authors: m.authors,
+                        has_image: m
+                            .logo_image
+                            .flatten()
+                            .as_ref()
+                            .map(|row| row.data.as_ref().map(|_| ()))
+                            .flatten()
+                            .is_some(),
                     }),
                     has_update: has_curseforge_update || has_modrinth_update,
                 }
@@ -369,13 +381,18 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .ok_or(InvalidInstanceModIdError(instance_id, id))?;
 
-        let mut disabled_path = self
-            .app
-            .settings_manager()
-            .runtime_path
-            .get_instances()
-            .get_instance_path(shortpath)
-            .get_mods_path();
+        let mut disabled_path = {
+            let instance_path = self
+                .app
+                .settings_manager()
+                .runtime_path
+                .get_instances()
+                .get_instance_path(shortpath);
+
+            domain::AddonType::from_db_string(&m.addon_type)
+                .unwrap_or(domain::AddonType::Mods)
+                .get_folder_path(&instance_path)
+        };
 
         let enabled_path = disabled_path.join(&m.filename);
 
@@ -439,16 +456,26 @@ impl ManagerRef<'_, InstanceManager> {
                 .clone()
         };
 
+        let project = self
+            .app
+            .modplatforms_manager()
+            .curseforge
+            .get_mod(ModParameters {
+                mod_id: project_id.try_into()?,
+            })
+            .await?;
+
         let (version, modloader) = match version {
             domain::info::GameVersion::Custom(_) => todo!("Unsupported"),
             domain::info::GameVersion::Standard(version) => {
-                let modloader = version
-                    .modloaders
-                    .iter()
-                    .next()
-                    .ok_or(anyhow!("No modloader available"))?;
+                let first_modloader = version.modloaders.iter().next();
 
-                (version.release.clone(), modloader.type_)
+                let modloader = match project.data.class_id {
+                    Some(carbon_platforms::curseforge::ClassId::Mods) | None => first_modloader,
+                    _ => None,
+                };
+
+                (version.release.clone(), modloader.map(|v| v.type_.into()))
             }
         };
 
@@ -461,7 +488,7 @@ impl ManagerRef<'_, InstanceManager> {
                 query: ModFilesParametersQuery {
                     game_version: Some(version.clone()),
                     game_version_type_id: None,
-                    mod_loader_type: Some(modloader.into()),
+                    mod_loader_type: modloader,
                     index: None,
                     page_size: Some(200),
                 },
@@ -527,16 +554,27 @@ impl ManagerRef<'_, InstanceManager> {
                 .clone()
         };
 
+        let project = self
+            .app
+            .modplatforms_manager()
+            .modrinth
+            .get_project(ProjectID(project_id.clone()))
+            .await?;
+
         let (version, modloader) = match version {
             domain::info::GameVersion::Custom(_) => todo!("Unsupported"),
             domain::info::GameVersion::Standard(version) => {
-                let modloader = version
-                    .modloaders
-                    .iter()
-                    .next()
-                    .ok_or(anyhow!("No modloader available"))?;
+                let first_modloader = version.modloaders.iter().next();
 
-                (version.release.clone(), modloader.type_.to_string())
+                let modloader = match project.project_type {
+                    carbon_platforms::modrinth::project::ProjectType::Mod => first_modloader,
+                    _ => None,
+                };
+
+                (
+                    version.release.clone(),
+                    modloader.map(|v| vec![v.type_.to_string()]),
+                )
             }
         };
 
@@ -547,7 +585,7 @@ impl ManagerRef<'_, InstanceManager> {
             .get_project_versions(ProjectVersionsFilters {
                 project_id: ProjectID(project_id.clone()),
                 game_versions: Some(Vec::from([version.clone()])),
-                loaders: Some(Vec::from([modloader])),
+                loaders: modloader,
                 limit: None,
                 offset: None,
             })
@@ -582,7 +620,9 @@ impl ManagerRef<'_, InstanceManager> {
         drop(instances);
 
         let Some(GameVersion::Standard(version)) = &config.game_configuration.version else {
-            bail!("Instance uses a custom game version file. Cannot resolve minecraft version for mod installation");
+            bail!(
+                "Instance uses a custom game version file. Cannot resolve minecraft version for mod installation"
+            );
         };
 
         let mod_sources = self.instance_cfg_mod_sources(&config).await?;
@@ -755,7 +795,9 @@ impl ManagerRef<'_, InstanceManager> {
 
         let Some(GameVersion::Standard(version)) = data.config.game_configuration.version.clone()
         else {
-            bail!("Instance uses a custom game version file. Cannot resolve minecraft version for mod installation");
+            bail!(
+                "Instance uses a custom game version file. Cannot resolve minecraft version for mod installation"
+            );
         };
 
         drop(instances);
@@ -830,7 +872,9 @@ impl ManagerRef<'_, InstanceManager> {
 
         let Some(GameVersion::Standard(version)) = data.config.game_configuration.version.clone()
         else {
-            bail!("Instance uses a custom game version file. Cannot resolve minecraft version for mod installation");
+            bail!(
+                "Instance uses a custom game version file. Cannot resolve minecraft version for mod installation"
+            );
         };
 
         drop(instances);
@@ -845,11 +889,16 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
-        let mr = m.metadata
+        let mr = m
+            .metadata
             .expect("metadata must be associated with a ModFileCache entry")
             .modrinth
             .expect("curseforge metadata was queried but not returned")
-            .ok_or_else(|| anyhow!("Attempted to use update_modrinth_mod to update a mod not availible on modrinth"))?;
+            .ok_or_else(|| {
+                anyhow!(
+                    "Attempted to use update_modrinth_mod to update a mod not availible on modrinth"
+                )
+            })?;
 
         let mod_files = self
             .app
@@ -988,14 +1037,14 @@ mod test {
         // first invalidation will happen when the mod is scanned locally
         app.wait_for_invalidation(INSTANCE_MODS).await?;
 
-        let mods = app.instance_manager().list_mods(instance_id).await?;
+        let mods = app.instance_manager().list_mods(instance_id, None).await?;
         dbg!(&mods);
         assert_ne!(mods.get(0), None);
 
         // second invalidation will happen when the curseforge metadata is fetched
         app.wait_for_invalidation(INSTANCE_MODS).await?;
 
-        let mods = app.instance_manager().list_mods(instance_id).await?;
+        let mods = app.instance_manager().list_mods(instance_id, None).await?;
         dbg!(&mods);
         assert_ne!(mods[0].curseforge, None);
 

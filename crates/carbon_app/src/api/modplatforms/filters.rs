@@ -1,16 +1,21 @@
-use std::fmt::Display;
-use std::ops::{Deref, DerefMut};
-
+use super::FEUnifiedSearchType;
+use super::responses::{FEUnifiedCategoryId, FEUnifiedModLoaderType, FEUnifiedPlatform};
 use anyhow::anyhow;
+use carbon_platforms::curseforge::filters::{
+    ModSearchParameters, ModSearchParametersQuery, ModSearchSortField, ModSearchSortOrder,
+};
+use carbon_platforms::modrinth::search::{
+    ProjectSearchParameters, SearchFacet, SearchFacetAnd, SearchFacetOr, SearchIndex,
+};
+use carbon_platforms::modrinth::tag::LoaderType;
 use serde::{Deserialize, Serialize};
 use specta::Type;
+use std::fmt::Display;
+use std::ops::{Deref, DerefMut};
+use strum_macros::EnumIter;
 
-use super::curseforge::filters::CFFEModSearchParametersQuery;
-use super::modrinth;
-use super::{curseforge, FESearchAPI};
-
-#[derive(Type, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
+#[serde(transparent)]
 pub struct Or<T>(pub Vec<T>);
 
 impl<T> Deref for Or<T> {
@@ -47,12 +52,12 @@ impl<T> FromIterator<T> for Or<T> {
     }
 }
 
-#[derive(Type, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct And<T>(pub Vec<Or<T>>);
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
+#[serde(transparent)]
+pub struct And<T>(pub Vec<T>);
 
 impl<T> Deref for And<T> {
-    type Target = Vec<Or<T>>;
+    type Target = Vec<T>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -66,7 +71,7 @@ impl<T> DerefMut for And<T> {
 }
 
 impl<T> IntoIterator for And<T> {
-    type Item = Or<T>;
+    type Item = T;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -79,214 +84,238 @@ impl<T> FromIterator<T> for And<T> {
         let (size_lower, _) = iter.size_hint();
         let mut c = Vec::with_capacity(size_lower);
         for i in iter {
-            c.push(Or(vec![i]));
-        }
-        And(c)
-    }
-}
-
-impl<T> FromIterator<Or<T>> for And<T> {
-    fn from_iter<I: IntoIterator<Item = Or<T>>>(iter: I) -> Self {
-        let iter = iter.into_iter();
-        let (size_lower, _) = iter.size_hint();
-        let mut c = Vec::with_capacity(size_lower);
-        for i in iter {
             c.push(i);
         }
         And(c)
     }
 }
 
-impl<T> From<Or<T>> for And<T> {
-    fn from(value: Or<T>) -> Self {
+impl<T> From<T> for And<T> {
+    fn from(value: T) -> Self {
         And(vec![value])
     }
 }
 
-#[derive(Type, Debug, Deserialize, Serialize)]
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum FEUnifiedEnvironment {
+    Server,
+    Client,
+}
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone, EnumIter)]
 #[serde(rename_all = "camelCase")]
 pub enum FEUnifiedModSortIndex {
-    CurseForge(curseforge::filters::CFFEModSearchSortField),
-    Modrinth(modrinth::filters::MRFESearchIndex),
+    Relevance,   // for modrinth it's Relevance, for curseforge it's Popularity
+    Downloads,   // for modrinth it's TotalDownloads, for curseforge it's Downloads
+    LastUpdated, // for modrinth it's Updated, for curseforge it's LastUpdated
 }
 
-#[derive(
-    Type,
-    Debug,
-    serde_enum_str::Deserialize_enum_str,
-    serde_enum_str::Serialize_enum_str,
-    PartialEq,
-    Eq,
-    Clone,
-    strum_macros::EnumIter,
-)]
-#[serde(rename_all = "lowercase")]
-pub enum FEUnifiedModLoaderType {
-    // all
-    Forge,
-    NeoForge,
-    Fabric,
-    Quilt,
-    LiteLoader,
-    Unknown,
-
-    // curseforge
-    Cauldron,
-
-    // modrinth
-    Bukkit,
-    Bungeecord,
-    Canvas,
-    Datapack,
-    Folia,
-    Iris,
-    Minecraft,
-    Modloader,
-    Optifine,
-    Paper,
-    Purpur,
-    Rift,
-    Spigot,
-    Sponge,
-    Vanilla,
-    Velocity,
-    Waterfall,
-}
-
-impl TryFrom<FEUnifiedModLoaderType> for curseforge::structs::CFFEModLoaderType {
-    type Error = anyhow::Error;
-
-    fn try_from(value: FEUnifiedModLoaderType) -> Result<Self, Self::Error> {
+impl From<FEUnifiedModSortIndex> for SearchIndex {
+    fn from(value: FEUnifiedModSortIndex) -> Self {
         match value {
-            FEUnifiedModLoaderType::Forge => Ok(curseforge::structs::CFFEModLoaderType::Forge),
-
-            FEUnifiedModLoaderType::NeoForge => {
-                Ok(curseforge::structs::CFFEModLoaderType::Neoforge)
-            }
-            FEUnifiedModLoaderType::Fabric => Ok(curseforge::structs::CFFEModLoaderType::Fabric),
-            FEUnifiedModLoaderType::Quilt => Ok(curseforge::structs::CFFEModLoaderType::Quilt),
-            FEUnifiedModLoaderType::LiteLoader => {
-                Ok(curseforge::structs::CFFEModLoaderType::LiteLoader)
-            }
-            FEUnifiedModLoaderType::Cauldron => {
-                Ok(curseforge::structs::CFFEModLoaderType::Cauldron)
-            }
-            value => Err(anyhow!(
-                "Curseforge does not support the `{}` loader",
-                value.to_string()
-            )),
+            FEUnifiedModSortIndex::Relevance => SearchIndex::Relevance,
+            FEUnifiedModSortIndex::Downloads => SearchIndex::Downloads,
+            FEUnifiedModSortIndex::LastUpdated => SearchIndex::Updated,
         }
     }
 }
 
-impl TryFrom<FEUnifiedModLoaderType> for modrinth::structs::MRFELoaderType {
-    type Error = anyhow::Error;
-
-    fn try_from(value: FEUnifiedModLoaderType) -> Result<Self, Self::Error> {
+impl From<FEUnifiedModSortIndex> for ModSearchSortField {
+    fn from(value: FEUnifiedModSortIndex) -> Self {
         match value {
-            FEUnifiedModLoaderType::Forge => Ok(modrinth::structs::MRFELoaderType::Forge),
-            FEUnifiedModLoaderType::NeoForge => Ok(modrinth::structs::MRFELoaderType::Neoforge),
-            FEUnifiedModLoaderType::Fabric => Ok(modrinth::structs::MRFELoaderType::Fabric),
-            FEUnifiedModLoaderType::Quilt => Ok(modrinth::structs::MRFELoaderType::Quilt),
-            FEUnifiedModLoaderType::LiteLoader => Ok(modrinth::structs::MRFELoaderType::Liteloader),
-            FEUnifiedModLoaderType::Bukkit => Ok(modrinth::structs::MRFELoaderType::Bukkit),
-            FEUnifiedModLoaderType::Bungeecord => Ok(modrinth::structs::MRFELoaderType::Bungeecord),
-            FEUnifiedModLoaderType::Canvas => Ok(modrinth::structs::MRFELoaderType::Canvas),
-            FEUnifiedModLoaderType::Datapack => Ok(modrinth::structs::MRFELoaderType::Datapack),
-            FEUnifiedModLoaderType::Folia => Ok(modrinth::structs::MRFELoaderType::Folia),
-            FEUnifiedModLoaderType::Iris => Ok(modrinth::structs::MRFELoaderType::Iris),
-            FEUnifiedModLoaderType::Minecraft => Ok(modrinth::structs::MRFELoaderType::Minecraft),
-            FEUnifiedModLoaderType::Modloader => Ok(modrinth::structs::MRFELoaderType::Modloader),
-            FEUnifiedModLoaderType::Optifine => Ok(modrinth::structs::MRFELoaderType::Optifine),
-            FEUnifiedModLoaderType::Paper => Ok(modrinth::structs::MRFELoaderType::Paper),
-            FEUnifiedModLoaderType::Purpur => Ok(modrinth::structs::MRFELoaderType::Purpur),
-            FEUnifiedModLoaderType::Rift => Ok(modrinth::structs::MRFELoaderType::Rift),
-            FEUnifiedModLoaderType::Spigot => Ok(modrinth::structs::MRFELoaderType::Spigot),
-            FEUnifiedModLoaderType::Sponge => Ok(modrinth::structs::MRFELoaderType::Sponge),
-            FEUnifiedModLoaderType::Vanilla => Ok(modrinth::structs::MRFELoaderType::Vanilla),
-            FEUnifiedModLoaderType::Velocity => Ok(modrinth::structs::MRFELoaderType::Velocity),
-            FEUnifiedModLoaderType::Waterfall => Ok(modrinth::structs::MRFELoaderType::Waterfall),
-            FEUnifiedModLoaderType::Unknown => Err(anyhow!("Can't use unknown modloader type")),
-            FEUnifiedModLoaderType::Cauldron => {
-                Err(anyhow!("Modrinth does not support the `Cauldron` loader"))
-            }
+            FEUnifiedModSortIndex::Relevance => ModSearchSortField::Popularity,
+            FEUnifiedModSortIndex::Downloads => ModSearchSortField::TotalDownloads,
+            FEUnifiedModSortIndex::LastUpdated => ModSearchSortField::LastUpdated,
         }
     }
 }
-
-#[derive(Type, Debug, Deserialize, Serialize)]
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub enum FEUnifiedSearchType {
-    Mod,
-    ModPack,
+pub enum FEUnifiedModSearchSortOrder {
+    Ascending,
+    Descending,
 }
 
-impl Display for FEUnifiedSearchType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let out = match self {
-            FEUnifiedSearchType::Mod => "mod",
-            FEUnifiedSearchType::ModPack => "modpack",
-        };
-        write!(f, "{}", out)
-    }
-}
-
-impl From<FEUnifiedSearchType> for curseforge::structs::CFFEClassId {
-    fn from(value: FEUnifiedSearchType) -> Self {
+impl From<FEUnifiedModSearchSortOrder> for ModSearchSortOrder {
+    fn from(value: FEUnifiedModSearchSortOrder) -> Self {
         match value {
-            FEUnifiedSearchType::Mod => curseforge::structs::CFFEClassId::Mods,
-            FEUnifiedSearchType::ModPack => curseforge::structs::CFFEClassId::Modpacks,
+            FEUnifiedModSearchSortOrder::Ascending => ModSearchSortOrder::Ascending,
+            FEUnifiedModSearchSortOrder::Descending => ModSearchSortOrder::Descending,
         }
     }
 }
 
-#[derive(Type, Debug, Deserialize, Serialize)]
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub enum FEUnifiedSearchCategoryID {
-    Curseforge(i32),
-    Modrinth(String),
+pub enum FECurseforgeSearchSortField {
+    Featured,
+    Popularity,
+    TotalDownloads,
+    LastUpdated,
+    Name,
+    Author,
+    Category,
+    GameVersion,
 }
 
-#[derive(Type, Debug, Deserialize, Serialize)]
+impl From<FECurseforgeSearchSortField> for ModSearchSortField {
+    fn from(value: FECurseforgeSearchSortField) -> Self {
+        match value {
+            FECurseforgeSearchSortField::Featured => ModSearchSortField::Featured,
+            FECurseforgeSearchSortField::Popularity => ModSearchSortField::Popularity,
+            FECurseforgeSearchSortField::TotalDownloads => ModSearchSortField::TotalDownloads,
+            FECurseforgeSearchSortField::LastUpdated => ModSearchSortField::LastUpdated,
+            FECurseforgeSearchSortField::Name => ModSearchSortField::Name,
+            FECurseforgeSearchSortField::Author => ModSearchSortField::Author,
+            FECurseforgeSearchSortField::Category => ModSearchSortField::Category,
+            FECurseforgeSearchSortField::GameVersion => ModSearchSortField::GameVersion,
+        }
+    }
+}
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum FEModrinthSearchIndex {
+    Relevance,
+    Downloads,
+    Follows,
+    Newest,
+    Updated,
+}
+
+impl From<FEModrinthSearchIndex> for SearchIndex {
+    fn from(value: FEModrinthSearchIndex) -> Self {
+        match value {
+            FEModrinthSearchIndex::Relevance => SearchIndex::Relevance,
+            FEModrinthSearchIndex::Downloads => SearchIndex::Downloads,
+            FEModrinthSearchIndex::Follows => SearchIndex::Follows,
+            FEModrinthSearchIndex::Newest => SearchIndex::Newest,
+            FEModrinthSearchIndex::Updated => SearchIndex::Updated,
+        }
+    }
+}
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "platform", content = "filters")]
+pub enum FEPlatformFilters {
+    Curseforge {
+        sort_field: Option<FECurseforgeSearchSortField>,
+        sort_order: Option<FEUnifiedModSearchSortOrder>,
+    },
+    Modrinth {
+        sort_index: Option<FEModrinthSearchIndex>,
+    },
+}
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FEUnifiedSearchParameters {
     pub search_query: Option<String>,
-    pub categories: Option<And<FEUnifiedSearchCategoryID>>,
+    // Technically modrinth supports [AND[OR[category]]] but since curseforge doesn't, we will just support ANDs
+    pub categories: Option<And<FEUnifiedCategoryId>>,
     pub game_versions: Option<Or<String>>,
     pub modloaders: Option<Or<FEUnifiedModLoaderType>>,
     pub project_type: Option<FEUnifiedSearchType>,
-    pub sort_index: Option<FEUnifiedModSortIndex>,
-    pub sort_order: Option<curseforge::filters::CFFEModSearchSortOrder>,
+    pub platform_filters: Option<FEPlatformFilters>,
     pub index: Option<u32>,
     pub page_size: Option<u32>,
-    pub search_api: FESearchAPI,
+    pub search_api: Option<FEUnifiedPlatform>,
+    pub environment: Option<FEUnifiedEnvironment>,
 }
 
-impl From<FEUnifiedSearchParameters> for curseforge::filters::CFFEModSearchParameters {
+impl From<FEUnifiedSearchParameters> for ProjectSearchParameters {
     fn from(value: FEUnifiedSearchParameters) -> Self {
-        curseforge::filters::CFFEModSearchParameters {
-            query: CFFEModSearchParametersQuery {
+        let mut facets = SearchFacetAnd::new();
+        if let Some(categories) = value.categories {
+            for cat_or in categories {
+                match cat_or {
+                    FEUnifiedCategoryId::Curseforge(_) => {}
+                    FEUnifiedCategoryId::Modrinth(id) => {
+                        facets.push(SearchFacetOr::new(vec![SearchFacet::Category(id)]));
+                    }
+                }
+            }
+        }
+        if let Some(versions) = value.game_versions {
+            let versions_or = versions.into_iter().map(SearchFacet::Version).collect();
+            facets.push(versions_or);
+        }
+        if let Some(modloaders) = value.modloaders {
+            let modloaders_or = modloaders
+                .into_iter()
+                .filter_map(|loader| TryInto::<LoaderType>::try_into(loader).ok())
+                .map(|modloader| SearchFacet::Category(modloader.to_string()))
+                .collect();
+            facets.push(modloaders_or);
+        }
+        if let Some(project_type) = value.project_type {
+            facets.push(SearchFacetOr::new(vec![SearchFacet::ProjectType(
+                project_type.to_string(),
+            )]));
+        }
+
+        // Extract Modrinth-specific sorting from platform filters, default to Downloads
+        let sort_index = match &value.platform_filters {
+            Some(FEPlatformFilters::Modrinth { sort_index }) => {
+                sort_index.as_ref().map(|idx| idx.clone().into())
+            }
+            _ => Some(SearchIndex::Downloads), // Default to Downloads when no platform filters
+        };
+
+        ProjectSearchParameters {
+            query: value.search_query,
+            facets: if facets.is_empty() {
+                None
+            } else {
+                Some(facets)
+            },
+            index: sort_index,
+            offset: value.index,
+            limit: value.page_size,
+            filters: None,
+        }
+    }
+}
+
+impl From<FEUnifiedSearchParameters> for ModSearchParameters {
+    fn from(value: FEUnifiedSearchParameters) -> Self {
+        // Extract Curseforge-specific sorting from platform filters, default to TotalDownloads DESC
+        let (sort_field, sort_order) = match &value.platform_filters {
+            Some(FEPlatformFilters::Curseforge {
+                sort_field,
+                sort_order,
+            }) => (
+                sort_field.as_ref().map(|f| f.clone().into()),
+                sort_order.as_ref().map(|o| o.clone().into()),
+            ),
+            _ => (
+                Some(ModSearchSortField::TotalDownloads),
+                Some(ModSearchSortOrder::Descending),
+            ), // Default to TotalDownloads DESC
+        };
+
+        ModSearchParameters {
+            query: ModSearchParametersQuery {
                 game_id: 432,
                 search_filter: value.search_query,
                 game_version: value.game_versions.and_then(|vers| vers.into_iter().next()),
                 category_ids: value.categories.map(|cat_groups| {
                     cat_groups
                         .into_iter()
-                        .filter_map(|cats| {
+                        .filter_map(|cat| {
                             // Curseforge does't support ORs of categories, take only the first of each
                             // group
-                            cats.into_iter().find_map(|cat| match cat {
-                                FEUnifiedSearchCategoryID::Curseforge(id) => Some(id),
-                                FEUnifiedSearchCategoryID::Modrinth(_) => None,
-                            })
+                            match cat {
+                                FEUnifiedCategoryId::Curseforge(id) => Some(id),
+                                FEUnifiedCategoryId::Modrinth(_) => None,
+                            }
                         })
                         .collect()
                 }),
-                sort_order: value.sort_order,
-                sort_field: match value.sort_index {
-                    Some(FEUnifiedModSortIndex::CurseForge(field)) => Some(field),
-                    _ => None,
-                },
+                sort_order,
+                sort_field,
                 class_id: value.project_type.map(Into::into),
                 mod_loader_types: value.modloaders.map(|loaders| {
                     loaders
@@ -304,72 +333,16 @@ impl From<FEUnifiedSearchParameters> for curseforge::filters::CFFEModSearchParam
     }
 }
 
-impl TryFrom<FEUnifiedSearchParameters>
-    for carbon_platforms::curseforge::filters::ModSearchParameters
-{
-    type Error = anyhow::Error;
-
-    fn try_from(value: FEUnifiedSearchParameters) -> Result<Self, Self::Error> {
-        let search_params: curseforge::filters::CFFEModSearchParameters = value.try_into()?;
-        Ok(search_params.into())
-    }
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+#[serde(tag = "type", content = "value")]
+pub enum FEUnifiedProjectID {
+    Curseforge(i32),
+    Modrinth(String),
 }
 
-impl From<FEUnifiedSearchParameters> for modrinth::filters::MRFEProjectSearchParameters {
-    fn from(value: FEUnifiedSearchParameters) -> Self {
-        let mut facets = modrinth::filters::MRFESearchFacetAnd::new();
-        if let Some(categories) = value.categories {
-            for cat_or in categories {
-                let category_or = cat_or
-                    .into_iter()
-                    .filter_map(|cat| match cat {
-                        FEUnifiedSearchCategoryID::Curseforge(_) => None,
-                        FEUnifiedSearchCategoryID::Modrinth(id) => {
-                            Some(modrinth::filters::MRFESearchFacet::Category(id))
-                        }
-                    })
-                    .collect();
-                facets.push(category_or);
-            }
-        }
-        if let Some(versions) = value.game_versions {
-            let versions_or = versions
-                .into_iter()
-                .map(modrinth::filters::MRFESearchFacet::Version)
-                .collect();
-            facets.push(versions_or);
-        }
-        if let Some(modloaders) = value.modloaders {
-            let modloaders_or = modloaders
-                .into_iter()
-                .filter_map(|loader| {
-                    TryInto::<modrinth::structs::MRFELoaderType>::try_into(loader).ok()
-                })
-                .map(|modloader| {
-                    modrinth::filters::MRFESearchFacet::Category(modloader.to_string())
-                })
-                .collect();
-            facets.push(modloaders_or);
-        }
-        if let Some(project_type) = value.project_type {
-            facets.push(modrinth::filters::MRFESearchFacetOr(vec![
-                modrinth::filters::MRFESearchFacet::ProjectType(project_type.to_string()),
-            ]));
-        }
-        modrinth::filters::MRFEProjectSearchParameters {
-            query: value.search_query,
-            facets: if facets.is_empty() {
-                None
-            } else {
-                Some(facets)
-            },
-            index: match value.sort_index {
-                Some(FEUnifiedModSortIndex::Modrinth(index)) => Some(index),
-                _ => None,
-            },
-            offset: value.index,
-            limit: value.page_size,
-            filters: None,
-        }
-    }
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FEUnifiedProjectIDParameters {
+    pub project_id: FEUnifiedProjectID,
 }

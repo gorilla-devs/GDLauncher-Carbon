@@ -5,7 +5,6 @@ import { useTransContext } from "@gd/i18n"
 import { Button } from "@gd/ui"
 import { setPayload, payload, setExportStep } from ".."
 import { ExportArgs, ExportEntry } from "@gd/core_module/bindings"
-import { instanceId } from "@/utils/browser"
 import { buildNestedObject, checkedFiles } from "./ExportCheckboxParent"
 import _ from "lodash"
 import { setFailedMsg } from "./Exporting"
@@ -29,7 +28,11 @@ function convertNestedObject(obj: any): any {
   return { entries: result }
 }
 
-const BeginExport = () => {
+interface Props {
+  instanceId: number
+}
+
+const BeginExport = (props: Props) => {
   const [t] = useTransContext()
   const modalsContext = useModal()
   const exportInstanceMutation = rspc.createMutation(() => ({
@@ -49,7 +52,10 @@ const BeginExport = () => {
   }
 
   const handleExportInstance = () => {
-    setPayload((prev) => ({ ...prev, instance_id: instanceId() }))
+    setPayload((prev) => ({
+      ...prev,
+      instance_id: props.instanceId
+    }))
     setFailedMsg(undefined)
     const obj = buildNestedObject(checkedFiles())
     const converted = convertNestedObject({ entries: obj })
@@ -69,7 +75,7 @@ const BeginExport = () => {
   }
 
   return (
-    <div class="flex justify-between items-center w-full pt-4">
+    <div class="flex w-full items-center justify-between pt-4">
       <Button
         type="secondary"
         size="large"

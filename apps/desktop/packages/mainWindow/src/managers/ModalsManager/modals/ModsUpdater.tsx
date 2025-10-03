@@ -1,4 +1,4 @@
-import { Progressbar, createNotification } from "@gd/ui"
+import { Progress, toast } from "@gd/ui"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
 import { Trans } from "@gd/i18n"
@@ -11,11 +11,11 @@ import { RSPCError } from "@rspc/client"
 interface Props {
   instanceId: number
   mods: Mod[]
+  onComplete?: () => void
 }
 
 const AppUpdate = (props: ModalProps) => {
   const data: () => Props = () => props?.data
-  const addNotification = createNotification()
   const modalsContext = useModal()
   const [modsUpdated, setModsUpdated] = createSignal(0)
   const [isDestroyed, setIsDestroyed] = createSignal(false)
@@ -28,11 +28,7 @@ const AppUpdate = (props: ModalProps) => {
     mutationKey: ["instance.updateMod"],
     onError: (err) => {
       console.error(err)
-      addNotification({
-        name: `Error updating mod`,
-        content: err?.message,
-        type: "error"
-      })
+      toast.error(`Error updating mod: ${err?.message}`)
     }
   }))
 
@@ -45,11 +41,7 @@ const AppUpdate = (props: ModalProps) => {
         })
       } catch (err) {
         console.error(err)
-        addNotification({
-          name: `Error updating mod`,
-          content: (err as RSPCError)?.message,
-          type: "error"
-        })
+        toast.error(`Error updating mod: ${(err as RSPCError)?.message}`)
       } finally {
         setModsUpdated((prev) => prev + 1)
       }
@@ -57,10 +49,18 @@ const AppUpdate = (props: ModalProps) => {
       if (isDestroyed()) return
     }
 
-    addNotification({
-      name: "Mods updated successfully!",
-      type: "success"
-    })
+    // Add a delay to ensure all backend tasks complete
+    // The WebSocket invalidation will trigger the data refresh
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+
+    toast.success("Mods updated successfully!")
+
+    // Call the onComplete callback if provided
+    const onComplete = data().onComplete
+    if (onComplete) {
+      onComplete()
+    }
+
     modalsContext?.closeModal()
   }
 
@@ -87,9 +87,7 @@ const AppUpdate = (props: ModalProps) => {
               }}
             />
           </div>
-          <Progressbar
-            percentage={(modsUpdated() / data().mods.length) * 100}
-          />
+          <Progress value={(modsUpdated() / data().mods.length) * 100} />
         </div>
         <div class="flex flex-col items-center text-xl mt-20">
           <Trans

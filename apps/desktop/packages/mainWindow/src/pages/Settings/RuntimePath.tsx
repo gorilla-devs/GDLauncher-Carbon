@@ -1,4 +1,4 @@
-import { Button, Input, Tooltip } from "@gd/ui"
+import { Button, Input, Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
 import { Trans } from "@gd/i18n"
 import PageTitle from "./components/PageTitle"
 import RowsContainer from "./components/RowsContainer"
@@ -62,7 +62,7 @@ const RuntimePath = () => {
               value={runtimePath()}
               icon={
                 <div
-                  class="w-5 h-5 cursor-pointer hover:text-lightSlate-700 ease-in-out transition-colors i-ri:folder-fill"
+                  class="hover:text-lightSlate-700 i-ri:folder-fill h-5 w-5 cursor-pointer transition-colors ease-in-out"
                   onClick={async () => {
                     const result = await window.openFileDialog({
                       title: "Select Runtime Path",
@@ -82,34 +82,80 @@ const RuntimePath = () => {
                 setRuntimePath(value)
               }}
             />
-            <Tooltip content={<Trans key="tooltip.undo" />}>
-              <Button
-                rounded={false}
-                type="secondary"
-                class="h-10"
-                size="small"
-                onClick={() => {
-                  setRuntimePath(currentRuntimePath()!)
-                }}
-              >
-                <i class="w-5 h-5 i-ri:arrow-go-back-fill" />
-              </Button>
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  rounded={false}
+                  type="secondary"
+                  class="h-10"
+                  size="small"
+                  onClick={() => {
+                    setRuntimePath(currentRuntimePath()!)
+                  }}
+                >
+                  <i class="i-ri:arrow-go-back-fill h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <Trans key="tooltip.undo" />
+              </TooltipContent>
             </Tooltip>
-            <Tooltip content={<Trans key="tooltip.reset" />}>
-              <Button
-                rounded={false}
-                type="secondary"
-                class="h-10"
-                size="small"
-                onClick={() => {
-                  setRuntimePath(initialRuntimePath()!)
-                }}
-              >
-                <i class="w-5 h-5 i-ri:close-fill" />
-              </Button>
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  rounded={false}
+                  type="secondary"
+                  class="h-10"
+                  size="small"
+                  onClick={() => {
+                    setRuntimePath(initialRuntimePath()!)
+                  }}
+                >
+                  <i class="i-ri:close-fill h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <Trans key="tooltip.reset" />
+              </TooltipContent>
             </Tooltip>
-            <Tooltip
-              content={
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  rounded={false}
+                  type="primary"
+                  class="h-10"
+                  size="small"
+                  backgroundColor={
+                    isPathValid() === "potentially_valid"
+                      ? "bg-yellow-900"
+                      : undefined
+                  }
+                  disabled={
+                    !isPathValid() ||
+                    isPathValid() === "invalid" ||
+                    isChangingRuntimePath() ||
+                    currentRuntimePath() === runtimePath()
+                  }
+                  loading={isChangingRuntimePath()}
+                  onClick={async () => {
+                    modalsContext?.openModal(
+                      {
+                        name: "ConfirmChangeRuntimePath"
+                      },
+                      {
+                        runtimePath: runtimePath()!,
+                        isTargetFolderAlreadyUsed:
+                          isPathValid() === "potentially_valid",
+                        setIsChangingRuntimePath,
+                        isChangingRuntimePath: isChangingRuntimePath
+                      }
+                    )
+                  }}
+                >
+                  <i class="i-ri-restart-line h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
                 <Switch>
                   <Match when={currentRuntimePath() === runtimePath()}>
                     <Trans key="tooltip.rtp_unchanged" />
@@ -126,42 +172,7 @@ const RuntimePath = () => {
                     <Trans key="tooltip.rtp_not_valid" />
                   </Match>
                 </Switch>
-              }
-            >
-              <Button
-                rounded={false}
-                type="primary"
-                class="h-10"
-                size="small"
-                backgroundColor={
-                  isPathValid() === "potentially_valid"
-                    ? "bg-yellow-900"
-                    : undefined
-                }
-                disabled={
-                  !isPathValid() ||
-                  isPathValid() === "invalid" ||
-                  isChangingRuntimePath() ||
-                  currentRuntimePath() === runtimePath()
-                }
-                loading={isChangingRuntimePath()}
-                onClick={async () => {
-                  modalsContext?.openModal(
-                    {
-                      name: "ConfirmChangeRuntimePath"
-                    },
-                    {
-                      runtimePath: runtimePath()!,
-                      isTargetFolderAlreadyUsed:
-                        isPathValid() === "potentially_valid",
-                      setIsChangingRuntimePath,
-                      isChangingRuntimePath: isChangingRuntimePath
-                    }
-                  )
-                }}
-              >
-                <i class="w-5 h-5 i-ri-restart-line" />
-              </Button>
+              </TooltipContent>
             </Tooltip>
           </Center>
         </Row>

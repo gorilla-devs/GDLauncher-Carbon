@@ -187,7 +187,7 @@ impl Middleware for CacheMiddleware {
                     Err(_) => {
                         return Err(reqwest_middleware::Error::Middleware(anyhow!(
                             "could not return cached response"
-                        )))
+                        )));
                     }
                 }
             }
@@ -201,7 +201,7 @@ impl Middleware for CacheMiddleware {
 mod test {
     use std::time::SystemTime;
 
-    use axum::{http::header, routing::get, Router};
+    use axum::{Router, http::header, routing::get};
     use chrono::{Duration, Utc};
     use tokio::net::TcpListener;
 
@@ -209,8 +209,11 @@ mod test {
 
     macro_rules! launch_server {
         [$($headers:expr),*] => {{
-            let tcp_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let port = tcp_listener.local_addr().unwrap().port();
+            let tcp_listener = TcpListener::bind("127.0.0.1:0").await
+                .expect("Failed to bind test server to localhost");
+            let port = tcp_listener.local_addr()
+                .expect("Failed to get local address of test server")
+                .port();
 
             let server = Router::new()
                 .route("/", get(|| async { ([$($headers),*], "test") }));
@@ -218,7 +221,7 @@ mod test {
             tokio::spawn(async {
                 axum::serve(tcp_listener, server.into_make_service())
                     .await
-                    .unwrap();
+                    .expect("Test server failed to start");
             });
 
             // let the server start
@@ -233,7 +236,7 @@ mod test {
             .get(format!("http://127.0.0.1:{port}/"))
             .send()
             .await
-            .unwrap()
+            .expect("Failed to send test request")
             .headers()
             .get("Cached")
             .is_some()

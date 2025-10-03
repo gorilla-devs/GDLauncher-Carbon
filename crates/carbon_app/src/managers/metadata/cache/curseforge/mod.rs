@@ -1,19 +1,19 @@
 use super::BundleSender;
 use super::ModplatformCacher;
 use super::UpdateNotifier;
-use crate::domain::instance::info::ModLoaderType;
 use crate::domain::instance::InstanceId;
+use crate::domain::instance::info::ModLoaderType;
 use crate::managers::App;
+use carbon_platforms::ModChannel;
+use carbon_platforms::curseforge::File;
+use carbon_platforms::curseforge::FileReleaseType;
+use carbon_platforms::curseforge::FingerprintsMatchesResult;
+use carbon_platforms::curseforge::Mod;
 use carbon_platforms::curseforge::filters::ModFilesParameters;
 use carbon_platforms::curseforge::filters::ModFilesParametersQuery;
 use carbon_platforms::curseforge::filters::ModParameters;
 use carbon_platforms::curseforge::filters::ModsParameters;
 use carbon_platforms::curseforge::filters::ModsParametersBody;
-use carbon_platforms::curseforge::File;
-use carbon_platforms::curseforge::FileReleaseType;
-use carbon_platforms::curseforge::FingerprintsMatchesResult;
-use carbon_platforms::curseforge::Mod;
-use carbon_platforms::ModChannel;
 use carbon_repos::db::read_filters::DateTimeFilter;
 use carbon_repos::db::read_filters::IntFilter;
 use carbon_repos::db::{
@@ -89,12 +89,20 @@ impl ModplatformCacher for CurseforgeModCacher {
             return Ok(());
         }
 
+        let total_mod_count = modlist.len();
+        debug!(
+            "Found {} mods to process for CurseForge caching",
+            total_mod_count
+        );
+
         let failed_instances = mcm.failed_cf_instances.read().await;
         let delay = failed_instances.get(&instance_id);
 
         if let Some((end_time, _)) = delay {
             if Instant::now() < *end_time {
-                warn!("Not attempting to cache curseforge mods for {instance_id} as too many attempts have failed recently");
+                warn!(
+                    "Not attempting to cache curseforge mods for {instance_id} as too many attempts have failed recently"
+                );
                 return Ok(());
             }
         }
@@ -118,13 +126,6 @@ impl ModplatformCacher for CurseforgeModCacher {
 
                 let mpm = app.modplatforms_manager();
                 let mod_responses = fp_response.exact_matches.iter().map(|m| async {
-                    let mcm = app.meta_cache_manager();
-                    let semaphore = mcm
-                        .targets_semaphore
-                        .acquire()
-                        .await
-                        .expect("the target semaphore is never closed");
-
                     let cfmod = mpm
                         .curseforge
                         .get_mod(ModParameters {
@@ -203,7 +204,8 @@ impl ModplatformCacher for CurseforgeModCacher {
 
         let futures = batch.into_iter().filter_map(|(metadata_id, murmur2)| {
             let fp_match = matches.get(&murmur2);
-            fp_match.map(|(fp_match, modinfo)| async move {
+            fp_match.map(|(fp_match, modinfo)| {
+                async move {
                 let r = cache_curseforge_meta_unchecked(
                     app,
                     metadata_id.clone(),
@@ -218,6 +220,7 @@ impl ModplatformCacher for CurseforgeModCacher {
                     error!({ error = ?e, metadata_id, file_id = ?fp_match.file.id }, "Could not store curseforge mod metadata. Will not attempt to download again for this session.");
 
                     mcm.ignored_remote_cf_hashes.write().await.insert(murmur2);
+                }
                 }
             })
         });
@@ -291,7 +294,6 @@ impl ModplatformCacher for CurseforgeModCacher {
                         .await
                         .expect("the image download semaphore is never closed");
 
-                    debug!("thumbnailing curseforge mod icon for {instance_id}/{filename} (project: {project_id}, file: {file_id})");
 
                     let icon = app.reqwest_client
                         .get(&row.url)
@@ -330,7 +332,6 @@ impl ModplatformCacher for CurseforgeModCacher {
                         .exec()
                         .await?;
 
-                    debug!("saved curseforge mod thumbnail for {instance_id}/{filename} (project: {project_id}, file: {file_id})");
 
                     let _ = update_notifier.send(instance_id);
                     Ok::<_, anyhow::Error>(())
@@ -365,16 +366,6 @@ async fn cache_curseforge_meta_unchecked(
     modinfo: &Mod,
     mod_files: &[File],
 ) -> anyhow::Result<()> {
-    let prev = app
-        .prisma_client
-        .curse_forge_mod_cache()
-        .find_unique(cfdb::UniqueWhereParam::MetadataIdEquals(
-            metadata_id.clone(),
-        ))
-        .with(cfdb::logo_image::fetch())
-        .exec()
-        .await?;
-
     // This is undocumented, we're guessing what the valid values here are.
     // It seems to contain both game versions and modloaders
     fn parse_update_paths(file_info: &File) -> Vec<(String, ModLoaderType, ModChannel)> {
@@ -404,7 +395,7 @@ async fn cache_curseforge_meta_unchecked(
         pairs
     }
 
-    let file_update_paths = parse_update_paths(&fileinfo);
+    let file_update_paths = parse_update_paths(fileinfo);
     let mut update_paths = Vec::<(String, ModLoaderType, ModChannel)>::new();
 
     let mut latest_files_sorted = mod_files.iter().collect::<Vec<_>>();
@@ -443,64 +434,85 @@ async fn cache_curseforge_meta_unchecked(
         })
         .join(";");
 
-    let o_insert_cfmeta = app.prisma_client.curse_forge_mod_cache().create(
-        murmur2 as i32,
-        modinfo.id,
-        fileinfo.id,
-        modinfo.name.clone(),
-        fileinfo.display_name.clone(),
-        modinfo.slug.clone(),
-        modinfo.summary.clone(),
-        modinfo.authors.iter().map(|a| &a.name).join(", "),
-        ModChannel::from(fileinfo.release_type) as i32,
-        update_paths,
-        chrono::Utc::now().into(),
-        metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),
-        Vec::new(),
-    );
+    if let Ok(Some(existing_entry)) = app
+        .prisma_client
+        .curse_forge_mod_cache()
+        .find_unique(cfdb::UniqueWhereParam::MetadataIdEquals(
+            metadata_id.clone(),
+        ))
+        .exec()
+        .await
+    {
+        if existing_entry.cached_at > (chrono::Utc::now() - chrono::Duration::days(1)) {
+            return Ok(());
+        }
+    }
 
-    let o_delete_cfmeta =
-        prev.as_ref().map(|_| {
-            app.prisma_client.curse_forge_mod_cache().delete(
-                cfdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
-            )
-        });
-
-    let old_image = prev
-        .map(|p| {
-            p.logo_image
-                .expect("logo_image was requested but not returned by prisma")
-        })
-        .flatten();
-    let new_image = modinfo.logo.as_ref().map(|it| &it.url).cloned();
-
-    let image = match (new_image, old_image) {
-        (Some(new), Some(old)) => Some((old.up_to_date == 1 && new == old.url, new, old.data)),
-        (Some(new), None) => Some((false, new, None)),
-        (None, Some(old)) => Some((old.up_to_date == 1, old.url, old.data)),
-        (None, None) => None,
-    };
-
-    let o_insert_logo = image.map(|(up_to_date, url, data)| {
-        app.prisma_client.curse_forge_mod_image_cache().create(
-            url,
-            cfdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+    let cache_result = app
+        .prisma_client
+        .curse_forge_mod_cache()
+        .upsert(
+            cfdb::UniqueWhereParam::ProjectIdFileIdEquals(modinfo.id as i32, fileinfo.id as i32),
+            cfdb::create(
+                murmur2 as i32,
+                modinfo.id as i32,
+                fileinfo.id as i32,
+                modinfo.name.clone(),
+                fileinfo.display_name.clone(),
+                modinfo.slug.clone(),
+                modinfo.summary.clone(),
+                modinfo.authors.iter().map(|a| &a.name).join(", "),
+                ModChannel::from(fileinfo.release_type) as i32,
+                update_paths.clone(),
+                chrono::Utc::now().into(),
+                metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),
+                Vec::new(),
+            ),
             vec![
-                cfimgdb::SetParam::SetUpToDate(if up_to_date { 1 } else { 0 }),
-                cfimgdb::SetParam::SetData(data),
+                cfdb::SetParam::SetMurmur2(murmur2 as i32),
+                cfdb::SetParam::SetProjectId(modinfo.id as i32),
+                cfdb::SetParam::SetFileId(fileinfo.id as i32),
+                cfdb::SetParam::SetName(modinfo.name.clone()),
+                cfdb::SetParam::SetVersion(fileinfo.display_name.clone()),
+                cfdb::SetParam::SetUrlslug(modinfo.slug.clone()),
+                cfdb::SetParam::SetSummary(modinfo.summary.clone()),
+                cfdb::SetParam::SetAuthors(modinfo.authors.iter().map(|a| &a.name).join(", ")),
+                cfdb::SetParam::SetReleaseType(ModChannel::from(fileinfo.release_type) as i32),
+                cfdb::SetParam::SetUpdatePaths(update_paths.clone()),
+                cfdb::SetParam::SetCachedAt(chrono::Utc::now().into()),
             ],
         )
-    });
-
-    debug!("updating curseforge metadata entry for {metadata_id}");
-
-    app.prisma_client
-        ._batch((
-            o_delete_cfmeta.into_iter().collect::<Vec<_>>(),
-            o_insert_cfmeta,
-            o_insert_logo.into_iter().collect::<Vec<_>>(),
-        ))
+        .exec()
         .await?;
+
+    if let Some(logo) = &modinfo.logo {
+        if let Err(e) = app
+            .prisma_client
+            .curse_forge_mod_image_cache()
+            .upsert(
+                cfimgdb::UniqueWhereParam::MetadataIdEquals(cache_result.metadata_id.clone()),
+                cfimgdb::create(
+                    logo.url.clone(),
+                    cfdb::UniqueWhereParam::MetadataIdEquals(cache_result.metadata_id.clone()),
+                    vec![
+                        cfimgdb::SetParam::SetUpToDate(0), // Mark as needing download
+                        cfimgdb::SetParam::SetData(None),
+                    ],
+                ),
+                vec![
+                    cfimgdb::SetParam::SetUrl(logo.url.clone()),
+                    cfimgdb::SetParam::SetUpToDate(0), // Mark as needing download on update
+                ],
+            )
+            .exec()
+            .await
+        {
+            warn!(
+                "Failed to upsert curseforge image for metadata_id {}: {:?}",
+                cache_result.metadata_id, e
+            );
+        }
+    }
 
     Ok(())
 }

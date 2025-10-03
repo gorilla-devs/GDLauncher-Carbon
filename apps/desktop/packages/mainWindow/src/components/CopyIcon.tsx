@@ -1,4 +1,4 @@
-import { createNotification } from "@gd/ui"
+import { toast } from "@gd/ui"
 import { createSignal } from "solid-js"
 
 interface Props {
@@ -7,7 +7,6 @@ interface Props {
 
 const CopyIcon = (props: Props) => {
   const [clicked, setClicked] = createSignal(false)
-  const addNotification = createNotification()
 
   return (
     <div
@@ -18,10 +17,7 @@ const CopyIcon = (props: Props) => {
       onClick={() => {
         if (!props.text) return
         navigator.clipboard.writeText(props.text as string)
-        addNotification({
-          name: "Copied to clipboard",
-          type: "success"
-        })
+        toast.success("Copied to clipboard")
         setClicked(true)
         setTimeout(() => {
           setClicked(false)

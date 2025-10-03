@@ -2,7 +2,7 @@ import { QueryClient } from "@tanstack/solid-query"
 import { WebsocketTransport, createClient } from "@rspc/client"
 import { createSolidQueryHooks } from "@rspc/solid"
 import type { Procedures } from "@gd/core_module"
-import { createNotification } from "@gd/ui"
+import { toast } from "@gd/ui"
 
 export const rspc = createSolidQueryHooks<Procedures>()
 export const queryClient = new QueryClient({
@@ -20,8 +20,6 @@ export const queryClient = new QueryClient({
 export let port: number | null = null
 
 export default function initRspc(_port: number) {
-  const addNotification = createNotification()
-
   port = _port
 
   const transport = new WebsocketTransport(`ws://127.0.0.1:${_port}/rspc/ws`)
@@ -29,24 +27,19 @@ export default function initRspc(_port: number) {
   const client = createClient<Procedures>({
     transport,
     onError: (error) => {
-      console.error("RSPC error:", error)
+      console.trace("RSPC error:", error)
 
       try {
         const parsed = JSON.parse(error.message) as {
           cause: { display: string }[]
         }
-        addNotification({
-          name: "RSPC Error",
-          content: parsed.cause.reduce((acc: string, e) => {
+        toast.error("RSPC Error", {
+          description: parsed.cause.reduce((acc: string, e) => {
             return acc + (!acc ? "" : " | ") + e.display
-          }, ""),
-          type: "error"
+          }, "")
         })
       } catch {
-        addNotification({
-          name: error.message,
-          type: "error"
-        })
+        toast.error(error.message)
       }
     }
   })
@@ -74,7 +67,6 @@ export default function initRspc(_port: number) {
         if (data.args !== null) {
           key.push(data.args)
         }
-        // console.log("Invalidations channel", key, data.args);
         context.queryClient
           .invalidateQueries({
             queryKey: key

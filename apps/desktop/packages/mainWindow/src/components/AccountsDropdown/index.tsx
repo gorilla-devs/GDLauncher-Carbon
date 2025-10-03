@@ -3,7 +3,7 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 import { port, rspc } from "@/utils/rspcClient"
 import { AccountStatus, AccountType } from "@gd/core_module/bindings"
 import { Trans } from "@gd/i18n"
-import { Button, Popover } from "@gd/ui"
+import { Button, Popover, PopoverContent, PopoverTrigger } from "@gd/ui"
 import { For, Switch, Match, createSignal } from "solid-js"
 import gdlLogo from "/assets/images/gdlauncher_logo.svg"
 import defaultInstanceImg from "/assets/images/default-instance-img.png"
@@ -37,7 +37,7 @@ export interface Props {
 
 export const AccountsDropdown = (props: Props) => {
   const globalStore = useGlobalStore()
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const [showAccountsDropdown, setShowAccountsDropdown] = createSignal(false)
 
   const setActiveAccountMutation = rspc.createMutation(() => ({
@@ -49,19 +49,18 @@ export const AccountsDropdown = (props: Props) => {
       ? globalStore.gdlAccount.data?.value
       : undefined
 
-  let gdlAccountRef: HTMLDivElement
-  let mcAccountsRef: HTMLDivElement
-  let settingsButtonRef: HTMLDivElement
+  let gdlAccountRef: HTMLDivElement | undefined
+  let mcAccountsRef: HTMLDivElement | undefined
+  let settingsButtonRef: HTMLDivElement | undefined
 
   return (
     <Popover
       placement="bottom"
-      color="bg-transparent"
-      noTip
-      noShadow
-      trigger="click"
-      onOpen={() => {
-        setShowAccountsDropdown(true)
+      open={showAccountsDropdown()}
+      onOpenChange={(open) => {
+        setShowAccountsDropdown(open)
+
+        if (!open) return
 
         if (gdlAccountRef) {
           gdlAccountRef.animate(
@@ -119,26 +118,60 @@ export const AccountsDropdown = (props: Props) => {
           )
         }
       }}
-      onClose={() => {
-        setShowAccountsDropdown(false)
-      }}
-      content={(close) => (
+    >
+      <PopoverTrigger>
+        <div
+          class="group relative rounded-lg p-4 transition-all duration-100 ease-in-out"
+          classList={{
+            "bg-darkSlate-700": showAccountsDropdown()
+          }}
+        >
+          <div class="bg-darkSlate-700 -z-1 absolute left-0 top-0 h-full w-full scale-75 rounded-md opacity-0 transition-[transform,opacity] duration-150 ease-[cubic-bezier(.4,0,.2,1)] group-hover:scale-100 group-hover:opacity-100" />
+
+          <div class="flex items-center gap-4">
+            <img
+              src={`http://127.0.0.1:${port}/account/headImage?uuid=${
+                globalStore.accounts.data?.find(
+                  (account) =>
+                    account.uuid ===
+                    globalStore.currentlySelectedAccountUuid.data
+                )?.uuid
+              }`}
+              class="h-6 w-6 rounded-md"
+            />
+            <div class="max-w-30 truncate">
+              {
+                globalStore.accounts.data?.find(
+                  (account) =>
+                    account.uuid ===
+                    globalStore.currentlySelectedAccountUuid.data
+                )?.username
+              }
+            </div>
+            <div class="i-ri:arrow-down-s-line h-4 w-4" />
+          </div>
+        </div>
+      </PopoverTrigger>
+      <PopoverContent
+        class="w-80 border-none bg-transparent p-0"
+        hideCloseButton
+      >
         <div class="flex flex-col gap-1">
           <div
-            class="bg-darkSlate-700 w-70 h-auto p-2 rounded-lg mr-2 opacity-0 shadow-lg shadow-darkSlate-900 transition-opacity"
+            class="bg-darkSlate-700 shadow-darkSlate-900 mr-2 h-auto w-full rounded-lg p-2 opacity-0 shadow-lg transition-opacity"
             ref={gdlAccountRef}
           >
-            <div class="py-2 px-4 text-xl flex items-center gap-4">
-              <img src={gdlLogo} class="w-6 h-6" />
+            <div class="flex items-center gap-4 px-4 py-2 text-xl">
+              <img src={gdlLogo} class="h-6 w-6" />
               <div>
                 <Trans key="GDLauncher_account" />
               </div>
             </div>
-            <hr class="w-full border-darkSlate-50 opacity-20" />
+            <hr class="border-darkSlate-50 w-full opacity-20" />
             <Switch
               fallback={
-                <div class="flex items-center gap-4 py-2 px-4 rounded-lg">
-                  <div class="w-6 h-6 rounded-md bg-darkSlate-600" />
+                <div class="flex items-center gap-4 rounded-lg px-4 py-2">
+                  <div class="bg-darkSlate-600 h-6 w-6 rounded-md" />
                   <div>
                     <Trans key="No_account_synced" />
                   </div>
@@ -146,12 +179,12 @@ export const AccountsDropdown = (props: Props) => {
               }
             >
               <Match when={validGDLUser()}>
-                <div class="flex items-center gap-4 py-2 px-4 rounded-lg">
+                <div class="flex items-center gap-4 rounded-lg px-4 py-2">
                   <img
                     src={validGDLUser()?.profileIconUrl}
-                    class="w-6 h-6 rounded-md"
+                    class="h-6 w-6 rounded-md"
                   />
-                  <div class="truncate max-w-50">
+                  <div class="max-w-50 truncate">
                     {validGDLUser()?.nickname}
                   </div>
                 </div>
@@ -159,20 +192,20 @@ export const AccountsDropdown = (props: Props) => {
             </Switch>
           </div>
           <div
-            class="bg-darkSlate-700 w-70 h-auto p-2 rounded-lg mr-2 opacity-0 shadow-lg shadow-darkSlate-900 transition-opacity"
+            class="bg-darkSlate-700 shadow-darkSlate-900 mr-2 h-auto w-full rounded-lg p-2 opacity-0 shadow-lg transition-opacity"
             ref={mcAccountsRef}
           >
-            <div class="py-2 px-4 text-xl flex items-center gap-4">
-              <img src={defaultInstanceImg} class="w-6 h-6" />
+            <div class="flex items-center gap-4 px-4 py-2 text-xl">
+              <img src={defaultInstanceImg} class="h-6 w-6" />
               <div>
                 <Trans key="Minecraft_accounts" />
               </div>
             </div>
-            <hr class="w-full border-darkSlate-50 opacity-20" />
+            <hr class="border-darkSlate-50 w-full opacity-20" />
             <For each={globalStore.accounts.data || []}>
               {(account) => (
                 <div
-                  class="flex justify-between items-center gap-4 px-4 py-2 hover:bg-darkSlate-600 rounded-lg"
+                  class="hover:bg-darkSlate-600 flex items-center justify-between gap-4 rounded-lg px-4 py-2"
                   classList={{
                     "bg-darkSlate-600":
                       account.uuid ===
@@ -185,31 +218,31 @@ export const AccountsDropdown = (props: Props) => {
                   <div class="flex items-center gap-4">
                     <img
                       src={`http://127.0.0.1:${port}/account/headImage?uuid=${account.uuid}`}
-                      class="w-6 h-6 rounded-md"
+                      class="h-6 w-6 rounded-md"
                     />
-                    <div class="truncate max-w-30">{account.username}</div>
+                    <div class="max-w-30 truncate">{account.username}</div>
                   </div>
                   <div class="flex items-center gap-2">
                     <Switch>
                       <Match when={account.type.type === "microsoft"}>
-                        <div class="w-4 h-4 i-ri:microsoft-fill" />
+                        <div class="i-ri:microsoft-fill h-4 w-4" />
                       </Match>
                       <Match when={account.type.type === "offline"}>
-                        <div class="w-4 h-4 i-ri:computer-line" />
+                        <div class="i-ri:computer-line h-4 w-4" />
                       </Match>
                     </Switch>
                     <Switch>
                       <Match when={account.status === "ok"}>
-                        <div class="w-4 h-4 text-green-500 i-ri:check-fill" />
+                        <div class="i-ri:check-fill h-4 w-4 text-green-500" />
                       </Match>
                       <Match when={account.status === "expired"}>
-                        <div class="w-4 h-4 text-yellow-500 i-ri:alert-fill" />
+                        <div class="i-ri:alert-fill h-4 w-4 text-yellow-500" />
                       </Match>
                       <Match when={account.status === "refreshing"}>
-                        <div class="w-4 h-4 text-yellow-500 i-ri:loader-4-fill" />
+                        <div class="i-ri:loader-4-fill h-4 w-4 text-yellow-500" />
                       </Match>
                       <Match when={account.status === "invalid"}>
-                        <div class="w-4 h-4 text-red-500 i-ri:close-fill" />
+                        <div class="i-ri:close-fill h-4 w-4 text-red-500" />
                       </Match>
                     </Switch>
                   </div>
@@ -218,7 +251,7 @@ export const AccountsDropdown = (props: Props) => {
             </For>
           </div>
           <div
-            class="bg-darkSlate-700 w-70 h-auto p-2 rounded-lg mr-2 opacity-0 shadow-lg shadow-darkSlate-900 transition-opacity"
+            class="bg-darkSlate-700 shadow-darkSlate-900 mr-2 h-auto w-full rounded-lg p-2 opacity-0 shadow-lg transition-opacity"
             ref={settingsButtonRef}
           >
             <Button
@@ -227,12 +260,12 @@ export const AccountsDropdown = (props: Props) => {
               fullWidth
               onClick={() => {
                 if (props.disabled) return
-                navigate("/settings/accounts")
-                close()
+                setShowAccountsDropdown(false)
+                navigator.navigate("/settings/accounts")
               }}
             >
               <div
-                class="text-2xl i-ri:settings-line pointer-events-auto"
+                class="i-ri:settings-line pointer-events-auto text-2xl"
                 classList={{
                   "text-lightSlate-50": !!props.disabled,
                   "hover:text-lightSlate-100 duration-100 ease-in-out":
@@ -245,35 +278,7 @@ export const AccountsDropdown = (props: Props) => {
             </Button>
           </div>
         </div>
-      )}
-    >
-      <div
-        class="hover:bg-darkSlate-700 p-4 rounded-lg transition-all duration-100 ease-in-out"
-        classList={{
-          "bg-darkSlate-700": showAccountsDropdown()
-        }}
-      >
-        <div class="flex gap-4 items-center">
-          <img
-            src={`http://127.0.0.1:${port}/account/headImage?uuid=${
-              globalStore.accounts.data?.find(
-                (account) =>
-                  account.uuid === globalStore.currentlySelectedAccountUuid.data
-              )?.uuid
-            }`}
-            class="w-6 h-6 rounded-md"
-          />
-          <div class="truncate max-w-30">
-            {
-              globalStore.accounts.data?.find(
-                (account) =>
-                  account.uuid === globalStore.currentlySelectedAccountUuid.data
-              )?.username
-            }
-          </div>
-          <div class="w-4 h-4 i-ri:arrow-down-s-line" />
-        </div>
-      </div>
+      </PopoverContent>
     </Popover>
   )
 }

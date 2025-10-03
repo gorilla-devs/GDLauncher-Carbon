@@ -1,82 +1,26 @@
 [package]
 name = "carbon_platforms"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [lib]
 doctest = false
 
 [dependencies]
+serde_qs = { workspace = true }
 anyhow = { workspace = true }
 derive_more = { workspace = true }
 thiserror = { workspace = true }
-sentry = { workspace = true }
 serde = { workspace = true, features = ["derive", "rc"] }
 serde_json = { workspace = true }
-serde_qs = { workspace = true }
-directories = { workspace = true }
-tokio = { workspace = true }
-futures = { workspace = true }
-tower-http = { workspace = true, default-features = false, features = ["cors"] }
-rspc = { workspace = true }
-specta = { workspace = true, features = ["chrono"] }
-rspc-axum = { workspace = true, features = ["ws"] }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-tracing-appender = { workspace = true }
-const_format = { workspace = true }
-# tracing-forest = { workspace = true }
-reqwest = { workspace = true }
-reqwest-middleware = { workspace = true }
-reqwest-retry = { workspace = true }
-async-stream = { workspace = true }
-dunce = { workspace = true }
-axum = { workspace = true, features = ["ws"] }
-jsonwebtoken = { workspace = true }
-jwt = "0.16.0"
-async-trait = { workspace = true }
 chrono = { workspace = true }
 carbon_macro = { path = "../carbon_macro" }
-carbon_compression = { path = "../carbon_compression" }
-carbon_net = { path = "../carbon_net" }
-carbon_scheduler = { workspace = true }
-uuid = { workspace = true }
-rusqlite = { version = "0.25.4", features = ["bundled"] }
-rusqlite_migration = "1.0.2"
-prisma-client-rust = { workspace = true, features = [
-  "sqlite-create-many",
-  "sqlite",
-  "migrations",
-], default_features = false }
 strum_macros = { workspace = true }
 strum = { workspace = true }
-regex = { workspace = true }
-image = { workspace = true }
-task-local-extensions = { workspace = true }
-hyper = { workspace = true }
-zip = { workspace = true }
-httpdate = { workspace = true }
 daedalus = { workspace = true }
 url = { workspace = true }
 serde_repr = { workspace = true }
-sysinfo = { workspace = true }
-iridium = { path = "../iridium", optional = true }
-trash = { workspace = true }
-toml = { workspace = true }
-opener = { workspace = true }
-md-5 = { workspace = true }
-sha1 = { workspace = true }
-hex = { workspace = true }
-murmurhash32 = { workspace = true }
-sha2 = { workspace = true }
 itertools = { workspace = true }
-fs_extra = { workspace = true }
-indexmap = { version = "1.9.3", features = ["serde"] }
-unicode-segmentation = "1.12.0"
-tracing-test = "0.2.4"
-walkdir = { workspace = true }
-async-recursion = "1.1.1"
-shlex = "1.3.0"
 serde-enum-str = "0.4.0"
-carbon_parsing = { path = "../carbon_parsing" }
 carbon_rt_path = { path = "../carbon_rt_path" }

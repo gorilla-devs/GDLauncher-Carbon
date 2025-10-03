@@ -1,7 +1,7 @@
 import { Trans } from "@gd/i18n"
 import { ModalProps } from "@/managers/ModalsManager"
 import ModalLayout from "@/managers/ModalsManager/ModalLayout"
-import { Button, Dropdown, createNotification } from "@gd/ui"
+import { Button, Dropdown, toast } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
 import { Show, createEffect, createSignal, onMount } from "solid-js"
 import {
@@ -35,7 +35,6 @@ const AddManagedJava = (props: ModalProps) => {
   )
   const [selectedJavaVersion, setSelectedJavaVersion] = createSignal("")
   const [loading, setLoading] = createSignal(false)
-  const addNotification = createNotification()
 
   // eslint-disable-next-line solid/reactivity
   const versionsByVendor = rspc.createQuery(() => ({
@@ -155,10 +154,7 @@ const AddManagedJava = (props: ModalProps) => {
                       vendor: vend
                     })
 
-                    addNotification({
-                      name: "Java added successfully",
-                      type: "success"
-                    })
+                    toast.success("Java added successfully")
                   } catch (err) {
                     console.error(err)
                     setLoading(false)

@@ -56,6 +56,7 @@ impl From<FETaskId> for domain::VisualTaskId {
 
 #[derive(Type, Serialize)]
 pub struct FETask {
+    id: FETaskId,
     name: Translation,
     progress: Progress,
     downloaded: u32,
@@ -88,6 +89,7 @@ pub enum FESubtaskProgress {
 impl From<domain::Task> for FETask {
     fn from(value: domain::Task) -> Self {
         Self {
+            id: value.id.into(),
             name: value.name.into(),
             progress: value.progress.into(),
             downloaded: value.downloaded,

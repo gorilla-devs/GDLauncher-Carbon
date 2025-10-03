@@ -9,7 +9,7 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 export let windowCloseWarningAcquireLock = true
 
 const WindowCloseWarning = (props: ModalProps) => {
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const modalsManager = useModal()
 
   const settings = rspc.createQuery(() => ({
@@ -50,7 +50,7 @@ const WindowCloseWarning = (props: ModalProps) => {
                 <span
                   class="text-lightSlate-300 underline hover:text-lightSlate-100 transition-colors ease-in-out duration-100"
                   onClick={() => {
-                    navigate("/settings")
+                    navigator.navigate("/settings")
                     modalsManager?.closeModal()
                     setTimeout(() => {
                       document

@@ -17,6 +17,8 @@ use carbon_platforms::modrinth::{
     },
 };
 
+use crate::api::modplatforms::FEUnifiedSearchType;
+
 #[derive(Type, Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum MRFEProjectSupportRange {
@@ -56,15 +58,14 @@ impl From<MRFEProjectSupportRange> for ProjectSupportRange {
 #[derive(Type, Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum MRFEProjectType {
-    /// WARNING: Can also be a plugin or data pack.
-    /// You will have to read the loaders to get more specific information.
     Mod,
     Shader,
     Modpack,
     ResourcePack,
     Plugin,
-    Project,
     DataPack,
+    #[serde(other)]
+    Unknown,
 }
 
 impl From<ProjectType> for MRFEProjectType {
@@ -75,8 +76,8 @@ impl From<ProjectType> for MRFEProjectType {
             ProjectType::Modpack => MRFEProjectType::Modpack,
             ProjectType::ResourcePack => MRFEProjectType::ResourcePack,
             ProjectType::Plugin => MRFEProjectType::Plugin,
-            ProjectType::Project => MRFEProjectType::Project,
             ProjectType::DataPack => MRFEProjectType::DataPack,
+            ProjectType::Unknown => MRFEProjectType::Unknown,
         }
     }
 }
@@ -89,8 +90,8 @@ impl From<MRFEProjectType> for ProjectType {
             MRFEProjectType::Modpack => ProjectType::Modpack,
             MRFEProjectType::ResourcePack => ProjectType::ResourcePack,
             MRFEProjectType::Plugin => ProjectType::Plugin,
-            MRFEProjectType::Project => ProjectType::Project,
             MRFEProjectType::DataPack => ProjectType::DataPack,
+            MRFEProjectType::Unknown => ProjectType::Unknown,
         }
     }
 }
@@ -201,10 +202,10 @@ impl TryFrom<MRFEProjectSearchResult> for ProjectSearchResult {
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
 pub struct MRFECategory {
     /// An SVG icon for the category
-    pub icon: String,
+    pub icon: Option<String>,
     pub name: String,
     /// The project type this category is applicable to
-    pub project_type: MRFEProjectType,
+    pub project_type: FEUnifiedSearchType,
     /// The header under which the category should go
     pub header: String,
 }
@@ -212,17 +213,6 @@ pub struct MRFECategory {
 impl From<Category> for MRFECategory {
     fn from(value: Category) -> Self {
         MRFECategory {
-            icon: value.icon,
-            name: value.name,
-            project_type: value.project_type.into(),
-            header: value.header,
-        }
-    }
-}
-
-impl From<MRFECategory> for Category {
-    fn from(value: MRFECategory) -> Self {
-        Category {
             icon: value.icon,
             name: value.name,
             project_type: value.project_type.into(),

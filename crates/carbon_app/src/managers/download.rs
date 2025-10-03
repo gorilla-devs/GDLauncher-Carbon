@@ -15,7 +15,7 @@ use thiserror::Error;
 use tokio::{
     fs::OpenOptions,
     io::{AsyncWriteExt, BufWriter},
-    sync::{mpsc, watch, Mutex},
+    sync::{Mutex, mpsc, watch},
 };
 use uuid::Uuid;
 
@@ -543,7 +543,9 @@ mod test {
         tokio::fs::create_dir_all(tmpfolder).await.unwrap();
 
         // this file should not instantly download.
-        let url = String::from("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.18%2B10/OpenJDK11U-jdk_x64_linux_hotspot_11.0.18_10.tar.gz");
+        let url = String::from(
+            "https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.18%2B10/OpenJDK11U-jdk_x64_linux_hotspot_11.0.18_10.tar.gz",
+        );
 
         app.download_manager()
             .start_download(url.clone())
@@ -564,7 +566,9 @@ mod test {
         tokio::fs::create_dir_all(tmpfolder).await.unwrap();
 
         // this file should not instantly download.
-        let url = String::from("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.18%2B10/OpenJDK11U-jdk_x64_linux_hotspot_11.0.18_10.tar.gz");
+        let url = String::from(
+            "https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.18%2B10/OpenJDK11U-jdk_x64_linux_hotspot_11.0.18_10.tar.gz",
+        );
 
         let handle = app.download_manager().start_download(url.clone()).await?;
         handle.cancel().await;
@@ -582,7 +586,9 @@ mod test {
         tokio::fs::create_dir_all(tmpfolder).await.unwrap();
 
         // this file should not instantly download.
-        let url = String::from("https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.18%2B10/OpenJDK11U-jdk_x64_linux_hotspot_11.0.18_10.tar.gz");
+        let url = String::from(
+            "https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.18%2B10/OpenJDK11U-jdk_x64_linux_hotspot_11.0.18_10.tar.gz",
+        );
 
         let handle = app
             .download_manager()

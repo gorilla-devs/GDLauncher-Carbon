@@ -1,9 +1,10 @@
 use crate::domain::instance::info;
 use chrono::{DateTime, Utc};
 use hyper::{
-    header::{InvalidHeaderValue, AUTHORIZATION, CONTENT_TYPE},
     HeaderMap, StatusCode,
+    header::{AUTHORIZATION, CONTENT_TYPE, InvalidHeaderValue},
 };
+use reqwest::multipart::Form;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -307,6 +308,34 @@ impl GDLAccountTask {
             .put(url)
             .headers(headers)
             .body(reqwest::Body::from(body))
+            .send()
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn upload_profile_icon(
+        &self,
+        id_token: String,
+        icon_path: String,
+    ) -> anyhow::Result<()> {
+        // reqwest-middleware does not support multipart form data
+        // so we need to use reqwest directly
+        let client = reqwest::Client::new();
+
+        let url = format!("{}/v1/users/user/avatar", self.base_api);
+
+        let mut form = Form::new().file("avatar", icon_path).await?;
+
+        let authorization = format!("Bearer {}", id_token);
+        let mut headers = HeaderMap::new();
+        headers.insert(AUTHORIZATION, authorization.parse()?);
+        headers.insert(CONTENT_TYPE, "multipart/form-data".parse()?);
+
+        let resp = client
+            .post(url)
+            .headers(headers)
+            .multipart(form)
             .send()
             .await?;
 

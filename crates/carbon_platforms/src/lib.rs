@@ -1,14 +1,12 @@
-use std::{fmt, str::FromStr};
+use std::str::FromStr;
 
 use anyhow::{anyhow, bail};
 use chrono::{DateTime, Utc};
 use itertools::Itertools;
-use serde::{
-    de::{DeserializeOwned, Visitor},
-    Deserialize, Deserializer, Serialize, Serializer,
-};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned};
 
 pub mod curseforge;
+pub mod gdlauncher;
 pub mod modrinth;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

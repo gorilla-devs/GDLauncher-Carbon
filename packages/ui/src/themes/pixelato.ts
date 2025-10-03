@@ -2,7 +2,7 @@ import { Theme } from "."
 
 const additionalStyles = `
   html, body {
-    font-size: 15px;
+    font-size: 16px;
   }
 
   * {
@@ -100,7 +100,7 @@ const pixelato: Theme = {
 
   font: "Monocraft",
   "font-mono": "Monocraft",
-  "ads-sidebar-background": "url(./assets/images/sidebar-bg.png)",
+  "ads-sidebar-background": "rgb(76, 175, 80)",
   "additional-styles": additionalStyles
 }
 

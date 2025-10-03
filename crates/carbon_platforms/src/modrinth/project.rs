@@ -206,15 +206,14 @@ pub enum ProjectSupportRange {
 #[derive(Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ProjectType {
-    /// WARNING: Can also be a plugin or data pack.
-    /// You will have to read the loaders to get more specific information.
     Mod,
     Shader,
     Modpack,
     ResourcePack,
     Plugin,
-    Project,
     DataPack,
+    #[serde(other)]
+    Unknown,
 }
 
 impl ProjectType {

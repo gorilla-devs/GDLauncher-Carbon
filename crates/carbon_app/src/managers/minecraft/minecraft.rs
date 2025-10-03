@@ -4,13 +4,13 @@ use crate::{
     domain::{
         java::{JavaArch, JavaComponent},
         minecraft::minecraft::{
-            chain_lwjgl_libs_with_base_libs, get_default_jvm_args, is_rule_allowed,
-            library_is_allowed, OsExt, ARCH_WIDTH,
+            ARCH_WIDTH, OsExt, chain_lwjgl_libs_with_base_libs, get_default_jvm_args,
+            is_rule_allowed, library_is_allowed,
         },
     },
 };
 use anyhow::Context;
-use carbon_repos::db::{app_configuration::pre_launch_hook, PrismaClient};
+use carbon_repos::db::{PrismaClient, app_configuration::pre_launch_hook};
 use carbon_repos::pcr::QueryError;
 use carbon_rt_path::{InstancePath, RuntimePath};
 use daedalus::minecraft::{
@@ -652,8 +652,6 @@ pub async fn generate_startup_command(
             command.push("-XstartOnFirstThread".to_string());
         }
     }
-
-    command.push("-Dorg.lwjgl.util.Debug=true".to_string());
 
     command.push(version.main_class);
 

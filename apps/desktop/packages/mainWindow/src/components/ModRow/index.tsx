@@ -1,8 +1,15 @@
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { formatDownloadCount, truncateText } from "@/utils/helpers"
 import { rspc } from "@/utils/rspcClient"
-import { Trans } from "@gd/i18n"
-import { Button, createNotification, Popover, Spinner } from "@gd/ui"
+import { Trans, useTransContext } from "@gd/i18n"
+import {
+  Button,
+  toast,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  Spinner
+} from "@gd/ui"
 import { formatDistanceToNowStrict } from "date-fns"
 import {
   createSignal,
@@ -16,17 +23,7 @@ import {
   Switch
 } from "solid-js"
 import OverviewPopover from "../OverviewPopover"
-import {
-  getDataCreation,
-  getDownloads,
-  getLogoUrl,
-  getName,
-  getProjectId,
-  getSummary,
-  isCurseForgeData,
-  ModProps,
-  ModRowProps
-} from "@/utils/mods"
+import { ModRowProps } from "@/utils/mods"
 import Categories from "./Categories"
 import Authors from "./Authors"
 import ModDownloadButton from "../ModDownloadButton"
@@ -36,35 +33,29 @@ const ModRow = (props: ModRowProps) => {
   const owner = getOwner()
   const [loading, setLoading] = createSignal(false)
   const [isRowSmall, setIsRowSmall] = createSignal(false)
+  const [t] = useTransContext()
   const rspcContext = rspc.useContext()
 
-  const mergedProps = mergeProps({ type: "Modpack" }, props)
-  const navigate = useGDNavigate()
-  const addNotification = createNotification()
+  const mergedProps = mergeProps({ type: "Mod" as const }, props)
+  const navigator = useGDNavigate()
 
   const prepareInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.prepareInstance"],
     onSuccess() {
       setLoading(false)
-      addNotification({
-        name: "Instance successfully created.",
-        type: "success"
-      })
+      toast.success(t("notifications.instance_created_success"))
     },
     onError() {
       setLoading(false)
-      addNotification({
-        name: "Error while creating the instance.",
-        type: "error"
-      })
+      toast.error(t("notifications.instance_created_error"))
     },
     onSettled() {
       setLoading(false)
-      navigate(`/library`)
+      navigator.navigate(`/library`)
     }
   }))
 
-  const instanceId = () => (props as ModProps)?.instanceId
+  const instanceId = () => props?.instanceId
 
   const loadIconMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.loadIconUrl"]
@@ -78,19 +69,14 @@ const ModRow = (props: ModRowProps) => {
     },
     onError() {
       setLoading(false)
-      addNotification({
-        name: "Error while downloading the modpack.",
-        type: "error"
-      })
+      toast.error(t("notifications.modpack_download_error"))
     }
   }))
 
   const handleExplore = () => {
-    navigate(
-      `/${mergedProps.type === "Modpack" ? "modpacks" : "mods"}/${getProjectId(
-        props
-      )}/${
-        isCurseForgeData(props.data) ? "curseforge" : "modrinth"
+    navigator.navigate(
+      `/${mergedProps.type === "Mod" ? "mods" : "modpacks"}/${props.data.id}/{
+        props.data.platform
       }?instanceId=${instanceId()}`
     )
   }
@@ -100,16 +86,18 @@ const ModRow = (props: ModRowProps) => {
     projectId?: number | string
   ) => {
     return {
-      type: isCurseForgeData(props.data) ? "curseforge" : "modrinth",
-      value: isCurseForgeData(props.data)
-        ? {
-            file_id: (fileId as number) || props.data.curseforge.mainFileId,
-            project_id: (projectId as number) || props.data.curseforge.id
-          }
-        : {
-            project_id: projectId?.toString() || props.data.modrinth.project_id,
-            version_id: fileId?.toString()!
-          }
+      type: props.data.platform,
+      value:
+        props.data.platform === "curseforge"
+          ? {
+              file_id:
+                (fileId as number) || parseInt(props.data.mainFileId || "0"),
+              project_id: (projectId as number) || parseInt(props.data.id)
+            }
+          : {
+              project_id: projectId?.toString() || props.data.id,
+              version_id: fileId?.toString()!
+            }
     } as Modpack
   }
 
@@ -143,53 +131,38 @@ const ModRow = (props: ModRowProps) => {
     return (
       <div class="flex flex-col justify-between">
         <div class="flex justify-between w-full">
-          <Popover
-            noPadding
-            noTip
-            content={() => (
-              <OverviewPopover
-                data={props}
-                modrinthCategories={props.modrinthCategories?.filter(
-                  (category) =>
-                    category.project_type.includes(props.type.toLowerCase())
-                )}
-              />
-            )}
-            placement="right-start"
-            color="bg-darkSlate-900"
-          >
-            <h2
-              class="text-ellipsis overflow-hidden whitespace-nowrap cursor-pointer mt-0 mb-1 hover:underline"
-              onClick={() => handleExplore()}
-              classList={{
-                "max-w-140": !isRowSmall(),
-                "max-w-90": isRowSmall()
-              }}
-            >
-              {getName(props)}
-            </h2>
+          <Popover placement="right-start">
+            <PopoverTrigger>
+              <h2
+                class="text-ellipsis overflow-hidden whitespace-nowrap cursor-pointer mt-0 mb-1 hover:underline"
+                onClick={() => handleExplore()}
+                classList={{
+                  "max-w-140": !isRowSmall(),
+                  "max-w-90": isRowSmall()
+                }}
+              >
+                {props.data.title}
+              </h2>
+            </PopoverTrigger>
+            <PopoverContent class="bg-darkSlate-900">
+              <OverviewPopover data={props} />
+            </PopoverContent>
           </Popover>
-          <Categories
-            modProps={props}
-            isRowSmall={isRowSmall()}
-            modrinthCategories={props.modrinthCategories?.filter((category) =>
-              category.project_type.includes(props.type.toLowerCase())
-            )}
-          />
+          <Categories modProps={props} isRowSmall={isRowSmall()} />
         </div>
         <div class="flex gap-4 items-center">
           <div class="flex items-center gap-2 text-lightSlate-700">
             <i class="text-lightSlate-700 i-ri:time-fill" />
             <div class="whitespace-nowrap text-sm">
               {formatDistanceToNowStrict(
-                new Date(getDataCreation(props)).getTime()
+                new Date(props.data.releaseDate).getTime()
               )}
             </div>
           </div>
           <div class="flex gap-2 items-center text-lightSlate-700">
             <i class="text-lightSlate-700 i-ri:download-fill" />
             <div class="text-sm whitespace-nowrap">
-              {formatDownloadCount(getDownloads(props))}
+              {formatDownloadCount(props.data.downloadsCount)}
             </div>
           </div>
           <div class="flex gap-2 items-center text-lightSlate-700">
@@ -208,10 +181,10 @@ const ModRow = (props: ModRowProps) => {
     >
       <div class="absolute z-10 bg-gradient-to-r from-darkSlate-700 from-50% inset-0" />
       <div class="absolute inset-0 from-darkSlate-700 z-10 bg-gradient-to-t" />
-      <Show when={getLogoUrl(props)}>
+      <Show when={props.data.imageUrl}>
         <img
           class="absolute right-0 top-0 bottom-0 select-none w-1/2 z-0"
-          src={getLogoUrl(props)!}
+          src={props.data.imageUrl || ""}
         />
       </Show>
       <div class="flex w-full">
@@ -222,16 +195,21 @@ const ModRow = (props: ModRowProps) => {
               <p class="text-sm overflow-hidden text-ellipsis m-0 text-lightSlate-700 max-w-full max-h-15">
                 <Switch>
                   <Match when={isRowSmall()}>
-                    {truncateText(getSummary(props), 60)}
+                    {truncateText(props.data.description, 60)}
                   </Match>
                   <Match when={!isRowSmall()}>
-                    {truncateText(getSummary(props), 120)}
+                    {truncateText(props.data.description, 120)}
                   </Match>
                 </Switch>
               </p>
               <div class="flex w-full justify-end items-end">
                 <Switch>
-                  <Match when={mergedProps.type === "Modpack"}>
+                  <Match
+                    when={
+                      mergedProps.type === "Mod" &&
+                      props.data.type === "modpack"
+                    }
+                  >
                     <div class="flex items-center gap-3">
                       <Button
                         size={isRowSmall() ? "small" : "medium"}
@@ -251,20 +229,20 @@ const ModRow = (props: ModRowProps) => {
                           disabled={loading()}
                           onClick={async () => {
                             runWithOwner(owner, async () => {
-                              if (props.type !== "Modpack") return
+                              if (props.data.type !== "modpack") return
 
                               setLoading(true)
 
-                              const imgUrl = getLogoUrl(props)
+                              const imgUrl = props.data.imageUrl
                               if (imgUrl) loadIconMutation.mutate(imgUrl)
 
                               let fileVersion = undefined
-                              if (!isCurseForgeData(props.data)) {
+                              if (props.data.platform !== "curseforge") {
                                 const mrVersions =
                                   await rspcContext.client.query([
                                     "modplatforms.modrinth.getProjectVersions",
                                     {
-                                      project_id: getProjectId(props).toString()
+                                      project_id: props.data.id
                                     }
                                   ])
 
@@ -272,10 +250,10 @@ const ModRow = (props: ModRowProps) => {
                               }
 
                               createInstanceMutation.mutate({
-                                group: props.defaultGroup || 1,
+                                group: 1,
                                 use_loaded_icon: true,
                                 notes: "",
-                                name: getName(props),
+                                name: props.data.title,
                                 version: {
                                   Modpack: instanceCreationObj(fileVersion)
                                 }
@@ -287,13 +265,17 @@ const ModRow = (props: ModRowProps) => {
                             <Spinner />
                           </Show>
                           <Show when={!loading()}>
-                            <Trans key="instance.download_latest" />
+                            <Trans key="instance.download" />
                           </Show>
                         </Button>
                       </Show>
                     </div>
                   </Match>
-                  <Match when={mergedProps.type === "Mod"}>
+                  <Match
+                    when={
+                      mergedProps.type === "Mod" && props.data.type === "mod"
+                    }
+                  >
                     <div class="flex gap-3">
                       <Button
                         size={isRowSmall() ? "small" : "medium"}
@@ -302,16 +284,7 @@ const ModRow = (props: ModRowProps) => {
                       >
                         <Trans key="instance.explore_modpack" />
                       </Button>
-                      <ModDownloadButton
-                        size={isRowSmall() ? "small" : "medium"}
-                        projectId={getProjectId(props)}
-                        isCurseforge={isCurseForgeData(props.data)}
-                        instanceId={instanceId()}
-                        instanceLocked={
-                          (props as ModProps).instanceDetails?.modpack?.locked
-                        }
-                        instanceMods={(props as ModProps).instanceMods}
-                      />
+                      <ModDownloadButton addon={props.data} />
                     </div>
                   </Match>
                 </Switch>

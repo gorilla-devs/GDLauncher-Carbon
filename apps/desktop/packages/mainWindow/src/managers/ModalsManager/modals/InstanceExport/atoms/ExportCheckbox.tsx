@@ -1,4 +1,3 @@
-import { instanceId } from "@/utils/browser"
 import { rspc } from "@/utils/rspcClient"
 import { Checkbox } from "@gd/ui"
 import { createEffect, createSignal, For, Match, Show, Switch } from "solid-js"
@@ -62,24 +61,41 @@ const FileCheckbox = (props: { file: FileFolder; name: string }) => {
   )
 }
 
-const ExportCheckbox = (props: { folder: FileFolder; initialData: any }) => {
+const ExportCheckbox = (props: {
+  folder: FileFolder
+  initialData: any
+  instanceId: number
+}) => {
   const [isOpen, setIsOpen] = createSignal(false)
   const [contents, setContents] = createSignal<any[]>([])
   const rspcContext = rspc.useContext()
 
-  createEffect(async () => {
-    if (!isOpen() && contents().length === 0) {
-      const res = await rspcContext.client.query([
+  createEffect((prevState) => {
+    const currentIsOpen = isOpen()
+    const currentContentsLength = contents().length
+    const currentPath = props.folder.path
+
+    const current = { currentIsOpen, currentContentsLength, currentPath }
+
+    if (!currentIsOpen && currentContentsLength === 0 && currentPath) {
+      rspcContext.client.query([
         "instance.explore",
         {
-          instance_id: instanceId()!,
-          path: props.folder.path!
+          instance_id: props.instanceId,
+          path: currentPath
         }
-      ])
-
-      setContents(res)
+      ]).then((res) => {
+        // Check if state hasn't changed during async operation
+        if (!isOpen() && props.folder.path === currentPath) {
+          setContents(res)
+        }
+      }).catch((error) => {
+        console.error("Failed to explore instance folder:", error)
+      })
     }
-  })
+
+    return current
+  }, { currentIsOpen: false, currentContentsLength: 0, currentPath: undefined })
 
   createEffect(() => {
     const obj = buildNestedObject(checkedFiles())
@@ -162,11 +178,12 @@ const ExportCheckbox = (props: { folder: FileFolder; initialData: any }) => {
           </For> */}
           <For each={props.initialData || contents()}>
             {(item) => (
-              <div class="flex justify-between items-center flex-row">
+              <div class="flex flex-row items-center justify-between">
                 <Switch>
                   <Match when={item.type === "Directory"}>
                     <ExportCheckbox
                       initialData={undefined}
+                      instanceId={props.instanceId}
                       folder={{
                         name: item.name,
                         type: item.type,
@@ -176,7 +193,7 @@ const ExportCheckbox = (props: { folder: FileFolder; initialData: any }) => {
                   </Match>
                   <Match when={item.type !== "Directory"}>
                     <div class="flex items-center gap-2 p-1">
-                      <div class="w-[16px] h-[16px]" />
+                      <div class="h-[16px] w-[16px]" />
                       <FileCheckbox name={item.name} file={props.folder} />
                       {/* <Checkbox
                         checked={checkedFiles().some((checkedItem) =>

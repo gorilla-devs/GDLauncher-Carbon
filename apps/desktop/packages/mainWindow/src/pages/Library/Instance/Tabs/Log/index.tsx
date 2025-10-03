@@ -9,6 +9,13 @@ import { VirtualizerHandle } from "virtua/lib/solid"
 
 export const [isFullScreen, setIsFullScreen] = createSignal(false)
 
+export interface LogQuery {
+  query: string | null
+  matchCase: boolean
+  matchWholeWord: boolean
+  useRegex: boolean
+}
+
 const Logs = () => {
   let logsContentRef: HTMLDivElement | undefined
   let scrollBottomRef: HTMLDivElement | undefined
@@ -22,6 +29,27 @@ const Logs = () => {
   const [autoFollow, setAutoFollow] = createSignal(true)
   const params = useParams()
   const [newLogsCount, setNewLogsCount] = createSignal(0)
+  const [query, setQuery] = createStore<LogQuery>({
+    query: null,
+    matchCase: false,
+    matchWholeWord: false,
+    useRegex: false
+  })
+
+  const logSearchResults = rspc.createQuery(() => ({
+    queryKey: [
+      "instance.searchLogs",
+      {
+        log_id: selectedLog()!,
+        query: query.query!,
+        match_case: query.matchCase,
+        match_whole_word: query.matchWholeWord,
+        use_regex: query.useRegex
+      }
+    ],
+    enabled:
+      !!query.query && selectedLog() !== undefined && selectedLog() !== null
+  }))
 
   const availableLogEntries = rspc.createQuery(() => ({
     queryKey: ["instance.getLogs", parseInt(params.id, 10)]
@@ -158,6 +186,9 @@ const Logs = () => {
       />
       <LogsContent
         logs={logs}
+        query={query}
+        setQuery={setQuery}
+        logSearchResults={logSearchResults.data}
         isActive={isActive() || false}
         isLoading={isLoading()}
         scrollToBottom={scrollToBottom}
@@ -168,6 +199,12 @@ const Logs = () => {
         newLogsCount={newLogsCount()}
         autoFollowPreference={autoFollowPreference()}
         setAutoFollowPreference={setAutoFollowPreference}
+        scrollToIndex={virtualizerRef?.scrollToIndex ?? (() => {})}
+        isIndexLoaded={(index: number) => {
+          const startIndex = (virtualizerRef?.findStartIndex() ?? 0) - 10
+          const endIndex = (virtualizerRef?.findEndIndex() ?? 0) + 10
+          return index >= startIndex && index <= endIndex
+        }}
       />
     </div>
   )

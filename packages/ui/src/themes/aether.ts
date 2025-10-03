@@ -1,0 +1,107 @@
+import { Theme } from "."
+
+const additionalStyles = `
+  html, body {
+    font-size: 16px;
+  }
+
+  * {
+    border-radius: 0 !important;
+  }
+`
+
+const aether: Theme = {
+  accent: "192 132 252", // Bright purple
+  primary: "168 85 247", // Vivid purple
+  "darkSlate-50": "139 92 246",
+  "darkSlate-100": "124 58 237",
+  "darkSlate-200": "109 40 217",
+  "darkSlate-300": "91 33 182",
+  "darkSlate-400": "76 29 149",
+  "darkSlate-500": "67 26 130",
+  "darkSlate-600": "58 24 112",
+  "darkSlate-700": "49 21 95",
+  "darkSlate-800": "39 17 77",
+  "darkSlate-900": "30 13 60",
+  "lightSlate-50": "255 255 255",
+  "lightSlate-100": "250 245 255",
+  "lightSlate-200": "243 232 255",
+  "lightSlate-300": "233 213 255",
+  "lightSlate-400": "216 180 254",
+  "lightSlate-500": "192 132 252",
+  "lightSlate-600": "168 85 247",
+  "lightSlate-700": "147 51 234",
+  "lightSlate-800": "126 34 206",
+  "lightSlate-900": "107 33 168",
+  "darkGray-50": "95 95 105",
+  "darkGray-100": "82 82 91",
+  "darkGray-200": "71 71 79",
+  "darkGray-300": "60 60 67",
+  "darkGray-400": "50 50 56",
+  "darkGray-500": "42 42 47",
+  "darkGray-600": "35 35 39",
+  "darkGray-700": "28 28 31",
+  "darkGray-800": "22 22 25",
+  "darkGray-900": "17 17 19",
+  "lightGray-50": "250 250 250",
+  "lightGray-100": "240 240 243",
+  "lightGray-200": "228 228 231",
+  "lightGray-300": "212 212 216",
+  "lightGray-400": "190 190 195",
+  "lightGray-500": "165 165 170",
+  "lightGray-600": "140 140 145",
+  "lightGray-700": "115 115 120",
+  "lightGray-800": "90 90 95",
+  "lightGray-900": "70 70 75",
+  "primary-50": "250 245 255",
+  "primary-100": "243 232 255",
+  "primary-200": "233 213 255",
+  "primary-300": "216 180 254",
+  "primary-400": "192 132 252",
+  "primary-500": "168 85 247",
+  "primary-600": "147 51 234",
+  "primary-700": "126 34 206",
+  "primary-800": "107 33 168",
+  "primary-900": "88 28 135",
+  "red-50": "254 242 242",
+  "red-100": "254 226 226",
+  "red-200": "252 165 165",
+  "red-300": "248 113 113",
+  "red-400": "239 68 68",
+  "red-500": "220 38 38",
+  "red-600": "185 28 28",
+  "red-700": "153 27 27",
+  "red-800": "127 29 29",
+  "red-900": "105 25 25",
+  "yellow-50": "254 252 232",
+  "yellow-100": "254 249 195",
+  "yellow-200": "254 240 138",
+  "yellow-300": "253 224 71",
+  "yellow-400": "250 204 21",
+  "yellow-500": "234 179 8",
+  "yellow-600": "202 138 4",
+  "yellow-700": "161 98 7",
+  "yellow-800": "133 77 14",
+  "yellow-900": "113 63 18",
+  "green-50": "240 253 244",
+  "green-100": "220 252 231",
+  "green-200": "187 247 208",
+  "green-300": "134 239 172",
+  "green-400": "74 222 128",
+  "green-500": "34 197 94",
+  "green-600": "22 163 74",
+  "green-700": "21 128 61",
+  "green-800": "22 101 52",
+  "green-900": "20 83 45",
+  "brands-curseforge": "241 100 54",
+  "brands-modrinth": "27 217 106",
+  "brands-discord": "88 101 242",
+  "brands-bisecthosting": "4 203 235",
+
+  font: "Monocraft",
+  "font-mono": "Monocraft",
+  "ads-sidebar-background": "linear-gradient(180deg, rgba(30,13,60,1) 0%, rgba(12,12,14,1) 100%)",
+  "additional-styles": additionalStyles
+}
+
+export { aether }

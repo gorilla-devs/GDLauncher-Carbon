@@ -1,17 +1,18 @@
 use crate::api::keys::settings::GET_SETTINGS;
+use crate::api::{CoreModuleStatus, update_core_module_status};
 use crate::domain::account::*;
 use crate::{
     api::keys::account::*,
     managers::account::{api::GetProfileError, enroll::InvalidateCtx},
 };
+use anyhow::{Context, ensure};
 use anyhow::{anyhow, bail};
-use anyhow::{ensure, Context};
 use async_trait::async_trait;
 use axum::extract;
 use carbon_repos::db::app_configuration;
 use carbon_repos::db::{self, read_filters::StringFilter};
 use carbon_repos::pcr::{
-    chrono::DateTime, prisma_errors::query_engine::RecordNotFound, Direction, QueryError,
+    Direction, QueryError, chrono::DateTime, prisma_errors::query_engine::RecordNotFound,
 };
 use chrono::{FixedOffset, Utc};
 use gdl_account::{
@@ -21,7 +22,7 @@ use gdl_account::{
 use jwt::{Header, Token};
 use reqwest::Client;
 use reqwest_middleware::ClientBuilder;
-use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
+use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::{
@@ -209,7 +210,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ))?
             .id_token
         else {
-            bail!("this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})");
+            bail!(
+                "this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})"
+            );
         };
 
         info!("Waiting for account validation");
@@ -230,7 +233,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ))?
             .id_token
         else {
-            bail!("this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})");
+            bail!(
+                "this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})"
+            );
         };
 
         Ok(self.gdl_account_task.get_account(id_token).await?)
@@ -254,7 +259,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .id_token
         else {
             return Err(RequestGDLAccountDeletionError::RequestFailed(
-                anyhow::anyhow!("this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})")
+                anyhow::anyhow!(
+                    "this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})"
+                ),
             ));
         };
 
@@ -289,7 +296,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ))?
             .id_token
         else {
-            bail!("this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})");
+            bail!(
+                "this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})"
+            );
         };
 
         let user = self
@@ -348,7 +357,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
             ))?
             .id_token
         else {
-            bail!("this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {saved_gdl_account_uuid})")
+            bail!(
+                "this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {saved_gdl_account_uuid})"
+            )
         };
 
         let Some(user) = self.gdl_account_task.get_account(id_token).await? else {
@@ -374,7 +385,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .id_token
         else {
             return Err(RequestNewVerificationTokenError::RequestFailed(
-                anyhow::anyhow!("this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})")
+                anyhow::anyhow!(
+                    "this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})"
+                ),
             ));
         };
 
@@ -476,6 +489,27 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(())
     }
 
+    pub async fn upload_profile_icon(self, uuid: String, icon_path: String) -> anyhow::Result<()> {
+        let Some(id_token) = self
+            .get_account_entries()
+            .await?
+            .into_iter()
+            .find(|account| account.uuid == uuid)
+            .ok_or(anyhow::anyhow!(
+                "attempted to get an account that does not exist"
+            ))?
+            .id_token
+        else {
+            return Err(anyhow::anyhow!(
+                "this account is present in the db but the id_token is missing. Presumably offline account. (uuid: {uuid})"
+            ));
+        };
+
+        self.gdl_account_task
+            .upload_profile_icon(id_token, icon_path)
+            .await
+    }
+
     /// Add or update an account
     async fn add_account(self, account: FullAccount) -> anyhow::Result<()> {
         use db::account::{SetParam, UniqueWhereParam};
@@ -570,7 +604,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
         Ok(())
     }
 
-    pub async fn refresh_account(self, uuid: String) -> anyhow::Result<()> {
+    pub async fn refresh_account(
+        self,
+        uuid: String,
+    ) -> anyhow::Result<tokio::task::JoinHandle<Result<(), futures::future::Aborted>>> {
         use db::account::UniqueWhereParam;
 
         info!("Refreshing account {uuid}");
@@ -673,7 +710,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             }
         }
 
-        let enrollment = EnrollmentTask::refresh(
+        let (enrollment, handler) = EnrollmentTask::refresh(
             self.app.reqwest_client.clone(),
             refresh_token.clone(),
             Invalidator {
@@ -687,7 +724,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
         self.app.invalidate(GET_ACCOUNTS, Some(uuid.into()));
 
-        Ok(())
+        Ok(handler)
     }
 
     pub async fn delete_account(self, uuid: String) -> anyhow::Result<()> {
@@ -1060,37 +1097,53 @@ impl AccountRefreshService {
                     });
 
                     for account in accounts {
+                        trace!(
+                            "Considering checking account: {} {}",
+                            account.uuid, account.username
+                        );
+
                         let uuid = account.uuid.clone();
                         // ignore badly formed account entries since we can't handle them
                         let Ok(account) = FullAccount::try_from(account) else {
-                            tracing::error!("Badly formed account entry for uuid {uuid}. Cannot check refresh status.");
+                            tracing::error!(
+                                "Badly formed account entry for uuid {uuid}. Cannot check refresh status."
+                            );
                             continue;
                         };
-                        let FullAccountType::Microsoft { token_expires, .. } = account.type_ else {
-                            continue;
+                        let token_expires = match account.type_ {
+                            FullAccountType::Microsoft { token_expires, .. } => Some(token_expires),
+                            _ => None,
                         };
 
                         let now = Utc::now();
-                        let token_expiration_threshold =
-                            token_expires - chrono::Duration::hours(12);
+                        let token_expiration_threshold = token_expires
+                            .map(|token_expires| token_expires - chrono::Duration::hours(12));
 
-                        trace!("Checking account {uuid} for token expiration. Expires at {token_expires}. Current time is {now}. Comparison is {token_expiration_threshold} < {now}", now = Utc::now());
+                        let should_refresh = match token_expiration_threshold {
+                            Some(token_expiration_threshold) => token_expiration_threshold < now,
+                            None => true,
+                        };
 
-                        if token_expiration_threshold < now {
+                        if should_refresh {
                             debug!(
                                 "Attempting to refresh access token for expired account {}",
                                 &account.uuid
                             );
-                            let r = account_manager.refresh_account(account.uuid.clone()).await;
-
-                            if let Err(e) = r {
-                                error!({ error = ?e }, "Failed to refresh access token for {}", &account.uuid);
-                            }
+                            let Ok(handler) =
+                                account_manager.refresh_account(account.uuid.clone()).await
+                            else {
+                                error!("Failed to refresh access token for {}", &account.uuid);
+                                notifier_clone.notify_one();
+                                first_check_done = true;
+                                continue;
+                            };
 
                             // This works because GDL account is guaranteed to be first in the list
                             // and if there is no gdl account, the currently selected account is guaranteed
                             // to be first
                             if !first_check_done {
+                                let _ = handler.await;
+
                                 notifier_clone.notify_one();
                                 first_check_done = true;
                             }
@@ -1111,9 +1164,11 @@ impl AccountRefreshService {
             // tokio::sync::Notify is not cancellation safe, but in this case we don't care
             // because if it's cancelled, we'll just continue
             _ = notifier.notified() => {
+                update_core_module_status(CoreModuleStatus::AccountRefreshComplete);
+
                 info!("Initial refresh complete");
             }
-            _ = tokio::time::sleep(Duration::from_secs(5)) => {
+            _ = tokio::time::sleep(Duration::from_secs(10)) => {
                 error!("Failed to wait for initial refresh to complete");
             }
         }
@@ -1128,9 +1183,7 @@ pub enum GetActiveAccountError {
 
 #[derive(Error, Debug)]
 pub enum GetAccountStatusError {
-    #[error(
-        "getting account status: microsoft account token expiry date is unset (invalid state)"
-    )]
+    #[error("getting account status: microsoft account token expiry date is unset (invalid state)")]
     TokenExpiryUnset,
 
     #[error("getting account status: microsoft account token is unset")]
@@ -1341,6 +1394,8 @@ impl From<api::FullAccount> for FullAccount {
 
 #[derive(Error, Debug)]
 pub enum FullAccountLoadError {
-    #[error("attempted to parse microsoft account DB entry(uuid {0}), but was missing refresh token expiration timestamp")]
+    #[error(
+        "attempted to parse microsoft account DB entry(uuid {0}), but was missing refresh token expiration timestamp"
+    )]
     MissingExpiration(String),
 }

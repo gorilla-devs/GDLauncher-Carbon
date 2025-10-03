@@ -1,11 +1,14 @@
-import { mainTheme, Theme as UITheme, pixelato, win95 } from "@gd/ui"
+import { mainTheme, Theme as UITheme, pixelato, win95, inferno, aether, frost } from "@gd/ui"
 import { createEffect } from "solid-js"
 import { rspc } from "./rspcClient"
 
 enum _Theme {
   _Main = "main",
   _Pixelato = "pixelato",
-  _Win95 = "win95"
+  _Win95 = "win95",
+  _Inferno = "inferno",
+  _Aether = "aether",
+  _Frost = "frost"
 }
 
 const initThemes = () => {
@@ -33,6 +36,18 @@ export function applyThemeByName(themeName: string | undefined) {
       applyTheme(win95)
       break
     }
+    case _Theme._Inferno: {
+      applyTheme(inferno)
+      break
+    }
+    case _Theme._Aether: {
+      applyTheme(aether)
+      break
+    }
+    case _Theme._Frost: {
+      applyTheme(frost)
+      break
+    }
     default: {
       applyTheme(mainTheme)
       break
@@ -44,8 +59,9 @@ export function applyTheme(theme: UITheme) {
   // Inject theme
   for (const key in theme) {
     if (key === "additional-styles") {
-      if (document.getElementById(key)) {
-        document.getElementById(key)?.remove()
+      const existingStyle = document.getElementById(key)
+      if (existingStyle) {
+        existingStyle.remove()
       }
 
       const style = document.createElement("style")
@@ -73,6 +89,15 @@ export function getThemeColor(themeName: string, color: keyof UITheme): string {
     }
     case _Theme._Win95: {
       return `rgb(${win95[color]})`
+    }
+    case _Theme._Inferno: {
+      return `rgb(${inferno[color]})`
+    }
+    case _Theme._Aether: {
+      return `rgb(${aether[color]})`
+    }
+    case _Theme._Frost: {
+      return `rgb(${frost[color]})`
     }
     default: {
       return `rgb(${mainTheme[color]})`

@@ -98,12 +98,6 @@ impl From<CategoriesResponse> for MRFECategoriesResponse {
     }
 }
 
-impl From<MRFECategoriesResponse> for CategoriesResponse {
-    fn from(value: MRFECategoriesResponse) -> Self {
-        value.into_iter().map(Into::into).collect()
-    }
-}
-
 #[derive(Type, Deserialize, Serialize, Debug, Clone)]
 pub struct MRFELoadersResponse(pub Vec<MRFELoader>);
 

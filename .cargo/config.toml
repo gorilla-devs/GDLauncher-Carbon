@@ -1,6 +1,22 @@
+
+
 [alias]
 prisma = "run -p prisma-cli --"
 [net]
 git-fetch-with-cli = true
+
+
+# Production builds - use old linkers for maximum compatibility
 [target.x86_64-pc-windows-msvc]
+linker = "link.exe"
 rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.aarch64-apple-darwin]
+rustflags = [
+  "-C", "link-arg=-fuse-ld=ld"
+]
+
+[target.x86_64-apple-darwin]
+rustflags = [
+  "-C", "link-arg=-fuse-ld=ld"
+]

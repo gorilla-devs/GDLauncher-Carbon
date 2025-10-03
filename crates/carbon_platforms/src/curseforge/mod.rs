@@ -5,7 +5,7 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use std::{collections::HashMap, path::PathBuf};
 use tracing::info;
 
-use crate::{modrinth::UtcDateTime, ModChannel};
+use crate::{ModChannel, modrinth::UtcDateTime};
 
 pub mod filters;
 pub mod manifest;
@@ -45,7 +45,7 @@ pub struct File {
     pub is_early_access_content: Option<bool>,
     pub early_access_end_date: Option<String>, // Consider using a datetime library for date-time representation
     pub file_fingerprint: u32,
-    pub modules: Vec<FileModule>,
+    pub modules: Option<Vec<FileModule>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -227,7 +227,7 @@ pub struct MinecraftModLoaderVersion {
     pub install_profile_json: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Mod {
     pub id: i32,
@@ -257,7 +257,7 @@ pub struct Mod {
     pub thumbs_up_count: i32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[repr(u16)]
 pub enum ClassId {
     Mods = 6,
@@ -268,6 +268,7 @@ pub enum ClassId {
     Worlds = 17,
     Addons = 4559,
     Shaders = 6552,
+    Datapacks = 6945,
     Other(u16),
 }
 
@@ -328,6 +329,7 @@ impl<'de> Deserialize<'de> for ClassId {
             17 => Ok(Self::Worlds),
             4559 => Ok(Self::Addons),
             6552 => Ok(Self::Shaders),
+            6945 => Ok(Self::Datapacks),
             other => Ok(Self::Other(other)),
         }
     }
@@ -346,6 +348,7 @@ impl Serialize for ClassId {
             Self::BukkitPlugins => 5,
             Self::Worlds => 17,
             Self::Addons => 4559,
+            Self::Datapacks => 6945,
             Self::Shaders => 6552,
             Self::Other(other) => *other,
         })
@@ -441,7 +444,7 @@ pub enum GameVersionTypeStatus {
     Deleted = 2,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[repr(u8)]
 pub enum ModLoaderType {
     Forge = 1,
@@ -496,7 +499,7 @@ pub enum ModLoaderInstallMethod {
     ForgeInstallerV2 = 3,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ModLinks {
     pub website_url: Option<String>,
@@ -505,7 +508,7 @@ pub struct ModLinks {
     pub source_url: Option<String>,
 }
 
-#[derive(Debug, Serialize_repr, Deserialize_repr)]
+#[derive(Debug, Serialize_repr, Deserialize_repr, Clone)]
 #[repr(u8)]
 pub enum ModStatus {
     New = 1,
@@ -520,7 +523,7 @@ pub enum ModStatus {
     UnderReview = 10,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Category {
     pub id: i32,
@@ -530,20 +533,21 @@ pub struct Category {
     pub icon_url: Option<String>,
     pub date_modified: String,
     pub is_class: Option<bool>,
-    pub class_id: Option<i32>,
+    pub class_id: Option<ClassId>,
     pub parent_category_id: Option<i32>,
     pub display_index: Option<i32>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ModAuthor {
     pub id: i32,
     pub name: String,
     pub url: String,
+    pub avatar_url: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ModAsset {
     pub id: i32,
@@ -554,7 +558,7 @@ pub struct ModAsset {
     pub url: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FileIndex {
     pub game_version: String,

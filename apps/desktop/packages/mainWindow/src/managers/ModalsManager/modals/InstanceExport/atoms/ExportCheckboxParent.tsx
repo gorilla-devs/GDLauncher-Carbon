@@ -1,4 +1,3 @@
-import { instanceId } from "@/utils/browser"
 import { rspc } from "@/utils/rspcClient"
 import { createEffect, createSignal } from "solid-js"
 import ExportCheckbox from "./ExportCheckbox"
@@ -27,18 +26,25 @@ export function buildNestedObject(paths: string[][]) {
 
   return root
 }
-const ExportCheckboxParent = () => {
+
+interface Props {
+  instanceId: number
+}
+
+const ExportCheckboxParent = (props: Props) => {
   const [allSelected, setAllSelected] = createSignal(false)
   const [someSelected, setSomeSelected] = createSignal(false)
   const [t] = useTransContext()
+
   const explore = rspc.createQuery(() => ({
     queryKey: [
       "instance.explore",
       {
-        instance_id: instanceId()!,
+        instance_id: props.instanceId,
         path: []
       }
-    ]
+    ],
+    enabled: !!props.instanceId
   }))
 
   createEffect(() => {
@@ -86,7 +92,11 @@ const ExportCheckboxParent = () => {
           }
         />
       </div>
-      <ExportCheckbox initialData={explore.data} folder={{ path: [] }} />
+      <ExportCheckbox
+        initialData={explore.data}
+        instanceId={props.instanceId}
+        folder={{ path: [] }}
+      />
     </>
   )
 }

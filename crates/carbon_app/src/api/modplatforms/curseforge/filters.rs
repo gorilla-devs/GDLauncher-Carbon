@@ -10,7 +10,7 @@ use carbon_platforms::curseforge::filters::{
 
 use super::structs::{CFFEClassId, CFFEModLoaderType};
 
-#[derive(Type, Debug, Deserialize, Serialize)]
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum CFFEModSearchSortField {
     Featured,
@@ -53,7 +53,7 @@ impl From<ModSearchSortField> for CFFEModSearchSortField {
     }
 }
 
-#[derive(Type, Debug, Deserialize, Serialize)]
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub enum CFFEModSearchSortOrder {
     Ascending,

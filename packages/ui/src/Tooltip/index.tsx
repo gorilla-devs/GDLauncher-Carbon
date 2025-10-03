@@ -1,98 +1,45 @@
-import { JSX, createSignal, Show, createEffect } from "solid-js"
-import { Portal } from "solid-js/web"
-import { useFloating } from "solid-floating-ui"
-import {
-  offset,
-  flip,
-  shift,
-  autoUpdate,
-  hide,
-  size,
-  Placement
-} from "@floating-ui/dom"
+import { cn } from "../util"
+import type { PolymorphicProps } from "@kobalte/core/polymorphic"
+import type {
+  TooltipContentProps,
+  TooltipRootProps
+} from "@kobalte/core/tooltip"
+import { Tooltip as TooltipPrimitive } from "@kobalte/core/tooltip"
+import { type ValidComponent, mergeProps, splitProps } from "solid-js"
 
-interface Props {
-  children: JSX.Element
-  content: JSX.Element | string | number
-  placement?: Placement
-  color?: string
-  noTip?: boolean
-  noPadding?: boolean
-  opened?: boolean
-  class?: string
+export const TooltipTrigger = TooltipPrimitive.Trigger
+
+export const Tooltip = (props: TooltipRootProps) => {
+  const merge = mergeProps<TooltipRootProps[]>(
+    {
+      gutter: 4,
+      flip: false
+    },
+    props
+  )
+
+  return <TooltipPrimitive {...merge} />
 }
 
-const Tooltip = (props: Props) => {
-  const [tooltipOpened, setTooltipOpened] = createSignal(false)
-  const [elementRef, setElementRef] = createSignal<HTMLDivElement | undefined>()
-  const [toolTipRef, setToolTipRef] = createSignal<HTMLDivElement | undefined>()
+type tooltipContentProps<T extends ValidComponent = "div"> =
+  TooltipContentProps<T> & {
+    class?: string
+  }
 
-  const position = useFloating(elementRef, toolTipRef, {
-    placement: props.placement || "top",
-    middleware: [offset(10), flip(), shift(), hide(), size()],
-    whileElementsMounted: (reference, floating, update) =>
-      autoUpdate(reference, floating, update, {
-        animationFrame: true
-      })
-  })
-
-  let hoverTimeout: ReturnType<typeof setTimeout>
-
-  createEffect(() => {
-    if (position.middlewareData.hide?.referenceHidden) setTooltipOpened(false)
-  })
+export const TooltipContent = <T extends ValidComponent = "div">(
+  props: PolymorphicProps<T, tooltipContentProps<T>>
+) => {
+  const [local, rest] = splitProps(props as tooltipContentProps, ["class"])
 
   return (
-    <>
-      <Show when={(props.opened || tooltipOpened()) && props.content}>
-        <Portal>
-          <div
-            ref={(el) => setToolTipRef(el)}
-            class={`absolute rounded-lg z-[100] ${props.color || ""}`}
-            style={{
-              position: "absolute",
-              top: `${position.y ?? 0}px`,
-              left: `${position.x ?? 0}px`
-            }}
-            classList={{
-              "bg-darkSlate-900": !props.color,
-              "px-2 py-1": !props.noPadding
-            }}
-          >
-            <div class="relative z-20">{props.content}</div>
-            <Show when={!props.noTip}>
-              <div
-                class={`absolute w-4 h-4 rotate-45 z-10 ${props.color || ""}`}
-                classList={{
-                  "bg-darkSlate-900": !props.color,
-                  "left-1/2 -translate-x-1/2 -bottom-1":
-                    props.placement?.includes("top") || !props.placement,
-                  "top-1/2 -translate-y-1/2 -left-1":
-                    props.placement?.includes("right")
-                }}
-              />
-            </Show>
-          </div>
-        </Portal>
-      </Show>
-
-      <div
-        class={props.class}
-        ref={(el) => setElementRef(el)}
-        onMouseEnter={() => {
-          hoverTimeout = setTimeout(() => {
-            setTooltipOpened(true)
-          }, 400)
-        }}
-        onMouseLeave={() => {
-          clearInterval(hoverTimeout)
-          setTooltipOpened(false)
-        }}
-      >
-        {props.children}
-      </div>
-    </>
+    <TooltipPrimitive.Portal>
+      <TooltipPrimitive.Content
+        class={cn(
+          "z-500 overflow-hidden rounded-md bg-darkSlate-900 px-3 py-1.5 text-xs text-primary-foreground data-[expanded]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[expanded]:fade-in-0 data-[closed]:zoom-out-95 data-[expanded]:zoom-in-95",
+          local.class
+        )}
+        {...rest}
+      />
+    </TooltipPrimitive.Portal>
   )
 }
-
-export { Tooltip }

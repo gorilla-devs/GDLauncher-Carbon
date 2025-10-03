@@ -8,6 +8,7 @@ import {
   useContext
 } from "solid-js"
 import { Dynamic, Portal } from "solid-js/web"
+import { useTransContext } from "@gd/i18n"
 import { useGDNavigate } from "../NavigationManager"
 import adSize from "@/utils/adhelper"
 
@@ -29,66 +30,62 @@ type Hash = Record<
   }
 >
 
-const defaultModals = {
+const getDefaultModals = (t: (key: string) => string) => ({
   privacyStatement: {
     component: lazy(() => import("./modals/PrivacyStatement")),
-    title: "Privacy Statement"
+    title: t("modals.privacy_statement")
   },
   termsAndConditions: {
     component: lazy(() => import("./modals/TermsAndConditions")),
-    title: "Terms and Conditions"
+    title: t("modals.terms_and_conditions")
   },
   addManagedJava: {
     component: lazy(() => import("./modals/Java/AddManagedJava")),
-    title: "Add java version"
+    title: t("modals.add_java_version")
   },
   addCustomJava: {
     component: lazy(() => import("./modals/Java/AddCustomJava")),
-    title: "Add java version"
-  },
-  modDetails: {
-    component: lazy(() => import("./modals/ModDetails")),
-    title: "Mod Details"
+    title: t("modals.add_java_version")
   },
   javaSetup: {
     component: lazy(() => import("./modals/Java/JavaSetup")),
-    title: "Java Setup"
+    title: t("modals.java_setup")
   },
   instanceCreation: {
     component: lazy(() => import("./modals/InstanceCreation")),
-    title: "New Instance"
+    title: t("modals.new_instance")
   },
   exportInstance: {
     component: lazy(() => import("./modals/InstanceExport")),
-    title: "Export Instance"
+    title: t("modals.export_instance")
   },
   modpack_version_update: {
     component: lazy(() => import("./modals/ModPackVersionUpdate")),
-    title: "Change Modpack Version"
+    title: t("modals.change_modpack_version")
   },
   unlock_confirmation: {
     component: lazy(() => import("./modals/Confirmation")),
-    title: "Unlock Instance"
+    title: t("modals.unlock_instance")
   },
   unpair_confirmation: {
     component: lazy(() => import("./modals/Confirmation")),
-    title: "Unpair Instance"
+    title: t("modals.unpair_instance")
   },
   notification: {
     component: lazy(() => import("./modals/Notification")),
-    title: "Notification"
+    title: t("modals.notification")
   },
   confirmInstanceDeletion: {
     component: lazy(() => import("./modals/ConfirmInstanceDeletion")),
-    title: "Confirm Instance Deletion"
+    title: t("modals.confirm_instance_deletion")
   },
   ConfirmChangeRuntimePath: {
     component: lazy(() => import("./modals/ConfirmChangeRuntimePath")),
-    title: "Confirm Change RuntimePath"
+    title: t("modals.confirm_change_runtime_path")
   },
   appUpdate: {
     component: lazy(() => import("./modals/AppUpdate")),
-    title: "New App Version Available"
+    title: t("modals.new_app_version_available")
   },
   onBoarding: {
     component: lazy(() => import("./modals/OnBoarding")),
@@ -96,43 +93,55 @@ const defaultModals = {
   },
   whyAreAdsNeeded: {
     component: lazy(() => import("./modals/WhyAreAdsNeeded")),
-    title: "Why are ads needed?"
+    title: t("modals.why_are_ads_needed")
   },
   modsUpdater: {
     component: lazy(() => import("./modals/ModsUpdater")),
-    title: "Mods Updater"
+    title: t("modals.mods_updater")
   },
   javaProfileCreation: {
     component: lazy(() => import("./modals/JavaProfileCreationModal")),
-    title: "Create Java Profile"
+    title: t("modals.create_java_profile")
   },
   windowCloseWarning: {
     component: lazy(() => import("./modals/WindowCloseWarning")),
-    title: "Are you sure you want to quit?"
+    title: t("modals.confirm_quit")
   },
   changelogs: {
     component: lazy(() => import("./modals/Changelogs")),
-    title: "Welcome to a new version of GDLauncher!"
+    title: t("modals.welcome_new_version")
   },
   confirmGDLAccountDeletion: {
     component: lazy(() => import("./modals/ConfirmGDLAccountDeletion")),
-    title: "Confirm Account Deletion"
+    title: t("modals.confirm_account_deletion")
   },
   confirmMsWithGDLAccountRemoval: {
     component: lazy(() => import("./modals/ConfirmMsWithGDLAccountRemoval")),
-    title: "Confirm Account Removal"
+    title: t("modals.confirm_account_removal")
   },
   accountExpired: {
     component: lazy(() => import("./modals/AccountExpired")),
-    title: "Account Expired"
+    title: t("modals.account_expired")
   },
   bisectHostingAffiliate: {
     component: lazy(() => import("./modals/BisectHostingAffiliate")),
-    title: "BisectHosting Affiliate"
+    title: t("modals.bisecthosting_affiliate")
+  },
+  changeGDLAccountRecoveryEmail: {
+    component: lazy(() => import("./modals/ChangeGDLAccountRecoveryEmail")),
+    title: t("modals.change_recovery_email")
+  },
+  modDetails: {
+    component: lazy(() => import("./modals/ModDetails")),
+    title: t("modals.mod_details")
+  },
+  confirmCacheClear: {
+    component: lazy(() => import("./modals/ConfirmCacheClear")),
+    title: t("modals.confirm_cache_clear")
   }
-}
+})
 
-type ModalName = keyof typeof defaultModals
+type ModalName = keyof ReturnType<typeof getDefaultModals>
 
 interface Modal {
   name: ModalName
@@ -149,7 +158,9 @@ type Stack = { name: ModalName; data: any }[]
 const ModalsContext = createContext<Context>()
 
 export const ModalProvider = (props: { children: JSX.Element }) => {
-  const navigate = useGDNavigate()
+  const [t] = useTransContext()
+  const defaultModals = getDefaultModals(t)
+  const navigator = useGDNavigate()
   const location = useLocation()
   const queryParams = () => location.search as ModalName
   const urlSearchParams = () => new URLSearchParams(queryParams())
@@ -210,7 +221,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
         url.append(`m[${modalStack().length}]`, modal.name)
 
         const decodedParamString = decodeURIComponent(url.toString())
-        navigate(decodedParamString.replace("=&", "?"))
+        navigator.navigate(decodedParamString.replace("=&", "?"))
       } else {
         setSearchParams({
           [`m[${modalStack().length}]`]: modal.name
@@ -224,7 +235,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
     <ModalsContext.Provider value={manager}>
       {props.children}
       <Portal mount={document.getElementById("overlay")!}>
-        <div class="w-screen h-screen">
+        <div class="h-screen w-screen">
           <For each={modalStack()}>
             {(modal, index) => {
               const ModalComponent = defaultModals[modal.name].component
@@ -235,9 +246,9 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                 .preventClose
 
               return (
-                <div class="h-screen w-screen flex absolute inset-0">
+                <div class="absolute inset-0 flex h-screen w-screen">
                   <div
-                    class="flex h-full items-center relative flex-grow justify-center z-999"
+                    class="z-999 relative flex h-full flex-grow items-center justify-center"
                     onMouseDown={() => {
                       if (!preventClose) {
                         closeModal()
@@ -247,7 +258,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                     <div
                       style={{ "z-index": `${index() + 1}` }}
                       onMouseDown={(e) => e.stopPropagation()}
-                      class="duration-100 ease-in-out animate-enterWithOpacityChange"
+                      class="animate-enterWithOpacityChange duration-100 ease-in-out"
                     >
                       <Dynamic
                         component={ModalComponent}
@@ -256,11 +267,11 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                         title={title}
                       />
                     </div>
-                    <div class="absolute inset-0 bg-darkSlate-900 opacity-80" />
+                    <div class="bg-darkSlate-900 absolute inset-0 opacity-80" />
                   </div>
 
                   <div
-                    class="h-screen duration-100 ease-in-out text-lightSlate-50 place-items-center z-999 origin-center bg-darkSlate-900 opacity-80"
+                    class="text-lightSlate-50 z-999 bg-darkSlate-900 h-screen origin-center place-items-center opacity-80 duration-100 ease-in-out"
                     style={{
                       width: `${adSize.width}px`
                     }}

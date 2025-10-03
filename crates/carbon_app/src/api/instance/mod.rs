@@ -1,15 +1,16 @@
+use super::Set;
 use super::keys::instance::*;
 use super::router::router;
+use super::settings::ModSources;
 use super::translation::Translation;
 use super::vtask::FETaskId;
-use super::Set;
-use crate::api::modplatforms::RemoteVersion;
+use crate::api::keys;
 use crate::domain::instance::{self as domain, InstanceModpackInfo};
 use crate::error::{AxumError, FeError};
 use crate::managers::instance as manager;
-use crate::managers::instance::log::LogEntrySourceKind;
 use crate::managers::instance::InstanceMoveTarget;
-use crate::managers::{instance::importer, App, AppInner};
+use crate::managers::instance::log::{LogEntrySourceKind, SearchResult};
+use crate::managers::{App, AppInner, instance::importer};
 use anyhow::anyhow;
 use axum::extract::{Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode};
@@ -62,9 +63,16 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 return Err(anyhow::anyhow!("instance name cannot be empty"));
             }
 
+            let group: domain::GroupId = match details.group {
+                Some(group) => group.into(),
+                None => app.instance_manager()
+                .get_default_group()
+                .await?
+            };
+
             app.instance_manager()
                 .create_instance(
-                    details.group.into(),
+                    group,
                     details.name,
                     details.use_loaded_icon,
                     details.version.try_into()?,
@@ -181,23 +189,23 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok(result)
         }
 
-        query INSTANCE_MODS[app, id: Option<FEInstanceId>] {
-            let Some(id) = id else {
-                return Ok(None);
-            };
-
-            app.meta_cache_manager()
-                .watch_and_prioritize(Some(id.into()))
-                .await;
-
+        query INSTANCE_MODS[app, instance_id: FEInstanceId] {
             let result = app.instance_manager()
-                .list_mods(id.into())
+                .list_mods(instance_id.into(), None)
                 .await?
                 .into_iter()
                 .map(Into::into)
                 .collect::<Vec<Mod>>();
 
             Ok(Some(result))
+        }
+
+        mutation PRIORITIZE_INSTANCE_CACHE[app, instance_id: Option<FEInstanceId>] {
+            app.meta_cache_manager()
+                .watch_and_prioritize(instance_id.map(|id| id.into()))
+                .await;
+
+            Ok(())
         }
 
         mutation PREPARE_INSTANCE[app, id: FEInstanceId] {
@@ -237,6 +245,23 @@ pub(super) fn mount() -> RouterBuilder<App> {
                .into_iter()
                .map(GameLogEntry::from)
                .collect::<Vec<_>>())
+        }
+
+        query SEARCH_LOGS[app, query: SearchLogsQuery] {
+            let res = app.instance_manager()
+                .search_in_log(
+                    query.log_id.into(),
+                    &*query.query,
+                    query.match_case,
+                    query.match_whole_word,
+                    query.use_regex,
+                )
+                .await?
+                .into_iter()
+                .map(FESearchResult::from)
+                .collect::<Vec<_>>();
+
+            Ok(res)
         }
 
         mutation DELETE_LOG[app, id: GameLogId] {
@@ -312,19 +337,19 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok(super::vtask::FETaskId::from(task))
         }
 
-        query FIND_MOD_UPDATE[app, args: UpdateMod] {
-            app.instance_manager().find_mod_update(
-                args.instance_id.into(),
-                args.mod_id,
-            ).await
-            .map(|v| v.map(RemoteVersion::from))
-        }
+        // query FIND_MOD_UPDATE[app, args: UpdateMod] {
+        //     app.instance_manager().find_mod_update(
+        //         args.instance_id.into(),
+        //         args.mod_id,
+        //     ).await
+        //     .map(|v| v.map(RemoteVersion::from))
+        // }
 
         query GET_MOD_SOURCES[app, instance_id: FEInstanceId] {
             app.instance_manager()
                 .get_instance_mod_sources(instance_id.into())
                 .await
-                .map(super::modplatforms::ModSources::from)
+                .map(crate::api::settings::ModSources::from)
         }
 
         mutation INSTALL_LATEST_MOD[app, imod: InstallLatestMod] {
@@ -595,6 +620,7 @@ struct ListInstance {
     date_created: DateTime<Utc>,
     date_updated: DateTime<Utc>,
     seconds_played: u32,
+    locked: bool,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -638,7 +664,8 @@ enum ConfigurationParseErrorType {
 
 #[derive(Type, Debug, Deserialize)]
 struct CreateInstance {
-    group: FEGroupId,
+    #[specta(optional)]
+    group: Option<FEGroupId>,
     name: String,
     use_loaded_icon: bool,
     version: CreateInstanceVersion,
@@ -706,7 +733,7 @@ struct FEUpdateInstance {
     #[specta(optional)]
     game_resolution: Option<Set<Option<GameResolution>>>,
     #[specta(optional)]
-    mod_sources: Option<Set<Option<super::modplatforms::ModSources>>>,
+    mod_sources: Option<Set<Option<ModSources>>>,
     #[specta(optional)]
     modpack_locked: Option<Set<Option<bool>>>,
 }
@@ -881,6 +908,7 @@ impl From<GameResolution> for domain::info::GameResolution {
 #[derive(Type, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct InstanceDetails {
+    id: FEInstanceId,
     name: String,
     favorite: bool,
     version: Option<String>,
@@ -984,6 +1012,7 @@ struct Mod {
     id: String,
     filename: String,
     enabled: bool,
+    addon_type: domain::AddonType,
     metadata: Option<ModFileMetadata>,
     curseforge: Option<CurseForgeModMetadata>,
     modrinth: Option<ModrinthModMetadata>,
@@ -1146,6 +1175,7 @@ struct ImportRequest {
 impl From<domain::InstanceDetails> for InstanceDetails {
     fn from(value: domain::InstanceDetails) -> Self {
         Self {
+            id: value.id.into(),
             favorite: value.favorite,
             name: value.name,
             version: value.version,
@@ -1350,6 +1380,7 @@ impl From<manager::ListInstance> for ListInstance {
             date_created: value.date_created,
             date_updated: value.date_updated,
             seconds_played: value.seconds_played,
+            locked: value.locked,
         }
     }
 }
@@ -1434,6 +1465,7 @@ impl From<domain::Mod> for Mod {
             id: value.id,
             filename: value.filename,
             enabled: value.enabled,
+            addon_type: value.addon_type,
             metadata: value.metadata.map(Into::into),
             curseforge: value.curseforge.map(Into::into),
             modrinth: value.modrinth.map(Into::into),
@@ -1697,7 +1729,7 @@ impl From<importer::FullImportScanStatus> for FullImportScanStatus {
 }
 
 mod log {
-    use axum::extract::{ws::Message, WebSocketUpgrade};
+    use axum::extract::{WebSocketUpgrade, ws::Message};
     use tracing::{error, trace};
 
     use super::*;
@@ -1768,5 +1800,41 @@ mod log {
                 }
             }
         })
+    }
+}
+
+#[derive(Debug, Deserialize, Type)]
+pub struct SearchLogsQuery {
+    log_id: i32,
+    query: String,
+    match_case: bool,
+    match_whole_word: bool,
+    use_regex: bool,
+}
+
+#[derive(Debug, Type, Serialize)]
+struct FESearchResult {
+    pub entry_index: u32,
+    pub pos: u32,
+    pub len: u32,
+}
+
+impl From<SearchResult> for FESearchResult {
+    fn from(value: SearchResult) -> Self {
+        Self {
+            entry_index: value.entry_index as u32,
+            pos: value.pos as u32,
+            len: value.len as u32,
+        }
+    }
+}
+
+impl From<FESearchResult> for SearchResult {
+    fn from(value: FESearchResult) -> Self {
+        Self {
+            entry_index: value.entry_index as usize,
+            pos: value.pos as usize,
+            len: value.len as usize,
+        }
     }
 }

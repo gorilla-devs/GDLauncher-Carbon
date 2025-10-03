@@ -4,6 +4,7 @@ import { Tab, TabList, Tabs } from "@gd/ui"
 import { For, JSX } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import FeatureStatusBadge from "@/components/FeatureStatusBadge"
+import { useTransContext } from "@gd/i18n"
 
 export interface settingsItem {
   name: string | JSX.Element
@@ -13,21 +14,22 @@ export interface settingsItem {
 
 function Settings() {
   const location = useLocation()
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
+  const [t] = useTransContext()
 
   const settings: settingsItem[] = [
     {
-      name: "General",
+      name: t("settings:General"),
       icon: "i-ri:home-gear-fill",
       path: "/settings"
     },
     {
-      name: "Accounts",
+      name: t("settings:Accounts"),
       icon: "i-ri:account-box-fill",
       path: "/settings/accounts"
     },
     {
-      name: "Language",
+      name: t("settings:Language"),
       icon: "i-ri:global-fill",
       path: "/settings/language"
     },
@@ -44,22 +46,22 @@ function Settings() {
       path: "/settings/appearance"
     },
     {
-      name: "Java",
+      name: t("settings:Java"),
       icon: "i-nonicons:java-16",
       path: "/settings/java"
     },
     {
-      name: "Custom Commands",
+      name: t("settings:custom_commands"),
       icon: "i-ri:terminal-fill",
       path: "/settings/custom-commands"
     },
     {
-      name: "Privacy",
+      name: t("settings:Privacy"),
       icon: "i-ri:shield-keyhole-fill",
       path: "/settings/privacy"
     },
     {
-      name: "Runtime Path",
+      name: t("settings:runtime_path"),
       icon: "i-ri-folder-fill",
       path: "/settings/runtime-path"
     }
@@ -67,8 +69,8 @@ function Settings() {
 
   return (
     <>
-      <ContentWrapper>
-        <div class="w-full box-border sticky top-0 z-50">
+      <ContentWrapper zeroPadding>
+        <div class="w-full box-border sticky top-0 z-50 px-6">
           <Tabs
             orientation="horizontal"
             defaultIndex={settings.findIndex(
@@ -81,7 +83,7 @@ function Settings() {
                   {(item) => (
                     <Tab
                       onClick={() => {
-                        navigate(item.path)
+                        navigator.navigate(item.path)
                       }}
                     >
                       <div class="flex flex-col gap-2 justify-center items-center">
@@ -98,7 +100,9 @@ function Settings() {
           </Tabs>
         </div>
         <div class="pt-4 h-1 w-1" />
-        <Outlet />
+        <div class="px-6">
+          <Outlet />
+        </div>
         <div class="pb-4 h-1 w-1" />
       </ContentWrapper>
     </>

@@ -1,7 +1,7 @@
 use core::fmt;
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc, Weak,
+    atomic::{AtomicUsize, Ordering},
 };
 
 pub struct LivenessTracker {

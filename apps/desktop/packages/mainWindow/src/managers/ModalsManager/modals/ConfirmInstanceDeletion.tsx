@@ -1,21 +1,34 @@
-import { rspc } from "@/utils/rspcClient"
+import { rspc, queryClient } from "@/utils/rspcClient"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
-import { Button, createNotification } from "@gd/ui"
+import { Button, toast } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
+import { useGDNavigate } from "@/managers/NavigationManager"
 
 const ConfirmInstanceDeletion = (props: ModalProps) => {
   const [t] = useTransContext()
   const modalsContext = useModal()
-  const addNotification = createNotification()
+  const navigator = useGDNavigate()
 
   const deleteInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.deleteInstance"],
+    onSuccess: async () => {
+      // Cancel any ongoing queries for this instance to prevent errors
+      await queryClient.cancelQueries({
+        queryKey: ["instance.getInstanceDetails", props?.data?.id]
+      })
+      await queryClient.cancelQueries({
+        queryKey: ["instance.getModpackInfo", props?.data?.id]
+      })
+      await queryClient.cancelQueries({
+        queryKey: ["instance.getInstanceMods", props?.data?.id]
+      })
+
+      navigator.navigate("/library")
+    },
     onError: (error) => {
-      addNotification({
-        name: "Cannot delete instance",
-        content: error.message,
-        type: "error"
+      toast.error(t("notifications.cannot_delete_instance"), {
+        description: error.message
       })
     }
   }))
@@ -51,8 +64,8 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
           <Button
             type="secondary"
             onClick={() => {
-              deleteInstanceMutation.mutate(props?.data?.id)
               modalsContext?.closeModal()
+              deleteInstanceMutation.mutate(props?.data?.id)
             }}
           >
             {t("instance_confirm_deletion.delete")}

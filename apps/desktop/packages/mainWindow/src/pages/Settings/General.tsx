@@ -36,6 +36,12 @@ const General = () => {
     if (routeData.data.data) setSettings(routeData.data.data)
   })
 
+  const handleClearCache = () => {
+    modalsContext?.openModal({
+      name: "confirmCacheClear"
+    })
+  }
+
   const templateGameResolution = () => {
     return [
       { label: "854 x 480 (100%)", key: "Standard:854x480" },
@@ -63,22 +69,8 @@ const General = () => {
       </PageTitle>
       <RowsContainer>
         <Row>
-          <Title
-            description={
-              <Trans
-                key="settings:release_channel_text"
-                options={{
-                  defaultValue: "Select the preferred release channel"
-                }}
-              />
-            }
-          >
-            <Trans
-              key="settings:release_channel_title"
-              options={{
-                defaultValue: "Release Channel"
-              }}
-            />
+          <Title description={<Trans key="settings:release_channel_text" />}>
+            <Trans key="settings:release_channel_title" />
           </Title>
           <RightHandSide>
             <Dropdown
@@ -217,23 +209,6 @@ const General = () => {
                 </div>
               </Show>
             </div>
-          </RightHandSide>
-        </Row>
-        <Row>
-          <Title description={<Trans key="settings:show_news_text" />}>
-            <Trans key="settings:show_news_title" />
-          </Title>
-          <RightHandSide>
-            <Switch
-              checked={settings.showNews}
-              onChange={(e) => {
-                settingsMutation.mutate({
-                  showNews: {
-                    Set: e.currentTarget.checked
-                  }
-                })
-              }}
-            />
           </RightHandSide>
         </Row>
         <Row>
@@ -429,6 +404,14 @@ const General = () => {
           <RightHandSide>
             <div>
               <div class="flex justify-end gap-4 flex-col items-center 2xl:flex-row">
+                <Button type="secondary" onClick={handleClearCache}>
+                  <div class="flex items-center gap-2">
+                    <i class="w-5 h-5 i-ri:delete-back-2-line" />
+                    <div>
+                      <Trans key="settings:clear_cache_button" />
+                    </div>
+                  </div>
+                </Button>
                 <Button
                   type="secondary"
                   onClick={() => {

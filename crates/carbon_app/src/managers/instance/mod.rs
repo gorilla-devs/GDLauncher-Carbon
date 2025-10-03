@@ -2,25 +2,25 @@ use self::export::InstanceExportManager;
 use self::importer::InstanceImportManager;
 use self::log::GameLog;
 use self::run::{LaunchState, PersistenceManager};
+use super::ManagerRef;
 use super::metadata::cache;
 use super::modplatforms::curseforge::CurseForge;
 use super::vtask::{TaskState, VisualTask};
-use super::ManagerRef;
 use crate::api::keys::instance::*;
 use crate::api::translation::Translation;
 use crate::domain::instance::info::{GameVersion, InstanceIcon, Modpack};
 use crate::domain::instance::{
     self as domain, GameLogId, GroupId, InstanceFolder, InstanceId, InstanceModpackInfo,
 };
-use crate::domain::java::{SystemJavaProfileName, SYSTEM_JAVA_PROFILE_NAME_PREFIX};
+use crate::domain::java::{SYSTEM_JAVA_PROFILE_NAME_PREFIX, SystemJavaProfileName};
 use crate::domain::vtask::VisualTaskId;
 use crate::livenesstracker::LivenessTracker;
 use crate::managers::instance::modpack::PackVersionFile;
 use anyhow::bail;
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
+use carbon_platforms::ModPlatform;
 use carbon_platforms::curseforge::filters::{ModFileParameters, ModParameters};
 use carbon_platforms::modrinth::search::{ProjectID, VersionID};
-use carbon_platforms::ModPlatform;
 use carbon_repos::db::read_filters::StringFilter;
 use carbon_repos::db::{self, read_filters::IntFilter};
 use carbon_repos::pcr::Direction;
@@ -30,7 +30,7 @@ use db::instance::Data as CachedInstance;
 use domain::info;
 use fs_extra::dir::CopyOptions;
 use futures::future::BoxFuture;
-use futures::{join, Future};
+use futures::{Future, join};
 use serde::Serialize;
 use serde_json::error::Category as JsonErrorType;
 use specta::Type;
@@ -44,7 +44,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::{collections::HashMap, io, ops::Deref, path::PathBuf};
 use thiserror::Error;
-use tokio::sync::{watch, Mutex, MutexGuard, RwLock};
+use tokio::sync::{Mutex, MutexGuard, RwLock, watch};
 use tracing::{info, trace};
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -680,7 +680,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
                     match group {
                         Some(x) => Ok(GroupId(x.id)),
-                        None => bail!("invalid database state: default group specified in configuration, but missing from groups"),
+                        None => bail!(
+                            "invalid database state: default group specified in configuration, but missing from groups"
+                        ),
                     }
                 }
                 None => {
@@ -1670,16 +1672,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         });
 
         Ok(domain::InstanceDetails {
+            id: instance_id,
             favorite: instance.favorite,
             name: instance.config.name.clone(),
             version: mc_version,
             modpack: instance.config.modpack.clone(),
-            locked: instance
-                .config
-                .modpack
-                .as_ref()
-                .map(|x| x.locked)
-                .unwrap_or(false),
             global_java_args: instance.config.game_configuration.global_java_args,
             extra_java_args: instance.config.game_configuration.extra_java_args.clone(),
             memory: instance.config.game_configuration.memory,
@@ -2045,13 +2042,13 @@ mod test {
 
     use super::domain;
     use carbon_repos::{
-        db::{read_filters::IntFilter, PrismaClient},
+        db::{PrismaClient, read_filters::IntFilter},
         pcr::Direction,
     };
     use unicode_segmentation::UnicodeSegmentation;
 
     use crate::{
-        domain::instance::{info, InstanceSettingsUpdate},
+        domain::instance::{InstanceSettingsUpdate, info},
         managers::instance::{
             GroupId, InstanceId, InstanceMoveTarget, ListGroup, ListInstance, ListInstanceStatus,
             ValidListInstance,

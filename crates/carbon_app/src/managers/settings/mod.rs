@@ -1,7 +1,7 @@
 use self::terms_and_privacy::TermsAndPrivacy;
 use super::ManagerRef;
 use crate::api::{keys::settings::*, settings::FESettingsUpdate};
-use anyhow::{anyhow, Context};
+use anyhow::{Context, anyhow};
 use carbon_platforms::{ModChannelWithUsage, ModPlatform};
 use carbon_repos::db::app_configuration::{self, hashed_email_accepted, last_app_version};
 use chrono::Utc;
@@ -132,13 +132,6 @@ impl ManagerRef<'_, SettingsManager> {
                 vec![app_configuration::download_dependencies::set(
                     download_dependencies.inner(),
                 )],
-            ));
-        }
-
-        if let Some(show_news) = incoming_settings.show_news {
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::show_news::set(show_news.inner())],
             ));
         }
 

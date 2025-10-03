@@ -1,9 +1,9 @@
 use crate::{
     domain::instance::{
-        info::{CurseforgeModpack, ModrinthModpack},
         InstanceModpackInfo,
+        info::{CurseforgeModpack, ModrinthModpack},
     },
-    managers::{metadata::cache, App},
+    managers::{App, metadata::cache},
 };
 use carbon_platforms::{
     curseforge::filters::{ModFileParameters, ModParameters},
@@ -123,78 +123,57 @@ pub async fn get_modpack_metadata(
             let icon_bytes_is_some = icon_bytes.is_some();
 
             app.prisma_client
-                ._transaction()
-                .run(|prisma_client| async move {
-                    if has_cached_entry {
-                        prisma_client
-                            .modrinth_modpack_cache()
-                            .update(
-                                db::modrinth_modpack_cache::project_id_version_id(
-                                    modrinth.project_id.clone(),
-                                    modrinth.version_id.clone(),
-                                ),
-                                vec![
-                                    db::modrinth_modpack_cache::modpack_name::set(name),
-                                    db::modrinth_modpack_cache::version_name::set(file_name),
-                                    db::modrinth_modpack_cache::url_slug::set(slug),
-                                ],
-                            )
-                            .exec()
-                            .await?;
-                    } else {
-                        prisma_client
-                            .modrinth_modpack_cache()
-                            .create(
+                .modrinth_modpack_cache()
+                .upsert(
+                    db::modrinth_modpack_cache::project_id_version_id(
+                        modrinth.project_id.clone(),
+                        modrinth.version_id.clone(),
+                    ),
+                    db::modrinth_modpack_cache::create(
+                        modrinth.project_id.clone(),
+                        modrinth.version_id.clone(),
+                        name.clone(),
+                        file_name.clone(),
+                        slug.clone(),
+                        vec![],
+                    ),
+                    vec![
+                        db::modrinth_modpack_cache::modpack_name::set(name.clone()),
+                        db::modrinth_modpack_cache::version_name::set(file_name.clone()),
+                        db::modrinth_modpack_cache::url_slug::set(slug.clone()),
+                    ],
+                )
+                .exec()
+                .await?;
+
+            if icon_bytes_is_some || has_cached_logo {
+                app.prisma_client
+                    .modrinth_modpack_image_cache()
+                    .upsert(
+                        db::modrinth_modpack_image_cache::project_id_version_id(
+                            modrinth.project_id.clone(),
+                            modrinth.version_id.clone(),
+                        ),
+                        db::modrinth_modpack_image_cache::create(
+                            url.clone().unwrap_or_default(),
+                            db::modrinth_modpack_cache::project_id_version_id(
                                 modrinth.project_id.clone(),
                                 modrinth.version_id.clone(),
-                                name,
-                                file_name,
-                                slug,
-                                vec![],
-                            )
-                            .exec()
-                            .await?;
-                    }
-
-                    if has_cached_logo {
-                        prisma_client
-                            .modrinth_modpack_image_cache()
-                            .update(
-                                db::modrinth_modpack_image_cache::project_id_version_id(
-                                    modrinth.project_id.clone(),
-                                    modrinth.version_id.clone(),
-                                ),
-                                vec![
-                                    db::modrinth_modpack_image_cache::url::set(
-                                        url.unwrap_or_default(),
-                                    ),
-                                    db::modrinth_modpack_image_cache::data::set(
-                                        icon_bytes.map(|icon_bytes| icon_bytes.to_vec()),
-                                    ),
-                                ],
-                            )
-                            .exec()
-                            .await?;
-                    } else {
-                        prisma_client
-                            .modrinth_modpack_image_cache()
-                            .create(
-                                url.unwrap_or_default(),
-                                db::modrinth_modpack_cache::project_id_version_id(
-                                    modrinth.project_id.clone(),
-                                    modrinth.version_id.clone(),
-                                ),
-                                vec![db::modrinth_modpack_image_cache::data::set(
-                                    icon_bytes.map(|icon_bytes| icon_bytes.to_vec()),
-                                )],
-                            )
-                            .exec()
-                            .await?;
-                    }
-
-                    Ok::<(), anyhow::Error>(())
-                })
-                .await?;
+                            ),
+                            vec![db::modrinth_modpack_image_cache::data::set(
+                                icon_bytes.clone().map(|icon_bytes| icon_bytes.to_vec()),
+                            )],
+                        ),
+                        vec![
+                            db::modrinth_modpack_image_cache::url::set(url.unwrap_or_default()),
+                            db::modrinth_modpack_image_cache::data::set(
+                                icon_bytes.map(|icon_bytes| icon_bytes.to_vec()),
+                            ),
+                        ],
+                    )
+                    .exec()
+                    .await?;
+            }
 
             Ok::<_, anyhow::Error>((modpack, version, icon_bytes_is_some))
         })

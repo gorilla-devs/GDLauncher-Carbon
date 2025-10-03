@@ -1,15 +1,16 @@
-use super::{
-    modplatforms::{ModChannelWithUsage, ModPlatform, ModSources},
-    Set,
-};
+use super::Set;
 use crate::{
     api::{
-        keys::settings::{
-            GET_PRIVACY_STATEMENT_BODY, GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY, SET_SETTINGS,
+        keys::{
+            self,
+            settings::{
+                GET_PRIVACY_STATEMENT_BODY, GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY, SET_SETTINGS,
+            },
         },
         router::router,
     },
     managers::App,
+    mirror_into,
 };
 use rspc::RouterBuilder;
 use serde::{Deserialize, Serialize};
@@ -214,7 +215,6 @@ struct FESettings {
     download_dependencies: bool,
     launcher_action_on_game_launch: FELauncherActionOnGameLaunch,
     show_app_close_warning: bool,
-    show_news: bool,
     show_featured: bool,
     instances_sort_by: InstancesSortBy,
     instances_sort_by_asc: bool,
@@ -250,7 +250,6 @@ impl TryFrom<carbon_repos::db::app_configuration::Data> for FESettings {
             last_app_version: data.last_app_version,
             concurrent_downloads: data.concurrent_downloads,
             download_dependencies: data.download_dependencies,
-            show_news: data.show_news,
             show_featured: data.show_featured,
             instances_sort_by: data.instances_sort_by.try_into()?,
             instances_sort_by_asc: data.instances_sort_by_asc,
@@ -369,8 +368,6 @@ pub struct FESettingsUpdate {
     #[specta(optional)]
     pub deletion_through_recycle_bin: Option<Set<bool>>,
     #[specta(optional)]
-    pub show_news: Option<Set<bool>>,
-    #[specta(optional)]
     pub show_featured: Option<Set<bool>>,
     #[specta(optional)]
     pub xmx: Option<Set<i32>>,
@@ -403,3 +400,95 @@ pub struct FESettingsUpdate {
     #[specta(optional)]
     pub gdl_account_id: Option<Set<Option<String>>>,
 }
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "lowercase")]
+pub enum FESearchAPI {
+    Curseforge,
+    Modrinth,
+}
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone, Copy)]
+#[repr(i32)]
+pub enum ModChannel {
+    Alpha = 0,
+    Beta,
+    Stable,
+}
+impl Default for ModChannel {
+    fn default() -> Self {
+        Self::Stable
+    }
+}
+
+impl TryFrom<i32> for ModChannel {
+    type Error = anyhow::Error;
+
+    fn try_from(value: i32) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Alpha),
+            1 => Ok(Self::Beta),
+            2 => Ok(Self::Stable),
+            _ => Err(anyhow::anyhow!(
+                "Invalid mod channel id {value} not in range 0..=2"
+            )),
+        }
+    }
+}
+
+mirror_into!(
+    ModChannel,
+    carbon_platforms::ModChannel,
+    |value| match value {
+        Other::Alpha => Self::Alpha,
+        Other::Beta => Self::Beta,
+        Other::Stable => Self::Stable,
+    }
+);
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone, Copy)]
+pub enum ModPlatform {
+    Curseforge,
+    Modrinth,
+}
+
+mirror_into!(
+    ModPlatform,
+    carbon_platforms::ModPlatform,
+    |value| match value {
+        Other::Curseforge => Self::Curseforge,
+        Other::Modrinth => Self::Modrinth,
+    }
+);
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone, Copy)]
+pub struct ModChannelWithUsage {
+    pub channel: ModChannel,
+    pub allow_updates: bool,
+}
+
+mirror_into!(
+    ModChannelWithUsage,
+    carbon_platforms::ModChannelWithUsage,
+    |value| {
+        Self {
+            channel: value.channel.into(),
+            allow_updates: value.allow_updates,
+        }
+    }
+);
+
+#[derive(Type, Debug, Deserialize, Serialize, Clone)]
+pub struct ModSources {
+    pub channels: Vec<ModChannelWithUsage>,
+    pub platform_blacklist: Vec<ModPlatform>,
+}
+
+mirror_into!(ModSources, carbon_platforms::ModSources, |value| Self {
+    channels: value.channels.into_iter().map(Into::into).collect(),
+    platform_blacklist: value
+        .platform_blacklist
+        .into_iter()
+        .map(Into::into)
+        .collect(),
+});

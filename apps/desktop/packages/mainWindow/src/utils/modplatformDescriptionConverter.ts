@@ -1,4 +1,3 @@
-import { marked } from "marked"
 import sanitizeHtml from "sanitize-html"
 
 const opts = {
@@ -23,14 +22,6 @@ const opts = {
   }
 }
 
-export async function parseToHtml(
-  data: string | undefined,
-  type: "html" | "markdown"
-) {
-  if (type === "html") {
-    return sanitizeHtml(data || "", opts)
-  }
-
-  // Sanitize html is needed to tranasform tags like a and img
-  return sanitizeHtml(await marked.parse(data || ""), opts)
+export function parseToHtml(data: string | undefined) {
+  return sanitizeHtml(data || "", opts)
 }

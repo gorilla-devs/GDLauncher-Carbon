@@ -6,6 +6,9 @@
       "outputs": ["dist/**", "core.node"],
       "cache": false
     },
+    "@gd/desktop": {
+      "env": ["DEV"]
+    },
     "@gd/desktop#build": {
       "dependsOn": ["^@gd/ui#build", "^@gd/config#build"],
       "cache": false

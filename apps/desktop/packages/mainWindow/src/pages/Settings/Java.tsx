@@ -9,8 +9,12 @@ import {
   TabPanel,
   Tabs,
   Tooltip,
+  TooltipContent,
+  TooltipTrigger,
   Dropdown,
   Popover,
+  PopoverContent,
+  PopoverTrigger,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -79,14 +83,17 @@ const Java = () => {
     const results = flattenedAvailableJavas()?.map((java) => {
       return {
         label: (
-          <div class="w-full flex flex-col gap-2">
+          <div class="flex w-full flex-col gap-2">
             <div class="flex justify-between">
               <div class="text-lightSlate-50">{java.version}</div>
               <div>{java.type}</div>
             </div>
             <div class="w-full text-left">
-              <Tooltip content={java.path}>
-                <TruncatedPath originalPath={java.path} />
+              <Tooltip>
+                <TooltipTrigger>
+                  <TruncatedPath originalPath={java.path} />
+                </TooltipTrigger>
+                <TooltipContent>{java.path}</TooltipContent>
               </Tooltip>
             </div>
           </div>
@@ -180,37 +187,47 @@ const Java = () => {
                 })
               }}
             />
-            <Tooltip content={<Trans key="tooltip.undo" />}>
-              <Button
-                type="secondary"
-                class="h-10"
-                size="small"
-                onClick={() => {
-                  settingsMutation.mutate({
-                    javaCustomArgs: {
-                      Set: initialJavaArgs() || ""
-                    }
-                  })
-                }}
-              >
-                <i class="w-5 h-5 i-ri:arrow-go-back-fill" />
-              </Button>
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  type="secondary"
+                  class="h-10"
+                  size="small"
+                  onClick={() => {
+                    settingsMutation.mutate({
+                      javaCustomArgs: {
+                        Set: initialJavaArgs() || ""
+                      }
+                    })
+                  }}
+                >
+                  <i class="i-ri:arrow-go-back-fill h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <Trans key="tooltip.undo" />
+              </TooltipContent>
             </Tooltip>
-            <Tooltip content={<Trans key="tooltip.reset" />}>
-              <Button
-                type="secondary"
-                class="h-10"
-                size="small"
-                onClick={() => {
-                  settingsMutation.mutate({
-                    javaCustomArgs: {
-                      Set: ""
-                    }
-                  })
-                }}
-              >
-                <i class="w-5 h-5 i-ri:close-fill" />
-              </Button>
+            <Tooltip>
+              <TooltipTrigger>
+                <Button
+                  type="secondary"
+                  class="h-10"
+                  size="small"
+                  onClick={() => {
+                    settingsMutation.mutate({
+                      javaCustomArgs: {
+                        Set: ""
+                      }
+                    })
+                  }}
+                >
+                  <i class="i-ri:close-fill h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <Trans key="tooltip.reset" />
+              </TooltipContent>
             </Tooltip>
           </div>
         </Row>
@@ -247,8 +264,8 @@ const Java = () => {
                 </Tab>
               </TabList>
               <TabPanel>
-                <div class="h-full p-4 min-h-96">
-                  <div class="flex justify-between items-center mb-4">
+                <div class="h-full min-h-96 p-4">
+                  <div class="mb-4 flex items-center justify-between">
                     <div>
                       <div class="m-0 text-sm font-normal">
                         <Trans key="java.java_description_text" />
@@ -264,9 +281,9 @@ const Java = () => {
                       </div>
                     </div>
                     <DropdownMenu placement="bottom-end">
-                      <DropdownMenuTrigger class="p-0 b-0 bg-transparent">
+                      <DropdownMenuTrigger class="b-0 bg-transparent p-0">
                         <Button as="div" type="secondary" size="small">
-                          <div class="text-xl i-ri:add-fill" />
+                          <div class="i-ri:add-fill text-xl" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
@@ -286,7 +303,7 @@ const Java = () => {
                   <div class="flex flex-col gap-4">
                     <For each={Object.entries(javas())}>
                       {([javaVersion, obj]) => (
-                        <div class="rounded-xl border-1 border-solid border-darkSlate-600">
+                        <div class="border-1 border-darkSlate-600 rounded-xl border-solid">
                           <h3 class="px-4">
                             <Trans
                               key="java.java_version_number"
@@ -305,21 +322,33 @@ const Java = () => {
                                     )
 
                                   return (
-                                    <div class="flex justify-between rounded-md py-2 px-4 hover:bg-darkSlate-600">
-                                      <div class="flex flex-col gap-2 w-full flex-1 min-w-0">
+                                    <div class="hover:bg-darkSlate-600 flex justify-between rounded-md px-4 py-2">
+                                      <div class="flex w-full min-w-0 flex-1 flex-col gap-2">
                                         <div class="flex justify-between">
                                           <div class="flex items-center gap-2">
                                             <div class="text-lightSlate-50 flex items-center gap-2">
                                               <div>{java.version}</div>
                                               <Switch>
                                                 <Match when={java.isValid}>
-                                                  <Tooltip content="This java path works and is valid">
-                                                    <div class="flex i-ri:checkbox-circle-fill text-emerald-500" />
+                                                  <Tooltip>
+                                                    <TooltipTrigger>
+                                                      <div class="i-ri:checkbox-circle-fill flex text-emerald-500" />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                      This java path works and
+                                                      is valid
+                                                    </TooltipContent>
                                                   </Tooltip>
                                                 </Match>
                                                 <Match when={!java.isValid}>
-                                                  <Tooltip content="This java path doesn't seem to work">
-                                                    <div class="flex i-ri:error-warning-fill text-yellow-500" />
+                                                  <Tooltip>
+                                                    <TooltipTrigger>
+                                                      <div class="i-ri:error-warning-fill flex text-yellow-500" />
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                      This java path doesn't
+                                                      seem to work
+                                                    </TooltipContent>
                                                   </Tooltip>
                                                 </Match>
                                               </Switch>
@@ -329,9 +358,21 @@ const Java = () => {
                                                 usedInNProfiles().length > 0
                                               }
                                             >
-                                              <div class="h-2/3 w-px bg-darkSlate-400 mr-2" />
-                                              <Popover
-                                                content={() => (
+                                              <div class="bg-darkSlate-400 mr-2 h-2/3 w-px" />
+                                              <Popover>
+                                                <PopoverTrigger>
+                                                  <div class="text-sm underline">
+                                                    <Trans
+                                                      key="settings:used_in_counted_profiles"
+                                                      options={{
+                                                        count:
+                                                          usedInNProfiles()
+                                                            .length
+                                                      }}
+                                                    />
+                                                  </div>
+                                                </PopoverTrigger>
+                                                <PopoverContent>
                                                   <div class="p-4">
                                                     <h3>
                                                       <Trans key="settings:used_in_the_following_profiles" />
@@ -348,32 +389,27 @@ const Java = () => {
                                                       </For>
                                                     </ul>
                                                   </div>
-                                                )}
-                                              >
-                                                <div class="text-sm underline">
-                                                  <Trans
-                                                    key="settings:used_in_counted_profiles"
-                                                    options={{
-                                                      count:
-                                                        usedInNProfiles().length
-                                                    }}
-                                                  />
-                                                </div>
+                                                </PopoverContent>
                                               </Popover>
                                             </Show>
                                           </div>
                                         </div>
                                         <div class="flex justify-between">
-                                          <div class="flex-1 text-xs text-lightSlate-700 overflow-hidden whitespace-nowrap">
-                                            <Tooltip content={java.path}>
-                                              <TruncatedPath
-                                                originalPath={java.path}
-                                              />
+                                          <div class="text-lightSlate-700 flex-1 overflow-hidden whitespace-nowrap text-xs">
+                                            <Tooltip>
+                                              <TooltipTrigger>
+                                                <TruncatedPath
+                                                  originalPath={java.path}
+                                                />
+                                              </TooltipTrigger>
+                                              <TooltipContent>
+                                                {java.path}
+                                              </TooltipContent>
                                             </Tooltip>
                                           </div>
                                         </div>
                                       </div>
-                                      <div class="flex items-center ml-2">
+                                      <div class="ml-2 flex items-center">
                                         <Show
                                           when={
                                             java.type === "custom" ||
@@ -381,7 +417,7 @@ const Java = () => {
                                           }
                                         >
                                           <div
-                                            class="text-lightSlate-700 hover:text-red-400 ease-in-out duration-100 text-lg transition-color i-ri:delete-bin-7-fill"
+                                            class="text-lightSlate-700 transition-color i-ri:delete-bin-7-fill text-lg duration-100 ease-in-out hover:text-red-400"
                                             onClick={() =>
                                               deleteJavaMutation.mutate(java.id)
                                             }
@@ -406,15 +442,15 @@ const Java = () => {
                 </div>
               </TabPanel>
               <TabPanel>
-                <div class="h-full p-4 flex flex-col gap-4 min-h-96">
-                  <div class="flex justify-between items-center mb-4">
+                <div class="flex h-full min-h-96 flex-col gap-4 p-4">
+                  <div class="mb-4 flex items-center justify-between">
                     <h2 class="m-0 text-sm font-normal">
                       <Trans key="java.profiles_description_text" />
                     </h2>
                   </div>
                   <For each={javaProfiles()}>
                     {(profiles, i) => (
-                      <div class="rounded-xl border-1 border-solid border-darkSlate-600">
+                      <div class="border-1 border-darkSlate-600 rounded-xl border-solid">
                         <div class="flex items-center justify-between px-4">
                           <h3>
                             <Switch>
@@ -436,7 +472,7 @@ const Java = () => {
                                 })
                               }}
                             >
-                              <div class="text-xl i-ri:add-fill" />
+                              <div class="i-ri:add-fill text-xl" />
                             </Button>
                           </Show>
                         </div>
@@ -447,8 +483,8 @@ const Java = () => {
                             )?.id
 
                             return (
-                              <div class="px-4 py-2 flex justify-between items-center hover:bg-darkSlate-600">
-                                <h3 class="m-0 text-lightSlate-700 text-sm">
+                              <div class="hover:bg-darkSlate-600 flex items-center justify-between px-4 py-2">
+                                <h3 class="text-lightSlate-700 m-0 text-sm">
                                   {profile.name}
                                 </h3>
                                 <div class="m-0 flex items-center gap-4">
@@ -473,20 +509,23 @@ const Java = () => {
                                   />
                                   <Show when={i() === 1}>
                                     <div
-                                      class="text-lightSlate-700 hover:text-red-400 ease-in-out duration-100 text-lg transition-color i-ri:delete-bin-7-fill"
+                                      class="text-lightSlate-700 transition-color i-ri:delete-bin-7-fill text-lg duration-100 ease-in-out hover:text-red-400"
                                       onClick={() => {
                                         deleteProfile.mutate(profile.name)
                                       }}
                                     />
                                   </Show>
                                   <Show when={profile.isSystem}>
-                                    <Popover
-                                      content={() => (
-                                        <div class="p-4 flex flex-col gap-8 max-w-100 h-auto">
+                                    <Popover>
+                                      <PopoverTrigger>
+                                        <div class="i-ri:information-fill text-lightSlate-700 hover:text-lightSlate-100 transition-color text-lg duration-100 ease-in-out" />
+                                      </PopoverTrigger>
+                                      <PopoverContent>
+                                        <div class="max-w-100 flex h-auto flex-col gap-8 p-4">
                                           <div>
                                             <Trans key="settings:profile_used_in_mc_versions" />
                                           </div>
-                                          <div class="p-4 flex flex-wrap items-start justify-start content-start gap-4 overflow-y-auto h-70">
+                                          <div class="h-70 flex flex-wrap content-start items-start justify-start gap-4 overflow-y-auto p-4">
                                             <For
                                               each={
                                                 profileAssignments.data?.[
@@ -502,9 +541,7 @@ const Java = () => {
                                             </For>
                                           </div>
                                         </div>
-                                      )}
-                                    >
-                                      <div class="i-ri:information-fill text-lg text-lightSlate-700 hover:text-lightSlate-100 ease-in-out duration-100 transition-color" />
+                                      </PopoverContent>
                                     </Popover>
                                   </Show>
                                 </div>

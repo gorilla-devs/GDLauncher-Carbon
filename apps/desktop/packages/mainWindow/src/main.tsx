@@ -5,6 +5,7 @@ import {
   createResource,
   createSignal,
   ErrorBoundary,
+  JSX,
   Match,
   Show,
   Switch
@@ -16,14 +17,40 @@ import App from "@/app"
 import { ModalProvider } from "@/managers/ModalsManager"
 import "virtual:uno.css"
 import "@gd/ui/style.css"
-import { ContextMenuProvider, NotificationsProvider } from "@gd/ui"
+import { ContextMenuProvider, Progress, Toaster } from "@gd/ui"
+import "@unocss/reset/tailwind.css"
 import { NavigationManager } from "./managers/NavigationManager"
 // import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
 import RiveAppWapper from "./utils/RiveAppWrapper"
 import GDAnimation from "./gd_logo_animation.riv"
 import { GlobalStoreProvider } from "./components/GlobalStoreContext"
+import PatternBackground from "./components/PatternBackground"
+import gdlauncherLogo from "/assets/images/gdlauncher_wide_logo_blue.svg"
+
+const ProdWrapErrorBoundary = (props: { children: JSX.Element }) => {
+  return (
+    <Switch>
+      <Match when={!import.meta.env.DEV}>
+        <ErrorBoundary
+          fallback={(err) => {
+            console.error("Window errored", err)
+            window.fatalError(err, "Window")
+            return <></>
+          }}
+        >
+          {props.children}
+        </ErrorBoundary>
+      </Match>
+      <Match when={import.meta.env.DEV}>{props.children}</Match>
+    </Switch>
+  )
+}
 
 render(() => {
+  const [coreModuleProgress, setCoreModuleProgress] = createSignal<
+    number | undefined
+  >(undefined)
+
   const [coreModuleLoaded] = createResource(async () => {
     let port
     try {
@@ -59,6 +86,35 @@ render(() => {
     return port
   })
 
+  window.listenToCoreModuleProgress((_, progress) => {
+    const startProgress = coreModuleProgress() ?? 0
+    const endProgress = progress
+    const duration = 300
+    const startTime = Date.now()
+
+    const easeOutCubic = (x: number): number => {
+      return 1 - Math.pow(1 - x, 3)
+    }
+
+    const animate = () => {
+      const currentTime = Date.now()
+      const elapsed = currentTime - startTime
+      const progress = Math.min(elapsed / duration, 1)
+
+      if (progress < 1) {
+        const easedProgress = easeOutCubic(progress)
+        const currentValue =
+          startProgress + (endProgress - startProgress) * easedProgress
+        setCoreModuleProgress(currentValue)
+        requestAnimationFrame(animate)
+      } else {
+        setCoreModuleProgress(endProgress)
+      }
+    }
+
+    requestAnimationFrame(animate)
+  })
+
   const startTime = Date.now()
 
   const [isReady, setIsReady] = createSignal(false)
@@ -69,44 +125,72 @@ render(() => {
   createEffect(() => {
     if (!isIntroAnimationFinished()) return
 
-    setIsReady(coreModuleLoaded.state === "ready")
+    const minLoadingTime = 2500
+    const timeElapsed = Date.now() - startTime
+
+    // DEV ONLY
+    if (import.meta.env.DEV && coreModuleLoaded.state === "ready") {
+      setIsReady(true)
+    }
+
+    if (coreModuleLoaded.state === "ready" && timeElapsed >= minLoadingTime) {
+      setIsReady(true)
+    } else if (coreModuleLoaded.state === "ready") {
+      setTimeout(() => {
+        setIsReady(true)
+      }, minLoadingTime - timeElapsed)
+    }
   })
 
   return (
-    <ErrorBoundary
-      fallback={(err) => {
-        console.error("Window errored", err)
-
-        window.fatalError(err, "Window")
-
-        return <></>
-      }}
-    >
+    <ProdWrapErrorBoundary>
       <Switch>
         <Match when={isIntroAnimationFinished()}>
           <Switch>
             <Match when={isReady()}>
-              <NotificationsProvider>
-                <InnerApp port={coreModuleLoaded() as unknown as number} />
-              </NotificationsProvider>
+              <InnerApp port={coreModuleLoaded() as unknown as number} />
+              <Toaster />
             </Match>
             <Match when={!isReady()}>
-              <div class="flex flex-col gap-8 justify-center items-center h-screen w-screen">
-                <Show when={Date.now() - startTime > 5000}>
-                  <div class="text-xl">
-                    {
-                      // Hardcoded because we don't know the language at this point
-                      "App initialization is taking longer than expected. Please wait for up to 2 minutes."
-                    }
+              <PatternBackground>
+                <div class="flex h-screen w-screen flex-col items-center justify-center gap-8">
+                  <Show when={Date.now() - startTime > 5000}>
+                    <div class="text-xl">
+                      {
+                        // Hardcoded because we don't know the language at this point
+                        "App initialization is taking longer than expected. Please wait for up to 2 minutes."
+                      }
+                    </div>
+                  </Show>
+
+                  <div class="overflow-visible">
+                    <img
+                      src={gdlauncherLogo}
+                      class="animate-logoReveal opacity-0"
+                      style={{ "animation-delay": "1000ms" }}
+                    />
                   </div>
-                </Show>
-                <div class="animate-spin rounded-full h-12 w-12 bg-blue-500 i-ri:loader-4-line" />
-              </div>
+
+                  <div class="i-ri:loader-4-line h-12 w-12 animate-spin rounded-full bg-blue-500" />
+
+                  <div
+                    class="w-1/3 transition-opacity duration-300"
+                    classList={{
+                      "opacity-0": coreModuleProgress() === undefined
+                    }}
+                  >
+                    <Progress
+                      color="bg-blue-500"
+                      value={coreModuleProgress() ?? 0}
+                    />
+                  </div>
+                </div>
+              </PatternBackground>
             </Match>
           </Switch>
         </Match>
         <Match when={!isIntroAnimationFinished()}>
-          <div class="w-full flex justify-center items-center h-screen">
+          <div class="flex h-screen w-full items-center justify-center">
             <RiveAppWapper
               src={GDAnimation}
               onStop={() => {
@@ -116,7 +200,7 @@ render(() => {
           </div>
         </Match>
       </Switch>
-    </ErrorBoundary>
+    </ProdWrapErrorBoundary>
   )
 }, document.getElementById("root")!)
 
@@ -173,36 +257,55 @@ const TransWrapper = (props: TransWrapperProps) => {
     queryKey: ["settings.getSettings"]
   }))
 
-  createEffect(async () => {
+  createEffect((prevLanguage) => {
     if (settings.isSuccess) {
       const { language } = settings.data
+
       if (!_i18nInstance.isInitialized) {
-        let maybeEnglish = null
-        if (language !== "english") {
-          maybeEnglish = await loadLanguageFiles("english")
+        const currentLanguage = language
+
+        const initI18n = async () => {
+          let maybeEnglish = null
+          if (currentLanguage !== "english") {
+            maybeEnglish = await loadLanguageFiles("english")
+          }
+
+          // Check if language hasn't changed during async load
+          if (settings.data.language !== currentLanguage) {
+            return
+          }
+
+          const defaultNamespacesMap = await loadLanguageFiles(currentLanguage)
+
+          // Check again after second async load
+          if (settings.data.language !== currentLanguage) {
+            return
+          }
+
+          await _i18nInstance.init({
+            ns: Object.keys(defaultNamespacesMap),
+            defaultNS: "common",
+            lng: currentLanguage,
+            fallbackLng: "english",
+            resources: {
+              [currentLanguage]: defaultNamespacesMap,
+              ...(maybeEnglish && { english: maybeEnglish })
+            },
+            partialBundledLanguages: true,
+            debug: true
+          })
+
+          setIsI18nReady(true)
         }
 
-        const defaultNamespacesMap = await loadLanguageFiles(language)
-
-        await _i18nInstance.init({
-          ns: Object.keys(defaultNamespacesMap),
-          defaultNS: "common",
-          lng: language,
-          fallbackLng: "english",
-          resources: {
-            [language]: defaultNamespacesMap,
-            ...(maybeEnglish && { english: maybeEnglish })
-          },
-          partialBundledLanguages: true,
-          debug: true
-        })
-
-        setIsI18nReady(true)
-
-        return
+        initI18n()
       }
+
+      return language
     }
-  })
+
+    return prevLanguage
+  }, undefined)
 
   createEffect(() => {
     const root = document.getElementById("root")

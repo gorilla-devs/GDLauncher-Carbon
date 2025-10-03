@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createSignal } from "solid-js"
+import { Show, createEffect, createSignal, createMemo } from "solid-js"
 import {
   CFFEModAuthor,
   FEModResponse,
@@ -7,6 +7,8 @@ import {
   MRFETeamResponse
 } from "@gd/core_module/bindings"
 import { rspc } from "@/utils/rspcClient"
+import AuthorAvatars, { Author } from "@/components/AuthorAvatars"
+import { AuthorsSkeleton } from "@gd/ui"
 
 interface Props {
   modpackDetails: FEModResponse | MRFEProject | undefined
@@ -16,22 +18,41 @@ interface Props {
 
 const Authors = (props: Props) => {
   const [authors, setAuthors] = createSignal<MRFETeamResponse>([])
+  const [isLoading, setIsLoading] = createSignal(false)
   const rspcContext = rspc.useContext()
 
-  createEffect(async () => {
+  createEffect((prevTeamId) => {
     if (
       props.modpackDetails &&
       props.isModrinth &&
       (props.modpackDetails as MRFEProject)?.team
     ) {
-      const modrinthAuthorsQuery = await rspcContext.client.query([
-        "modplatforms.modrinth.getTeam",
-        (props.modpackDetails as MRFEProject)?.team
-      ])
+      const currentTeamId = (props.modpackDetails as MRFEProject)?.team
 
-      if (modrinthAuthorsQuery) setAuthors(modrinthAuthorsQuery)
+      setIsLoading(true)
+
+      rspcContext.client.query([
+        "modplatforms.modrinth.getTeam",
+        currentTeamId
+      ]).then((modrinthAuthorsQuery) => {
+        // Check if team hasn't changed during async operation
+        const currentTeam = props.isModrinth && props.modpackDetails
+          ? (props.modpackDetails as MRFEProject)?.team
+          : undefined
+
+        if (currentTeam === currentTeamId && modrinthAuthorsQuery) {
+          setAuthors(modrinthAuthorsQuery)
+        }
+        setIsLoading(false)
+      }).catch(() => {
+        setIsLoading(false)
+      })
+
+      return currentTeamId
     }
-  })
+
+    return prevTeamId
+  }, undefined)
 
   const getAuthors = () => {
     if (props.isCurseforge && props.modpackDetails) {
@@ -42,20 +63,41 @@ const Authors = (props: Props) => {
     return []
   }
 
+  const normalizedAuthors = createMemo((): Author[] => {
+    const rawAuthors = getAuthors()
+    if (!rawAuthors) return []
+
+    if (props.isCurseforge) {
+      return (rawAuthors as CFFEModAuthor[]).map((author) => ({
+        name: author.name,
+        avatarUrl: author.avatarUrl,
+        url: author.url,
+        id: author.id,
+        platform: "curseforge" as const
+      }))
+    } else if (props.isModrinth) {
+      return (rawAuthors as MRFETeamMember[]).map((member) => ({
+        name: member.user.name || member.user.username,
+        avatarUrl: member.user.avatar_url,
+        role: member.role,
+        id: member.user.id,
+        platform: "modrinth" as const
+      }))
+    }
+
+    return []
+  })
+
   return (
-    <Show when={getAuthors()?.length > 0}>
-      <div class="flex gap-2 items-center">
-        <div class="i-ri:user-fill" />
-        <For each={getAuthors()}>
-          {(author) => (
-            <p class="m-0">
-              {props.isCurseforge
-                ? (author as CFFEModAuthor).name
-                : (author as MRFETeamMember).user.username}
-            </p>
-          )}
-        </For>
-      </div>
+    <Show
+      when={!isLoading() && normalizedAuthors().length > 0}
+      fallback={
+        <Show when={isLoading()}>
+          <AuthorsSkeleton count={3} size="md" />
+        </Show>
+      }
+    >
+      <AuthorAvatars authors={normalizedAuthors()} maxDisplay={4} />
     </Show>
   )
 }

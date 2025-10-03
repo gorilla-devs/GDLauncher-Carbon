@@ -1,6 +1,6 @@
 use super::UpdateValue;
-use crate::managers::instance::modpack::packinfo::PackInfo;
 use crate::managers::App;
+use crate::managers::instance::modpack::packinfo::PackInfo;
 use anyhow::Context;
 use carbon_net::{DownloadOptions, Downloadable, Progress};
 use carbon_platforms::modrinth::version::{ModpackIndex, ModrinthEnvironmentSupport, VersionFile};

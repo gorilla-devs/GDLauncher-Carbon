@@ -1,4 +1,10 @@
-import { Button, LoadingBar, Popover } from "@gd/ui"
+import {
+  Button,
+  Progress,
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from "@gd/ui"
 import {
   createEffect,
   createSignal,
@@ -10,7 +16,7 @@ import {
 import { msToMinutes, msToSeconds, parseTwoDigitNumber } from "@/utils/helpers"
 import { Setter } from "solid-js"
 import { DeviceCode } from "@/components/CodeInput"
-import { createNotification } from "@gd/ui"
+import { toast } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
 import { DeviceCodeObjectType } from "."
@@ -116,23 +122,17 @@ const CodeStep = (props: Props) => {
     if (isCodeExpired) {
       handleRefersh()
     } else if (typeof error === "string") {
-      addNotification({
-        name: "Authentication Error",
-        content: t(`error.${error}`),
-        type: "error"
+      toast.error("Authentication Error", {
+        description: t(`error.${error}`)
       })
     } else {
       if (typeof error.xboxAccount === "string")
-        addNotification({
-          name: "Authentication Error",
-          content: t(`error.xbox_${error.xboxAccount}`),
-          type: "error"
+        toast.error("Authentication Error", {
+          description: t(`error.xbox_${error.xboxAccount}`)
         })
       else {
-        addNotification({
-          name: "Authentication Error",
-          content: `${t("error.xbox_code")} ${error.xboxAccount.unknown}`,
-          type: "error"
+        toast.error("Authentication Error", {
+          description: `${t("error.xbox_code")} ${error.xboxAccount.unknown}`
         })
       }
     }
@@ -148,48 +148,43 @@ const CodeStep = (props: Props) => {
 
   onCleanup(() => clearInterval(interval))
 
-  const addNotification = createNotification()
-
   return (
-    <div class="relative flex flex-col justify-between items-center text-center">
+    <div class="relative flex flex-col items-center justify-between text-center">
       <GateAnimationRiveWrapper width={80} height={80} src={GateAnimation} />
-      <div class="absolute top-4 right-4">
-        <Popover
-          noTip
-          content={() => (
-            <div class="px-4 max-w-100 pb-6 text-sm">
+      <div class="absolute right-4 top-4">
+        <Popover>
+          <PopoverTrigger>
+            <div class="text-lightSlate-700 hover:text-lightSlate-50 transition-color flex items-center text-sm duration-75">
+              <div>
+                <Trans key="login.need_help" />
+              </div>
+              <div class="i-ri:question-fill ml-2 h-4 w-4" />
+            </div>
+          </PopoverTrigger>
+          <PopoverContent>
+            <div class="max-w-100 px-4 pb-6 text-sm">
               <h3>
                 <Trans key="login.troubles_logging_in" />
               </h3>
-              <div class="text-sm pb-8">
+              <div class="pb-8 text-sm">
                 <Trans key="login.link_not_working_help" />
               </div>
               <div
-                class="text-lightSlate-600 flex gap-2 items-center hover:text-lightSlate-50"
+                class="text-lightSlate-600 hover:text-lightSlate-50 flex items-center gap-2"
                 onClick={() => {
                   navigator.clipboard.writeText(deviceCodeLink()!)
-                  addNotification({
-                    name: "The link has been copied",
-                    type: "success"
-                  })
+                  toast.success("The link has been copied")
                 }}
               >
-                <div class="w-4 h-4 i-ri:link" />
+                <div class="i-ri:link h-4 w-4" />
                 <div>{deviceCodeLink()}</div>
               </div>
             </div>
-          )}
-        >
-          <div class="flex items-center text-lightSlate-700 hover:text-lightSlate-50 transition-color duration-75 text-sm">
-            <div>
-              <Trans key="login.need_help" />
-            </div>
-            <div class="ml-2 w-4 h-4 i-ri:question-fill" />
-          </div>
+          </PopoverContent>
         </Popover>
       </div>
       <div>
-        <div class="flex flex-col justify-center items-center">
+        <div class="flex flex-col items-center justify-center">
           <DeviceCode
             expired={expired()}
             value={userCode() || ""}
@@ -197,31 +192,32 @@ const CodeStep = (props: Props) => {
             handleRefresh={handleRefersh}
           />
           <Show when={expired()}>
-            <p class="text-red-500 text-sm">
+            <p class="text-sm text-red-500">
               <Trans key="login.code_expired_message" />
             </p>
           </Show>
         </div>
         <Show when={!expired()}>
-          <p class="text-lightSlate-700 text-sm">
+          <p class="text-lightSlate-700 text-sm mt-2">
             <span class="text-lightSlate-500 mr-1">{countDown()}</span>
             <Trans key="login.before_expiring" />
           </p>
         </Show>
       </div>
       <Show when={error()}>
-        <p class="text-red-500 m-0">{error()}</p>
+        <p class="m-0 text-red-500">{error()}</p>
       </Show>
       <div
-        class="flex flex-col justify-center items-center"
+        class="flex flex-col items-center justify-center"
         classList={{ "opacity-0": expired() }}
       >
         <p class="text-lightSlate-700 font-bold">
           <Trans key="login.enter_code_in_browser" />
         </p>
         <Button
+          uppercase
           id="login-btn"
-          class="normal-case"
+          class="mt-12 normal-case"
           onClick={() => {
             setLoading(true)
             navigator.clipboard.writeText(userCode() || "")
@@ -247,7 +243,7 @@ const CodeStep = (props: Props) => {
         </p>
       </div>
       <div class="flex flex-col gap-2" classList={{ "opacity-0": !loading() }}>
-        <span class="text-xs text-lightSlate-700">
+        <span class="text-lightSlate-700 text-xs">
           <Switch>
             <Match when={(routeData.status.data as any)?.pollingCode}>
               <Trans key="login.polling_microsoft_auth" />
@@ -266,7 +262,7 @@ const CodeStep = (props: Props) => {
             </Match>
           </Switch>
         </span>
-        <LoadingBar />
+        <Progress />
       </div>
     </div>
   )

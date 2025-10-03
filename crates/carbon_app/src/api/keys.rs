@@ -55,6 +55,7 @@ keys! {
         SAVE_GDL_ACCOUNT                            = "saveGdlAccount";
         REQUEST_GDL_ACCOUNT_DELETION                = "requestGdlAccountDeletion";
         CHANGE_GDL_ACCOUNT_NICKNAME                 = "changeGdlAccountNickname";
+        UPLOAD_PROFILE_ICON                         = "uploadProfileIcon";
     }
 
     java {
@@ -100,10 +101,12 @@ keys! {
         SET_FAVORITE                                = "setFavorite";
         INSTANCE_DETAILS                            = "getInstanceDetails";
         INSTANCE_MODS                               = "getInstanceMods";
+        PRIORITIZE_INSTANCE_CACHE                   = "prioritizeInstanceCache";
         PREPARE_INSTANCE                            = "prepareInstance";
         LAUNCH_INSTANCE                             = "launchInstance";
         KILL_INSTANCE                               = "killInstance";
         GET_LOGS                                    = "getLogs";
+        SEARCH_LOGS                                 = "searchLogs";
         DELETE_LOG                                  = "deleteLog";
         OPEN_INSTANCE_FOLDER                        = "openInstanceFolder";
         ENABLE_MOD                                  = "enableMod";
@@ -149,8 +152,6 @@ keys! {
     }
 
     modplatforms {
-        CURSEFORGE_GET_MODLOADERS                   = "curseforge.getModloaders";
-        CURSEFORGE_GET_CATEGORIES                   = "curseforge.getCategories";
         CURSEFORGE_SEARCH                           = "curseforge.search";
         CURSEFORGE_GET_MOD                          = "curseforge.getMod";
         CURSEFORGE_GET_MODS                         = "curseforge.getMods";
@@ -159,9 +160,6 @@ keys! {
         CURSEFORGE_GET_MOD_FILES                    = "curseforge.getModFiles";
         CURSEFORGE_GET_FILES                        = "curseforge.getFiles";
         CURSEFORGE_GET_MOD_FILE_CHANGELOG           = "curseforge.getModFileChangelog";
-
-        MODRINTH_GET_LOADERS                        = "modrinth.getLoaders";
-        MODRINTH_GET_CATEGORIES                     = "modrinth.getCategories";
         MODRINTH_SEARCH                             = "modrinth.search";
         MODRINTH_GET_PROJECT                        = "modrinth.getProject";
         MODRINTH_GET_PROJECTS                       = "modrinth.getProjects";
@@ -172,5 +170,10 @@ keys! {
         MODRINTH_GET_TEAM                           = "modrinth.getTeam";
 
         UNIFIED_SEARCH                              = "unifiedSearch";
+        UNIFIED_GET_PROJECT                         = "unifiedGetProject";
+        UNIFIED_GET_PROJECT_VERSIONS                = "unifiedGetProjectVersions";
+        UNIFIED_SEARCH_PROJECT_TYPE                 = "unifiedSearchProjectType";
+        GET_UNIFIED_CATEGORIES                      = "getUnifiedCategories";
+        GET_UNIFIED_MODLOADERS                      = "getUnifiedModloaders";
     }
 }

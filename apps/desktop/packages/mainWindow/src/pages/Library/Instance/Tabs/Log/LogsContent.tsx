@@ -1,6 +1,6 @@
-import { createSignal, Match, Show, Switch } from "solid-js"
+import { createSignal, For, Match, Show, Switch } from "solid-js"
 
-import { isFullScreen, setIsFullScreen } from "."
+import { isFullScreen, LogQuery, setIsFullScreen } from "."
 import { LogEntry, LogEntryLevel, LogEntrySourceKind } from "@/utils/logs"
 import formatDateTime from "./formatDateTime"
 import FullscreenToggle from "./components/FullscreenToggle"
@@ -9,9 +9,17 @@ import { Trans } from "@gd/i18n"
 import { Button } from "@gd/ui"
 import { VList } from "@/components/VirtuaWrapper"
 import { VirtualizerHandle } from "virtua/lib/solid"
+import { SetStoreFunction } from "solid-js/store"
+import LogsFinders from "./LogsFinders"
+import { FESearchResult } from "@gd/core_module/bindings"
+import useKeyboardShortcut from "@/hooks/useKeyboardShortcut"
+import { ScrollToIndexOpts } from "virtua/lib/core"
 
 interface Props {
   logs: LogEntry[]
+  query: LogQuery
+  setQuery: SetStoreFunction<LogQuery>
+  logSearchResults: FESearchResult[] | undefined
   isActive: boolean
   isLoading: boolean
   scrollToBottom: () => void
@@ -22,6 +30,8 @@ interface Props {
   newLogsCount: number
   autoFollowPreference: boolean
   setAutoFollowPreference: (_: boolean) => void
+  scrollToIndex: (index: number, opts: ScrollToIndexOpts) => void
+  isIndexLoaded: (index: number) => boolean
 }
 
 const color = {
@@ -132,6 +142,9 @@ function LevelFormatter(props: {
 }
 
 function ContentFormatter(props: {
+  relativeCurrentResultIndex: number | null
+  baseIndex: number | null
+  searchResults: FESearchResult[] | undefined
   level: LogEntryLevel
   sourceKind: LogEntrySourceKind
   message: string
@@ -158,7 +171,39 @@ function ContentFormatter(props: {
         "block w-full pt-2": props.startLogMessageOnNewLine
       }}
     >
-      {props.message}
+      {props.searchResults?.length ? (
+        <>
+          <For each={props.searchResults}>
+            {(result, i) => (
+              <>
+                {i() === 0 &&
+                  result.pos > 0 &&
+                  props.message.slice(0, result.pos)}
+                {i() > 0 &&
+                  props.message.slice(
+                    props.searchResults![i() - 1].pos +
+                      props.searchResults![i() - 1].len,
+                    result.pos
+                  )}
+                <span
+                  id={`finder-result-${(props.baseIndex ?? 0) + i()}`}
+                  class="bg-yellow-500/50"
+                  classList={{
+                    "outline outline-2 outline-yellow-500":
+                      props.relativeCurrentResultIndex === i()
+                  }}
+                >
+                  {props.message.slice(result.pos, result.pos + result.len)}
+                </span>
+                {i() === (props.searchResults?.length ?? 0) - 1 &&
+                  props.message.slice(result.pos + result.len)}
+              </>
+            )}
+          </For>
+        </>
+      ) : (
+        props.message
+      )}
     </span>
   )
 }
@@ -215,6 +260,7 @@ function ScrollBottomButton(props: {
 }
 
 const LogsContent = (props: Props) => {
+  const [open, setOpen] = createSignal(false)
   const [logsDensity, setLogsDensity] = createSignal<LogDensity>("low")
   const [columns, setColumns] = createSignal<Columns>({
     timestamp: true,
@@ -226,13 +272,48 @@ const LogsContent = (props: Props) => {
   const [fontMultiplier, setFontMultiplier] = createSignal<0 | 1 | 2>(1)
   const [startLogMessageOnNewLine, setStartLogMessageOnNewLine] =
     createSignal(false)
+  const [currentResultIndex, setCurrentResultIndex] = createSignal<
+    number | null
+  >(null)
+
+  let searchInputRef: HTMLInputElement | undefined
+
+  const setSearchInputRef = (ref: HTMLInputElement) => {
+    searchInputRef = ref
+  }
+
+  useKeyboardShortcut(
+    [navigator.platform.includes("Mac") ? "Meta" : "Control", "F"],
+    () => {
+      if (open() && searchInputRef) {
+        searchInputRef.focus()
+      } else {
+        setOpen(true)
+      }
+    }
+  )
+
+  useKeyboardShortcut(["Escape"], () => {
+    setOpen(false)
+  })
 
   return (
     <div class="border-darkSlate-700 border-l-solid relative flex min-w-0 flex-1 flex-col border">
       <div class="bg-darkSlate-800 box-border flex h-10 w-full shrink-0 items-center justify-between gap-4 px-4 py-8">
-        {/* <Input icon={<div class="i-ri:search-line" />} placeholder="Search" /> */}
         <div />
         <div class="flex items-center gap-4">
+          <LogsFinders
+            setSearchInputRef={setSearchInputRef}
+            open={open()}
+            setOpen={setOpen}
+            query={props.query}
+            setQuery={props.setQuery}
+            logSearchResults={props.logSearchResults}
+            currentResultIndex={currentResultIndex()}
+            setCurrentResultIndex={setCurrentResultIndex}
+            scrollToIndex={props.scrollToIndex}
+            isIndexLoaded={props.isIndexLoaded}
+          />
           <LogsOptions
             logsDensity={logsDensity()}
             setLogsDensity={setLogsDensity}
@@ -254,7 +335,9 @@ const LogsContent = (props: Props) => {
       <Show when={props.isActive}>
         <div class="z-1 bg-darkSlate-700 text-lightSlate-700 absolute right-6 top-20 flex h-10 w-fit items-center rounded-3xl px-4">
           <div class="animate-liveCirclePulse mr-2 h-3 w-3 rounded-full bg-red-400 text-red-400" />
-          <div>LIVE</div>
+          <div>
+            <Trans key="ui.live" />
+          </div>
         </div>
       </Show>
       <div
@@ -293,7 +376,36 @@ const LogsContent = (props: Props) => {
               onWheel={props.onScroll}
               overscan={10}
             >
-              {(log) => {
+              {(log, index) => {
+                const rowSearchResult = open()
+                  ? props.logSearchResults?.filter(
+                      (result) => result.entry_index === index()
+                    )
+                  : undefined
+
+                const baseIndex = props.logSearchResults?.findIndex(
+                  (result) => result.entry_index === index()
+                )
+
+                let relativeCurrentResultIndex = -1
+
+                const currResultIndex = currentResultIndex()
+
+                if (
+                  currResultIndex !== null &&
+                  props.logSearchResults?.[currResultIndex]?.entry_index ===
+                    index()
+                ) {
+                  // Find which result within this row matches the current global index
+                  const rowResultIndex = rowSearchResult?.findIndex(
+                    (result) =>
+                      result === props.logSearchResults?.[currResultIndex]
+                  )
+                  if (rowResultIndex !== undefined && rowResultIndex !== -1) {
+                    relativeCurrentResultIndex = rowResultIndex
+                  }
+                }
+
                 return (
                   <div
                     class="border-b-solid border-darkSlate-600 relative w-full break-words border-b"
@@ -303,6 +415,7 @@ const LogsContent = (props: Props) => {
                       "py-1": logsDensity() === "high"
                     }}
                   >
+                    <span>{index()}</span>
                     <Show when={columns().timestamp}>
                       <DateTimeFormatter
                         timestamp={log.timestamp}
@@ -343,6 +456,9 @@ const LogsContent = (props: Props) => {
                       />
                     </Show>
                     <ContentFormatter
+                      relativeCurrentResultIndex={relativeCurrentResultIndex}
+                      baseIndex={baseIndex ?? null}
+                      searchResults={rowSearchResult}
                       message={log.message}
                       level={log.level}
                       sourceKind={log.sourceKind}

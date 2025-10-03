@@ -1,14 +1,14 @@
 import { rspc } from "@/utils/rspcClient"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
-import { Button, Input, createNotification } from "@gd/ui"
-import { Trans } from "@gd/i18n"
+import { Button, Input, toast } from "@gd/ui"
+import { Trans, useTransContext } from "@gd/i18n"
 import { createSignal } from "solid-js"
 import JavaPathAutoComplete from "@/components/JavaPathAutoComplete"
 
 const JavaProfileCreationModal = (props: ModalProps) => {
   const modalsContext = useModal()
-  const notification = createNotification()
+  const [t] = useTransContext()
   const [profileName, setProfileName] = createSignal("")
   const [javaId, setJavaId] = createSignal("")
 
@@ -45,11 +45,13 @@ const JavaProfileCreationModal = (props: ModalProps) => {
           </h4>
           <Input
             disabled={createCustomJavaVersionMutation.isPending}
-            placeholder="Type a profile name"
+            placeholder={t("placeholders.type_profile_name")}
             value={profileName()}
             onInput={(e) => setProfileName(e.currentTarget.value)}
             errorMessage={
-              profileAlreadyExists() ? "Profile name already exists" : undefined
+              profileAlreadyExists()
+                ? t("errors.profile_name_exists")
+                : undefined
             }
           />
           <h4>
@@ -86,10 +88,7 @@ const JavaProfileCreationModal = (props: ModalProps) => {
                 javaId: javaId()
               })
 
-              notification({
-                name: "Profile created",
-                type: "success"
-              })
+              toast.success("Profile created")
 
               modalsContext?.closeModal()
             }}

@@ -11,7 +11,6 @@ type RouteData = CreateQueryResult<EnrollmentStatus | null, RSPCError>
 
 interface EventsCallbacks {
   onPolling?: (_info: DeviceCode) => void
-  // TODO: handle errors
   onFail?: (_error: EnrollmentError) => void
   onError?: (_error: RSPCError | null) => void
   onComplete?: (_accountEntry: AccountEntry) => void

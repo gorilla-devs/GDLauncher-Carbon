@@ -25,5 +25,8 @@ pub(crate) async fn get_runtime_path_override() -> PathBuf {
     fs::create_dir_all(&data_path)
         .expect(format!("Failed to create data directory: {:?}", data_path).as_str());
 
-    dunce::canonicalize(data_path).unwrap()
+    dunce::canonicalize(&data_path)
+        .unwrap_or_else(|e| {
+            panic!("Failed to canonicalize runtime path {:?}: {}. Please ensure the path exists and is accessible.", data_path, e)
+        })
 }

@@ -10,19 +10,17 @@ import Title from "@/pages/Settings/components/Title"
 import Row from "@/pages/Settings/components/Row"
 import RowsContainer from "@/pages/Settings/components/RowsContainer"
 import RightHandSide from "@/pages/Settings/components/RightHandSide"
-import { setInstanceId } from "@/utils/browser"
 import { useModal } from "@/managers/ModalsManager"
 import JavaPathAutoComplete from "@/components/JavaPathAutoComplete"
+import useSearchContext from "@/components/SearchInputContext"
 
 const Settings = () => {
   const [t] = useTransContext()
   const modalsContext = useModal()
+  const searchContext = useSearchContext()
   const params = useParams()
   const updateInstanceMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.updateInstance"],
-    onMutate: (newData: any) => {
-      queryClient.setQueryData(["instance.getInstanceDetails"], newData)
-    }
+    mutationKey: ["instance.updateInstance"]
   }))
 
   const getAllProfiles = rspc.createQuery(() => ({
@@ -102,50 +100,62 @@ const Settings = () => {
               <Button
                 type="outline"
                 onClick={() => {
-                  setInstanceId(parseInt(params.id, 10))
-                  modalsContext?.openModal(
-                    {
-                      name: "unlock_confirmation"
+                  searchContext?.setSelectedInstanceId(parseInt(params.id, 10))
+                  // modalsContext?.openModal(
+                  //   {
+                  //     name: "unlock_confirmation"
+                  //   },
+                  //   {
+                  //     instanceState: "unlock",
+                  //     instanceId: parseInt(params.id, 10)
+                  //   }
+                  // )
+                  updateInstanceMutation.mutate({
+                    modpackLocked: {
+                      Set: false
                     },
-                    { instanceState: "unlock" }
-                  )
+                    instance: parseInt(params.id, 10)
+                  })
                 }}
               >
-                <i class="w-5 h-5 i-ri:lock-fill" />
+                <i class="i-ri:lock-fill h-5 w-5" />
                 <Trans key="instance_settings.unlock" />
               </Button>
             </Show>
             <Show when={!routeData.instanceDetails.data?.modpack?.locked}>
               <div class="flex items-center gap-2">
-                <i class="w-5 h-5 i-ri:lock-unlock-fill" />
+                <i class="i-ri:lock-unlock-fill h-5 w-5" />
                 <Trans key="instance_settings.unlocked" />
               </div>
             </Show>
             <Button
               type="outline"
               onClick={() => {
-                setInstanceId(parseInt(params.id, 10))
+                searchContext?.setSelectedInstanceId(parseInt(params.id, 10))
                 modalsContext?.openModal(
                   {
                     name: "unpair_confirmation"
                   },
-                  { instanceState: "unpair" }
+                  {
+                    instanceState: "unpair",
+                    instanceId: parseInt(params.id, 10)
+                  }
                 )
               }}
             >
-              <i class="w-5 h-5 i-ri:git-branch-fill" />
+              <i class="i-ri:git-branch-fill h-5 w-5" />
               <Trans key="instance_settings.unpair" />
             </Button>
             <Button
               type="outline"
               onClick={() => {
-                setInstanceId(parseInt(params.id, 10))
+                searchContext?.setSelectedInstanceId(parseInt(params.id, 10))
                 modalsContext?.openModal({
                   name: "modpack_version_update"
                 })
               }}
             >
-              <i class="w-5 h-5 i-ri:arrow-left-right-fill" />
+              <i class="i-ri:arrow-left-right-fill h-5 w-5" />
               <Trans key="instance_settings.change_modpack_version" />
             </Button>
           </div>
@@ -198,11 +208,11 @@ const Settings = () => {
           options={[
             {
               value: "Path",
-              label: "Path"
+              label: t("ui.path")
             },
             {
               value: "Profile",
-              label: "Profile"
+              label: t("ui.profile")
             }
           ]}
         />
@@ -240,7 +250,7 @@ const Settings = () => {
               <Dropdown
                 class="min-w-100 max-w-2/3"
                 value={javaSelectedProfile()}
-                placeholder={"Select a java profile"}
+                placeholder={t("placeholders.select_java_profile")}
                 options={
                   getAllProfiles.data?.map((profile) => ({
                     key: profile.name,
@@ -364,7 +374,7 @@ const Settings = () => {
           routeData?.instanceDetails?.data?.extraJavaArgs !== undefined
         }
       >
-        <div class="flex w-full justify-between items-center -mt-8">
+        <div class="-mt-8 flex w-full items-center justify-between">
           <h5 class="text-lightSlate-700">
             <Trans key="instance_settings.prepend_global_java_args" />
           </h5>
@@ -380,7 +390,7 @@ const Settings = () => {
             }}
           />
         </div>
-        <div class="flex w-full gap-4 items-center">
+        <div class="flex w-full items-center gap-4">
           <Show when={routeData?.instanceDetails?.data?.globalJavaArgs}>
             {"{GLOBAL_JAVA_ARGS}"}
             <div>+</div>
@@ -407,7 +417,7 @@ const Settings = () => {
               })
             }}
           >
-            <i class="w-5 h-5 i-ri:arrow-go-back-fill" />
+            <i class="i-ri:arrow-go-back-fill h-5 w-5" />
           </Button>
           <Button
             rounded={false}
@@ -421,7 +431,7 @@ const Settings = () => {
               })
             }}
           >
-            <i class="w-5 h-5 i-ri:close-fill" />
+            <i class="i-ri:close-fill h-5 w-5" />
           </Button>
         </div>
       </Show>
@@ -454,7 +464,7 @@ const Settings = () => {
             placeholder={t("settings:resolution_presets")}
             options={[
               ...templateGameResolution(),
-              { label: "Custom", key: "custom" }
+              { label: t("ui.custom"), key: "custom" }
             ]}
             onChange={(option) => {
               let value: {

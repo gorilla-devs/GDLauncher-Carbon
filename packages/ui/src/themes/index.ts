@@ -97,3 +97,6 @@ export type { Theme }
 export { mainTheme } from "./main"
 export { pixelato } from "./pixelato"
 export { win95 } from "./win95"
+export { inferno } from "./inferno"
+export { aether } from "./aether"
+export { frost } from "./frost"

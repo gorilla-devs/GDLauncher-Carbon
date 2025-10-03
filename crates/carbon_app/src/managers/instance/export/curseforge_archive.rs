@@ -1,14 +1,14 @@
 use crate::{
     api::translation::Translation,
     domain::{
-        instance::{info::GameVersion, ExportEntry, InstanceId},
+        instance::{ExportEntry, InstanceId, info::GameVersion},
         vtask::VisualTaskId,
     },
     managers::{
-        instance::{export::ZipMode, InstanceType, InvalidInstanceIdError},
+        AppInner,
+        instance::{InstanceType, InvalidInstanceIdError, export::ZipMode},
         modplatforms::curseforge::convert_standard_version_to_cf_version,
         vtask::{TaskState, VisualTask},
-        AppInner,
     },
 };
 use anyhow::anyhow;
@@ -234,8 +234,8 @@ mod test {
     use zip::ZipArchive;
 
     use crate::{
-        domain::instance::{info, ExportEntry, InstanceId},
-        managers::instance::{export::ExportTarget, InstanceVersionSource},
+        domain::instance::{ExportEntry, InstanceId, info},
+        managers::instance::{InstanceVersionSource, export::ExportTarget},
     };
 
     #[traced_test]

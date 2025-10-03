@@ -1,5 +1,3 @@
-import { mcVersions } from "@/utils/mcVersion"
-import { supportedModloaders } from "@/utils/sidebar"
 import DefaultImg from "/assets/images/default-instance-img.png"
 import { McType } from "@gd/core_module/bindings"
 import { Trans } from "@gd/i18n"
@@ -10,6 +8,7 @@ import { createStore } from "solid-js/store"
 import { rspc } from "@/utils/rspcClient"
 import { useInfiniteVersionsQuery } from "../InfiniteScrollVersionsQueryWrapper"
 import { getInstanceImageUrl } from "@/utils/instances"
+import { useGlobalStore } from "../GlobalStoreContext"
 
 const mapTypeToColor = (type: McType) => {
   return (
@@ -37,7 +36,11 @@ interface Props {
 
 const ExploreVersionsNavbar = (props: Props) => {
   const [searchParams, _setSearchParams] = useSearchParams()
-  const instanceId = () => parseInt(searchParams.instanceId, 10)
+  const instanceId = () => {
+    const id = parseInt(searchParams.instanceId, 10)
+    return isNaN(id) ? undefined : id
+  }
+  const globalStore = useGlobalStore()
 
   const infiniteQuery = useInfiniteVersionsQuery()
 
@@ -56,32 +59,19 @@ const ExploreVersionsNavbar = (props: Props) => {
   }))
 
   const modloaders = () => {
-    let res: { label: string; key: string }[] = []
-
-    if (props.modplatform === "modrinth") {
-      const results = supportedModloaders[props.modplatform]
-      res = results
-        .filter((modloader) =>
-          modloader.supported_project_types.includes("modpack")
-        )
-        .map((v) => ({
-          label: v.name.toString(),
-          key: v.name.toString()
-        }))
-    } else if (props.modplatform === "curseforge") {
-      const results = supportedModloaders[props.modplatform]
-      res = results.map((v) => ({
+    const results = globalStore.modloaders.data
+    const coreModloaders =
+      results?.map((v) => ({
         label: v.toString(),
         key: v.toString()
-      }))
-    }
+      })) || []
 
     return [
       {
         label: "Select a modloader",
         key: ""
       }
-    ].concat(res)
+    ].concat(coreModloaders)
   }
 
   const filteredGameVersions = createMemo(() => {
@@ -89,7 +79,7 @@ const ExploreVersionsNavbar = (props: Props) => {
     const oldAlpha = gameVersionFilters.oldAlpha
     const oldBeta = gameVersionFilters.oldBeta
 
-    return mcVersions().filter(
+    return globalStore.minecraftVersions.data?.filter(
       (item) =>
         item.type === "release" ||
         (item.type === "snapshot" && snapshot) ||
@@ -110,9 +100,9 @@ const ExploreVersionsNavbar = (props: Props) => {
 
     return [
       allVersionsLabel,
-      ...filteredGameVersions().map((item) => ({
+      ...(filteredGameVersions() || []).map((item) => ({
         label: (
-          <div class="flex justify-between w-full">
+          <div class="flex w-full justify-between">
             <span>{item.id}</span>
             {mapTypeToColor(item.type)}
           </div>
@@ -123,12 +113,12 @@ const ExploreVersionsNavbar = (props: Props) => {
   }
 
   return (
-    <div class="w-full flex gap-4 h-12 my-4">
+    <div class="mb-4 flex h-12 w-full gap-4">
       <Switch>
         <Match when={!isNaN(instanceId())}>
           <div class="flex gap-2">
             <div
-              class="h-full flex-1 w-12"
+              class="h-full w-12 flex-1"
               style={{
                 "background-image": instanceDetails.data?.iconRevision
                   ? `url("${getInstanceImageUrl(
@@ -143,7 +133,7 @@ const ExploreVersionsNavbar = (props: Props) => {
             />
             <div class="flex flex-col justify-between">
               <div>{instanceDetails.data?.name}</div>
-              <div class="flex text-lightSlate-700 gap-2">
+              <div class="text-lightSlate-700 flex gap-2">
                 <Checkbox
                   checked={overrideEnabled()}
                   onChange={setOverrideEnabled}
@@ -156,7 +146,7 @@ const ExploreVersionsNavbar = (props: Props) => {
         <Match
           when={props.type === "mod" && (!instanceId || isNaN(instanceId()))}
         >
-          <div class="flex items-center text-lightSlate-700">
+          <div class="text-lightSlate-700 flex items-center">
             <Trans key="rowcontainer.no_instance_selected" />
           </div>
         </Match>

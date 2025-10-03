@@ -13,7 +13,7 @@ function Row(props: Props) {
   return (
     <div
       class={
-        "flex justify-between items-center " +
+        "py-6 flex justify-between items-center " +
           (props.forceContentBelow ? " flex-col items-stretch " : "") +
           props.class || ""
       }

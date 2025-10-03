@@ -51,4 +51,46 @@ pub enum Translation {
     InstanceExportCacheMods,
     InstanceExportCalculateSize,
     InstanceExportCreatingBundle,
+    CacheTaskLocal {
+        instance_name: String,
+    },
+    CacheTaskCurseForge {
+        instance_name: String,
+    },
+    CacheTaskModrinth {
+        instance_name: String,
+    },
+    CacheSubtaskScanningFiles,
+    CacheSubtaskQueryingPlatform {
+        platform: String,
+    },
+    CacheSubtaskDownloadingImages,
+    CacheSubtaskFinalizingCache,
+    CacheStatusTitle,
+    CacheStatusNoActiveTasks,
+    CacheStatusIdle,
+    CacheStatusRunning,
+    CacheStatusFailed,
+    CacheStatusActiveTasks {
+        count: u32,
+    },
+    CacheStatusActiveCount {
+        count: u32,
+    },
+    CacheStatusOperationsInfo,
+    CacheErrorGeneric,
+    CacheSubtaskScanningDirectories,
+    CacheSubtaskQueryingPlatformDatabase {
+        platform: String,
+    },
+    CacheSubtaskDownloadingThumbnails,
+    CacheSubtaskProcessingFiles,
+    CacheProgressDirectories {
+        current: u32,
+        total: u32,
+    },
+    CacheProgressFiles {
+        current: u32,
+        total: u32,
+    },
 }

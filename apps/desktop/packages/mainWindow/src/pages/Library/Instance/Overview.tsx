@@ -13,7 +13,7 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 const Overview = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData()
   const params = useParams()
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const [t] = useTransContext()
 
   const modpackPlatform = () =>
@@ -66,7 +66,7 @@ const Overview = () => {
         <Show
           when={
             routeData.instanceMods &&
-            (routeData.instanceDetails.data?.modloaders.length || 0) > 0
+            (routeData.instanceDetails.data?.modloaders?.length || 0) > 0
           }
         >
           <Card
@@ -170,16 +170,12 @@ const Overview = () => {
                     type="primary"
                     onClick={() => {
                       if (modpackPlatform() === "curseforge") {
-                        navigate(
-                          `/modpacks/${modpackProjectId()}/curseforge?instanceId=${
-                            params.id
-                          }`
+                        navigator.navigate(
+                          `/addon/${modpackProjectId()}/curseforge`
                         )
                       } else if (modpackPlatform() === "modrinth") {
-                        navigate(
-                          `/modpacks/${modpackProjectId()}/modrith?instanceId=${
-                            params.id
-                          }`
+                        navigator.navigate(
+                          `/addon/${modpackProjectId()}/modrinth`
                         )
                       }
                     }}

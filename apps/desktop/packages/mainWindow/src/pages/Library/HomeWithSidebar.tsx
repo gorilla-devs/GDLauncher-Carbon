@@ -1,48 +1,8 @@
-import { Carousel, News, Skeleton } from "@gd/ui"
-import { For, Match, Show, Suspense, Switch, createResource } from "solid-js"
-import { Trans, useTransContext } from "@gd/i18n"
-import InstanceTile from "@/components/InstanceTile"
-import skull from "/assets/images/icons/skull.png"
-import DefaultImg from "/assets/images/default-instance-img.png"
-import UnstableCard from "@/components/UnstableCard"
-import FeaturedModpackTile from "./FeaturedModpackTile"
-import { initNews } from "@/utils/news"
-import { useGlobalStore } from "@/components/GlobalStoreContext"
-
 const HomeWithSidebar = () => {
-  const [t] = useTransContext()
-  const routeData = useGlobalStore()
-
-  const newsInitializer = initNews()
-
-  const [news] = createResource(() => newsInitializer)
-
   return (
     <div>
-      <div class="overflow-hidden">
+      {/* <div class="overflow-hidden">
         <UnstableCard />
-        <Show when={routeData.settings.data?.showNews}>
-          <div class="flex gap-4">
-            <div class="flex-1 flex-grow">
-              <Switch>
-                <Match when={(news()?.length || 0) > 0}>
-                  <News
-                    slides={news()}
-                    onClick={(news) => {
-                      window.openExternalLink(news.url || "")
-                    }}
-                    fallBackImg={DefaultImg}
-                  />
-                </Match>
-                <Match when={news.length === 0 || routeData.settings.isLoading}>
-                  <Skeleton.news />
-                </Match>
-              </Switch>
-            </div>
-            <div class="h-auto w-[1px] bg-darkSlate-400" />
-            <FeaturedModpackTile />
-          </div>
-        </Show>
         <Switch>
           <Match
             when={
@@ -150,7 +110,7 @@ const HomeWithSidebar = () => {
             </div>
           </Match>
         </Switch>
-      </div>
+      </div> */}
     </div>
   )
 }

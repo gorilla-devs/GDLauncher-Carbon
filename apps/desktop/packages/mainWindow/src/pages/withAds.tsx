@@ -1,71 +1,28 @@
 import { AdsBanner } from "@/components/AdBanner"
 import AppNavbar from "@/components/Navbar"
-import { Outlet, useRouteData } from "@solidjs/router"
-import { Match, Show, Switch, createEffect } from "solid-js"
-import fetchData from "./app.data"
-import { setMappedMcVersions, setMcVersions } from "@/utils/mcVersion"
-import {
-  setCurseforgeCategories,
-  setModrinthCategories,
-  setSupportedModloaders
-} from "@/utils/sidebar"
+import { Outlet } from "@solidjs/router"
+import { Match, Show, Switch } from "solid-js"
+
 import adSize from "@/utils/adhelper"
 import { Trans } from "@gd/i18n"
 import { useModal } from "@/managers/ModalsManager"
 import { BisectBanner } from "@/components/BisectBanner"
+import { SearchInputContext } from "@/components/SearchInputContext"
+import { getSearchResults } from "@/utils/platformSearch"
 
 function withAdsLayout() {
-  const routeData: ReturnType<typeof fetchData> = useRouteData()
   const modalContext = useModal()
-
-  createEffect(() => {
-    if (routeData.minecraftVersions.data) {
-      setMcVersions(routeData.minecraftVersions.data)
-      routeData.minecraftVersions.data.forEach((version) => {
-        if (version.type === "release") {
-          setMappedMcVersions((prev) => [
-            ...prev,
-            { label: version.id, key: version.id }
-          ])
-        }
-      })
-      setMappedMcVersions((prev) => [
-        { key: "", label: "All version" },
-        ...prev
-      ])
-    }
-  })
-
-  createEffect(() => {
-    if (routeData.curseForgeModloaders.data) {
-      setSupportedModloaders("curseforge", routeData.curseForgeModloaders.data)
-    }
-    if (routeData.modrinthModloaders.data) {
-      setSupportedModloaders("modrinth", routeData.modrinthModloaders.data)
-    }
-  })
-
-  createEffect(() => {
-    if (routeData.curseforgeCategories.data)
-      setCurseforgeCategories(routeData.curseforgeCategories.data.data)
-  })
-
-  createEffect(() => {
-    if (routeData.modrinthCategories.data)
-      setModrinthCategories(routeData.modrinthCategories.data)
+  const searchResults = getSearchResults({
+    limit: 20,
+    offset: 0
   })
 
   return (
-    <>
+    <SearchInputContext.Provider value={searchResults}>
       <AppNavbar />
-      <div
-        class="flex w-screen z-10 h-auto"
-        style={{
-          background: "var(--ads-sidebar-background)"
-        }}
-      >
-        <main class="relative flex-grow">
-          <div class="flex justify-end h-[calc(100vh-60px)]">
+      <div class="z-99 flex h-auto w-screen">
+        <main class="relative grow">
+          <div class="flex h-[calc(100vh-60px)] justify-end">
             <div
               style={{
                 width: `calc(100vw - ${adSize.width}px)`
@@ -73,9 +30,14 @@ function withAdsLayout() {
             >
               <Outlet />
             </div>
-            <div class="flex flex-col justify-between h-[calc(100vh-100px)]">
+            <div
+              class="flex h-full flex-col justify-between gap-4"
+              style={{
+                "view-transition-name": `ad`,
+                background: "var(--ads-sidebar-background)"
+              }}
+            >
               <div
-                class="py-4"
                 style={{
                   width: `${adSize.width}px`,
                   height: `${adSize.height}px`
@@ -94,7 +56,7 @@ function withAdsLayout() {
               </div>
               <div class="flex justify-center">
                 <div
-                  class="text-center hover:text-lightSlate-50 transition-colors duration-200 text-lightSlate-700"
+                  class="hover:text-lightSlate-50 text-lightSlate-700 text-center transition-colors duration-200"
                   onClick={() => {
                     modalContext?.openModal({
                       name: "whyAreAdsNeeded"
@@ -108,7 +70,7 @@ function withAdsLayout() {
           </div>
         </main>
       </div>
-    </>
+    </SearchInputContext.Provider>
   )
 }
 

@@ -165,7 +165,7 @@ impl Modrinth {
         Ok(ver)
     }
 
-    #[tracing::instrument(skip(self))]
+    #[tracing::instrument(skip(self, version_ids))]
     pub async fn get_versions(&self, version_ids: VersionIDs) -> anyhow::Result<VersionsResponse> {
         let mut url = self.base_url.join("versions")?;
         let query = version_ids.into_query_parameters()?;

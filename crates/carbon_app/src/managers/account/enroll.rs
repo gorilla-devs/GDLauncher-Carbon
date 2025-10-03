@@ -1,12 +1,13 @@
-use std::sync::Arc;
+use crate::api::{CoreModuleStatus, update_core_module_status};
 
 use super::api::{
-    get_profile, DeviceCode, DeviceCodeExpiredError, FullAccount, GetProfileError, McAccount,
-    McAuth, McEntitlementMissingError, MsAuth, XboxAuth, XboxError,
+    DeviceCode, DeviceCodeExpiredError, FullAccount, GetProfileError, McAccount, McAuth,
+    McEntitlementMissingError, MsAuth, XboxAuth, XboxError, get_profile,
 };
 use anyhow::anyhow;
 use async_trait::async_trait;
 use futures::{future::abortable, stream::AbortHandle};
+use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::RwLock;
 use tracing::trace;
@@ -110,7 +111,10 @@ impl EnrollmentTask {
         client: reqwest_middleware::ClientWithMiddleware,
         refresh_token: String,
         invalidate: impl InvalidateCtx + Send + Sync + 'static,
-    ) -> Self {
+    ) -> (
+        Self,
+        tokio::task::JoinHandle<Result<(), futures::future::Aborted>>,
+    ) {
         let status = Arc::new(RwLock::new(EnrollmentStatus::RequestingCode));
         let task_status = status.clone();
 
@@ -126,34 +130,36 @@ impl EnrollmentTask {
                 trace!("Refreshing MsAuth with refresh token");
                 // attempt to refresh token
                 let ms_auth = MsAuth::refresh(&client, &refresh_token).await?;
+                update_core_module_status(CoreModuleStatus::RefreshMSAuth);
 
                 trace!("Successfully refreshed MsAuth with refresh token");
 
                 update_status(EnrollmentStatus::XboxAuth).await;
-
                 trace!("Authenticating with XBox");
 
                 // authenticate with XBox
                 let xbox_auth = XboxAuth::from_ms(&ms_auth, &client).await??;
 
+                update_core_module_status(CoreModuleStatus::XboxAuth);
                 trace!("Successfully authenticated with XBox");
 
                 trace!("Authenticating with MC");
 
                 update_status(EnrollmentStatus::McLogin).await;
-
                 // authenticate with MC
                 let mc_auth = McAuth::auth_ms(xbox_auth, &client).await?;
 
+                update_core_module_status(CoreModuleStatus::McLogin);
                 trace!("Successfully authenticated with MC");
 
                 update_status(EnrollmentStatus::MCEntitlements).await;
-
                 let entitlements = mc_auth.get_entitlement(&client).await??;
+                update_core_module_status(CoreModuleStatus::MCEntitlements);
 
                 update_status(EnrollmentStatus::McProfile).await;
 
                 let mc_profile = get_profile(&client, &mc_auth.access_token).await??;
+                update_core_module_status(CoreModuleStatus::McProfile);
 
                 let account = McAccount {
                     entitlement: entitlements.clone(),
@@ -182,12 +188,15 @@ impl EnrollmentTask {
         };
 
         let (task, abort_handle) = abortable(task);
-        tokio::task::spawn(task);
+        let handler = tokio::task::spawn(task);
 
-        Self {
-            status,
-            abort: abort_handle,
-        }
+        (
+            Self {
+                status,
+                abort: abort_handle,
+            },
+            handler,
+        )
     }
 }
 

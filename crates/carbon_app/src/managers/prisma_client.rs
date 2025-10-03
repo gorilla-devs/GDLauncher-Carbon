@@ -201,11 +201,11 @@ async fn seed_init_db(db_client: &PrismaClient, gdl_base_api: String) -> Result<
             }
 
             tracing::info!(
-                    "Should empty tos_privacy: {}, latest tos_privacy checksum: {}, current tos_privacy checksum: {:?}",
-                    should_empty_tos_privacy,
-                    latest_tos_privacy_checksum,
-                    app_config.terms_and_privacy_accepted_checksum
-                );
+                "Should empty tos_privacy: {}, latest tos_privacy checksum: {}, current tos_privacy checksum: {:?}",
+                should_empty_tos_privacy,
+                latest_tos_privacy_checksum,
+                app_config.terms_and_privacy_accepted_checksum
+            );
 
             if should_empty_tos_privacy {
                 updates.push(app_configuration::terms_and_privacy_accepted::set(false));
@@ -252,7 +252,7 @@ mod test {
             .create_async()
             .await;
 
-        let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
         let temp_path = dunce::canonicalize(temp_dir.into_path()).unwrap();
 
         let db_client = load_and_migrate(temp_path.clone(), mock_url.to_string())
@@ -315,7 +315,7 @@ mod test {
             .create_async()
             .await;
 
-        let temp_dir = tempdir::TempDir::new("carbon_app_test").unwrap();
+        let temp_dir = tempfile::tempdir().unwrap();
         let temp_path = dunce::canonicalize(temp_dir.into_path()).unwrap();
 
         let db_client = load_and_migrate(temp_path.clone(), mock_url_200)

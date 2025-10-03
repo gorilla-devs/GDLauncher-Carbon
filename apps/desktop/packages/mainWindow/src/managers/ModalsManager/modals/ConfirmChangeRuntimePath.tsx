@@ -1,6 +1,6 @@
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
-import { Button, Progressbar } from "@gd/ui"
+import { Button, Progress } from "@gd/ui"
 import { Trans } from "@gd/i18n"
 import { Match, Show, Switch, createResource, createSignal } from "solid-js"
 import { Portal } from "solid-js/web"
@@ -168,9 +168,9 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                 </div>
 
                 <div class="w-full">
-                  <Progressbar
+                  <Progress
                     color="bg-primary-400"
-                    percentage={
+                    value={
                       RTprogress()
                         ? (RTprogress()!.current * 100) / RTprogress()!.total
                         : 0

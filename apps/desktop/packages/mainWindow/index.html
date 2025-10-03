@@ -14,7 +14,7 @@
        img-src 'self' data: https: blob: http://127.0.0.1:* http://localhost:* http://i.imgur.com;
        default-src 'unsafe-inline' 'self';
        frame-src 'self' https: https://youtube.com;
-       connect-src 'self' data: ws://127.0.0.1:* https://www.minecraft.net https://launchercontent.mojang.com/news.json http://127.0.0.1:* https://unpkg.com/@rive-app/canvas@2.21.5/rive.wasm https://cdn.jsdelivr.net/npm/@rive-app/canvas@2.21.5/rive_fallback.wasm https://*.gdl.gg;
+       connect-src 'self' data: ws://127.0.0.1:* https://www.minecraft.net https://launchercontent.mojang.com http://127.0.0.1:* https://unpkg.com/@rive-app/canvas@2.21.5/rive.wasm https://cdn.jsdelivr.net/npm/@rive-app/canvas@2.21.5/rive_fallback.wasm https://*.gdl.gg;
      "
     />
 
@@ -118,6 +118,110 @@
 
       * {
         font-family: var(--font);
+
+        font-synthesis: none;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* View transition classes */
+
+      @keyframes slide-out-to-left {
+        from {
+          transform: translateX(0);
+        }
+        to {
+          transform: translateX(-100%);
+        }
+      }
+
+      @keyframes slide-in-from-right {
+        from {
+          transform: translateX(100%);
+        }
+        to {
+          transform: translateX(0);
+        }
+      }
+
+      @keyframes slide-out-to-right {
+        from {
+          transform: translateX(0);
+        }
+        to {
+          transform: translateX(100%);
+        }
+      }
+
+      @keyframes slide-in-from-left {
+        from {
+          transform: translateX(-100%);
+        }
+        to {
+          transform: translateX(0);
+        }
+      }
+
+      /* Base transitions for all view transitions */
+      ::view-transition-old(root),
+      ::view-transition-new(root) {
+        animation-duration: 250ms;
+        animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        animation-fill-mode: both;
+      }
+
+      .disable-view-transition {
+        view-transition-name: disable-view-transition;
+      }
+
+      ::view-transition-old(disable-view-transition),
+      ::view-transition-new(disable-view-transition) {
+        animation-duration: 0s;
+      }
+
+      .slide-right-transition {
+        view-transition-name: slide-right-transition;
+      }
+
+      .slide-left-transition {
+        view-transition-name: slide-left-transition;
+      }
+
+      ::view-transition-old(slide-right-transition),
+      ::view-transition-new(slide-right-transition) {
+        animation-duration: 250ms;
+        animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        animation-fill-mode: both;
+      }
+
+      ::view-transition-old(slide-left-transition),
+      ::view-transition-new(slide-left-transition) {
+        animation-duration: 250ms;
+        animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+        animation-fill-mode: both;
+      }
+
+      ::view-transition-old(slide-right-transition) {
+        animation-name: slide-out-to-left;
+      }
+
+      ::view-transition-new(slide-right-transition) {
+        animation-name: slide-in-from-right;
+      }
+
+      ::view-transition-old(slide-left-transition) {
+        animation-name: slide-out-to-right;
+      }
+
+      ::view-transition-new(slide-left-transition) {
+        animation-name: slide-in-from-left;
+      }
+
+      html,
+      body {
+        background: rgb(var(--darkSlate-800));
+        color: white;
       }
 
       img {
@@ -197,10 +301,21 @@
       .appFatalCrash * {
         user-select: text;
       }
+
+      #news_article_content * {
+        user-select: text;
+        cursor: auto;
+      }
+
+      #news_article_content a {
+        cursor: pointer !important;
+      }
     </style>
     <title>GDLauncher Carbon</title>
     <script type="module">
       import { mainTheme } from "@gd/ui"
+
+      window.scrollRestoration = "manual"
 
       for (const key in mainTheme) {
         document.documentElement.style.setProperty(`--${key}`, mainTheme[key])
@@ -311,10 +426,6 @@
         right: 0;
         display: none;
       "
-    ></div>
-    <div
-      id="notifications"
-      style="position: fixed; z-index: 200; bottom: 0; left: 0"
     ></div>
     <div id="root"></div>
     <div id="appFatalCrash"></div>

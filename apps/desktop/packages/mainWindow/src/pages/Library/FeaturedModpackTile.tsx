@@ -16,7 +16,7 @@ import {
 const HEXING_TALES_MODPACK_ID = 891604
 
 const FeaturedModpackTile = () => {
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const rspcContext = rspc.useContext()
   const [shouldShow, setShouldShow] = createSignal(true)
 
@@ -69,7 +69,7 @@ const FeaturedModpackTile = () => {
                 !!hexingTales()?.data
             }}
             onClick={() => {
-              navigate(`/modpacks/${HEXING_TALES_MODPACK_ID}/curseforge`)
+              navigator.navigate(`/addon/${HEXING_TALES_MODPACK_ID}/curseforge`)
             }}
           >
             <div

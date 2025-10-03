@@ -5,11 +5,37 @@ use std::{
     num::ParseIntError,
 };
 
+fn sanitize_json_content(content: &str) -> String {
+    content
+        .chars()
+        .filter(|c| !c.is_control() || *c == '\t' || *c == '\n' || *c == '\r')
+        .collect()
+}
+
 use anyhow::{anyhow, bail};
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use zip::read::ZipFile;
 
 use crate::domain::instance::{self as domain, info::ModLoaderType};
+
+fn deserialize_authors_flexible<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum AuthorsField {
+        String(String),
+        Array(Vec<String>),
+    }
+
+    let authors = Option::<AuthorsField>::deserialize(deserializer)?;
+    Ok(match authors {
+        Some(AuthorsField::String(s)) => Some(s),
+        Some(AuthorsField::Array(vec)) => Some(vec.join(", ")),
+        None => None,
+    })
+}
 
 #[derive(Deserialize)]
 #[serde(untagged)]
@@ -50,7 +76,6 @@ struct NewMcModInfoObj {
 struct McModInfo {
     modid: Option<String>,
     name: Option<String>,
-    #[serde(alias = "mcversion")] // cccmod.info uses mcversion instead of version
     version: Option<String>,
     description: Option<String>,
     #[serde(alias = "authorList")] // cccmod.info uses authorList instead of authors
@@ -104,6 +129,7 @@ struct ModsTomlEntry {
     #[serde(rename = "displayName")]
     display_name: String,
     description: Option<String>,
+    #[serde(deserialize_with = "deserialize_authors_flexible", default)]
     authors: Option<String>,
     #[serde(rename = "logoFile")]
     logo_file: Option<String>,
@@ -195,6 +221,10 @@ enum FabricAuthor {
         name: String,
         contact: Option<String>,
     },
+    NameContactObject {
+        name: String,
+        contact: Option<FabricContact>,
+    },
 }
 
 #[derive(Deserialize, Clone)]
@@ -275,6 +305,9 @@ struct FabricModJsonEntry {
     contributors: Option<Vec<FabricAuthor>>,
     license: Option<FabricLicense>,
     icon: Option<FabricIcon>,
+    #[serde(rename = "accessWidener")]
+    access_widener: Option<String>,
+    custom: Option<serde_json::Value>,
 }
 
 fn fabric_mod_json_schema_version_default() -> u32 {
@@ -549,6 +582,19 @@ impl TryFrom<FabricModJson> for ModFileMetadata {
                             name
                         }
                     }
+                    FabricAuthor::NameContactObject { name, contact } => {
+                        if let Some(contact_obj) = contact {
+                            if let Some(email) = &contact_obj.email {
+                                format!("{} <{}>", name, email)
+                            } else if let Some(homepage) = &contact_obj.homepage {
+                                format!("{} <{}>", name, homepage)
+                            } else {
+                                name
+                            }
+                        } else {
+                            name
+                        }
+                    }
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
@@ -649,7 +695,9 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
         };
         let mut content = String::with_capacity(file.size() as usize);
         file.read_to_string(&mut content)?;
-        let modstoml = toml::from_str::<ModsToml>(&content)?;
+
+        let sanitized_content = sanitize_json_content(&content);
+        let modstoml = toml::from_str::<ModsToml>(&sanitized_content)?;
         let mut modstoml = modstoml
             .mods
             .into_iter()
@@ -682,6 +730,32 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
         mod_metadata = merge_mod_metadata(mod_metadata, metadata);
     }
 
+    'neoforge_mods_toml: {
+        let Ok(mut file) = zip.by_name("META-INF/neoforge.mods.toml") else {
+            break 'neoforge_mods_toml;
+        };
+        let mut content = String::with_capacity(file.size() as usize);
+        file.read_to_string(&mut content)?;
+
+        let sanitized_content = sanitize_json_content(&content);
+        let modstoml = toml::from_str::<ModsToml>(&sanitized_content)?;
+        let mut modstoml = modstoml
+            .mods
+            .into_iter()
+            .next()
+            .ok_or_else(|| anyhow!("neoforge.mods.toml contained no mod entries"))?;
+
+        let mut metadata: ModFileMetadata = modstoml.into();
+        match metadata.version {
+            Some(version) if version == "${file.jarVersion}" => {
+                metadata.version = None;
+            }
+            _ => (),
+        }
+
+        mod_metadata = merge_mod_metadata(mod_metadata, metadata);
+    }
+
     'fabric_mod_json: {
         let Ok(mut file) = zip.by_name("fabric.mod.json") else {
             break 'fabric_mod_json;
@@ -689,7 +763,8 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
         let mut content = String::with_capacity(file.size() as usize);
         file.read_to_string(&mut content)?;
 
-        let fabric_mod_json = serde_json::from_str::<FabricModJson>(&content)?;
+        let sanitized_content = sanitize_json_content(&content);
+        let fabric_mod_json = serde_json::from_str::<FabricModJson>(&sanitized_content)?;
 
         mod_metadata = merge_mod_metadata(mod_metadata, fabric_mod_json.try_into()?);
     }
@@ -701,13 +776,14 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
         let mut content = String::with_capacity(file.size() as usize);
         file.read_to_string(&mut content)?;
 
-        let quilt_mod_json = serde_json::from_str::<QuiltModJson>(&content)?;
+        let sanitized_content = sanitize_json_content(&content);
+        let quilt_mod_json = serde_json::from_str::<QuiltModJson>(&sanitized_content)?;
 
         mod_metadata = merge_mod_metadata(mod_metadata, quilt_mod_json.into());
     }
 
     'mcmodinfo: {
-        let mut file: Option<ZipFile> = None;
+        let mut file: Option<ZipFile<_>> = None;
 
         // CodeChickenCore for some unearthly reason uses cccmod.info instead of mcmod.info
         // https://github.com/Chicken-Bones/CodeChickenCore/blob/master/resources/cccmod.info
@@ -725,11 +801,15 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
             break 'mcmodinfo;
         }
 
-        let mcmod: McModInfo =
-            serde_json::from_reader::<_, McModInfoContainer>(file.expect("we just checked this"))
-                .unwrap_or_default()
-                .try_into()
-                .unwrap_or_default();
+        let mut file = file.expect("we just checked this");
+        let mut content = String::with_capacity(file.size() as usize);
+        file.read_to_string(&mut content).unwrap_or_default();
+
+        let sanitized_content = sanitize_json_content(&content);
+        let mcmod: McModInfo = serde_json::from_str::<McModInfoContainer>(&sanitized_content)
+            .unwrap_or_default()
+            .try_into()
+            .unwrap_or_default();
 
         mod_metadata = merge_mod_metadata(mod_metadata, mcmod.into());
     }
@@ -741,11 +821,11 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
 mod test {
     use std::io::{Cursor, Write};
 
-    use zip::{write::FileOptions, CompressionMethod, ZipWriter};
+    use zip::{CompressionMethod, ZipWriter, write::FileOptions};
 
     use crate::domain::instance::info::ModLoaderType;
 
-    use super::{parse_metadata, ModFileMetadata};
+    use super::{ModFileMetadata, parse_metadata};
 
     pub fn parsemeta(path: &str, content: &str) -> anyhow::Result<Option<ModFileMetadata>> {
         // write meta zip
@@ -839,35 +919,6 @@ mod test {
         });
 
         let returned = parsemeta("mcmod.info", mcmodinfo)?;
-
-        assert_eq!(returned, expected);
-        Ok(())
-    }
-
-    #[test]
-    pub fn old_forge_metadata_cccmod() -> anyhow::Result<()> {
-        let mcmodinfo = r#"
-          [{
-            "modid": "com.test.testmod",
-            "name": "TestMod",
-            "description": "test desc",
-            "mcversion": "1.0.0",
-            "authorList": ["TestAuthor1", "TestAuthor2"],
-            "logoFile": "/test/logo"
-          }]
-        "#;
-
-        let expected = Some(ModFileMetadata {
-            modid: Some(String::from("com.test.testmod")),
-            name: Some(String::from("TestMod")),
-            version: Some(String::from("1.0.0")),
-            description: Some(String::from("test desc")),
-            authors: Some(String::from("TestAuthor1, TestAuthor2")),
-            logo_file: Some(String::from("/test/logo")),
-            modloaders: vec![ModLoaderType::Forge],
-        });
-
-        let returned = parsemeta("cccmod.info", mcmodinfo)?;
 
         assert_eq!(returned, expected);
         Ok(())
@@ -1048,6 +1099,30 @@ displayName = "TestMod"
     }
 
     #[test]
+    pub fn fabric_author_contact_object_test() -> anyhow::Result<()> {
+        let modjson = r#"{
+  "schemaVersion": 1,
+  "id": "testmod",
+  "version": "1.0.0",
+  "name": "Test Mod",
+  "authors": [
+    {
+      "name": "Test Author",
+      "contact": {
+        "email": "test@example.com"
+      }
+    }
+  ]
+}
+        "#;
+
+        let returned = parsemeta("fabric.mod.json", modjson)?;
+        assert!(returned.is_some());
+
+        Ok(())
+    }
+
+    #[test]
     pub fn quilt_mod_json() -> anyhow::Result<()> {
         let modjson = r#"{
 	"schema_version": 1,
@@ -1106,6 +1181,45 @@ displayName = "TestMod"
 
         assert_eq!(returned, expected);
 
+        Ok(())
+    }
+
+    #[test]
+    pub fn xaero_minimap_mcmod() -> anyhow::Result<()> {
+        let mcmodinfo = r#"
+[
+{
+	"logoFile": "",
+	"credits": "",
+	"authorList": [
+		"TestAuthor"
+	],
+	"updateUrl": "",
+	"name": "TestMod",
+	"description": "The most typical testmod.",
+	"version": "23.4.0",
+	"modid": "testmod",
+	"mcversion": "1.12.2",
+	"url": "",
+	"screenshots": [],
+	"dependencies": []
+}
+]
+        "#;
+
+        let expected = Some(ModFileMetadata {
+            modid: Some(String::from("testmod")),
+            name: Some(String::from("TestMod")),
+            version: Some(String::from("23.4.0")),
+            description: Some(String::from("The most typical testmod.")),
+            authors: Some(String::from("TestAuthor")),
+            logo_file: Some(String::from("")),
+            modloaders: vec![ModLoaderType::Forge],
+        });
+
+        let returned = parsemeta("mcmod.info", mcmodinfo)?;
+
+        assert_eq!(returned, expected);
         Ok(())
     }
 }

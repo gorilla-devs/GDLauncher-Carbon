@@ -1,0 +1,49 @@
+import { Trans } from "@gd/i18n"
+import { For, Match, Suspense, Switch, useContext } from "solid-js"
+import { Skeleton } from "@gd/ui"
+import { AddonContext } from "."
+
+const Screenshots = () => {
+  const mod = useContext(AddonContext)
+
+  const screenshots = () => {
+    return mod?.data?.screenshotUrls
+  }
+
+  return (
+    <Suspense fallback={<Skeleton.modpackScreenshotsPage />}>
+      <div>
+        <Switch fallback={<Skeleton.modpackScreenshotsPage />}>
+          <Match when={(screenshots()?.length || 0) > 0 && !mod?.isLoading}>
+            <div class="flex flex-col gap-4">
+              <div class="flex flex-wrap gap-4">
+                <For each={screenshots()}>
+                  {(screenshot) => (
+                    <img
+                      src={screenshot}
+                      class="h-44 w-72 rounded-xl"
+                      alt={screenshot}
+                    />
+                  )}
+                </For>
+              </div>
+            </div>
+          </Match>
+          <Match when={(screenshots()?.length || 0) === 0 && !mod?.isLoading}>
+            <Trans
+              key="modpack.no_screenshot"
+              options={{
+                defaultValue: "No screenshots"
+              }}
+            />
+          </Match>
+          <Match when={mod?.isLoading}>
+            <Skeleton.modpackScreenshotsPage />
+          </Match>
+        </Switch>
+      </div>
+    </Suspense>
+  )
+}
+
+export default Screenshots

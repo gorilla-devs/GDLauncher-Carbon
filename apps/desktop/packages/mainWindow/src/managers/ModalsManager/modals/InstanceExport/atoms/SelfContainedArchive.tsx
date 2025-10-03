@@ -1,5 +1,5 @@
 import { useTransContext } from "@gd/i18n"
-import { Switch, Tooltip } from "@gd/ui"
+import { Switch, Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
 import { setPayload, payload } from ".."
 
 const SelfContainedArchive = () => {
@@ -11,11 +11,16 @@ const SelfContainedArchive = () => {
     })
   }
   return (
-    <div class="w-full flex justify-between items-center pt-4">
+    <div class="flex w-full items-center justify-between pt-4">
       <div class="flex items-center gap-2">
         <div>{t("instance.self_contained_addons_bundling")}</div>
-        <Tooltip content={t("instance.self_contained_addons_bundling_tooltip")}>
-          <div class="text-2xl text-darkSlate-400 duration-100 ease-in-out cursor-pointer i-ri:information-fill transition-color hover:text-lightSlate-50" />
+        <Tooltip>
+          <TooltipTrigger>
+            <div class="text-darkSlate-400 i-ri:information-fill transition-color hover:text-lightSlate-50 cursor-pointer text-2xl duration-100 ease-in-out" />
+          </TooltipTrigger>
+          <TooltipContent>
+            {t("instance.self_contained_addons_bundling_tooltip")}
+          </TooltipContent>
         </Tooltip>
       </div>
       <Switch

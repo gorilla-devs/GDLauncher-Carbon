@@ -6,12 +6,23 @@ use super::*;
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Category {
     /// An SVG icon for the category
-    pub icon: String,
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_empty_string_as_none")]
+    pub icon: Option<String>,
     pub name: String,
     /// The project type this category is applicable to
     pub project_type: project::ProjectType,
     /// The header under which the category should go
     pub header: String,
+}
+
+/// Deserializes an empty string as None
+fn deserialize_empty_string_as_none<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    if s.is_empty() { Ok(None) } else { Ok(Some(s)) }
 }
 
 /// A loader that can load projects of `project_type`

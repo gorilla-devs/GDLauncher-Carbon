@@ -1,13 +1,12 @@
 import { rspc } from "@/utils/rspcClient"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
-import { Button, createNotification } from "@gd/ui"
+import { Button, toast } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 
 const ConfirmGDLAccountDeletion = (props: ModalProps) => {
   const [t] = useTransContext()
-  const addNotification = createNotification()
   const globalStore = useGlobalStore()
 
   const modalsContext = useModal()
@@ -48,10 +47,8 @@ const ConfirmGDLAccountDeletion = (props: ModalProps) => {
               }
 
               await requestAccountDeletionMutation.mutateAsync(uuid)
-              addNotification({
-                name: "Deletion Request Sent",
-                content: "Check your email",
-                type: "success"
+              toast.success("Deletion Request Sent", {
+                description: "Check your email"
               })
 
               modalsContext?.closeModal()

@@ -2,12 +2,12 @@ import {
   createInfiniteQuery,
   CreateInfiniteQueryResult
 } from "@tanstack/solid-query"
-import { Accessor, createContext, Setter, useContext } from "solid-js"
-import { createVirtualizer } from "@tanstack/solid-virtual"
+import { createContext, useContext, createSignal } from "solid-js"
 import { rspc } from "@/utils/rspcClient"
-import { instanceId, setInstanceId } from "@/utils/browser"
 import { useSearchParams } from "@solidjs/router"
 import useVersionsQuery from "@/pages/Mods/useVersionsQuery"
+import useSearchContext from "../SearchInputContext"
+import { VirtualizerHandle } from "virtua/lib/solid"
 
 export interface VersionRowType {
   data: VersionRowTypeData[]
@@ -37,11 +37,9 @@ interface InfiniteQueryType {
   query: typeof versionsQuery
   isLoading: boolean
   setQuery: (_newValue: Partial<typeof versionsQuery>) => void
-  rowVirtualizer: any
-  setParentRef: (_el: Element | null) => void
   allRows: () => VersionRowTypeData[]
-  setInstanceId: Setter<number | undefined>
-  instanceId: Accessor<number | undefined>
+  ref: () => VirtualizerHandle | null
+  setRef: (ref: VirtualizerHandle | null) => void
 }
 
 interface Props {
@@ -60,7 +58,8 @@ export const useInfiniteVersionsQuery = () => {
 const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   const rspcContext = rspc.useContext()
   const [searchParams, _setSearchParams] = useSearchParams()
-  let parentRef: HTMLDivElement | null = null
+  const searchContext = useSearchContext()
+  const [ref, setRef] = createSignal<VirtualizerHandle | null>(null)
 
   const infiniteQuery = createInfiniteQuery(() => ({
     queryKey: ["modplatforms.versions"],
@@ -105,9 +104,9 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
             status: v.fileStatus,
             mainThumbnail: project.data.logo?.url
           })),
-          index: response.pagination?.index,
-          total: response.pagination?.totalCount
-        } as VersionRowType
+          index: response.pagination?.index || 0,
+          total: response.pagination?.totalCount || 0
+        } satisfies VersionRowType
       } else {
         const project = await rspcContext.client.query([
           "modplatforms.modrinth.getProject",
@@ -123,13 +122,13 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
               : undefined,
             loaders: versionsQuery.modLoaderType
               ? [versionsQuery.modLoaderType]
-              : undefined
-            // limit: versionsQuery.pageSize,
-            // offset: versionsQuery.index
+              : undefined,
+            limit: versionsQuery.pageSize,
+            offset: ctx.pageParam
           }
         ])
 
-        return {
+        const processedData = {
           data: response.map((v) => ({
             id: v.project_id,
             fileId: v.id,
@@ -141,18 +140,26 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
             fileName: v.files[0].filename,
             size: v.files[0].size,
             hash: v.files[0].hashes.sha512,
-            status: v.status,
-            mainThumbnail: project.icon_url
+            status: v.status || "",
+            mainThumbnail: project.icon_url || undefined
           })),
-          index: versionsQuery.index,
+          index: ctx.pageParam,
           total: project.versions.length
-        } as VersionRowType
+        } satisfies VersionRowType
+
+        return processedData
       }
     },
     initialPageParam: 0,
-    getNextPageParam: (lastPage) => {
+    getNextPageParam: (lastPage, allPages) => {
       if (props.modplatform === "modrinth") {
-        return null
+        const loadedCount = allPages.reduce(
+          (acc, page) => acc + page.data.length,
+          0
+        )
+        const totalCount = lastPage.total || 0
+
+        return loadedCount < totalCount ? loadedCount : null
       }
 
       const index = lastPage?.index || 0
@@ -162,7 +169,7 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
 
       return (hasNextPage && index + pageSize) || null
     },
-    enabled: false
+    enabled: !!props.modId
   }))
 
   const setQueryWrapper = (newValue: Partial<typeof versionsQuery>) => {
@@ -174,11 +181,12 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   }
 
   const _instanceId = parseInt(searchParams.instanceId, 10)
-  setInstanceId(_instanceId)
+  const instanceId = isNaN(_instanceId) ? undefined : _instanceId
+  searchContext?.setSelectedInstanceId(instanceId)
 
-  if (_instanceId && !isNaN(_instanceId)) {
+  if (instanceId !== undefined) {
     rspcContext.client
-      .query(["instance.getInstanceDetails", _instanceId])
+      .query(["instance.getInstanceDetails", instanceId])
       .then((details) => {
         setQueryWrapper({
           modLoaderType: details?.modloaders[0].type_,
@@ -200,15 +208,6 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   const allRows = () =>
     infiniteQuery.data ? infiniteQuery.data.pages.flatMap((d) => d.data) : []
 
-  const rowVirtualizer = createVirtualizer({
-    get count() {
-      return infiniteQuery.hasNextPage ? allRows().length + 1 : allRows().length
-    },
-    getScrollElement: () => parentRef,
-    estimateSize: () => 62,
-    overscan: 10
-  })
-
   const context = {
     infiniteQuery,
     get query() {
@@ -218,13 +217,9 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
       return infiniteQuery.isLoading
     },
     setQuery: setQueryWrapper,
-    rowVirtualizer,
-    setParentRef: (el: Element | null) => {
-      parentRef = el as HTMLDivElement
-    },
     allRows,
-    setInstanceId,
-    instanceId
+    ref,
+    setRef
   }
 
   return (

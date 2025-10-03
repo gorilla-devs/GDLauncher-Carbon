@@ -10,8 +10,8 @@ use crate::{
         vtask::VisualTaskId,
     },
     managers::{
-        instance::InstanceVersionSource,
-        modplatforms::curseforge::convert_cf_version_to_standard_version, AppInner,
+        AppInner, instance::InstanceVersionSource,
+        modplatforms::curseforge::convert_cf_version_to_standard_version,
     },
 };
 use anyhow::anyhow;
@@ -112,7 +112,7 @@ impl CurseforgeArchiveImporter {
                 return Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
                     name,
                     reason,
-                })))
+                })));
             }
         };
 

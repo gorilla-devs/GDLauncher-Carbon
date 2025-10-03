@@ -150,23 +150,23 @@ export const hasKey = <O extends object>(
   key: PropertyKey
 ): key is keyof O => key in obj
 
-export const formatDownloadCount = (count: number) => {
-  let formattedCount
+export function formatDownloadCount(num: number, digits = 1): string {
+  const lookup: { value: number; symbol: string }[] = [
+    { value: 1, symbol: "" },
+    { value: 1e3, symbol: "k" },
+    { value: 1e6, symbol: "M" },
+    { value: 1e9, symbol: "B" }
+  ]
 
-  if (count >= 1000000) {
-    formattedCount = (count / 1000000).toFixed(1)
-  } else if (count >= 1000) {
-    formattedCount = (count / 1000).toFixed(1)
-  } else {
-    return count
-  }
+  const rx = /\.0+$|(\.[0-9]*[1-9])0+$/
+  const item = lookup
+    .slice()
+    .reverse()
+    .find((item) => num >= item.value)
 
-  // Remove the decimal point and trailing zero if the number is a whole number
-  if (formattedCount.endsWith(".0")) {
-    formattedCount = formattedCount.slice(0, -2)
-  }
-
-  return formattedCount + (count >= 1000000 ? "M" : "K")
+  return item
+    ? (num / item.value).toFixed(digits).replace(rx, "$1") + item.symbol
+    : "0"
 }
 
 export const truncateText = (text: string, maxLength: number): string => {
@@ -198,6 +198,8 @@ export const parseError = (error: RSPCError) => {
   return parsedError.cause[0].display
 }
 
-export const capitalize = (word: string) => {
-  return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+export const capitalize = (word: string | null | undefined) => {
+  if (!word) return word
+
+  return word?.charAt(0).toUpperCase() + word?.slice(1).toLowerCase()
 }

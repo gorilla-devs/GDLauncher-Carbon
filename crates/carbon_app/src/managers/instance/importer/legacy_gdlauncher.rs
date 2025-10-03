@@ -11,7 +11,7 @@ use crate::{
         },
         vtask::VisualTaskId,
     },
-    managers::{instance::InstanceVersionSource, AppInner},
+    managers::{AppInner, instance::InstanceVersionSource},
 };
 use anyhow::anyhow;
 use chrono::{DateTime, NaiveDateTime, Utc};
@@ -179,11 +179,15 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                     }
 
                     let Some(project_id) = instance.config.loader.project_id else {
-                        trace!("Legacy gdl import specifies curseforge source but is missing project id, ignoring");
+                        trace!(
+                            "Legacy gdl import specifies curseforge source but is missing project id, ignoring"
+                        );
                         break 'cf;
                     };
                     let Some(file_id) = instance.config.loader.file_id else {
-                        trace!("Legacy gdl import specifies curseforge source but is missing file id, ignoring");
+                        trace!(
+                            "Legacy gdl import specifies curseforge source but is missing file id, ignoring"
+                        );
                         break 'cf;
                     };
 

@@ -2,12 +2,12 @@ use super::{InstanceData, InstanceManager, InstanceType};
 use crate::{
     domain::{
         instance::{
-            info::{self, CurseforgeModpack, Modpack, ModpackInfo, ModrinthModpack},
             InstanceId,
+            info::{self, CurseforgeModpack, Modpack, ModpackInfo, ModrinthModpack},
         },
         vtask::VisualTaskId,
     },
-    managers::{instance::InvalidInstanceIdError, ManagerRef},
+    managers::{ManagerRef, instance::InvalidInstanceIdError},
 };
 use anyhow::bail;
 use carbon_platforms::{
@@ -161,7 +161,9 @@ impl ManagerRef<'_, InstanceManager> {
         let setup_path = instance_path.get_root().join(".setup");
 
         if setup_path.exists() {
-            anyhow::bail!("Instance has not completed the setup phase, attempting to change the modpack may irreparably damage it.");
+            anyhow::bail!(
+                "Instance has not completed the setup phase, attempting to change the modpack may irreparably damage it."
+            );
         }
 
         tokio::fs::create_dir_all(&setup_path).await?;

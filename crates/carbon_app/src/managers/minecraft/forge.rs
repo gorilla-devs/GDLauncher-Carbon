@@ -1,11 +1,11 @@
 use super::META_VERSION;
 use crate::managers::java::utils::PATH_SEPARATOR;
-use anyhow::{bail, Context};
+use anyhow::{Context, bail};
 use carbon_repos::{db::PrismaClient, pcr::QueryError};
 use carbon_rt_path::{InstancePath, LibrariesPath};
 use daedalus::{
-    modded::{LoaderVersion, Manifest, PartialVersionInfo, Processor, SidedDataEntry},
     GradleSpecifier,
+    modded::{LoaderVersion, Manifest, PartialVersionInfo, Processor, SidedDataEntry},
 };
 use std::{
     collections::HashMap,

@@ -3,9 +3,12 @@ use chrono::{DateTime, Local, NaiveDateTime, TimeZone, Utc};
 use itertools::Itertools;
 use serde::Serialize;
 use std::{
+    borrow::Cow,
     ops::{Bound, RangeBounds},
     sync::atomic::{AtomicI32, Ordering},
+    time::Instant,
 };
+use unicode_segmentation::UnicodeSegmentation;
 
 use thiserror::Error;
 use tokio::{
@@ -24,6 +27,100 @@ use super::InstanceManager;
 
 #[derive(Debug, Default)]
 pub struct GameLog(Vec<LogEntry>);
+
+impl GameLog {
+    pub fn search(
+        &self,
+        query: &str,
+        match_case: bool,
+        match_whole_word: bool,
+        use_regex: bool,
+    ) -> Vec<SearchResult> {
+        let mut results = Vec::new();
+
+        let regex = if use_regex {
+            match regex::Regex::new(query) {
+                Ok(r) => Some(r),
+                Err(_) => return vec![],
+            }
+        } else {
+            None
+        };
+
+        for (entry_index, entry) in self.0.iter().enumerate() {
+            let message: Cow<str> = if match_case {
+                entry.message.as_str().into()
+            } else {
+                entry.message.to_lowercase().into()
+            };
+            let search_query = if match_case {
+                query.to_string()
+            } else {
+                query.to_lowercase()
+            };
+
+            let message_graphemes: Vec<&str> = message.graphemes(true).collect();
+            let query_graphemes: Vec<&str> = search_query.graphemes(true).collect();
+
+            if use_regex {
+                if let Some(regex) = &regex {
+                    for mat in regex.find_iter(&message) {
+                        let start_grapheme_pos = message[..mat.start()].graphemes(true).count();
+                        let end_grapheme_pos = message[..mat.end()].graphemes(true).count();
+                        results.push(SearchResult {
+                            entry_index,
+                            pos: start_grapheme_pos,
+                            len: end_grapheme_pos - start_grapheme_pos,
+                        });
+                    }
+                }
+            } else if match_whole_word {
+                let mut pos = 0;
+                while pos < message_graphemes.len() {
+                    if message_graphemes[pos..].starts_with(&query_graphemes) {
+                        // Check word boundaries
+                        let is_word_start = pos == 0
+                            || !message_graphemes[pos - 1]
+                                .chars()
+                                .next()
+                                .unwrap()
+                                .is_alphanumeric();
+                        let query_end = pos + query_graphemes.len();
+                        let is_word_end = query_end >= message_graphemes.len()
+                            || !message_graphemes[query_end]
+                                .chars()
+                                .next()
+                                .unwrap()
+                                .is_alphanumeric();
+
+                        if is_word_start && is_word_end {
+                            results.push(SearchResult {
+                                entry_index,
+                                pos,
+                                len: query_graphemes.len(),
+                            });
+                        }
+                    }
+                    pos += 1;
+                }
+            } else {
+                let mut pos = 0;
+                while pos < message_graphemes.len() {
+                    if message_graphemes[pos..].starts_with(&query_graphemes) {
+                        results.push(SearchResult {
+                            entry_index,
+                            pos,
+                            len: query_graphemes.len(),
+                        });
+                    }
+                    pos += 1;
+                }
+            }
+        }
+
+        results
+    }
+}
 
 /// Represents a log entry.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -175,6 +272,13 @@ impl GameLog {
     }
 }
 
+#[derive(Debug)]
+pub struct SearchResult {
+    pub entry_index: usize,
+    pub pos: usize,
+    pub len: usize,
+}
+
 static LOG_ID: AtomicI32 = AtomicI32::new(0);
 impl ManagerRef<'_, InstanceManager> {
     pub async fn create_log(
@@ -317,10 +421,28 @@ impl ManagerRef<'_, InstanceManager> {
 
         read_logs_from_memory(self.clone(), instance_id).await
     }
+
+    pub async fn search_in_log(
+        self,
+        id: GameLogId,
+        query: &str,
+        match_case: bool,
+        match_whole_word: bool,
+        use_regex: bool,
+    ) -> anyhow::Result<Vec<SearchResult>> {
+        let log = self.get_log(id).await?;
+        let log = log.borrow();
+
+        Ok(log.search(query, match_case, match_whole_word, use_regex))
+    }
 }
 
 pub fn format_message_as_log4j_event(message: &str) -> String {
-    format!("<log4j:Event logger=\"GDLAUNCHER\" timestamp=\"{}\" level=\"INFO\" thread=\"N/A\">\n\t<log4j:Message><![CDATA[{}]]></log4j:Message>\n</log4j:Event>\n", Utc::now().timestamp_millis(), message)
+    format!(
+        "<log4j:Event logger=\"GDLAUNCHER\" timestamp=\"{}\" level=\"INFO\" thread=\"N/A\">\n\t<log4j:Message><![CDATA[{}]]></log4j:Message>\n</log4j:Event>\n",
+        Utc::now().timestamp_millis(),
+        message
+    )
 }
 
 pub struct LogProcessor<'a> {
@@ -346,6 +468,8 @@ impl<'a> LogProcessor<'a> {
         if let Some(file) = file {
             file.write_all(data).await?;
         }
+
+        let data = &*strip_ansi_escapes::strip(data);
 
         self.parser.feed(data);
 
@@ -426,5 +550,32 @@ mod test {
         test_span(&log, 1..0, []);
         test_span(&log, 1..2, ["item 2"]);
         test_span(&log, 1..=3, ["item 2", "item 3", "item 4"]);
+    }
+
+    #[test]
+    fn search() {
+        let mut log = GameLog::new();
+
+        log.add_entry(LogEntry::system_message("item 1"));
+        log.add_entry(LogEntry::system_message("item 2"));
+        log.add_entry(LogEntry::system_message("item 3"));
+
+        let results = log.search("item", false, false, false);
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0].entry_index, 0);
+        assert_eq!(results[1].entry_index, 1);
+        assert_eq!(results[2].entry_index, 2);
+    }
+
+    #[test]
+    fn search_multiline() {
+        let mut log = GameLog::new();
+
+        let msg = r#"first\u001bsomething\u001belse"#;
+
+        log.add_entry(LogEntry::system_message(msg));
+
+        let results = log.search("els", false, false, false);
+        println!("{:?}", results);
     }
 }

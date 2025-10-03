@@ -40,7 +40,7 @@ const InstanceTile = (props: {
     subTasks: undefined
   })
 
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
 
   const validInstance = () =>
     props.instance.status.status === "valid"
@@ -130,7 +130,7 @@ const InstanceTile = (props: {
         setClickedInstanceId(props.identifier)
 
         requestAnimationFrame(() => {
-          navigate(`/library/${props.instance.id}`)
+          navigator.navigate(`/library/${props.instance.id}`)
         })
       }}
       shouldSetViewTransition={clickedInstanceId() === props.identifier}

@@ -2,15 +2,15 @@ use crate::api::{keys::vtask::*, translation::Translation};
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicI32, Ordering},
         Arc, Mutex,
+        atomic::{AtomicI32, Ordering},
     },
 };
 
 use anyhow::anyhow;
 
 use thiserror::Error;
-use tokio::sync::{watch, RwLock};
+use tokio::sync::{RwLock, watch};
 use tracing::error;
 
 use super::ManagerRef;
@@ -68,7 +68,7 @@ impl ManagerRef<'_, VisualTaskManager> {
         let tasklist = self.tasks.read().await;
         let mut tasks = tasklist
             .iter()
-            .map(|(i, task)| (i, task.make_domain_task()))
+            .map(|(i, task)| (i, task.make_domain_task(*i)))
             .collect::<Vec<_>>();
         tasks.sort_by(|(a, _), (b, _)| Ord::cmp(a, b));
 
@@ -86,7 +86,7 @@ impl ManagerRef<'_, VisualTaskManager> {
         let task = tasklist.get(&task_id);
 
         match task {
-            Some(task) => Some(task.make_domain_task().await),
+            Some(task) => Some(task.make_domain_task(task_id).await),
             None => None,
         }
     }
@@ -113,20 +113,33 @@ impl ManagerRef<'_, VisualTaskManager> {
     pub async fn wait_with_log(self, task_id: VisualTaskId) -> anyhow::Result<()> {
         use tracing::info;
 
-        let tasklist = self.tasks.read().await;
-        let Some(task) = tasklist.get(&task_id) else {
-            info!("task already exited");
-            return Ok(());
-        };
+        let mut notify = {
+            let tasklist = self.tasks.read().await;
+            let Some(task) = tasklist.get(&task_id) else {
+                info!("task already exited");
+                return Ok(());
+            };
 
-        let mut notify = task.notify_rx.clone();
+            let notify = task.notify_rx.clone();
+            notify
+        }; // tasklist is dropped here, releasing the strong reference to the task
 
         while notify.changed().await.is_ok() {
             if let NotifyState::Drop = *notify.borrow() {
+                info!("Received Drop notification, exiting wait_with_log");
                 break;
             }
 
-            let domain = task.make_domain_task().await;
+            // For logging, we need to get the task again, but only temporarily
+            let domain = {
+                let tasklist = self.tasks.read().await;
+                if let Some(task) = tasklist.get(&task_id) {
+                    task.make_domain_task(task_id).await
+                } else {
+                    // Task was removed from the list, exit
+                    break;
+                }
+            };
 
             let progress = match &domain.progress {
                 domain::Progress::Indeterminate => String::from("unk"),
@@ -193,6 +206,7 @@ enum NotifyState {
 impl Drop for VisualTask {
     fn drop(&mut self) {
         if self.owner {
+            tracing::info!("VisualTask owner dropped, sending Drop notification");
             let _ = self.notify_tx.send(NotifyState::Drop);
         }
     }
@@ -323,7 +337,7 @@ impl VisualTask {
             .fold((0, 0), |(ad, at), (d, t)| (ad + d, at + t))
     }
 
-    pub async fn make_domain_task(&self) -> domain::Task {
+    pub async fn make_domain_task(&self, id: VisualTaskId) -> domain::Task {
         let (name, state) = {
             let data = self.data.read().await;
             (data.name.clone(), data.state.clone())
@@ -332,6 +346,7 @@ impl VisualTask {
         let (downloaded, download_total) = self.downloaded_bytes().await;
 
         domain::Task {
+            id,
             name: name.into(),
             progress: match state {
                 TaskState::Indeterminate => domain::Progress::Indeterminate,
@@ -527,6 +542,7 @@ mod test {
     use crate::managers::vtask::{TaskState, VisualTask};
 
     #[tokio::test]
+    #[tracing_test::traced_test]
     async fn test() {
         let app = crate::setup_managers_for_test().await;
 
@@ -538,6 +554,7 @@ mod test {
         subtask.start_opaque();
 
         let mut tasks = vec![domain::Task {
+            id,
             name: Translation::Test,
             progress: domain::Progress::Indeterminate,
             downloaded: 0,

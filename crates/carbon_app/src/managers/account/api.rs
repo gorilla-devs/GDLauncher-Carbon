@@ -1,9 +1,9 @@
 use std::time::Duration;
 
-use anyhow::{anyhow, bail, Context};
+use anyhow::{Context, anyhow, bail};
 use axum::routing::trace;
 use chrono::{DateTime, Utc};
-use jsonwebtoken::{errors::ErrorKind, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, errors::ErrorKind};
 use reqwest::StatusCode;
 use reqwest_middleware::ClientWithMiddleware;
 use serde::{Deserialize, Serialize};
@@ -13,7 +13,7 @@ use thiserror::Error;
 use tracing::{error, info, trace};
 
 use crate::error::request::{
-    censor_error, MalformedResponseDetails, RequestContext, RequestError, RequestErrorDetails,
+    MalformedResponseDetails, RequestContext, RequestError, RequestErrorDetails, censor_error,
 };
 
 #[derive(Debug, Clone)]
@@ -147,8 +147,7 @@ impl DeviceCode {
                 _ => {
                     trace!(
                         "Device code request returned unexpected {:?} status at {:?}",
-                        response,
-                        response_at
+                        response, response_at
                     );
 
                     bail!(RequestError::from_status(&response,))

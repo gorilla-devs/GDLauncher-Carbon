@@ -1,4 +1,4 @@
-import { Progressbar } from "@gd/ui"
+import { Progress } from "@gd/ui"
 import JavaLogo from "/assets/images/icons/java-logo.svg"
 import { Trans } from "@gd/i18n"
 
@@ -19,7 +19,7 @@ const AutomaticStep = () => {
           />
         </h3>
       </div>
-      <Progressbar percentage={percentage} />
+      <Progress value={percentage} />
       <p class="mb-0">
         {`${percentage}%`}
         <Trans

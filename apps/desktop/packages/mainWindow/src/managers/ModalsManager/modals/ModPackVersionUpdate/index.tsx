@@ -2,13 +2,14 @@ import { Button, Dropdown, Spinner } from "@gd/ui"
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { rspc } from "@/utils/rspcClient"
-import { instanceId } from "@/utils/browser"
 import { Show, createEffect, createSignal } from "solid-js"
 import { Modpack } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useTransContext } from "@gd/i18n"
+import useSearchContext from "@/components/SearchInputContext"
 
 const ModPackVersionUpdate = (props: ModalProps) => {
+  const searchContext = useSearchContext()
   const [t] = useTransContext()
   const [currentPlatform, setCurrentPlatform] = createSignal<
     "modrinth" | "curseforge" | null
@@ -16,10 +17,13 @@ const ModPackVersionUpdate = (props: ModalProps) => {
   const [selectedVersion, setSelectedVersion] = createSignal<string | null>(
     null
   )
-  const navigate = useGDNavigate()
+  const navigator = useGDNavigate()
   const modalContext = useModal()
   const instance = rspc.createQuery(() => ({
-    queryKey: ["instance.getInstanceDetails", instanceId()!]
+    queryKey: [
+      "instance.getInstanceDetails",
+      searchContext?.selectedInstance.data?.id!
+    ]
   }))
 
   const changeModpackMutation = rspc.createMutation(() => ({
@@ -123,7 +127,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
     if (!selectedVersion()) return
 
     await changeModpackMutation.mutateAsync({
-      instance: instanceId()!,
+      instance: searchContext?.selectedInstance.data?.id!,
       modpack: {
         type: currentPlatform(),
         value:
@@ -140,7 +144,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
     })
 
     modalContext?.closeModal()
-    navigate("/library")
+    navigator.navigate("/library")
   }
 
   return (

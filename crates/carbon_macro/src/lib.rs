@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Data, DeriveInput, Fields};
+use syn::{Data, DeriveInput, Fields, parse_macro_input};
 
 #[proc_macro_attribute]
 pub fn into_query_parameters(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -16,7 +16,7 @@ pub fn into_query_parameters(_attr: TokenStream, item: TokenStream) -> TokenStre
 
     let attrs = &input.attrs;
 
-    let gen = quote! {
+    let generated = quote! {
         #(#attrs)*
         pub struct #struct_name {
             #fields
@@ -29,5 +29,5 @@ pub fn into_query_parameters(_attr: TokenStream, item: TokenStream) -> TokenStre
         }
     };
 
-    TokenStream::from(gen)
+    TokenStream::from(generated)
 }

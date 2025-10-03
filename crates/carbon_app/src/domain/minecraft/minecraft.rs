@@ -52,9 +52,7 @@ pub fn libraries_into_vec_downloadable(
 // Use java arch instead of system arch
 pub fn is_rule_allowed(rule: &Rule, java_arch: &JavaArch) -> bool {
     let res = match rule {
-        Rule {
-            os: Some(ref os), ..
-        } => os_rule(os, java_arch),
+        Rule { os: Some(os), .. } => os_rule(os, java_arch),
         Rule {
             features: Some(_), ..
         } => false,
@@ -214,18 +212,22 @@ pub fn chain_lwjgl_libs_with_base_libs(
                             return None;
                         };
 
-                        classifiers
-                            .get(&native_name.replace("${arch}", ARCH_WIDTH))
-                            .unwrap()
-                            .path
-                            .clone()
+                        let native_key = native_name.replace("${arch}", ARCH_WIDTH);
+                        if let Some(classifier) = classifiers.get(&native_key) {
+                            classifier.path.clone()
+                        } else {
+                            tracing::warn!("Library {} has classifier but missing native key {}", library.name, native_key);
+                            return None;
+                        }
                     } else {
-                        panic!("Library has no artifact or classifier");
+                        tracing::warn!("Library {} has downloads but no artifact or classifier", library.name);
+                        return None;
                     }
                 } else if library.url.is_some() {
                     library.name.into_path().to_string_lossy().to_string()
                 } else {
-                    panic!("Library has no method of retrieval");
+                    tracing::warn!("Library {} has no method of retrieval (no downloads or url)", library.name);
+                    return None;
                 }
             });
 

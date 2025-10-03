@@ -11,7 +11,7 @@ use crate::{
     domain::metrics::GDLMetricsEvent,
     domain::vtask::VisualTaskId,
     managers::instance::log::{
-        format_message_as_log4j_event, GameLog, LogEntry, LogEntrySourceKind,
+        GameLog, LogEntry, LogEntrySourceKind, format_message_as_log4j_event,
     },
     managers::instance::modpack::packinfo,
     managers::instance::schema::make_instance_config,
@@ -20,19 +20,18 @@ use crate::{
     managers::minecraft::assets::get_assets_dir,
     managers::minecraft::minecraft::get_lwjgl_meta,
     managers::minecraft::modrinth,
-    managers::minecraft::{curseforge, UpdateValue},
+    managers::minecraft::{UpdateValue, curseforge},
     managers::modplatforms::curseforge::convert_cf_version_to_standard_version,
     managers::modplatforms::modrinth::convert_mr_version_to_standard_version,
     managers::vtask::Subtask,
     managers::{
-        self,
+        self, ManagerRef,
         account::FullAccount,
         vtask::{NonFailedDismissError, TaskState, VisualTask},
-        ManagerRef,
     },
     util::NormalizedWalkdir,
 };
-use anyhow::{anyhow, bail, Context};
+use anyhow::{Context, anyhow, bail};
 use carbon_net::DownloadOptions;
 use carbon_parsing::log::{LogParser, ParsedItem};
 use chrono::{DateTime, Local, Utc};
@@ -49,7 +48,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
-use tokio::sync::{watch, Mutex, Semaphore};
+use tokio::sync::{Mutex, Semaphore, watch};
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 use tokio::{io::AsyncReadExt, sync::mpsc};
@@ -287,11 +286,7 @@ impl ManagerRef<'_, InstanceManager> {
             None => None,
         };
 
-        app.meta_cache_manager()
-            .watch_and_prioritize(Some(instance_id))
-            .await;
-
-        let result = app.instance_manager().list_mods(instance_id).await?;
+        let result = app.instance_manager().list_mods(instance_id, None).await?;
         let msg = format!(
             "Mods ({} enabled / {} disabled): {}",
             result.iter().filter(|mod_| mod_.enabled).count(),
@@ -341,6 +336,7 @@ impl ManagerRef<'_, InstanceManager> {
                 .await?;
                 modpack::process_modpack_staging(
                     Arc::clone(&app),
+                    instance_id,
                     instance_shortpath.clone(),
                     &t_subtasks,
                 )
@@ -505,11 +501,13 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let start_time = Utc::now();
 
+                    let process_id = child.id().expect("Failed to get process ID for child process. The process may have already exited.");
+
                     let _ = app.instance_manager()
                         .change_launch_state(
                             instance_id,
                             LaunchState::Running(RunningInstance {
-                                process_id: child.id().expect("child process id is not present even though child process was started"),
+                                process_id,
                                 kill_tx,
                                 start_time,
                                 log: log_id,
@@ -519,7 +517,7 @@ impl ManagerRef<'_, InstanceManager> {
 
                     let (Some(stdout), Some(stderr)) = (child.stdout.take(), child.stderr.take())
                     else {
-                        panic!("stdout and stderr are not availible even though the child process was created with both enabled");
+                        panic!("Failed to capture stdout and stderr from child process. The process was created with piped stdio, but the streams are not available. This may indicate a system-level issue with process creation.");
                     };
 
                     let mut last_stored_time = start_time;
@@ -653,7 +651,7 @@ impl ManagerRef<'_, InstanceManager> {
 
             let mods = app
                 .instance_manager()
-                .list_mods(instance_id)
+                .list_mods(instance_id, None)
                 .await
                 .unwrap_or_default()
                 .len();

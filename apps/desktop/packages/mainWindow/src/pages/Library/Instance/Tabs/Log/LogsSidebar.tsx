@@ -161,7 +161,9 @@ const LogsSidebar = (props: LogsSidebarProps) => {
               >
                 <div class="relative w-full h-full flex items-center px-4 py-1 box-border bg-darkSlate-600 rounded-md">
                   <div class="bg-red-400 rounded-full text-red-400 w-4 h-4 mr-2 animate-liveCirclePulse" />
-                  <div>LIVE</div>
+                  <div>
+                    <Trans key="ui.live" />
+                  </div>
                   <Show when={props.selectedLog === activeLog()?.id}>
                     <div class="absolute right-0 top-0 w-1 h-full bg-primary-400" />
                   </Show>

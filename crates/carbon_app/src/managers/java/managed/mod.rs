@@ -14,8 +14,8 @@ use std::{
 };
 use strum::IntoEnumIterator;
 use tokio::sync::{
-    watch::{self, Sender},
     Mutex,
+    watch::{self, Sender},
 };
 
 // mod adoptopenjdk;

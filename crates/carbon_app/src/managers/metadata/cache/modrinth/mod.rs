@@ -1,8 +1,9 @@
 use super::{BundleSender, ModplatformCacher, UpdateNotifier};
-use crate::domain::instance::info::ModLoaderType;
 use crate::domain::instance::InstanceId;
+use crate::domain::instance::info::ModLoaderType;
 use crate::managers::App;
 use anyhow::anyhow;
+use carbon_platforms::ModChannel;
 use carbon_platforms::modrinth::search::VersionIDs;
 use carbon_platforms::modrinth::version::Version;
 use carbon_platforms::modrinth::{
@@ -11,7 +12,6 @@ use carbon_platforms::modrinth::{
     search::{ProjectIDs, TeamIDs, VersionHashesQuery},
     version::HashAlgorithm,
 };
-use carbon_platforms::ModChannel;
 use carbon_repos::db::read_filters::{DateTimeFilter, IntFilter};
 use carbon_repos::db::{
     mod_file_cache as fcdb, mod_metadata as metadb, modrinth_mod_cache as mrdb,
@@ -78,12 +78,20 @@ impl ModplatformCacher for ModrinthModCacher {
             return Ok(());
         }
 
+        let total_mod_count = modlist.len();
+        debug!(
+            "Found {} mods to process for Modrinth caching",
+            total_mod_count
+        );
+
         let failed_instances = mcm.failed_mr_instances.read().await;
         let delay = failed_instances.get(&instance_id);
 
         if let Some((end_time, _)) = delay {
             if Instant::now() < *end_time {
-                warn!("Not attempting to cache modrinth mods for {instance_id} as too many attempts have failed recently");
+                warn!(
+                    "Not attempting to cache modrinth mods for {instance_id} as too many attempts have failed recently"
+                );
                 return Ok(());
             }
         }
@@ -139,15 +147,8 @@ impl ModplatformCacher for ModrinthModCacher {
 
                 let mpm = app.modplatforms_manager();
                 let combined_version_futures = combined_versions_list
-                    .chunks(1000) // ~13 chars per version, 1000 worked fine at time of testing
+                    .chunks(350) // ~13 chars per version, 500 worked fine at time of testing
                     .map(|chunk| async {
-                        let mcm = app.meta_cache_manager();
-                        let semaphore = mcm
-                            .targets_semaphore
-                            .acquire()
-                            .await
-                            .expect("the target semaphore is never closed");
-
                         let resp = mpm
                             .modrinth
                             .get_versions(VersionIDs {
@@ -340,7 +341,6 @@ impl ModplatformCacher for ModrinthModCacher {
                         .await
                         .expect("the image download semaphore is never closed");
 
-                    debug!("thumbnailing modrinth mod icon for {instance_id}/{filename} (project: {project_id}, version: {version_id})");
 
                     let icon = app.reqwest_client
                         .get(&row.url)
@@ -378,7 +378,6 @@ impl ModplatformCacher for ModrinthModCacher {
                         .exec()
                         .await?;
 
-                    debug!("saved modrinth mod thumbnail for {instance_id}/{filename} (project: {project_id}, version: {version_id})");
 
                     let _ = update_notifier.send(instance_id);
                     Ok::<_, anyhow::Error>(())
@@ -416,16 +415,6 @@ async fn cache_modrinth_meta_unchecked(
     authors: String,
     versions: &[Version],
 ) -> anyhow::Result<()> {
-    let prev = app
-        .prisma_client
-        .modrinth_mod_cache()
-        .find_unique(mrdb::UniqueWhereParam::MetadataIdEquals(
-            metadata_id.clone(),
-        ))
-        .with(mrdb::logo_image::fetch())
-        .exec()
-        .await?;
-
     let mut file_update_paths = HashSet::<(&str, ModLoaderType, ModChannel)>::new();
 
     let mut versions_sorted = versions.iter().collect::<Vec<_>>();
@@ -468,67 +457,92 @@ async fn cache_modrinth_meta_unchecked(
         })
         .join(";");
 
-    let o_insert_mrmeta = app.prisma_client.modrinth_mod_cache().create(
-        sha512.clone(),
-        project.id,
-        version.id.clone(),
-        project.title,
-        version.name.clone(),
-        project.slug,
-        project.description,
-        authors,
-        ModChannel::from(version.version_type) as i32,
-        update_paths,
-        filename,
-        file_url,
-        chrono::Utc::now().into(),
-        metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),
-        Vec::new(),
-    );
+    if let Ok(Some(existing_entry)) = app
+        .prisma_client
+        .modrinth_mod_cache()
+        .find_unique(mrdb::UniqueWhereParam::MetadataIdEquals(
+            metadata_id.clone(),
+        ))
+        .exec()
+        .await
+    {
+        if existing_entry.cached_at > (chrono::Utc::now() - chrono::Duration::days(1)) {
+            return Ok(());
+        }
+    }
 
-    let o_delete_mrmeta = prev.as_ref().map(|_| {
-        app.prisma_client
-            .modrinth_mod_cache()
-            .delete(mrdb::UniqueWhereParam::MetadataIdEquals(
-                metadata_id.clone(),
-            ))
-    });
-
-    let old_image = prev
-        .map(|p| {
-            p.logo_image
-                .expect("logo_image was requested but not returned by prisma")
-        })
-        .flatten();
-    let new_image = project.icon_url;
-
-    let image = match (new_image, old_image) {
-        (Some(new), Some(old)) => Some((old.up_to_date == 1 && new == old.url, new, old.data)),
-        (Some(new), None) => Some((false, new, None)),
-        (None, Some(old)) => Some((old.up_to_date == 1, old.url, old.data)),
-        (None, None) => None,
-    };
-
-    let o_insert_logo = image.map(|(up_to_date, url, data)| {
-        app.prisma_client.modrinth_mod_image_cache().create(
-            url,
-            mrdb::UniqueWhereParam::MetadataIdEquals(metadata_id.clone()),
+    let cache_result = app
+        .prisma_client
+        .modrinth_mod_cache()
+        .upsert(
+            mrdb::UniqueWhereParam::ProjectIdVersionIdEquals(
+                project.id.clone(),
+                version.id.clone(),
+            ),
+            mrdb::create(
+                sha512.clone(),
+                project.id.clone(),
+                version.id.clone(),
+                project.title.clone(),
+                version.name.clone(),
+                project.slug.clone(),
+                project.description.clone(),
+                authors.clone(),
+                ModChannel::from(version.version_type) as i32,
+                update_paths.clone(),
+                filename.clone(),
+                file_url.clone(),
+                chrono::Utc::now().into(),
+                metadb::UniqueWhereParam::IdEquals(metadata_id.clone()),
+                Vec::new(),
+            ),
             vec![
-                mrimgdb::SetParam::SetUpToDate(if up_to_date { 1 } else { 0 }),
-                mrimgdb::SetParam::SetData(data),
+                mrdb::SetParam::SetSha512(sha512.clone()),
+                mrdb::SetParam::SetProjectId(project.id.clone()),
+                mrdb::SetParam::SetVersionId(version.id.clone()),
+                mrdb::SetParam::SetTitle(project.title.clone()),
+                mrdb::SetParam::SetVersion(version.name.clone()),
+                mrdb::SetParam::SetUrlslug(project.slug.clone()),
+                mrdb::SetParam::SetDescription(project.description.clone()),
+                mrdb::SetParam::SetAuthors(authors.clone()),
+                mrdb::SetParam::SetReleaseType(ModChannel::from(version.version_type) as i32),
+                mrdb::SetParam::SetUpdatePaths(update_paths.clone()),
+                mrdb::SetParam::SetFilename(filename.clone()),
+                mrdb::SetParam::SetFileUrl(file_url.clone()),
+                mrdb::SetParam::SetCachedAt(chrono::Utc::now().into()),
             ],
         )
-    });
-
-    debug!("updating modrinth metadata entry for {metadata_id}");
-
-    app.prisma_client
-        ._batch((
-            o_delete_mrmeta.into_iter().collect::<Vec<_>>(),
-            o_insert_mrmeta,
-            o_insert_logo.into_iter().collect::<Vec<_>>(),
-        ))
+        .exec()
         .await?;
+
+    if let Some(icon_url) = &project.icon_url {
+        if let Err(e) = app
+            .prisma_client
+            .modrinth_mod_image_cache()
+            .upsert(
+                mrimgdb::UniqueWhereParam::MetadataIdEquals(cache_result.metadata_id.clone()),
+                mrimgdb::create(
+                    icon_url.clone(),
+                    mrdb::UniqueWhereParam::MetadataIdEquals(cache_result.metadata_id.clone()),
+                    vec![
+                        mrimgdb::SetParam::SetUpToDate(0), // Mark as needing download
+                        mrimgdb::SetParam::SetData(None),
+                    ],
+                ),
+                vec![
+                    mrimgdb::SetParam::SetUrl(icon_url.clone()),
+                    mrimgdb::SetParam::SetUpToDate(0), // Mark as needing download on update
+                ],
+            )
+            .exec()
+            .await
+        {
+            warn!(
+                "Failed to upsert modrinth image for metadata_id {}: {:?}",
+                cache_result.metadata_id, e
+            );
+        }
+    }
 
     Ok(())
 }

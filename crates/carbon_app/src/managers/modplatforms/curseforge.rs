@@ -8,11 +8,11 @@ use crate::{
 };
 use anyhow::bail;
 use carbon_platforms::curseforge::{
+    Category, CurseForgeResponse, File, FingerprintsMatchesResult, MinecraftModLoaderIndex, Mod,
     filters::{
         FilesParameters, ModDescriptionParameters, ModFileChangelogParameters, ModFileParameters,
         ModFilesParameters, ModParameters, ModSearchParameters, ModsParameters,
     },
-    Category, CurseForgeResponse, File, FingerprintsMatchesResult, MinecraftModLoaderIndex, Mod,
 };
 use reqwest_middleware::ClientWithMiddleware;
 use serde_json::json;

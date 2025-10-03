@@ -1,20 +1,19 @@
 import {
-  CFFEMod,
+  FEUnifiedSearchResultWithDescription,
+  FEUnifiedSearchType,
   InstanceDetails,
-  MRFEProject,
   Mod
 } from "@gd/core_module/bindings"
 import { VersionRowTypeData } from "../InfiniteScrollVersionsQueryWrapper"
-import { For, Match, Show, Switch, createSignal } from "solid-js"
-import { Trans } from "@gd/i18n"
-import { Button, Popover, Spinner, Tooltip } from "@gd/ui"
+import { For, Match, Show, Switch } from "solid-js"
 import { format } from "date-fns"
-import CopyIcon from "../CopyIcon"
+import { Badge, Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
 import ModDownloadButton from "../ModDownloadButton"
+import ModpackDownloadButton from "../ModpackDownloadButton"
 
 export interface Props {
   modVersion: VersionRowTypeData
-  project: CFFEMod | MRFEProject | undefined
+  project: FEUnifiedSearchResultWithDescription | undefined
   isCurseforge?: boolean
   instanceId?: number | null
   instanceDetails?: InstanceDetails
@@ -25,205 +24,165 @@ export interface Props {
         remoteId: string | number
       }
     | undefined
-  type: "modpack" | "mod"
+  type: FEUnifiedSearchType | undefined
 }
 
 export interface AdditionalProps {
   loading: boolean
   disabled: boolean
   isInstalled?: boolean
-  onPrimaryAction: () => void
 }
 
-const CopiableEntity = (props: {
-  text: string | undefined | null | number
-}) => {
-  return (
-    <div class="flex items-center text-lightSlate-200 w-60">
-      <div class="truncate">
-        <Tooltip
-          content={<div class="max-w-110 break-all">{props.text || "-"}</div>}
-        >
-          {props.text || "-"}
-        </Tooltip>
-      </div>
-      <Show when={props.text}>
-        <div class="flex-shrink-0 ml-2">
-          <CopyIcon text={props.text} />
-        </div>
-      </Show>
-    </div>
-  )
+const formatDownloadCount = (count: number) => {
+  if (count >= 1000000) {
+    return (count / 1000000).toFixed(1) + "M"
+  } else if (count >= 1000) {
+    return (count / 1000).toFixed(1) + "K"
+  }
+  return count.toString()
 }
 
 const RowContainer = (props: Props & AdditionalProps) => {
-  const [isHoveringInfoCard, setIsHoveringInfoCard] = createSignal(false)
-
   return (
     <Switch>
       <Match when={props.modVersion}>
-        <div class="py-2 flex flex-col justify-center">
-          <h4 class="m-0 pb-2 font-medium text-md">
-            {props.modVersion.name.replaceAll(".zip", "")}
-          </h4>
-          <div class="flex text-sm gap-2 divide-darkSlate-500 text-lightGray-800 divide-x-1">
-            <Trans key="explore_versions.tags" />
-            <For each={props.modVersion.gameVersions}>
-              {(version) => <div>{version}</div>}
-            </For>
+        <div class="contents">
+          {/* Version name column */}
+          <div class="flex flex-col justify-center py-2 min-w-0">
+            <div class="flex items-center gap-2 min-w-0">
+              <Show when={props.isInstalled}>
+                <div class="i-ri:check-line text-green-400 text-sm" />
+              </Show>
+              <Tooltip placement="top">
+                <TooltipTrigger>
+                  <h4 class="text-lightSlate-50 text-sm font-medium leading-tight truncate">
+                    {props.modVersion.name.replaceAll(".zip", "")}
+                  </h4>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {props.modVersion.name.replaceAll(".zip", "")}
+                </TooltipContent>
+              </Tooltip>
+            </div>
+            {/* Game versions - compact display */}
+            <div class="mt-1 flex gap-1 overflow-hidden">
+              <For each={props.modVersion.gameVersions.slice(0, 2)}>
+                {(version) => (
+                  <Badge variant="secondary" class="text-xs">
+                    {version}
+                  </Badge>
+                )}
+              </For>
+              <Show when={props.modVersion.gameVersions.length > 2}>
+                <Tooltip placement="top">
+                  <TooltipTrigger>
+                    <Badge variant="secondary" class="text-xs">
+                      +{props.modVersion.gameVersions.length - 2}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <div class="flex flex-col gap-1">
+                      <div class="font-medium text-xs">
+                        Additional versions:
+                      </div>
+                      <div class="flex flex-wrap gap-1 max-w-xs">
+                        <For each={props.modVersion.gameVersions.slice(2)}>
+                          {(version) => (
+                            <Badge variant="secondary" class="text-xs">
+                              {version}
+                            </Badge>
+                          )}
+                        </For>
+                      </div>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </Show>
+            </div>
           </div>
-        </div>
-        <div class="flex items-center">
-          {format(new Date(props.modVersion.datePublished), "dd-MM-yyyy")}
-        </div>
-        <div class="flex items-center">{props.modVersion.downloads}</div>
-        <div
-          class="flex items-center"
-          classList={{
-            "text-green-500":
-              props.modVersion.releaseType === "stable" ||
-              props.modVersion.releaseType === "release",
-            "text-yellow-500": props.modVersion.releaseType === "beta",
-            "text-red-500": props.modVersion.releaseType === "alpha"
-          }}
-        >
-          {props.modVersion.releaseType}
-        </div>
-        <div class="flex items-center">
-          <div onClick={(e) => e.stopPropagation()}>
-            <Popover
-              noPadding
-              noTip
-              onOpen={() => setIsHoveringInfoCard(true)}
-              onClose={() => setIsHoveringInfoCard(false)}
-              content={() => (
-                <div
-                  class="bg-darkSlate-900 rounded-lg shadow-md p-4 text-lightSlate-700 border-darkSlate-700 border-solid border-1 shadow-darkSlate-90 w-110"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div class="text-lightSlate-50 font-bold mb-4 text-xl">
-                    <Trans
-                      key="addons_versions.technical_info_for"
-                      options={{
-                        addon_name: props.modVersion.name
-                      }}
-                    >
-                      {""}
-                      <span class="italic">{""}</span>
-                    </Trans>
-                  </div>
-                  <div class="flex flex-col w-full">
-                    <div class="flex justify-between w-full text-sm">
-                      <div class="w-50">
-                        <Trans key="addons_versions.project_id" />
-                      </div>
-                      <CopiableEntity text={props.modVersion.id} />
-                    </div>
-                    <div class="flex justify-between w-full text-sm">
-                      <div class="w-50">
-                        <Trans key="addons_versions.file_id" />
-                      </div>
-                      <CopiableEntity text={props.modVersion.fileId} />
-                    </div>
-                    <div class="flex justify-between w-full text-sm">
-                      <div class="w-50">
-                        <Trans key="addons_versions.file_name" />
-                      </div>
-                      <CopiableEntity text={props.modVersion.fileName} />
-                    </div>
-                    <div class="flex justify-between w-full text-sm">
-                      <div class="w-50">
-                        <Trans key="addons_versions.file_size" />
-                      </div>
-                      <CopiableEntity text={props.modVersion.size} />
-                    </div>
-                    <div class="flex justify-between w-full text-sm">
-                      <div class="w-50">
-                        <Trans key="addons_versions.hash" />
-                      </div>
-                      <CopiableEntity text={props.modVersion.hash} />
-                    </div>
-                    <div class="flex justify-between w-full text-sm">
-                      <div class="w-50">
-                        <Trans key="addons_versions.status" />
-                      </div>
-                      <CopiableEntity text={props.modVersion.status} />
-                    </div>
-                    <div class="flex justify-between w-full text-sm">
-                      <div class="w-50">
-                        <Trans key="addons_versions.release_type" />
-                      </div>
-                      <CopiableEntity text={props.modVersion.releaseType} />
-                    </div>
-                  </div>
-                </div>
-              )}
-              trigger="click"
-              placement="left-end"
-              color="bg-darkSlate-900"
+
+          {/* Published date column */}
+          <div class="flex items-center text-lightSlate-300 text-sm">
+            {format(new Date(props.modVersion.datePublished), "MMM dd, yyyy")}
+          </div>
+
+          {/* Downloads column */}
+          <div class="flex items-center text-lightSlate-300 text-sm">
+            {formatDownloadCount(props.modVersion.downloads)}
+          </div>
+
+          {/* Release type column */}
+          <div class="flex items-center gap-2">
+            <div
+              class="h-2 w-2 rounded-full"
+              classList={{
+                "bg-green-500":
+                  props.modVersion.releaseType === "stable" ||
+                  props.modVersion.releaseType === "release",
+                "bg-yellow-500": props.modVersion.releaseType === "beta",
+                "bg-red-500": props.modVersion.releaseType === "alpha"
+              }}
+            />
+            <span
+              class="text-sm font-medium capitalize"
+              classList={{
+                "text-green-400":
+                  props.modVersion.releaseType === "stable" ||
+                  props.modVersion.releaseType === "release",
+                "text-yellow-400": props.modVersion.releaseType === "beta",
+                "text-red-400": props.modVersion.releaseType === "alpha"
+              }}
             >
-              <div
-                class="duration-100 ease-in-out cursor-pointer hover:text-lightSlate-50 text-2xl text-lightSlate-700 i-ri:information-fill transition-color"
-                classList={{
-                  "text-lightSlate-50": isHoveringInfoCard()
-                }}
-              />
-            </Popover>
+              {props.modVersion.releaseType}
+            </span>
           </div>
-        </div>
-        <div class="flex items-center">
-          <Switch>
-            <Match when={props.type === "mod"}>
-              <ModDownloadButton
-                size="medium"
-                projectId={props.modVersion.id}
-                fileId={props.modVersion.fileId}
-                isCurseforge={props.isCurseforge || false}
-                instanceId={props.instanceId}
-                instanceLocked={props.instanceDetails?.modpack?.locked}
-                instanceMods={props.instanceMods}
-              />
-            </Match>
-            <Match when={props.type === "modpack"}>
-              <Button
-                type="primary"
-                variant={props.isInstalled ? "green" : undefined}
-                rounded={false}
-                disabled={props.disabled || props.isInstalled}
-                onClick={props.onPrimaryAction}
-              >
-                <div class="flex gap-2">
-                  <Switch>
-                    <Match when={props.type === "mod" && !props.instanceId}>
-                      <Trans key="rowcontainer.no_instance_selected" />
-                    </Match>
-                    <Match when={props.loading}>
-                      <Trans key="modpack.version_downloading" />
-                      <Spinner class="w-5 h-5" />
-                    </Match>
-                    <Match when={!props.loading && !props.isInstalled}>
-                      <Switch>
-                        <Match when={props.installedFile}>
-                          <Trans key="modpack.version_switch" />
-                        </Match>
-                        <Match when={!props.installedFile}>
-                          <Trans key="modpack.version_download" />
-                        </Match>
-                      </Switch>
-                      <div class="w-5 h-5 i-ri:download-2-fill" />
-                    </Match>
-                    <Match when={!props.loading && props.isInstalled}>
-                      <Trans key="modpack.version_installed" />
-                    </Match>
-                  </Switch>
-                </div>
-              </Button>
-            </Match>
-          </Switch>
+
+          {/* Download button column */}
+          <div class="flex items-center justify-end">
+            <Switch>
+              <Match when={props.type === "modpack"}>
+                <ModpackDownloadButton
+                  addon={props.project}
+                  name={props.modVersion.name}
+                  fileId={
+                    props.project?.platform === "curseforge"
+                      ? parseInt(props.modVersion.fileId, 10)
+                      : props.modVersion.fileId
+                  }
+                  size="small"
+                />
+              </Match>
+              <Match when={props.type !== "modpack"}>
+                <ModDownloadButton
+                  selectedInstanceId={props.instanceId ?? undefined}
+                  selectedInstanceMods={props.instanceMods}
+                  addon={props.project}
+                  fileId={
+                    props.project?.platform === "curseforge"
+                      ? parseInt(props.modVersion.fileId, 10)
+                      : props.modVersion.fileId
+                  }
+                  size="small"
+                />
+              </Match>
+            </Switch>
+          </div>
         </div>
       </Match>
       <Match when={!props.modVersion}>
-        <Trans key="loading" />
+        <div class="contents">
+          <div class="animate-pulse py-3">
+            <div class="bg-darkSlate-600 mb-1 h-4 w-3/4 rounded" />
+            <div class="flex gap-1">
+              <div class="bg-darkSlate-600 h-3 w-12 rounded" />
+              <div class="bg-darkSlate-600 h-3 w-12 rounded" />
+            </div>
+          </div>
+          <div class="bg-darkSlate-600 animate-pulse h-4 rounded" />
+          <div class="bg-darkSlate-600 animate-pulse h-4 rounded" />
+          <div class="bg-darkSlate-600 animate-pulse h-4 rounded" />
+          <div class="bg-darkSlate-600 animate-pulse h-8 w-20 rounded" />
+        </div>
       </Match>
     </Switch>
   )

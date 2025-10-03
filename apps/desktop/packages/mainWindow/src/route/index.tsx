@@ -3,25 +3,15 @@ import { RouteDefinition } from "@solidjs/router"
 import SettingsJavaData from "@/pages/Settings/settings.java.data"
 import SettingsGeneralData from "@/pages/Settings/settings.general.data"
 import LoginData from "@/pages/Login/auth.login.data"
-import AppData from "@/pages/app.data"
-import ModpackBrowserData from "@/pages/Modpacks/modpacksBrowser.data"
-import ModsBrowserData from "@/pages/Mods/modsBrowser.data"
-import ModpackData from "@/pages/Modpacks/modpack.overview"
-import ModpackVersionsData from "@/pages/Modpacks/modpack.versions"
-import ModVersionsData from "@/pages/Mods/mods.versions"
-import ModpackScreenshotsData from "@/pages/Modpacks/modpack.screenshots"
+import AddonVersionsData from "@/pages/AddonViewPage/changelog.data"
 import InstanceData from "@/pages/Library/Instance/instance.data"
 import Login from "@/pages/Login"
 import withAdsLayout from "@/pages/withAds"
 import Library from "@/pages/Library"
 import Home from "@/pages/Library/Home"
 import Instance from "@/pages/Library/Instance"
-import ModpacksLayout from "@/pages/Modpacks"
-import ModpackBrowser from "@/pages/Modpacks/ModpacksBrowser"
-import ModsBrowser from "@/pages/Mods/ModsBrowser"
-import ModsInfiniteScrollQueryWrapper from "@/pages/Mods/Explore"
-import ModpacksInfiniteScrollQueryWrapper from "@/pages/Modpacks/Explore"
-import ModsLayout from "@/pages/Mods"
+import AddonViewPage from "@/pages/AddonViewPage"
+import Search from "@/pages/Search"
 /* Defining the routes for the application. */
 
 export const routes: RouteDefinition[] = [
@@ -33,7 +23,6 @@ export const routes: RouteDefinition[] = [
   {
     path: "/",
     component: withAdsLayout,
-    data: AppData,
     children: [
       {
         path: "/library",
@@ -55,9 +44,9 @@ export const routes: RouteDefinition[] = [
                 )
               },
               {
-                path: "/mods",
+                path: "/addons",
                 component: lazy(
-                  () => import("@/pages/Library/Instance/Tabs/Mods")
+                  () => import("@/pages/Library/Instance/Tabs/Addons")
                 )
               },
               {
@@ -104,79 +93,54 @@ export const routes: RouteDefinition[] = [
         ]
       },
       {
-        path: "/modpacks",
-        component: ModpacksLayout,
-        data: ModpackBrowserData,
+        path: "/news",
+        component: lazy(() => import("@/pages/News/NewsWrapper")),
         children: [
           {
             path: "/",
-            component: ModpackBrowser
+            component: lazy(() => import("@/pages/News"))
+          },
+          {
+            path: "/:id",
+            component: lazy(() => import("@/pages/News/PageView"))
           }
         ]
       },
       {
-        path: "/mods",
-        component: ModsLayout,
-        data: ModsBrowserData,
+        path: "/search",
+        component: Search,
         children: [
           {
-            path: "/",
-            component: ModsBrowser
+            path: "/:type?",
+            component: lazy(() => import("@/pages/Search/List"))
           }
         ]
       },
       {
-        path: "/mods/:id/:platform",
-        component: ModsInfiniteScrollQueryWrapper,
-        data: ModpackData,
+        path: "addon/:id/:platform",
+        component: AddonViewPage,
         children: [
           {
             path: "/",
-            component: lazy(() => import("@/pages/Mods/Explore/Overview"))
+            component: lazy(() => import("@/pages/AddonViewPage/Overview"))
           },
           {
             path: "/versions",
-            component: lazy(() => import("@/pages/Mods/Explore/Versions")),
-            data: ModVersionsData
+            component: lazy(() => import("@/pages/AddonViewPage/Versions")),
+            data: AddonVersionsData
           },
           {
             path: "/changelog",
-            component: lazy(() => import("@/pages/Mods/Explore/Changelog"))
+            component: lazy(() => import("@/pages/AddonViewPage/Changelog")),
+            data: AddonVersionsData
           },
           {
             path: "/screenshots",
-            component: lazy(() => import("@/pages/Mods/Explore/Screenshots")),
-            data: ModpackScreenshotsData
+            component: lazy(() => import("@/pages/AddonViewPage/Screenshots"))
           }
         ]
       },
-      {
-        path: "/modpacks/:id/:platform",
-        component: ModpacksInfiniteScrollQueryWrapper,
-        data: ModpackData,
-        children: [
-          {
-            path: "/",
-            component: lazy(() => import("@/pages/Modpacks/Explore/Overview"))
-          },
-          {
-            path: "/versions",
-            component: lazy(() => import("@/pages/Modpacks/Explore/Versions")),
-            data: ModpackVersionsData
-          },
-          {
-            path: "/changelog",
-            component: lazy(() => import("@/pages/Modpacks/Explore/Changelog"))
-          },
-          {
-            path: "/screenshots",
-            component: lazy(
-              () => import("@/pages/Modpacks/Explore/Screenshots")
-            ),
-            data: ModpackScreenshotsData
-          }
-        ]
-      },
+
       {
         path: "/settings",
         component: lazy(() => import("@/pages/Settings")),

@@ -1,10 +1,10 @@
 [package]
 name = "carbon_app"
 version = "0.0.0"
-edition = "2021"
-author = "GorillaDevs Inc."
+edition = "2024"
 
 [dependencies]
+semver = "1.0.25"
 anyhow = { workspace = true }
 derive_more = { workspace = true }
 thiserror = { workspace = true }
@@ -15,7 +15,7 @@ serde_qs = { workspace = true }
 directories = { workspace = true }
 tokio = { workspace = true }
 futures = { workspace = true }
-tower-http = { workspace = true, default-features = false, features = ["cors"] }
+tower-http = { workspace = true }
 rspc = { workspace = true }
 specta = { workspace = true, features = ["chrono"] }
 rspc-axum = { workspace = true, features = ["ws"] }
@@ -72,11 +72,14 @@ async-recursion = "1.1.1"
 shlex = "1.3.0"
 serde-enum-str = "0.4.0"
 markdown = { workspace = true }
+serde_plain = { workspace = true }
 ring = { workspace = true }
 num_cpus = { workspace = true }
-display-info = "0.5.1"
+display-info = { git = "https://github.com/blarfoon/display-info", rev = "e17abca4592b520b9027dbd8dc71bf756f913292" }
+strip-ansi-escapes = { workspace = true }
 # libc = { workspace = true }
 nom = { workspace = true }
+mockall = "0.13.1"
 carbon_parsing = { path = "../carbon_parsing" }
 carbon_rt_path = { path = "../carbon_rt_path" }
 carbon_platforms = { path = "../carbon_platforms" }
@@ -96,7 +99,7 @@ static_vcruntime = { version = "2.0.0" }
 
 [dev-dependencies]
 assert2 = { workspace = true }
-tempdir = { workspace = true }
+tempfile = { workspace = true }
 flowtest = { workspace = true }
 tracing-test = { workspace = true }
 mockito = { workspace = true }

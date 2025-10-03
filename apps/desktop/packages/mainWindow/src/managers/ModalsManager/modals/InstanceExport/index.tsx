@@ -13,6 +13,11 @@ import ExportDone from "./atoms/ExportDone"
 
 const [exportStep, setExportStep] = createSignal(0)
 export { exportStep, setExportStep }
+
+interface Props {
+  instanceId: number
+}
+
 interface IPayload {
   instance_id: number | undefined
   target: ExportTarget
@@ -28,8 +33,12 @@ const [payload, setPayload] = createStore<IPayload>({
   self_contained_addons_bundling: false,
   filter: { entries: {} }
 })
+
 export { payload, setPayload }
+
 const InstanceExport = (props: ModalProps) => {
+  const data: () => Props = () => props.data
+  const instanceId = () => data()?.instanceId
   return (
     <ModalLayout
       noHeader={props.noHeader}
@@ -41,10 +50,10 @@ const InstanceExport = (props: ModalProps) => {
           <Match when={exportStep() === 0}>
             <ExportFormat />
             {/* <ExportNameVersion /> */}
-            <FilesSelection />
+            <FilesSelection instanceId={instanceId()} />
             <SelfContainedArchive />
             <ExportPath />
-            <BeginExport />
+            <BeginExport instanceId={instanceId()} />
           </Match>
           <Match when={exportStep() === 1}>
             <Exporting />

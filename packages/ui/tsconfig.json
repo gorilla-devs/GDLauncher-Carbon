@@ -1,6 +1,12 @@
 {
   "extends": "@gd/config/tsconfig.json",
-  "include": ["src/**/*.ts", "src/**/*.tsx", "./types.d.ts"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "showcase/**/*.ts",
+    "showcase/**/*.tsx",
+    "./types.d.ts"
+  ],
   "exclude": ["dist/**/*", "node_modules"],
   "compilerOptions": {
     "jsx": "preserve",
