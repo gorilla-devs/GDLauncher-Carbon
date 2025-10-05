@@ -20,11 +20,14 @@ import {
   createEffect,
   createSignal,
   onCleanup,
-  onMount
+  onMount,
+  createMemo
 } from "solid-js"
+import { createAsyncEffect } from "@/utils/asyncEffect"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { queryClient, rspc } from "@/utils/rspcClient"
 import fetchData from "./instance.data"
+import { detectDuplicatedMods } from "@/utils/duplicateMods"
 import {
   FEModResponse,
   MRFEProject,
@@ -77,6 +80,13 @@ const Instance = () => {
 
   const [t] = useTransContext()
   const modalsContext = useModal()
+
+  // Detect duplicated mods
+  const duplicatedMods = createMemo(() => {
+    if (!routeData.instanceMods) return []
+    return detectDuplicatedMods(routeData.instanceMods)
+  })
+
   let backButtonRef: HTMLSpanElement
   let headerRef: HTMLElement
   let innerContainerRef: HTMLDivElement | undefined
@@ -271,24 +281,25 @@ const Instance = () => {
     routeData.instanceDetails.data?.modpack?.modpack.type === "curseforge" &&
     routeData.instanceDetails.data?.modpack?.modpack.value
 
-  createEffect((prevData) => {
+  createAsyncEffect((isStale, prevData) => {
     const isCurseforge = curseforgeData()
 
     if (isCurseforge) {
       const currentProjectId = isCurseforge.project_id
 
-      rspcContext.client.query([
-        "modplatforms.curseforge.getMod",
-        {
-          modId: currentProjectId
-        }
-      ]).then((modpackData) => {
-        // Check if data hasn't changed during async operation
-        const currentCfData = curseforgeData()
-        if (currentCfData && currentCfData.project_id === currentProjectId) {
-          setModpackDetails(modpackData)
-        }
-      })
+      rspcContext.client
+        .query([
+          "modplatforms.curseforge.getMod",
+          {
+            modId: currentProjectId
+          }
+        ])
+        .then((modpackData) => {
+          // Check if data hasn't changed during async operation
+          if (!isStale()) {
+            setModpackDetails(modpackData)
+          }
+        })
     }
 
     return isCurseforge
@@ -298,22 +309,20 @@ const Instance = () => {
     routeData.instanceDetails.data?.modpack?.modpack.type === "modrinth" &&
     routeData.instanceDetails.data?.modpack?.modpack.value
 
-  createEffect((prevData) => {
+  createAsyncEffect((isStale, prevData) => {
     const isModrinth = modrinthData()
 
     if (isModrinth) {
       const currentProjectId = isModrinth.project_id
 
-      rspcContext.client.query([
-        "modplatforms.modrinth.getProject",
-        currentProjectId
-      ]).then((modpackData) => {
-        // Check if data hasn't changed during async operation
-        const currentMrData = modrinthData()
-        if (currentMrData && currentMrData.project_id === currentProjectId) {
-          setModpackDetails(modpackData)
-        }
-      })
+      rspcContext.client
+        .query(["modplatforms.modrinth.getProject", currentProjectId])
+        .then((modpackData) => {
+          // Check if data hasn't changed during async operation
+          if (!isStale()) {
+            setModpackDetails(modpackData)
+          }
+        })
     }
 
     return isModrinth
@@ -808,6 +817,41 @@ const Instance = () => {
                   !isFullScreen() && !location.pathname.includes("/addons")
               }}
             >
+              <Show when={duplicatedMods().length > 0}>
+                <div
+                  class="bg-yellow-900/20 border border-yellow-600/30 rounded-xl p-4 flex items-center justify-between mb-4"
+                  classList={{
+                    "mx-6 mt-4": location.pathname.includes("/addons")
+                  }}
+                >
+                  <div class="flex items-center gap-3">
+                    <div class="i-ri:alert-line text-yellow-500 text-2xl" />
+                    <div>
+                      <h3 class="font-semibold text-yellow-200 m-0 mb-1">
+                        Duplicated Mods Detected
+                      </h3>
+                      <p class="text-sm text-yellow-300/70 m-0">
+                        {duplicatedMods().length} mod{duplicatedMods().length > 1 ? 's have' : ' has'} multiple versions installed. This may cause conflicts.
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="primary"
+                    size="small"
+                    onClick={() => {
+                      modalsContext?.openModal(
+                        { name: "duplicatedModsResolution" },
+                        {
+                          duplicatedMods: duplicatedMods().map(g => g.mods),
+                          instanceId: parseInt(params.id, 10)
+                        }
+                      )
+                    }}
+                  >
+                    Fix Now
+                  </Button>
+                </div>
+              </Show>
               <Outlet />
             </div>
           </div>

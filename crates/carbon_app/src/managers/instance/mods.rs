@@ -131,7 +131,29 @@ impl ManagerRef<'_, InstanceManager> {
                     .with(metadb::modrinth::fetch().with(mrdb::logo_image::fetch())),
             )
             .exec()
-            .await?
+            .await?;
+
+        // Detect duplicated mods by grouping enabled mods by modid
+        let mut modid_counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+        for m in &mods {
+            // Only consider enabled mods with metadata and modid
+            if m.enabled {
+                if let Some(ref metadata) = m.metadata {
+                    if let Some(ref modid) = metadata.modid {
+                        *modid_counts.entry(modid.clone()).or_insert(0) += 1;
+                    }
+                }
+            }
+        }
+
+        // Build set of modids that have duplicates (appear more than once)
+        let duplicate_modids: std::collections::HashSet<String> = modid_counts
+            .into_iter()
+            .filter(|(_, count)| *count > 1)
+            .map(|(modid, _)| modid)
+            .collect();
+
+        let mods = mods
             .into_iter()
             .map(|m| {
                 let (mid, cf, mr) = m
@@ -240,6 +262,14 @@ impl ManagerRef<'_, InstanceManager> {
                             .is_some(),
                     }),
                     has_update: has_curseforge_update || has_modrinth_update,
+                    is_duplicate: m
+                        .enabled
+                        && m.metadata
+                            .as_ref()
+                            .and_then(|meta| meta.modid.as_ref())
+                            .map(|modid| duplicate_modids.contains(modid))
+                            .unwrap_or(false),
+                    file_size: m.filesize as u64,
                 }
             });
 

@@ -64,9 +64,12 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   const infiniteQuery = createInfiniteQuery(() => ({
     queryKey: ["modplatforms.versions"],
     queryFn: async (ctx) => {
-      setVersionsQuery({
-        index: ctx.pageParam
-      })
+      // Only set index for CurseForge, Modrinth doesn't use pagination
+      if (props.modplatform === "curseforge") {
+        setVersionsQuery({
+          index: ctx.pageParam
+        })
+      }
 
       if (props.modplatform === "curseforge") {
         const project = await rspcContext.client.query([
@@ -122,9 +125,7 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
               : undefined,
             loaders: versionsQuery.modLoaderType
               ? [versionsQuery.modLoaderType]
-              : undefined,
-            limit: versionsQuery.pageSize,
-            offset: ctx.pageParam
+              : undefined
           }
         ])
 
@@ -143,8 +144,8 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
             status: v.status || "",
             mainThumbnail: project.icon_url || undefined
           })),
-          index: ctx.pageParam,
-          total: project.versions.length
+          index: 0,
+          total: response.length
         } satisfies VersionRowType
 
         return processedData
@@ -153,13 +154,8 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => {
       if (props.modplatform === "modrinth") {
-        const loadedCount = allPages.reduce(
-          (acc, page) => acc + page.data.length,
-          0
-        )
-        const totalCount = lastPage.total || 0
-
-        return loadedCount < totalCount ? loadedCount : null
+        // Modrinth returns all versions in a single request, no pagination
+        return null
       }
 
       const index = lastPage?.index || 0

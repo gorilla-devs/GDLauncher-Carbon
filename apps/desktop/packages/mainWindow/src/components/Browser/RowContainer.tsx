@@ -5,7 +5,7 @@ import {
   Mod
 } from "@gd/core_module/bindings"
 import { VersionRowTypeData } from "../InfiniteScrollVersionsQueryWrapper"
-import { For, Match, Show, Switch } from "solid-js"
+import { For, Match, Show, Switch, createMemo } from "solid-js"
 import { format } from "date-fns"
 import { Badge, Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
 import ModDownloadButton from "../ModDownloadButton"
@@ -43,6 +43,12 @@ const formatDownloadCount = (count: number) => {
 }
 
 const RowContainer = (props: Props & AdditionalProps) => {
+  const fileId = createMemo(() =>
+    props.project?.platform === "curseforge"
+      ? parseInt(props.modVersion.fileId, 10)
+      : props.modVersion.fileId
+  )
+
   return (
     <Switch>
       <Match when={props.modVersion}>
@@ -144,11 +150,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
                 <ModpackDownloadButton
                   addon={props.project}
                   name={props.modVersion.name}
-                  fileId={
-                    props.project?.platform === "curseforge"
-                      ? parseInt(props.modVersion.fileId, 10)
-                      : props.modVersion.fileId
-                  }
+                  fileId={fileId()}
                   size="small"
                 />
               </Match>
@@ -157,11 +159,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
                   selectedInstanceId={props.instanceId ?? undefined}
                   selectedInstanceMods={props.instanceMods}
                   addon={props.project}
-                  fileId={
-                    props.project?.platform === "curseforge"
-                      ? parseInt(props.modVersion.fileId, 10)
-                      : props.modVersion.fileId
-                  }
+                  fileId={fileId()}
                   size="small"
                 />
               </Match>

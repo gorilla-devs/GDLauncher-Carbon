@@ -24,6 +24,7 @@ interface ColumnConfig {
   onToggleMod: (mod: ModType) => Promise<void>
   onUpdateMod: (mod: ModType) => Promise<void>
   onDeleteMod: (mod: ModType) => Promise<void>
+  onSwitchVersion: (mod: ModType) => void
   isModUpdating: (modId: string) => boolean
   instanceId: number
 }
@@ -60,7 +61,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
           class={`transition-opacity duration-100 ease-in-out ${
             props.row.getIsSelected()
               ? "opacity-100"
-              : "opacity-0 group-hover:opacity-100"
+              : "opacity-0 group-hover/row:opacity-100"
           }`}
           onMouseDown={(e) => e.stopPropagation()}
         >
@@ -138,6 +139,16 @@ export const createAddonColumns = (config: ColumnConfig) => {
     // Filename column
     columnHelper.accessor("filename", {
       header: t("instance.table.filename"),
+      sortingFn: (rowA, rowB) => {
+        const modA = rowA.original
+        const modB = rowB.original
+        const a = modA.metadata?.name || modA.filename
+        const b = modB.metadata?.name || modB.filename
+        return a.localeCompare(b, undefined, {
+          sensitivity: "base",
+          numeric: true
+        })
+      },
       cell: (info) => {
         const mod = info.row.original
         const displayName = mod.metadata?.name || mod.filename
@@ -170,6 +181,28 @@ export const createAddonColumns = (config: ColumnConfig) => {
           </div>
         )
       }
+    }),
+
+    // Duplicate Warning column
+    columnHelper.accessor("is_duplicate", {
+      header: "",
+      size: 48,
+      cell: (props) => {
+        const mod = props.row.original
+        return (
+          <Show when={mod.is_duplicate}>
+            <Tooltip>
+              <TooltipTrigger>
+                <div class="i-ri:alert-fill text-lg text-yellow-500" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <Trans key="instance.duplicate_mod_warning" />
+              </TooltipContent>
+            </Tooltip>
+          </Show>
+        )
+      },
+      enableSorting: false
     }),
 
     // Type column
@@ -338,7 +371,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
               </Tooltip>
             }
           >
-            <div onMouseDown={(e) => e.stopPropagation()}>
+            <div class="group" onMouseDown={(e) => e.stopPropagation()}>
               <Switch
                 checked={mod.enabled}
                 onChange={() => config.onToggleMod(mod)}
@@ -347,6 +380,39 @@ export const createAddonColumns = (config: ColumnConfig) => {
           </Show>
         )
       }
+    }),
+
+    // Actions column
+    columnHelper.display({
+      id: "actions",
+      header: t("instance.table.actions"),
+      size: 80,
+      cell: (props) => {
+        const mod = props.row.original
+        const hasPlatformData = !!mod.curseforge || !!mod.modrinth
+
+        return (
+          <Show when={hasPlatformData}>
+            <div
+              class="flex items-center justify-center"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <Tooltip>
+                <TooltipTrigger>
+                  <div
+                    class="i-ri:arrow-left-right-line text-lg text-lightSlate-400 hover:text-lightSlate-200 cursor-pointer transition-colors"
+                    onClick={() => config.onSwitchVersion(mod)}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>
+                  <Trans key="instance.switch_version" />
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </Show>
+        )
+      },
+      enableSorting: false
     })
   ]
 }

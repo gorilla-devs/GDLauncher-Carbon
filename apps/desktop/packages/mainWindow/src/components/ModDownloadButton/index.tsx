@@ -154,6 +154,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   // Watch for installation completion and clear states reactively
   const [wasInstalled, setWasInstalled] = createSignal(false)
   const [wasLoading, setWasLoading] = createSignal(false)
+  const [isInitialized, setIsInitialized] = createSignal(false)
 
   createEffect(() => {
     const installed = isInstalled()
@@ -168,13 +169,16 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     }
 
     // For other addon types: show toast when transitioning from not installed to installed
-    if (!isWorld && installed && !wasInstalled()) {
+    // Skip on initial mount to avoid showing toast for already-installed versions
+    if (!isWorld && installed && !wasInstalled() && isInitialized()) {
       toast.success(`${props.addon?.title || "Addon"} installed successfully`, {
         duration: 2000
       })
-      setWasInstalled(true)
-    } else if (!installed) {
-      setWasInstalled(false)
+    }
+
+    // Track installed state changes
+    if (installed !== wasInstalled()) {
+      setWasInstalled(installed)
     }
 
     // Track loading state changes
@@ -184,6 +188,11 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
       setLoading(false)
       setTaskId(null)
       setProgress(null)
+    }
+
+    // Mark as initialized after first run
+    if (!isInitialized()) {
+      setIsInitialized(true)
     }
   })
 

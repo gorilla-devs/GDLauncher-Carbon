@@ -11,7 +11,7 @@ import {
   TooltipContent,
   TooltipTrigger
 } from "@gd/ui"
-import { Outlet, useLocation, useParams } from "@solidjs/router"
+import { Outlet, useLocation, useParams, useSearchParams } from "@solidjs/router"
 import {
   For,
   JSX,
@@ -91,6 +91,17 @@ const AddonExplore = () => {
   const location = useLocation()
   const indexTab = () => getTabIndexFromPath(location.pathname)
   const [t] = useTransContext()
+  const [searchParams] = useSearchParams()
+
+  const selectedInstanceId = () => {
+    const id = parseInt(searchParams.instanceId, 10)
+    return isNaN(id) ? undefined : id
+  }
+
+  const instanceMods = rspc.createQuery(() => ({
+    queryKey: ["instance.getInstanceMods", selectedInstanceId()],
+    enabled: selectedInstanceId() !== undefined
+  }))
 
   const project = rspc.createQuery(() => ({
     queryKey: [
@@ -283,7 +294,11 @@ const AddonExplore = () => {
                           project.data?.type && project.data?.type !== "modpack"
                         }
                       >
-                        <ModDownloadButton addon={project.data} />
+                        <ModDownloadButton
+                          addon={project.data}
+                          selectedInstanceId={selectedInstanceId()}
+                          selectedInstanceMods={instanceMods.data}
+                        />
                       </Match>
                     </Switch>
                   </div>
@@ -352,7 +367,11 @@ const AddonExplore = () => {
                           project.data?.type && project.data?.type !== "modpack"
                         }
                       >
-                        <ModDownloadButton addon={project.data} />
+                        <ModDownloadButton
+                          addon={project.data}
+                          selectedInstanceId={selectedInstanceId()}
+                          selectedInstanceMods={instanceMods.data}
+                        />
                       </Match>
                     </Switch>
                   </div>

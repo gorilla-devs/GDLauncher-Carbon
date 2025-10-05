@@ -10,6 +10,7 @@ import {
   Show,
   Switch
 } from "solid-js"
+import { createAsyncEffect } from "@/utils/asyncEffect"
 import { Router, hashIntegration } from "@solidjs/router"
 import initRspc, { rspc, queryClient } from "@/utils/rspcClient"
 import { i18n, TransProvider, icu, loadLanguageFiles } from "@gd/i18n"
@@ -257,7 +258,7 @@ const TransWrapper = (props: TransWrapperProps) => {
     queryKey: ["settings.getSettings"]
   }))
 
-  createEffect((prevLanguage) => {
+  createAsyncEffect((isStale, prevLanguage) => {
     if (settings.isSuccess) {
       const { language } = settings.data
 
@@ -271,14 +272,14 @@ const TransWrapper = (props: TransWrapperProps) => {
           }
 
           // Check if language hasn't changed during async load
-          if (settings.data.language !== currentLanguage) {
+          if (isStale()) {
             return
           }
 
           const defaultNamespacesMap = await loadLanguageFiles(currentLanguage)
 
           // Check again after second async load
-          if (settings.data.language !== currentLanguage) {
+          if (isStale()) {
             return
           }
 

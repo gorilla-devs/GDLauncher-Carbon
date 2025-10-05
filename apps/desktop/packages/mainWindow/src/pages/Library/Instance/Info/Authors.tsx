@@ -1,4 +1,5 @@
 import { Show, createEffect, createSignal, createMemo } from "solid-js"
+import { createAsyncEffect } from "@/utils/asyncEffect"
 import {
   CFFEModAuthor,
   FEModResponse,
@@ -21,7 +22,7 @@ const Authors = (props: Props) => {
   const [isLoading, setIsLoading] = createSignal(false)
   const rspcContext = rspc.useContext()
 
-  createEffect((prevTeamId) => {
+  createAsyncEffect((isStale, prevTeamId) => {
     if (
       props.modpackDetails &&
       props.isModrinth &&
@@ -31,22 +32,18 @@ const Authors = (props: Props) => {
 
       setIsLoading(true)
 
-      rspcContext.client.query([
-        "modplatforms.modrinth.getTeam",
-        currentTeamId
-      ]).then((modrinthAuthorsQuery) => {
-        // Check if team hasn't changed during async operation
-        const currentTeam = props.isModrinth && props.modpackDetails
-          ? (props.modpackDetails as MRFEProject)?.team
-          : undefined
-
-        if (currentTeam === currentTeamId && modrinthAuthorsQuery) {
-          setAuthors(modrinthAuthorsQuery)
-        }
-        setIsLoading(false)
-      }).catch(() => {
-        setIsLoading(false)
-      })
+      rspcContext.client
+        .query(["modplatforms.modrinth.getTeam", currentTeamId])
+        .then((modrinthAuthorsQuery) => {
+          // Check if team hasn't changed during async operation
+          if (!isStale() && modrinthAuthorsQuery) {
+            setAuthors(modrinthAuthorsQuery)
+          }
+          setIsLoading(false)
+        })
+        .catch(() => {
+          setIsLoading(false)
+        })
 
       return currentTeamId
     }

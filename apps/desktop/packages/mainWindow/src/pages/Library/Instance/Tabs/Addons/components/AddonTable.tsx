@@ -818,7 +818,7 @@ export const AddonTable = (props: AddonTableProps) => {
 
   const getRowClasses = (rowId: string) => {
     const baseClasses =
-      "border-darkSlate-600 hover:bg-darkSlate-750 flex w-full border-t group cursor-pointer"
+      "border-darkSlate-600 flex w-full border-t group/row cursor-pointer"
 
     if (contextMenuSelection().has(rowId) && isContextMenuOpen()) {
       return `${baseClasses} bg-blue-500/10 ring-1 ring-blue-400/30`

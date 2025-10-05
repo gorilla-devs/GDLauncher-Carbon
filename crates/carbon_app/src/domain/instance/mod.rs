@@ -165,6 +165,8 @@ pub struct Mod {
     pub curseforge: Option<CurseForgeModMetadata>,
     pub modrinth: Option<ModrinthModMetadata>,
     pub has_update: bool,
+    pub is_duplicate: bool,
+    pub file_size: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

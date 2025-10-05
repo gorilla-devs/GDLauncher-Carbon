@@ -132,9 +132,12 @@ const Mods = () => {
   }
 
   const sortAlphabetically = (a: Modtype, b: Modtype) => {
-    if (a.filename < b.filename) return -1
-    if (a.filename > b.filename) return 1
-    return 0
+    const aName = a.curseforge?.name || a.metadata?.name || a.filename
+    const bName = b.curseforge?.name || b.metadata?.name || b.filename
+    return aName.localeCompare(bName, undefined, {
+      sensitivity: "base",
+      numeric: true
+    })
   }
 
   const isSelectAllIndeterminate = () => {

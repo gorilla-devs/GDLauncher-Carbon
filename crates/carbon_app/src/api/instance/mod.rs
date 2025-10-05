@@ -1017,6 +1017,8 @@ struct Mod {
     curseforge: Option<CurseForgeModMetadata>,
     modrinth: Option<ModrinthModMetadata>,
     has_update: bool,
+    is_duplicate: bool,
+    file_size: f64,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -1470,6 +1472,8 @@ impl From<domain::Mod> for Mod {
             curseforge: value.curseforge.map(Into::into),
             modrinth: value.modrinth.map(Into::into),
             has_update: value.has_update,
+            is_duplicate: value.is_duplicate,
+            file_size: value.file_size as f64,
         }
     }
 }

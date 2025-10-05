@@ -1,6 +1,7 @@
 import { rspc } from "@/utils/rspcClient"
 import { Checkbox } from "@gd/ui"
 import { createEffect, createSignal, For, Match, Show, Switch } from "solid-js"
+import { createAsyncEffect } from "@/utils/asyncEffect"
 import {
   buildNestedObject,
   checkedFiles,
@@ -70,32 +71,31 @@ const ExportCheckbox = (props: {
   const [contents, setContents] = createSignal<any[]>([])
   const rspcContext = rspc.useContext()
 
-  createEffect((prevState) => {
+  createAsyncEffect((isStale) => {
     const currentIsOpen = isOpen()
     const currentContentsLength = contents().length
     const currentPath = props.folder.path
 
-    const current = { currentIsOpen, currentContentsLength, currentPath }
-
     if (!currentIsOpen && currentContentsLength === 0 && currentPath) {
-      rspcContext.client.query([
-        "instance.explore",
-        {
-          instance_id: props.instanceId,
-          path: currentPath
-        }
-      ]).then((res) => {
-        // Check if state hasn't changed during async operation
-        if (!isOpen() && props.folder.path === currentPath) {
-          setContents(res)
-        }
-      }).catch((error) => {
-        console.error("Failed to explore instance folder:", error)
-      })
+      rspcContext.client
+        .query([
+          "instance.explore",
+          {
+            instance_id: props.instanceId,
+            path: currentPath
+          }
+        ])
+        .then((res) => {
+          // Check if state hasn't changed during async operation
+          if (!isStale()) {
+            setContents(res)
+          }
+        })
+        .catch((error) => {
+          console.error("Failed to explore instance folder:", error)
+        })
     }
-
-    return current
-  }, { currentIsOpen: false, currentContentsLength: 0, currentPath: undefined })
+  })
 
   createEffect(() => {
     const obj = buildNestedObject(checkedFiles())

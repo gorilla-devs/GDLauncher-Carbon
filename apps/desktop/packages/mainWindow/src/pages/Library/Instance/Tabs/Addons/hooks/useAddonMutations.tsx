@@ -204,6 +204,50 @@ export const useAddonMutations = (
     )
   }
 
+  const handleSwitchVersion = (mod: ModType) => {
+    const hasCurseforge = !!mod.curseforge
+    const hasModrinth = !!mod.modrinth
+    const modName = mod.metadata?.name || mod.filename
+
+    // If no platforms available, do nothing
+    if (!hasCurseforge && !hasModrinth) return
+
+    const navigateToVersions = (
+      platform: "curseforge" | "modrinth",
+      projectId: string | number
+    ) => {
+      navigator.navigate(
+        `/addon/${projectId}/${platform}/versions?instanceId=${params.id}`
+      )
+    }
+
+    // If both platforms exist, ask user which one to use
+    if (hasCurseforge && hasModrinth) {
+      modalsContext?.openModal(
+        {
+          name: "platformSelection"
+        },
+        {
+          modName,
+          onSelectPlatform: (platform: "curseforge" | "modrinth") => {
+            const projectId =
+              platform === "curseforge"
+                ? mod.curseforge!.project_id
+                : mod.modrinth!.project_id
+            navigateToVersions(platform, projectId)
+          }
+        }
+      )
+    } else {
+      // Navigate directly to the only available platform
+      if (hasCurseforge) {
+        navigateToVersions("curseforge", mod.curseforge!.project_id)
+      } else {
+        navigateToVersions("modrinth", mod.modrinth!.project_id)
+      }
+    }
+  }
+
   return {
     // Mutations
     deleteModMutation,
@@ -220,6 +264,7 @@ export const useAddonMutations = (
     handleOpenFolder,
     gotoSearchPage,
     handleUpdateSelected,
-    handleUpdateAll
+    handleUpdateAll,
+    handleSwitchVersion
   }
 }

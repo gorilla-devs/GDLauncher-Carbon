@@ -89,6 +89,7 @@ const Addons = () => {
     onToggleMod: addonMutations.handleToggleMod,
     onUpdateMod: addonMutations.handleUpdateMod,
     onDeleteMod: addonMutations.handleDeleteMod,
+    onSwitchVersion: addonMutations.handleSwitchVersion,
     isModUpdating: addonData.isModUpdating,
     instanceId: parseInt(params.id, 10)
   })

@@ -29,7 +29,9 @@ export const useAddonData = () => {
   >("all")
 
   // Table states
-  const [sorting, setSorting] = createSignal<SortingState>([])
+  const [sorting, setSorting] = createSignal<SortingState>([
+    { id: "filename", desc: false }
+  ])
   const [columnFilters, setColumnFilters] = createSignal<ColumnFiltersState>([])
   const [columnVisibility, setColumnVisibility] = createSignal<VisibilityState>(
     {}

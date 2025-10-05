@@ -6,6 +6,7 @@ import {
 
 import { createEffect, createMemo, createSignal, mergeProps } from "solid-js"
 import { rspc } from "./rspcClient"
+import { createAsyncEffect } from "./asyncEffect"
 import { createInfiniteQuery } from "@tanstack/solid-query"
 import { VirtualizerHandle } from "virtua/lib/solid"
 import { useSearchParams } from "@solidjs/router"
@@ -78,13 +79,13 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     enabled: !!selectedInstanceId()
   }))
 
-  createEffect((prevId) => {
+  createAsyncEffect((isStale, prevId) => {
     const currentId = selectedInstanceId()
     if (currentId && currentId !== prevId) {
       selectedInstanceMods.refetch()
       selectedInstance.refetch().then((res) => {
         // Check if still on same instance to avoid race conditions
-        if (selectedInstanceId() === currentId) {
+        if (!isStale()) {
           const modloader = res.data?.modloaders[0]
           const gameVersion = res.data?.version
           setSearchQuery((prev) => ({
@@ -123,7 +124,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   }
 
   // When the instanceId changes, reset the search query to default with instance filters
-  createEffect((prevInstanceId: number) => {
+  createAsyncEffect((isStale, prevInstanceId: number | undefined) => {
     if (
       !selectedInstanceId() &&
       prevInstanceId !== selectedInstanceId() &&
@@ -219,7 +220,8 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     const currentQuery = searchQuery()
 
     // Only refetch if query actually changed (deep comparison)
-    const queryChanged = JSON.stringify(prevQuery) !== JSON.stringify(currentQuery)
+    const queryChanged =
+      JSON.stringify(prevQuery) !== JSON.stringify(currentQuery)
 
     if (queryChanged) {
       rspcContext.queryClient.removeQueries({

@@ -22,6 +22,7 @@ import {
   createEffect,
   createSignal
 } from "solid-js"
+import { createAsyncEffect } from "@/utils/asyncEffect"
 import { createStore } from "solid-js/store"
 import SingleCheckBox from "./SingleCheckBox"
 import BeginImportStep from "./BeginImportStep"
@@ -72,35 +73,28 @@ const SingleEntity = (props: {
     setPath(entityDefaultPath.data!)
   })
 
-  createEffect((prevPath) => {
+  createAsyncEffect((isStale, prevPath) => {
     const currentPath = path()
 
-    const scanAndInvalidate = async () => {
-      try {
-        if (currentPath) {
-          await scanImportableInstancesMutation.mutateAsync([
-            props.entity.entity,
-            currentPath
-          ])
-        } else {
-          await scanImportableInstancesMutation.mutateAsync([
-            props.entity.entity,
-            ""
-          ])
-        }
+    const mutation = currentPath
+      ? scanImportableInstancesMutation.mutateAsync([
+          props.entity.entity,
+          currentPath
+        ])
+      : scanImportableInstancesMutation.mutateAsync([props.entity.entity, ""])
 
+    mutation
+      .then(() => {
         // Check if path hasn't changed during async operation
-        if (path() === currentPath) {
+        if (!isStale()) {
           queryClient.invalidateQueries({
             queryKey: ["instance.getImportScanStatus"]
           })
         }
-      } catch (error) {
+      })
+      .catch((error) => {
         console.error("Failed to scan importable instances:", error)
-      }
-    }
-
-    scanAndInvalidate()
+      })
 
     return currentPath
   }, undefined)

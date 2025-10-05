@@ -325,6 +325,16 @@ const Mod = (props: Props) => {
           </div>
         </div>
         <span class="flex items-center justify-center gap-4">
+          <Show when={props.mod.is_duplicate}>
+            <Tooltip>
+              <TooltipTrigger>
+                <i class="i-ri:alert-fill h-5 w-5 text-yellow-500" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <Trans key="instance.duplicate_mod_warning" />
+              </TooltipContent>
+            </Tooltip>
+          </Show>
           <Show when={props.mod.has_update && props.isInstanceLocked}>
             <Tooltip>
               <TooltipTrigger class="max-w-38 flex overflow-hidden text-ellipsis">

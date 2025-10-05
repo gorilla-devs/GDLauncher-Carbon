@@ -9,6 +9,7 @@ import {
   createSignal,
   createMemo
 } from "solid-js"
+import { createAsyncEffect } from "@/utils/asyncEffect"
 import { Dropdown } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
 import fetchData from "./changelog.data"
@@ -209,70 +210,68 @@ const Changelog = () => {
     }
   })
 
-  createEffect((prev) => {
+  createAsyncEffect((isStale) => {
     const modpackId = parseInt(params.id, 10)
     const currentFileId = fileId()
     const currentLastFile = lastFile()
     const isCurseforge = routeData.isCurseforge
 
-    const current = { modpackId, currentFileId, currentLastFile, isCurseforge }
-
     if (isCurseforge) {
       if (
         currentFileId !== undefined ||
-        (currentLastFile && (currentLastFile as CFFEFile).id !== undefined)
+        (currentLastFile && currentLastFile.id !== undefined)
       ) {
         setIsLoadingChangelog(true)
         setChangelog(undefined)
         setReleaseDate(undefined)
 
         const targetFileId =
-          parseInt(currentFileId as string, 10) || (currentLastFile as CFFEFile).id
+          parseInt(currentFileId as string, 10) ||
+          (currentLastFile as CFFEFile).id
 
-        rspcContext.client.query([
-          "modplatforms.curseforge.getModFileChangelog",
-          {
-            modId: modpackId,
-            fileId: targetFileId
-          }
-        ]).then((changelogQuery) => {
-          // Check if parameters haven't changed during async operation
-          if (fileId() === currentFileId && routeData.isCurseforge === isCurseforge) {
-            setChangelog(changelogQuery.data)
-            const fileData =
-              routeData.modpackDetails.data?.data.latestFiles.find(
-                (file) => file.id === targetFileId
-              ) ||
-              routeData.modpackDetails.data?.data.latestFilesIndexes.find(
-                (file) => file.fileId === targetFileId
-              )
-
-            if (fileData && "fileDate" in fileData) {
-              setReleaseDate(fileData.fileDate)
-            } else {
-              setReleaseDate(undefined)
+        rspcContext.client
+          .query([
+            "modplatforms.curseforge.getModFileChangelog",
+            {
+              modId: modpackId,
+              fileId: targetFileId
             }
-            setIsLoadingChangelog(false)
-          }
-        }).catch((e) => {
-          console.error(e)
-          if (fileId() === currentFileId && routeData.isCurseforge === isCurseforge) {
-            setChangelog(undefined)
-            setReleaseDate(undefined)
-            setIsLoadingChangelog(false)
-          }
-        })
+          ])
+          .then((changelogQuery) => {
+            // Check if parameters haven't changed during async operation
+            if (!isStale()) {
+              setChangelog(changelogQuery.data)
+              const fileData =
+                routeData.modpackDetails.data?.data.latestFiles.find(
+                  (file) => file.id === targetFileId
+                ) ||
+                routeData.modpackDetails.data?.data.latestFilesIndexes.find(
+                  (file) => file.fileId === targetFileId
+                )
+
+              if (fileData && "fileDate" in fileData) {
+                setReleaseDate(fileData.fileDate)
+              } else {
+                setReleaseDate(undefined)
+              }
+              setIsLoadingChangelog(false)
+            }
+          })
+          .catch((e) => {
+            console.error(e)
+            if (!isStale()) {
+              setChangelog(undefined)
+              setReleaseDate(undefined)
+              setIsLoadingChangelog(false)
+            }
+          })
       }
     }
+  })
 
-    return current
-  }, { modpackId: 0, currentFileId: undefined, currentLastFile: undefined, isCurseforge: false })
-
-  createEffect((prev) => {
+  createAsyncEffect((isStale) => {
     const currentFileId = fileId()
     const isCurseforge = routeData.isCurseforge
-
-    const current = { currentFileId, isCurseforge }
 
     if (!isCurseforge) {
       if (currentFileId !== undefined) {
@@ -280,35 +279,33 @@ const Changelog = () => {
         setChangelog(undefined)
         setReleaseDate(undefined)
 
-        rspcContext.client.query([
-          "modplatforms.modrinth.getVersion",
-          currentFileId as string
-        ]).then((changelogQuery) => {
-          // Check if parameters haven't changed during async operation
-          if (fileId() === currentFileId && !routeData.isCurseforge) {
-            if (changelogQuery?.changelog) {
-              setChangelog(changelogQuery.changelog)
+        rspcContext.client
+          .query(["modplatforms.modrinth.getVersion", currentFileId as string])
+          .then((changelogQuery) => {
+            // Check if parameters haven't changed during async operation
+            if (!isStale()) {
+              if (changelogQuery?.changelog) {
+                setChangelog(changelogQuery.changelog)
+              }
+              if (changelogQuery?.date_published) {
+                setReleaseDate(changelogQuery.date_published)
+              } else {
+                setReleaseDate(undefined)
+              }
+              setIsLoadingChangelog(false)
             }
-            if (changelogQuery?.date_published) {
-              setReleaseDate(changelogQuery.date_published)
-            } else {
+          })
+          .catch((err) => {
+            console.error(err)
+            if (!isStale()) {
+              setChangelog(undefined)
               setReleaseDate(undefined)
+              setIsLoadingChangelog(false)
             }
-            setIsLoadingChangelog(false)
-          }
-        }).catch((err) => {
-          console.error(err)
-          if (fileId() === currentFileId && !routeData.isCurseforge) {
-            setChangelog(undefined)
-            setReleaseDate(undefined)
-            setIsLoadingChangelog(false)
-          }
-        })
+          })
       }
     }
-
-    return current
-  }, { currentFileId: undefined, isCurseforge: false })
+  })
 
   const isLoading = createMemo(() => isLoadingChangelog())
 

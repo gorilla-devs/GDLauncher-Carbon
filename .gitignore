@@ -97,3 +97,4 @@ crates/carbon_repos/prisma/dev.db-journal
 crates/iridium
 .vscode
 .zed
+CLAUDE.md
