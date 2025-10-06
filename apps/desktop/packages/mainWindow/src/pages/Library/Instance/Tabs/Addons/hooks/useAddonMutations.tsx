@@ -3,6 +3,7 @@ import { rspc } from "@/utils/rspcClient"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { Mod as ModType, AddonType } from "@gd/core_module/bindings"
 import { useModal } from "@/managers/ModalsManager"
+import { onCleanup } from "solid-js"
 
 export const useAddonMutations = (
   refetchAddons: () => Promise<any>,
@@ -19,6 +20,15 @@ export const useAddonMutations = (
   const params = useParams()
   const navigator = useGDNavigate()
   const modalsContext = useModal()
+
+  // Track active polling intervals for cleanup
+  const activeIntervals = new Set<number>()
+
+  // Clean up all active intervals when component unmounts
+  onCleanup(() => {
+    activeIntervals.forEach((intervalId) => clearInterval(intervalId))
+    activeIntervals.clear()
+  })
 
   // Mutations
   const deleteModMutation = rspc.createMutation(() => ({
@@ -88,10 +98,14 @@ export const useAddonMutations = (
 
         if (attempts >= maxAttempts) {
           clearInterval(pollInterval)
+          activeIntervals.delete(pollInterval as unknown as number)
           // If we hit max attempts, stop showing as updating
           optimisticUpdates.stopUpdatingMod(mod.id)
         }
-      }, 500)
+      }, 500) as unknown as number
+
+      // Track the interval for cleanup
+      activeIntervals.add(pollInterval)
 
       // The stopUpdatingMod will be called automatically when the mod no longer has updates
       // This happens in the useAddonData reconciliation logic

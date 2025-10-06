@@ -1,4 +1,4 @@
-import { Component, For, Suspense } from "solid-js"
+import { Component, For, Suspense, createMemo } from "solid-js"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import { Badge, Skeleton } from "@gd/ui"
@@ -27,11 +27,12 @@ const Masonry: Component<MasonryProps> = (props) => {
     return pattern[index % pattern.length]
   }
 
-  const elements = () =>
+  const elements = createMemo(() =>
     props.elements.map((element, index) => ({
       ...element,
       size: getSizePattern(index)
     }))
+  )
 
   const masonrySkeletonElements = () =>
     new Array(15).fill(null).map((_, i) => getSizePattern(i))

@@ -94,14 +94,20 @@ const CodeStep = (props: Props) => {
     }
   }
 
-  let interval: ReturnType<typeof setTimeout>
+  let interval: ReturnType<typeof setTimeout> | undefined
+  let retryMessageTimeoutId: number | undefined
   const routeData: ReturnType<typeof fetchData> = useRouteData()
 
   createEffect(() => {
+    // Clear any existing interval before setting up a new one
+    if (interval !== undefined) {
+      clearInterval(interval)
+      interval = undefined
+    }
+
     if (expired()) {
       if (routeData.status.data) accountEnrollCancelMutation.mutate(undefined)
       setLoading(false)
-      clearInterval(interval)
       setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`)
     } else {
       interval = setInterval(() => {
@@ -146,7 +152,12 @@ const CodeStep = (props: Props) => {
     })
   })
 
-  onCleanup(() => clearInterval(interval))
+  onCleanup(() => {
+    clearInterval(interval)
+    if (retryMessageTimeoutId !== undefined) {
+      clearTimeout(retryMessageTimeoutId)
+    }
+  })
 
   return (
     <div class="relative flex flex-col items-center justify-between text-center">
@@ -223,8 +234,14 @@ const CodeStep = (props: Props) => {
             navigator.clipboard.writeText(userCode() || "")
             window.openExternalLink(deviceCodeLink() || "")
 
-            setTimeout(() => {
+            // Clear any existing timeout before setting a new one
+            if (retryMessageTimeoutId !== undefined) {
+              clearTimeout(retryMessageTimeoutId)
+            }
+
+            retryMessageTimeoutId = setTimeout(() => {
               setShouldShowRetryMessage(true)
+              retryMessageTimeoutId = undefined
             }, 15 * 1000)
           }}
         >

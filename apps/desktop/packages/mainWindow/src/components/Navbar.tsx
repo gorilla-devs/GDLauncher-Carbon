@@ -1,5 +1,5 @@
 import { useLocation, useMatch } from "@solidjs/router"
-import { Match, Show, Switch, createEffect } from "solid-js"
+import { Match, Show, Switch, createMemo } from "solid-js"
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg"
 import {
   Tab,
@@ -40,7 +40,6 @@ const AppNavbar = () => {
   const location = useLocation()
   const navigator = useGDNavigate()
   const globalStore = useGlobalStore()
-  const [accounts, setAccounts] = createStore<AccountsStatus[]>([])
   const modalsContext = useModal()
   const [t] = useTransContext()
 
@@ -57,25 +56,23 @@ const AppNavbar = () => {
     return -1
   }
 
-  createEffect(() => {
-    const mappedAccounts = globalStore.accounts.data?.map((account) => {
-      const accountStatusQuery = {} as any
+  const accounts = createMemo(() => {
+    return (
+      globalStore.accounts.data?.map((account) => {
+        const accountStatusQuery = {} as any
 
-      return {
-        label: {
-          name: account?.username,
-          icon: `http://127.0.0.1:${port}/account/headImage?uuid=${account.uuid}`,
-          uuid: account.uuid,
-          type: account.type,
-          status: accountStatusQuery.data
-        },
-        key: account?.uuid
-      }
-    })
-
-    if (mappedAccounts) {
-      setAccounts(mappedAccounts)
-    }
+        return {
+          label: {
+            name: account?.username,
+            icon: `http://127.0.0.1:${port}/account/headImage?uuid=${account.uuid}`,
+            uuid: account.uuid,
+            type: account.type,
+            status: accountStatusQuery.data
+          },
+          key: account?.uuid
+        }
+      }) ?? []
+    )
   })
 
   return (

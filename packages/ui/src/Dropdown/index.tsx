@@ -125,15 +125,24 @@ const Dropdown = (props: Props) => {
   >()
   const [menuRef, setMenuRef] = createSignal<HTMLUListElement | undefined>()
 
+  let toggleTimeoutId: number | undefined
+
   createEffect(() => {
     setSelectedValue(incomingSelectedValue())
   })
 
   const toggleMenu = () => {
     if (props.disabled) return
+
+    // Clear any existing timeout
+    if (toggleTimeoutId !== undefined) {
+      clearTimeout(toggleTimeoutId)
+    }
+
     setMenuOpened(true)
-    setTimeout(() => {
+    toggleTimeoutId = setTimeout(() => {
       setMenuOpened(false)
+      toggleTimeoutId = undefined
     }, 100)
   }
 
@@ -150,7 +159,12 @@ const Dropdown = (props: Props) => {
     if (position.middlewareData.hide?.referenceHidden) setMenuOpened(false)
   })
 
-  onCleanup(() => setMenuOpened(false))
+  onCleanup(() => {
+    setMenuOpened(false)
+    if (toggleTimeoutId !== undefined) {
+      clearTimeout(toggleTimeoutId)
+    }
+  })
 
   createEffect(() => {
     if (menuOpened() && menuRef() && selectedValue()) {

@@ -92,7 +92,11 @@ export const AddonFilters = (props: AddonFiltersProps) => {
   // Also measure when visible addon types change (affects badge layout)
   createEffect(() => {
     visibleAddonTypes() // Track dependency
-    setTimeout(measureHeight, 0) // Defer to next tick to ensure layout is updated
+    const timeoutId = setTimeout(measureHeight, 0) // Defer to next tick to ensure layout is updated
+
+    onCleanup(() => {
+      clearTimeout(timeoutId)
+    })
   })
 
   return (

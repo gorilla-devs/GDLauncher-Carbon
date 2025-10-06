@@ -915,15 +915,12 @@ export const AddonTable = (props: AddonTableProps) => {
       props.onTableReady(table)
     }
 
-    createEffect(() => {
-      scrollHandlerCleanup?.()
-      resizeObserver?.disconnect()
+    // Initialize scroll handling
+    scrollHandlerCleanup?.()
+    resizeObserver?.disconnect()
 
-      const container = findScrollContainer()
-      if (!container) {
-        return
-      }
-
+    const container = findScrollContainer()
+    if (container) {
       scrollContainerRef = container
 
       const { handler, cleanup } = createScrollHandler(container)
@@ -956,22 +953,22 @@ export const AddonTable = (props: AddonTableProps) => {
         }
         cleanup()
       }
-    })
+    }
 
     document.addEventListener("mouseup", handleMouseUp)
     document.addEventListener("mousemove", handleMouseMove)
+  })
 
-    onCleanup(() => {
-      scrollHandlerCleanup?.()
-      resizeObserver?.disconnect()
-      document.removeEventListener("mouseup", handleMouseUp)
-      document.removeEventListener("mousemove", handleMouseMove)
-      document.body.style.userSelect = ""
-      document.body.style.cursor = ""
-      if (autoScrollInterval) {
-        clearInterval(autoScrollInterval)
-      }
-    })
+  onCleanup(() => {
+    scrollHandlerCleanup?.()
+    resizeObserver?.disconnect()
+    document.removeEventListener("mouseup", handleMouseUp)
+    document.removeEventListener("mousemove", handleMouseMove)
+    document.body.style.userSelect = ""
+    document.body.style.cursor = ""
+    if (autoScrollInterval) {
+      clearInterval(autoScrollInterval)
+    }
   })
 
   return (

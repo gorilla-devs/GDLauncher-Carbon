@@ -1,5 +1,5 @@
 import { toast } from "@gd/ui"
-import { createSignal } from "solid-js"
+import { createSignal, onCleanup } from "solid-js"
 
 interface Props {
   text: string | null | undefined | number
@@ -7,6 +7,13 @@ interface Props {
 
 const CopyIcon = (props: Props) => {
   const [clicked, setClicked] = createSignal(false)
+  let timeoutId: number | undefined
+
+  onCleanup(() => {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId)
+    }
+  })
 
   return (
     <div
@@ -19,8 +26,15 @@ const CopyIcon = (props: Props) => {
         navigator.clipboard.writeText(props.text as string)
         toast.success("Copied to clipboard")
         setClicked(true)
-        setTimeout(() => {
+
+        // Clear any existing timeout before setting a new one
+        if (timeoutId !== undefined) {
+          clearTimeout(timeoutId)
+        }
+
+        timeoutId = setTimeout(() => {
           setClicked(false)
+          timeoutId = undefined
         }, 600)
       }}
     />

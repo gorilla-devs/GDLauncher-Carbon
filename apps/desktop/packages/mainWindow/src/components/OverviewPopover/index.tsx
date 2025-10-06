@@ -3,7 +3,7 @@ import { formatDownloadCount } from "@/utils/helpers"
 import { Trans } from "@gd/i18n"
 import { Badge } from "@gd/ui"
 import { formatDistanceToNowStrict } from "date-fns"
-import { For, Match, Show, Switch } from "solid-js"
+import { For, Match, Show, Switch, createMemo } from "solid-js"
 import { useGlobalStore } from "../GlobalStoreContext"
 
 const Authors = (props: { data: ModRowProps }) => {
@@ -33,7 +33,7 @@ const Authors = (props: { data: ModRowProps }) => {
 const OverviewPopover = (props: { data: ModRowProps }) => {
   const globalStore = useGlobalStore()
 
-  const categories = () => {
+  const categories = createMemo(() => {
     const cats = props.data.data.categories
 
     if (props.data.data.platform === "curseforge") {
@@ -45,7 +45,7 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
     return cats.map(
       (cat) => globalStore.categories.data?.modrinth[cat.toString()]
     )
-  }
+  })
 
   const hasScreenshots = props.data.data.screenshotUrls.length > 0
 

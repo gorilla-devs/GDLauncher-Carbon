@@ -149,10 +149,14 @@ const Settings = () => {
             <Button
               type="outline"
               onClick={() => {
-                searchContext?.setSelectedInstanceId(parseInt(params.id, 10))
-                modalsContext?.openModal({
-                  name: "modpack_version_update"
-                })
+                modalsContext?.openModal(
+                  {
+                    name: "modpack_version_update"
+                  },
+                  {
+                    instanceId: parseInt(params.id, 10)
+                  }
+                )
               }}
             >
               <i class="i-ri:arrow-left-right-fill h-5 w-5" />

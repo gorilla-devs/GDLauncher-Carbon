@@ -1,28 +1,38 @@
-import { Button, Dropdown, Spinner } from "@gd/ui"
+import {
+  Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Spinner
+} from "@gd/ui"
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { rspc } from "@/utils/rspcClient"
-import { Show, createEffect, createSignal } from "solid-js"
+import { Show, createEffect, createSignal, createMemo } from "solid-js"
 import { Modpack } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useTransContext } from "@gd/i18n"
-import useSearchContext from "@/components/SearchInputContext"
+
+interface Props {
+  instanceId: number
+}
 
 const ModPackVersionUpdate = (props: ModalProps) => {
-  const searchContext = useSearchContext()
+  const data: () => Props = () => props.data
+  const instanceId = () => data()?.instanceId
   const [t] = useTransContext()
-  const [currentPlatform, setCurrentPlatform] = createSignal<
-    "modrinth" | "curseforge" | null
-  >(null)
   const [selectedVersion, setSelectedVersion] = createSignal<string | null>(
     null
   )
   const navigator = useGDNavigate()
   const modalContext = useModal()
+
   const instance = rspc.createQuery(() => ({
     queryKey: [
       "instance.getInstanceDetails",
-      searchContext?.selectedInstance.data?.id!
+      instanceId()
     ]
   }))
 
@@ -30,115 +40,111 @@ const ModPackVersionUpdate = (props: ModalProps) => {
     mutationKey: ["instance.changeModpack"]
   }))
 
-  const getProjectId = () => {
+  // Pure reactive memo - no side effects
+  const modpackData = createMemo(() => {
     const modpack = instance.data?.modpack?.modpack
-    if (modpack) {
-      if (modpack.type === "curseforge") {
-        setCurrentPlatform("curseforge")
-        return {
-          projectId: modpack.value.project_id,
-          fileId: modpack.value.file_id
-        }
-      } else {
-        setCurrentPlatform("modrinth")
-        return {
-          projectId: modpack.value.project_id,
-          fileId: modpack.value.version_id
-        }
+    if (!modpack) return null
+
+    if (modpack.type === "curseforge") {
+      return {
+        platform: "curseforge" as const,
+        projectId: modpack.value.project_id,
+        fileId: modpack.value.file_id
       }
-    }
-
-    return undefined
-  }
-
-  createEffect(() => {
-    if (!selectedVersion()) {
-      setSelectedVersion(getProjectId()?.fileId?.toString() || "")
+    } else {
+      return {
+        platform: "modrinth" as const,
+        projectId: modpack.value.project_id,
+        fileId: modpack.value.version_id
+      }
     }
   })
 
-  const responseCF = rspc.createQuery(() => ({
-    queryKey: [
-      "modplatforms.curseforge.getModFiles",
-      {
-        modId: getProjectId()?.projectId as number,
-        query: {
-          pageSize: 300
-        }
-      }
-    ],
-    enabled: false
-  }))
+  const currentPlatform = createMemo(() => modpackData()?.platform)
 
-  const responseModrinth = rspc.createQuery(() => ({
-    queryKey: [
-      "modplatforms.modrinth.getProjectVersions",
-      {
-        project_id: getProjectId()?.projectId.toString()!
-      }
-    ],
-    enabled: false
-  }))
-
+  // Initialize selected version once when modpack data loads
   createEffect(() => {
-    if (currentPlatform() === "curseforge") {
-      responseCF.refetch()
-    } else if (currentPlatform() === "modrinth") {
-      responseModrinth.refetch()
+    const data = modpackData()
+    if (data && !selectedVersion()) {
+      setSelectedVersion(data.fileId?.toString() || "")
     }
   })
 
-  const response = () =>
+  const responseCF = rspc.createQuery(() => {
+    const data = modpackData()
+    return {
+      queryKey: [
+        "modplatforms.curseforge.getModFiles",
+        {
+          modId: data?.projectId as number,
+          query: {
+            pageSize: 300
+          }
+        }
+      ],
+      enabled: data?.platform === "curseforge"
+    }
+  })
+
+  const responseModrinth = rspc.createQuery(() => {
+    const data = modpackData()
+    return {
+      queryKey: [
+        "modplatforms.modrinth.getProjectVersions",
+        {
+          project_id: data?.projectId.toString()!
+        }
+      ],
+      enabled: data?.platform === "modrinth"
+    }
+  })
+
+  const response = createMemo(() =>
     currentPlatform() === "curseforge" ? responseCF : responseModrinth
+  )
 
-  const options = () => {
-    if (currentPlatform() === "curseforge") {
+  const versions = createMemo(() => {
+    const data = modpackData()
+    if (!data) return []
+
+    if (data.platform === "curseforge") {
       return (
         responseCF.data?.data.map((file) => ({
-          label: (
-            <div class="flex justify-between w-full">
-              <span>{file.displayName}</span>
-              <Show when={file.id === getProjectId()?.fileId}>
-                <span class="text-green-500">{`[ Current ]`}</span>
-              </Show>
-            </div>
-          ),
-          key: file.id.toString()
+          id: file.id.toString(),
+          name: file.displayName,
+          isCurrent: file.id === data.fileId
         })) || []
       )
     }
 
     return (
       responseModrinth.data?.map((file) => ({
-        label: (
-          <div class="flex justify-between w-full">
-            <span>{file.name}</span>
-            <Show when={file.id === getProjectId()?.fileId}>
-              <span class="text-green-500">{`[ Current ]`}</span>
-            </Show>
-          </div>
-        ),
-        key: file.id.toString()
+        id: file.id.toString(),
+        name: file.name,
+        isCurrent: file.id === data.fileId
       })) || []
     )
-  }
+  })
 
   const handleUpdate = async () => {
-    if (!selectedVersion()) return
+    const version = selectedVersion()
+    const data = modpackData()
+    const id = instanceId()
+    if (!version || !data || !id) return
 
     await changeModpackMutation.mutateAsync({
-      instance: searchContext?.selectedInstance.data?.id!,
+      instance: id,
       modpack: {
-        type: currentPlatform(),
+        type: data.platform,
         value:
-          currentPlatform() === "curseforge"
+          data.platform === "curseforge"
             ? {
-                project_id: getProjectId()?.projectId as number,
-                file_id: parseInt(selectedVersion()!)
+                project_id: data.projectId as number,
+                file_id: parseInt(version)
               }
             : {
-                project_id: getProjectId()?.projectId.toString()!,
-                version_id: selectedVersion()
+                project_id: data.projectId.toString(),
+                version_id: version
               }
       } as Modpack
     })
@@ -158,14 +164,44 @@ const ModPackVersionUpdate = (props: ModalProps) => {
           <Spinner />
         </Show>
         <Show when={!response().isLoading && !instance.isLoading}>
-          <Dropdown
-            class="bg-darkSlate-800 w-full"
-            options={options()}
+          <Select
             value={selectedVersion()}
-            onChange={(option) => {
-              setSelectedVersion(option.key.toString())
+            onChange={(value) => value && setSelectedVersion(value)}
+            options={versions().map((v) => v.id)}
+            placeholder=""
+            disallowEmptySelection={true}
+            itemComponent={(itemProps) => {
+              const version = versions().find((v) => v.id === itemProps.item.rawValue)
+              return (
+                <SelectItem item={itemProps.item}>
+                  <div class="flex justify-between w-full">
+                    <span>{version?.name}</span>
+                    <Show when={version?.isCurrent}>
+                      <span class="text-green-500">[ Current ]</span>
+                    </Show>
+                  </div>
+                </SelectItem>
+              )
             }}
-          />
+          >
+            <SelectTrigger class="bg-darkSlate-800 w-full">
+              <SelectValue<string>>
+                {(state) => {
+                  const selectedId = state.selectedOption()
+                  const version = versions().find((v) => v.id === selectedId)
+                  return (
+                    <div class="flex justify-between w-full">
+                      <span>{version?.name}</span>
+                      <Show when={version?.isCurrent}>
+                        <span class="text-green-500">[ Current ]</span>
+                      </Show>
+                    </div>
+                  )
+                }}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent class="z-[1000] max-h-80 overflow-y-auto" />
+          </Select>
 
           <div class="flex justify-between">
             <Button

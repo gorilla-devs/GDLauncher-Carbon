@@ -41,7 +41,7 @@ const FeaturedModpackTile = () => {
 
   createEffect(() => {
     if (!instances()) return
-    if (!settings) return
+    if (!settings()) return
 
     for (const i of instances()!) {
       if (

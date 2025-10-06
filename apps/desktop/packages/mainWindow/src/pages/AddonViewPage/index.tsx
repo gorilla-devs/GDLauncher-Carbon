@@ -24,7 +24,8 @@ import {
   Show,
   Switch,
   createContext,
-  createSignal
+  createSignal,
+  createMemo
 } from "solid-js"
 import { format } from "date-fns"
 import ExploreVersionsNavbar from "@/components/ExploreVersionsNavbar"
@@ -124,6 +125,19 @@ const AddonExplore = () => {
   }))
 
   const isFetching = () => project.isLoading
+
+  const normalizedAuthors = createMemo(() => {
+    if (!project.data?.authors) return []
+    return project.data.authors.map(
+      (author): Author => ({
+        name: author.name,
+        avatarUrl: author.avatarUrl,
+        id: author.name, // Use name as ID since FEUnifiedAuthor doesn't have separate ID
+        platform: project.data!.platform,
+        url: null // FEUnifiedAuthor doesn't include profile URLs
+      })
+    )
+  })
 
   const instancePages = () => [
     {
@@ -265,15 +279,7 @@ const AddonExplore = () => {
                             }
                           >
                             <AuthorAvatars
-                              authors={project.data!.authors.map(
-                                (author): Author => ({
-                                  name: author.name,
-                                  avatarUrl: author.avatarUrl,
-                                  id: author.name, // Use name as ID since FEUnifiedAuthor doesn't have separate ID
-                                  platform: project.data!.platform,
-                                  url: null // FEUnifiedAuthor doesn't include profile URLs
-                                })
-                              )}
+                              authors={normalizedAuthors()}
                               maxDisplay={4}
                               size="md"
                             />
