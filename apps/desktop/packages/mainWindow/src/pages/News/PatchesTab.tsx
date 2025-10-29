@@ -2,6 +2,7 @@ import { For, Match, Switch } from "solid-js"
 import { usePatchNotes } from "@/utils/news"
 import { Trans } from "@gd/i18n"
 import { useGDNavigate } from "@/managers/NavigationManager"
+import { AnimatedIcon } from "@gd/ui"
 
 const getVersionTypeColor = (versionType?: string) => {
   switch (versionType?.toLowerCase()) {
@@ -128,7 +129,7 @@ const PatchesTab = (props: PatchesTabProps) => {
                           </span>
                           <div class="text-primary-400 flex items-center text-sm opacity-0 transition-opacity group-hover:opacity-100">
                             <span class="mr-2 font-medium">Read More</span>
-                            <i class="i-hugeicons:arrow-right-01" />
+                            <AnimatedIcon icon="i-hugeicons:arrow-right-01" />
                           </div>
                         </div>
                       </div>

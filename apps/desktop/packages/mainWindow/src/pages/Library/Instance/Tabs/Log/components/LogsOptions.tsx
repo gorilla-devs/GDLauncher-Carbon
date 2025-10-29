@@ -10,7 +10,8 @@ import {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
+  AnimatedIcon
 } from "@gd/ui"
 
 export type LogDensity = "low" | "medium" | "high"
@@ -40,7 +41,7 @@ export default function LogsOptions(props: Props) {
   return (
     <DropdownMenu placement="left">
       <DropdownMenuTrigger class="b-0 bg-transparent p-0">
-        <div class="bg-lightSlate-800 hover:bg-lightSlate-50 i-hugeicons:settings-01 h-6 w-6 transition-colors duration-200 ease-in-out" />
+        <AnimatedIcon icon="i-hugeicons:settings-01" class="bg-lightSlate-800 hover:bg-lightSlate-50 transition-colors duration-200 ease-in-out" size="h-6 w-6" />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuSub>

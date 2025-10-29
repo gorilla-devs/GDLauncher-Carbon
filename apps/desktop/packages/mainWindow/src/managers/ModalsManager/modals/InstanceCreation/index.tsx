@@ -1,4 +1,4 @@
-import { Tab, TabList, TabPanel, Tabs } from "@gd/ui"
+import { Tab, TabList, TabPanel, Tabs, AnimatedIcon } from "@gd/ui"
 import { ModalProps } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { Trans, useTransContext } from "@gd/i18n"
@@ -32,13 +32,13 @@ const InstanceCreation = (props: ModalProps) => {
               <TabList heightClass="h-14">
                 <Tab class="w-1/2" centerContent>
                   <div class="flex items-center gap-2">
-                    <div class="i-hugeicons:add-01" />
+                    <AnimatedIcon icon="i-hugeicons:add-01" />
                     <Trans key="instance.instance_creation_custom_tab" />
                   </div>
                 </Tab>
                 <Tab class="w-1/2" centerContent>
                   <div class="flex items-center gap-2">
-                    <div class="i-hugeicons:upload-01" />
+                    <AnimatedIcon icon="i-hugeicons:upload-01" />
                     <Trans key="instance.instance_import_tab" />
                   </div>
                 </Tab>

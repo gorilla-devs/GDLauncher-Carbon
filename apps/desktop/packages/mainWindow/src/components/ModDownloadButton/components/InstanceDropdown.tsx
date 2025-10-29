@@ -13,7 +13,8 @@ import {
   DropdownMenuContent,
   DropdownMenuRadioGroup,
   DropdownMenuTrigger,
-  Input
+  Input,
+  AnimatedIcon
 } from "@gd/ui"
 import { VList } from "@/components/VirtuaWrapper"
 import { InstanceItem } from "./InstanceItem"
@@ -177,7 +178,7 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
               }}
               onKeyDown={(e) => e.stopPropagation()}
               onKeyUp={(e) => e.stopPropagation()}
-              icon={<div class="i-hugeicons:search-01 h-4 w-4" />}
+              icon={<AnimatedIcon icon="i-hugeicons:search-01" size="h-4 w-4" />}
               variant="transparent"
               class="h-full"
             />

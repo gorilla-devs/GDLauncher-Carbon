@@ -1,6 +1,6 @@
 import { Outlet, useLocation } from "@solidjs/router"
 import ContentWrapper from "@/components/ContentWrapper"
-import { Tab, TabList, Tabs } from "@gd/ui"
+import { AnimatedIcon, Tab, TabList, Tabs } from "@gd/ui"
 import { For, JSX } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import FeatureStatusBadge from "@/components/FeatureStatusBadge"
@@ -87,7 +87,7 @@ function Settings() {
                       }}
                     >
                       <div class="flex flex-col items-center justify-center gap-2">
-                        <i class={"w-5 h-5 " + item.icon} />
+                        <AnimatedIcon icon={item.icon} size="w-5 h-5" />
                         <div class="whitespace-nowrap text-center">
                           {item.name}
                         </div>

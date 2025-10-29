@@ -6,7 +6,7 @@ import { useParams, useRouteData } from "@solidjs/router"
 import { format, formatDuration, intervalToDuration } from "date-fns"
 import FadedBanner, { FadedBannerSkeleton } from "@/components/FadedBanner"
 import { port } from "@/utils/rspcClient"
-import { Button } from "@gd/ui"
+import { AnimatedIcon, Button } from "@gd/ui"
 import { getModpackPlatformIcon } from "@/utils/instances"
 import { useGDNavigate } from "@/managers/NavigationManager"
 
@@ -138,7 +138,7 @@ const Overview = () => {
                         />
                       </div>
                       <div class="flex items-center gap-2">
-                        <div class="i-hugeicons:file-01 h-3 w-3" />
+                        <AnimatedIcon icon="i-hugeicons:file-01" size="h-3 w-3" />
                         <div class="truncate whitespace-break-spaces">
                           {routeData.modpackInfo.data?.version_name}
                         </div>
@@ -163,7 +163,7 @@ const Overview = () => {
                     }}
                   >
                     <Trans key="instance.modpack_open_website" />
-                    <i class="i-hugeicons:link-square-02" />
+                    <AnimatedIcon icon="i-hugeicons:link-square-02" />
                   </Button>
                   <Button
                     rounded={false}
@@ -181,7 +181,7 @@ const Overview = () => {
                     }}
                   >
                     <Trans key="instance.modpack_view" />
-                    <i class="i-hugeicons:arrow-right-01 h-4 w-4" />
+                    <AnimatedIcon icon="i-hugeicons:arrow-right-01" size="h-4 w-4" />
                   </Button>
                 </div>
               </div>

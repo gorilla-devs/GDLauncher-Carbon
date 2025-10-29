@@ -9,6 +9,7 @@ import { For, Match, Show, Switch, createSignal, mergeProps } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
 import {
+  AnimatedIcon,
   ContextMenu,
   ContextMenuContent,
   ContextMenuGroup,
@@ -212,26 +213,13 @@ const Tile = (props: Props) => {
               </ContextMenuGroupLabel>
               <ContextMenuSeparator />
               <ContextMenuItem
-                class="border-brands-bisecthosting text-brands-bisecthosting flex items-center gap-2 border-2 border-solid"
-                onClick={() => {
-                  modalsContext?.openModal({
-                    name: "bisectHostingAffiliate"
-                  })
-                }}
-              >
-                <div class="i-simple-icons:bisecthosting h-4 w-4" />
-                <Trans key="instance.action_create_server" />
-              </ContextMenuItem>
-              <ContextMenuSeparator />
-              <ContextMenuItem
                 class="flex items-center gap-2"
                 onClick={handlePlay}
                 disabled={isLoading() || isInQueue() || props.isDeleting}
               >
-                <div
-                  class={`h-4 w-4 ${
-                    props.isRunning ? "i-hugeicons:stop" : "i-hugeicons:play"
-                  }`}
+                <AnimatedIcon
+                  icon={props.isRunning ? "i-hugeicons:stop" : "i-hugeicons:play"}
+                  size="h-4 w-4"
                 />
                 {props.isRunning
                   ? t("instance.stop")
@@ -242,7 +230,7 @@ const Tile = (props: Props) => {
                 onClick={handleEdit}
                 disabled={isLoading() || isInQueue() || props.isDeleting}
               >
-                <div class="i-hugeicons:pencil-edit-01 h-4 w-4" />
+                <AnimatedIcon icon="i-hugeicons:pencil-edit-01" size="h-4 w-4" />
                 {t("instance.action_edit")}
               </ContextMenuItem>
               <ContextMenuItem
@@ -250,7 +238,7 @@ const Tile = (props: Props) => {
                 onClick={handleSettings}
                 disabled={isLoading() || isInQueue() || props.isDeleting}
               >
-                <div class="i-hugeicons:settings-01 h-4 w-4" />
+                <AnimatedIcon icon="i-hugeicons:settings-01" size="h-4 w-4" />
                 {t("instance.action_settings")}
               </ContextMenuItem>
               <ContextMenuItem
@@ -263,11 +251,11 @@ const Tile = (props: Props) => {
                   })
                 }}
               >
-                <div
-                  class="h-4 w-4"
+                <AnimatedIcon
+                  icon="i-hugeicons:star"
+                  size="h-4 w-4"
                   classList={{
-                    "text-yellow-500 i-hugeicons:star": props.instance.favorite,
-                    "i-hugeicons:star": !props.instance.favorite
+                    "text-yellow-500": props.instance.favorite
                   }}
                 />
                 {props.instance.favorite
@@ -294,7 +282,7 @@ const Tile = (props: Props) => {
                 }}
                 disabled={isLoading() || isInQueue() || props.isDeleting}
               >
-                <div class="i-hugeicons:file-export h-4 w-4" />
+                <AnimatedIcon icon="i-hugeicons:file-export" size="h-4 w-4" />
                 {t("instance.export_instance")}
               </ContextMenuItem>
               <ContextMenuSeparator />
@@ -308,7 +296,7 @@ const Tile = (props: Props) => {
                       class="flex items-center gap-2"
                       onClick={handleOpenFolder}
                     >
-                      <div class="i-hugeicons:folder-open h-4 w-4" />
+                      <AnimatedIcon icon="i-hugeicons:folder-open" size="h-4 w-4" />
                       {t("instance.action_open_folder")}
                     </ContextMenuItem>
                     <ContextMenuItem
@@ -317,7 +305,7 @@ const Tile = (props: Props) => {
                         navigate.navigate(`/library/${props.instance.id}/logs`)
                       }}
                     >
-                      <div class="i-hugeicons:file-script h-4 w-4" />
+                      <AnimatedIcon icon="i-hugeicons:file-script" size="h-4 w-4" />
                       {t("instance.view_logs")}
                     </ContextMenuItem>
                     <ContextMenuItem
@@ -328,7 +316,7 @@ const Tile = (props: Props) => {
                         )
                       }}
                     >
-                      <div class="i-hugeicons:puzzle h-4 w-4" />
+                      <AnimatedIcon icon="i-hugeicons:puzzle" size="h-4 w-4" />
                       {t("instance.view_mods")}
                     </ContextMenuItem>
                     {!props.isInvalid && (
@@ -339,7 +327,7 @@ const Tile = (props: Props) => {
                           isLoading() || isInQueue() || props.isDeleting
                         }
                       >
-                        <div class="i-hugeicons:copy-01 h-4 w-4" />
+                        <AnimatedIcon icon="i-hugeicons:copy-01" size="h-4 w-4" />
                         {t("instance.action_duplicate")}
                       </ContextMenuItem>
                     )}
@@ -352,7 +340,7 @@ const Tile = (props: Props) => {
                 onClick={handleDelete}
                 disabled={isLoading() || isInQueue() || props.isDeleting}
               >
-                <div class="i-hugeicons:delete-02 h-4 w-4" />
+                <AnimatedIcon icon="i-hugeicons:delete-02" size="h-4 w-4" />
                 {t("instance.action_delete")}
               </ContextMenuItem>
             </ContextMenuGroup>
@@ -432,7 +420,7 @@ const Tile = (props: Props) => {
                         </h2>
                         <div class="z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-l from-black from-30% opacity-50" />
                         <div class="z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-t from-black opacity-50" />
-                        <div class="i-hugeicons:alert-01 z-1 absolute right-1 top-1 text-2xl text-yellow-500" />
+                        <AnimatedIcon icon="i-hugeicons:alert-01" class="z-1 absolute right-1 top-1 text-2xl text-yellow-500" />
                       </Show>
                       <Show when={props.failError}>
                         <div
@@ -455,8 +443,9 @@ const Tile = (props: Props) => {
                               : {}
                           }
                         />
-                        <div
-                          class="i-hugeicons:alert-01 z-1 absolute bottom-20 left-0 right-0 top-0 m-auto text-4xl text-red-500"
+                        <AnimatedIcon
+                          icon="i-hugeicons:alert-01"
+                          class="z-1 absolute bottom-20 left-0 right-0 top-0 m-auto text-4xl text-red-500"
                           style={
                             props.shouldSetViewTransition
                               ? {
@@ -629,11 +618,11 @@ const Tile = (props: Props) => {
                           handlePlay()
                         }}
                       >
-                        <div
+                        <AnimatedIcon
+                          icon={props.isRunning ? "i-hugeicons:stop" : "i-hugeicons:play"}
                           class="text-lightSlate-50"
                           classList={{
-                            "i-hugeicons:play": !props.isRunning,
-                            "i-hugeicons:stop text-xl": props.isRunning
+                            "text-xl": props.isRunning
                           }}
                         />
                       </div>
@@ -649,12 +638,13 @@ const Tile = (props: Props) => {
                       <div>
                         <Tooltip>
                           <TooltipTrigger>
-                            <div
-                              class="h-6 w-6"
+                            <AnimatedIcon
+                              icon={copiedError() ? "i-hugeicons:tick-double-02" : "i-hugeicons:copy-01"}
+                              size="h-6 w-6"
                               classList={{
-                                "text-lightSlate-700 hover:text-lightSlate-100 duration-100 ease-in-out i-hugeicons:copy-01":
+                                "text-lightSlate-700 hover:text-lightSlate-100 duration-100 ease-in-out":
                                   !copiedError(),
-                                "text-green-400 i-hugeicons:tick-double-02":
+                                "text-green-400":
                                   copiedError()
                               }}
                               onClick={(e) => {

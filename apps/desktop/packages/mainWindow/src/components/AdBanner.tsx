@@ -5,10 +5,12 @@ export const AdsBanner = () => {
     <div
       style={{
         height: `${adSize.height}px`,
-        width: `${adSize.width}px`
+        width: `${adSize.width}px`,
+        "z-index": "50000",
+        position: "relative"
       }}
     >
-      <owadview class="z-100 relative" />
+      <owadview class="relative" />
     </div>
   )
 }

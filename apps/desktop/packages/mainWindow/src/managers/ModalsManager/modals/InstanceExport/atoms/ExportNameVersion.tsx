@@ -1,5 +1,5 @@
 import { useTransContext } from "@gd/i18n"
-import { Input } from "@gd/ui"
+import { Input, AnimatedIcon } from "@gd/ui"
 
 export const ExportNameVersion = () => {
   const [t] = useTransContext()
@@ -8,12 +8,12 @@ export const ExportNameVersion = () => {
       <span>{t("instance.instance_name")}</span>
       <Input
         inputColor="bg-darkSlate-900"
-        icon={<div onClick={() => {}} class="i-material-symbols:close" />}
+        icon={<AnimatedIcon icon="i-material-symbols:close" onClick={() => {}} />}
       />
       <span>{t("instance.version")}</span>
       <Input
         inputColor="bg-darkSlate-900"
-        icon={<div onClick={() => {}} class="i-material-symbols:close" />}
+        icon={<AnimatedIcon icon="i-material-symbols:close" onClick={() => {}} />}
       />
     </div>
   )

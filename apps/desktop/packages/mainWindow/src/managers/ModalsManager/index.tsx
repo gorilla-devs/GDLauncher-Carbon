@@ -123,10 +123,6 @@ const getDefaultModals = (t: (key: string) => string) => ({
     component: lazy(() => import("./modals/AccountExpired")),
     title: t("modals.account_expired")
   },
-  bisectHostingAffiliate: {
-    component: lazy(() => import("./modals/BisectHostingAffiliate")),
-    title: t("modals.bisecthosting_affiliate")
-  },
   changeGDLAccountRecoveryEmail: {
     component: lazy(() => import("./modals/ChangeGDLAccountRecoveryEmail")),
     title: t("modals.change_recovery_email")

@@ -6,6 +6,7 @@ import {
 } from "@tanstack/solid-table"
 import { Trans, useTransContext } from "@gd/i18n"
 import {
+  AnimatedIcon,
   Button,
   toast,
   Popover,
@@ -61,7 +62,10 @@ const GDLAccountRowItem = (props: {
               </div>
             </Show>
             <div class="hidden group-hover:block">
-              <div class="i-hugeicons:clipboard text-lightSlate-50" />
+              <AnimatedIcon
+                icon="i-hugeicons:clipboard"
+                class="text-lightSlate-50"
+              />
             </div>
           </div>
         </Show>
@@ -124,16 +128,33 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
       <div class="flex items-center justify-center">
         <Switch>
           <Match when={info.getValue() === "ok"}>
-            <div class="i-hugeicons:tick-02 h-4 w-4 text-green-500" />
+            <AnimatedIcon
+              icon="i-hugeicons:tick-02"
+              class="text-green-500"
+              size="h-4 w-4"
+            />
           </Match>
           <Match when={info.getValue() === "expired"}>
-            <div class="i-hugeicons:alert-01 h-4 w-4 text-yellow-500" />
+            <AnimatedIcon
+              icon="i-hugeicons:alert-01"
+              class="text-yellow-500"
+              size="h-4 w-4"
+            />
           </Match>
           <Match when={info.getValue() === "refreshing"}>
-            <div class="i-hugeicons:refresh h-4 w-4 text-yellow-500" />
+            <AnimatedIcon
+              icon="i-hugeicons:refresh"
+              class="text-yellow-500"
+              size="h-4 w-4"
+              interactive={false}
+            />
           </Match>
           <Match when={info.getValue() === "invalid"}>
-            <div class="i-hugeicons:cancel-01 h-4 w-4 text-red-500" />
+            <AnimatedIcon
+              icon="i-hugeicons:cancel-01"
+              class="text-red-500"
+              size="h-4 w-4"
+            />
           </Match>
         </Switch>
       </div>
@@ -264,7 +285,11 @@ const Accounts = () => {
                     <Popover>
                       <PopoverTrigger>
                         <Button type="outline">
-                          <i class="i-hugeicons:logout-01 block h-6 w-6" />
+                          <AnimatedIcon
+                            icon="i-hugeicons:logout-01"
+                            class="block"
+                            size="h-6 w-6"
+                          />
                           <Trans key="settings:log_out_gdl_account" />
                         </Button>
                       </PopoverTrigger>
@@ -275,7 +300,11 @@ const Accounts = () => {
                             removeGDLAccountMutation.mutate(undefined)
                           }}
                         >
-                          <i class="i-hugeicons:logout-01 block h-6 w-6" />
+                          <AnimatedIcon
+                            icon="i-hugeicons:logout-01"
+                            class="block"
+                            size="h-6 w-6"
+                          />
                           <Trans key="settings:confirm" />
                         </Button>
                       </PopoverContent>
@@ -286,7 +315,11 @@ const Accounts = () => {
                   >
                     <div class="mb-4 flex items-center justify-between gap-8 rounded-md p-4 text-yellow-500 outline outline-yellow-500">
                       <div class="flex items-center gap-4">
-                        <i class="i-hugeicons:alert-01 block h-6 w-6" />
+                        <AnimatedIcon
+                          icon="i-hugeicons:alert-01"
+                          class="block"
+                          size="h-6 w-6"
+                        />
                         <Trans key="settings:gdl_account_not_verified" />
                       </div>
                       <Tooltip>
@@ -319,7 +352,7 @@ const Accounts = () => {
                               }
                             }}
                           >
-                            <div class="i-hugeicons:mail-send-01" />
+                            <AnimatedIcon icon="i-hugeicons:mail-send-01" />
                             <Trans key="settings:send_new_verification_email" />
                           </Button>
                         </TooltipTrigger>
@@ -370,7 +403,7 @@ const Accounts = () => {
                 </div>
 
                 <div class="my-10 flex items-center gap-2 text-xl text-red-500">
-                  <div class="i-hugeicons:alert-01 h-4 w-4" />
+                  <AnimatedIcon icon="i-hugeicons:alert-01" size="h-4 w-4" />
                   <Trans key="settings:danger_zone" />
                 </div>
                 <div class="text-lightSlate-700 flex items-center justify-between gap-12">
@@ -389,7 +422,11 @@ const Accounts = () => {
                           })
                         }}
                       >
-                        <i class="i-hugeicons:delete-02 block h-6 w-6" />
+                        <AnimatedIcon
+                          icon="i-hugeicons:delete-02"
+                          class="block"
+                          size="h-6 w-6"
+                        />
                         <Trans key="settings:request_account_deletion" />
                       </Button>
                     </TooltipTrigger>
@@ -410,7 +447,7 @@ const Accounts = () => {
                       gdNavigator.navigate("/")
                     }}
                   >
-                    <div class="i-hugeicons:link-01" />
+                    <AnimatedIcon icon="i-hugeicons:link-01" />
                     <Trans key="settings:link_gdl_account" />
                   </Button>
                 </div>
@@ -427,7 +464,11 @@ const Accounts = () => {
                       removeGDLAccountMutation.mutate(undefined)
                     }}
                   >
-                    <i class="i-hugeicons:logout-01 block h-6 w-6" />
+                    <AnimatedIcon
+                      icon="i-hugeicons:logout-01"
+                      class="block"
+                      size="h-6 w-6"
+                    />
                     <Trans key="settings:log_out_gdl_account" />
                   </Button>
                 </div>
@@ -445,10 +486,10 @@ const Accounts = () => {
                 type="secondary"
                 size="small"
                 onClick={() => {
-                  gdNavigator.navigate("/?addMicrosoftAccount=true")
+                  gdNavigator.navigate("/?addMicrosoftAccount=true&returnTo=/settings/accounts")
                 }}
               >
-                <div class="i-hugeicons:add-01" />
+                <AnimatedIcon icon="i-hugeicons:add-01" />
               </Button>
             </div>
           </Title>
@@ -515,19 +556,22 @@ const Accounts = () => {
                             <div class="flex w-full items-center justify-center gap-4">
                               <Show when={row.original.status !== "ok"}>
                                 <div class="w-full text-yellow-500 hover:text-yellow-200">
-                                  <div
-                                    class="i-hugeicons:refresh h-4 w-4"
+                                  <AnimatedIcon
+                                    icon="i-hugeicons:refresh"
+                                    size="h-4 w-4"
+                                    interactive={false}
                                     onClick={async () => {
                                       gdNavigator.navigate(
-                                        "/?addMicrosoftAccount=true"
+                                        "/?addMicrosoftAccount=true&returnTo=/settings/accounts"
                                       )
                                     }}
                                   />
                                 </div>
                               </Show>
                               <div class="flex w-full items-center justify-center hover:text-red-500">
-                                <div
-                                  class="i-hugeicons:delete-02 h-4 w-4"
+                                <AnimatedIcon
+                                  icon="i-hugeicons:delete-02"
+                                  size="h-4 w-4"
                                   onClick={async () => {
                                     const gdlAccountUuid =
                                       globalStore.settings.data?.gdlAccountId
@@ -568,7 +612,11 @@ const Accounts = () => {
                             }
                           >
                             <div class="flex items-center justify-center">
-                              <div class="text-lightSlate-50 i-hugeicons:tick-double-02 h-4 w-4" />
+                              <AnimatedIcon
+                                icon="i-hugeicons:tick-double-02"
+                                class="text-lightSlate-50"
+                                size="h-4 w-4"
+                              />
                             </div>
                           </Match>
                           <Match
@@ -579,7 +627,11 @@ const Accounts = () => {
                             }
                           >
                             <div class="flex items-center justify-center opacity-0 duration-100 ease-in-out group-hover/internal:opacity-100">
-                              <div class="text-darkSlate-300 i-hugeicons:tick-double-02 h-4 w-4" />
+                              <AnimatedIcon
+                                icon="i-hugeicons:tick-double-02"
+                                class="text-darkSlate-300"
+                                size="h-4 w-4"
+                              />
                             </div>
                           </Match>
                           <Match
@@ -589,7 +641,10 @@ const Accounts = () => {
                             }
                           >
                             <div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 duration-100 ease-in-out group-hover/internal:opacity-100">
-                              <div class="i-hugeicons:clipboard text-lightSlate-50" />
+                              <AnimatedIcon
+                                icon="i-hugeicons:clipboard"
+                                class="text-lightSlate-50"
+                              />
                             </div>
                           </Match>
                         </Switch>

@@ -8,7 +8,8 @@ import {
   Tooltip,
   Button,
   TooltipContent,
-  TooltipTrigger
+  TooltipTrigger,
+  AnimatedIcon
 } from "@gd/ui"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { AccountsDropdown } from "./AccountsDropdown"
@@ -89,8 +90,10 @@ const AppNavbar = () => {
             }}
           />
           <div class="flex items-center gap-2 px-2">
-            <div
-              class="i-hugeicons:arrow-left-01 h-6 w-6 transition-[transform,opacity] duration-200 ease-[cubic-bezier(.4,0,.2,1)]"
+            <AnimatedIcon
+              icon="i-hugeicons:arrow-left-01"
+              size="h-6 w-6"
+              class="transition-[transform,opacity] duration-200 ease-[cubic-bezier(.4,0,.2,1)]"
               classList={{
                 "opacity-0 -translate-x-4": location.pathname === "/library"
               }}
@@ -122,7 +125,7 @@ const AppNavbar = () => {
               })
             }}
           >
-            <i class="i-hugeicons:add-01 flex" />
+            <AnimatedIcon icon="i-hugeicons:add-01" class="flex" />
           </Button>
         </div>
         <div class="text-lightSlate-50 flex h-full list-none items-center gap-6">
@@ -136,8 +139,9 @@ const AppNavbar = () => {
                   }}
                 >
                   <Tab>
-                    <div
-                      class="i-hugeicons:settings-01 text-2xl"
+                    <AnimatedIcon
+                      icon="i-hugeicons:settings-01"
+                      size="text-2xl"
                       classList={{
                         "text-lightSlate-50":
                           !!isSettings() || !!isSettingsNested()
@@ -151,8 +155,9 @@ const AppNavbar = () => {
                   }}
                 >
                   <Tab>
-                    <div
-                      class="i-hugeicons:news text-2xl"
+                    <AnimatedIcon
+                      icon="i-hugeicons:news"
+                      size="text-2xl"
                       classList={{
                         "text-lightSlate-50": !!isNews()
                       }}
@@ -169,8 +174,10 @@ const AppNavbar = () => {
                   <Tab ignored>
                     <Tooltip>
                       <TooltipTrigger>
-                        <div
-                          class="i-hugeicons:download-02 text-2xl text-green-500"
+                        <AnimatedIcon
+                          icon="i-hugeicons:download-02"
+                          size="text-2xl"
+                          class="text-green-500"
                           classList={{
                             "hover:text-green-100": !updateDownloaded()
                           }}

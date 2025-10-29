@@ -40,9 +40,12 @@ keys! {
         GET_ACCOUNTS                                = "getAccounts";
         DELETE_ACCOUNT                              = "deleteAccount";
         ENROLL_BEGIN                                = "enroll.begin";
+        ENROLL_BEGIN_BROWSER                        = "enroll.beginBrowser";
+        ENROLL_PROTOCOL_CALLBACK                    = "enroll.protocolCallback";
         ENROLL_CANCEL                               = "enroll.cancel";
         ENROLL_GET_STATUS                           = "enroll.getStatus";
         ENROLL_FINALIZE                             = "enroll.finalize";
+        ENROLL_RESUME                               = "enroll.resume";
         REFRESH_ACCOUNT                             = "refreshAccount";
         GET_HEAD                                    = "getHead";
 
@@ -56,6 +59,8 @@ keys! {
         REQUEST_GDL_ACCOUNT_DELETION                = "requestGdlAccountDeletion";
         CHANGE_GDL_ACCOUNT_NICKNAME                 = "changeGdlAccountNickname";
         UPLOAD_PROFILE_ICON                         = "uploadProfileIcon";
+        CHECK_USERNAME_AVAILABLE                    = "checkUsernameAvailable";
+        CREATE_PROFILE                              = "createProfile";
     }
 
     java {

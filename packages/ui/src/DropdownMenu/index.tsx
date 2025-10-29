@@ -31,7 +31,7 @@ const DropdownMenuContent = <T extends ValidComponent = "div">(
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content
         class={cn(
-          "z-200 min-w-32 origin-[var(--kb-menu-content-transform-origin)] overflow-visible rounded-md border border-solid border-darkSlate-600 bg-darkSlate-800 p-1 text-lightSlate-200 shadow-md outline-none data-[expanded]:animate-menuEnter animate-menuLeave",
+          "z-100000 min-w-32 origin-[var(--kb-menu-content-transform-origin)] overflow-visible rounded-md border border-solid border-darkSlate-600 bg-darkSlate-800 p-1 text-lightSlate-200 shadow-md outline-none data-[expanded]:animate-menuEnter animate-menuLeave",
           props.class
         )}
         {...rest}
@@ -153,7 +153,7 @@ const DropdownMenuSubContent = <T extends ValidComponent = "div">(
   return (
     <DropdownMenuPrimitive.SubContent
       class={cn(
-        "z-200 min-w-32 origin-[var(--kb-menu-content-transform-origin)] overflow-hidden rounded-md border border-solid border-darkSlate-600 bg-darkSlate-800 p-1 text-lightSlate-200 shadow-md outline-none data-[expanded]:animate-menuEnter animate-menuLeave",
+        "z-100000 min-w-32 origin-[var(--kb-menu-content-transform-origin)] overflow-hidden rounded-md border border-solid border-darkSlate-600 bg-darkSlate-800 p-1 text-lightSlate-200 shadow-md outline-none data-[expanded]:animate-menuEnter animate-menuLeave",
         props.class
       )}
       {...rest}

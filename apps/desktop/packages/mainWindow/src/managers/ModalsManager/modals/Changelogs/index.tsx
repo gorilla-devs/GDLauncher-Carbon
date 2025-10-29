@@ -4,7 +4,7 @@ import ModalLayout from "../../ModalLayout"
 import { Trans } from "@gd/i18n"
 import { For, Show, createSignal, onMount, createMemo } from "solid-js"
 import changelogs, { Changelog, ChangelogEntry } from "./changelogs"
-import { Button, Badge } from "@gd/ui"
+import { Button, Badge, AnimatedIcon } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
 
 type CategoryType = keyof Changelog
@@ -50,8 +50,10 @@ const FeatureCard = (props: FeatureCardProps) => {
       }}
     >
       <div class="flex items-start gap-3">
-        <div
-          class={`${getColor().icon} ${getColor().text} mt-1 h-5 w-5 shrink-0`}
+        <AnimatedIcon
+          icon={getColor().icon}
+          class={`${getColor().text} mt-1 shrink-0`}
+          size="h-5 w-5"
         />
         <div class="flex-1">
           <h3 class="text-lightSlate-50 m-0 mb-2 text-base font-semibold">
@@ -74,6 +76,8 @@ interface HeroFeatureCardProps {
 }
 
 const HeroFeatureCard = (props: HeroFeatureCardProps) => {
+  const [mediaLoaded, setMediaLoaded] = createSignal(false)
+
   const getGradient = () => {
     switch (props.type) {
       case "new":
@@ -138,7 +142,7 @@ const HeroFeatureCard = (props: HeroFeatureCardProps) => {
           }}
         >
           <div class="mb-4 flex items-center gap-3">
-            <div class={`${getIcon()} ${getIconColor()} h-8 w-8`} />
+            <AnimatedIcon icon={getIcon()} class={getIconColor()} size="h-8 w-8" />
             <Badge variant="secondary" class="text-xs font-semibold">
               Major Feature
             </Badge>
@@ -155,35 +159,55 @@ const HeroFeatureCard = (props: HeroFeatureCardProps) => {
 
         {/* Media Section */}
         <Show when={props.entry.media}>
-          <div class="relative flex items-center justify-center overflow-hidden rounded-xl p-6">
-            <Show
-              when={isVideo()}
-              fallback={
-                <img
+          <div class="relative overflow-hidden rounded-xl p-6">
+            <div class="relative aspect-[4/3] w-full">
+              {/* Loading skeleton - absolute positioned as background */}
+              <Show when={!mediaLoaded()}>
+                <div class="bg-darkSlate-700 absolute inset-0 animate-pulse rounded-lg" />
+              </Show>
+
+              {/* Media - absolute positioned on top */}
+              <Show
+                when={isVideo()}
+                fallback={
+                  <img
+                    src={props.entry.media}
+                    alt={props.entry.title}
+                    class="absolute inset-0 h-full w-full rounded-lg object-cover shadow-lg transition-opacity duration-500"
+                    classList={{
+                      "opacity-0": !mediaLoaded(),
+                      "opacity-100": mediaLoaded()
+                    }}
+                    onLoad={() => setMediaLoaded(true)}
+                  />
+                }
+              >
+                <video
                   src={props.entry.media}
-                  alt={props.entry.title}
-                  class="aspect-[4/3] w-full rounded-lg object-cover shadow-lg"
+                  autoplay
+                  loop
+                  muted
+                  playsinline
+                  class="absolute inset-0 h-full w-full rounded-lg object-cover shadow-lg transition-opacity duration-500"
+                  classList={{
+                    "opacity-0": !mediaLoaded(),
+                    "opacity-100": mediaLoaded()
+                  }}
+                  onLoadedData={() => setMediaLoaded(true)}
                 />
-              }
-            >
-              <video
-                // ref={videoRef}
-                src={props.entry.media}
-                autoplay
-                loop
-                muted
-                playsinline
-                class="aspect-[4/3] w-full rounded-lg object-cover shadow-lg"
-              />
-            </Show>
+              </Show>
+            </div>
           </div>
         </Show>
       </div>
 
       {/* Decorative background element - only show when no media */}
       <Show when={!props.entry.media}>
-        <div
-          class={`${getIcon()} ${getIconColor()} absolute -right-8 -top-8 h-32 w-32 opacity-10`}
+        <AnimatedIcon
+          icon={getIcon()}
+          class={`${getIconColor()} absolute -right-8 -top-8 opacity-10`}
+          size="h-32 w-32"
+          interactive={false}
         />
       </Show>
     </div>
@@ -236,7 +260,7 @@ const CategoryFilter = (props: CategoryFilterProps) => {
       }`}
       onClick={props.onToggle}
     >
-      <div class={`${config.icon} h-4 w-4`} />
+      <AnimatedIcon icon={config.icon} size="h-4 w-4" />
       <span>{config.label}</span>
       <Badge
         variant={props.active ? "default" : "secondary"}
@@ -427,7 +451,7 @@ const Changelogs = (props: ModalProps) => {
                 }}
               >
                 <div class="flex items-center justify-center gap-2">
-                  <div class="i-hugeicons:discord inline-block h-5 w-5" />
+                  <AnimatedIcon icon="i-hugeicons:discord" class="inline-block" size="h-5 w-5" />
                   <Trans key="changelogs.cta_discord_button" />
                 </div>
               </Button>
@@ -453,7 +477,7 @@ const Changelogs = (props: ModalProps) => {
                 }}
               >
                 <div class="flex items-center justify-center gap-2">
-                  <div class="i-hugeicons:github inline-block h-5 w-5" />
+                  <AnimatedIcon icon="i-hugeicons:github" class="inline-block" size="h-5 w-5" />
                   <Trans key="changelogs.cta_github_button" />
                 </div>
               </Button>
@@ -480,7 +504,7 @@ const Changelogs = (props: ModalProps) => {
               }}
             >
               <div class="flex items-center justify-center gap-2">
-                <div class="i-hugeicons:alert-02 inline-block h-5 w-5" />
+                <AnimatedIcon icon="i-hugeicons:alert-02" class="inline-block" size="h-5 w-5" />
                 <Trans key="changelogs.cta_report_button" />
               </div>
             </Button>

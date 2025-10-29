@@ -1,4 +1,4 @@
-import { Progress, toast } from "@gd/ui"
+import { Progress, toast, AnimatedIcon } from "@gd/ui"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
 import { Trans } from "@gd/i18n"
@@ -96,7 +96,7 @@ const AppUpdate = (props: ModalProps) => {
               mod_name: currentModName()
             }}
           />
-          <i class="i-hugeicons:loading-03 mt-10 animate-spin text-6xl" />
+          <AnimatedIcon icon="i-hugeicons:loading-03" class="mt-10 animate-spin" size="text-6xl" interactive={false} />
         </div>
       </div>
     </ModalLayout>

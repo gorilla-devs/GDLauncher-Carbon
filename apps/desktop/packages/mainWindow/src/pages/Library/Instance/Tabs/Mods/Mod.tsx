@@ -3,6 +3,7 @@ import { queryClient, rspc } from "@/utils/rspcClient"
 import { getModloaderIcon } from "@/utils/sidebar"
 import { Mod as ModType } from "@gd/core_module/bindings"
 import {
+  AnimatedIcon,
   Button,
   Checkbox,
   Popover,
@@ -329,7 +330,7 @@ const Mod = (props: Props) => {
           <Show when={props.mod.is_duplicate}>
             <Tooltip>
               <TooltipTrigger>
-                <i class="i-hugeicons:alert-01 h-5 w-5 text-yellow-500" />
+                <AnimatedIcon icon="i-hugeicons:alert-01" size="h-5 w-5" class="text-yellow-500" />
               </TooltipTrigger>
               <TooltipContent>
                 <Trans key="instance.duplicate_mod_warning" />
@@ -339,7 +340,7 @@ const Mod = (props: Props) => {
           <Show when={props.mod.has_update && props.isInstanceLocked}>
             <Tooltip>
               <TooltipTrigger class="max-w-38 flex overflow-hidden text-ellipsis">
-                <i class="text-lightSlate-700 i-hugeicons:download-02 h-5 w-5" />
+                <AnimatedIcon icon="i-hugeicons:download-02" size="h-5 w-5" class="text-lightSlate-700" />
               </TooltipTrigger>
               <TooltipContent>
                 <Trans key="instance.locked_cannot_apply_changes" />
@@ -369,8 +370,10 @@ const Mod = (props: Props) => {
                   />
                 }
               > */}
-              <i
-                class="i-hugeicons:download-02 text-lightSlate-700 hover:text-green-500 flex h-5 w-5"
+              <AnimatedIcon
+                icon="i-hugeicons:download-02"
+                class="text-lightSlate-700 hover:text-green-500 flex"
+                size="h-5 w-5"
                 onClick={(e) => {
                   e.stopPropagation()
                   updateModMutation.mutate({
@@ -416,8 +419,9 @@ const Mod = (props: Props) => {
           <Show when={props.isInstanceLocked}>
             <Tooltip>
               <TooltipTrigger>
-                <div
-                  class="text-lightSlate-700 i-hugeicons:delete-02 text-2xl duration-100 ease-in-out"
+                <AnimatedIcon
+                  icon="i-hugeicons:delete-02"
+                  class="text-lightSlate-700 text-2xl duration-100 ease-in-out"
                   onClick={(e) => {
                     e.stopPropagation()
 
@@ -436,8 +440,9 @@ const Mod = (props: Props) => {
             </Tooltip>
           </Show>
           <Show when={!props.isInstanceLocked}>
-            <div
-              class="text-lightSlate-700 i-hugeicons:delete-02 transition-color text-2xl duration-100 ease-in-out hover:text-red-500"
+            <AnimatedIcon
+              icon="i-hugeicons:delete-02"
+              class="text-lightSlate-700 transition-color text-2xl duration-100 ease-in-out hover:text-red-500"
               onClick={(e) => {
                 e.stopPropagation()
 
@@ -456,8 +461,9 @@ const Mod = (props: Props) => {
               placement="left-end"
             >
               <PopoverTrigger>
-                <div
-                  class="text-lightSlate-700 i-hugeicons:information-circle transition-color hover:text-lightSlate-50 cursor-pointer text-2xl duration-100 ease-in-out"
+                <AnimatedIcon
+                  icon="i-hugeicons:information-circle"
+                  class="text-lightSlate-700 transition-color hover:text-lightSlate-50 cursor-pointer text-2xl duration-100 ease-in-out"
                   classList={{
                     "text-lightSlate-50": isHoveringInfoCard()
                   }}
@@ -599,7 +605,7 @@ const Mod = (props: Props) => {
                           }}
                         >
                           <Trans key="instance.open_mod_page" />
-                          <div class="i-hugeicons:arrow-right-01 ml-1" />
+                          <AnimatedIcon icon="i-hugeicons:arrow-right-01" class="ml-1" />
                         </Button>
                         <Button
                           type="outline"
@@ -612,7 +618,7 @@ const Mod = (props: Props) => {
                           }}
                         >
                           <Trans key="instance.open_in_browser" />
-                          <div class="i-hugeicons:link-square-02 ml-1" />
+                          <AnimatedIcon icon="i-hugeicons:link-square-02" class="ml-1" />
                         </Button>
                       </div>
                     </Show>
@@ -650,7 +656,7 @@ const Mod = (props: Props) => {
                           }}
                         >
                           <Trans key="instance.open_mod_page" />
-                          <div class="i-hugeicons:arrow-right-01 ml-1" />
+                          <AnimatedIcon icon="i-hugeicons:arrow-right-01" class="ml-1" />
                         </Button>
                         <Button
                           type="outline"
@@ -663,7 +669,7 @@ const Mod = (props: Props) => {
                           }}
                         >
                           <Trans key="instance.open_in_browser" />
-                          <div class="i-hugeicons:link-square-02 ml-1" />
+                          <AnimatedIcon icon="i-hugeicons:link-square-02" class="ml-1" />
                         </Button>
                       </div>
                     </Show>
@@ -675,8 +681,9 @@ const Mod = (props: Props) => {
           <div onClick={(e) => e.stopPropagation()}>
             <Popover placement="left">
               <PopoverTrigger>
-                <div
-                  class="text-lightSlate-700 transition-color hover:text-lightSlate-50 i-hugeicons:more-horizontal cursor-pointer text-2xl duration-100 ease-in-out"
+                <AnimatedIcon
+                  icon="i-hugeicons:more-horizontal"
+                  class="text-lightSlate-700 transition-color hover:text-lightSlate-50 cursor-pointer text-2xl duration-100 ease-in-out"
                   classList={{
                     "text-lightSlate-50": isHoveringOptionsCard()
                   }}

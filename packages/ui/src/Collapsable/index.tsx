@@ -1,4 +1,5 @@
 import { JSX, createSignal } from "solid-js"
+import { AnimatedIcon } from "../AnimatedIcon"
 
 interface Props {
   children: JSX.Element
@@ -27,8 +28,10 @@ const Collapsable = (props: Props) => {
           setOpened((prev) => !prev)
         }}
       >
-        <div
-          class="transition ease-in-out i-hugeicons:arrow-down-01 min-w-4 min-h-4 text-lightSlate-700"
+        <AnimatedIcon
+          icon="i-hugeicons:arrow-down-01"
+          size="min-w-4 min-h-4"
+          class="transition ease-in-out text-lightSlate-700"
           classList={{
             "-rotate-180": !opened()
           }}

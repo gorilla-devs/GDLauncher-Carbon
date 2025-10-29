@@ -1,7 +1,7 @@
 import { Trans, useTransContext } from "@gd/i18n"
 import { ModalProps, useModal } from "@/managers/ModalsManager"
 import ModalLayout from "@/managers/ModalsManager/ModalLayout"
-import { Button, Input, toast } from "@gd/ui"
+import { Button, Input, toast, AnimatedIcon } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
 import { Match, Switch, createSignal } from "solid-js"
 
@@ -32,15 +32,15 @@ const AddCustomJava = (props: ModalProps) => {
               icon={
                 <Switch>
                   <Match when={validateJavaPath.isPending}>
-                    <div class="i-hugeicons:loading-03 text-lightSlate-700 flex animate-spin" />
+                    <AnimatedIcon icon="i-hugeicons:loading-03" class="text-lightSlate-700 flex animate-spin" interactive={false} />
                   </Match>
                   <Match when={value()}>
                     <Switch>
                       <Match when={validPath() === true}>
-                        <div class="i-hugeicons:tick-double-02 flex text-emerald-500" />
+                        <AnimatedIcon icon="i-hugeicons:tick-double-02" class="flex text-emerald-500" />
                       </Match>
                       <Match when={validPath() === false}>
-                        <div class="i-hugeicons:alert-02 flex text-yellow-500" />
+                        <AnimatedIcon icon="i-hugeicons:alert-02" class="flex text-yellow-500" />
                       </Match>
                     </Switch>
                   </Match>

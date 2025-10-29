@@ -1,4 +1,11 @@
-import { Button, Input, Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
+import {
+  AnimatedIcon,
+  Button,
+  Input,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from "@gd/ui"
 import { Trans } from "@gd/i18n"
 import PageTitle from "./components/PageTitle"
 import RowsContainer from "./components/RowsContainer"
@@ -61,8 +68,10 @@ const RuntimePath = () => {
               class="w-full"
               value={runtimePath()}
               icon={
-                <div
-                  class="hover:text-lightSlate-700 i-hugeicons:folder-01 h-5 w-5 cursor-pointer transition-colors ease-in-out"
+                <AnimatedIcon
+                  icon="i-hugeicons:folder-01"
+                  class="hover:text-lightSlate-700 cursor-pointer transition-colors ease-in-out"
+                  size="h-5 w-5"
                   onClick={async () => {
                     const result = await window.openFileDialog({
                       title: "Select Runtime Path",
@@ -93,7 +102,10 @@ const RuntimePath = () => {
                     setRuntimePath(currentRuntimePath()!)
                   }}
                 >
-                  <i class="i-hugeicons:arrow-turn-backward h-5 w-5" />
+                  <AnimatedIcon
+                    icon="i-hugeicons:arrow-turn-backward"
+                    size="h-5 w-5"
+                  />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -111,7 +123,7 @@ const RuntimePath = () => {
                     setRuntimePath(initialRuntimePath()!)
                   }}
                 >
-                  <i class="i-hugeicons:cancel-01 h-5 w-5" />
+                  <AnimatedIcon icon="i-hugeicons:cancel-01" size="h-5 w-5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -152,7 +164,10 @@ const RuntimePath = () => {
                     )
                   }}
                 >
-                  <i class="i-hugeicons:arrow-reload-horizontal h-5 w-5" />
+                  <AnimatedIcon
+                    icon="i-hugeicons:arrow-reload-horizontal"
+                    size="h-5 w-5"
+                  />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>

@@ -7,7 +7,8 @@ import {
   SelectContent,
   SelectItem,
   SelectValue,
-  Badge
+  Badge,
+  AnimatedIcon
 } from "@gd/ui"
 import { ModalProps, useModal } from "../.."
 import { Trans, useTransContext } from "@gd/i18n"
@@ -508,7 +509,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
           <div class="flex w-full items-center">
             <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
             <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
-              <div class="i-hugeicons:file-02 text-primary-500 text-sm" />
+              <AnimatedIcon icon="i-hugeicons:file-02" class="text-primary-500" size="text-sm" />
               <Trans key="general.about" />
             </span>
             <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
@@ -538,7 +539,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
               <Switch>
                 <Match when={!bgPreview()}>
                   <div class="flex flex-col items-center gap-0.5">
-                    <div class="i-hugeicons:image-01 text-lightSlate-600 group-hover:text-lightSlate-400 text-2xl transition-colors" />
+                    <AnimatedIcon icon="i-hugeicons:image-01" class="text-lightSlate-600 group-hover:text-lightSlate-400 transition-colors" size="text-2xl" />
                     <span class="text-lightSlate-600 group-hover:text-lightSlate-400 text-[10px] transition-colors">
                       Add icon
                     </span>
@@ -546,8 +547,10 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 </Match>
                 <Match when={bgPreview()}>
                   <div class="bg-darkSlate-900/90 absolute right-1 top-1 rounded-lg p-1 opacity-0 transition-opacity group-hover:opacity-100">
-                    <div
-                      class="text-lightSlate-50 i-hugeicons:cancel-circle text-base transition-all hover:text-red-500"
+                    <AnimatedIcon
+                      icon="i-hugeicons:cancel-circle"
+                      class="text-lightSlate-50 transition-all hover:text-red-500"
+                      size="text-base"
                       onClick={(e) => {
                         e.preventDefault()
                         e.stopPropagation()
@@ -586,7 +589,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
           <div class="flex w-full items-center">
             <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
             <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
-              <div class="i-hugeicons:minecraft text-primary-500 text-sm" />
+              <AnimatedIcon icon="i-hugeicons:minecraft" class="text-primary-500" size="text-sm" />
               <Trans key="instance.instance_mc_version" />
             </span>
             <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
@@ -693,7 +696,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 title="Snapshot versions"
               >
                 <div class="flex items-center gap-1">
-                  <div class="i-hugeicons:test-tube text-xs" />
+                  <AnimatedIcon icon="i-hugeicons:test-tube" size="text-xs" />
                   <span>Snapshot</span>
                 </div>
               </Badge>
@@ -706,7 +709,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 title="Old alpha versions"
               >
                 <div class="flex items-center gap-1">
-                  <div class="i-hugeicons:alpha text-xs" />
+                  <AnimatedIcon icon="i-hugeicons:alpha" size="text-xs" />
                   <span>Alpha</span>
                 </div>
               </Badge>
@@ -717,7 +720,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 title="Old beta versions"
               >
                 <div class="flex items-center gap-1">
-                  <div class="i-hugeicons:beta text-xs" />
+                  <AnimatedIcon icon="i-hugeicons:beta" size="text-xs" />
                   <span>Beta</span>
                 </div>
               </Badge>
@@ -730,7 +733,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
           <div class="flex w-full items-center">
             <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
             <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
-              <div class="i-hugeicons:package text-primary-500 text-sm" />
+              <AnimatedIcon icon="i-hugeicons:package" class="text-primary-500" size="text-sm" />
               <Trans key="general.modloader" />
             </span>
             <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
@@ -824,7 +827,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                   }
                 >
                   <div class="text-lightSlate-500 bg-darkSlate-800 flex items-center gap-2 rounded-md px-3 py-2 text-sm">
-                    <div class="i-hugeicons:alert-circle text-yellow-500" />
+                    <AnimatedIcon icon="i-hugeicons:alert-circle" class="text-yellow-500" />
                     <span>
                       No versions available for Minecraft {mcVersion()}
                     </span>
@@ -854,7 +857,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
           <Switch>
             <Match when={!instanceData()}>
               <div class="flex items-center gap-1.5">
-                <div class="i-hugeicons:add-01" />
+                <AnimatedIcon icon="i-hugeicons:add-01" />
                 <Trans
                   key="instance.instance_modal_instance_creation_create"
                   options={{
@@ -865,7 +868,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             </Match>
             <Match when={instanceData()}>
               <div class="flex items-center gap-1.5">
-                <div class="i-hugeicons:pencil-edit-01" />
+                <AnimatedIcon icon="i-hugeicons:pencil-edit-01" />
                 <Trans key="instance.instance_modal_instance_update" />
               </div>
             </Match>

@@ -1,4 +1,4 @@
-import { Button } from "@gd/ui"
+import { Button, AnimatedIcon } from "@gd/ui"
 import { StepsProps } from "."
 import { Trans } from "@gd/i18n"
 
@@ -8,7 +8,7 @@ const ManualStep = (props: StepsProps) => {
       <div class="flex h-full w-full flex-col justify-between">
         <div class="h-13 border-primary-500 flex flex-col items-center justify-center border-2 border-dashed py-4">
           <div class="flex flex-col items-center justify-center gap-2">
-            <div class="text-lightSlate-700 i-hugeicons:folder-open w-6 text-xl" />
+            <AnimatedIcon icon="i-hugeicons:folder-open" class="text-lightSlate-700" size="w-6 text-xl" />
             <p class="text-lightSlate-700 m-0">
               <Trans
                 key="java.select_java_zip"

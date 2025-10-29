@@ -7,6 +7,7 @@ import DynamicBadgeContainer from "./DynamicBadgeContainer"
 import { createSignal, Match, Switch } from "solid-js"
 import ModpackDownloadButton from "@/components/ModpackDownloadButton"
 import ModDownloadButton from "@/components/ModDownloadButton"
+import { AnimatedIcon } from "@gd/ui"
 
 interface SearchResultItemProps {
   result: FEUnifiedSearchResult
@@ -114,7 +115,7 @@ export function ListItem(props: SearchResultItemProps) {
                 <Switch>
                   <Match when={props.isInstalled}>
                     <div class="flex items-center gap-2 text-xl font-bold text-green-500">
-                      <i class="i-hugeicons:tick-02" />
+                      <AnimatedIcon icon="i-hugeicons:tick-02" />
                       Installed
                     </div>
                   </Match>

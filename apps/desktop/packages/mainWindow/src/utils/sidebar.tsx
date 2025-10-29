@@ -4,6 +4,7 @@ import fabricIcon from "/assets/images/icons/fabric.png"
 import quiltIcon from "/assets/images/icons/quilt.svg"
 import vanillaIcon from "/assets/images/icons/vanilla.png"
 import { FEUnifiedModLoaderType } from "@gd/core_module/bindings"
+import { AnimatedImageIcon } from "@gd/ui"
 
 export const getModloaderIcon = (modloader: string) => {
   switch (modloader?.toString().toLowerCase()) {
@@ -36,7 +37,7 @@ export const ModloaderIcon = (props: { modloader: FEUnifiedModLoaderType }) => {
       }
     >
       <Match when={typeof props.modloader === "string"}>
-        <img class="h-4 w-4" src={getModloaderIcon(props.modloader)} />
+        <AnimatedImageIcon class="h-4 w-4" src={getModloaderIcon(props.modloader)} alt={props.modloader as string} />
       </Match>
     </Switch>
   )

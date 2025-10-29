@@ -1,4 +1,6 @@
-import { createEffect, onCleanup } from "solid-js"
+import { onMount, onCleanup } from "solid-js"
+import { render } from "solid-js/web"
+import InlinePatternSVG from "./InlinePatternSVG"
 
 interface Props {
   children: any
@@ -18,7 +20,7 @@ const PatternBackground = (props: Props) => {
   const duration = props.animationDuration || 1200 // ms
   let containerRef: HTMLDivElement | undefined
 
-  createEffect(() => {
+  onMount(() => {
     if (!containerRef) return
 
     const container = document.createElement("div")
@@ -32,7 +34,7 @@ const PatternBackground = (props: Props) => {
     for (let y = 0; y < rows; y++) {
       for (let x = 0; x < cols; x++) {
         const tile = document.createElement("div")
-        tile.className = "absolute bg-pattern opacity-0"
+        tile.className = "absolute"
 
         // Calculate distance from bottom left corner
         const dx = x - 0 // bottomLeftX is 0
@@ -44,11 +46,26 @@ const PatternBackground = (props: Props) => {
           height: ${tileSize}px;
           left: ${x * tileSize}px;
           top: ${y * tileSize}px;
-          background-image: url(./assets/images/gdlauncher_pattern.svg);
-          background-position: ${-x * tileSize}px ${-y * tileSize}px;
+          overflow: hidden;
+          opacity: 0;
           transition: opacity 0.2s ease-out;
           transition-delay: ${(distance * duration) / (rows + cols) + 500}ms;
         `
+
+        // Create SVG wrapper positioned to show correct tile portion
+        const svgWrapper = document.createElement("div")
+        svgWrapper.style.cssText = `
+          position: absolute;
+          left: ${-x * tileSize}px;
+          top: ${-y * tileSize}px;
+          width: 1920px;
+          height: 1080px;
+        `
+
+        // Render the inline SVG into the wrapper
+        render(() => <InlinePatternSVG />, svgWrapper)
+
+        tile.appendChild(svgWrapper)
         container.appendChild(tile)
         tiles.push({ element: tile, x, y, distance })
       }

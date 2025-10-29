@@ -7,7 +7,7 @@
   "license": "ARR",
   "type": "module",
   "_comment": "DO NOT MANUALLY EDIT THE VERSION",
-  "version": "0.0.0",
+  "version": "2.0.26-beta.1761485239",
   "main": "dist/main/index.cjs",
   "scripts": {
     "dev": "node scripts/watch.mjs",
@@ -67,7 +67,9 @@
     "virtua": "0.41.2",
     "vite": "^6.3.4",
     "vite-plugin-solid": "^2.11.6",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "@types/qrcode": "^1.5.6",
+    "qrcode": "^1.5.4"
   },
   "env": {
     "//": "Used in build scripts",

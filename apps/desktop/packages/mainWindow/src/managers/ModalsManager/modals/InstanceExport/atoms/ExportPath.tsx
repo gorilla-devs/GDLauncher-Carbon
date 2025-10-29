@@ -1,5 +1,5 @@
 import { useTransContext } from "@gd/i18n"
-import { Input } from "@gd/ui"
+import { Input, AnimatedIcon } from "@gd/ui"
 import { createSignal } from "solid-js"
 import { setPayload, payload } from ".."
 
@@ -26,16 +26,19 @@ const ExportPath = () => {
           class="flex-1"
           inputColor="bg-darkSlate-900"
           icon={
-            <div
+            <AnimatedIcon
+              icon="i-material-symbols:close"
               onClick={() => {
                 setPath("")
               }}
-              class="i-material-symbols:close"
             />
           }
         />
         <div class="flex items-center justify-center rounded-lg bg-[#1D2028] p-2">
-          <div
+          <AnimatedIcon
+            icon="i-material-symbols:folder-open-outline"
+            class="cursor-pointer"
+            size="text-2xl"
             onClick={async () => {
               const result = await window.showSaveDialog({
                 title: "Select Runtime Path",
@@ -61,7 +64,6 @@ const ExportPath = () => {
 
               setPayload({ ...payload, save_path: result.filePath })
             }}
-            class="i-material-symbols:folder-open-outline cursor-pointer text-2xl"
           />
         </div>
       </div>

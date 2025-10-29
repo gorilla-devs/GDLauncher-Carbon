@@ -1,5 +1,5 @@
 import { rspc } from "@/utils/rspcClient"
-import { Input, Tooltip, TooltipTrigger, TooltipContent } from "@gd/ui"
+import { Input, Tooltip, TooltipTrigger, TooltipContent, AnimatedIcon } from "@gd/ui"
 import {
   Match,
   Switch,
@@ -141,20 +141,20 @@ const JavaPathAutoComplete = (props: Props) => {
         icon={
           <Switch>
             <Match when={createCustomJavaVersionMutation.isPending}>
-              <div class="i-hugeicons:loading-03 text-lightSlate-700 flex animate-spin" />
+              <AnimatedIcon icon="i-hugeicons:loading-03" class="text-lightSlate-700 flex animate-spin" interactive={false} />
             </Match>
             <Match when={javaComponent()}>
               <Switch>
                 <Match when={javaComponent()?.isValid}>
-                  <div class="i-hugeicons:tick-double-02 flex text-emerald-500" />
+                  <AnimatedIcon icon="i-hugeicons:tick-double-02" class="flex text-emerald-500" />
                 </Match>
                 <Match when={!javaComponent()?.isValid}>
-                  <div class="i-hugeicons:alert-02 flex text-yellow-500" />
+                  <AnimatedIcon icon="i-hugeicons:alert-02" class="flex text-yellow-500" />
                 </Match>
               </Switch>
             </Match>
             <Match when={shouldSuggestCreation()}>
-              <div class="i-hugeicons:add-01 text-lightSlate-700 flex" />
+              <AnimatedIcon icon="i-hugeicons:add-01" class="text-lightSlate-700 flex" />
             </Match>
           </Switch>
         }

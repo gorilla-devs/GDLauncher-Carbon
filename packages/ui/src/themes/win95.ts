@@ -119,7 +119,9 @@ const win95: Theme = {
 
   font: "W95FA",
   "font-mono": "W95FA",
-  "ads-sidebar-background": "rgb(var(--accent))",
+  "ads-sidebar-background": "url(./assets/images/gdlauncher_pattern.svg)",
+  "pattern-background": "165 165 165",
+  "pattern-fill": "175 175 175",
   "additional-styles": additionalStyles
 }
 

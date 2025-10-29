@@ -276,7 +276,7 @@ function Input(props: Props) {
         <Portal>
           <ul
             ref={setMenuRef}
-            class="absolute h-max max-h-60 bottom-0 overflow-y-auto overflow-x-hidden text-lightSlate-700 shadow-md shadow-darkSlate-900 list-none m-0 p-0 z-100 min-w-32 max-w-200"
+            class="absolute h-max max-h-60 bottom-0 overflow-y-auto overflow-x-hidden text-lightSlate-700 shadow-md shadow-darkSlate-900 list-none m-0 p-0 z-100000 min-w-32 max-w-200"
             onMouseOut={() => {
               setFocusInUl(false)
             }}

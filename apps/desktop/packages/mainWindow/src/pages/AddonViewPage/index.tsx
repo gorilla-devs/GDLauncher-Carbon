@@ -9,7 +9,8 @@ import {
   Tabs,
   Tooltip,
   TooltipContent,
-  TooltipTrigger
+  TooltipTrigger,
+  AnimatedIcon
 } from "@gd/ui"
 import {
   Outlet,
@@ -207,7 +208,7 @@ const AddonExplore = () => {
               onClick={() => {
                 navigator.prev()
               }}
-              icon={<div class="i-hugeicons:arrow-left-01 text-2xl" />}
+              icon={<AnimatedIcon icon="i-hugeicons:arrow-left-01" size="text-2xl" />}
               size="small"
               type="secondary"
             >
@@ -231,7 +232,7 @@ const AddonExplore = () => {
                     window.openExternalLink(`${baseUrl}${project.data?.slug}`)
                   }}
                 >
-                  <div class="i-hugeicons:link-square-02 text-xl" />
+                  <AnimatedIcon icon="i-hugeicons:link-square-02" size="text-xl" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -273,7 +274,7 @@ const AddonExplore = () => {
                       </Switch>
                     </div>
                     <div class="border-darkSlate-500 flex items-center gap-2 border-0 p-0 lg:border-r-2 lg:px-2">
-                      <div class="i-hugeicons:clock-01 text-lg" />
+                      <AnimatedIcon icon="i-hugeicons:clock-01" size="text-lg" />
                       <Switch>
                         <Match when={!isFetching()}>
                           <Show when={project.data?.releaseDate}>
@@ -365,7 +366,7 @@ const AddonExplore = () => {
                       size="small"
                       type="secondary"
                     >
-                      <div class="i-hugeicons:arrow-left-01 text-2xl" />
+                      <AnimatedIcon icon="i-hugeicons:arrow-left-01" size="text-2xl" />
                       <Trans key="instance.step_back" />
                     </Button>
                   </div>

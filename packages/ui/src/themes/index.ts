@@ -90,6 +90,8 @@ interface Theme {
   font: string
   "font-mono": string
   "ads-sidebar-background": string
+  "pattern-background": string
+  "pattern-fill": string
   "additional-styles": string
 }
 

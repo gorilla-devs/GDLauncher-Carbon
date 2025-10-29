@@ -9,8 +9,6 @@ export default function getAdSize(display?: Display) {
       width: 1280,
       height: 960,
       adSize: {
-        useFallbackAd: false,
-        useVertical: false,
         width: 0,
         height: 0,
         shouldShow: false
@@ -21,33 +19,61 @@ export default function getAdSize(display?: Display) {
   const primaryDisplay = display || screen.getPrimaryDisplay()
   const { width, height } = primaryDisplay.size
 
-  if (width < 1920 || height < 1080) {
+  // Tier 1: Large displays (≥1920×1080) - Spacious
+  if (width >= 1920 && height >= 1080) {
     return {
-      minWidth: width < 1024 ? width - 100 : 1024,
-      minHeight: height < 790 ? height - 100 : 790,
-      width: width < 1024 ? width - 100 : 1024,
-      height: height < 790 ? height - 100 : 790,
+      minWidth: 1200,
+      minHeight: 720,
+      width: 1600,
+      height: 900,
       adSize: {
-        useFallbackAd: false,
-        useVertical: true,
-        width: 160,
-        height: 600,
+        width: 440,
+        height: 670,
         shouldShow: true
       }
     }
-  } else {
+  }
+
+  // Tier 2: Medium-Large displays (≥1680×1050) - Comfortable
+  if (width >= 1680 && height >= 1050) {
     return {
-      minWidth: 1280,
-      minHeight: 790,
-      width: 1600,
-      height: 790,
+      minWidth: 1200,
+      minHeight: 720,
+      width: 1450,
+      height: 850,
       adSize: {
-        useFallbackAd: false,
-        useVertical: false,
         width: 400,
         height: 600,
         shouldShow: true
       }
+    }
+  }
+
+  // Tier 3: Medium displays (≥1366×768) - Efficient
+  if (width >= 1366 && height >= 768) {
+    return {
+      minWidth: 1200,
+      minHeight: 720,
+      width: Math.min(width - 80, 1280),
+      height: 720,
+      adSize: {
+        width: 400,
+        height: 600,
+        shouldShow: true
+      }
+    }
+  }
+
+  // Tier 4: Small displays (<1366×768) - Adaptive
+  return {
+    minWidth: 960,
+    minHeight: 680,
+    width: Math.min(width - 48, 1150),
+    height: Math.min(height - 48, 720),
+    adSize: {
+      width: 160,
+      height: 600,
+      shouldShow: true
     }
   }
 }

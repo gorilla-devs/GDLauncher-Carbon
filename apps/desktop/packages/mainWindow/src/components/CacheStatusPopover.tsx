@@ -1,6 +1,6 @@
 import { Component, Show, For, onMount, onCleanup } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
-import { Progress, Popover, PopoverTrigger, PopoverContent } from "@gd/ui"
+import { Progress, Popover, PopoverTrigger, PopoverContent, AnimatedIcon } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
 
 interface CacheStatusPopoverProps {
@@ -258,7 +258,7 @@ const CacheStatusPopover: Component<CacheStatusPopoverProps> = (props) => {
           <div class="mb-6 flex items-center justify-between">
             <div class="flex items-center gap-3">
               <div class="rounded-lg bg-blue-500/10 p-2">
-                <div class="i-hugeicons:tick-02 text-lg text-blue-400" />
+                <AnimatedIcon icon="i-hugeicons:tick-02" size="text-lg" class="text-blue-400" />
               </div>
               <div>
                 <h3 class="text-lightSlate-50 text-lg font-semibold">
@@ -294,7 +294,7 @@ const CacheStatusPopover: Component<CacheStatusPopoverProps> = (props) => {
                 <div class="py-12 text-center">
                   <div class="mb-4 flex justify-center">
                     <div class="bg-lightSlate-800/30 rounded-full p-4">
-                      <div class="i-hugeicons:tick-double-02 text-lightSlate-400 text-3xl" />
+                      <AnimatedIcon icon="i-hugeicons:tick-double-02" size="text-3xl" class="text-lightSlate-400" />
                     </div>
                   </div>
                   <h4 class="text-lightSlate-300 mb-2 font-medium">

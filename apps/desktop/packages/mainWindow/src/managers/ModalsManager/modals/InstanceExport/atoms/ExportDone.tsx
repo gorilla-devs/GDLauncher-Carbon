@@ -1,5 +1,5 @@
 import { useTransContext } from "@gd/i18n"
-import { Button } from "@gd/ui"
+import { Button, AnimatedIcon } from "@gd/ui"
 import CheckIcon from "./CheckIcon"
 import { Show } from "solid-js"
 import { failedMsg } from "./Exporting"
@@ -25,7 +25,7 @@ export default function ExportDone(props: { path: string }) {
             window.openFolder(props.path)
           }}
         >
-          <div class="i-hugeicons:folder-open" />
+          <AnimatedIcon icon="i-hugeicons:folder-open" />
           <span>{t("instance.open_folder")}</span>
         </Button>
       </Show>

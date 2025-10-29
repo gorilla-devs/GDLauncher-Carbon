@@ -7,12 +7,13 @@ import { useRouteData } from "@solidjs/router"
 import fetchData from "../../instance.data"
 import { rspc } from "@/utils/rspcClient"
 import { CFFEFile } from "@gd/core_module/bindings"
+import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 
 const NoVersions = () => {
   return (
     <div class="min-h-90 flex h-full w-full items-center justify-center">
-      <div class="flex flex-col items-center justify-center text-center">
-        <img src={skull} class="h-16 w-16" />
+      <div class="flex flex-col items-center justify-center gap-6 text-center">
+        <PlaceholderGorilla size={8} variant="Shrugging Gorilla - No Options" />
         <p class="text-lightSlate-700 max-w-100">
           <Trans
             key="modpack.no_versions_text"

@@ -33,7 +33,7 @@ const ContextMenuContent = <T extends ValidComponent = "div">(
     <ContextMenuPrimitive.Portal>
       <ContextMenuPrimitive.Content
         class={cn(
-          "z-200 min-w-40 max-w-[200px] origin-[var(--kb-menu-content-transform-origin)] overflow-visible rounded-md border border-solid border-darkSlate-600 bg-darkSlate-800 p-1 text-lightSlate-200 shadow-md data-[expanded]:animate-menuEnter animate-menuLeave outline-none",
+          "z-100000 min-w-40 max-w-[200px] origin-[var(--kb-menu-content-transform-origin)] overflow-visible rounded-md border border-solid border-darkSlate-600 bg-darkSlate-800 p-1 text-lightSlate-200 shadow-md data-[expanded]:animate-menuEnter animate-menuLeave outline-none",
           local.class
         )}
         {...others}
@@ -143,7 +143,7 @@ const ContextMenuSubContent = <T extends ValidComponent = "div">(
   return (
     <ContextMenuPrimitive.SubContent
       class={cn(
-        "z-180 min-w-40 origin-[var(--kb-menu-content-transform-origin)] overflow-hidden rounded-md border border-solid border-darkSlate-600 bg-darkSlate-800 p-1 text-lightSlate-200 shadow-md data-[expanded]:animate-menuEnter animate-menuLeave outline-none",
+        "z-100000 min-w-40 origin-[var(--kb-menu-content-transform-origin)] overflow-hidden rounded-md border border-solid border-darkSlate-600 bg-darkSlate-800 p-1 text-lightSlate-200 shadow-md data-[expanded]:animate-menuEnter animate-menuLeave outline-none",
         local.class
       )}
       {...others}

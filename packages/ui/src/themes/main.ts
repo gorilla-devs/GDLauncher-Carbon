@@ -97,6 +97,8 @@ const mainTheme: Theme = {
   font: "Ubuntu",
   "font-mono": "Ubuntu Mono",
   "ads-sidebar-background": "url(./assets/images/gdlauncher_pattern.svg)",
+  "pattern-background": "21 24 30",
+  "pattern-fill": "30 33 41",
   "additional-styles": additionalStyles
 }
 

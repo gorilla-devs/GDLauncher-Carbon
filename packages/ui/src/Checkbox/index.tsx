@@ -1,5 +1,6 @@
 import { createEffect, createSignal, Show, JSX } from "solid-js"
 import { cva, type VariantProps } from "class-variance-authority"
+import { AnimatedIcon } from "../AnimatedIcon"
 
 const checkboxStyles = cva(
   "box-border flex h-5 min-h-5 w-5 min-w-5 items-center justify-center rounded-md transition-all duration-200 ease-in-out",
@@ -74,8 +75,10 @@ function Checkbox(props: Props) {
         })}
       >
         <Show when={checked()}>
-          <div
-            class="i-hugeicons:tick-02 text-lightSlate-50 animation-pulse"
+          <AnimatedIcon
+            icon="i-hugeicons:tick-02"
+            size="h-4 w-4"
+            class="animation-pulse"
             classList={{
               "text-lightSlate-50": !props.disabled,
               "text-lightSlate-700": props.disabled

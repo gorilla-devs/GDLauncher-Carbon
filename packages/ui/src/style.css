@@ -78,3 +78,33 @@ a {
   background: rgb(var(--darkSlate-500));
   animation: skeleton-pulse 1.2s ease-in-out infinite;
 }
+
+/* Interactive icon animations - bouncy rotation on hover/click */
+.icon-interactive {
+  transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  will-change: transform;
+}
+
+.icon-interactive:hover {
+  transform: rotate(8deg) scale(1.06);
+}
+
+.icon-interactive:active {
+  transform: rotate(-2deg) scale(0.96);
+}
+
+/* Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .icon-interactive {
+    transition: none;
+    will-change: auto;
+  }
+
+  .icon-interactive:hover {
+    transform: none;
+  }
+
+  .icon-interactive:active {
+    transform: none;
+  }
+}

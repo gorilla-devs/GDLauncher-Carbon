@@ -1,6 +1,6 @@
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
-import { Button, Progress } from "@gd/ui"
+import { Button, Progress, AnimatedIcon } from "@gd/ui"
 import { Trans } from "@gd/i18n"
 import { Match, Show, Switch, createResource, createSignal } from "solid-js"
 import { Portal } from "solid-js/web"
@@ -125,7 +125,7 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                 <Match when={!migrationError()}>
                   <div class="flex items-center text-2xl">
                     <Trans key="settings:applying_new_runtime_path" />
-                    <div class="i-hugeicons:loading-03 ml-2 animate-spin" />
+                    <AnimatedIcon icon="i-hugeicons:loading-03" class="ml-2 animate-spin" interactive={false} />
                   </div>
                 </Match>
               </Switch>
