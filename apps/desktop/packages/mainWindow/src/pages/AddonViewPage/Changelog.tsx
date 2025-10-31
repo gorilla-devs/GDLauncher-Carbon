@@ -16,8 +16,7 @@ import {
   SelectTrigger,
   SelectContent,
   SelectItem,
-  SelectValue,
-  AnimatedIcon
+  SelectValue
 } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
 import fetchData from "./changelog.data"
@@ -49,7 +48,7 @@ const ChangelogCard = (props: {
               }
             >
               <div class="text-lightSlate-600 flex items-center gap-2 text-xs">
-                <AnimatedIcon icon="i-hugeicons:calendar-01" class="shrink-0" />
+                <div class="i-hugeicons:calendar-01 shrink-0 h-4 w-4" />
                 <span>{format(new Date(props.releaseDate!), "PPP")}</span>
                 <span class="text-lightSlate-700">•</span>
                 <span class="text-lightSlate-500">
@@ -148,7 +147,7 @@ const EmptyChangelogState = () => {
       </p>
       <div class="bg-darkSlate-700 border-darkSlate-600 mt-6 w-full max-w-md rounded-lg border p-3 text-left sm:mt-8 sm:p-4">
         <div class="text-lightSlate-400 mb-2 flex items-center gap-2 text-sm">
-          <AnimatedIcon icon="i-hugeicons:information-circle" class="shrink-0" />
+          <div class="i-hugeicons:information-circle shrink-0 h-5 w-5" />
           <span class="font-medium">Tip</span>
         </div>
         <p class="text-lightSlate-600 text-xs leading-relaxed sm:text-sm">

@@ -1,6 +1,6 @@
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
-import { Button, toast, AnimatedIcon } from "@gd/ui"
+import { Button, toast } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 
 const ConfirmCacheClear = (props: ModalProps) => {
@@ -32,11 +32,11 @@ const ConfirmCacheClear = (props: ModalProps) => {
               modalsContext?.closeModal()
             }}
           >
-            <AnimatedIcon icon="i-hugeicons:cancel-01" />
+            <div class="i-hugeicons:cancel-01" />
             <Trans key="settings:clear_cache_cancel" />
           </Button>
           <Button type="secondary" onClick={handleConfirm} disabled={false}>
-            <AnimatedIcon icon="i-hugeicons:tick-02" />
+            <div class="i-hugeicons:tick-02" />
             <Trans key="settings:clear_cache_confirm" />
           </Button>
         </div>

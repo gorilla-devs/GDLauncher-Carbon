@@ -1,4 +1,4 @@
-import { Input, AnimatedIcon } from "@gd/ui"
+import { Input } from "@gd/ui"
 import { For, Show, createSignal, createEffect, JSX } from "solid-js"
 import { VList } from "./VirtuaWrapper"
 
@@ -79,7 +79,7 @@ export function SearchableDropdown(props: SearchableDropdownProps) {
       </Show>
       <span class="flex-1 truncate">{option.label}</span>
       <Show when={props.isSelected?.(option)}>
-        <AnimatedIcon icon="i-hugeicons:tick-02" class="text-primary-500" size="h-4 w-4" />
+        <div class="i-hugeicons:tick-02 text-primary-500 h-4 w-4" />
       </Show>
     </div>
   )
@@ -106,7 +106,7 @@ export function SearchableDropdown(props: SearchableDropdownProps) {
               placeholder={props.searchPlaceholder || "Search..."}
               value={searchQuery()}
               onInput={(e) => setSearchQuery(e.target.value)}
-              icon={<AnimatedIcon icon="i-hugeicons:search-01" size="h-4 w-4" />}
+              icon={<div class="i-hugeicons:search-01 h-4 w-4" />}
               variant="transparent"
               onClick={(e) => {
                 e.stopPropagation()
@@ -129,7 +129,7 @@ export function SearchableDropdown(props: SearchableDropdownProps) {
               when={filteredOptions().length > 0}
               fallback={
                 <div class="text-lightSlate-400 flex flex-col items-center gap-2 px-2 py-3 text-center text-sm">
-                  <AnimatedIcon icon="i-hugeicons:search-remove" size="text-2xl" />
+                  <div class="i-hugeicons:search-remove text-2xl" />
                   <span>{props.emptyMessage || "No results found"}</span>
                 </div>
               }

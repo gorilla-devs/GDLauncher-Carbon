@@ -1,5 +1,5 @@
 import { Trans } from "@gd/i18n"
-import { Button, AnimatedIcon } from "@gd/ui"
+import { Button } from "@gd/ui"
 
 /**
  * Authentication method selection step
@@ -22,7 +22,7 @@ export function AuthMethodStep(props: AuthMethodStepProps) {
     <div class="flex w-full flex-1 flex-col items-center justify-center gap-8 text-center">
       {/* Microsoft icon */}
       <div class="bg-darkSlate-700 flex h-20 w-20 items-center justify-center rounded-2xl">
-        <AnimatedIcon icon="i-hugeicons:microsoft" size="h-12 w-12" class="text-lightSlate-50" />
+        <div class="i-hugeicons:microsoft h-12 w-12 text-lightSlate-50" />
       </div>
 
       {/* Heading and description */}
@@ -45,13 +45,13 @@ export function AuthMethodStep(props: AuthMethodStepProps) {
           loading={props.loading}
           disabled={props.loading}
         >
-          <AnimatedIcon icon="i-hugeicons:microsoft" size="h-4 w-4" />
+          <div class="i-hugeicons:microsoft h-4 w-4" />
           <Trans key="login.sign_in" />
         </Button>
 
         {/* Recommended badge */}
         <div class="text-primary-400 flex items-center justify-center gap-1 text-xs font-medium">
-          <AnimatedIcon icon="i-hugeicons:star" size="h-3 w-3" />
+          <div class="i-hugeicons:star h-3 w-3" />
           <span><Trans key="login.recommended" /></span>
         </div>
       </div>

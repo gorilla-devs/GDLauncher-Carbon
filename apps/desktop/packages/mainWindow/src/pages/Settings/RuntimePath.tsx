@@ -1,5 +1,4 @@
 import {
-  AnimatedIcon,
   Button,
   Input,
   Tooltip,
@@ -68,10 +67,8 @@ const RuntimePath = () => {
               class="w-full"
               value={runtimePath()}
               icon={
-                <AnimatedIcon
-                  icon="i-hugeicons:folder-01"
-                  class="hover:text-lightSlate-700 cursor-pointer transition-colors ease-in-out"
-                  size="h-5 w-5"
+                <div
+                  class="i-hugeicons:folder-01 hover:text-lightSlate-700 h-5 w-5 cursor-pointer transition-colors ease-in-out"
                   onClick={async () => {
                     const result = await window.openFileDialog({
                       title: "Select Runtime Path",
@@ -102,10 +99,7 @@ const RuntimePath = () => {
                     setRuntimePath(currentRuntimePath()!)
                   }}
                 >
-                  <AnimatedIcon
-                    icon="i-hugeicons:arrow-turn-backward"
-                    size="h-5 w-5"
-                  />
+                  <div class="i-hugeicons:arrow-turn-backward h-5 w-5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -123,7 +117,7 @@ const RuntimePath = () => {
                     setRuntimePath(initialRuntimePath()!)
                   }}
                 >
-                  <AnimatedIcon icon="i-hugeicons:cancel-01" size="h-5 w-5" />
+                  <div class="i-hugeicons:cancel-01 h-5 w-5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -164,10 +158,7 @@ const RuntimePath = () => {
                     )
                   }}
                 >
-                  <AnimatedIcon
-                    icon="i-hugeicons:arrow-reload-horizontal"
-                    size="h-5 w-5"
-                  />
+                  <div class="i-hugeicons:arrow-reload-horizontal h-5 w-5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>

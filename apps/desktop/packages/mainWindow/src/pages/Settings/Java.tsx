@@ -1,6 +1,5 @@
 import { Trans } from "@gd/i18n"
 import {
-  AnimatedIcon,
   Button,
   Input,
   Slider,
@@ -210,10 +209,7 @@ const Java = () => {
                     })
                   }}
                 >
-                  <AnimatedIcon
-                    icon="i-hugeicons:arrow-turn-backward"
-                    size="h-5 w-5"
-                  />
+                  <div class="i-hugeicons:arrow-turn-backward h-5 w-5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -234,7 +230,7 @@ const Java = () => {
                     })
                   }}
                 >
-                  <AnimatedIcon icon="i-hugeicons:cancel-01" size="h-5 w-5" />
+                  <div class="i-hugeicons:cancel-01 h-5 w-5" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -295,7 +291,7 @@ const Java = () => {
                     <DropdownMenu placement="bottom-end">
                       <DropdownMenuTrigger class="b-0 bg-transparent p-0">
                         <Button as="div" type="secondary" size="small">
-                          <AnimatedIcon icon="i-hugeicons:add-01" size="text-xl" />
+                          <div class="i-hugeicons:add-01 text-xl" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent>
@@ -344,10 +340,7 @@ const Java = () => {
                                                 <Match when={java.isValid}>
                                                   <Tooltip>
                                                     <TooltipTrigger>
-                                                      <AnimatedIcon
-                                                        icon="i-hugeicons:tick-double-02"
-                                                        class="flex text-emerald-500"
-                                                      />
+                                                      <div class="i-hugeicons:tick-double-02 flex text-emerald-500 text-lg" />
                                                     </TooltipTrigger>
                                                     <TooltipContent>
                                                       This java path works and
@@ -358,10 +351,7 @@ const Java = () => {
                                                 <Match when={!java.isValid}>
                                                   <Tooltip>
                                                     <TooltipTrigger>
-                                                      <AnimatedIcon
-                                                        icon="i-hugeicons:alert-02"
-                                                        class="flex text-yellow-500"
-                                                      />
+                                                      <div class="i-hugeicons:alert-02 flex text-yellow-500 text-lg" />
                                                     </TooltipTrigger>
                                                     <TooltipContent>
                                                       This java path doesn't
@@ -434,10 +424,8 @@ const Java = () => {
                                             java.type === "managed"
                                           }
                                         >
-                                          <AnimatedIcon
-                                            icon="i-hugeicons:delete-02"
-                                            class="text-lightSlate-700 transition-color duration-100 ease-in-out hover:text-red-400"
-                                            size="text-lg"
+                                          <div
+                                            class="i-hugeicons:delete-02 text-lightSlate-700 text-lg transition-color duration-100 ease-in-out hover:text-red-400"
                                             onClick={() =>
                                               deleteJavaMutation.mutate(java.id)
                                             }
@@ -492,7 +480,7 @@ const Java = () => {
                                 })
                               }}
                             >
-                              <AnimatedIcon icon="i-hugeicons:add-01" size="text-xl" />
+                              <div class="i-hugeicons:add-01 text-xl" />
                             </Button>
                           </Show>
                         </div>
@@ -546,10 +534,8 @@ const Java = () => {
                                     <SelectContent />
                                   </Select>
                                   <Show when={i() === 1}>
-                                    <AnimatedIcon
-                                      icon="i-hugeicons:delete-02"
-                                      class="text-lightSlate-700 transition-color duration-100 ease-in-out hover:text-red-400"
-                                      size="text-lg"
+                                    <div
+                                      class="i-hugeicons:delete-02 text-lightSlate-700 text-lg transition-color duration-100 ease-in-out hover:text-red-400"
                                       onClick={() => {
                                         deleteProfile.mutate(profile.name)
                                       }}
@@ -558,11 +544,7 @@ const Java = () => {
                                   <Show when={profile.isSystem}>
                                     <Popover>
                                       <PopoverTrigger>
-                                        <AnimatedIcon
-                                          icon="i-hugeicons:information-circle"
-                                          class="text-lightSlate-700 hover:text-lightSlate-100 transition-color duration-100 ease-in-out"
-                                          size="text-lg"
-                                        />
+                                        <div class="i-hugeicons:information-circle text-lightSlate-700 hover:text-lightSlate-100 text-lg transition-color duration-100 ease-in-out" />
                                       </PopoverTrigger>
                                       <PopoverContent>
                                         <div class="max-w-100 flex h-auto flex-col gap-8 p-4">

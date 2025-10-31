@@ -11,8 +11,7 @@ import {
   Spinner,
   Tooltip,
   TooltipContent,
-  TooltipTrigger,
-  AnimatedIcon
+  TooltipTrigger
 } from "@gd/ui"
 import {
   For,
@@ -180,9 +179,8 @@ const SingleEntity = (props: {
             class="flex-1"
             inputColor="bg-darkSlate-800"
             icon={
-              <AnimatedIcon
-                icon="i-hugeicons:cancel-01"
-                class="bg-darkSlate-50 hover:bg-white"
+              <div
+                class="i-hugeicons:cancel-01 bg-darkSlate-50 hover:bg-white"
                 onClick={() => {
                   setPath("")
                 }}
@@ -194,9 +192,8 @@ const SingleEntity = (props: {
               <Tooltip>
                 <TooltipTrigger>
                   <div class="bg-darkSlate-800 text-lightSlate-700 hover:text-lightSlate-50 flex items-center justify-center rounded-lg p-2">
-                    <AnimatedIcon
-                      icon="i-hugeicons:arrow-turn-backward"
-                      size="text-xl"
+                    <div
+                      class="i-hugeicons:arrow-turn-backward text-xl"
                       onClick={async () => {
                         setPath(entityDefaultPath.data!)
                       }}
@@ -213,6 +210,7 @@ const SingleEntity = (props: {
                 <TooltipTrigger>
                   <div class="bg-darkSlate-800 text-lightSlate-700 hover:text-lightSlate-50 flex items-center justify-center rounded-lg p-2">
                     <div
+                      class="i-hugeicons:folder-02"
                       onClick={async () => {
                         const result = await window.openFileDialog({
                           title: t("instance.select_path"),
@@ -239,6 +237,7 @@ const SingleEntity = (props: {
                 <TooltipTrigger>
                   <div class="bg-darkSlate-800 text-lightSlate-700 hover:text-lightSlate-50 flex items-center justify-center rounded-lg p-2">
                     <div
+                      class="i-hugeicons:zip-02"
                       onClick={async () => {
                         const result = await window.openFileDialog({
                           title: t("instance.select_zip"),

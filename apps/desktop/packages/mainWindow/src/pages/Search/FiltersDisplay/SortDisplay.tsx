@@ -2,7 +2,6 @@ import useSearchContext from "@/components/SearchInputContext"
 import { Show } from "solid-js"
 import { FilterBadge } from "./FilterBadge"
 import { capitalize } from "@/utils/helpers"
-import { AnimatedIcon } from "@gd/ui"
 
 export default function SortDisplay() {
   const searchContext = useSearchContext()
@@ -42,7 +41,7 @@ export default function SortDisplay() {
       <Show when={getCurseforgeSortField()}>
         <FilterBadge onClick={clearPlatformFilters}>
           <div class="flex items-center gap-2">
-            <AnimatedIcon icon="i-hugeicons:sort-by-up-01" size="h-4 w-4" />
+            <div class="i-hugeicons:sort-by-up-01 h-4 w-4" />
             Sort: {capitalize(getCurseforgeSortField())}
           </div>
         </FilterBadge>
@@ -51,13 +50,13 @@ export default function SortDisplay() {
       <Show when={getCurseforgeSortOrder()}>
         <FilterBadge onClick={clearPlatformFilters}>
           <div class="flex items-center gap-2">
-            <AnimatedIcon
-              icon={
-                getCurseforgeSortOrder() === "ascending"
+            <div
+              class={
+                "h-4 w-4 " +
+                (getCurseforgeSortOrder() === "ascending"
                   ? "i-hugeicons:sort-by-up-01"
-                  : "i-hugeicons:sort-by-down-01"
+                  : "i-hugeicons:sort-by-down-01")
               }
-              size="h-4 w-4"
             />
             Order: {capitalize(getCurseforgeSortOrder())}
           </div>
@@ -67,7 +66,7 @@ export default function SortDisplay() {
       <Show when={getModrinthSortIndex()}>
         <FilterBadge onClick={clearPlatformFilters}>
           <div class="flex items-center gap-2">
-            <AnimatedIcon icon="i-hugeicons:sort-by-up-01" size="h-4 w-4" />
+            <div class="i-hugeicons:sort-by-up-01 h-4 w-4" />
             Sort: {capitalize(getModrinthSortIndex())}
           </div>
         </FilterBadge>

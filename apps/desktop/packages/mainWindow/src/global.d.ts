@@ -71,7 +71,10 @@ declare global {
 declare module "solid-js" {
   namespace JSX {
     interface IntrinsicElements {
-      owadview: any
+      owadview: {
+        class?: string
+        adstyle?: string
+      }
     }
   }
 }

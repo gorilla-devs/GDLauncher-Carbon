@@ -151,7 +151,7 @@ const Tab = (_props: Props) => {
         orientation: tabsContext?.orientation(),
         isSelected: tabsContext?.isSelectedIndex(index()),
         noPadding: props.noPadding,
-        class: `bg-darkSlate-800 hover:text-lightSlate-50 ${classProp}`
+        class: `animate-icons-on-hover ${tabsContext?.isSelectedIndex(index()) ? "tab-selected" : ""} bg-darkSlate-800 hover:text-lightSlate-50 ${classProp}`
       })}
       ref={(el) => {
         ref = el

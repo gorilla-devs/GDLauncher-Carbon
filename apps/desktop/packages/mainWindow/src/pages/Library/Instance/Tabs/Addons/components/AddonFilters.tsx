@@ -9,8 +9,7 @@ import {
   SelectValue,
   Tooltip,
   TooltipContent,
-  TooltipTrigger,
-  AnimatedIcon
+  TooltipTrigger
 } from "@gd/ui"
 import { For, Show, onMount, onCleanup, createEffect } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
@@ -114,7 +113,7 @@ export const AddonFilters = (props: AddonFiltersProps) => {
               value={props.searchQuery()}
               onInput={(e) => props.setSearchQuery(e.target.value)}
               placeholder={t("instance.search_addons")}
-              icon={<AnimatedIcon icon="i-hugeicons:search-01" />}
+              icon={<div class="i-hugeicons:search-01" />}
               class="max-w-sm"
             />
 
@@ -147,13 +146,13 @@ export const AddonFilters = (props: AddonFiltersProps) => {
                   const getIcon = (value: string) => {
                     switch (value) {
                       case "all":
-                        return <AnimatedIcon icon="i-hugeicons:globe" size="h-4 w-4" />
+                        return <div class="i-hugeicons:globe h-4 w-4" />
                       case "curseforge":
-                        return <AnimatedIcon icon="i-simple-icons:curseforge" size="h-4 w-4" />
+                        return <div class="i-simple-icons:curseforge h-4 w-4" />
                       case "modrinth":
-                        return <AnimatedIcon icon="i-simple-icons:modrinth" size="h-4 w-4" />
+                        return <div class="i-simple-icons:modrinth h-4 w-4" />
                       case "local":
-                        return <AnimatedIcon icon="i-hugeicons:folder-01" size="h-4 w-4" />
+                        return <div class="i-hugeicons:folder-01 h-4 w-4" />
                       default:
                         return null
                     }
@@ -188,7 +187,7 @@ export const AddonFilters = (props: AddonFiltersProps) => {
                       const getIcon = (value: string) => {
                         switch (value) {
                           case "all":
-                            return <AnimatedIcon icon="i-hugeicons:globe" size="h-4 w-4" />
+                            return <div class="i-hugeicons:globe h-4 w-4" />
                           case "curseforge":
                             return (
                               <div class="i-simple-icons:curseforge h-4 w-4" />
@@ -198,7 +197,7 @@ export const AddonFilters = (props: AddonFiltersProps) => {
                               <div class="i-simple-icons:modrinth h-4 w-4" />
                             )
                           case "local":
-                            return <AnimatedIcon icon="i-hugeicons:folder-01" size="h-4 w-4" />
+                            return <div class="i-hugeicons:folder-01 h-4 w-4" />
                           default:
                             return null
                         }
@@ -229,7 +228,7 @@ export const AddonFilters = (props: AddonFiltersProps) => {
                     disabled={props.isInstanceLocked()}
                     class="text-xs"
                   >
-                    <AnimatedIcon icon="i-hugeicons:download-02" size="text-sm" />
+                    <div class="i-hugeicons:download-02 text-sm" />
                     <Trans
                       key="instance.update_all_count"
                       options={{ count: props.updateCount() }}
@@ -248,7 +247,7 @@ export const AddonFilters = (props: AddonFiltersProps) => {
               onClick={props.onOpenFolder}
               class="px-3"
             >
-              <AnimatedIcon icon="i-hugeicons:folder-open" />
+              <div class="i-hugeicons:folder-open" />
             </Button>
 
             <Tooltip open={props.isInstanceLocked() ? undefined : false}>
@@ -260,7 +259,7 @@ export const AddonFilters = (props: AddonFiltersProps) => {
                   disabled={props.isInstanceLocked()}
                   class="font-semibold"
                 >
-                  <AnimatedIcon icon="i-hugeicons:add-01" />
+                  <div class="i-hugeicons:add-01" />
                   <Trans key="instance.add_addons" />
                 </Button>
               </TooltipTrigger>
@@ -292,14 +291,14 @@ export const AddonFilters = (props: AddonFiltersProps) => {
                   <div class={`${getAddonTypeIcon(type)} text-sm`} />
                   {getAddonTypeLabel(type)}
                   <Show when={props.enabledAddonTypes[type]}>
-                    <AnimatedIcon icon="i-hugeicons:tick-02" class="ml-1" />
+                    <div class="i-hugeicons:tick-02 ml-1" />
                   </Show>
                 </Badge>
               )}
             </For>
           </div>
           <div class="text-lightSlate-600 flex items-center gap-2 text-xs">
-            <AnimatedIcon icon="i-hugeicons:mouse-01" />
+            <div class="i-hugeicons:mouse-01" />
             <span>{t("instance.right_click_hint")}</span>
             <span class="text-lightSlate-700">•</span>
             <span>{t("instance.multi_select_hint")}</span>

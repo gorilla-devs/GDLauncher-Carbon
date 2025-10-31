@@ -169,14 +169,13 @@ render(() => {
         const isOccasion = isSpecialOccasion()
 
         // Skip directly to library if:
-        // 1. User is fully set up (has accounts, terms accepted, GDL account)
+        // 1. User is fully set up (has accounts, terms accepted, made GDL account decision)
         // 2. AND it's NOT a special occasion (we want to show seasonal splash during occasions)
         if (
           settings.termsAndPrivacyAccepted &&
           activeUuid &&
           accounts.length > 0 &&
-          settings.gdlAccountId &&
-          settings.gdlAccountId !== "" &&
+          settings.gdlAccountId != null &&
           !isOccasion
         ) {
           console.log(

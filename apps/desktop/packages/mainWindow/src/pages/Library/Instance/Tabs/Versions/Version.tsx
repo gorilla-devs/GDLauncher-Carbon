@@ -2,7 +2,6 @@ import { Trans } from "@gd/i18n"
 import { Show } from "solid-js"
 import { format } from "date-fns"
 import { CFFEFile } from "@gd/core_module/bindings"
-import { AnimatedIcon } from "@gd/ui"
 
 interface Props {
   version: CFFEFile
@@ -31,7 +30,7 @@ const Active = () => {
           defaultValue: "Active"
         }}
       />
-      <AnimatedIcon icon="i-hugeicons:tick-02" class="text-2xl text-green-500" />
+      <div class="i-hugeicons:tick-02 text-2xl text-green-500" />
     </div>
   )
 }
@@ -72,7 +71,7 @@ const Version = (props: Props) => {
                 defaultValue: "Switch Version"
               }}
             />
-            <AnimatedIcon icon="i-hugeicons:download-02" class="text-darkSlate-300 group-hover:text-lightSlate-700 text-2xl" />
+            <div class="i-hugeicons:download-02 text-darkSlate-300 group-hover:text-lightSlate-700 text-2xl" />
           </div>
         </Show>
       </div>

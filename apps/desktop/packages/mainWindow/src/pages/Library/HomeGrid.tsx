@@ -1,5 +1,4 @@
 import {
-  AnimatedIcon,
   Button,
   Collapsable,
   ContextMenu,
@@ -346,16 +345,15 @@ const HomeGrid = () => {
                 icon={
                   <Switch>
                     <Match when={filter()}>
-                      <AnimatedIcon
-                        icon="i-hugeicons:cancel-01"
-                        class="hover:bg-white"
+                      <div
+                        class="hover:bg-white i-hugeicons:cancel-01"
                         onClick={() => {
                           setFilter("")
                         }}
                       />
                     </Match>
                     <Match when={!filter()}>
-                      <AnimatedIcon icon="i-hugeicons:search-01" />
+                      <div class="i-hugeicons:search-01" />
                     </Match>
                   </Switch>
                 }
@@ -363,7 +361,7 @@ const HomeGrid = () => {
               <DropdownMenu>
                 <DropdownMenuTrigger>
                   <Button type="secondary" size="small">
-                    <AnimatedIcon icon="i-hugeicons:filter" size="h-4 w-4" />
+                    <div class="i-hugeicons:filter h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent class="w-64">
@@ -445,10 +443,8 @@ const HomeGrid = () => {
                               )?.label || "Name"}
                             </span>
                             {globalStore.settings.data?.instancesSortBy && (
-                              <AnimatedIcon
-                                icon={globalStore.settings.data?.instancesSortByAsc ? "i-hugeicons:arrange-by-letters-a-z" : "i-hugeicons:arrange-by-letters-z-a"}
-                                class="ml-2"
-                                size="h-4 w-4"
+                              <div
+                                class={`ml-2 h-4 w-4 ${globalStore.settings.data?.instancesSortByAsc ? "i-hugeicons:arrange-by-letters-a-z" : "i-hugeicons:arrange-by-letters-z-a"}`}
                               />
                             )}
                           </div>
@@ -500,10 +496,8 @@ const HomeGrid = () => {
                                     <span>{option.label}</span>
                                     {globalStore.settings.data
                                       ?.instancesSortBy === option.key && (
-                                      <AnimatedIcon
-                                        icon={globalStore.settings.data?.instancesSortByAsc ? "i-hugeicons:arrange-by-letters-a-z" : "i-hugeicons:arrange-by-letters-z-a"}
-                                        class="ml-4"
-                                        size="h-4 w-4"
+                                      <div
+                                        class={`ml-4 h-4 w-4 ${globalStore.settings.data?.instancesSortByAsc ? "i-hugeicons:arrange-by-letters-a-z" : "i-hugeicons:arrange-by-letters-z-a"}`}
                                       />
                                     )}
                                   </div>
@@ -528,10 +522,8 @@ const HomeGrid = () => {
                               )?.label || "Group"}
                             </span>
                             {globalStore.settings.data?.instancesGroupBy && (
-                              <AnimatedIcon
-                                icon={globalStore.settings.data?.instancesGroupByAsc ? "i-hugeicons:arrange-by-letters-a-z" : "i-hugeicons:arrange-by-letters-z-a"}
-                                class="ml-2"
-                                size="h-4 w-4"
+                              <div
+                                class={`ml-2 h-4 w-4 ${globalStore.settings.data?.instancesGroupByAsc ? "i-hugeicons:arrange-by-letters-a-z" : "i-hugeicons:arrange-by-letters-z-a"}`}
                               />
                             )}
                           </div>
@@ -584,10 +576,8 @@ const HomeGrid = () => {
                                     <span>{option.label}</span>
                                     {globalStore.settings.data
                                       ?.instancesGroupBy === option.key && (
-                                      <AnimatedIcon
-                                        icon={globalStore.settings.data?.instancesGroupByAsc ? "i-hugeicons:arrange-by-letters-a-z" : "i-hugeicons:arrange-by-letters-z-a"}
-                                        class="ml-4"
-                                        size="h-4 w-4"
+                                      <div
+                                        class={`ml-4 h-4 w-4 ${globalStore.settings.data?.instancesGroupByAsc ? "i-hugeicons:arrange-by-letters-a-z" : "i-hugeicons:arrange-by-letters-z-a"}`}
                                       />
                                     )}
                                   </div>
@@ -720,7 +710,7 @@ const HomeGrid = () => {
                       })
                     }}
                   >
-                    <AnimatedIcon icon="i-hugeicons:file-add" size="h-4 w-4" />
+                    <div class="i-hugeicons:file-add h-4 w-4" />
                     Create New Instance
                   </ContextMenuItem>
                   <ContextMenuItem
@@ -736,7 +726,7 @@ const HomeGrid = () => {
                       )
                     }}
                   >
-                    <AnimatedIcon icon="i-hugeicons:download-02" size="h-4 w-4" />
+                    <div class="i-hugeicons:download-02 h-4 w-4" />
                     Import Instance
                   </ContextMenuItem>
                 </ContextMenuGroup>

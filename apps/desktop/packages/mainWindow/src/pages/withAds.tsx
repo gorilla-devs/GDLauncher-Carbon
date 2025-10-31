@@ -9,6 +9,7 @@ import { useModal } from "@/managers/ModalsManager"
 import { SearchInputContext } from "@/components/SearchInputContext"
 import { getSearchResults } from "@/utils/platformSearch"
 import { FilterBadgesBar } from "@/components/FilterBadgesBar"
+import ThemedPatternSVG from "@/components/ThemedPatternSVG"
 
 function withAdsLayout() {
   const modalContext = useModal()
@@ -33,21 +34,23 @@ function withAdsLayout() {
             </div>
             <Show when={adSize.shouldShow}>
               <div
-                class="flex h-full flex-col justify-between gap-4"
-                style={{
-                  "view-transition-name": `ad`,
-                  background: "var(--ads-sidebar-background)"
-                }}
+                class="relative flex h-full flex-col justify-between gap-4"
+                style={{ width: `${adSize.width}px` }}
               >
+                <div class="absolute inset-0 overflow-hidden pointer-events-none">
+                  <ThemedPatternSVG />
+                </div>
                 <div
+                  class="relative z-10"
                   style={{
+                    "view-transition-name": `ad`,
                     width: `${adSize.width}px`,
                     height: `${adSize.height}px`
                   }}
                 >
                   <AdsBanner />
                 </div>
-                <div class="flex justify-center">
+                <div class="relative z-10 flex justify-center">
                   <div
                     class="hover:text-lightSlate-50 text-lightSlate-700 text-center transition-colors duration-200"
                     onClick={() => {

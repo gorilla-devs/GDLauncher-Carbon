@@ -13,7 +13,6 @@ import {
 import PageTitle from "./components/PageTitle"
 import Row from "./components/Row"
 import Title from "./components/Title"
-import { AnimatedIcon } from "@gd/ui"
 
 const Appearance = () => {
   const routeData: ReturnType<typeof fetchData> = useRouteData()
@@ -73,7 +72,7 @@ const Appearance = () => {
                           "opacity-100": themeName() === theme
                         }}
                       >
-                        <AnimatedIcon icon="i-hugeicons:tick-02" size="h-6 w-6" />
+                        <div class="i-hugeicons:tick-02 h-6 w-6" />
                       </div>
 
                       <ThemePreview

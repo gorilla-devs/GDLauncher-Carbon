@@ -1,5 +1,5 @@
 import { Trans } from "@gd/i18n"
-import { Checkbox, AnimatedIcon } from "@gd/ui"
+import { Checkbox } from "@gd/ui"
 import { For, Show, createEffect } from "solid-js"
 import { createStore } from "solid-js/store"
 import { format } from "date-fns"
@@ -115,7 +115,7 @@ const Screenshots = () => {
               />
             </div>
             <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
-              <AnimatedIcon icon="i-hugeicons:folder-open" size="text-2xl" />
+              <div class="i-hugeicons:folder-open text-2xl" />
               <Trans
                 key="instance.open_screenshots_folder"
                 options={{
@@ -124,7 +124,7 @@ const Screenshots = () => {
               />
             </div>
             <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
-              <AnimatedIcon icon="i-hugeicons:unavailable" size="text-2xl" />
+              <div class="i-hugeicons:unavailable text-2xl" />
               <Trans
                 key="instance.disable_screenshot"
                 options={{
@@ -133,7 +133,7 @@ const Screenshots = () => {
               />
             </div>
             <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
-              <AnimatedIcon icon="i-hugeicons:delete-02" size="text-2xl" />
+              <div class="i-hugeicons:delete-02 text-2xl" />
               <Trans
                 key="instance.delete_screenshot"
                 options={{
@@ -168,7 +168,7 @@ const Screenshots = () => {
                           <p class="text-lightSlate-700 text-md m-0">
                             {format(new Date(screenshot.date), "dd-MM-yyyy")}
                           </p>
-                          <AnimatedIcon icon="i-hugeicons:more-horizontal" class="text-lightSlate-700" />
+                          <div class="i-hugeicons:more-horizontal text-lightSlate-700" />
                         </div>
                       </div>
                     )}

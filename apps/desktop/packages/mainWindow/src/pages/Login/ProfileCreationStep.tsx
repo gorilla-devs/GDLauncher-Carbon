@@ -1,6 +1,5 @@
 import { Show, createSignal, createMemo, createEffect, onCleanup } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
-import { AnimatedIcon } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
 
 interface ProfileCreationStepProps {
@@ -121,7 +120,7 @@ const ProfileCreationStep = (props: ProfileCreationStepProps) => {
 
   return (
     <div class="flex w-full flex-col items-center gap-6 text-center">
-      <AnimatedIcon icon="i-hugeicons:user-add-02" size="h-16 w-16" class="text-primary-400" />
+      <div class="i-hugeicons:user-add-02 h-16 w-16 text-primary-400" />
 
       <div>
         <h2 class="text-lightSlate-50 mb-2 text-xl font-bold">
@@ -152,7 +151,7 @@ const ProfileCreationStep = (props: ProfileCreationStepProps) => {
           </Show>
           <Show when={isValid() && checking()}>
             <p class="text-lightSlate-500 flex items-center">
-              <AnimatedIcon icon="i-hugeicons:loading-03" size="h-3 w-3" class="mr-2 inline animate-spin" interactive={false} />
+              <span class="i-hugeicons:loading-03 h-3 w-3 mr-2 inline animate-spin" />
               <Trans key="profile_creation.checking" />
             </p>
           </Show>

@@ -1,6 +1,8 @@
 import adSize from "@/utils/adhelper"
 
 export const AdsBanner = () => {
+  const isHighImpact = () => adSize.width === 440
+
   return (
     <div
       style={{
@@ -10,7 +12,10 @@ export const AdsBanner = () => {
         position: "relative"
       }}
     >
-      <owadview class="relative" />
+      <owadview
+        class="relative"
+        {...(isHighImpact() ? { adstyle: "high-impact-ad" } : {})}
+      />
     </div>
   )
 }

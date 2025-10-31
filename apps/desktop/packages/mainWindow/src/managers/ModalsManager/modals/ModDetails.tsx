@@ -9,8 +9,7 @@ import {
   Separator,
   Tooltip,
   TooltipTrigger,
-  TooltipContent,
-  AnimatedIcon
+  TooltipContent
 } from "@gd/ui"
 import { ModalProps } from ".."
 import ModalLayout from "../ModalLayout"
@@ -117,7 +116,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
             when={getModImage()}
             fallback={
               <div class="bg-darkSlate-700 flex h-24 w-24 items-center justify-center rounded-lg shadow-lg">
-                <AnimatedIcon icon="i-hugeicons:zip-01" class="text-lightSlate-600" size="text-4xl" />
+                <div class="i-hugeicons:zip-01 text-lightSlate-600 text-4xl" />
               </div>
             }
           >
@@ -191,7 +190,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
 
               <Show when={mod().has_update}>
                 <Badge variant="warning" class="gap-1">
-                  <AnimatedIcon icon="i-hugeicons:download-02" />
+                  <div class="i-hugeicons:download-02" />
                   {t("modals.mod_details.update_available")}
                 </Badge>
               </Show>
@@ -250,7 +249,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                       )
                     }}
                   >
-                    <AnimatedIcon icon="i-hugeicons:link-square-02" />
+                    <div class="i-hugeicons:link-square-02" />
                     {t("modals.mod_details.view_on_curseforge")}
                   </Button>
                 </Show>
@@ -265,7 +264,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                       )
                     }}
                   >
-                    <AnimatedIcon icon="i-hugeicons:link-square-02" />
+                    <div class="i-hugeicons:link-square-02" />
                     {t("modals.mod_details.view_on_modrinth")}
                   </Button>
                 </Show>

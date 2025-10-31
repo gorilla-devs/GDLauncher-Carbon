@@ -1,4 +1,4 @@
-import { Button, AnimatedIcon } from "@gd/ui"
+import { Button } from "@gd/ui"
 import { Trans } from "@gd/i18n"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 
@@ -16,7 +16,7 @@ export const NoAddons = (props: NoAddonsProps) => {
         </p>
       </div>
       <Button type="outline" size="medium" onClick={props.onAddAddons}>
-        <AnimatedIcon icon="i-hugeicons:add-01" />
+        <div class="i-hugeicons:add-01 h-4 w-4" />
         <Trans key="instance.add_addons" />
       </Button>
     </div>

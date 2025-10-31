@@ -107,9 +107,6 @@ const frost: Theme = {
 
   font: "Monocraft",
   "font-mono": "Monocraft",
-  "ads-sidebar-background": "url(./assets/images/gdlauncher_pattern.svg)",
-  "pattern-background": "12 76 122",
-  "pattern-fill": "7 94 153",
   "additional-styles": additionalStyles
 }
 

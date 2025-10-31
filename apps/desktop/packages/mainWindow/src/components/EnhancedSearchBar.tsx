@@ -4,7 +4,7 @@ import useSearchContext from "./SearchInputContext"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useMatch } from "@solidjs/router"
 import { useTransContext } from "@gd/i18n"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, AnimatedIcon } from "@gd/ui"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@gd/ui"
 import { FiltersDropdown } from "@/pages/Search/FiltersDropdown"
 
 export function EnhancedSearchBar() {
@@ -73,7 +73,7 @@ export function EnhancedSearchBar() {
         }}
       />
 
-      <AnimatedIcon icon="i-hugeicons:search-01" class="text-darkSlate-400 shrink-0" size="h-5 w-5" />
+      <div class="i-hugeicons:search-01 text-darkSlate-400 h-5 w-5 shrink-0" />
 
       <Show when={!isExpanded()}>
         <input
@@ -107,10 +107,8 @@ export function EnhancedSearchBar() {
           (searchResults?.searchQuery().searchQuery?.length || 0 > 0)
         }
       >
-        <AnimatedIcon
-          icon="i-hugeicons:cancel-01"
-          size="text-lg"
-          class="text-darkSlate-500 cursor-pointer transition-colors duration-200 ease-in-out hover:text-white"
+        <div
+          class="i-hugeicons:cancel-01 text-lg text-darkSlate-500 cursor-pointer transition-colors duration-200 ease-in-out hover:text-white"
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
@@ -142,7 +140,7 @@ export function EnhancedSearchBar() {
             class="text-lightSlate-50 hover:bg-darkSlate-600 data-[expanded]:bg-darkSlate-600 flex items-center justify-center rounded p-1.5 transition-colors hover:text-white data-[expanded]:text-white"
             title={t("search.filters")}
           >
-            <AnimatedIcon icon="i-hugeicons:filter" size="text-lg" />
+            <div class="i-hugeicons:filter text-lg" />
           </DropdownMenuTrigger>
           <DropdownMenuContent>
             <FiltersDropdown />

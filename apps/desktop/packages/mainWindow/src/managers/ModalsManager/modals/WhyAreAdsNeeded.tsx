@@ -1,7 +1,7 @@
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
 import { Trans } from "@gd/i18n"
-import { Button, AnimatedIcon } from "@gd/ui"
+import { Button } from "@gd/ui"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 
 const WhyAreAdsNeeded = (props: ModalProps) => {
@@ -24,7 +24,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
           {/* Hero Introduction */}
           <div class="bg-darkSlate-700/50 border-darkSlate-600 flex items-start gap-6 rounded-lg border p-6">
             <div class="bg-darkSlate-800 border-primary-500/30 flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 shadow-[0_0_20px_rgba(139,92,246,0.2)]">
-              <AnimatedIcon icon="i-hugeicons:customer-support" class="text-primary-500" size="text-[2.5rem]" />
+              <div class="i-hugeicons:customer-support text-primary-500 text-[2.5rem]" />
             </div>
             <div class="flex-1">
               <p class="text-lightSlate-300 text-base leading-relaxed">
@@ -36,14 +36,14 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
           {/* Why Development Matters Section */}
           <div class="bg-darkSlate-700 border-darkSlate-600 rounded-lg border p-6">
             <h3 class="text-lightSlate-300 mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
-              <AnimatedIcon icon="i-hugeicons:code" class="text-primary-500" size="text-base" />
+              <div class="i-hugeicons:code text-primary-500 text-base" />
               <Trans key="ads.paragraph-2" />
             </h3>
             <div class="grid grid-cols-3 gap-6">
               {/* Card 1 - Minecraft Updates */}
               <div class="bg-darkSlate-800 border-darkSlate-600 group flex flex-col items-center gap-3 rounded-lg border p-4 transition-all duration-300 hover:border-emerald-500/30">
                 <div class="bg-darkSlate-700 flex h-14 w-14 items-center justify-center rounded-xl border border-emerald-500/30 transition-transform duration-200 group-hover:scale-110">
-                  <AnimatedIcon icon="i-hugeicons:rocket-01" class="text-emerald-500" size="text-[2rem]" />
+                  <div class="i-hugeicons:rocket-01 text-emerald-500 text-[2rem]" />
                 </div>
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
                   <Trans key="ads.paragraph-2-list-element-1" />
@@ -53,7 +53,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
               {/* Card 2 - Compatibility */}
               <div class="bg-darkSlate-800 border-darkSlate-600 hover:border-primary-500/30 group flex flex-col items-center gap-3 rounded-lg border p-4 transition-all duration-300">
                 <div class="bg-darkSlate-700 border-primary-500/30 flex h-14 w-14 items-center justify-center rounded-xl border transition-transform duration-200 group-hover:scale-110">
-                  <AnimatedIcon icon="i-hugeicons:tick-02" class="text-primary-500" size="text-[2rem]" />
+                  <div class="i-hugeicons:tick-02 text-primary-500 text-[2rem]" />
                 </div>
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
                   <Trans key="ads.paragraph-2-list-element-2" />
@@ -63,7 +63,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
               {/* Card 3 - Enhancement */}
               <div class="bg-darkSlate-800 border-darkSlate-600 group flex flex-col items-center gap-3 rounded-lg border p-4 transition-all duration-300 hover:border-blue-500/30">
                 <div class="bg-darkSlate-700 flex h-14 w-14 items-center justify-center rounded-xl border border-blue-500/30 transition-transform duration-200 group-hover:scale-110">
-                  <AnimatedIcon icon="i-hugeicons:sparkles" class="text-blue-500" size="text-[2rem]" />
+                  <div class="i-hugeicons:sparkles text-blue-500 text-[2rem]" />
                 </div>
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
                   <Trans key="ads.paragraph-2-list-element-3" />
@@ -75,14 +75,14 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
           {/* What Support Enables Section */}
           <div class="bg-darkSlate-700 border-darkSlate-600 rounded-lg border p-6">
             <h3 class="text-lightSlate-300 mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
-              <AnimatedIcon icon="i-hugeicons:dollar-circle" class="text-primary-500" size="text-base" />
+              <div class="i-hugeicons:dollar-circle text-primary-500 text-base" />
               <Trans key="ads.paragraph-3" />
             </h3>
             <div class="grid grid-cols-3 gap-6">
               {/* Card 1 - Team Support */}
               <div class="bg-darkSlate-800 border-darkSlate-600 group flex flex-col items-center gap-3 rounded-lg border p-4 transition-all duration-300 hover:border-purple-500/30">
                 <div class="bg-darkSlate-700 flex h-14 w-14 items-center justify-center rounded-xl border border-purple-500/30 transition-transform duration-200 group-hover:scale-110">
-                  <AnimatedIcon icon="i-hugeicons:user-multiple-02" class="text-purple-500" size="text-[2rem]" />
+                  <div class="i-hugeicons:user-multiple-02 text-purple-500 text-[2rem]" />
                 </div>
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
                   <Trans key="ads.paragraph-3-list-element-1" />
@@ -92,7 +92,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
               {/* Card 2 - Research & Innovation */}
               <div class="bg-darkSlate-800 border-darkSlate-600 group flex flex-col items-center gap-3 rounded-lg border p-4 transition-all duration-300 hover:border-cyan-500/30">
                 <div class="bg-darkSlate-700 flex h-14 w-14 items-center justify-center rounded-xl border border-cyan-500/30 transition-transform duration-200 group-hover:scale-110">
-                  <AnimatedIcon icon="i-hugeicons:bulb" class="text-cyan-500" size="text-[2rem]" />
+                  <div class="i-hugeicons:bulb text-cyan-500 text-[2rem]" />
                 </div>
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
                   <Trans key="ads.paragraph-3-list-element-2" />
@@ -102,7 +102,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
               {/* Card 3 - Full-time Development */}
               <div class="bg-darkSlate-800 border-darkSlate-600 group flex flex-col items-center gap-3 rounded-lg border p-4 transition-all duration-300 hover:border-pink-500/30">
                 <div class="bg-darkSlate-700 flex h-14 w-14 items-center justify-center rounded-xl border border-pink-500/30 transition-transform duration-200 group-hover:scale-110">
-                  <AnimatedIcon icon="i-hugeicons:clock-01" class="text-pink-500" size="text-[2rem]" />
+                  <div class="i-hugeicons:clock-01 text-pink-500 text-[2rem]" />
                 </div>
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
                   <Trans key="ads.paragraph-3-list-element-3" />
@@ -114,7 +114,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
           {/* Revenue Transparency Section */}
           <div class="bg-darkSlate-700 border-darkSlate-600 rounded-lg border p-6">
             <h3 class="text-lightSlate-300 mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
-              <AnimatedIcon icon="i-hugeicons:pie-chart" class="text-primary-500" size="text-base" />
+              <div class="i-hugeicons:pie-chart text-primary-500 text-base" />
               Revenue Transparency
             </h3>
             <div class="space-y-4">
@@ -151,7 +151,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
                 </div>
                 <div class="flex items-start gap-3">
                   <div class="bg-darkSlate-600 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
-                    <AnimatedIcon icon="i-hugeicons:user-star-01" class="text-lightSlate-400" size="text-xl" />
+                    <div class="i-hugeicons:user-star-01 text-lightSlate-400 text-xl" />
                   </div>
                   <div class="flex-1">
                     <div class="text-lightSlate-50 mb-1 text-sm font-semibold">
@@ -176,7 +176,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
               {/* Subscription Option */}
               <div class="bg-primary-500/5 border-primary-500/20 flex items-start gap-4 rounded-lg border p-4">
                 <div class="bg-primary-500/20 flex h-12 w-12 shrink-0 items-center justify-center rounded-lg">
-                  <AnimatedIcon icon="i-hugeicons:award-01" class="text-primary-500" size="text-2xl" />
+                  <div class="i-hugeicons:award-01 text-primary-500 text-2xl" />
                 </div>
                 <div class="flex-1">
                   <p class="text-lightSlate-300 text-sm leading-relaxed">
@@ -188,7 +188,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
               {/* Ad Controls */}
               <div class="bg-darkSlate-600/50 border-darkSlate-500 flex items-start gap-4 rounded-lg border p-4">
                 <div class="bg-darkSlate-700 flex h-12 w-12 shrink-0 items-center justify-center rounded-lg">
-                  <AnimatedIcon icon="i-hugeicons:eye" class="text-lightSlate-400" size="text-2xl" />
+                  <div class="i-hugeicons:eye text-lightSlate-400 text-2xl" />
                 </div>
                 <div class="flex-1">
                   <p class="text-lightSlate-300 text-sm leading-relaxed">
@@ -202,7 +202,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
           {/* Thank You Section */}
           <div class="space-y-4 py-6 text-center">
             <div class="mb-2 flex items-center justify-center gap-2">
-              <AnimatedIcon icon="i-hugeicons:thumbs-up" class="text-primary-500" size="text-2xl" />
+              <div class="i-hugeicons:thumbs-up text-primary-500 text-2xl" />
             </div>
             <p class="text-lightSlate-300 mx-auto max-w-2xl text-base leading-relaxed">
               <Trans key="ads.paragraph-7" />

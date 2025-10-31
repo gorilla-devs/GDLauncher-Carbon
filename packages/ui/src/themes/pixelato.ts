@@ -100,9 +100,6 @@ const pixelato: Theme = {
 
   font: "Monocraft",
   "font-mono": "Monocraft",
-  "ads-sidebar-background": "url(./assets/images/gdlauncher_pattern.svg)",
-  "pattern-background": "16 16 16",
-  "pattern-fill": "32 32 32",
   "additional-styles": additionalStyles
 }
 

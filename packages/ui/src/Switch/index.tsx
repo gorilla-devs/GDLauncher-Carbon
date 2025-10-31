@@ -1,6 +1,5 @@
 import { JSX, Show, createEffect, createSignal } from "solid-js"
 import { cva, type VariantProps } from "class-variance-authority"
-import { AnimatedIcon } from "../AnimatedIcon"
 
 const switchStyles = cva(
   "absolute top-0 left-0 right-0 bottom-0 transition-colors duration-100 ease-in-out rounded-full",
@@ -132,10 +131,8 @@ function Switch(props: Props) {
         })}
       >
         {state().isLoading && (
-          <AnimatedIcon
-            icon="i-hugeicons:loading-03"
-            size="text-xs"
-            class="absolute text-lightSlate-700 z-50 animate-spin"
+          <div
+            class="i-hugeicons:loading-03 text-xs absolute text-lightSlate-700 z-50 animate-spin"
             style={{ left: "calc(50% - 0.38rem)", top: "calc(50% - 0.38rem)" }}
           />
         )}

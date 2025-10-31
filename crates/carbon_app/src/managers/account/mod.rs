@@ -788,7 +788,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             (Some(gdl_account), _) if gdl_account == uuid => {
                 self.remove_gdl_account().await?;
             }
-            (_, 0) => {
+            (_, 1) => {
                 self.remove_gdl_account().await?;
             }
             _ => {}

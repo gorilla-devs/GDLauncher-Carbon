@@ -2,12 +2,7 @@ import useSearchContext from "@/components/SearchInputContext"
 import { For, Show } from "solid-js"
 import { FilterBadge } from "./FilterBadge"
 import { getModloaderIcon } from "@/utils/sidebar"
-import {
-  AnimatedIcon,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger
-} from "@gd/ui"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
 import { shouldBypassModloaderFilter } from "@/utils/platformSearch"
 import { Trans } from "@gd/i18n"
 
@@ -49,11 +44,7 @@ export default function ModloadersDisplay() {
                 >
                   <Show when={shouldHideFilters()}>
                     <div class="absolute left-0 top-0 flex h-full w-full items-center justify-center rounded-[5px] bg-black/20">
-                      <AnimatedIcon
-                        icon="i-hugeicons:view-off-slash"
-                        class="text-lightSlate-300"
-                        size="h-4 w-4"
-                      />
+                      <div class="i-hugeicons:view-off-slash text-lightSlate-300 h-4 w-4" />
                     </div>
                   </Show>
                   <img class="h-4 w-4" src={getModloaderIcon(modloader)} />

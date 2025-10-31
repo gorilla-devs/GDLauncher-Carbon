@@ -1,5 +1,5 @@
 import { useModal } from "../.."
-import { Button, Spinner, AnimatedIcon } from "@gd/ui"
+import { Button, Spinner } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
 import { For, Match, Show, Switch, createSignal } from "solid-js"
 import { ImportEntityStatus } from "@gd/core_module/bindings"
@@ -71,7 +71,7 @@ const ThirdStep = (props: Props) => {
               <div class="flex w-full items-center">
                 <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
                 <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
-                  <AnimatedIcon icon="i-hugeicons:rocket-02" class="text-primary-500" size="text-sm" />
+                  <div class="i-hugeicons:rocket-02 text-primary-500 text-sm" />
                   <Trans key="instance.import_instance" />
                 </span>
                 <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />

@@ -1,11 +1,9 @@
 /**
  * Authentication hooks for Login page
  *
- * These hooks extract complex logic from the monolithic Login component
- * into reusable, testable, and maintainable pieces.
+ * Note: The auth flow has been migrated to XState state machine.
+ * Old hooks (useAuthFlow, useEnrollmentStatus, useAuthTransitions, useAuthAnimations)
+ * have been removed and replaced by the state machine in ../machines/loginMachine.ts
+ *
+ * See LoginContainer.tsx for the new XState-based implementation.
  */
-
-export { useAuthFlow } from "./useAuthFlow"
-export { useEnrollmentStatus } from "./useEnrollmentStatus"
-export { useAuthTransitions } from "./useAuthTransitions"
-export { useAuthAnimations } from "./useAuthAnimations"

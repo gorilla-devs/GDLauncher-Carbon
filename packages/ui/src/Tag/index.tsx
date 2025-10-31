@@ -1,5 +1,4 @@
 import { Show, mergeProps, JSX } from "solid-js"
-import { AnimatedIcon } from "../AnimatedIcon"
 
 interface Props {
   name?: string
@@ -34,10 +33,8 @@ export const Tag = (props: Props) => {
         <p class="m-0 text-lightSlate-700 whitespace-nowrap">{props.name}</p>
       </Show>
       <Show when={mergedProps.type === "default"}>
-        <AnimatedIcon
-          icon="i-hugeicons:cancel-01"
-          size="text-lg"
-          class="text-darkSlate-200 cursor-pointer"
+        <div
+          class="i-hugeicons:cancel-01 text-lg text-darkSlate-200 cursor-pointer"
           onClick={() => {
             if (props.name) props.onClose?.(props.name)
           }}

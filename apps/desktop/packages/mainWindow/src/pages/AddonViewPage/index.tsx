@@ -9,8 +9,7 @@ import {
   Tabs,
   Tooltip,
   TooltipContent,
-  TooltipTrigger,
-  AnimatedIcon
+  TooltipTrigger
 } from "@gd/ui"
 import {
   Outlet,
@@ -27,6 +26,8 @@ import {
   createContext,
   createSignal,
   createMemo,
+  createEffect,
+  on,
   onMount
 } from "solid-js"
 import { format } from "date-fns"
@@ -44,6 +45,7 @@ import { CreateQueryResult } from "@tanstack/solid-query"
 import { RSPCError } from "@rspc/client"
 import ModpackDownloadButton from "@/components/ModpackDownloadButton"
 import AuthorAvatars, { Author } from "@/components/AuthorAvatars"
+import useSearchContext from "@/components/SearchInputContext"
 
 const getTabIndexFromPath = (path: string) => {
   if (path.match(/\/(addon)\/.+\/.+/g)) {
@@ -100,6 +102,7 @@ const AddonExplore = () => {
   const indexTab = () => getTabIndexFromPath(location.pathname)
   const [t] = useTransContext()
   const [searchParams] = useSearchParams()
+  const searchContext = useSearchContext()
 
   const selectedInstanceId = () => {
     const id = parseInt(searchParams.instanceId, 10)
@@ -127,6 +130,31 @@ const AddonExplore = () => {
   }))
 
   const isFetching = () => project.isLoading
+
+  // Navigate back to list when search filters change
+  createEffect(
+    on(
+      () => ({
+        searchQuery: searchContext?.searchQuery().searchQuery,
+        projectType: searchContext?.searchQuery().projectType,
+        categories: searchContext?.searchQuery().categories,
+        gameVersions: searchContext?.searchQuery().gameVersions,
+        modloaders: searchContext?.searchQuery().modloaders,
+        environment: searchContext?.searchQuery().environment,
+        searchApi: searchContext?.searchQuery().searchApi,
+        platformFilters: searchContext?.searchQuery().platformFilters
+      }),
+      () => {
+        // Navigate to search list view when filters change
+        const type = searchContext?.searchQuery().projectType || "modpack"
+        const instanceParam = selectedInstanceId()
+          ? `?instanceId=${selectedInstanceId()}`
+          : ""
+        navigator.navigate(`/search/${type}${instanceParam}`)
+      },
+      { defer: true } // Don't run on mount, only on changes
+    )
+  )
 
   const normalizedAuthors = createMemo(() => {
     if (!project.data?.authors) return []
@@ -208,7 +236,7 @@ const AddonExplore = () => {
               onClick={() => {
                 navigator.prev()
               }}
-              icon={<AnimatedIcon icon="i-hugeicons:arrow-left-01" size="text-2xl" />}
+              icon={<div class="i-hugeicons:arrow-left-01 text-2xl h-6 w-6" />}
               size="small"
               type="secondary"
             >
@@ -232,7 +260,7 @@ const AddonExplore = () => {
                     window.openExternalLink(`${baseUrl}${project.data?.slug}`)
                   }}
                 >
-                  <AnimatedIcon icon="i-hugeicons:link-square-02" size="text-xl" />
+                  <div class="i-hugeicons:link-square-02 text-xl h-6 w-6" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
@@ -241,7 +269,7 @@ const AddonExplore = () => {
             </Tooltip>
           </div>
           <div class="from-darkSlate-800 sticky top-52 z-40 flex h-24 justify-center bg-gradient-to-t from-10% px-6">
-            <div class="flex w-full gap-4 lg:flex-row">
+            <div class="flex w-full flex-row gap-4">
               <div
                 class="bg-darkSlate-800 h-16 w-16 rounded-xl bg-cover bg-center"
                 style={{
@@ -261,9 +289,9 @@ const AddonExplore = () => {
                     </Match>
                   </Switch>
                 </div>
-                <div class="flex cursor-default flex-col justify-between lg:flex-row">
-                  <div class="text-lightSlate-700 flex flex-col items-start gap-1 lg:flex-row lg:items-center lg:gap-0">
-                    <div class="border-darkSlate-500 border-0 p-0 lg:border-r-2 lg:pr-2">
+                <div class="flex cursor-default flex-row justify-between">
+                  <div class="text-lightSlate-700 flex flex-row items-center gap-0">
+                    <div class="border-darkSlate-500 border-r-2 pr-2">
                       <Switch>
                         <Match when={!isFetching()}>
                           {project.data?.minecraftVersions[0]}
@@ -273,8 +301,8 @@ const AddonExplore = () => {
                         </Match>
                       </Switch>
                     </div>
-                    <div class="border-darkSlate-500 flex items-center gap-2 border-0 p-0 lg:border-r-2 lg:px-2">
-                      <AnimatedIcon icon="i-hugeicons:clock-01" size="text-lg" />
+                    <div class="border-darkSlate-500 flex items-center gap-2 border-r-2 px-2">
+                      <div class="i-hugeicons:clock-01 text-lg h-5 w-5" />
                       <Switch>
                         <Match when={!isFetching()}>
                           <Show when={project.data?.releaseDate}>
@@ -289,7 +317,7 @@ const AddonExplore = () => {
                         </Match>
                       </Switch>
                     </div>
-                    <div class="flex items-center gap-2 p-0 lg:px-2">
+                    <div class="flex items-center gap-2 px-2">
                       <div class="flex gap-2 text-sm">
                         <Switch>
                           <Match
@@ -312,7 +340,7 @@ const AddonExplore = () => {
                       </div>
                     </div>
                   </div>
-                  <div class="mt-2 flex items-center gap-2 lg:mt-0">
+                  <div class="mt-0 flex items-center gap-2">
                     <Switch fallback={<></>}>
                       <Match
                         when={
@@ -366,7 +394,7 @@ const AddonExplore = () => {
                       size="small"
                       type="secondary"
                     >
-                      <AnimatedIcon icon="i-hugeicons:arrow-left-01" size="text-2xl" />
+                      <div class="i-hugeicons:arrow-left-01 text-2xl h-6 w-6" />
                       <Trans key="instance.step_back" />
                     </Button>
                   </div>

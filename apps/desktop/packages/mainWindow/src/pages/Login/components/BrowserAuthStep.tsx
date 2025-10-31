@@ -1,5 +1,5 @@
 import { Trans, useTransContext } from "@gd/i18n"
-import { Button, Progress, toast, AnimatedIcon } from "@gd/ui"
+import { Button, Progress, toast } from "@gd/ui"
 import { Show, Switch, Match, createSignal, createEffect, onCleanup } from "solid-js"
 import { msToMinutes, msToSeconds, parseTwoDigitNumber } from "@/utils/helpers"
 import GateAnimationRiveWrapper from "@/utils/GateAnimationRiveWrapper"
@@ -145,7 +145,7 @@ export function BrowserAuthStep(props: BrowserAuthStepProps) {
           <div class="border-darkSlate-600 flex flex-col items-center gap-2 border-t pt-4">
             <p class="text-lightSlate-600 text-xs"><Trans key="login.browser_didnt_open" /></p>
             <Button size="small" type="secondary" onClick={openBrowser}>
-              <AnimatedIcon icon="i-hugeicons:link-square-02" />
+              <div class="i-hugeicons:link-square-02" />
               <Trans key="login.open_browser_manually" />
             </Button>
           </div>

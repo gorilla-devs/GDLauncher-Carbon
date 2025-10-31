@@ -252,6 +252,7 @@ function Button(props: Props) {
           props.backgroundColor,
           props.fullWidth
         ),
+        "animate-icons-on-hover": true,
         ...props.classList
       }}
       style={{

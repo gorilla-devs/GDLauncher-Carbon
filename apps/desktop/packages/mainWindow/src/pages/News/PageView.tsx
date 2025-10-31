@@ -1,7 +1,7 @@
 import { Show, createMemo } from "solid-js"
 import { useParams } from "@solidjs/router"
 import { useNews, usePatchNotes } from "@/utils/news"
-import { AnimatedIcon, Button, Spinner } from "@gd/ui"
+import { Button, Spinner } from "@gd/ui"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { parseToHtml } from "@/utils/modplatformDescriptionConverter"
 import { createQuery } from "@tanstack/solid-query"
@@ -96,10 +96,7 @@ const PageView = () => {
               onClick={() => navigator.navigate("/news")}
               class="text-lightSlate-400 hover:text-lightSlate-200 group mb-2 flex items-center gap-3 self-start transition-colors"
             >
-              <AnimatedIcon
-                icon="i-hugeicons:arrow-left-01"
-                class="transition-transform group-hover:-translate-x-1"
-              />
+              <div class="i-hugeicons:arrow-left-01 text-lg transition-transform group-hover:-translate-x-1" />
               <span class="font-medium">Back to News</span>
             </button>
 
@@ -135,10 +132,7 @@ const PageView = () => {
 
               <div class="text-lightSlate-300 flex items-center gap-4">
                 <div class="flex items-center gap-2">
-                  <AnimatedIcon
-                    icon="i-hugeicons:calendar-01"
-                    class="text-primary-400"
-                  />
+                  <div class="i-hugeicons:calendar-01 text-primary-400 text-lg" />
                   <time class="text-lg font-medium">
                     {new Date(article().date).toLocaleDateString(undefined, {
                       year: "numeric",
@@ -312,7 +306,7 @@ const PageView = () => {
                     ? "Read Full Patch Notes"
                     : "Read Full Article"}
                 </span>
-                <AnimatedIcon icon="i-hugeicons:link-square-02" size="text-xl" />
+                <div class="i-hugeicons:link-square-02 text-xl" />
               </Button>
             </div>
           </article>

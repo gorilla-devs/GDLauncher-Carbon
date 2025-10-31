@@ -1,4 +1,4 @@
-import { toast, AnimatedIcon } from "@gd/ui"
+import { toast } from "@gd/ui"
 import { useModal } from "../.."
 import { Trans, useTransContext } from "@gd/i18n"
 import { createSignal, For, Show, createMemo } from "solid-js"
@@ -220,7 +220,7 @@ const Presets = () => {
           when={!isLoading()}
           fallback={
             <div class="flex flex-1 items-center justify-center">
-              <AnimatedIcon icon="i-hugeicons:loading-03" class="text-lightSlate-400 animate-spin" size="text-4xl" interactive={false} />
+              <div class="i-hugeicons:loading-03 text-lightSlate-400 animate-spin text-4xl" />
             </div>
           }
         >
@@ -250,7 +250,7 @@ const Presets = () => {
                 <Show
                   when={creatingPreset() !== vanillaPreset.name}
                   fallback={
-                    <AnimatedIcon icon="i-hugeicons:loading-03" class="text-primary-500 animate-spin" size="text-4xl" interactive={false} />
+                    <div class="i-hugeicons:loading-03 text-primary-500 animate-spin text-4xl" />
                   }
                 >
                   <div class="relative">
@@ -299,7 +299,7 @@ const Presets = () => {
                         <Show
                           when={!creating}
                           fallback={
-                            <AnimatedIcon icon="i-hugeicons:loading-03" class="text-primary-500 animate-spin" size="text-4xl" interactive={false} />
+                            <div class="i-hugeicons:loading-03 text-primary-500 animate-spin text-4xl" />
                           }
                         >
                           <div class="relative">

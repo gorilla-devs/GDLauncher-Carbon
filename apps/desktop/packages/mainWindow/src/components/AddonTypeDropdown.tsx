@@ -3,8 +3,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
-  AnimatedIcon
+  DropdownMenuTrigger
 } from "@gd/ui"
 import { FEUnifiedSearchType } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
@@ -112,7 +111,7 @@ export function AddonTypeDropdown() {
       <DropdownMenuTrigger class="text-lightSlate-50 hover:bg-darkSlate-600 data-[expanded]:bg-darkSlate-600 flex items-center gap-2 rounded px-2.5 py-1.5 transition-colors hover:text-white data-[expanded]:text-white">
         <div class={`${currentOption()?.icon} text-lg`} />
         <span class="text-sm font-medium">{currentOption()?.label}</span>
-        <AnimatedIcon icon="i-hugeicons:arrow-down-01" size="text-xs" />
+        <div class="i-hugeicons:arrow-down-01 text-xs shrink-0" />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <For each={addonTypeOptions()}>

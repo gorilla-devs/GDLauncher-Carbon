@@ -175,7 +175,7 @@ function Input(props: Props) {
         class={container({
           hasIcon: !!local.icon,
           variant: local.variant,
-          class: `${local.class || ""} ${local.inputColor || ""}`
+          class: `animate-icons-on-hover ${local.class || ""} ${local.inputColor || ""}`
         })}
         ref={setInputContainerRef}
       >

@@ -1,5 +1,5 @@
 import { GameLogEntry } from "@gd/core_module/bindings"
-import { Collapsable, Skeleton, AnimatedIcon } from "@gd/ui"
+import { Collapsable, Skeleton } from "@gd/ui"
 import { createSignal, For, Match, Show, Switch } from "solid-js"
 import formatDateTime from "./formatDateTime"
 import { Trans, useTransContext } from "@gd/i18n"
@@ -130,14 +130,12 @@ const LogsSidebar = (props: LogsSidebarProps) => {
         <div>
           <Trans key="logs.all_sessions" />
         </div>
-        <AnimatedIcon
-          icon={
+        <div
+          class={`h-6 w-6 text-lightSlate-600 hover:text-lightSlate-50 duration-100 ease-in-out ${
             sortDirection() === "asc"
               ? "i-hugeicons:sort-by-up-01"
               : "i-hugeicons:sort-by-down-01"
-          }
-          class="text-lightSlate-600 hover:text-lightSlate-50 duration-100 ease-in-out"
-          size="h-6 w-6"
+          }`}
           onClick={() => {
             if (sortDirection() === "asc") {
               setSortDirection("desc")

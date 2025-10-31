@@ -1,5 +1,5 @@
 import { Trans } from "@gd/i18n"
-import { Button, AnimatedIcon } from "@gd/ui"
+import { Button } from "@gd/ui"
 import { createSignal, Show } from "solid-js"
 import { rspc } from "@/utils/rspcClient"
 
@@ -97,7 +97,7 @@ export function GDLAccountSetupModal(props: GDLAccountSetupModalProps) {
             onClick={handleClose}
             class="text-lightSlate-600 hover:text-lightSlate-50 transition-colors"
           >
-            <AnimatedIcon icon="i-hugeicons:cancel-01" size="h-5 w-5" />
+            <div class="i-hugeicons:cancel-01 h-5 w-5" />
           </button>
         </div>
 
@@ -108,7 +108,7 @@ export function GDLAccountSetupModal(props: GDLAccountSetupModalProps) {
             <div class="flex flex-col gap-6">
               <div class="flex items-center gap-4">
                 <div class="bg-primary-500/20 flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl">
-                  <AnimatedIcon icon="i-hugeicons:computer-phone-sync" size="h-8 w-8" class="text-primary-400" />
+                  <div class="i-hugeicons:computer-phone-sync h-8 w-8 text-primary-400" />
                 </div>
                 <div class="flex flex-col gap-1">
                   <h3 class="text-lightSlate-50 m-0 text-lg font-semibold">
@@ -126,19 +126,19 @@ export function GDLAccountSetupModal(props: GDLAccountSetupModalProps) {
                 </h4>
                 <ul class="text-lightSlate-600 flex flex-col gap-2 text-sm">
                   <li class="flex items-start gap-2">
-                    <AnimatedIcon icon="i-hugeicons:tick-02" size="h-4 w-4" class="text-primary-400 mt-1 shrink-0" />
+                    <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-1 shrink-0" />
                     <span><Trans key="login.benefit_share_instances_friends" /></span>
                   </li>
                   <li class="flex items-start gap-2">
-                    <AnimatedIcon icon="i-hugeicons:tick-02" size="h-4 w-4" class="text-primary-400 mt-1 shrink-0" />
+                    <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-1 shrink-0" />
                     <span><Trans key="login.benefit_track_metrics_playtime" /></span>
                   </li>
                   <li class="flex items-start gap-2">
-                    <AnimatedIcon icon="i-hugeicons:tick-02" size="h-4 w-4" class="text-primary-400 mt-1 shrink-0" />
+                    <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-1 shrink-0" />
                     <span><Trans key="login.benefit_sync_settings_preferences" /></span>
                   </li>
                   <li class="flex items-start gap-2">
-                    <AnimatedIcon icon="i-hugeicons:tick-02" size="h-4 w-4" class="text-primary-400 mt-1 shrink-0" />
+                    <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-1 shrink-0" />
                     <span><Trans key="login.benefit_access_anywhere" /></span>
                   </li>
                 </ul>
@@ -190,7 +190,7 @@ export function GDLAccountSetupModal(props: GDLAccountSetupModalProps) {
               <Trans key="general.skip" />
             ) : (
               <>
-                <AnimatedIcon icon="i-hugeicons:arrow-left-01" />
+                <div class="i-hugeicons:arrow-left-01" />
                 <Trans key="general.back" />
               </>
             )}
@@ -223,7 +223,7 @@ export function GDLAccountSetupModal(props: GDLAccountSetupModalProps) {
               ) : (
                 <>
                   <Trans key="general.next" />
-                  <AnimatedIcon icon="i-hugeicons:arrow-right-01" />
+                  <div class="i-hugeicons:arrow-right-01" />
                 </>
               )}
             </Button>

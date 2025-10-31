@@ -91,7 +91,7 @@ export const SelectContent = <T extends ValidComponent = "div">(
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         class={cn(
-          "relative z-[1000] max-h-80 min-w-[8rem] overflow-y-auto rounded-md border border-darkSlate-500 bg-darkSlate-800 text-lightSlate-100 shadow-md data-[expanded]:animate-selectEnter data-[closed]:animate-selectLeave",
+          "relative z-[100000] max-h-80 min-w-[8rem] overflow-y-auto rounded-md border border-darkSlate-500 bg-darkSlate-800 text-lightSlate-100 shadow-md data-[expanded]:animate-selectEnter data-[closed]:animate-selectLeave",
           local.class
         )}
         {...rest}

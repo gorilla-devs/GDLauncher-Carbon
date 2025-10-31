@@ -2,7 +2,7 @@ import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { rspc } from "@/utils/rspcClient"
 import { Trans } from "@gd/i18n"
-import { AnimatedIcon, Skeleton } from "@gd/ui"
+import { Skeleton } from "@gd/ui"
 import {
   For,
   Match,
@@ -72,10 +72,8 @@ const FeaturedModpackTile = () => {
               navigator.navigate(`/addon/${HEXING_TALES_MODPACK_ID}/curseforge`)
             }}
           >
-            <AnimatedIcon
-              icon="i-hugeicons:view"
-              class="z-1 text-lightSlate-900 hover:text-lightSlate-50 absolute right-2 top-2 opacity-50 duration-200 ease-in-out"
-              size="h-4 w-4"
+            <div
+              class="z-1 text-lightSlate-900 hover:text-lightSlate-50 absolute right-2 top-2 opacity-50 duration-200 ease-in-out i-hugeicons:view h-4 w-4"
               onClick={(e) => {
                 e.stopPropagation()
                 settingsMutation.mutate({
@@ -122,10 +120,8 @@ const FeaturedModpackTile = () => {
           </div>
         </Show>
         <Show when={!settings()?.showFeatured}>
-          <AnimatedIcon
-            icon="i-hugeicons:view-off-slash"
-            class="text-lightSlate-900 hover:text-lightSlate-50 my-2 mr-2 opacity-50 duration-200 ease-in-out"
-            size="h-4 w-4"
+          <div
+            class="text-lightSlate-900 hover:text-lightSlate-50 my-2 mr-2 opacity-50 duration-200 ease-in-out i-hugeicons:view-off-slash h-4 w-4"
             onClick={(e) => {
               e.stopPropagation()
               settingsMutation.mutate({

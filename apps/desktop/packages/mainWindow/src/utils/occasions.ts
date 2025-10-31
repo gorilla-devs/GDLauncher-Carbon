@@ -138,27 +138,31 @@ function isDateInOccasion(occasion: Occasion, date: Date = new Date()): boolean 
  * Checks against current date and dev override
  */
 export function getCurrentOccasion(): Occasion | null {
-  // Dev mode override for testing
-  if (typeof window !== "undefined" && (window as any).forceOccasion) {
-    const forcedId = (window as any).forceOccasion
-    const forced = OCCASIONS.find((o) => o.id === forcedId)
-    if (forced) {
-      console.log(`[Occasions] Forced occasion: ${forced.name}`)
-      return forced
-    }
-  }
-
-  const now = new Date()
-
-  // Find first matching occasion
-  for (const occasion of OCCASIONS) {
-    if (isDateInOccasion(occasion, now)) {
-      console.log(`[Occasions] Active occasion: ${occasion.name}`)
-      return occasion
-    }
-  }
-
+  // TEMPORARILY DISABLED FOR THIS RELEASE
+  // All occasions are disabled to focus on core functionality
   return null
+
+  // // Dev mode override for testing
+  // if (typeof window !== "undefined" && (window as any).forceOccasion) {
+  //   const forcedId = (window as any).forceOccasion
+  //   const forced = OCCASIONS.find((o) => o.id === forcedId)
+  //   if (forced) {
+  //     console.log(`[Occasions] Forced occasion: ${forced.name}`)
+  //     return forced
+  //   }
+  // }
+
+  // const now = new Date()
+
+  // // Find first matching occasion
+  // for (const occasion of OCCASIONS) {
+  //   if (isDateInOccasion(occasion, now)) {
+  //     console.log(`[Occasions] Active occasion: ${occasion.name}`)
+  //     return occasion
+  //   }
+  // }
+
+  // return null
 }
 
 /**

@@ -1,5 +1,5 @@
 import { Show, onCleanup, onMount } from "solid-js"
-import { Tab, Tooltip, TooltipContent, TooltipTrigger, AnimatedIcon } from "@gd/ui"
+import { Tab, Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
 import { Trans, useTransContext } from "@gd/i18n"
 import CacheStatusPopover from "./CacheStatusPopover"
@@ -64,10 +64,10 @@ export const CacheStatusIcon = () => {
           <Tooltip>
             <TooltipTrigger>
               <div class="hover:text-lightSlate-100 relative cursor-pointer text-2xl transition-colors duration-200">
-                <AnimatedIcon icon="i-hugeicons:database-01" />
+                <div class="i-hugeicons:database-01 h-6 w-6" />
                 <Show when={hasActiveTasks()}>
                   <div class="absolute bottom-0 left-0 text-sm text-white">
-                    <AnimatedIcon icon="i-hugeicons:refresh" class="animate-spin" interactive={false} />
+                    <div class="i-hugeicons:refresh h-4 w-4 animate-spin" />
                   </div>
                 </Show>
               </div>

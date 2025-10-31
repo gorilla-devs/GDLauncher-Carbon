@@ -5,8 +5,7 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-  Spinner,
-  AnimatedIcon
+  Spinner
 } from "@gd/ui"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
@@ -118,7 +117,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
               when={imageUrl}
               fallback={
                 <div class="bg-darkSlate-600 flex h-8 w-8 items-center justify-center rounded">
-                  <AnimatedIcon icon="i-hugeicons:file-01" size="text-lg" class="text-lightSlate-400" />
+                  <div class="i-hugeicons:file-01 text-lg text-lightSlate-400" />
                 </div>
               }
             >
@@ -195,7 +194,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
           <Show when={mod.is_duplicate}>
             <Tooltip>
               <TooltipTrigger>
-                <AnimatedIcon icon="i-hugeicons:alert-01" size="text-lg" class="text-yellow-500" />
+                <div class="i-hugeicons:alert-01 text-lg text-yellow-500" />
               </TooltipTrigger>
               <TooltipContent>
                 <Trans key="instance.duplicate_mod_warning" />
@@ -241,7 +240,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
           return (
             <Tooltip>
               <TooltipTrigger>
-                <AnimatedIcon icon="i-hugeicons:folder-01" size="text-lg" class="text-gray-500" />
+                <div class="i-hugeicons:folder-01 text-lg text-gray-500" />
               </TooltipTrigger>
               <TooltipContent>{t("instance.table.local")}</TooltipContent>
             </Tooltip>
@@ -324,10 +323,8 @@ export const createAddonColumns = (config: ColumnConfig) => {
                   when={!isUpdating()}
                   fallback={<Spinner class="h-5 w-5 text-blue-400" />}
                 >
-                  <AnimatedIcon
-                    icon="i-hugeicons:download-02"
-                    size="text-lg"
-                    class="cursor-pointer transition-colors"
+                  <div
+                    class="i-hugeicons:download-02 text-lg cursor-pointer transition-colors"
                     classList={{
                       "text-green-500 hover:text-green-400": !isDisabled(),
                       "text-gray-400 cursor-not-allowed": isDisabled()
@@ -406,10 +403,8 @@ export const createAddonColumns = (config: ColumnConfig) => {
             >
               <Tooltip>
                 <TooltipTrigger>
-                  <AnimatedIcon
-                    icon="i-hugeicons:arrow-left-right"
-                    size="text-lg"
-                    class="text-lightSlate-400 hover:text-lightSlate-200 cursor-pointer transition-colors"
+                  <div
+                    class="i-hugeicons:arrow-left-right text-lg text-lightSlate-400 hover:text-lightSlate-200 cursor-pointer transition-colors"
                     onClick={() => config.onSwitchVersion(mod)}
                   />
                 </TooltipTrigger>

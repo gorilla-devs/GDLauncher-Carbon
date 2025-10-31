@@ -8,8 +8,6 @@ export * from "./Tooltip"
 export { Toaster, toast } from "./Sonner"
 
 export { Button } from "./Button"
-export { AnimatedIcon } from "./AnimatedIcon"
-export { AnimatedImageIcon } from "./AnimatedImageIcon"
 export { Input } from "./Input"
 export { Slider } from "./Slider"
 export { Switch } from "./Switch"

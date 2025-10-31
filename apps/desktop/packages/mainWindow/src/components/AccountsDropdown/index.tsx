@@ -3,7 +3,7 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 import { port, rspc } from "@/utils/rspcClient"
 import { AccountStatus, AccountType } from "@gd/core_module/bindings"
 import { Trans } from "@gd/i18n"
-import { Button, Popover, PopoverContent, PopoverTrigger, AnimatedIcon } from "@gd/ui"
+import { Button, Popover, PopoverContent, PopoverTrigger } from "@gd/ui"
 import { For, Switch, Match, createSignal } from "solid-js"
 import gdlLogo from "/assets/images/gdlauncher_logo.svg"
 import defaultInstanceImg from "/assets/images/default-instance-img.png"
@@ -150,7 +150,7 @@ export const AccountsDropdown = (props: Props) => {
                 )?.username
               }
             </div>
-            <AnimatedIcon icon="i-hugeicons:arrow-down-01" size="h-4 w-4" />
+            <div class="i-hugeicons:arrow-down-01 h-4 w-4" />
           </div>
         </div>
       </PopoverTrigger>
@@ -227,24 +227,24 @@ export const AccountsDropdown = (props: Props) => {
                   <div class="flex items-center gap-2">
                     <Switch>
                       <Match when={account.type.type === "microsoft"}>
-                        <AnimatedIcon icon="i-hugeicons:microsoft" size="h-4 w-4" />
+                        <div class="i-hugeicons:microsoft h-4 w-4" />
                       </Match>
                       <Match when={account.type.type === "offline"}>
-                        <AnimatedIcon icon="i-hugeicons:computer" size="h-4 w-4" />
+                        <div class="i-hugeicons:computer h-4 w-4" />
                       </Match>
                     </Switch>
                     <Switch>
                       <Match when={account.status === "ok"}>
-                        <AnimatedIcon icon="i-hugeicons:tick-02" size="h-4 w-4" class="text-green-500" />
+                        <div class="i-hugeicons:tick-02 h-4 w-4 text-green-500" />
                       </Match>
                       <Match when={account.status === "expired"}>
-                        <AnimatedIcon icon="i-hugeicons:alert-01" size="h-4 w-4" class="text-yellow-500" />
+                        <div class="i-hugeicons:alert-01 h-4 w-4 text-yellow-500" />
                       </Match>
                       <Match when={account.status === "refreshing"}>
-                        <AnimatedIcon icon="i-hugeicons:loading-03" size="h-4 w-4" class="text-yellow-500" />
+                        <div class="i-hugeicons:loading-03 h-4 w-4 text-yellow-500" />
                       </Match>
                       <Match when={account.status === "invalid"}>
-                        <AnimatedIcon icon="i-hugeicons:cancel-01" size="h-4 w-4" class="text-red-500" />
+                        <div class="i-hugeicons:cancel-01 h-4 w-4 text-red-500" />
                       </Match>
                     </Switch>
                   </div>
@@ -266,10 +266,8 @@ export const AccountsDropdown = (props: Props) => {
                 navigator.navigate("/settings/accounts")
               }}
             >
-              <AnimatedIcon
-                icon="i-hugeicons:settings-01"
-                size="text-2xl"
-                class="pointer-events-auto"
+              <div
+                class="i-hugeicons:settings-01 text-2xl pointer-events-auto"
                 classList={{
                   "text-lightSlate-50": !!props.disabled,
                   "hover:text-lightSlate-100 duration-100 ease-in-out":

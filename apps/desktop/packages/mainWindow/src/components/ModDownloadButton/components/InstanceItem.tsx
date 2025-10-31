@@ -1,5 +1,5 @@
 import { Show, createMemo } from "solid-js"
-import { DropdownMenuRadioItem, Spinner, AnimatedIcon } from "@gd/ui"
+import { DropdownMenuRadioItem, Spinner } from "@gd/ui"
 import DefaultImg from "/assets/images/default-instance-img.png"
 
 interface InstanceItemProps {
@@ -73,10 +73,10 @@ export const InstanceItem = (props: InstanceItemProps) => {
             <Spinner class="h-4 w-4" />
           </Show>
           <Show when={props.isInstalled && !props.isLoading}>
-            <AnimatedIcon icon="i-hugeicons:tick-02" size="h-4 w-4" class="text-green-400" />
+            <div class="i-hugeicons:tick-02 h-4 w-4 text-green-400" />
           </Show>
           <Show when={props.instance.locked}>
-            <AnimatedIcon icon="i-hugeicons:lock" size="h-4 w-4" class="text-lightSlate-500" />
+            <div class="i-hugeicons:lock h-4 w-4 text-lightSlate-500" />
           </Show>
         </div>
       </div>

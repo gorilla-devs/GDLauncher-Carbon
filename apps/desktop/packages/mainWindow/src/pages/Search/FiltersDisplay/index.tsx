@@ -1,6 +1,6 @@
 import useSearchContext from "@/components/SearchInputContext"
 import { Show } from "solid-js"
-import { AnimatedIcon, Button } from "@gd/ui"
+import { Button } from "@gd/ui"
 import InstanceDisplay from "./InstanceDisplay"
 import CategoriesDisplay from "./CategoriesDisplay"
 import ModloadersDisplay from "./ModloadersDisplay"
@@ -49,7 +49,7 @@ export default function FiltersDisplay() {
             size="small"
             class="text-xs"
           >
-            <AnimatedIcon icon="i-hugeicons:cancel-circle" size="h-4 w-4" />
+            <div class="i-hugeicons:cancel-circle h-4 w-4" />
             Clear all
           </Button>
           <div class="bg-darkSlate-600 h-4 w-px" />

@@ -1,5 +1,5 @@
 import { Trans } from "@gd/i18n"
-import { Button, AnimatedIcon } from "@gd/ui"
+import { Button } from "@gd/ui"
 import { Show } from "solid-js"
 
 /**
@@ -35,7 +35,7 @@ export function CompleteStep(props: CompleteStepProps) {
     <div class="flex w-full flex-1 flex-col items-center justify-center gap-8 text-center">
       {/* Success icon */}
       <div class="bg-primary-500/10 flex h-24 w-24 items-center justify-center rounded-full">
-        <AnimatedIcon icon="i-hugeicons:computer-phone-sync" size="h-12 w-12" class="text-primary-400" />
+        <div class="i-hugeicons:computer-phone-sync h-12 w-12 text-primary-400" />
       </div>
 
       {/* Success message */}
@@ -66,7 +66,7 @@ export function CompleteStep(props: CompleteStepProps) {
                   when={props.foundGDLAccountData?.profileIconUrl}
                   fallback={
                     <div class="bg-primary-500/30 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
-                      <AnimatedIcon icon="i-hugeicons:user-account" size="h-5 w-5" class="text-primary-400" />
+                      <div class="i-hugeicons:user-account h-5 w-5 text-primary-400" />
                     </div>
                   }
                 >
@@ -90,15 +90,15 @@ export function CompleteStep(props: CompleteStepProps) {
               </div>
               <ul class="text-lightSlate-500 m-0 flex list-none flex-col gap-2 pl-0 text-sm">
                 <li class="flex items-start gap-2">
-                  <AnimatedIcon icon="i-hugeicons:tick-02" size="h-4 w-4" class="text-primary-400 mt-0.5 shrink-0" />
+                  <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
                   <span><Trans key="login.benefit_shared_instances" /></span>
                 </li>
                 <li class="flex items-start gap-2">
-                  <AnimatedIcon icon="i-hugeicons:tick-02" size="h-4 w-4" class="text-primary-400 mt-0.5 shrink-0" />
+                  <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
                   <span><Trans key="login.benefit_metrics_sync" /></span>
                 </li>
                 <li class="flex items-start gap-2">
-                  <AnimatedIcon icon="i-hugeicons:tick-02" size="h-4 w-4" class="text-primary-400 mt-0.5 shrink-0" />
+                  <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
                   <span><Trans key="login.benefit_settings_sync" /></span>
                 </li>
               </ul>
@@ -109,7 +109,7 @@ export function CompleteStep(props: CompleteStepProps) {
                 onClick={props.onLinkExistingAccount}
               >
                 <Trans key="login.sync_account" />
-                <AnimatedIcon icon="i-hugeicons:arrow-right-01" size="h-4 w-4" class="ml-2" />
+                <div class="i-hugeicons:arrow-right-01 h-4 w-4 ml-2" />
               </Button>
             </div>
           </div>
@@ -126,7 +126,7 @@ export function CompleteStep(props: CompleteStepProps) {
             <div class="flex flex-col gap-4">
               <div class="flex items-start gap-3">
                 <div class="bg-primary-500/30 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
-                  <AnimatedIcon icon="i-hugeicons:user-account" size="h-5 w-5" class="text-primary-400" />
+                  <div class="i-hugeicons:user-account h-5 w-5 text-primary-400" />
                 </div>
                 <div class="flex flex-col gap-1 text-left">
                   <h3 class="text-lightSlate-50 m-0 text-base font-bold">
@@ -139,15 +139,15 @@ export function CompleteStep(props: CompleteStepProps) {
               </div>
               <ul class="text-lightSlate-500 m-0 flex list-none flex-col gap-2 pl-0 text-sm">
                 <li class="flex items-start gap-2">
-                  <AnimatedIcon icon="i-hugeicons:tick-02" size="h-4 w-4" class="text-primary-400 mt-0.5 shrink-0" />
+                  <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
                   <span><Trans key="login.benefit_share_with_friends" /></span>
                 </li>
                 <li class="flex items-start gap-2">
-                  <AnimatedIcon icon="i-hugeicons:tick-02" size="h-4 w-4" class="text-primary-400 mt-0.5 shrink-0" />
+                  <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
                   <span><Trans key="login.benefit_track_metrics" /></span>
                 </li>
                 <li class="flex items-start gap-2">
-                  <AnimatedIcon icon="i-hugeicons:tick-02" size="h-4 w-4" class="text-primary-400 mt-0.5 shrink-0" />
+                  <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
                   <span><Trans key="login.benefit_sync_devices" /></span>
                 </li>
               </ul>
@@ -161,7 +161,7 @@ export function CompleteStep(props: CompleteStepProps) {
                 onClick={props.onSetupGDLAccount}
               >
                 <Trans key="login.enable_cloud_sync" />
-                <AnimatedIcon icon="i-hugeicons:arrow-right-01" size="h-4 w-4" class="ml-2" />
+                <div class="i-hugeicons:arrow-right-01 h-4 w-4 ml-2" />
               </Button>
             </div>
           </div>

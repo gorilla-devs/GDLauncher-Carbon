@@ -11,7 +11,6 @@ import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import { Switch, Match, createSignal } from "solid-js"
 import { port } from "./rspcClient"
-import { AnimatedImageIcon } from "@gd/ui"
 
 export const isListInstanceInvalid = (status: ListInstanceStatus) => {
   return "Invalid" in status
@@ -133,14 +132,14 @@ export const CategoryIcon = (props: {
         <div class="h-4 w-4" innerHTML={props.value} />
       </Match>
       <Match when={props.type === "url"}>
-        <AnimatedImageIcon class="h-4 w-4" src={props.value} alt="Category icon" />
+        <img class="h-4 w-4" src={props.value} />
       </Match>
     </Switch>
   )
 }
 
 export const PlatformIcon = (props: { modpack: "curseforge" | "modrinth" }) => {
-  return <AnimatedImageIcon class="h-4 w-4" src={getModpackPlatformIcon(props.modpack)} alt={props.modpack} />
+  return <img class="h-4 w-4" src={getModpackPlatformIcon(props.modpack)} />
 }
 
 export const [importedInstances, setImportedInstances] = createSignal<number[]>(

@@ -7,8 +7,7 @@ import {
   Switch,
   Tooltip,
   TooltipContent,
-  TooltipTrigger,
-  AnimatedIcon
+  TooltipTrigger
 } from "@gd/ui"
 import { For, Show, createMemo, createSignal } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
@@ -162,7 +161,7 @@ const Mods = () => {
             class="text-lightSlate-700 hover:text-lightSlate-50 mr-2 flex h-full items-center px-6"
             onClick={() => setSelectedModsMap(reconcile({}))}
           >
-            <AnimatedIcon icon="i-hugeicons:cancel-01" size="text-2xl" />
+            <div class="i-hugeicons:cancel-01 text-2xl" />
           </div>
           <div class="text-lightSlate-700">
             <Trans
@@ -238,7 +237,7 @@ const Mods = () => {
             <Tooltip placement="top">
               <TooltipTrigger>
                 <div class="text-lightSlate-700 flex cursor-pointer items-center gap-2">
-                  <AnimatedIcon icon="i-hugeicons:delete-02" size="text-2xl" />
+                  <div class="i-hugeicons:delete-02 text-2xl" />
                   <Trans key="instance.delete_mod" />
                 </div>
               </TooltipTrigger>
@@ -259,7 +258,7 @@ const Mods = () => {
                 })
               }}
             >
-              <AnimatedIcon icon="i-hugeicons:delete-02" size="text-2xl" />
+              <div class="i-hugeicons:delete-02 text-2xl" />
               <Trans key="instance.delete_mod" />
             </div>
           </Show>
@@ -270,7 +269,7 @@ const Mods = () => {
               <Tooltip placement="top">
                 <TooltipTrigger>
                   <div class="text-lightSlate-700 flex items-center gap-2">
-                    <AnimatedIcon icon="i-hugeicons:download-02" size="text-2xl" />
+                    <div class="i-hugeicons:download-02 text-2xl" />
                     <Trans key="instance.update_mods" />
                   </div>
                 </TooltipTrigger>
@@ -286,7 +285,7 @@ const Mods = () => {
                   updateSelectedMods()
                 }}
               >
-                <AnimatedIcon icon="i-hugeicons:download-02" size="text-2xl" />
+                <div class="i-hugeicons:download-02 text-2xl" />
                 <Trans key="instance.update_mods" />
               </div>
             </Show>
@@ -327,7 +326,7 @@ const Mods = () => {
             <Input
               onInput={(e) => setFilter(e.target.value)}
               placeholder={t("instance.mods.search")}
-              icon={<AnimatedIcon icon="i-hugeicons:search-01" />}
+              icon={<div class="i-hugeicons:search-01" />}
               class="text-lightSlate-700 rounded-full"
             />
           </div>
@@ -395,7 +394,7 @@ const Mods = () => {
                       updateAllMods()
                     }}
                   >
-                    <AnimatedIcon icon="i-hugeicons:download-02" size="text-2xl" />
+                    <div class="i-hugeicons:download-02 text-2xl" />
                     <div
                       classList={{
                         "w-0": isInstanceLocked()
@@ -428,7 +427,7 @@ const Mods = () => {
                     })
                   }}
                 >
-                  <AnimatedIcon icon="i-hugeicons:folder-open" size="text-2xl" />
+                  <div class="i-hugeicons:folder-open text-2xl" />
                 </div>
               </TooltipTrigger>
               <TooltipContent class="max-w-38 overflow-hidden text-ellipsis">

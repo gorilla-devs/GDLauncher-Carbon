@@ -1,5 +1,4 @@
 import {
-  AnimatedIcon,
   Button,
   Select,
   SelectTrigger,
@@ -463,7 +462,7 @@ const General = () => {
                 modalsContext?.openModal({ name: "onBoarding" })
               }}
             >
-              <AnimatedIcon icon="i-hugeicons:refresh" />
+              <div class="i-hugeicons:refresh text-lg" />
               <Trans key="settings:rerun_onboarding" />
             </Button>
           </RightHandSide>
@@ -483,7 +482,7 @@ const General = () => {
               <div class="flex flex-col items-center justify-end gap-4 2xl:flex-row">
                 <Button type="secondary" onClick={handleClearCache}>
                   <div class="flex items-center gap-2">
-                    <AnimatedIcon icon="i-hugeicons:delete-02" size="h-5 w-5" />
+                    <div class="i-hugeicons:delete-02 h-5 w-5" />
                     <div>
                       <Trans key="settings:clear_cache_button" />
                     </div>
@@ -496,10 +495,7 @@ const General = () => {
                   }}
                 >
                   <div class="flex items-center gap-2">
-                    <AnimatedIcon
-                      icon="i-hugeicons:arrow-reload-horizontal"
-                      size="h-5 w-5"
-                    />
+                    <div class="i-hugeicons:arrow-reload-horizontal h-5 w-5" />
                     <div>
                       <Trans key="settings:restart_app" />
                     </div>
@@ -507,7 +503,7 @@ const General = () => {
                 </Button>
                 <Button type="secondary">
                   <div class="flex items-center gap-2">
-                    <AnimatedIcon icon="i-hugeicons:delete-02" size="h-5 w-5" />
+                    <div class="i-hugeicons:delete-02 h-5 w-5" />
                     <div>
                       <Trans key="settings:reset_all_data" />
                     </div>

@@ -1,7 +1,6 @@
 import { screen, Display } from "electron"
 
 export default function getAdSize(display?: Display) {
-  // Showcase mode - 4:3 aspect ratio with no ads
   if (__SHOWCASE_MODE__) {
     return {
       minWidth: 1280,
@@ -19,26 +18,26 @@ export default function getAdSize(display?: Display) {
   const primaryDisplay = display || screen.getPrimaryDisplay()
   const { width, height } = primaryDisplay.size
 
-  // Tier 1: Large displays (≥1920×1080) - Spacious
+  // Tier 1: Large displays (≥1920×1080)
   if (width >= 1920 && height >= 1080) {
     return {
       minWidth: 1200,
-      minHeight: 720,
+      minHeight: 876, // navbar(60) + ad(730) + gap(16) + text(70)
       width: 1600,
-      height: 900,
+      height: 960,
       adSize: {
         width: 440,
-        height: 670,
+        height: 730,
         shouldShow: true
       }
     }
   }
 
-  // Tier 2: Medium-Large displays (≥1680×1050) - Comfortable
+  // Tier 2: Medium-Large displays (≥1680×1050) - Comfortable (Standard Ad only)
   if (width >= 1680 && height >= 1050) {
     return {
       minWidth: 1200,
-      minHeight: 720,
+      minHeight: 746, // navbar(60) + ad(600) + gap(16) + text(70)
       width: 1450,
       height: 850,
       adSize: {
@@ -49,13 +48,13 @@ export default function getAdSize(display?: Display) {
     }
   }
 
-  // Tier 3: Medium displays (≥1366×768) - Efficient
+  // Tier 3: Medium displays (≥1366×768) - Efficient (Standard Ad only)
   if (width >= 1366 && height >= 768) {
     return {
       minWidth: 1200,
-      minHeight: 720,
+      minHeight: 746, // navbar(60) + ad(600) + gap(16) + text(70)
       width: Math.min(width - 80, 1280),
-      height: 720,
+      height: Math.max(746, Math.min(height - 48, 820)),
       adSize: {
         width: 400,
         height: 600,
@@ -64,12 +63,12 @@ export default function getAdSize(display?: Display) {
     }
   }
 
-  // Tier 4: Small displays (<1366×768) - Adaptive
+  // Tier 4: Small displays (<1366×768) - Adaptive (Skyscraper only)
   return {
     minWidth: 960,
-    minHeight: 680,
+    minHeight: 746, // navbar(60) + ad(600) + gap(16) + text(70)
     width: Math.min(width - 48, 1150),
-    height: Math.min(height - 48, 720),
+    height: Math.min(height - 48, 820),
     adSize: {
       width: 160,
       height: 600,

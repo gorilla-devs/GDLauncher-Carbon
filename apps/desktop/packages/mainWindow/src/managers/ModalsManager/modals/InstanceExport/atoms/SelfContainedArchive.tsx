@@ -1,5 +1,5 @@
 import { useTransContext } from "@gd/i18n"
-import { Switch, Tooltip, TooltipContent, TooltipTrigger, AnimatedIcon } from "@gd/ui"
+import { Switch, Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
 import { setPayload, payload } from ".."
 
 const SelfContainedArchive = () => {
@@ -16,7 +16,7 @@ const SelfContainedArchive = () => {
         <div>{t("instance.self_contained_addons_bundling")}</div>
         <Tooltip>
           <TooltipTrigger>
-            <AnimatedIcon icon="i-hugeicons:information-circle" class="text-darkSlate-400 hover:text-lightSlate-50 cursor-pointer transition-color duration-100 ease-in-out" size="text-2xl" />
+            <div class="i-hugeicons:information-circle text-darkSlate-400 hover:text-lightSlate-50 cursor-pointer transition-color duration-100 ease-in-out text-2xl" />
           </TooltipTrigger>
           <TooltipContent>
             {t("instance.self_contained_addons_bundling_tooltip")}

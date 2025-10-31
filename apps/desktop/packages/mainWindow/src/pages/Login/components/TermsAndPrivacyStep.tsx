@@ -1,5 +1,5 @@
 import { Trans } from "@gd/i18n"
-import { Checkbox, AnimatedIcon } from "@gd/ui"
+import { Checkbox } from "@gd/ui"
 import { useModal } from "@/managers/ModalsManager"
 import { createSignal } from "solid-js"
 
@@ -72,7 +72,7 @@ export function TermsAndPrivacyStep(props: TermsAndPrivacyStepProps) {
               })
             }}
           >
-            <AnimatedIcon icon="i-hugeicons:file-02" size="h-4 w-4" class="shrink-0" />
+            <div class="i-hugeicons:file-02 h-4 w-4 shrink-0" />
             <Trans key="login.terms_link_label" />
           </button>
 
@@ -86,7 +86,7 @@ export function TermsAndPrivacyStep(props: TermsAndPrivacyStepProps) {
               })
             }}
           >
-            <AnimatedIcon icon="i-hugeicons:shield-user" size="h-4 w-4" class="shrink-0" />
+            <div class="i-hugeicons:shield-user h-4 w-4 shrink-0" />
             <Trans key="login.privacy_link_label" />
           </button>
 
@@ -98,7 +98,7 @@ export function TermsAndPrivacyStep(props: TermsAndPrivacyStepProps) {
               window?.openCMPWindow()
             }}
           >
-            <AnimatedIcon icon="i-hugeicons:settings-02" size="h-4 w-4" class="shrink-0" />
+            <div class="i-hugeicons:settings-02 h-4 w-4 shrink-0" />
             <Trans key="login.manage_cmp" />
           </button>
         </div>

@@ -15,8 +15,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-  toast,
-  AnimatedIcon
+  toast
 } from "@gd/ui"
 import {
   createEffect,
@@ -43,7 +42,7 @@ interface Props {
   nextStep: () => void
   prevStep: () => void
   onSwitchToBrowser?: () => void
-  enrollmentStatus: CreateQueryResult<any, any>
+  enrollmentStatus: CreateQueryResult<any, any> | null
 }
 
 export function DeviceCodeStepEnhanced(props: Props) {
@@ -161,11 +160,13 @@ export function DeviceCodeStepEnhanced(props: Props) {
   }
 
   createEffect(() => {
-    handleStatus(props.enrollmentStatus, {
-      onFail(error) {
-        handleErrorMessages(error)
-      }
-    })
+    if (props.enrollmentStatus) {
+      handleStatus(props.enrollmentStatus, {
+        onFail(error) {
+          handleErrorMessages(error)
+        }
+      })
+    }
   })
 
   onCleanup(() => {
@@ -231,29 +232,29 @@ export function DeviceCodeStepEnhanced(props: Props) {
             disabled={!deviceCodeLink()}
             fullWidth
           >
-            <AnimatedIcon icon="i-hugeicons:link-square-02" size="h-5 w-5" />
+            <div class="i-hugeicons:link-square-02 h-5 w-5" />
             <Trans key="login.open_microsoft_login" />
           </Button>
 
           {/* Loading progress - Inline when active */}
-          <Show when={props.enrollmentStatus.data}>
+          <Show when={props.enrollmentStatus?.data}>
             <div class="flex items-center gap-3 w-full">
               <Progress class="flex-1" />
               <span class="text-lightSlate-500 text-xs whitespace-nowrap">
                 <Switch>
-                  <Match when={(props.enrollmentStatus.data as any)?.pollingCode}>
+                  <Match when={(props.enrollmentStatus?.data as any)?.pollingCode}>
                     <Trans key="login.polling_microsoft_auth" />
                   </Match>
-                  <Match when={props.enrollmentStatus.data === "xboxAuth"}>
+                  <Match when={props.enrollmentStatus?.data === "xboxAuth"}>
                     <Trans key="login.authenticating_xbox" />
                   </Match>
-                  <Match when={props.enrollmentStatus.data === "mcLogin"}>
+                  <Match when={props.enrollmentStatus?.data === "mcLogin"}>
                     <Trans key="login.authenticating_minecraft" />
                   </Match>
-                  <Match when={props.enrollmentStatus.data === "mcProfile"}>
+                  <Match when={props.enrollmentStatus?.data === "mcProfile"}>
                     <Trans key="login.retrieving_minecraft_profile" />
                   </Match>
-                  <Match when={(props.enrollmentStatus.data as any)?.mcEntitlements}>
+                  <Match when={(props.enrollmentStatus?.data as any)?.mcEntitlements}>
                     <Trans key="login.retrieving_minecraft_entitlements" />
                   </Match>
                 </Switch>

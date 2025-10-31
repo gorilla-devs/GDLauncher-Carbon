@@ -32,6 +32,7 @@ import { LoginContainer } from "./components/LoginContainer"
 export interface DeviceCodeObjectType {
   userCode: string
   link: string
+  verificationUri: string
   expiresAt: string
 }
 

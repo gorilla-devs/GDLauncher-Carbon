@@ -100,9 +100,6 @@ const aether: Theme = {
 
   font: "Monocraft",
   "font-mono": "Monocraft",
-  "ads-sidebar-background": "url(./assets/images/gdlauncher_pattern.svg)",
-  "pattern-background": "30 13 60",
-  "pattern-fill": "39 17 77",
   "additional-styles": additionalStyles
 }
 

@@ -1,7 +1,7 @@
 import { ModRowProps } from "@/utils/mods"
 import { formatDownloadCount } from "@/utils/helpers"
 import { Trans } from "@gd/i18n"
-import { Badge, AnimatedIcon } from "@gd/ui"
+import { Badge } from "@gd/ui"
 import { formatDistanceToNowStrict } from "date-fns"
 import { For, Match, Show, Switch, createMemo } from "solid-js"
 import { useGlobalStore } from "../GlobalStoreContext"
@@ -18,7 +18,7 @@ const Authors = (props: { data: ModRowProps }) => {
                   <img src={author.avatarUrl!} class="h-3 w-3 rounded-full" />
                 </Match>
                 <Match when={!author.avatarUrl}>
-                  <AnimatedIcon icon="i-hugeicons:user" size="h-3 w-3" class="text-lightSlate-100" />
+                  <div class="i-hugeicons:user h-3 w-3 text-lightSlate-100 shrink-0" />
                 </Match>
               </Switch>
               {author.name}
@@ -73,7 +73,7 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
               if (url) window.openExternalLink(url)
             }}
           >
-            <AnimatedIcon icon="i-hugeicons:link-square-02" size="h-4 w-4" class="text-lightSlate-500 hover:text-lightSlate-50 transition-color transition-100 absolute right-4 top-4 z-30 ease-in-out" />
+            <div class="i-hugeicons:link-square-02 h-4 w-4 text-lightSlate-500 hover:text-lightSlate-50 transition-color transition-100 absolute right-4 top-4 z-30 ease-in-out shrink-0" />
           </div>
         </Show>
         <h4 class="text-lightSlate-100 z-30 mb-2 w-fit px-4 text-xl">
@@ -103,7 +103,7 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
           <div class="mt-4 flex w-full flex-1 flex-col items-start gap-2">
             <div class="text-lightSlate-700 flex items-start gap-2">
               <span class="flex items-center gap-2">
-                <AnimatedIcon icon="i-hugeicons:user" size="h-4 w-4" class="text-lightSlate-100" />
+                <div class="i-hugeicons:user h-4 w-4 text-lightSlate-100 shrink-0" />
                 <p class="text-lightSlate-100 m-0 text-sm">
                   <Trans key="modpack.authors" />
                 </p>
@@ -112,7 +112,7 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
             </div>
 
             <div class="text-lightSlate-700 flex items-center gap-2">
-              <AnimatedIcon icon="i-hugeicons:clock-01" class="text-lightSlate-100" />
+              <div class="i-hugeicons:clock-01 text-lightSlate-100 h-5 w-5 shrink-0" />
               <p class="text-lightSlate-100 m-0 text-sm">
                 <Trans key="modpack.last_updated" />
               </p>
@@ -129,7 +129,7 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
             </div>
 
             <div class="text-lightSlate-700 flex items-center gap-2">
-              <AnimatedIcon icon="i-hugeicons:calendar-01" class="text-lightSlate-100" />
+              <div class="i-hugeicons:calendar-01 text-lightSlate-100 h-5 w-5 shrink-0" />
               <p class="text-lightSlate-100 m-0 text-sm">
                 <Trans key="modpack.release_date" />
               </p>
@@ -146,7 +146,7 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
             </div>
 
             <div class="text-lightSlate-700 flex items-center gap-2">
-              <AnimatedIcon icon="i-hugeicons:download-02" class="text-lightSlate-100" />
+              <div class="i-hugeicons:download-02 text-lightSlate-100 h-5 w-5 shrink-0" />
               <p class="text-lightSlate-100 m-0 text-sm">
                 <Trans key="modpack.total_download" />
               </p>
@@ -155,7 +155,7 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
               </div>
             </div>
             <div class="text-lightSlate-700 flex w-full items-center gap-2">
-              <AnimatedIcon icon="i-hugeicons:joystick-01" class="text-lightSlate-100" />
+              <div class="i-hugeicons:joystick-01 text-lightSlate-100 h-5 w-5 shrink-0" />
               <p class="text-lightSlate-100 m-0 text-sm">
                 <Trans key="modpack.mcVersion" />
               </p>

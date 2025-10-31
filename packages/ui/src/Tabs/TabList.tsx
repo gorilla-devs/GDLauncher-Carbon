@@ -34,9 +34,9 @@ const tabListStyles = cva("flex relative items-start w-full min-h-12 gap-6", {
 const tabListContentStyles = cva("flex box-border overflow-auto w-full gap-6", {
   variants: {
     variant: {
-      underline: "border-b-darkSlate-800 border-b-1 h-full",
-      block: "items-center m-2 rounded-xl",
-      traditional: "items-center scrollbar-hide"
+      underline: "border-b-darkSlate-800 border-b-1 h-full px-2 py-1",
+      block: "items-center m-2 rounded-xl px-2 py-1",
+      traditional: "items-center scrollbar-hide px-2 py-1"
     },
     orientation: {
       horizontal: "flex-row",
@@ -146,14 +146,14 @@ const TabList = (props: Props) => {
                           currentIndex()
                         )}px + (${
                           tabsContext?.gap?.() ?? 1.5
-                        }rem * ${currentIndex()})))`
+                        }rem * ${currentIndex()}) + 0.5rem))`
                       }
                     : {
                         transform: `translateY(calc(${getPositionPx(
                           currentIndex()
                         )}px+ (${
                           tabsContext?.gap?.() ?? 1.5
-                        }rem * ${currentIndex()})))`
+                        }rem * ${currentIndex()}) + 0.25rem))`
                       })
                 }}
               />

@@ -5,7 +5,7 @@ import { useInfiniteVersionsQuery } from "@/components/InfiniteScrollVersionsQue
 import { useContext, For, Show } from "solid-js"
 import { Trans } from "@gd/i18n"
 import { AddonContext } from "@/pages/AddonViewPage"
-import { Button, Spinner, Skeleton, AnimatedIcon } from "@gd/ui"
+import { Button, Spinner, Skeleton } from "@gd/ui"
 import { createVirtualizer } from "@tanstack/solid-virtual"
 
 const Versions = () => {
@@ -104,7 +104,7 @@ const Versions = () => {
               fallback={
                 <div class="flex flex-col items-center justify-center py-16 text-center">
                   <Show when={infiniteQuery.infiniteQuery.error}>
-                    <AnimatedIcon icon="i-hugeicons:alert-02" size="text-3xl" class="mb-4 text-red-400" />
+                    <div class="i-hugeicons:alert-02 text-3xl mb-4 text-red-400" />
                     <h3 class="mb-2 text-lg font-semibold text-red-300">
                       Error loading versions
                     </h3>
@@ -113,7 +113,7 @@ const Versions = () => {
                       size="small"
                       onClick={() => infiniteQuery.infiniteQuery.refetch()}
                     >
-                      <AnimatedIcon icon="i-hugeicons:refresh" class="mr-2" />
+                      <div class="i-hugeicons:refresh mr-2 h-4 w-4" />
                       Retry
                     </Button>
                   </Show>

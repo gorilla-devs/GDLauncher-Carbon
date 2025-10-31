@@ -1,7 +1,6 @@
 import getRouteIndex from "@/route/getRouteIndex"
 import { Trans, useTransContext } from "@gd/i18n"
 import {
-  AnimatedIcon,
   Tabs,
   TabList,
   Tab,
@@ -192,7 +191,7 @@ const Instance = () => {
     {
       label: (
         <div class="flex items-center gap-2">
-          <AnimatedIcon icon="i-hugeicons:dashboard-square-01" class="text-lg" />
+          <div class="i-hugeicons:dashboard-square-01 text-lg" />
           <Trans key="ui.overview" />
         </div>
       ),
@@ -201,7 +200,7 @@ const Instance = () => {
     {
       label: (
         <div class="flex items-center gap-2">
-          <AnimatedIcon icon="i-hugeicons:puzzle" class="text-lg" />
+          <div class="i-hugeicons:puzzle text-lg" />
           <Trans key="ui.addons" />
         </div>
       ),
@@ -211,7 +210,7 @@ const Instance = () => {
     {
       label: (
         <div class="flex items-center gap-2">
-          <AnimatedIcon icon="i-hugeicons:settings-01" class="text-lg" />
+          <div class="i-hugeicons:settings-01 text-lg" />
           <Trans key="ui.settings" />
         </div>
       ),
@@ -220,7 +219,7 @@ const Instance = () => {
     {
       label: (
         <div class="flex items-center gap-2">
-          <AnimatedIcon icon="i-hugeicons:file-script" class="text-lg" />
+          <div class="i-hugeicons:file-script text-lg" />
           <Trans key="ui.logs" />
           <FeatureStatusBadge type="beta" />
         </div>
@@ -495,7 +494,7 @@ const Instance = () => {
               size="small"
               type="transparent"
             >
-              <AnimatedIcon icon="i-hugeicons:arrow-left-01" class="text-xl" />
+              <div class="i-hugeicons:arrow-left-01 text-xl" />
             </Button>
           </div>
           <div class="absolute right-5 top-5 z-50 flex w-fit gap-2">
@@ -508,7 +507,7 @@ const Instance = () => {
                   size="small"
                   type="transparent"
                 >
-                  <AnimatedIcon icon="i-hugeicons:more-horizontal" class="text-xl" />
+                  <div class="i-hugeicons:more-horizontal text-xl" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
@@ -516,7 +515,7 @@ const Instance = () => {
                   {(item) => (
                     <DropdownMenuItem onSelect={item.action}>
                       <div class="flex items-center gap-2">
-                        <AnimatedIcon icon={item.icon} />
+                        <div class={item.icon} />
                         <span>{item.label}</span>
                       </div>
                     </DropdownMenuItem>
@@ -535,9 +534,8 @@ const Instance = () => {
               size="small"
               type="transparent"
             >
-              <AnimatedIcon
-                icon="i-hugeicons:star"
-                class="text-xl"
+              <div
+                class="i-hugeicons:star text-xl"
                 classList={{
                   "text-yellow-500": isFavorite()
                 }}
@@ -600,9 +598,8 @@ const Instance = () => {
                           {routeData.instanceDetails.data?.name}
                         </h1>
                         <Show when={!editableName()}>
-                          <AnimatedIcon
-                            icon="i-hugeicons:pencil-edit-01"
-                            class="transition-color hover:text-lightSlate-700 duration-100 ease-in-out"
+                          <div
+                            class="i-hugeicons:pencil-edit-01 transition-color hover:text-lightSlate-700 duration-100 ease-in-out"
                             onClick={() => setEditableName(true)}
                           />
                         </Show>
@@ -611,17 +608,15 @@ const Instance = () => {
                         class="relative flex h-full items-center gap-2 pr-2"
                         classList={{ "bg-darkSlate-800 pl-2": editableName() }}
                       >
-                        <AnimatedIcon
-                          icon="i-hugeicons:tick-02"
-                          class="text-lightSlate-50 duration-50 z-10 cursor-pointer text-3xl transition ease-in-out hover:text-green-500"
+                        <div
+                          class="text-lightSlate-50 duration-50 z-10 cursor-pointer text-3xl transition ease-in-out hover:text-green-500 i-hugeicons:tick-02"
                           classList={{
                             hidden: !editableName()
                           }}
                           onClick={() => handleNameChange()}
                         />
-                        <AnimatedIcon
-                          icon="i-hugeicons:cancel-01"
-                          class="text-lightSlate-50 duration-50 z-10 cursor-pointer text-3xl transition ease-in-out hover:text-red-500"
+                        <div
+                          class="text-lightSlate-50 duration-50 z-10 cursor-pointer text-3xl transition ease-in-out hover:text-red-500 i-hugeicons:cancel-01"
                           classList={{
                             hidden: !editableName()
                           }}
@@ -676,7 +671,7 @@ const Instance = () => {
                           }
                         >
                           <div class="flex items-center gap-2">
-                            <AnimatedIcon icon="i-hugeicons:clock-01" class="text-lg" />
+                            <div class="i-hugeicons:clock-01 text-lg" />
                             <span class="whitespace-nowrap">
                               {convertSecondsToHumanTime(
                                 routeData.instanceDetails.data!.secondsPlayed
@@ -704,11 +699,11 @@ const Instance = () => {
                         >
                           <Switch>
                             <Match when={!isRunning()}>
-                              <AnimatedIcon icon="i-hugeicons:play" class="text-xl" />
+                              <div class="i-hugeicons:play text-xl" />
                               <Trans key="instance.play" />
                             </Match>
                             <Match when={isRunning()}>
-                              <AnimatedIcon icon="i-hugeicons:stop" class="text-xl" />
+                              <div class="i-hugeicons:stop text-xl" />
                               <Trans key="instance.stop" />
                             </Match>
                           </Switch>
@@ -752,7 +747,7 @@ const Instance = () => {
                 >
                   <Button
                     onClick={() => navigator.navigate("/library")}
-                    icon={<AnimatedIcon icon="i-hugeicons:arrow-left-01" class="text-2xl" />}
+                    icon={<div class="i-hugeicons:arrow-left-01 text-2xl" />}
                     size="small"
                     type="secondary"
                   >
@@ -798,11 +793,11 @@ const Instance = () => {
                 >
                   <Switch>
                     <Match when={!isRunning()}>
-                      <AnimatedIcon icon="i-hugeicons:play" class="text-base" />
+                      <div class="i-hugeicons:play text-base" />
                       <Trans key="instance.play" />
                     </Match>
                     <Match when={isRunning()}>
-                      <AnimatedIcon icon="i-hugeicons:stop" class="text-base" />
+                      <div class="i-hugeicons:stop text-base" />
                       <Trans key="instance.stop" />
                     </Match>
                   </Switch>
@@ -827,7 +822,7 @@ const Instance = () => {
                   }}
                 >
                   <div class="flex items-center gap-3">
-                    <AnimatedIcon icon="i-hugeicons:alert-01" class="text-2xl text-yellow-500" />
+                    <div class="i-hugeicons:alert-01 text-2xl text-yellow-500" />
                     <div>
                       <h3 class="m-0 mb-1 font-semibold text-yellow-200">
                         Duplicated Mods Detected
@@ -852,7 +847,7 @@ const Instance = () => {
                       )
                     }}
                   >
-                    <AnimatedIcon icon="i-hugeicons:magic-wand-01" />
+                    <div class="i-hugeicons:magic-wand-01" />
                     Fix Now
                   </Button>
                 </div>

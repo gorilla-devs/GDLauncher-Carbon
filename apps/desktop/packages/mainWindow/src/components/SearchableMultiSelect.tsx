@@ -1,4 +1,4 @@
-import { Input, AnimatedIcon } from "@gd/ui"
+import { Input } from "@gd/ui"
 import { For, Show, createSignal, createEffect, JSX } from "solid-js"
 import { VList } from "./VirtuaWrapper"
 
@@ -86,7 +86,7 @@ export function SearchableMultiSelect(props: SearchableMultiSelectProps) {
         }`}
       >
         <Show when={isSelected(option)}>
-          <AnimatedIcon icon="i-hugeicons:tick-02" size="h-3 w-3" class="text-white" />
+          <div class="i-hugeicons:tick-02 h-3 w-3 text-white" />
         </Show>
       </div>
 
@@ -119,7 +119,7 @@ export function SearchableMultiSelect(props: SearchableMultiSelectProps) {
               placeholder={props.searchPlaceholder || "Search..."}
               value={searchQuery()}
               onInput={(e) => setSearchQuery(e.target.value)}
-              icon={<AnimatedIcon icon="i-hugeicons:search-01" size="h-4 w-4" />}
+              icon={<div class="i-hugeicons:search-01 h-4 w-4" />}
               variant="transparent"
               onClick={(e) => {
                 e.stopPropagation()
@@ -142,7 +142,7 @@ export function SearchableMultiSelect(props: SearchableMultiSelectProps) {
               when={filteredOptions().length > 0}
               fallback={
                 <div class="text-lightSlate-400 flex flex-col items-center gap-2 px-2 py-3 text-center text-sm">
-                  <AnimatedIcon icon="i-hugeicons:search-remove" size="text-2xl" />
+                  <div class="i-hugeicons:search-remove text-2xl" />
                   <span>{props.emptyMessage || "No results found"}</span>
                 </div>
               }

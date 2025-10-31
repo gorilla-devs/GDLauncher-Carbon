@@ -6,8 +6,7 @@ import {
   SelectContent,
   SelectItem,
   SelectValue,
-  Input,
-  AnimatedIcon
+  Input
 } from "@gd/ui"
 import { For, Show } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
@@ -167,7 +166,7 @@ const ResourcePacks = () => {
         <div class="flex flex-wrap items-center justify-between gap-1 pb-4">
           <Input
             placeholder={t("general.type_here")}
-            icon={<AnimatedIcon icon="i-hugeicons:search-01" />}
+            icon={<div class="i-hugeicons:search-01" />}
             class="text-lightSlate-700 w-full rounded-full"
             inputClass=""
           />
@@ -224,7 +223,7 @@ const ResourcePacks = () => {
               />
             </div>
             <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
-              <AnimatedIcon icon="i-hugeicons:folder-open" size="text-2xl" />
+              <div class="i-hugeicons:folder-open text-2xl" />
               <Trans
                 key="instance.open_resource_packs_folder"
                 options={{
@@ -233,7 +232,7 @@ const ResourcePacks = () => {
               />
             </div>
             <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
-              <AnimatedIcon icon="i-hugeicons:unavailable" size="text-2xl" />
+              <div class="i-hugeicons:unavailable text-2xl" />
               <Trans
                 key="instance.disable_resource_pack"
                 options={{
@@ -242,7 +241,7 @@ const ResourcePacks = () => {
               />
             </div>
             <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
-              <AnimatedIcon icon="i-hugeicons:delete-02" size="text-2xl" />
+              <div class="i-hugeicons:delete-02 text-2xl" />
               <Trans
                 key="instance.delete_resource_pack"
                 options={{

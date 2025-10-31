@@ -2,7 +2,6 @@ import useSearchContext from "@/components/SearchInputContext"
 import { Show } from "solid-js"
 import { FilterBadge } from "./FilterBadge"
 import { capitalize } from "@/utils/helpers"
-import { AnimatedIcon } from "@gd/ui"
 
 export default function EnvironmentDisplay() {
   const searchContext = useSearchContext()
@@ -18,13 +17,13 @@ export default function EnvironmentDisplay() {
         }}
       >
         <div class="flex items-center gap-2">
-          <AnimatedIcon
-            icon={
-              searchContext?.searchQuery().environment === "server"
+          <div
+            class={
+              "h-4 w-4 " +
+              (searchContext?.searchQuery().environment === "server"
                 ? "i-hugeicons:server-stack-01"
-                : "i-hugeicons:computer"
+                : "i-hugeicons:computer")
             }
-            size="h-4 w-4"
           />
           {capitalize(searchContext?.searchQuery().environment)}
         </div>
