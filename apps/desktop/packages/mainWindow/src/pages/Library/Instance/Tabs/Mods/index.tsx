@@ -12,8 +12,8 @@ import {
 import { For, Show, createMemo, createSignal } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import Mod from "./Mod"
-import skull from "/assets/images/icons/skull.png"
 import { useParams, useRouteData } from "@solidjs/router"
+import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 import { rspc } from "@/utils/rspcClient"
 import { createStore, produce, reconcile } from "solid-js/store"
 import fetchData from "../../instance.data"
@@ -112,8 +112,11 @@ const Mods = () => {
   const NoMods = () => {
     return (
       <div class="min-h-90 flex h-full w-full items-center justify-center">
-        <div class="flex flex-col items-center justify-center text-center">
-          <img src={skull} class="h-16 w-16" />
+        <div class="flex flex-col items-center justify-center gap-6 text-center">
+          <PlaceholderGorilla
+            size={10}
+            variant="Confused Gorilla - Empty Chest"
+          />
           <p class="text-lightSlate-700 max-w-100">
             <Trans key="instance.no_mods_text" />
           </p>
@@ -236,7 +239,7 @@ const Mods = () => {
             <Tooltip placement="top">
               <TooltipTrigger>
                 <div class="text-lightSlate-700 flex cursor-pointer items-center gap-2">
-                  <span class="i-hugeicons:delete-02 text-2xl" />
+                  <div class="i-hugeicons:delete-02 text-2xl" />
                   <Trans key="instance.delete_mod" />
                 </div>
               </TooltipTrigger>
@@ -257,7 +260,7 @@ const Mods = () => {
                 })
               }}
             >
-              <span class="i-hugeicons:delete-02 text-2xl" />
+              <div class="i-hugeicons:delete-02 text-2xl" />
               <Trans key="instance.delete_mod" />
             </div>
           </Show>
@@ -268,7 +271,7 @@ const Mods = () => {
               <Tooltip placement="top">
                 <TooltipTrigger>
                   <div class="text-lightSlate-700 flex items-center gap-2">
-                    <span class="i-hugeicons:download-02 text-2xl" />
+                    <div class="i-hugeicons:download-02 text-2xl" />
                     <Trans key="instance.update_mods" />
                   </div>
                 </TooltipTrigger>
@@ -284,7 +287,7 @@ const Mods = () => {
                   updateSelectedMods()
                 }}
               >
-                <span class="i-hugeicons:download-02 text-2xl" />
+                <div class="i-hugeicons:download-02 text-2xl" />
                 <Trans key="instance.update_mods" />
               </div>
             </Show>
@@ -393,7 +396,7 @@ const Mods = () => {
                       updateAllMods()
                     }}
                   >
-                    <span class="i-hugeicons:download-02 text-2xl" />
+                    <div class="i-hugeicons:download-02 text-2xl" />
                     <div
                       classList={{
                         "w-0": isInstanceLocked()
@@ -426,7 +429,7 @@ const Mods = () => {
                     })
                   }}
                 >
-                  <span class="i-hugeicons:folder-open text-2xl" />
+                  <div class="i-hugeicons:folder-open text-2xl" />
                 </div>
               </TooltipTrigger>
               <TooltipContent class="max-w-38 overflow-hidden text-ellipsis">

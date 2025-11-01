@@ -51,7 +51,7 @@ const FeatureCard = (props: FeatureCardProps) => {
     >
       <div class="flex items-start gap-3">
         <div
-          class={`${getColor().icon} ${getColor().text} mt-1 h-5 w-5 shrink-0`}
+          class={`${getColor().icon} ${getColor().text} mt-1 shrink-0 h-5 w-5`}
         />
         <div class="flex-1">
           <h3 class="text-lightSlate-50 m-0 mb-2 text-base font-semibold">
@@ -74,6 +74,8 @@ interface HeroFeatureCardProps {
 }
 
 const HeroFeatureCard = (props: HeroFeatureCardProps) => {
+  const [mediaLoaded, setMediaLoaded] = createSignal(false)
+
   const getGradient = () => {
     switch (props.type) {
       case "new":
@@ -155,27 +157,44 @@ const HeroFeatureCard = (props: HeroFeatureCardProps) => {
 
         {/* Media Section */}
         <Show when={props.entry.media}>
-          <div class="relative flex items-center justify-center overflow-hidden rounded-xl p-6">
-            <Show
-              when={isVideo()}
-              fallback={
-                <img
+          <div class="relative overflow-hidden rounded-xl p-6">
+            <div class="relative aspect-[4/3] w-full">
+              {/* Loading skeleton - absolute positioned as background */}
+              <Show when={!mediaLoaded()}>
+                <div class="bg-darkSlate-700 absolute inset-0 animate-pulse rounded-lg" />
+              </Show>
+
+              {/* Media - absolute positioned on top */}
+              <Show
+                when={isVideo()}
+                fallback={
+                  <img
+                    src={props.entry.media}
+                    alt={props.entry.title}
+                    class="absolute inset-0 h-full w-full rounded-lg object-cover shadow-lg transition-opacity duration-500"
+                    classList={{
+                      "opacity-0": !mediaLoaded(),
+                      "opacity-100": mediaLoaded()
+                    }}
+                    onLoad={() => setMediaLoaded(true)}
+                  />
+                }
+              >
+                <video
                   src={props.entry.media}
-                  alt={props.entry.title}
-                  class="aspect-[4/3] w-full rounded-lg object-cover shadow-lg"
+                  autoplay
+                  loop
+                  muted
+                  playsinline
+                  class="absolute inset-0 h-full w-full rounded-lg object-cover shadow-lg transition-opacity duration-500"
+                  classList={{
+                    "opacity-0": !mediaLoaded(),
+                    "opacity-100": mediaLoaded()
+                  }}
+                  onLoadedData={() => setMediaLoaded(true)}
                 />
-              }
-            >
-              <video
-                // ref={videoRef}
-                src={props.entry.media}
-                autoplay
-                loop
-                muted
-                playsinline
-                class="aspect-[4/3] w-full rounded-lg object-cover shadow-lg"
-              />
-            </Show>
+              </Show>
+            </div>
           </div>
         </Show>
       </div>
@@ -183,7 +202,7 @@ const HeroFeatureCard = (props: HeroFeatureCardProps) => {
       {/* Decorative background element - only show when no media */}
       <Show when={!props.entry.media}>
         <div
-          class={`${getIcon()} ${getIconColor()} absolute -right-8 -top-8 h-32 w-32 opacity-10`}
+          class={`${getIcon()} ${getIconColor()} absolute -right-8 -top-8 opacity-10 h-32 w-32`}
         />
       </Show>
     </div>

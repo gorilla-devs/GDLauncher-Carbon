@@ -128,7 +128,7 @@ const PatchesTab = (props: PatchesTabProps) => {
                           </span>
                           <div class="text-primary-400 flex items-center text-sm opacity-0 transition-opacity group-hover:opacity-100">
                             <span class="mr-2 font-medium">Read More</span>
-                            <i class="i-hugeicons:arrow-right-01" />
+                            <div class="i-hugeicons:arrow-right-01 text-lg" />
                           </div>
                         </div>
                       </div>

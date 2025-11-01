@@ -44,7 +44,7 @@ export default function ModloadersDisplay() {
                 >
                   <Show when={shouldHideFilters()}>
                     <div class="absolute left-0 top-0 flex h-full w-full items-center justify-center rounded-[5px] bg-black/20">
-                      <div class="i-hugeicons:view-off-slash text-lightSlate-300 h-4 w-4 " />
+                      <div class="i-hugeicons:view-off-slash text-lightSlate-300 h-4 w-4" />
                     </div>
                   </Show>
                   <img class="h-4 w-4" src={getModloaderIcon(modloader)} />

@@ -3,6 +3,7 @@ import { Show, children } from "solid-js"
 import { JSX } from "solid-js/jsx-runtime"
 import { ModalProps, useModal } from "."
 import { useGDNavigate } from "../NavigationManager"
+import adSize from "@/utils/adhelper"
 
 interface Props extends ModalProps {
   children: JSX.Element | Element
@@ -27,7 +28,12 @@ const ModalLayout = (props: Props) => {
       class={`${props.height || ""} ${props.width || ""}`}
       classList={{
         "h-full": !props.height,
-        "h-auto": !props.width
+        "w-full": !props.width
+      }}
+      style={{
+        "max-width": props.width
+          ? `calc(100vw - ${adSize.width + 40}px)`
+          : undefined
       }}
       onClick={(e) => {
         e.stopPropagation()

@@ -4,6 +4,7 @@ import { For, Show, createEffect } from "solid-js"
 import { createStore } from "solid-js/store"
 import { format } from "date-fns"
 import { getTitleByDays } from "@/utils/helpers"
+import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 
 interface ScreenshotsType {
   img: string
@@ -40,8 +41,8 @@ const screenshots: ScreenshotsType[] = [
 const NoMods = () => {
   return (
     <div class="min-h-90 flex h-full w-full items-center justify-center">
-      <div class="flex flex-col items-center justify-center gap-4 text-center">
-        <div class="i-hugeicons:image-01 text-lightSlate-600 h-16 w-16" />
+      <div class="flex flex-col items-center justify-center gap-6 text-center">
+        <PlaceholderGorilla size={10} variant="Camera Gorilla - Photographer" />
         <p class="text-lightSlate-700 max-w-100">
           <Trans
             key="instance.no_screenshots_text"
@@ -114,7 +115,7 @@ const Screenshots = () => {
               />
             </div>
             <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
-              <span class="i-hugeicons:folder-open text-2xl" />
+              <div class="i-hugeicons:folder-open text-2xl" />
               <Trans
                 key="instance.open_screenshots_folder"
                 options={{
@@ -123,7 +124,7 @@ const Screenshots = () => {
               />
             </div>
             <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
-              <span class="i-hugeicons:unavailable text-2xl" />
+              <div class="i-hugeicons:unavailable text-2xl" />
               <Trans
                 key="instance.disable_screenshot"
                 options={{
@@ -132,7 +133,7 @@ const Screenshots = () => {
               />
             </div>
             <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
-              <span class="i-hugeicons:delete-02 text-2xl" />
+              <div class="i-hugeicons:delete-02 text-2xl" />
               <Trans
                 key="instance.delete_screenshot"
                 options={{
@@ -167,7 +168,7 @@ const Screenshots = () => {
                           <p class="text-lightSlate-700 text-md m-0">
                             {format(new Date(screenshot.date), "dd-MM-yyyy")}
                           </p>
-                          <div class="text-lightSlate-700 i-hugeicons:more-horizontal" />
+                          <div class="i-hugeicons:more-horizontal text-lightSlate-700" />
                         </div>
                       </div>
                     )}

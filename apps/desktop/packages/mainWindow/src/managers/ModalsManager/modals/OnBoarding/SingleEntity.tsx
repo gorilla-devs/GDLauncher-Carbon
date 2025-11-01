@@ -180,10 +180,10 @@ const SingleEntity = (props: {
             inputColor="bg-darkSlate-800"
             icon={
               <div
+                class="i-hugeicons:cancel-01 bg-darkSlate-50 hover:bg-white"
                 onClick={() => {
                   setPath("")
                 }}
-                class="i-hugeicons:cancel-01 bg-darkSlate-50 hover:bg-white"
               />
             }
           />
@@ -193,10 +193,10 @@ const SingleEntity = (props: {
                 <TooltipTrigger>
                   <div class="bg-darkSlate-800 text-lightSlate-700 hover:text-lightSlate-50 flex items-center justify-center rounded-lg p-2">
                     <div
+                      class="i-hugeicons:arrow-turn-backward text-xl"
                       onClick={async () => {
                         setPath(entityDefaultPath.data!)
                       }}
-                      class="i-hugeicons:arrow-turn-backward text-xl"
                     />
                   </div>
                 </TooltipTrigger>
@@ -210,6 +210,7 @@ const SingleEntity = (props: {
                 <TooltipTrigger>
                   <div class="bg-darkSlate-800 text-lightSlate-700 hover:text-lightSlate-50 flex items-center justify-center rounded-lg p-2">
                     <div
+                      class="i-hugeicons:folder-02"
                       onClick={async () => {
                         const result = await window.openFileDialog({
                           title: t("instance.select_path"),
@@ -223,7 +224,6 @@ const SingleEntity = (props: {
 
                         setPath(result.filePaths[0])
                       }}
-                      class="i-hugeicons:folder-01 text-xl"
                     />
                   </div>
                 </TooltipTrigger>
@@ -237,6 +237,7 @@ const SingleEntity = (props: {
                 <TooltipTrigger>
                   <div class="bg-darkSlate-800 text-lightSlate-700 hover:text-lightSlate-50 flex items-center justify-center rounded-lg p-2">
                     <div
+                      class="i-hugeicons:zip-02"
                       onClick={async () => {
                         const result = await window.openFileDialog({
                           title: t("instance.select_zip"),
@@ -260,7 +261,6 @@ const SingleEntity = (props: {
 
                         setPath(result.filePaths[0])
                       }}
-                      class="i-hugeicons:zip-01 text-xl"
                     />
                   </div>
                 </TooltipTrigger>

@@ -2,6 +2,7 @@ import { Trans } from "@gd/i18n"
 import { For, Match, Suspense, Switch, useContext } from "solid-js"
 import { Skeleton } from "@gd/ui"
 import { AddonContext } from "."
+import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 
 const Screenshots = () => {
   const mod = useContext(AddonContext)
@@ -30,12 +31,20 @@ const Screenshots = () => {
             </div>
           </Match>
           <Match when={(screenshots()?.length || 0) === 0 && !mod?.isLoading}>
-            <Trans
-              key="modpack.no_screenshot"
-              options={{
-                defaultValue: "No screenshots"
-              }}
-            />
+            <div class="flex flex-col items-center justify-center gap-6 py-12 text-center">
+              <PlaceholderGorilla
+                size={8}
+                variant="Gallery Gorilla - Empty Frame"
+              />
+              <p class="text-lightSlate-700 max-w-100">
+                <Trans
+                  key="modpack.no_screenshot"
+                  options={{
+                    defaultValue: "No screenshots"
+                  }}
+                />
+              </p>
+            </div>
           </Match>
           <Match when={mod?.isLoading}>
             <Skeleton.modpackScreenshotsPage />

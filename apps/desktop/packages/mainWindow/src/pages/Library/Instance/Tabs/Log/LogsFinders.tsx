@@ -69,11 +69,7 @@ const LogsFinders = (props: Props) => {
     <Popover open={props.open} gutter={4} placement="bottom">
       <PopoverTrigger as="div" onClick={() => props.setOpen(!props.open)}>
         <div
-          class="hover:bg-lightSlate-50 i-hugeicons:search-01 h-6 w-6 transition-colors duration-200 ease-in-out"
-          classList={{
-            "bg-lightSlate-50": props.open,
-            "bg-lightSlate-800": !props.open
-          }}
+          class={`i-hugeicons:search-01 hover:bg-lightSlate-50 transition-colors duration-200 ease-in-out h-6 w-6 ${props.open ? "bg-lightSlate-50" : "bg-lightSlate-800"}`}
         />
       </PopoverTrigger>
       <PopoverContent
@@ -96,11 +92,7 @@ const LogsFinders = (props: Props) => {
                   }
                 >
                   <div
-                    class="i-codicon:case-sensitive group-hover:bg-lightSlate-50 transition-colors duration-200 ease-in-out"
-                    classList={{
-                      "bg-lightSlate-50": props.query.matchCase,
-                      "bg-lightSlate-800": !props.query.matchCase
-                    }}
+                    class={`i-codicon:case-sensitive group-hover:bg-lightSlate-50 transition-colors duration-200 ease-in-out ${props.query.matchCase ? "bg-lightSlate-50" : "bg-lightSlate-800"}`}
                   />
                 </div>
                 <div
@@ -117,11 +109,7 @@ const LogsFinders = (props: Props) => {
                   }
                 >
                   <div
-                    class="i-codicon:whole-word group-hover:bg-lightSlate-50 transition-colors duration-200 ease-in-out"
-                    classList={{
-                      "bg-lightSlate-50": props.query.matchWholeWord,
-                      "bg-lightSlate-800": !props.query.matchWholeWord
-                    }}
+                    class={`i-codicon:whole-word group-hover:bg-lightSlate-50 transition-colors duration-200 ease-in-out ${props.query.matchWholeWord ? "bg-lightSlate-50" : "bg-lightSlate-800"}`}
                   />
                 </div>
                 <div
@@ -135,11 +123,7 @@ const LogsFinders = (props: Props) => {
                   }
                 >
                   <div
-                    class="i-codicon:regex group-hover:bg-lightSlate-50 transition-colors duration-200 ease-in-out"
-                    classList={{
-                      "bg-lightSlate-50": props.query.useRegex,
-                      "bg-lightSlate-800": !props.query.useRegex
-                    }}
+                    class={`i-codicon:regex group-hover:bg-lightSlate-50 transition-colors duration-200 ease-in-out ${props.query.useRegex ? "bg-lightSlate-50" : "bg-lightSlate-800"}`}
                   />
                 </div>
               </div>
@@ -166,15 +150,15 @@ const LogsFinders = (props: Props) => {
             </Switch>
           </div>
           <div
-            class="bg-lightSlate-800 hover:bg-lightSlate-50 i-hugeicons:arrow-up-01 h-4 w-4 transition-colors duration-200 ease-in-out"
+            class="i-hugeicons:arrow-up-01 bg-lightSlate-800 hover:bg-lightSlate-50 transition-colors duration-200 ease-in-out h-4 w-4"
             onClick={() => handleArrowClick("up")}
           />
           <div
-            class="bg-lightSlate-800 hover:bg-lightSlate-50 i-hugeicons:arrow-down-01 h-4 w-4 transition-colors duration-200 ease-in-out"
+            class="i-hugeicons:arrow-down-01 bg-lightSlate-800 hover:bg-lightSlate-50 transition-colors duration-200 ease-in-out h-4 w-4"
             onClick={() => handleArrowClick("down")}
           />
           <div
-            class="bg-lightSlate-800 hover:bg-lightSlate-50 i-hugeicons:cancel-01 h-4 w-4 transition-colors duration-200 ease-in-out"
+            class="i-hugeicons:cancel-01 bg-lightSlate-800 hover:bg-lightSlate-50 transition-colors duration-200 ease-in-out h-4 w-4"
             onClick={() => props.setOpen(false)}
           />
         </div>

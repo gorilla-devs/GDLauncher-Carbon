@@ -64,10 +64,10 @@ export const CacheStatusIcon = () => {
           <Tooltip>
             <TooltipTrigger>
               <div class="hover:text-lightSlate-100 relative cursor-pointer text-2xl transition-colors duration-200">
-                <div class="i-hugeicons:database-01" />
+                <div class="i-hugeicons:database-01 h-6 w-6" />
                 <Show when={hasActiveTasks()}>
-                  <div class="absolute bottom-0 left-0 animate-spin text-sm text-white">
-                    <div class="i-hugeicons:refresh" />
+                  <div class="absolute bottom-0 left-0 text-sm text-white">
+                    <div class="i-hugeicons:refresh h-4 w-4 animate-spin" />
                   </div>
                 </Show>
               </div>

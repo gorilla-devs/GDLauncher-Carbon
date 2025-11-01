@@ -71,7 +71,7 @@ const Version = (props: Props) => {
                 defaultValue: "Switch Version"
               }}
             />
-            <div class="text-darkSlate-300 i-hugeicons:download-02 group-hover:text-lightSlate-700 text-2xl" />
+            <div class="i-hugeicons:download-02 text-darkSlate-300 group-hover:text-lightSlate-700 text-2xl" />
           </div>
         </Show>
       </div>

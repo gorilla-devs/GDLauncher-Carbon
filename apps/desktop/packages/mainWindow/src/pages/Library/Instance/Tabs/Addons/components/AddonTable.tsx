@@ -1014,18 +1014,24 @@ export const AddonTable = (props: AddonTableProps) => {
                           <Show when={header.column.getCanSort()}>
                             <div class="flex flex-col">
                               <div
-                                class={`i-hugeicons:arrow-up-01 text-xs ${
-                                  header.column.getIsSorted() === "asc"
-                                    ? "text-blue-400"
-                                    : "text-lightSlate-500"
-                                }`}
+                                class="text-xs"
+                                classList={{
+                                  "i-hugeicons:arrow-up-01": true,
+                                  "text-blue-400":
+                                    header.column.getIsSorted() === "asc",
+                                  "text-lightSlate-500":
+                                    header.column.getIsSorted() !== "asc"
+                                }}
                               />
                               <div
-                                class={`i-hugeicons:arrow-down-01 -mt-1 text-xs ${
-                                  header.column.getIsSorted() === "desc"
-                                    ? "text-blue-400"
-                                    : "text-lightSlate-500"
-                                }`}
+                                class="-mt-1 text-xs"
+                                classList={{
+                                  "i-hugeicons:arrow-down-01": true,
+                                  "text-blue-400":
+                                    header.column.getIsSorted() === "desc",
+                                  "text-lightSlate-500":
+                                    header.column.getIsSorted() !== "desc"
+                                }}
                               />
                             </div>
                           </Show>
@@ -1148,7 +1154,9 @@ export const AddonTable = (props: AddonTableProps) => {
                                 fallback={
                                   <Show
                                     when={item.icon === "modrinth"}
-                                    fallback={<div class={item.icon} />}
+                                    fallback={
+                                      <div class={`${item.icon} h-4 w-4`} />
+                                    }
                                   >
                                     <img
                                       src={ModrinthLogo}
@@ -1175,7 +1183,7 @@ export const AddonTable = (props: AddonTableProps) => {
                       <ContextMenuSubTrigger class="data-[state=open]:bg-darkSlate-700 relative">
                         <div class="flex items-center gap-2">
                           <Show when={item.icon}>
-                            <div class={item.icon} />
+                            <div class={`${item.icon} h-4 w-4`} />
                           </Show>
                           <span>{item.label}</span>
                         </div>
@@ -1204,7 +1212,9 @@ export const AddonTable = (props: AddonTableProps) => {
                                             <Show
                                               when={child.icon === "modrinth"}
                                               fallback={
-                                                <div class={child.icon} />
+                                                <div
+                                                  class={`${child.icon} h-4 w-4`}
+                                                />
                                               }
                                             >
                                               <img

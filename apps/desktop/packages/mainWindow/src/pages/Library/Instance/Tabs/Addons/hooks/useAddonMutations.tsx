@@ -224,15 +224,16 @@ export const useAddonMutations = (
     const modName = mod.metadata?.name || mod.filename
 
     // If no platforms available, do nothing
-    if (!hasCurseforge && !hasModrinth) return
+    if (!hasCurseforge && !hasModrinth) {
+      return
+    }
 
     const navigateToVersions = (
       platform: "curseforge" | "modrinth",
       projectId: string | number
     ) => {
-      navigator.navigate(
-        `/addon/${projectId}/${platform}/versions?instanceId=${params.id}`
-      )
+      const url = `/addon/${projectId}/${platform}/versions?instanceId=${params.id}`
+      navigator.navigate(url)
     }
 
     // If both platforms exist, ask user which one to use

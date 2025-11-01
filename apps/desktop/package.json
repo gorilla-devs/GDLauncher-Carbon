@@ -48,8 +48,10 @@
     "@testing-library/jest-dom": "^5.16.5",
     "@types/lodash": "^4.17.20",
     "@types/marked": "^5.0.2",
+    "@types/qrcode": "^1.5.6",
     "@types/sanitize-html": "^2.9.1",
     "@unocss/reset": "^0.65.1",
+    "@xstate/solid": "^2.0.0",
     "date-fns": "^2.30.0",
     "dotenv": "^16.3.1",
     "electron": "37.2.6",
@@ -61,13 +63,15 @@
     "lodash": "^4.17.21",
     "marked": "^15.0.3",
     "playwright": "^1.49.1",
+    "qrcode": "^1.5.4",
     "sanitize-html": "^2.13.1",
     "solid-js": "^1.9.3",
     "solid-transition-group": "^0.2.3",
     "virtua": "0.41.2",
     "vite": "^6.3.4",
     "vite-plugin-solid": "^2.11.6",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "xstate": "^5.0.0"
   },
   "env": {
     "//": "Used in build scripts",

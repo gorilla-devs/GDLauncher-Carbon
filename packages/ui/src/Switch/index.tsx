@@ -131,8 +131,8 @@ function Switch(props: Props) {
         })}
       >
         {state().isLoading && (
-          <i
-            class="i-hugeicons:loading-03 absolute text-xs text-lightSlate-700 z-50 animate-spin"
+          <div
+            class="i-hugeicons:loading-03 text-xs absolute text-lightSlate-700 z-50 animate-spin"
             style={{ left: "calc(50% - 0.38rem)", top: "calc(50% - 0.38rem)" }}
           />
         )}

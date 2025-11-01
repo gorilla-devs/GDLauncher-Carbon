@@ -27,15 +27,16 @@ const ExportPath = () => {
           inputColor="bg-darkSlate-900"
           icon={
             <div
+              class="i-material-symbols:close"
               onClick={() => {
                 setPath("")
               }}
-              class="i-material-symbols:close"
             />
           }
         />
         <div class="flex items-center justify-center rounded-lg bg-[#1D2028] p-2">
           <div
+            class="i-material-symbols:folder-open-outline cursor-pointer text-2xl"
             onClick={async () => {
               const result = await window.showSaveDialog({
                 title: "Select Runtime Path",
@@ -61,7 +62,6 @@ const ExportPath = () => {
 
               setPayload({ ...payload, save_path: result.filePath })
             }}
-            class="i-material-symbols:folder-open-outline cursor-pointer text-2xl"
           />
         </div>
       </div>

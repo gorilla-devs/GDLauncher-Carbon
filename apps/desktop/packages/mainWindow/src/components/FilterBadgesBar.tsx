@@ -8,12 +8,11 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 
 export function FilterBadgesBar() {
   const isSearchPage = useMatch(() => "/search/*")
-  const isAddonPage = useMatch(() => "/addon/*")
   const searchContext = useSearchContext()
   const [t] = useTransContext()
   const navigator = useGDNavigate()
 
-  const isExpanded = () => !!(isSearchPage() || isAddonPage())
+  const isExpanded = () => !!isSearchPage()
 
   const hasActiveFilters = () => {
     const query = searchContext?.searchQuery()

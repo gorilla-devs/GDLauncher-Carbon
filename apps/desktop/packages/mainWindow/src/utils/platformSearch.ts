@@ -238,7 +238,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     return currentQuery
   }, null)
 
-  const allRows = (): SearchResultItem[] => {
+  const allRows = createMemo<SearchResultItem[]>(() => {
     const cfData =
       searchQuery().searchApi === "modrinth"
         ? []
@@ -278,7 +278,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     }
 
     return results
-  }
+  })
 
   const hasNextPage = createMemo(() => {
     if (searchQuery().searchApi === "curseforge") {

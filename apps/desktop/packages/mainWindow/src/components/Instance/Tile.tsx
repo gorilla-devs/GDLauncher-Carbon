@@ -212,26 +212,12 @@ const Tile = (props: Props) => {
               </ContextMenuGroupLabel>
               <ContextMenuSeparator />
               <ContextMenuItem
-                class="border-brands-bisecthosting text-brands-bisecthosting flex items-center gap-2 border-2 border-solid"
-                onClick={() => {
-                  modalsContext?.openModal({
-                    name: "bisectHostingAffiliate"
-                  })
-                }}
-              >
-                <div class="i-simple-icons:bisecthosting h-4 w-4" />
-                <Trans key="instance.action_create_server" />
-              </ContextMenuItem>
-              <ContextMenuSeparator />
-              <ContextMenuItem
                 class="flex items-center gap-2"
                 onClick={handlePlay}
                 disabled={isLoading() || isInQueue() || props.isDeleting}
               >
                 <div
-                  class={`h-4 w-4 ${
-                    props.isRunning ? "i-hugeicons:stop" : "i-hugeicons:play"
-                  }`}
+                  class={`${props.isRunning ? "i-hugeicons:stop" : "i-hugeicons:play"} h-4 w-4`}
                 />
                 {props.isRunning
                   ? t("instance.stop")
@@ -264,10 +250,9 @@ const Tile = (props: Props) => {
                 }}
               >
                 <div
-                  class="h-4 w-4"
+                  class="i-hugeicons:star h-4 w-4"
                   classList={{
-                    "text-yellow-500 i-hugeicons:star": props.instance.favorite,
-                    "i-hugeicons:star": !props.instance.favorite
+                    "text-yellow-500": props.instance.favorite
                   }}
                 />
                 {props.instance.favorite
@@ -432,7 +417,7 @@ const Tile = (props: Props) => {
                         </h2>
                         <div class="z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-l from-black from-30% opacity-50" />
                         <div class="z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-t from-black opacity-50" />
-                        <div class="i-hugeicons:alert-01 z-1 absolute right-1 top-1 text-2xl text-yellow-500" />
+                        <div class="i-hugeicons:alert-01 z-1 absolute right-1 top-1 text-2xl text-yellow-500 shrink-0" />
                       </Show>
                       <Show when={props.failError}>
                         <div
@@ -456,7 +441,7 @@ const Tile = (props: Props) => {
                           }
                         />
                         <div
-                          class="i-hugeicons:alert-01 z-1 absolute bottom-20 left-0 right-0 top-0 m-auto text-4xl text-red-500"
+                          class="i-hugeicons:alert-01 z-1 absolute bottom-20 left-0 right-0 top-0 m-auto text-4xl text-red-500 shrink-0"
                           style={
                             props.shouldSetViewTransition
                               ? {
@@ -630,10 +615,9 @@ const Tile = (props: Props) => {
                         }}
                       >
                         <div
-                          class="text-lightSlate-50"
+                          class={`${props.isRunning ? "i-hugeicons:stop" : "i-hugeicons:play"} text-lightSlate-50 shrink-0`}
                           classList={{
-                            "i-hugeicons:play": !props.isRunning,
-                            "i-hugeicons:stop text-xl": props.isRunning
+                            "text-xl": props.isRunning
                           }}
                         />
                       </div>
@@ -650,12 +634,11 @@ const Tile = (props: Props) => {
                         <Tooltip>
                           <TooltipTrigger>
                             <div
-                              class="h-6 w-6"
+                              class={`${copiedError() ? "i-hugeicons:tick-double-02" : "i-hugeicons:copy-01"} h-6 w-6 shrink-0`}
                               classList={{
-                                "text-lightSlate-700 hover:text-lightSlate-100 duration-100 ease-in-out i-hugeicons:copy-01":
+                                "text-lightSlate-700 hover:text-lightSlate-100 duration-100 ease-in-out":
                                   !copiedError(),
-                                "text-green-400 i-hugeicons:tick-double-02":
-                                  copiedError()
+                                "text-green-400": copiedError()
                               }}
                               onClick={(e) => {
                                 e.stopPropagation()

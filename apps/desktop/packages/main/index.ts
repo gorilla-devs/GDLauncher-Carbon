@@ -591,10 +591,11 @@ async function createWindow(): Promise<BrowserWindow> {
     }
 
     lastDisplay = currentDisplay
-    const { minWidth, minHeight, adSize } = getAdSize(currentDisplay)
+    const { minWidth, minHeight, adSize, bannerAdSize } =
+      getAdSize(currentDisplay)
     win?.setMinimumSize(minWidth, minHeight)
     win?.setSize(minWidth, minHeight)
-    win?.webContents?.send("adSizeChanged", adSize)
+    win?.webContents?.send("adSizeChanged", { adSize, bannerAdSize })
   })
 
   win.on("close", (e) => {
@@ -702,7 +703,8 @@ ipcMain.handle("relaunch", async () => {
 
 ipcMain.handle("getAdSize", async () => {
   const currentDisplay = screen.getDisplayMatching(win?.getBounds()!)
-  return getAdSize(currentDisplay).adSize
+  const { adSize, bannerAdSize } = getAdSize(currentDisplay)
+  return { adSize, bannerAdSize }
 })
 
 ipcMain.handle("openFileDialog", async (_, opts: OpenDialogOptions) => {
@@ -722,9 +724,9 @@ ipcMain.handle("openFolder", async (_, path) => {
 })
 
 ipcMain.handle("openCMPWindow", async () => {
-  // @ts-ignore
+  // @ts-ignore - Overwolf types not available
   if (app.overwolf.openCMPWindow) {
-    // @ts-ignore
+    // @ts-ignore - Overwolf types not available
     app.overwolf.openCMPWindow()
   }
 })
@@ -894,13 +896,29 @@ app.whenReady().then(async () => {
     }
   )
 
-  app.on("second-instance", (_e, _argv) => {
+  app.on("second-instance", (_e, argv) => {
+    // Handle protocol URLs on Windows (passed as command line arguments)
+    const protocolUrl = argv.find((arg) => arg.startsWith("gdlauncher://"))
+
     if (win && !win.isDestroyed()) {
       // Focus on the main window if the user tried to open another
       if (win.isMinimized()) win.restore()
       win.focus()
+
+      // Forward protocol URL if present
+      if (protocolUrl) {
+        console.log("Protocol URL received via second-instance:", protocolUrl)
+        win.webContents.send("protocol-url", protocolUrl)
+      }
     } else {
       createWindow()
+
+      // If window was just created, wait a bit for it to be ready
+      if (protocolUrl && win) {
+        setTimeout(() => {
+          win?.webContents.send("protocol-url", protocolUrl)
+        }, 1000)
+      }
     }
   })
 
@@ -928,11 +946,12 @@ app.whenReady().then(async () => {
 
       lastDisplay = currentDisplay
 
-      const { minWidth, minHeight } = getAdSize(currentDisplay)
+      const { minWidth, minHeight, adSize, bannerAdSize } =
+        getAdSize(currentDisplay)
       if (changedMetrics.includes("workArea")) {
         win?.setMinimumSize(minWidth, minHeight)
         win?.setSize(minWidth, minHeight)
-        win?.webContents.send("adSizeChanged", getAdSize().adSize)
+        win?.webContents.send("adSizeChanged", { adSize, bannerAdSize })
       }
     }
   )
@@ -980,5 +999,24 @@ app.on("render-process-gone", (event, webContents, detailed) => {
 })
 
 app.on("open-url", (event, url) => {
-  dialog.showErrorBox("Welcome Back", `You arrived from: ${url}`)
+  console.log("Protocol URL received:", url)
+
+  // Handle gdlauncher:// protocol URLs
+  if (url.startsWith("gdlauncher://")) {
+    event.preventDefault()
+
+    // Focus the window if minimized
+    if (win && !win.isDestroyed()) {
+      if (win.isMinimized()) win.restore()
+      win.focus()
+
+      // Forward the protocol URL to the renderer process
+      win.webContents.send("protocol-url", url)
+    } else {
+      // Window not ready yet, store the URL for later
+      // This can happen if the app is launched via protocol before window is created
+      console.log("Window not ready, storing protocol URL for later")
+      // You could implement a queue here if needed
+    }
+  }
 })

@@ -34,8 +34,8 @@ import {
 } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import InstanceTile from "@/components/InstanceTile"
-import skull from "/assets/images/icons/skull.png"
 import UnstableCard from "@/components/UnstableCard"
+import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 import {
   InstancesGroupBy,
   InstancesSortBy,
@@ -319,8 +319,11 @@ const HomeGrid = () => {
             !globalStore.instances.isLoading
           }
         >
-          <div class="mt-12 flex h-full w-full flex-col items-center justify-center">
-            <img src={skull} class="h-16 w-16" />
+          <div class="mt-12 flex h-full w-full flex-col items-center justify-center gap-6">
+            <PlaceholderGorilla
+              size={14}
+              variant="Welcoming Gorilla - Open Arms"
+            />
             <p class="text-lightSlate-700 max-w-100 text-center">
               <Trans key="instance.no_instances_text" />
             </p>
@@ -345,10 +348,10 @@ const HomeGrid = () => {
                   <Switch>
                     <Match when={filter()}>
                       <div
+                        class="hover:bg-white i-hugeicons:cancel-01"
                         onClick={() => {
                           setFilter("")
                         }}
-                        class="i-hugeicons:cancel-01 hover:bg-white"
                       />
                     </Match>
                     <Match when={!filter()}>
@@ -360,7 +363,7 @@ const HomeGrid = () => {
               <DropdownMenu>
                 <DropdownMenuTrigger>
                   <Button type="secondary" size="small">
-                    <i class="i-hugeicons:filter h-4 w-4" />
+                    <div class="i-hugeicons:filter h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent class="w-64">
@@ -443,15 +446,7 @@ const HomeGrid = () => {
                             </span>
                             {globalStore.settings.data?.instancesSortBy && (
                               <div
-                                class="ml-2 h-4 w-4"
-                                classList={{
-                                  "i-hugeicons:arrange-by-letters-a-z":
-                                    globalStore.settings.data
-                                      ?.instancesSortByAsc,
-                                  "i-hugeicons:arrange-by-letters-z-a":
-                                    !globalStore.settings.data
-                                      ?.instancesSortByAsc
-                                }}
+                                class={`ml-2 h-4 w-4 ${globalStore.settings.data?.instancesSortByAsc ? "i-hugeicons:arrange-by-letters-a-z" : "i-hugeicons:arrange-by-letters-z-a"}`}
                               />
                             )}
                           </div>
@@ -504,15 +499,7 @@ const HomeGrid = () => {
                                     {globalStore.settings.data
                                       ?.instancesSortBy === option.key && (
                                       <div
-                                        class="ml-4 h-4 w-4"
-                                        classList={{
-                                          "i-hugeicons:arrange-by-letters-a-z":
-                                            globalStore.settings.data
-                                              ?.instancesSortByAsc,
-                                          "i-hugeicons:arrange-by-letters-z-a":
-                                            !globalStore.settings.data
-                                              ?.instancesSortByAsc
-                                        }}
+                                        class={`ml-4 h-4 w-4 ${globalStore.settings.data?.instancesSortByAsc ? "i-hugeicons:arrange-by-letters-a-z" : "i-hugeicons:arrange-by-letters-z-a"}`}
                                       />
                                     )}
                                   </div>
@@ -538,15 +525,7 @@ const HomeGrid = () => {
                             </span>
                             {globalStore.settings.data?.instancesGroupBy && (
                               <div
-                                class="ml-2 h-4 w-4"
-                                classList={{
-                                  "i-hugeicons:arrange-by-letters-a-z":
-                                    globalStore.settings.data
-                                      ?.instancesGroupByAsc,
-                                  "i-hugeicons:arrange-by-letters-z-a":
-                                    !globalStore.settings.data
-                                      ?.instancesGroupByAsc
-                                }}
+                                class={`ml-2 h-4 w-4 ${globalStore.settings.data?.instancesGroupByAsc ? "i-hugeicons:arrange-by-letters-a-z" : "i-hugeicons:arrange-by-letters-z-a"}`}
                               />
                             )}
                           </div>
@@ -600,15 +579,7 @@ const HomeGrid = () => {
                                     {globalStore.settings.data
                                       ?.instancesGroupBy === option.key && (
                                       <div
-                                        class="ml-4 h-4 w-4"
-                                        classList={{
-                                          "i-hugeicons:arrange-by-letters-a-z":
-                                            globalStore.settings.data
-                                              ?.instancesGroupByAsc,
-                                          "i-hugeicons:arrange-by-letters-z-a":
-                                            !globalStore.settings.data
-                                              ?.instancesGroupByAsc
-                                        }}
+                                        class={`ml-4 h-4 w-4 ${globalStore.settings.data?.instancesGroupByAsc ? "i-hugeicons:arrange-by-letters-a-z" : "i-hugeicons:arrange-by-letters-z-a"}`}
                                       />
                                     )}
                                   </div>

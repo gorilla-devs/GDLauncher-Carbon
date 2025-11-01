@@ -1,6 +1,7 @@
 /* @refresh reload */
 import { render } from "solid-js/web"
 import {
+  createContext,
   createEffect,
   createResource,
   createSignal,
@@ -8,7 +9,8 @@ import {
   JSX,
   Match,
   Show,
-  Switch
+  Switch,
+  useContext
 } from "solid-js"
 import { createAsyncEffect } from "@/utils/asyncEffect"
 import { Router, hashIntegration } from "@solidjs/router"
@@ -18,15 +20,22 @@ import App from "@/app"
 import { ModalProvider } from "@/managers/ModalsManager"
 import "virtual:uno.css"
 import "@gd/ui/style.css"
-import { ContextMenuProvider, Progress, Toaster } from "@gd/ui"
+import { ContextMenuProvider, Toaster } from "@gd/ui"
 import "@unocss/reset/tailwind.css"
 import { NavigationManager } from "./managers/NavigationManager"
 // import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
 import RiveAppWapper from "./utils/RiveAppWrapper"
 import GDAnimation from "./gd_logo_animation.riv"
 import { GlobalStoreProvider } from "./components/GlobalStoreContext"
-import PatternBackground from "./components/PatternBackground"
-import gdlauncherLogo from "/assets/images/gdlauncher_wide_logo_blue.svg"
+import AuthLoadingOverlay from "./pages/Login/AuthLoadingOverlay"
+import { isSpecialOccasion } from "@/utils/occasions"
+
+const BackendReadyContext = createContext<boolean>(false)
+
+export const useBackendReady = () => {
+  const context = useContext(BackendReadyContext)
+  return context
+}
 
 const ProdWrapErrorBoundary = (props: { children: JSX.Element }) => {
   return (
@@ -126,13 +135,8 @@ render(() => {
   createEffect(() => {
     if (!isIntroAnimationFinished()) return
 
-    const minLoadingTime = 2500
+    const minLoadingTime = 3000
     const timeElapsed = Date.now() - startTime
-
-    // DEV ONLY
-    if (import.meta.env.DEV && coreModuleLoaded.state === "ready") {
-      setIsReady(true)
-    }
 
     if (coreModuleLoaded.state === "ready" && timeElapsed >= minLoadingTime) {
       setIsReady(true)
@@ -143,7 +147,7 @@ render(() => {
     }
   })
 
-  // Check if we can skip login screen
+  // Smart auth bypass: Skip login screen for logged-in users (unless special occasion)
   createAsyncEffect(async () => {
     if (coreModuleLoaded.state === "ready" && coreModuleLoaded()) {
       const port = coreModuleLoaded() as unknown as number
@@ -154,14 +158,28 @@ render(() => {
         const activeUuid = await client.query(["account.getActiveUuid"])
         const accounts = await client.query(["account.getAccounts"])
 
-        // Skip login if user is already set up
+        // Check if it's a special occasion
+        const isOccasion = isSpecialOccasion()
+
+        // Skip directly to library if:
+        // 1. User is fully set up (has accounts, terms accepted, made GDL account decision)
+        // 2. AND it's NOT a special occasion (we want to show seasonal splash during occasions)
         if (
           settings.termsAndPrivacyAccepted &&
           activeUuid &&
           accounts.length > 0 &&
-          (settings.gdlAccountId || settings.gdlAccountId === "")
+          settings.gdlAccountId != null &&
+          !isOccasion
         ) {
+          console.log(
+            "[Auth Bypass] Skipping to library (logged in, no occasion)"
+          )
           window.location.hash = "#/library"
+        } else if (accounts.length > 0 && isOccasion) {
+          console.log(
+            "[Auth Bypass] Will show seasonal splash (logged in + occasion)"
+          )
+          // Let InnerApp/LoginContainer handle seasonal splash
         }
       } catch (e) {
         console.error("Error checking login status:", e)
@@ -175,37 +193,18 @@ render(() => {
         <Match when={isIntroAnimationFinished()}>
           <Switch>
             <Match when={isReady()}>
-              <InnerApp port={coreModuleLoaded() as unknown as number} />
+              <InnerApp
+                port={coreModuleLoaded() as unknown as number}
+                isBackendReady={true}
+              />
               <Toaster />
             </Match>
             <Match when={!isReady()}>
-              <PatternBackground>
-                <div class="flex h-screen w-screen flex-col items-center justify-center gap-8">
-                  <Show when={Date.now() - startTime > 5000}>
-                    <div class="text-xl">
-                      {
-                        // Hardcoded because we don't know the language at this point
-                        "App initialization is taking longer than expected. Please wait for up to 2 minutes."
-                      }
-                    </div>
-                  </Show>
-
-                  <div class="overflow-visible">
-                    <img
-                      src={gdlauncherLogo}
-                      class="animate-logoReveal opacity-0"
-                      style={{ "animation-delay": "1000ms" }}
-                    />
-                  </div>
-
-                  <div class="w-1/3">
-                    <Progress
-                      color="bg-blue-500"
-                      value={coreModuleProgress() ?? 0}
-                    />
-                  </div>
-                </div>
-              </PatternBackground>
+              <AuthLoadingOverlay
+                progress={coreModuleProgress() ?? 0}
+                status={null}
+                visible={true}
+              />
             </Match>
           </Switch>
         </Match>
@@ -226,6 +225,7 @@ render(() => {
 
 interface InnerAppProps {
   port: number
+  isBackendReady: boolean
 }
 
 const InnerApp = (props: InnerAppProps) => {
@@ -233,13 +233,17 @@ const InnerApp = (props: InnerAppProps) => {
 
   return (
     <rspc.Provider client={client} queryClient={queryClient}>
-      <TransWrapper createInvalidateQuery={createInvalidateQuery} />
+      <TransWrapper
+        createInvalidateQuery={createInvalidateQuery}
+        isBackendReady={props.isBackendReady}
+      />
     </rspc.Provider>
   )
 }
 
 interface TransWrapperProps {
   createInvalidateQuery: () => void
+  isBackendReady: boolean
 }
 
 const _i18nInstance = i18n.use(icu).createInstance()
@@ -344,17 +348,19 @@ const TransWrapper = (props: TransWrapperProps) => {
   return (
     <Show when={!settings.isInitialLoading && isI18nReady()}>
       <TransProvider instance={_i18nInstance}>
-        <Router source={hashIntegration()}>
-          <GlobalStoreProvider>
-            <NavigationManager>
-              <ContextMenuProvider>
-                <ModalProvider>
-                  <App createInvalidateQuery={props.createInvalidateQuery} />
-                </ModalProvider>
-              </ContextMenuProvider>
-            </NavigationManager>
-          </GlobalStoreProvider>
-        </Router>
+        <BackendReadyContext.Provider value={props.isBackendReady}>
+          <Router source={hashIntegration()}>
+            <GlobalStoreProvider>
+              <NavigationManager>
+                <ContextMenuProvider>
+                  <ModalProvider>
+                    <App createInvalidateQuery={props.createInvalidateQuery} />
+                  </ModalProvider>
+                </ContextMenuProvider>
+              </NavigationManager>
+            </GlobalStoreProvider>
+          </Router>
+        </BackendReadyContext.Provider>
       </TransProvider>
     </Show>
   )

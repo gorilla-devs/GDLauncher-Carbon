@@ -89,7 +89,6 @@ interface Theme {
 
   font: string
   "font-mono": string
-  "ads-sidebar-background": string
   "additional-styles": string
 }
 

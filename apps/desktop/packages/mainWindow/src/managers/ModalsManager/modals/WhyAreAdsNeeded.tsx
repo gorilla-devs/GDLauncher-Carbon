@@ -2,6 +2,7 @@ import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
 import { Trans } from "@gd/i18n"
 import { Button } from "@gd/ui"
+import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 
 const WhyAreAdsNeeded = (props: ModalProps) => {
   const modalsContext = useModal()
@@ -15,6 +16,14 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
     >
       <div class="h-full overflow-y-auto">
         <div class="space-y-6 px-8 py-6">
+          {/* Gorilla Mascot */}
+          <div class="flex justify-center">
+            <PlaceholderGorilla
+              size={8}
+              variant="Thoughtful Gorilla - Explaining Support"
+            />
+          </div>
+
           {/* Hero Introduction */}
           <div class="bg-darkSlate-700/50 border-darkSlate-600 flex items-start gap-6 rounded-lg border p-6">
             <div class="bg-darkSlate-800 border-primary-500/30 flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 shadow-[0_0_20px_rgba(139,92,246,0.2)]">
@@ -37,7 +46,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
               {/* Card 1 - Minecraft Updates */}
               <div class="bg-darkSlate-800 border-darkSlate-600 group flex flex-col items-center gap-3 rounded-lg border p-4 transition-all duration-300 hover:border-emerald-500/30">
                 <div class="bg-darkSlate-700 flex h-14 w-14 items-center justify-center rounded-xl border border-emerald-500/30 transition-transform duration-200 group-hover:scale-110">
-                  <div class="i-hugeicons:rocket-01 text-[2rem] text-emerald-500" />
+                  <div class="i-hugeicons:rocket-01 text-emerald-500 text-[2rem]" />
                 </div>
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
                   <Trans key="ads.paragraph-2-list-element-1" />
@@ -57,7 +66,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
               {/* Card 3 - Enhancement */}
               <div class="bg-darkSlate-800 border-darkSlate-600 group flex flex-col items-center gap-3 rounded-lg border p-4 transition-all duration-300 hover:border-blue-500/30">
                 <div class="bg-darkSlate-700 flex h-14 w-14 items-center justify-center rounded-xl border border-blue-500/30 transition-transform duration-200 group-hover:scale-110">
-                  <div class="i-hugeicons:sparkles text-[2rem] text-blue-500" />
+                  <div class="i-hugeicons:sparkles text-blue-500 text-[2rem]" />
                 </div>
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
                   <Trans key="ads.paragraph-2-list-element-3" />
@@ -76,7 +85,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
               {/* Card 1 - Team Support */}
               <div class="bg-darkSlate-800 border-darkSlate-600 group flex flex-col items-center gap-3 rounded-lg border p-4 transition-all duration-300 hover:border-purple-500/30">
                 <div class="bg-darkSlate-700 flex h-14 w-14 items-center justify-center rounded-xl border border-purple-500/30 transition-transform duration-200 group-hover:scale-110">
-                  <div class="i-hugeicons:user-multiple-02 text-[2rem] text-purple-500" />
+                  <div class="i-hugeicons:user-multiple-02 text-purple-500 text-[2rem]" />
                 </div>
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
                   <Trans key="ads.paragraph-3-list-element-1" />
@@ -86,7 +95,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
               {/* Card 2 - Research & Innovation */}
               <div class="bg-darkSlate-800 border-darkSlate-600 group flex flex-col items-center gap-3 rounded-lg border p-4 transition-all duration-300 hover:border-cyan-500/30">
                 <div class="bg-darkSlate-700 flex h-14 w-14 items-center justify-center rounded-xl border border-cyan-500/30 transition-transform duration-200 group-hover:scale-110">
-                  <div class="i-hugeicons:bulb text-[2rem] text-cyan-500" />
+                  <div class="i-hugeicons:bulb text-cyan-500 text-[2rem]" />
                 </div>
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
                   <Trans key="ads.paragraph-3-list-element-2" />
@@ -96,7 +105,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
               {/* Card 3 - Full-time Development */}
               <div class="bg-darkSlate-800 border-darkSlate-600 group flex flex-col items-center gap-3 rounded-lg border p-4 transition-all duration-300 hover:border-pink-500/30">
                 <div class="bg-darkSlate-700 flex h-14 w-14 items-center justify-center rounded-xl border border-pink-500/30 transition-transform duration-200 group-hover:scale-110">
-                  <div class="i-hugeicons:clock-01 text-[2rem] text-pink-500" />
+                  <div class="i-hugeicons:clock-01 text-pink-500 text-[2rem]" />
                 </div>
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
                   <Trans key="ads.paragraph-3-list-element-3" />

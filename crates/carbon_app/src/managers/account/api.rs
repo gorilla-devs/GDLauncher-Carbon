@@ -367,7 +367,7 @@ pub enum XboxError {
     #[error("no xbox account is associated with this microsoft account")]
     NoAccount,
 
-    #[error("xbox live is not availible in this country")]
+    #[error("xbox live is not available in this country")]
     XboxServicesBanned,
 
     #[error("this xbox account must be verified as an adult")]
@@ -389,6 +389,99 @@ impl XboxError {
             2148916236 | 2148916237 => Self::AdultVerificationRequired,
             2148916238 => Self::ChildAccount,
             xerr => Self::Unknown(xerr),
+        }
+    }
+
+    /// Get a user-friendly title for the error
+    pub fn title(&self) -> &'static str {
+        match self {
+            Self::NoAccount => "No Xbox Account Found",
+            Self::XboxServicesBanned => "Xbox Live Not Available",
+            Self::AdultVerificationRequired => "Adult Verification Required",
+            Self::ChildAccount => "Child Account Detected",
+            Self::Unknown(_) => "Xbox Authentication Error",
+        }
+    }
+
+    /// Get a detailed, user-friendly description of the error
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::NoAccount => {
+                "Your Microsoft account is not linked to an Xbox account. An Xbox account is required to play Minecraft."
+            }
+            Self::XboxServicesBanned => {
+                "Xbox Live services are not available in your region. Unfortunately, this prevents authentication with Minecraft."
+            }
+            Self::AdultVerificationRequired => {
+                "Your Xbox account requires adult verification before it can be used with Minecraft. This is a security requirement from Microsoft."
+            }
+            Self::ChildAccount => {
+                "Your Xbox account is registered as a child account and must be part of a Microsoft Family before it can access Minecraft. This is a safety feature from Microsoft."
+            }
+            Self::Unknown(code) => {
+                "An unexpected error occurred during Xbox authentication. This might be a temporary issue with Xbox Live services."
+            }
+        }
+    }
+
+    /// Get suggested recovery steps for the user
+    pub fn recovery_steps(&self) -> Vec<&'static str> {
+        match self {
+            Self::NoAccount => vec![
+                "Visit xbox.com and create a free Xbox account",
+                "Sign in with the same Microsoft account you used here",
+                "Complete the Xbox account setup process",
+                "Return to GDLauncher and try signing in again",
+            ],
+            Self::XboxServicesBanned => vec![
+                "Check if Xbox Live is available in your country",
+                "Try using a VPN to connect to a region where Xbox Live is available (use at your own discretion)",
+                "Contact Xbox Support for information about availability in your region",
+            ],
+            Self::AdultVerificationRequired => vec![
+                "Visit xbox.com and sign in to your account",
+                "Follow the adult verification process in your account settings",
+                "You may need to provide proof of age",
+                "Return to GDLauncher and try signing in again",
+            ],
+            Self::ChildAccount => vec![
+                "Ask your parent or guardian to add your account to their Microsoft Family",
+                "Visit account.microsoft.com/family to set up family management",
+                "Your parent/guardian will need to approve Minecraft access",
+                "Return to GDLauncher and try signing in again",
+            ],
+            Self::Unknown(_) => vec![
+                "Wait a few minutes and try again",
+                "Check Xbox Live service status at xbox.com/status",
+                "Try signing out of all Microsoft services and signing back in",
+                "Restart GDLauncher and try again",
+            ],
+        }
+    }
+
+    /// Get a support link for this error
+    pub fn support_link(&self) -> &'static str {
+        match self {
+            Self::NoAccount => "https://www.xbox.com/signup",
+            Self::XboxServicesBanned => {
+                "https://support.xbox.com/help/account-profile/manage-account/xbox-live-available-countries"
+            }
+            Self::AdultVerificationRequired => {
+                "https://support.xbox.com/help/account-profile/manage-account/verify-age-adult-account"
+            }
+            Self::ChildAccount => "https://account.microsoft.com/family/about",
+            Self::Unknown(_) => "https://support.xbox.com/help/errors/error-code-search",
+        }
+    }
+
+    /// Get the error code if available (for logging/debugging)
+    pub fn error_code(&self) -> Option<u32> {
+        match self {
+            Self::NoAccount => Some(2148916233),
+            Self::XboxServicesBanned => Some(2148916235),
+            Self::AdultVerificationRequired => Some(2148916236), // or 2148916237
+            Self::ChildAccount => Some(2148916238),
+            Self::Unknown(code) => Some(*code),
         }
     }
 }
@@ -569,6 +662,155 @@ pub async fn get_profile(
     }
 }
 
+/// Check if a Minecraft username is available
+pub async fn check_username_available(
+    client: &ClientWithMiddleware,
+    access_token: &str,
+    username: &str,
+) -> anyhow::Result<bool> {
+    #[derive(Debug, Deserialize)]
+    struct AvailabilityResponse {
+        status: String,
+    }
+
+    let response = client
+        .get(format!(
+            "https://api.minecraftservices.com/minecraft/profile/name/{}/available",
+            username
+        ))
+        .bearer_auth(access_token)
+        .send()
+        .await
+        .with_context(|| format!("Failed to check username availability"))?;
+
+    let availability = response
+        .json::<AvailabilityResponse>()
+        .await
+        .map_err(RequestError::from_error)?;
+
+    Ok(availability.status == "AVAILABLE")
+}
+
+/// Create a new Minecraft profile with the given username
+pub async fn create_profile(
+    client: &ClientWithMiddleware,
+    access_token: &str,
+    username: &str,
+) -> anyhow::Result<Result<McProfile, CreateProfileError>> {
+    #[derive(Debug, Serialize)]
+    struct CreateProfileRequest {
+        #[serde(rename = "profileName")]
+        profile_name: String,
+    }
+
+    let body = CreateProfileRequest {
+        profile_name: username.to_string(),
+    };
+
+    let body_str = serde_json::to_string(&body)?;
+
+    let response = client
+        .post("https://api.minecraftservices.com/minecraft/profile")
+        .bearer_auth(access_token)
+        .header("Content-Type", "application/json")
+        .body(reqwest::Body::from(body_str))
+        .send()
+        .await
+        .with_context(|| format!("Failed to create profile"))?;
+
+    match response.status() {
+        StatusCode::OK => {
+            #[derive(Debug, Deserialize)]
+            struct McProfileResponse {
+                id: String,
+                name: String,
+                skins: Vec<Skin>,
+            }
+
+            #[derive(Debug, Deserialize)]
+            struct Skin {
+                id: String,
+                state: String,
+                url: String,
+            }
+
+            let response = response
+                .json::<McProfileResponse>()
+                .await
+                .map_err(RequestError::from_error)?;
+
+            let skin = response
+                .skins
+                .into_iter()
+                .find(|skin| skin.state == "ACTIVE")
+                .map(|skin| McSkin {
+                    id: skin.id,
+                    url: skin.url,
+                });
+
+            Ok(Ok(McProfile {
+                uuid: response.id,
+                username: response.name,
+                skin,
+            }))
+        }
+        StatusCode::BAD_REQUEST => Ok(Err(CreateProfileError::InvalidUsername)),
+        StatusCode::FORBIDDEN => Ok(Err(CreateProfileError::NameNotAvailable)),
+        _ => bail!(RequestError::from_status(&response)),
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum CreateProfileError {
+    InvalidUsername,
+    NameNotAvailable,
+}
+
+impl CreateProfileError {
+    /// Get a user-friendly title for the error
+    pub fn title(&self) -> &'static str {
+        match self {
+            Self::InvalidUsername => "Invalid Username",
+            Self::NameNotAvailable => "Username Taken",
+        }
+    }
+
+    /// Get a detailed, user-friendly description of the error
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::InvalidUsername => {
+                "The username you chose doesn't meet Minecraft's requirements. Usernames must be 3-16 characters long and can only contain letters, numbers, and underscores."
+            }
+            Self::NameNotAvailable => {
+                "This username is already taken by another player. Please choose a different username."
+            }
+        }
+    }
+
+    /// Get suggested recovery steps for the user
+    pub fn recovery_steps(&self) -> Vec<&'static str> {
+        match self {
+            Self::InvalidUsername => vec![
+                "Make sure your username is 3-16 characters long",
+                "Use only letters (a-z, A-Z), numbers (0-9), and underscores (_)",
+                "Don't use spaces or special characters",
+                "Try a different username",
+            ],
+            Self::NameNotAvailable => vec![
+                "Try adding numbers to your desired username",
+                "Try a variation of your desired name",
+                "Be creative - make it unique!",
+                "Check https://namemc.com to see if a username is available",
+            ],
+        }
+    }
+
+    /// Get a support link for this error
+    pub fn support_link(&self) -> &'static str {
+        "https://help.minecraft.net/hc/en-us/articles/4409152531341-Minecraft-Profile-Troubleshooting"
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum McEntitlement {
     Owned,
@@ -590,9 +832,88 @@ pub enum GetProfileError {
     AuthTokenInvalid,
 }
 
+impl GetProfileError {
+    /// Get a user-friendly title for the error
+    pub fn title(&self) -> &'static str {
+        match self {
+            Self::GameProfileMissing => "Profile Creation Required",
+            Self::AuthTokenInvalid => "Authentication Expired",
+        }
+    }
+
+    /// Get a detailed, user-friendly description of the error
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::GameProfileMissing => {
+                "Your account needs a Minecraft profile to continue. This is a quick one-time setup where you choose your username."
+            }
+            Self::AuthTokenInvalid => {
+                "Your authentication has expired or become invalid. This can happen after extended periods of time or security changes."
+            }
+        }
+    }
+
+    /// Get suggested recovery steps for the user
+    pub fn recovery_steps(&self) -> Vec<&'static str> {
+        match self {
+            Self::GameProfileMissing => vec![
+                "Choose a unique username for your Minecraft profile",
+                "The username must be 3-16 characters long",
+                "Only letters, numbers, and underscores are allowed",
+                "Your profile will be created automatically once you choose a name",
+            ],
+            Self::AuthTokenInvalid => vec![
+                "Sign out and sign back in to refresh your authentication",
+                "Make sure you're using the correct Microsoft account",
+                "If the problem persists, try restarting GDLauncher",
+            ],
+        }
+    }
+
+    /// Get a support link for this error
+    pub fn support_link(&self) -> &'static str {
+        match self {
+            Self::GameProfileMissing => {
+                "https://help.minecraft.net/hc/en-us/articles/4409152531341-Minecraft-Profile-Troubleshooting"
+            }
+            Self::AuthTokenInvalid => {
+                "https://help.minecraft.net/hc/en-us/articles/4409159214605-Microsoft-Authentication-Issues"
+            }
+        }
+    }
+}
+
 #[derive(Error, Debug)]
 #[error("no game entitlement")]
 pub struct McEntitlementMissingError;
+
+impl McEntitlementMissingError {
+    /// Get a user-friendly title for the error
+    pub fn title(&self) -> &'static str {
+        "Minecraft Not Owned"
+    }
+
+    /// Get a detailed, user-friendly description of the error
+    pub fn description(&self) -> &'static str {
+        "Your Microsoft account does not own Minecraft: Java Edition. You need to purchase the game or have an active Xbox Game Pass subscription to play."
+    }
+
+    /// Get suggested recovery steps for the user
+    pub fn recovery_steps(&self) -> Vec<&'static str> {
+        vec![
+            "Visit minecraft.net to purchase Minecraft: Java Edition",
+            "Check if you have an active Xbox Game Pass subscription",
+            "Make sure you're signed in with the correct Microsoft account",
+            "If you recently purchased the game, wait 10-15 minutes and try again",
+            "Contact Minecraft Support if you believe you should have access",
+        ]
+    }
+
+    /// Get a support link for this error
+    pub fn support_link(&self) -> &'static str {
+        "https://www.minecraft.net/get-minecraft"
+    }
+}
 
 #[derive(Error, Debug, Clone)]
 pub enum McEntitlementError {

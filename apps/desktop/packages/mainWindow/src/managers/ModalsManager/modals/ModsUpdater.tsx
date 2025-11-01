@@ -96,7 +96,7 @@ const AppUpdate = (props: ModalProps) => {
               mod_name: currentModName()
             }}
           />
-          <i class="i-hugeicons:loading-03 mt-10 animate-spin text-6xl" />
+          <div class="i-hugeicons:loading-03 mt-10 animate-spin text-6xl" />
         </div>
       </div>
     </ModalLayout>

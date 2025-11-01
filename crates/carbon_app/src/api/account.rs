@@ -43,6 +43,14 @@ pub(super) fn mount() -> RouterBuilder<App> {
             app.account_manager().begin_enrollment().await
         }
 
+        mutation ENROLL_BEGIN_BROWSER[app, open_browser: bool] {
+            app.account_manager().begin_enrollment_browser(open_browser).await
+        }
+
+        mutation ENROLL_PROTOCOL_CALLBACK[app, protocol_url: String] {
+            app.account_manager().handle_protocol_callback(protocol_url).await
+        }
+
         mutation ENROLL_CANCEL[app, args: ()] {
             app.account_manager().cancel_enrollment().await
         }
@@ -59,6 +67,10 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         mutation ENROLL_FINALIZE[app, args: ()] {
             app.account_manager().finalize_enrollment().await
+        }
+
+        mutation ENROLL_RESUME[app, args: ()] {
+            app.account_manager().resume_enrollment().await
         }
 
         mutation REFRESH_ACCOUNT[app, uuid: String] {
@@ -133,6 +145,18 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         mutation UPLOAD_PROFILE_ICON[app, args: FEUploadProfileIcon] {
             app.account_manager().upload_profile_icon(args.uuid, args.icon_path).await
+        }
+
+        mutation CHECK_USERNAME_AVAILABLE[app, args: FECheckUsernameAvailability] {
+            app.account_manager()
+                .check_username_available(args.access_token, args.username)
+                .await
+        }
+
+        mutation CREATE_PROFILE[app, args: FECreateProfile] {
+            app.account_manager()
+                .create_minecraft_profile(args.access_token, args.username)
+                .await
         }
     }
 }
@@ -226,10 +250,18 @@ enum EnrollmentStatus {
     RefreshingMSAuth,
     RequestingCode,
     PollingCode(DeviceCode),
+    WaitingForBrowser {
+        auth_url: String,
+        redirect_uri: String,
+        expires_at: DateTime<Utc>,
+    },
     McLogin,
     XboxAuth,
     MCEntitlements,
     McProfile,
+    NeedsProfileCreation {
+        access_token: String,
+    },
     Complete(AccountEntry),
     Failed(EnrollmentError),
 }
@@ -244,10 +276,28 @@ struct DeviceCode {
 
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]
-enum EnrollmentError {
+struct EnrollmentError {
+    /// Short error identifier for programmatic handling
+    error_type: EnrollmentErrorType,
+    /// User-friendly error title
+    title: String,
+    /// Detailed error description
+    description: String,
+    /// List of suggested recovery steps
+    recovery_steps: Vec<String>,
+    /// Link to support documentation
+    support_link: String,
+    /// Original Xbox error if applicable
+    #[serde(skip_serializing_if = "Option::is_none")]
+    xbox_error: Option<XboxError>,
+}
+
+#[derive(Type, Serialize)]
+#[serde(rename_all = "camelCase")]
+enum EnrollmentErrorType {
     DeviceCodeExpired,
     /// signing in with xbox has returned an error
-    XboxAccount(XboxError),
+    XboxAccount,
     /// the user does not own the game OR is using xbox gamepass (this is not checked yet)
     NoGameOwnership,
     /// the user needs to log in once on the offical mc launcher
@@ -314,10 +364,22 @@ impl From<&account::EnrollmentStatus> for Result<EnrollmentStatus, FeError> {
             BE::RefreshingMSAuth => Api::RefreshingMSAuth,
             BE::RequestingCode => Api::RequestingCode,
             BE::PollingCode(code) => Api::PollingCode(code.clone().into()),
+            BE::WaitingForBrowser {
+                auth_url,
+                redirect_uri,
+                expires_at,
+            } => Api::WaitingForBrowser {
+                auth_url: auth_url.clone(),
+                redirect_uri: redirect_uri.clone(),
+                expires_at: *expires_at,
+            },
             &BE::McLogin => Api::McLogin,
             &BE::XboxAuth => Api::XboxAuth,
             &BE::MCEntitlements => Api::MCEntitlements,
             &BE::McProfile => Api::McProfile,
+            BE::NeedsProfileCreation { access_token, .. } => Api::NeedsProfileCreation {
+                access_token: access_token.clone(),
+            },
             BE::Complete(account) => Api::Complete({
                 // this is bad, but it used to be far worse
                 let account: account::FullAccount = account.clone().into();
@@ -346,10 +408,38 @@ impl From<account::EnrollmentError> for EnrollmentError {
         use account::EnrollmentError as BE;
 
         match value {
-            BE::DeviceCodeExpired => Self::DeviceCodeExpired,
-            BE::XboxError(e) => Self::XboxAccount(e),
-            BE::EntitlementMissing => Self::NoGameOwnership,
-            BE::GameProfileMissing => Self::NoGameProfile,
+            BE::DeviceCodeExpired => Self {
+                error_type: EnrollmentErrorType::DeviceCodeExpired,
+                title: value.title().to_string(),
+                description: value.description(),
+                recovery_steps: value.recovery_steps(),
+                support_link: value.support_link().to_string(),
+                xbox_error: None,
+            },
+            BE::XboxError(e) => Self {
+                error_type: EnrollmentErrorType::XboxAccount,
+                title: value.title().to_string(),
+                description: value.description(),
+                recovery_steps: value.recovery_steps(),
+                support_link: value.support_link().to_string(),
+                xbox_error: Some(e),
+            },
+            BE::EntitlementMissing => Self {
+                error_type: EnrollmentErrorType::NoGameOwnership,
+                title: value.title().to_string(),
+                description: value.description(),
+                recovery_steps: value.recovery_steps(),
+                support_link: value.support_link().to_string(),
+                xbox_error: None,
+            },
+            BE::GameProfileMissing => Self {
+                error_type: EnrollmentErrorType::NoGameProfile,
+                title: value.title().to_string(),
+                description: value.description(),
+                recovery_steps: value.recovery_steps(),
+                support_link: value.support_link().to_string(),
+                xbox_error: None,
+            },
         }
     }
 }
@@ -506,4 +596,18 @@ pub struct FEChangeGdlAccountNickname {
 pub struct FEUploadProfileIcon {
     pub uuid: String,
     pub icon_path: String,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FECheckUsernameAvailability {
+    pub access_token: String,
+    pub username: String,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FECreateProfile {
+    pub access_token: String,
+    pub username: String,
 }

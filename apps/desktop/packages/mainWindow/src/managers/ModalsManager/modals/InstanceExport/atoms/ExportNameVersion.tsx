@@ -8,12 +8,12 @@ export const ExportNameVersion = () => {
       <span>{t("instance.instance_name")}</span>
       <Input
         inputColor="bg-darkSlate-900"
-        icon={<div onClick={() => {}} class="i-material-symbols:close" />}
+        icon={<div class="i-material-symbols:close" onClick={() => {}} />}
       />
       <span>{t("instance.version")}</span>
       <Input
         inputColor="bg-darkSlate-900"
-        icon={<div onClick={() => {}} class="i-material-symbols:close" />}
+        icon={<div class="i-material-symbols:close" onClick={() => {}} />}
       />
     </div>
   )

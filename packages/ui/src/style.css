@@ -78,3 +78,30 @@ a {
   background: rgb(var(--darkSlate-500));
   animation: skeleton-pulse 1.2s ease-in-out infinite;
 }
+
+/* Animate icons when parent button/tab/input is hovered */
+.animate-icons-on-hover [class*="i-hugeicons:"],
+.animate-icons-on-hover img {
+  transition: transform 0.25s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  will-change: transform;
+  overflow: visible;
+}
+
+.animate-icons-on-hover:hover [class*="i-hugeicons:"],
+.animate-icons-on-hover:hover img,
+.animate-icons-on-hover:focus [class*="i-hugeicons:"],
+.animate-icons-on-hover:focus img,
+.animate-icons-on-hover:focus-visible [class*="i-hugeicons:"],
+.animate-icons-on-hover:focus-visible img,
+.tab-selected [class*="i-hugeicons:"],
+.tab-selected img {
+  transform: rotate(12deg) scale(1.1);
+}
+
+.animate-icons-on-hover:active [class*="i-hugeicons:"],
+.animate-icons-on-hover:active img {
+  transform: rotate(12deg) scale(1.1);
+}
+
+/* Respect potato PC mode (performance mode) - disabled by .potato-pc class on body */
+/* Note: .potato-pc already sets transition: none !important on all elements */

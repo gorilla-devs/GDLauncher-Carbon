@@ -131,11 +131,11 @@ const LogsSidebar = (props: LogsSidebarProps) => {
           <Trans key="logs.all_sessions" />
         </div>
         <div
-          class="text-lightSlate-600 hover:text-lightSlate-50 h-6 w-6 duration-100 ease-in-out"
-          classList={{
-            "i-hugeicons:sort-by-up-01": sortDirection() === "asc",
-            "i-hugeicons:sort-by-down-01": sortDirection() === "desc"
-          }}
+          class={`h-6 w-6 text-lightSlate-600 hover:text-lightSlate-50 duration-100 ease-in-out ${
+            sortDirection() === "asc"
+              ? "i-hugeicons:sort-by-up-01"
+              : "i-hugeicons:sort-by-down-01"
+          }`}
           onClick={() => {
             if (sortDirection() === "asc") {
               setSortDirection("desc")

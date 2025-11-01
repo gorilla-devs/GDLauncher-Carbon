@@ -18,11 +18,12 @@ export default function EnvironmentDisplay() {
       >
         <div class="flex items-center gap-2">
           <div
-            class={`h-4 w-4 ${
-              searchContext?.searchQuery().environment === "server"
+            class={
+              "h-4 w-4 " +
+              (searchContext?.searchQuery().environment === "server"
                 ? "i-hugeicons:server-stack-01"
-                : "i-hugeicons:computer"
-            }`}
+                : "i-hugeicons:computer")
+            }
           />
           {capitalize(searchContext?.searchQuery().environment)}
         </div>

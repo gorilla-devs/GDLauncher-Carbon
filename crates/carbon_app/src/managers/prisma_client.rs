@@ -173,7 +173,7 @@ async fn seed_init_db(db_client: &PrismaClient, gdl_base_api: String) -> Result<
 
     let should_force_release_channel =
         if APP_VERSION.contains("alpha") && !is_equal_to_current_version {
-            true  // Always force to alpha if running alpha
+            true // Always force to alpha if running alpha
         } else if APP_VERSION.contains("beta") && !is_equal_to_current_version {
             // Only force to beta if current channel is stable
             // Don't force down from alpha to beta

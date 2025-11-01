@@ -329,7 +329,7 @@ const Mod = (props: Props) => {
           <Show when={props.mod.is_duplicate}>
             <Tooltip>
               <TooltipTrigger>
-                <i class="i-hugeicons:alert-01 h-5 w-5 text-yellow-500" />
+                <div class="i-hugeicons:alert-01 h-5 w-5 text-yellow-500" />
               </TooltipTrigger>
               <TooltipContent>
                 <Trans key="instance.duplicate_mod_warning" />
@@ -339,7 +339,7 @@ const Mod = (props: Props) => {
           <Show when={props.mod.has_update && props.isInstanceLocked}>
             <Tooltip>
               <TooltipTrigger class="max-w-38 flex overflow-hidden text-ellipsis">
-                <i class="text-lightSlate-700 i-hugeicons:download-02 h-5 w-5" />
+                <div class="i-hugeicons:download-02 h-5 w-5 text-lightSlate-700" />
               </TooltipTrigger>
               <TooltipContent>
                 <Trans key="instance.locked_cannot_apply_changes" />
@@ -369,8 +369,8 @@ const Mod = (props: Props) => {
                   />
                 }
               > */}
-              <i
-                class="i-hugeicons:download-02 text-lightSlate-700 hover:text-green-500 flex h-5 w-5"
+              <div
+                class="text-lightSlate-700 hover:text-green-500 flex h-5 w-5 i-hugeicons:download-02"
                 onClick={(e) => {
                   e.stopPropagation()
                   updateModMutation.mutate({
@@ -417,7 +417,7 @@ const Mod = (props: Props) => {
             <Tooltip>
               <TooltipTrigger>
                 <div
-                  class="text-lightSlate-700 i-hugeicons:delete-02 text-2xl duration-100 ease-in-out"
+                  class="text-lightSlate-700 text-2xl duration-100 ease-in-out i-hugeicons:delete-02"
                   onClick={(e) => {
                     e.stopPropagation()
 
@@ -437,7 +437,7 @@ const Mod = (props: Props) => {
           </Show>
           <Show when={!props.isInstanceLocked}>
             <div
-              class="text-lightSlate-700 i-hugeicons:delete-02 transition-color text-2xl duration-100 ease-in-out hover:text-red-500"
+              class="text-lightSlate-700 transition-color text-2xl duration-100 ease-in-out hover:text-red-500 i-hugeicons:delete-02"
               onClick={(e) => {
                 e.stopPropagation()
 
@@ -457,7 +457,7 @@ const Mod = (props: Props) => {
             >
               <PopoverTrigger>
                 <div
-                  class="text-lightSlate-700 i-hugeicons:information-circle transition-color hover:text-lightSlate-50 cursor-pointer text-2xl duration-100 ease-in-out"
+                  class="text-lightSlate-700 transition-color hover:text-lightSlate-50 cursor-pointer text-2xl duration-100 ease-in-out i-hugeicons:information-circle"
                   classList={{
                     "text-lightSlate-50": isHoveringInfoCard()
                   }}
@@ -676,7 +676,7 @@ const Mod = (props: Props) => {
             <Popover placement="left">
               <PopoverTrigger>
                 <div
-                  class="text-lightSlate-700 transition-color hover:text-lightSlate-50 i-hugeicons:more-horizontal cursor-pointer text-2xl duration-100 ease-in-out"
+                  class="text-lightSlate-700 transition-color hover:text-lightSlate-50 cursor-pointer text-2xl duration-100 ease-in-out i-hugeicons:more-horizontal"
                   classList={{
                     "text-lightSlate-50": isHoveringOptionsCard()
                   }}

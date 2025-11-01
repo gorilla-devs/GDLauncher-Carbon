@@ -294,7 +294,7 @@ const CacheStatusPopover: Component<CacheStatusPopoverProps> = (props) => {
                 <div class="py-12 text-center">
                   <div class="mb-4 flex justify-center">
                     <div class="bg-lightSlate-800/30 rounded-full p-4">
-                      <div class="i-hugeicons:tick-double-02 text-lightSlate-400 text-3xl" />
+                      <div class="i-hugeicons:tick-double-02 text-3xl text-lightSlate-400" />
                     </div>
                   </div>
                   <h4 class="text-lightSlate-300 mb-2 font-medium">

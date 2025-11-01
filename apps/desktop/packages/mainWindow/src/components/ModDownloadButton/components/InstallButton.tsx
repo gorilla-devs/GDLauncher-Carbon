@@ -53,7 +53,7 @@ export const InstallButton = (props: InstallButtonProps) => {
               </Match>
               <Match when={!props.instanceLocked() && !props.fileId}>
                 <div class="flex items-center gap-1.5">
-                  <div class="i-hugeicons:download-02" />
+                  <div class="i-hugeicons:download-02 h-5 w-5" />
                   <Trans key="instance.download" />
                 </div>
               </Match>
@@ -66,13 +66,13 @@ export const InstallButton = (props: InstallButtonProps) => {
                 }
               >
                 <div class="flex items-center gap-1.5">
-                  <div class="i-hugeicons:download-02" />
+                  <div class="i-hugeicons:download-02 h-5 w-5" />
                   <Trans key="instance.switch_version" />
                 </div>
               </Match>
               <Match when={!props.instanceLocked() && props.fileId}>
                 <div class="flex items-center gap-1.5">
-                  <div class="i-hugeicons:download-02" />
+                  <div class="i-hugeicons:download-02 h-5 w-5" />
                   <Trans key="instance.download_version" />
                 </div>
               </Match>

@@ -100,8 +100,6 @@ const pixelato: Theme = {
 
   font: "Monocraft",
   "font-mono": "Monocraft",
-  "ads-sidebar-background":
-    "linear-gradient(180deg, rgb(76, 175, 80) 0%, rgb(27, 94, 32) 100%)",
   "additional-styles": additionalStyles
 }
 

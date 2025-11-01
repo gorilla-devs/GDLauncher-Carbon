@@ -163,7 +163,7 @@ const Overview = () => {
                     }}
                   >
                     <Trans key="instance.modpack_open_website" />
-                    <i class="i-hugeicons:link-square-02" />
+                    <div class="i-hugeicons:link-square-02" />
                   </Button>
                   <Button
                     rounded={false}
@@ -181,7 +181,7 @@ const Overview = () => {
                     }}
                   >
                     <Trans key="instance.modpack_view" />
-                    <i class="i-hugeicons:arrow-right-01 h-4 w-4" />
+                    <div class="i-hugeicons:arrow-right-01 h-4 w-4" />
                   </Button>
                 </div>
               </div>

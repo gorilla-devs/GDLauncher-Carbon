@@ -267,7 +267,7 @@ export const AccountsDropdown = (props: Props) => {
               }}
             >
               <div
-                class="i-hugeicons:settings-01 pointer-events-auto text-2xl"
+                class="i-hugeicons:settings-01 text-2xl pointer-events-auto"
                 classList={{
                   "text-lightSlate-50": !!props.disabled,
                   "hover:text-lightSlate-100 duration-100 ease-in-out":

@@ -20,6 +20,11 @@ const changelogs: Changelog = {
         "https://cdn.gdl.gg/launcher/changelog/2.0.26/addons-browser-overhaul.mp4"
     },
     {
+      title: "Redesigned Authentication Flow",
+      description:
+        "Completely redesigned authentication experience with a new welcome screen, separate terms and privacy step, QR code support for device code authentication, and clearer step-by-step progression through the sign-in process."
+    },
+    {
       title: "Duplicated Mods Resolution Wizard",
       description:
         "New multi-step wizard automatically detects and helps resolve duplicate mods in your instances. Choose to disable or delete duplicate versions with a comprehensive summary before applying changes."
@@ -116,6 +121,11 @@ const changelogs: Changelog = {
       title: "Redesigned Instance Creation Modal",
       description:
         "Improved interface for creating new instances with a cleaner, more intuitive design and better user experience."
+    },
+    {
+      title: "Fully Internationalized Authentication",
+      description:
+        "All authentication flow text is now fully translatable, including welcome messages, terms and privacy notices, error messages, and helper text, making the sign-in experience accessible to users worldwide."
     },
     {
       title: "Instance Addons Management Overhaul",

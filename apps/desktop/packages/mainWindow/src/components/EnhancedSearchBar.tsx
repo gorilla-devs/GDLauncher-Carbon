@@ -17,7 +17,7 @@ export function EnhancedSearchBar() {
   // Optimistic expansion state for instant feedback
   const [optimisticExpand, setOptimisticExpand] = createSignal(false)
 
-  // Keep expanded on both search and addon pages
+  // Keep expanded on search pages and addon pages
   const isExpanded = () =>
     !!(isSearchPage() || isAddonPage() || optimisticExpand())
 
@@ -52,7 +52,7 @@ export function EnhancedSearchBar() {
       }}
       classList={{
         "w-80 px-4": !isExpanded(),
-        "w-[600px] px-2": isExpanded()
+        "w-full max-w-[600px] px-2": isExpanded()
       }}
     >
       <div
@@ -108,7 +108,7 @@ export function EnhancedSearchBar() {
         }
       >
         <div
-          class="i-hugeicons:cancel-01 text-darkSlate-500 cursor-pointer text-lg transition-colors duration-200 ease-in-out hover:text-white"
+          class="i-hugeicons:cancel-01 text-lg text-darkSlate-500 cursor-pointer transition-colors duration-200 ease-in-out hover:text-white"
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()

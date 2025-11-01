@@ -44,6 +44,8 @@ use super::{AppInner, AppRef, ManagerRef};
 pub mod api;
 mod enroll;
 pub mod gdl_account;
+mod oauth_server;
+pub mod protocol_handler;
 pub mod skin;
 
 pub(crate) struct AccountManager {
@@ -54,6 +56,8 @@ pub(crate) struct AccountManager {
     skin_manager: SkinManager,
 
     gdl_account_task: GDLAccountTask,
+    /// Protocol handler for gdlauncher:// OAuth callbacks
+    protocol_handler: protocol_handler::ProtocolHandler,
 }
 
 impl AccountManager {
@@ -65,6 +69,7 @@ impl AccountManager {
             skin_manager: SkinManager {},
 
             gdl_account_task: GDLAccountTask::new(client, gdl_base_api),
+            protocol_handler: protocol_handler::ProtocolHandler::new(),
         }
     }
 }
@@ -510,6 +515,33 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .await
     }
 
+    pub async fn check_username_available(
+        self,
+        access_token: String,
+        username: String,
+    ) -> anyhow::Result<bool> {
+        api::check_username_available(&self.app.reqwest_client, &access_token, &username).await
+    }
+
+    pub async fn create_minecraft_profile(
+        self,
+        access_token: String,
+        username: String,
+    ) -> anyhow::Result<()> {
+        let result =
+            api::create_profile(&self.app.reqwest_client, &access_token, &username).await?;
+
+        match result {
+            Ok(_) => Ok(()),
+            Err(api::CreateProfileError::InvalidUsername) => {
+                bail!("InvalidUsername")
+            }
+            Err(api::CreateProfileError::NameNotAvailable) => {
+                bail!("NameNotAvailable")
+            }
+        }
+    }
+
     /// Add or update an account
     async fn add_account(self, account: FullAccount) -> anyhow::Result<()> {
         use db::account::{SetParam, UniqueWhereParam};
@@ -757,7 +789,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             (Some(gdl_account), _) if gdl_account == uuid => {
                 self.remove_gdl_account().await?;
             }
-            (_, 0) => {
+            (_, 1) => {
                 self.remove_gdl_account().await?;
             }
             _ => {}
@@ -790,34 +822,74 @@ impl<'s> ManagerRef<'s, AccountManager> {
     }
 
     pub async fn begin_enrollment(self) -> anyhow::Result<()> {
-        match &mut *self.active_enrollment.write().await {
-            Some(_) => bail!(BeginEnrollmentStatusError::InProgress),
-            enrollment @ None => {
-                let retry_policy = ExponentialBackoff::builder().build_with_max_retries(10);
-                let reqwest_client = Client::builder().build()?;
-                let client = ClientBuilder::new(reqwest_client)
-                    .with(RetryTransientMiddleware::new_with_policy(retry_policy))
-                    .build();
+        let mut enrollment_lock = self.active_enrollment.write().await;
 
-                struct Invalidator(AppRef);
+        // Automatically cancel any existing enrollment
+        if enrollment_lock.is_some() {
+            info!("Auto-canceling previous enrollment before starting new device code enrollment");
+            enrollment_lock.take();
+        }
 
-                #[async_trait]
-                impl InvalidateCtx for Invalidator {
-                    async fn invalidate(&self) {
-                        self.0.upgrade().invalidate(ENROLL_GET_STATUS, None);
-                    }
-                }
+        let retry_policy = ExponentialBackoff::builder().build_with_max_retries(10);
+        let reqwest_client = Client::builder().build()?;
+        let client = ClientBuilder::new(reqwest_client)
+            .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+            .build();
 
-                info!("Beginning account enrollment");
+        struct Invalidator(AppRef);
 
-                let active_enrollment =
-                    EnrollmentTask::begin(client, Invalidator(AppRef(Arc::downgrade(self.app))));
-
-                *enrollment = Some(active_enrollment);
-                self.app.invalidate(ENROLL_GET_STATUS, None);
-                Ok(())
+        #[async_trait]
+        impl InvalidateCtx for Invalidator {
+            async fn invalidate(&self) {
+                self.0.upgrade().invalidate(ENROLL_GET_STATUS, None);
             }
         }
+
+        info!("Beginning account enrollment (device code)");
+
+        let active_enrollment =
+            EnrollmentTask::begin(client, Invalidator(AppRef(Arc::downgrade(self.app))));
+
+        *enrollment_lock = Some(active_enrollment);
+        self.app.invalidate(ENROLL_GET_STATUS, None);
+        Ok(())
+    }
+
+    pub async fn begin_enrollment_browser(self, open_browser: bool) -> anyhow::Result<()> {
+        let mut enrollment_lock = self.active_enrollment.write().await;
+
+        // Automatically cancel any existing enrollment
+        if enrollment_lock.is_some() {
+            info!("Auto-canceling previous enrollment before starting new browser enrollment");
+            enrollment_lock.take();
+        }
+
+        let retry_policy = ExponentialBackoff::builder().build_with_max_retries(10);
+        let reqwest_client = Client::builder().build()?;
+        let client = ClientBuilder::new(reqwest_client)
+            .with(RetryTransientMiddleware::new_with_policy(retry_policy))
+            .build();
+
+        struct Invalidator(AppRef);
+
+        #[async_trait]
+        impl InvalidateCtx for Invalidator {
+            async fn invalidate(&self) {
+                self.0.upgrade().invalidate(ENROLL_GET_STATUS, None);
+            }
+        }
+
+        info!("Beginning account enrollment (browser)");
+
+        let active_enrollment = EnrollmentTask::begin_browser(
+            client,
+            Invalidator(AppRef(Arc::downgrade(self.app))),
+            open_browser,
+        );
+
+        *enrollment_lock = Some(active_enrollment);
+        self.app.invalidate(ENROLL_GET_STATUS, None);
+        Ok(())
     }
 
     pub async fn cancel_enrollment(self) -> anyhow::Result<()> {
@@ -830,6 +902,32 @@ impl<'s> ManagerRef<'s, AccountManager> {
             Some(_) => Ok(()),
             None => bail!(CancelEnrollmentStatusError::NotActive),
         }
+    }
+
+    /// Handle an OAuth callback from the custom protocol (gdlauncher://oauth/callback)
+    ///
+    /// This stores the callback for consumption by an active enrollment task.
+    /// The frontend should call this when Electron's 'open-url' event fires.
+    pub async fn handle_protocol_callback(self, protocol_url: String) -> anyhow::Result<()> {
+        info!("Received protocol callback");
+
+        // Parse and store the callback
+        self.protocol_handler.handle_callback(&protocol_url).await?;
+
+        info!("Protocol callback stored successfully");
+        Ok(())
+    }
+
+    /// Check if there's a pending protocol OAuth callback
+    pub async fn has_protocol_callback(self) -> bool {
+        self.protocol_handler.has_pending_code().await
+    }
+
+    /// Retrieve and consume a pending protocol OAuth callback
+    ///
+    /// Returns None if no callback is pending
+    pub async fn take_protocol_callback(self) -> Option<protocol_handler::ProtocolOAuthCallback> {
+        self.protocol_handler.take_pending_code().await
     }
 
     pub async fn get_enrollment_status<T>(
@@ -863,6 +961,72 @@ impl<'s> ManagerRef<'s, AccountManager> {
                     }
                     _ => bail!(FinalizeEnrollmentError::NotComplete),
                 }
+            }
+        }
+    }
+
+    pub async fn resume_enrollment(self) -> anyhow::Result<()> {
+        let enrollment_opt = self.active_enrollment.read().await;
+
+        let enrollment = match &*enrollment_opt {
+            None => bail!(ResumeEnrollmentError::NotActive),
+            Some(enrollment) => enrollment,
+        };
+
+        let mut status_lock = enrollment.status.write().await;
+        let status = mem::replace(&mut *status_lock, EnrollmentStatus::RequestingCode);
+
+        match status {
+            EnrollmentStatus::NeedsProfileCreation {
+                access_token,
+                ms_auth,
+                mc_auth,
+                entitlements,
+            } => {
+                // Update status to indicate we're fetching the profile
+                *status_lock = EnrollmentStatus::McProfile;
+                drop(status_lock);
+                drop(enrollment_opt);
+
+                // Fetch the profile again (should succeed now that user created it)
+                let mc_profile = api::get_profile(&self.app.reqwest_client, &access_token)
+                    .await?
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to get profile after creation: {:?}", e)
+                    })?;
+
+                let account = api::McAccount {
+                    entitlement: entitlements,
+                    profile: mc_profile,
+                    auth: mc_auth,
+                };
+
+                let full_account = api::FullAccount {
+                    ms: ms_auth,
+                    mc: account,
+                };
+
+                // Update status to Complete
+                if let Some(enrollment) = &*self.active_enrollment.read().await {
+                    *enrollment.status.write().await =
+                        EnrollmentStatus::Complete(full_account.clone());
+                }
+
+                self.app.invalidate(ENROLL_GET_STATUS, None);
+
+                // Finalize the enrollment
+                let uuid = full_account.mc.profile.uuid.clone();
+                self.add_account(full_account.into()).await?;
+                self.set_active_uuid(Some(uuid)).await?;
+
+                Ok(())
+            }
+            other_status => {
+                // Restore the original status
+                if let Some(enrollment) = &*self.active_enrollment.read().await {
+                    *enrollment.status.write().await = other_status;
+                }
+                bail!(ResumeEnrollmentError::NotInProfileCreationState)
             }
         }
     }
@@ -1227,6 +1391,15 @@ pub enum FinalizeEnrollmentError {
 
     #[error("enrollment is not complete")]
     NotComplete,
+}
+
+#[derive(Error, Debug)]
+pub enum ResumeEnrollmentError {
+    #[error("no active enrollment")]
+    NotActive,
+
+    #[error("enrollment is not in profile creation state")]
+    NotInProfileCreationState,
 }
 
 #[derive(Error, Debug)]

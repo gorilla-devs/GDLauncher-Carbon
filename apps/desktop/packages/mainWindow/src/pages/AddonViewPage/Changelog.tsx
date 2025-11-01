@@ -10,6 +10,7 @@ import {
   createMemo
 } from "solid-js"
 import { createAsyncEffect } from "@/utils/asyncEffect"
+import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 import {
   Select,
   SelectTrigger,
@@ -47,7 +48,7 @@ const ChangelogCard = (props: {
               }
             >
               <div class="text-lightSlate-600 flex items-center gap-2 text-xs">
-                <div class="i-hugeicons:calendar-01 shrink-0" />
+                <div class="i-hugeicons:calendar-01 shrink-0 h-4 w-4" />
                 <span>{format(new Date(props.releaseDate!), "PPP")}</span>
                 <span class="text-lightSlate-700">•</span>
                 <span class="text-lightSlate-500">
@@ -134,8 +135,8 @@ const EnhancedChangelogSkeleton = () => {
 const EmptyChangelogState = () => {
   return (
     <div class="flex flex-col items-center justify-center px-4 py-12 text-center sm:px-6 sm:py-16">
-      <div class="bg-darkSlate-600 mb-6 flex h-16 w-16 items-center justify-center rounded-full sm:h-24 sm:w-24">
-        <div class="i-hugeicons:note text-lightSlate-500 text-2xl sm:text-3xl" />
+      <div class="mb-6">
+        <PlaceholderGorilla size={8} variant="Reading Gorilla - Clipboard" />
       </div>
       <h3 class="text-lightSlate-200 mb-2 text-lg font-semibold sm:text-xl">
         No changelog available
@@ -146,7 +147,7 @@ const EmptyChangelogState = () => {
       </p>
       <div class="bg-darkSlate-700 border-darkSlate-600 mt-6 w-full max-w-md rounded-lg border p-3 text-left sm:mt-8 sm:p-4">
         <div class="text-lightSlate-400 mb-2 flex items-center gap-2 text-sm">
-          <div class="i-hugeicons:information-circle shrink-0" />
+          <div class="i-hugeicons:information-circle shrink-0 h-5 w-5" />
           <span class="font-medium">Tip</span>
         </div>
         <p class="text-lightSlate-600 text-xs leading-relaxed sm:text-sm">

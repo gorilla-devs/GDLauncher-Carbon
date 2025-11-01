@@ -51,11 +51,12 @@ export default function SortDisplay() {
         <FilterBadge onClick={clearPlatformFilters}>
           <div class="flex items-center gap-2">
             <div
-              class={`h-4 w-4 ${
-                getCurseforgeSortOrder() === "ascending"
+              class={
+                "h-4 w-4 " +
+                (getCurseforgeSortOrder() === "ascending"
                   ? "i-hugeicons:sort-by-up-01"
-                  : "i-hugeicons:sort-by-down-01"
-              }`}
+                  : "i-hugeicons:sort-by-down-01")
+              }
             />
             Order: {capitalize(getCurseforgeSortOrder())}
           </div>

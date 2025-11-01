@@ -8,6 +8,7 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 import { useParams } from "@solidjs/router"
 import { rspc } from "@/utils/rspcClient"
 import { Trans } from "@gd/i18n"
+import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 
 export function List() {
   const searchContext = useSearchContext()
@@ -88,8 +89,11 @@ export function List() {
             when={(searchContext?.allRows() || []).length > 0}
             fallback={
               <div class="flex flex-col items-center justify-center px-6 py-16 text-center">
-                <div class="i-hugeicons:search-01 mb-4 text-6xl text-gray-400" />
-                <h3 class="mb-2 text-xl font-semibold text-gray-300">
+                <PlaceholderGorilla
+                  size={12}
+                  variant="Searching Gorilla - Magnifying Glass"
+                />
+                <h3 class="mb-2 mt-6 text-xl font-semibold text-gray-300">
                   <Trans key="search.no_results_found" />
                 </h3>
                 <p class="max-w-md text-gray-500">
@@ -116,16 +120,14 @@ export function List() {
                   return <Skeleton.searchListItem />
                 }
 
-                const isInstalled = createMemo(() =>
-                  lookupTableInstalledMods().has(result.value!.id)
-                )
-
                 return (
                   <ListItem
                     instanceMods={instanceMods()?.data ?? undefined}
                     instanceId={instanceId()}
                     result={result.value!}
-                    isInstalled={isInstalled()}
+                    isInstalled={lookupTableInstalledMods().has(
+                      result.value!.id
+                    )}
                     onItemClick={() => {
                       navigator.navigate(
                         `/addon/${result.value!.id}/${result.value!.platform}?instanceId=${instanceId()}`

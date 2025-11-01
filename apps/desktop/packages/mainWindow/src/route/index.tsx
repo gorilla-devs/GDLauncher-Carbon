@@ -117,7 +117,7 @@ export const routes: RouteDefinition[] = [
         ]
       },
       {
-        path: "addon/:id/:platform",
+        path: "/addon/:id/:platform",
         component: AddonViewPage,
         children: [
           {

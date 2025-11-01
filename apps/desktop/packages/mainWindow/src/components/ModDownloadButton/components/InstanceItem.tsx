@@ -76,7 +76,7 @@ export const InstanceItem = (props: InstanceItemProps) => {
             <div class="i-hugeicons:tick-02 h-4 w-4 text-green-400" />
           </Show>
           <Show when={props.instance.locked}>
-            <div class="i-hugeicons:lock text-lightSlate-500 h-4 w-4" />
+            <div class="i-hugeicons:lock h-4 w-4 text-lightSlate-500" />
           </Show>
         </div>
       </div>

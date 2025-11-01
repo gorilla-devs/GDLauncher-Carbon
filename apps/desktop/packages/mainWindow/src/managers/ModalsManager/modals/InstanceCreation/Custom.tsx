@@ -538,7 +538,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
               <Switch>
                 <Match when={!bgPreview()}>
                   <div class="flex flex-col items-center gap-0.5">
-                    <div class="i-hugeicons:image-01 text-lightSlate-600 group-hover:text-lightSlate-400 text-2xl transition-colors" />
+                    <div class="i-hugeicons:image-01 text-lightSlate-600 group-hover:text-lightSlate-400 transition-colors text-2xl" />
                     <span class="text-lightSlate-600 group-hover:text-lightSlate-400 text-[10px] transition-colors">
                       Add icon
                     </span>
@@ -547,7 +547,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 <Match when={bgPreview()}>
                   <div class="bg-darkSlate-900/90 absolute right-1 top-1 rounded-lg p-1 opacity-0 transition-opacity group-hover:opacity-100">
                     <div
-                      class="text-lightSlate-50 i-hugeicons:cancel-circle text-base transition-all hover:text-red-500"
+                      class="i-hugeicons:cancel-circle text-lightSlate-50 transition-all hover:text-red-500 text-base"
                       onClick={(e) => {
                         e.preventDefault()
                         e.stopPropagation()

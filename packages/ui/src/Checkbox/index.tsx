@@ -75,7 +75,7 @@ function Checkbox(props: Props) {
       >
         <Show when={checked()}>
           <div
-            class="i-hugeicons:tick-02 text-lightSlate-50 animation-pulse"
+            class="i-hugeicons:tick-02 h-4 w-4 animation-pulse"
             classList={{
               "text-lightSlate-50": !props.disabled,
               "text-lightSlate-700": props.disabled

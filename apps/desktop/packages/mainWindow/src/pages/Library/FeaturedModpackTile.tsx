@@ -73,7 +73,7 @@ const FeaturedModpackTile = () => {
             }}
           >
             <div
-              class="z-1 text-lightSlate-900 hover:text-lightSlate-50 i-hugeicons:view absolute right-2 top-2 h-4 w-4 opacity-50 duration-200 ease-in-out"
+              class="z-1 text-lightSlate-900 hover:text-lightSlate-50 absolute right-2 top-2 opacity-50 duration-200 ease-in-out i-hugeicons:view h-4 w-4"
               onClick={(e) => {
                 e.stopPropagation()
                 settingsMutation.mutate({
@@ -121,7 +121,7 @@ const FeaturedModpackTile = () => {
         </Show>
         <Show when={!settings()?.showFeatured}>
           <div
-            class="text-lightSlate-900 hover:text-lightSlate-50 i-hugeicons:view-off-slash my-2 mr-2 h-4 w-4 opacity-50 duration-200 ease-in-out"
+            class="text-lightSlate-900 hover:text-lightSlate-50 my-2 mr-2 opacity-50 duration-200 ease-in-out i-hugeicons:view-off-slash h-4 w-4"
             onClick={(e) => {
               e.stopPropagation()
               settingsMutation.mutate({

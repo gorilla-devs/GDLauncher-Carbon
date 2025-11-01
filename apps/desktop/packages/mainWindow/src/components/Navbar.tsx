@@ -122,7 +122,7 @@ const AppNavbar = () => {
               })
             }}
           >
-            <i class="i-hugeicons:add-01 flex" />
+            <div class="i-hugeicons:add-01 flex h-5 w-5" />
           </Button>
         </div>
         <div class="text-lightSlate-50 flex h-full list-none items-center gap-6">

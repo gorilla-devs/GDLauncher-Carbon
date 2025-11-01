@@ -104,7 +104,7 @@ const Versions = () => {
               fallback={
                 <div class="flex flex-col items-center justify-center py-16 text-center">
                   <Show when={infiniteQuery.infiniteQuery.error}>
-                    <div class="i-hugeicons:alert-02 mb-4 text-3xl text-red-400" />
+                    <div class="i-hugeicons:alert-02 text-3xl mb-4 text-red-400" />
                     <h3 class="mb-2 text-lg font-semibold text-red-300">
                       Error loading versions
                     </h3>
@@ -113,7 +113,7 @@ const Versions = () => {
                       size="small"
                       onClick={() => infiniteQuery.infiniteQuery.refetch()}
                     >
-                      <div class="i-hugeicons:refresh mr-2" />
+                      <div class="i-hugeicons:refresh mr-2 h-4 w-4" />
                       Retry
                     </Button>
                   </Show>

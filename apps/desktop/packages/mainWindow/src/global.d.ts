@@ -12,7 +12,10 @@ declare global {
     fatalError: (error: string | Log[], moduleName?: string) => void
     ipcRenderer: import("electron").IpcRenderer
     report: any
-    getAdSize: () => Promise<BoundsSize>
+    getAdSize: () => Promise<{
+      adSize: BoundsSize
+      bannerAdSize?: BoundsSize
+    }>
     openFileDialog: (
       filters: Electron.OpenDialogOptions
     ) => Promise<Electron.OpenDialogReturnValue>
@@ -71,7 +74,10 @@ declare global {
 declare module "solid-js" {
   namespace JSX {
     interface IntrinsicElements {
-      owadview: any
+      owadview: {
+        class?: string
+        adstyle?: string
+      }
     }
   }
 }

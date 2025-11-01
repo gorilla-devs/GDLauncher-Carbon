@@ -103,14 +103,11 @@ const Instance = () => {
 
   onMount(() => {
     headerRef.parentElement?.addEventListener("scroll", handleScroll)
-    checkContainerSize()
-    window?.addEventListener("resize", checkContainerSize)
     setTabsTranslate(-backButtonRef.offsetWidth)
   })
 
   onCleanup(() => {
     headerRef.parentElement?.removeEventListener("scroll", handleScroll)
-    window?.removeEventListener("resize", checkContainerSize)
   })
 
   const setFavoriteMutation = rspc.createMutation(() => ({
@@ -336,22 +333,6 @@ const Instance = () => {
     setEditableName(false)
   }
 
-  const checkContainerSize = () => {
-    if (!headerRef || !innerContainerRef) return
-    const containerStyle = window.getComputedStyle(headerRef)
-    const containerWidth = parseInt(containerStyle.getPropertyValue("width"))
-
-    if (containerWidth <= 800) {
-      innerContainerRef.classList.remove("flex-row")
-      innerContainerRef.classList.add("flex-col")
-      innerContainerRef.classList.add("gap-4")
-    } else {
-      innerContainerRef.classList.remove("flex-col")
-      innerContainerRef.classList.add("flex-row")
-      innerContainerRef.classList.remove("gap-4")
-    }
-  }
-
   const openFolderMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.openInstanceFolder"]
   }))
@@ -535,10 +516,9 @@ const Instance = () => {
               type="transparent"
             >
               <div
-                class="text-xl"
+                class="i-hugeicons:star text-xl"
                 classList={{
-                  "text-yellow-500 i-hugeicons:star": isFavorite(),
-                  "i-hugeicons:star": !isFavorite()
+                  "text-yellow-500": isFavorite()
                 }}
               />
             </Button>
@@ -546,7 +526,7 @@ const Instance = () => {
           <div class="from-darkSlate-800 sticky top-52 z-20 box-border flex h-24 w-full justify-center bg-gradient-to-t px-6 pb-2">
             <div class="flex w-full justify-start">
               <div class="flex w-full items-end justify-between">
-                <div class="flex flex-1 flex-col justify-end gap-4 lg:flex-row">
+                <div class="flex flex-1 flex-row justify-end gap-4">
                   <img
                     src={
                       routeData.instanceDetails.data?.iconRevision
@@ -600,7 +580,7 @@ const Instance = () => {
                         </h1>
                         <Show when={!editableName()}>
                           <div
-                            class="transition-color i-hugeicons:pencil-edit-01 hover:text-lightSlate-700 duration-100 ease-in-out"
+                            class="i-hugeicons:pencil-edit-01 transition-color hover:text-lightSlate-700 duration-100 ease-in-out"
                             onClick={() => setEditableName(true)}
                           />
                         </Show>
@@ -610,14 +590,14 @@ const Instance = () => {
                         classList={{ "bg-darkSlate-800 pl-2": editableName() }}
                       >
                         <div
-                          class="text-lightSlate-50 i-hugeicons:tick-02 duration-50 z-10 cursor-pointer text-3xl transition ease-in-out hover:text-green-500"
+                          class="text-lightSlate-50 duration-50 z-10 cursor-pointer text-3xl transition ease-in-out hover:text-green-500 i-hugeicons:tick-02"
                           classList={{
                             hidden: !editableName()
                           }}
                           onClick={() => handleNameChange()}
                         />
                         <div
-                          class="text-lightSlate-50 duration-50 i-hugeicons:cancel-01 z-10 cursor-pointer text-3xl transition ease-in-out hover:text-red-500"
+                          class="text-lightSlate-50 duration-50 z-10 cursor-pointer text-3xl transition ease-in-out hover:text-red-500 i-hugeicons:cancel-01"
                           classList={{
                             hidden: !editableName()
                           }}
@@ -686,7 +666,7 @@ const Instance = () => {
                           isModrinth={modrinthProjectId() !== null}
                         />
                       </div>
-                      <div class="mt-2 flex items-center gap-2 lg:mt-0">
+                      <div class="flex items-center gap-2">
                         <Button
                           uppercase
                           size="large"
@@ -700,11 +680,11 @@ const Instance = () => {
                         >
                           <Switch>
                             <Match when={!isRunning()}>
-                              <i class="i-hugeicons:play text-xl" />
+                              <div class="i-hugeicons:play text-xl" />
                               <Trans key="instance.play" />
                             </Match>
                             <Match when={isRunning()}>
-                              <i class="i-hugeicons:stop text-xl" />
+                              <div class="i-hugeicons:stop text-xl" />
                               <Trans key="instance.stop" />
                             </Match>
                           </Switch>
@@ -794,11 +774,11 @@ const Instance = () => {
                 >
                   <Switch>
                     <Match when={!isRunning()}>
-                      <i class="i-hugeicons:play text-base" />
+                      <div class="i-hugeicons:play text-base" />
                       <Trans key="instance.play" />
                     </Match>
                     <Match when={isRunning()}>
-                      <i class="i-hugeicons:stop text-base" />
+                      <div class="i-hugeicons:stop text-base" />
                       <Trans key="instance.stop" />
                     </Match>
                   </Switch>

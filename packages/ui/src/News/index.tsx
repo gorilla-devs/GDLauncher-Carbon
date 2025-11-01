@@ -182,7 +182,7 @@ const News = (props: CarouselProps) => {
             changeSlide("left")
           }}
         >
-          <div class="i-hugeicons:arrow-left-01 text-lightSlate-50 text-3xl" />
+          <div class="i-hugeicons:arrow-left-01 text-3xl text-lightSlate-50" />
         </div>
         <div
           class="bg-darkSlate-800 absolute right-5 top-1/2 z-40 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full opacity-0 duration-200 ease-in-out group-hover:opacity-100"
@@ -191,7 +191,7 @@ const News = (props: CarouselProps) => {
             changeSlide("right")
           }}
         >
-          <div class="i-hugeicons:arrow-right-01 text-lightSlate-50 text-3xl" />
+          <div class="i-hugeicons:arrow-right-01 text-3xl text-lightSlate-50" />
         </div>
       </Show>
       <Show when={mergedProps.showIndicators}>
