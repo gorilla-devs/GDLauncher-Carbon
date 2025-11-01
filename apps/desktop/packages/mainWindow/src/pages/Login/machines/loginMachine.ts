@@ -164,18 +164,17 @@ export const createLoginMachine = (servicesAndActions: {
                     event.output.accountData,
                   pendingGDLAccountUuid: ({ event }: any) => event.output.uuid
                 }),
-                "animateSidebarIn",
-                "showBackButton"
+                "animateSidebarIn"
               ]
             },
             {
               target: "complete",
-              actions: ["animateSidebarIn", "showBackButton"]
+              actions: ["animateSidebarIn"]
             }
           ],
           onError: {
             target: "complete",
-            actions: ["logGDLCheckError", "animateSidebarIn", "showBackButton"]
+            actions: ["logGDLCheckError", "animateSidebarIn"]
           }
         }
       },

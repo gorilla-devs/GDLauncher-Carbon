@@ -326,26 +326,22 @@ export function LoginContainer() {
   }
 
   const isBackButtonVisible = () => {
-    // Special case: complete state only shows back button when adding from settings
-    // @ts-expect-error - XState v5 state.matches() has type inference issues
-    if (state.matches('complete')) {
-      return state.context.isAddingAccount
-    }
-
-    // Hide back button in these initial/loading states
+    // Blacklist: Only show back button in these specific interactive states
     return (
       // @ts-expect-error - XState v5 state.matches() has type inference issues
-      !state.matches('onboarding.welcome') &&
+      state.matches('onboarding.termsAndPrivacy') ||
       // @ts-expect-error - XState v5 state.matches() has type inference issues
-      !state.matches('initializing') &&
+      state.matches('authFlow.authMethod') ||
       // @ts-expect-error - XState v5 state.matches() has type inference issues
-      !state.matches('determiningInitialState') &&
+      state.matches({ authFlow: { enrolling: 'waitingForBrowser' } }) ||
       // @ts-expect-error - XState v5 state.matches() has type inference issues
-      !state.matches('checkingExistingAccount') &&
+      state.matches({ authFlow: { enrolling: 'pollingCode' } }) ||
       // @ts-expect-error - XState v5 state.matches() has type inference issues
-      !state.matches('seasonalSplash') &&
+      state.matches({ authFlow: { enrolling: 'profileCreation' } }) ||
       // @ts-expect-error - XState v5 state.matches() has type inference issues
-      !state.matches('navigatingToLibrary')
+      state.matches({ authFlow: { enrolling: 'failed' } }) ||
+      // @ts-expect-error - XState v5 state.matches() has type inference issues
+      (state.matches('complete') && state.context.isAddingAccount)
     )
   }
 
@@ -516,7 +512,7 @@ export function LoginContainer() {
                       hasGDLAccount={state.context.hasGDLAccount}
                       foundExistingAccount={state.context.foundExistingGDLAccount}
                       foundGDLAccountData={state.context.foundGDLAccountData}
-                      onContinue={() => sendWithTransition({ type: 'SKIP_GDL_ACCOUNT' })}
+                      onContinue={() => send({ type: 'SKIP_GDL_ACCOUNT' })}
                       onSetupGDLAccount={() => sendWithTransition({ type: 'SETUP_GDL_ACCOUNT' })}
                       onLinkExistingAccount={() => sendWithTransition({ type: 'LINK_GDL_ACCOUNT' })}
                     />
@@ -597,7 +593,7 @@ export function LoginContainer() {
                     size="large"
                     type="secondary"
                     fullWidth
-                    onClick={() => sendWithTransition({ type: 'SKIP_GDL_ACCOUNT' })}
+                    onClick={() => send({ type: 'SKIP_GDL_ACCOUNT' })}
                   >
                     <Trans key="login.continue_to_library" />
                     <div class="i-hugeicons:arrow-right-01" />

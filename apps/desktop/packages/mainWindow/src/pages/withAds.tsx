@@ -1,9 +1,10 @@
 import { AdsBanner } from "@/components/AdBanner"
+import { TopBannerAd } from "@/components/TopBannerAd"
 import AppNavbar from "@/components/Navbar"
 import { Outlet } from "@solidjs/router"
 import { Show } from "solid-js"
 
-import adSize from "@/utils/adhelper"
+import adSize, { bannerAdSize } from "@/utils/adhelper"
 import { Trans } from "@gd/i18n"
 import { useModal } from "@/managers/ModalsManager"
 import { SearchInputContext } from "@/components/SearchInputContext"
@@ -34,16 +35,30 @@ function withAdsLayout() {
             </div>
             <Show when={adSize.shouldShow}>
               <div
-                class="relative flex h-full flex-col justify-between gap-4"
-                style={{ width: `${adSize.width}px` }}
+                class="relative flex h-full flex-col gap-2 items-center"
+                style={{
+                  width: `${adSize.width}px`,
+                  "view-transition-name": `ad`,
+                  "z-index": "50000"
+                }}
               >
                 <div class="absolute inset-0 overflow-hidden pointer-events-none">
                   <ThemedPatternSVG />
                 </div>
+                <Show when={bannerAdSize.shouldShow}>
+                  <div
+                    class="relative z-10"
+                    style={{
+                      width: `${bannerAdSize.width}px`,
+                      height: `${bannerAdSize.height}px`
+                    }}
+                  >
+                    <TopBannerAd />
+                  </div>
+                </Show>
                 <div
                   class="relative z-10"
                   style={{
-                    "view-transition-name": `ad`,
                     width: `${adSize.width}px`,
                     height: `${adSize.height}px`
                   }}

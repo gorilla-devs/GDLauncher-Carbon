@@ -1,4 +1,4 @@
-import { onMount, onCleanup } from "solid-js"
+import { createEffect, onCleanup } from "solid-js"
 import { render } from "solid-js/web"
 import InlinePatternSVG from "./InlinePatternSVG"
 
@@ -20,7 +20,7 @@ const PatternBackground = (props: Props) => {
   const duration = props.animationDuration || 1200 // ms
   let containerRef: HTMLDivElement | undefined
 
-  onMount(() => {
+  createEffect(() => {
     if (!containerRef) return
 
     const container = document.createElement("div")
@@ -87,7 +87,13 @@ const PatternBackground = (props: Props) => {
   })
 
   return (
-    <div class="relative h-screen w-screen">
+    <div
+      class="relative h-screen w-screen"
+      style={{
+        "--pattern-background": "21 24 30",
+        "--pattern-fill": "30 33 41"
+      }}
+    >
       <div ref={containerRef} class="absolute inset-0" />
       <div class="relative">{props.children}</div>
     </div>

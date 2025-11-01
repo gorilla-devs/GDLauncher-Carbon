@@ -66,6 +66,14 @@ const getTabIndexFromPath = (path: string) => {
 const ModsInfiniteScrollQueryWrapper = () => {
   const params = useParams()
   const platform = () => params.platform as FEUnifiedPlatform
+
+  console.log('[ModsInfiniteScrollQueryWrapper] Route params:', {
+    modId: params.id,
+    modIdType: typeof params.id,
+    platform: platform(),
+    allParams: params
+  })
+
   return (
     <InfiniteScrollVersionsQueryWrapper
       modId={params.id}
@@ -131,30 +139,32 @@ const AddonExplore = () => {
 
   const isFetching = () => project.isLoading
 
-  // Navigate back to list when search filters change
-  createEffect(
-    on(
-      () => ({
-        searchQuery: searchContext?.searchQuery().searchQuery,
-        projectType: searchContext?.searchQuery().projectType,
-        categories: searchContext?.searchQuery().categories,
-        gameVersions: searchContext?.searchQuery().gameVersions,
-        modloaders: searchContext?.searchQuery().modloaders,
-        environment: searchContext?.searchQuery().environment,
-        searchApi: searchContext?.searchQuery().searchApi,
-        platformFilters: searchContext?.searchQuery().platformFilters
-      }),
-      () => {
-        // Navigate to search list view when filters change
-        const type = searchContext?.searchQuery().projectType || "modpack"
-        const instanceParam = selectedInstanceId()
-          ? `?instanceId=${selectedInstanceId()}`
-          : ""
-        navigator.navigate(`/search/${type}${instanceParam}`)
-      },
-      { defer: true } // Don't run on mount, only on changes
-    )
-  )
+  // DISABLED: Automatic redirect on filter changes
+  // This was causing unwanted redirects when changing version filters on the addon view page
+  // Users should stay on the current page when filters change
+  // createEffect(
+  //   on(
+  //     () => ({
+  //       searchQuery: searchContext?.searchQuery().searchQuery,
+  //       projectType: searchContext?.searchQuery().projectType,
+  //       categories: searchContext?.searchQuery().categories,
+  //       gameVersions: searchContext?.searchQuery().gameVersions,
+  //       modloaders: searchContext?.searchQuery().modloaders,
+  //       environment: searchContext?.searchQuery().environment,
+  //       searchApi: searchContext?.searchQuery().searchApi,
+  //       platformFilters: searchContext?.searchQuery().platformFilters
+  //     }),
+  //     () => {
+  //       // Navigate to search list view when filters change
+  //       const type = searchContext?.searchQuery().projectType || "modpack"
+  //       const instanceParam = selectedInstanceId()
+  //         ? `?instanceId=${selectedInstanceId()}`
+  //         : ""
+  //       navigator.navigate(`/search/${type}${instanceParam}`)
+  //     },
+  //     { defer: true } // Don't run on mount, only on changes
+  //   )
+  // )
 
   const normalizedAuthors = createMemo(() => {
     if (!project.data?.authors) return []

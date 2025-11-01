@@ -2,7 +2,7 @@ import {
   createInfiniteQuery,
   CreateInfiniteQueryResult
 } from "@tanstack/solid-query"
-import { createContext, useContext, createSignal } from "solid-js"
+import { createContext, useContext, createSignal, createEffect } from "solid-js"
 import { rspc } from "@/utils/rspcClient"
 import { useSearchParams } from "@solidjs/router"
 import useVersionsQuery from "@/pages/Mods/useVersionsQuery"
@@ -56,14 +56,33 @@ export const useInfiniteVersionsQuery = () => {
 }
 
 const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
+  console.log('[InfiniteScrollVersionsQueryWrapper] Component initialized with props:', {
+    modId: props.modId,
+    modIdType: typeof props.modId,
+    modplatform: props.modplatform,
+    initialQuery: props.initialQuery
+  })
+
   const rspcContext = rspc.useContext()
   const [searchParams, _setSearchParams] = useSearchParams()
   const searchContext = useSearchContext()
   const [ref, setRef] = createSignal<VirtualizerHandle | null>(null)
 
+  console.log('[InfiniteScrollVersionsQueryWrapper] Search params:', {
+    instanceId: searchParams.instanceId,
+    allSearchParams: searchParams
+  })
+
   const infiniteQuery = createInfiniteQuery(() => ({
-    queryKey: ["modplatforms.versions"],
+    queryKey: ["modplatforms.versions", props.modId, props.modplatform],
     queryFn: async (ctx) => {
+      console.log('[InfiniteScrollVersionsQueryWrapper] queryFn called:', {
+        platform: props.modplatform,
+        modId: props.modId,
+        pageParam: ctx.pageParam,
+        currentVersionsQuery: versionsQuery
+      })
+
       // Only set index for CurseForge, Modrinth doesn't use pagination
       if (props.modplatform === "curseforge") {
         setVersionsQuery({
@@ -72,25 +91,40 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
       }
 
       if (props.modplatform === "curseforge") {
+        const parsedModId = parseInt(props.modId, 10)
+        console.log('[InfiniteScrollVersionsQueryWrapper] CurseForge query - parsing modId:', {
+          originalModId: props.modId,
+          parsedModId,
+          isNaN: isNaN(parsedModId)
+        })
+
+        console.log('[InfiniteScrollVersionsQueryWrapper] Calling curseforge.getMod:', {
+          modId: parsedModId
+        })
         const project = await rspcContext.client.query([
           "modplatforms.curseforge.getMod",
           {
-            modId: parseInt(props.modId, 10)
+            modId: parsedModId
           }
         ])
+        console.log('[InfiniteScrollVersionsQueryWrapper] curseforge.getMod response:', project)
+
+        const queryParams = {
+          modId: parsedModId,
+          query: {
+            index: versionsQuery.index,
+            pageSize: versionsQuery.pageSize,
+            gameVersion: versionsQuery.gameVersion,
+            modLoaderType: versionsQuery.modLoaderType as any
+          }
+        }
+        console.log('[InfiniteScrollVersionsQueryWrapper] Calling curseforge.getModFiles with params:', queryParams)
 
         const response = await rspcContext.client.query([
           "modplatforms.curseforge.getModFiles",
-          {
-            modId: parseInt(props.modId, 10),
-            query: {
-              index: versionsQuery.index,
-              pageSize: versionsQuery.pageSize,
-              gameVersion: versionsQuery.gameVersion,
-              modLoaderType: versionsQuery.modLoaderType as any
-            }
-          }
+          queryParams
         ])
+        console.log('[InfiniteScrollVersionsQueryWrapper] curseforge.getModFiles response:', response)
 
         return {
           data: response.data.map((v) => ({
@@ -111,23 +145,31 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
           total: response.pagination?.totalCount || 0
         } satisfies VersionRowType
       } else {
+        console.log('[InfiniteScrollVersionsQueryWrapper] Modrinth query - calling getProject:', {
+          modId: props.modId
+        })
         const project = await rspcContext.client.query([
           "modplatforms.modrinth.getProject",
           props.modId
         ])
+        console.log('[InfiniteScrollVersionsQueryWrapper] modrinth.getProject response:', project)
+
+        const queryParams = {
+          project_id: props.modId,
+          game_versions: versionsQuery.gameVersion
+            ? [versionsQuery.gameVersion]
+            : undefined,
+          loaders: versionsQuery.modLoaderType
+            ? [versionsQuery.modLoaderType]
+            : undefined
+        }
+        console.log('[InfiniteScrollVersionsQueryWrapper] Calling modrinth.getProjectVersions with params:', queryParams)
 
         const response = await rspcContext.client.query([
           "modplatforms.modrinth.getProjectVersions",
-          {
-            project_id: props.modId,
-            game_versions: versionsQuery.gameVersion
-              ? [versionsQuery.gameVersion]
-              : undefined,
-            loaders: versionsQuery.modLoaderType
-              ? [versionsQuery.modLoaderType]
-              : undefined
-          }
+          queryParams
         ])
+        console.log('[InfiniteScrollVersionsQueryWrapper] modrinth.getProjectVersions response:', response)
 
         const processedData = {
           data: response.map((v) => ({
@@ -169,37 +211,54 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   }))
 
   const setQueryWrapper = (newValue: Partial<typeof versionsQuery>) => {
+    console.log('[InfiniteScrollVersionsQueryWrapper] setQueryWrapper called:', {
+      newValue,
+      currentVersionsQuery: versionsQuery
+    })
     setVersionsQuery(newValue)
     rspcContext.queryClient.removeQueries({
-      queryKey: ["modplatforms.versions"]
+      queryKey: ["modplatforms.versions", props.modId, props.modplatform]
     })
     infiniteQuery.refetch()
   }
 
-  const _instanceId = parseInt(searchParams.instanceId, 10)
-  const instanceId = isNaN(_instanceId) ? undefined : _instanceId
-  searchContext?.setSelectedInstanceId(instanceId)
-
-  if (instanceId !== undefined) {
-    rspcContext.client
-      .query(["instance.getInstanceDetails", instanceId])
-      .then((details) => {
-        setQueryWrapper({
-          modLoaderType: details?.modloaders[0].type_,
-          gameVersion: details?.version
-        })
-      })
-  } else {
-    setQueryWrapper({
-      modLoaderType: undefined,
-      gameVersion: undefined
+  createEffect(() => {
+    const _instanceId = parseInt(searchParams.instanceId, 10)
+    const instanceId = isNaN(_instanceId) ? undefined : _instanceId
+    console.log('[InfiniteScrollVersionsQueryWrapper] Instance ID processing:', {
+      rawInstanceId: searchParams.instanceId,
+      parsedInstanceId: _instanceId,
+      finalInstanceId: instanceId,
+      isNaN: isNaN(_instanceId)
     })
-  }
 
-  rspcContext.queryClient.removeQueries({
-    queryKey: ["modplatforms.versions"]
+    searchContext?.setSelectedInstanceId(instanceId)
+
+    if (instanceId !== undefined) {
+      console.log('[InfiniteScrollVersionsQueryWrapper] Fetching instance details for:', instanceId)
+      rspcContext.client
+        .query(["instance.getInstanceDetails", instanceId])
+        .then((details) => {
+          console.log('[InfiniteScrollVersionsQueryWrapper] Instance details received:', {
+            modloaders: details?.modloaders,
+            version: details?.version
+          })
+          setQueryWrapper({
+            modLoaderType: details?.modloaders[0].type_,
+            gameVersion: details?.version
+          })
+        })
+        .catch((err) => {
+          console.error('[InfiniteScrollVersionsQueryWrapper] Failed to fetch instance details:', err)
+        })
+    } else {
+      console.log('[InfiniteScrollVersionsQueryWrapper] No instance ID, setting undefined query params')
+      setQueryWrapper({
+        modLoaderType: undefined,
+        gameVersion: undefined
+      })
+    }
   })
-  infiniteQuery.refetch()
 
   const allRows = () =>
     infiniteQuery.data ? infiniteQuery.data.pages.flatMap((d) => d.data) : []

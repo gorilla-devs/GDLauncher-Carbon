@@ -2,7 +2,7 @@ import { Show, createEffect, createSignal } from "solid-js"
 import { AddonTypeDropdown } from "./AddonTypeDropdown"
 import useSearchContext from "./SearchInputContext"
 import { useGDNavigate } from "@/managers/NavigationManager"
-import { useMatch } from "@solidjs/router"
+import { useMatch, useLocation } from "@solidjs/router"
 import { useTransContext } from "@gd/i18n"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@gd/ui"
 import { FiltersDropdown } from "@/pages/Search/FiltersDropdown"
@@ -10,6 +10,7 @@ import { FiltersDropdown } from "@/pages/Search/FiltersDropdown"
 export function EnhancedSearchBar() {
   const searchResults = useSearchContext()
   const navigator = useGDNavigate()
+  const location = useLocation()
   const isSearchPage = useMatch(() => "/search/*")
   const isAddonPage = useMatch(() => "/addon/*")
   const [t] = useTransContext()
@@ -17,7 +18,7 @@ export function EnhancedSearchBar() {
   // Optimistic expansion state for instant feedback
   const [optimisticExpand, setOptimisticExpand] = createSignal(false)
 
-  // Keep expanded on both search and addon pages
+  // Keep expanded on search pages and addon pages
   const isExpanded = () =>
     !!(isSearchPage() || isAddonPage() || optimisticExpand())
 
@@ -52,7 +53,7 @@ export function EnhancedSearchBar() {
       }}
       classList={{
         "w-80 px-4": !isExpanded(),
-        "w-[600px] px-2": isExpanded()
+        "w-full max-w-[600px] px-2": isExpanded()
       }}
     >
       <div

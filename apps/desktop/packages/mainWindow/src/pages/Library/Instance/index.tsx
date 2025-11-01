@@ -103,14 +103,11 @@ const Instance = () => {
 
   onMount(() => {
     headerRef.parentElement?.addEventListener("scroll", handleScroll)
-    checkContainerSize()
-    window?.addEventListener("resize", checkContainerSize)
     setTabsTranslate(-backButtonRef.offsetWidth)
   })
 
   onCleanup(() => {
     headerRef.parentElement?.removeEventListener("scroll", handleScroll)
-    window?.removeEventListener("resize", checkContainerSize)
   })
 
   const setFavoriteMutation = rspc.createMutation(() => ({
@@ -336,22 +333,6 @@ const Instance = () => {
     setEditableName(false)
   }
 
-  const checkContainerSize = () => {
-    if (!headerRef || !innerContainerRef) return
-    const containerStyle = window.getComputedStyle(headerRef)
-    const containerWidth = parseInt(containerStyle.getPropertyValue("width"))
-
-    if (containerWidth <= 800) {
-      innerContainerRef.classList.remove("flex-row")
-      innerContainerRef.classList.add("flex-col")
-      innerContainerRef.classList.add("gap-4")
-    } else {
-      innerContainerRef.classList.remove("flex-col")
-      innerContainerRef.classList.add("flex-row")
-      innerContainerRef.classList.remove("gap-4")
-    }
-  }
-
   const openFolderMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.openInstanceFolder"]
   }))
@@ -545,7 +526,7 @@ const Instance = () => {
           <div class="from-darkSlate-800 sticky top-52 z-20 box-border flex h-24 w-full justify-center bg-gradient-to-t px-6 pb-2">
             <div class="flex w-full justify-start">
               <div class="flex w-full items-end justify-between">
-                <div class="flex flex-1 flex-col justify-end gap-4 lg:flex-row">
+                <div class="flex flex-1 flex-row justify-end gap-4">
                   <img
                     src={
                       routeData.instanceDetails.data?.iconRevision
@@ -685,7 +666,7 @@ const Instance = () => {
                           isModrinth={modrinthProjectId() !== null}
                         />
                       </div>
-                      <div class="mt-2 flex items-center gap-2 lg:mt-0">
+                      <div class="flex items-center gap-2">
                         <Button
                           uppercase
                           size="large"

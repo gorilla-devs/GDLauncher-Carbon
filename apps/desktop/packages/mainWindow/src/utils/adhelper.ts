@@ -12,21 +12,46 @@ export const [adSize, _setAdSize] = createStore<BoundsSize>({
   shouldShow: true
 })
 
+export const [bannerAdSize, _setBannerAdSize] = createStore<BoundsSize>({
+  width: 0,
+  height: 0,
+  shouldShow: false
+})
+
 const init = async () => {
   const bounds = await window.getAdSize()
-  _setAdSize(bounds)
-  window.adSizeChanged((_, newBounds: Omit<BoundsSize, "shouldShow">) => {
+  _setAdSize(bounds.adSize)
+
+  if (bounds.bannerAdSize) {
+    _setBannerAdSize(bounds.bannerAdSize)
+  }
+
+  window.adSizeChanged((_, newBounds: { adSize: Omit<BoundsSize, "shouldShow">, bannerAdSize?: Omit<BoundsSize, "shouldShow"> }) => {
     _setAdSize({
-      ...newBounds,
+      ...newBounds.adSize,
       shouldShow: false
     })
 
     setTimeout(() => {
       _setAdSize({
-        ...newBounds,
+        ...newBounds.adSize,
         shouldShow: true
       })
     }, 100)
+
+    if (newBounds.bannerAdSize) {
+      _setBannerAdSize({
+        ...newBounds.bannerAdSize,
+        shouldShow: false
+      })
+
+      setTimeout(() => {
+        _setBannerAdSize({
+          ...newBounds.bannerAdSize,
+          shouldShow: true
+        })
+      }, 100)
+    }
   })
 }
 
