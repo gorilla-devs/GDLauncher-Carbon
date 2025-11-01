@@ -1,5 +1,12 @@
 import { Button, Spinner } from "@gd/ui"
-import { Switch, Match, createEffect, createSignal, onCleanup, Show } from "solid-js"
+import {
+  Switch,
+  Match,
+  createEffect,
+  createSignal,
+  onCleanup,
+  Show
+} from "solid-js"
 import { Trans } from "@gd/i18n"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { useGDNavigate } from "@/managers/NavigationManager"
@@ -29,7 +36,7 @@ import { handleStatus } from "@/utils/login"
 // Import XState machine
 import { createLoginMachine } from "../machines/loginMachine"
 import { createServices } from "../machines/loginMachine.services"
-import { AuthFlowType, LoginStep, type LoginMachineEvents } from "../machines/loginMachine.types"
+import { type LoginMachineEvents } from "../machines/loginMachine.types"
 
 // Import styles
 import "../styles/viewTransitions.css"
@@ -104,7 +111,9 @@ export function LoginContainer() {
     input: {
       isAddingMicrosoftAccount: searchParams.addMicrosoftAccount === "true",
       isAddingGdlAccount: searchParams.addGdlAccount === "true",
-      isAddingAccount: searchParams.addMicrosoftAccount === "true" || searchParams.addGdlAccount === "true",
+      isAddingAccount:
+        searchParams.addMicrosoftAccount === "true" ||
+        searchParams.addGdlAccount === "true",
       returnPath: searchParams.returnTo || null,
       currentOccasion: getCurrentOccasion(),
       reducedMotion: globalStore.settings.data?.reducedMotion ?? false
@@ -112,7 +121,7 @@ export function LoginContainer() {
   })
 
   // Debug logging
-  console.log('[LoginContainer] Query params:', {
+  console.log("[LoginContainer] Query params:", {
     addMicrosoftAccount: searchParams.addMicrosoftAccount,
     addGdlAccount: searchParams.addGdlAccount,
     returnTo: searchParams.returnTo,
@@ -132,7 +141,7 @@ export function LoginContainer() {
   // Update refs in machine context
   createEffect(() => {
     send({
-      type: 'UPDATE_REFS',
+      type: "UPDATE_REFS",
       refs: {
         sidebar: sidebarRef,
         video: videoRef,
@@ -158,25 +167,25 @@ export function LoginContainer() {
       if (shouldShow) {
         btnRef.animate(
           [
-            { width: '0', margin: '0' },
-            { width: '60%', margin: '0 1rem 0 0' }
+            { width: "0", margin: "0" },
+            { width: "60%", margin: "0 1rem 0 0" }
           ],
           {
             duration: 300,
-            easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-            fill: 'forwards'
+            easing: "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+            fill: "forwards"
           }
         )
       } else {
         btnRef.animate(
           [
-            { width: '60%', margin: '0 1rem 0 0' },
-            { width: '0', margin: '0' }
+            { width: "60%", margin: "0 1rem 0 0" },
+            { width: "0", margin: "0" }
           ],
           {
             duration: 300,
-            easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-            fill: 'forwards'
+            easing: "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+            fill: "forwards"
           }
         )
       }
@@ -186,10 +195,8 @@ export function LoginContainer() {
   // Enable enrollment status polling when in enrollment states
   createEffect(() => {
     const isEnrolling =
-      // @ts-expect-error - XState v5 state.matches() has type inference issues
-      state.matches({ authFlow: { enrolling: 'waitingForBrowser' } }) ||
-      // @ts-expect-error - XState v5 state.matches() has type inference issues
-      state.matches({ authFlow: { enrolling: 'pollingCode' } })
+      state.matches({ authFlow: { enrolling: "waitingForBrowser" } }) ||
+      state.matches({ authFlow: { enrolling: "pollingCode" } })
 
     setIsPollingEnabled(isEnrolling)
   })
@@ -199,31 +206,33 @@ export function LoginContainer() {
     if (!enrollmentStatusQuery.data || !isPollingEnabled()) return
 
     // Handle browser auth status
-    // @ts-expect-error - XState v5 state.matches() has type inference issues
-    if (state.matches({ authFlow: { enrolling: 'waitingForBrowser' } })) {
+    if (state.matches({ authFlow: { enrolling: "waitingForBrowser" } })) {
       handleStatus(enrollmentStatusQuery, {
         onWaitingForBrowser: (info) => {
           send({
-            type: 'BROWSER_AUTH_READY',
+            type: "BROWSER_AUTH_READY",
             data: {
               authUrl: info.authUrl,
               redirectUri: info.redirectUri,
-              expiresAt: typeof info.expiresAt === 'string' ? parseInt(info.expiresAt, 10) : info.expiresAt
+              expiresAt:
+                typeof info.expiresAt === "string"
+                  ? parseInt(info.expiresAt, 10)
+                  : info.expiresAt
             }
           })
         },
         onComplete: () => {
-          send({ type: 'AUTH_COMPLETE' })
+          send({ type: "AUTH_COMPLETE" })
         },
         onNeedsProfileCreation: (accessToken) => {
           send({
-            type: 'PROFILE_CREATION_REQUIRED',
+            type: "PROFILE_CREATION_REQUIRED",
             data: accessToken
           })
         },
         onFail: (error) => {
           send({
-            type: 'AUTH_ERROR',
+            type: "AUTH_ERROR",
             error
           })
         }
@@ -231,12 +240,11 @@ export function LoginContainer() {
     }
 
     // Handle device code auth status
-    // @ts-expect-error - XState v5 state.matches() has type inference issues
-    if (state.matches({ authFlow: { enrolling: 'pollingCode' } })) {
+    if (state.matches({ authFlow: { enrolling: "pollingCode" } })) {
       handleStatus(enrollmentStatusQuery, {
         onPolling: (deviceCode) => {
           send({
-            type: 'POLLING_CODE_RECEIVED',
+            type: "POLLING_CODE_RECEIVED",
             data: {
               userCode: deviceCode.userCode,
               link: deviceCode.verificationUri,
@@ -246,17 +254,17 @@ export function LoginContainer() {
           })
         },
         onComplete: () => {
-          send({ type: 'AUTH_COMPLETE' })
+          send({ type: "AUTH_COMPLETE" })
         },
         onNeedsProfileCreation: (accessToken) => {
           send({
-            type: 'PROFILE_CREATION_REQUIRED',
+            type: "PROFILE_CREATION_REQUIRED",
             data: accessToken
           })
         },
         onFail: (error) => {
           send({
-            type: 'AUTH_ERROR',
+            type: "AUTH_ERROR",
             error
           })
         }
@@ -273,8 +281,8 @@ export function LoginContainer() {
   const sendWithTransition = (event: LoginMachineEvents) => {
     const shouldTransition =
       !globalStore.settings.data?.reducedMotion &&
-      typeof document !== 'undefined' &&
-      'startViewTransition' in document
+      typeof document !== "undefined" &&
+      "startViewTransition" in document
 
     if (shouldTransition) {
       document.startViewTransition(() => {
@@ -292,36 +300,31 @@ export function LoginContainer() {
   // Get step title based on current state
   const getStepTitle = () => {
     // @ts-expect-error - XState v5 state.matches() has type inference issues
-    if (state.matches('onboarding.welcome'))
+    if (state.matches("onboarding.welcome"))
       return <Trans key="login.titles.welcome_to_gdlauncher" />
     // @ts-expect-error - XState v5 state.matches() has type inference issues
-    if (state.matches('onboarding.termsAndPrivacy'))
+    if (state.matches("onboarding.termsAndPrivacy"))
       return <Trans key="login.titles.terms_and_privacy" />
     // @ts-expect-error - XState v5 state.matches() has type inference issues
-    if (state.matches('authFlow.authMethod'))
+    if (state.matches("authFlow.authMethod"))
       return <Trans key="login.titles.sign_in_with_microsoft" />
-    // @ts-expect-error - XState v5 state.matches() has type inference issues
-    if (state.matches({ authFlow: { enrolling: 'browser' } }) ||
-        // @ts-expect-error - XState v5 state.matches() has type inference issues
-        state.matches({ authFlow: { enrolling: 'waitingForBrowser' } }))
+    if (
+      state.matches({ authFlow: { enrolling: "browser" } }) ||
+      state.matches({ authFlow: { enrolling: "waitingForBrowser" } })
+    )
       return <Trans key="login.titles.browser_authentication" />
-    // @ts-expect-error - XState v5 state.matches() has type inference issues
-    if (state.matches({ authFlow: { enrolling: 'deviceCode' } }) ||
-        // @ts-expect-error - XState v5 state.matches() has type inference issues
-        state.matches({ authFlow: { enrolling: 'pollingCode' } }))
+    if (
+      state.matches({ authFlow: { enrolling: "deviceCode" } }) ||
+      state.matches({ authFlow: { enrolling: "pollingCode" } })
+    )
       return <Trans key="login.titles.microsoft_code_step" />
-    // @ts-expect-error - XState v5 state.matches() has type inference issues
-    if (state.matches({ authFlow: { enrolling: 'profileCreation' } }))
+    if (state.matches({ authFlow: { enrolling: "profileCreation" } }))
       return <Trans key="login.titles.create_profile" />
-    // @ts-expect-error - XState v5 state.matches() has type inference issues
-    if (state.matches('completingAuth'))
+    if (state.matches("completingAuth"))
       return <Trans key="login.titles.authentication_complete" />
-    // @ts-expect-error - XState v5 state.matches() has type inference issues
-    if (state.matches('checkingGDLAccount'))
+    if (state.matches("checkingGDLAccount"))
       return <Trans key="login.titles.gdl_account_verification" />
-    // @ts-expect-error - XState v5 state.matches() has type inference issues
-    if (state.matches('complete'))
-      return <Trans key="login.titles.all_set" />
+    if (state.matches("complete")) return <Trans key="login.titles.all_set" />
     return ""
   }
 
@@ -329,27 +332,21 @@ export function LoginContainer() {
     // Blacklist: Only show back button in these specific interactive states
     return (
       // @ts-expect-error - XState v5 state.matches() has type inference issues
-      state.matches('onboarding.termsAndPrivacy') ||
+      state.matches("onboarding.termsAndPrivacy") ||
       // @ts-expect-error - XState v5 state.matches() has type inference issues
-      state.matches('authFlow.authMethod') ||
-      // @ts-expect-error - XState v5 state.matches() has type inference issues
-      state.matches({ authFlow: { enrolling: 'waitingForBrowser' } }) ||
-      // @ts-expect-error - XState v5 state.matches() has type inference issues
-      state.matches({ authFlow: { enrolling: 'pollingCode' } }) ||
-      // @ts-expect-error - XState v5 state.matches() has type inference issues
-      state.matches({ authFlow: { enrolling: 'profileCreation' } }) ||
-      // @ts-expect-error - XState v5 state.matches() has type inference issues
-      state.matches({ authFlow: { enrolling: 'failed' } }) ||
-      // @ts-expect-error - XState v5 state.matches() has type inference issues
-      (state.matches('complete') && state.context.isAddingAccount)
+      state.matches("authFlow.authMethod") ||
+      state.matches({ authFlow: { enrolling: "waitingForBrowser" } }) ||
+      state.matches({ authFlow: { enrolling: "pollingCode" } }) ||
+      state.matches({ authFlow: { enrolling: "profileCreation" } }) ||
+      state.matches({ authFlow: { enrolling: "failed" } }) ||
+      (state.matches("complete") && state.context.isAddingAccount)
     )
   }
 
   return (
     <>
       {/* Seasonal Content Overlay */}
-      {/* @ts-expect-error - XState v5 state.matches() has type inference issues */}
-      <Show when={state.matches('seasonalSplash')}>
+      <Show when={state.matches("seasonalSplash")}>
         <>
           {/* Dark Overlay */}
           <div class="absolute inset-0 bg-black/30 z-40" />
@@ -360,8 +357,10 @@ export function LoginContainer() {
             <div
               class="mb-8 text-center transition-all duration-1000 ease-out"
               classList={{
-                "opacity-0 translate-y-5": !state.context.seasonalMessageVisible,
-                "opacity-100 translate-y-0": state.context.seasonalMessageVisible
+                "opacity-0 translate-y-5":
+                  !state.context.seasonalMessageVisible,
+                "opacity-100 translate-y-0":
+                  state.context.seasonalMessageVisible
               }}
             >
               <h1
@@ -380,16 +379,19 @@ export function LoginContainer() {
               <div
                 class="transition-all duration-500 ease-out"
                 classList={{
-                  "opacity-0 translate-y-2.5": !state.context.seasonalButtonVisible,
-                  "opacity-100 translate-y-0": state.context.seasonalButtonVisible
+                  "opacity-0 translate-y-2.5":
+                    !state.context.seasonalButtonVisible,
+                  "opacity-100 translate-y-0":
+                    state.context.seasonalButtonVisible
                 }}
               >
                 <Button
                   size="large"
                   variant="primary"
-                  onClick={() => send({ type: 'CONTINUE_SEASONAL' })}
+                  onClick={() => send({ type: "CONTINUE_SEASONAL" })}
                   style={{
-                    "background-color": state.context.currentOccasion!.colors.primary,
+                    "background-color":
+                      state.context.currentOccasion!.colors.primary,
                     "border-color": state.context.currentOccasion!.colors.accent
                   }}
                 >
@@ -404,8 +406,7 @@ export function LoginContainer() {
 
       <div class="flex h-screen w-full" id="main-login-page">
         {/* Sidebar */}
-        {/* @ts-expect-error - XState v5 state.matches() has type inference issues */}
-        <Show when={!state.matches('seasonalSplash')}>
+        <Show when={!state.matches("seasonalSplash")}>
           <div
             ref={sidebarRef}
             class="text-lightSlate-50 bg-darkSlate-800 z-1 absolute z-10 flex h-full -translate-x-full flex-col items-center overflow-hidden rounded-md"
@@ -435,86 +436,123 @@ export function LoginContainer() {
                   "view-transition-class": state.context.transitionDirection
                 }}
               >
-                {/* @ts-expect-error - XState v5 state.matches() has type inference issues */}
                 <Switch>
                   {/* @ts-expect-error - XState v5 state.matches() has type inference issues */}
-                  <Match when={state.matches('onboarding.welcome')}>
+                  <Match when={state.matches("onboarding.welcome")}>
                     <WelcomeStep
                       hasActiveAccount={!!state.context.activeUuid}
                     />
                   </Match>
 
                   {/* @ts-expect-error - XState v5 state.matches() has type inference issues */}
-                  <Match when={state.matches('onboarding.termsAndPrivacy')}>
+                  <Match when={state.matches("onboarding.termsAndPrivacy")}>
                     <TermsAndPrivacyStep
                       initialAccepted={state.context.termsAccepted}
                       onAcceptanceChange={(accepted) =>
-                        send({ type: accepted ? 'ACCEPT_TERMS' : 'ACCEPT_TERMS' })
+                        send({
+                          type: accepted ? "ACCEPT_TERMS" : "ACCEPT_TERMS"
+                        })
                       }
                     />
                   </Match>
 
                   {/* @ts-expect-error - XState v5 state.matches() has type inference issues */}
-                  <Match when={state.matches('authFlow.authMethod')}>
+                  <Match when={state.matches("authFlow.authMethod")}>
                     <AuthMethodStep
-                      onBrowserAuth={() => sendWithTransition({ type: 'SELECT_BROWSER_AUTH' })}
-                      onDeviceCodeAuth={() => sendWithTransition({ type: 'SELECT_DEVICE_CODE' })}
+                      onBrowserAuth={() =>
+                        sendWithTransition({ type: "SELECT_BROWSER_AUTH" })
+                      }
+                      onDeviceCodeAuth={() =>
+                        sendWithTransition({ type: "SELECT_DEVICE_CODE" })
+                      }
                       loading={state.context.loadingButton}
                     />
                   </Match>
 
-                  {/* @ts-expect-error - XState v5 state.matches() has type inference issues */}
-                  <Match when={state.matches({ authFlow: { enrolling: 'waitingForBrowser' } })}>
+                  <Match
+                    when={state.matches({
+                      authFlow: { enrolling: "waitingForBrowser" }
+                    })}
+                  >
                     <BrowserAuthStep
-                      authUrl={(enrollmentStatusQuery.data as any)?.waitingForBrowser?.auth_url}
-                      redirectUri={(enrollmentStatusQuery.data as any)?.waitingForBrowser?.redirect_uri}
-                      expiresAt={(enrollmentStatusQuery.data as any)?.waitingForBrowser?.expires_at}
+                      authUrl={
+                        (enrollmentStatusQuery.data as any)?.waitingForBrowser
+                          ?.auth_url
+                      }
+                      redirectUri={
+                        (enrollmentStatusQuery.data as any)?.waitingForBrowser
+                          ?.redirect_uri
+                      }
+                      expiresAt={
+                        (enrollmentStatusQuery.data as any)?.waitingForBrowser
+                          ?.expires_at
+                      }
                       currentStage={
-                        typeof enrollmentStatusQuery.data === 'string'
+                        typeof enrollmentStatusQuery.data === "string"
                           ? enrollmentStatusQuery.data
-                          : (enrollmentStatusQuery.data as any)?.waitingForBrowser
-                            ? 'waitingForBrowser'
-                            : 'waiting'
+                          : (enrollmentStatusQuery.data as any)
+                                ?.waitingForBrowser
+                            ? "waitingForBrowser"
+                            : "waiting"
                       }
                       isEnrolling={true}
-                      onSwitchToDeviceCode={() => sendWithTransition({ type: 'SWITCH_TO_DEVICE_CODE' })}
-                      onCancel={() => sendWithTransition({ type: 'BACK' })}
-                      onRetry={() => sendWithTransition({ type: 'SELECT_BROWSER_AUTH' })}
+                      onSwitchToDeviceCode={() =>
+                        sendWithTransition({ type: "SWITCH_TO_DEVICE_CODE" })
+                      }
+                      onCancel={() => sendWithTransition({ type: "BACK" })}
+                      onRetry={() =>
+                        sendWithTransition({ type: "SELECT_BROWSER_AUTH" })
+                      }
                     />
                   </Match>
 
-                  {/* @ts-expect-error - XState v5 state.matches() has type inference issues */}
-                  <Match when={state.matches({ authFlow: { enrolling: 'pollingCode' } })}>
+                  <Match
+                    when={state.matches({
+                      authFlow: { enrolling: "pollingCode" }
+                    })}
+                  >
                     <DeviceCodeStepEnhanced
                       deviceCodeObject={state.context.deviceCodeObject}
                       setDeviceCodeObject={() => {}}
                       nextStep={() => {}}
-                      prevStep={() => sendWithTransition({ type: 'BACK' })}
+                      prevStep={() => sendWithTransition({ type: "BACK" })}
                       enrollmentStatus={enrollmentStatusQuery}
-                      onSwitchToBrowser={() => sendWithTransition({ type: 'SWITCH_TO_BROWSER' })}
+                      onSwitchToBrowser={() =>
+                        sendWithTransition({ type: "SWITCH_TO_BROWSER" })
+                      }
                     />
                   </Match>
 
-                  {/* @ts-expect-error - XState v5 state.matches() has type inference issues */}
-                  <Match when={state.matches({ authFlow: { enrolling: 'profileCreation' } })}>
+                  <Match
+                    when={state.matches({
+                      authFlow: { enrolling: "profileCreation" }
+                    })}
+                  >
                     <ProfileCreationStep
-                      accessToken={state.context.profileAccessToken || ''}
-                      nextStep={() => sendWithTransition({ type: 'CREATE_PROFILE' })}
+                      accessToken={state.context.profileAccessToken || ""}
+                      nextStep={() =>
+                        sendWithTransition({ type: "CREATE_PROFILE" })
+                      }
                       onValidationChange={() => {}}
                       onPendingChange={() => {}}
                       onSubmitReady={() => {}}
                     />
                   </Match>
 
-                  {/* @ts-expect-error - XState v5 state.matches() has type inference issues */}
-                  <Match when={state.matches('complete')}>
+                  <Match when={state.matches("complete")}>
                     <CompleteStep
                       hasGDLAccount={state.context.hasGDLAccount}
-                      foundExistingAccount={state.context.foundExistingGDLAccount}
+                      foundExistingAccount={
+                        state.context.foundExistingGDLAccount
+                      }
                       foundGDLAccountData={state.context.foundGDLAccountData}
-                      onContinue={() => send({ type: 'SKIP_GDL_ACCOUNT' })}
-                      onSetupGDLAccount={() => sendWithTransition({ type: 'SETUP_GDL_ACCOUNT' })}
-                      onLinkExistingAccount={() => sendWithTransition({ type: 'LINK_GDL_ACCOUNT' })}
+                      onContinue={() => send({ type: "SKIP_GDL_ACCOUNT" })}
+                      onSetupGDLAccount={() =>
+                        sendWithTransition({ type: "SETUP_GDL_ACCOUNT" })
+                      }
+                      onLinkExistingAccount={() =>
+                        sendWithTransition({ type: "LINK_GDL_ACCOUNT" })
+                      }
                     />
                   </Match>
                 </Switch>
@@ -543,20 +581,19 @@ export function LoginContainer() {
                     size="large"
                     type="secondary"
                     fullWidth
-                    onClick={() => sendWithTransition({ type: 'BACK' })}
+                    onClick={() => sendWithTransition({ type: "BACK" })}
                   >
                     <div class="i-hugeicons:arrow-left-01" />
                     <Trans key="general.back" />
                   </Button>
                 </div>
 
-                {/* @ts-expect-error - XState v5 state.matches() has type inference issues */}
                 <Show
                   when={
                     // @ts-expect-error - XState v5 state.matches() has type inference issues
-                    state.matches('onboarding.welcome') ||
+                    state.matches("onboarding.welcome") ||
                     // @ts-expect-error - XState v5 state.matches() has type inference issues
-                    state.matches('onboarding.termsAndPrivacy')
+                    state.matches("onboarding.termsAndPrivacy")
                   }
                 >
                   <Button
@@ -565,14 +602,14 @@ export function LoginContainer() {
                     size="large"
                     disabled={
                       // @ts-expect-error - XState v5 state.matches() has type inference issues
-                      state.matches('onboarding.termsAndPrivacy') &&
+                      state.matches("onboarding.termsAndPrivacy") &&
                       !state.context.termsAccepted
                     }
-                    onClick={() => sendWithTransition({ type: 'CONTINUE' })}
+                    onClick={() => sendWithTransition({ type: "CONTINUE" })}
                   >
-                    {/* @ts-expect-error - XState v5 state.matches() has type inference issues */}
                     <Show
-                      when={state.matches('onboarding.welcome')}
+                      // @ts-expect-error - XState v5 state.matches() has type inference issues
+                      when={state.matches("onboarding.welcome")}
                       fallback={
                         <>
                           <Trans key="login.agree_and_continue" />
@@ -587,13 +624,16 @@ export function LoginContainer() {
                 </Show>
 
                 {/* Continue to Library button for complete state (only in normal flow, not when adding from settings) */}
-                {/* @ts-expect-error - XState v5 state.matches() has type inference issues */}
-                <Show when={state.matches('complete') && !state.context.isAddingAccount}>
+                <Show
+                  when={
+                    state.matches("complete") && !state.context.isAddingAccount
+                  }
+                >
                   <Button
                     size="large"
                     type="secondary"
                     fullWidth
-                    onClick={() => send({ type: 'SKIP_GDL_ACCOUNT' })}
+                    onClick={() => send({ type: "SKIP_GDL_ACCOUNT" })}
                   >
                     <Trans key="login.continue_to_library" />
                     <div class="i-hugeicons:arrow-right-01" />
@@ -639,11 +679,10 @@ export function LoginContainer() {
       </div>
 
       {/* GDL Account Setup Modal */}
-      {/* @ts-expect-error - XState v5 state.matches() has type inference issues */}
       <GDLAccountSetupModal
-        isOpen={state.matches({ complete: 'gdlSetup' })}
-        onClose={() => send({ type: 'GDL_SETUP_CANCELLED' })}
-        onComplete={() => send({ type: 'GDL_SETUP_COMPLETE' })}
+        isOpen={state.matches({ complete: "gdlSetup" })}
+        onClose={() => send({ type: "GDL_SETUP_CANCELLED" })}
+        onComplete={() => send({ type: "GDL_SETUP_COMPLETE" })}
         activeUuid={state.context.activeUuid}
       />
     </>

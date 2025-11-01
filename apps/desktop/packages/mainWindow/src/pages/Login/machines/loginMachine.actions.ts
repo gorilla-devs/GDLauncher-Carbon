@@ -1,5 +1,5 @@
-import { assign, enqueueActions } from 'xstate'
-import type { LoginMachineContext, LoginMachineEvents, AuthFlowType } from './loginMachine.types'
+import { assign, enqueueActions } from "xstate"
+import type { LoginMachineContext } from "./loginMachine.types"
 
 export const actions = {
   // State updates
@@ -8,11 +8,11 @@ export const actions = {
   }),
 
   setTransitionForward: assign({
-    transitionDirection: 'forward' as const
+    transitionDirection: "forward" as const
   }),
 
   setTransitionBackward: assign({
-    transitionDirection: 'backward' as const
+    transitionDirection: "backward" as const
   }),
 
   setAuthFlowTypeBrowser: assign({
@@ -25,7 +25,7 @@ export const actions = {
 
   setDeviceCodeObject: assign({
     deviceCodeObject: ({ event }) => {
-      if (event.type === 'POLLING_CODE_RECEIVED') {
+      if (event.type === "POLLING_CODE_RECEIVED") {
         return event.data
       }
       return null
@@ -34,7 +34,7 @@ export const actions = {
 
   setProfileAccessToken: assign({
     profileAccessToken: ({ event }) => {
-      if (event.type === 'PROFILE_CREATION_REQUIRED') {
+      if (event.type === "PROFILE_CREATION_REQUIRED") {
         return event.data
       }
       return null
@@ -47,8 +47,8 @@ export const actions = {
 
   setError: assign({
     error: ({ event }) => {
-      if (event.type === 'AUTH_ERROR') {
-        return event.error?.message || 'Unknown error'
+      if (event.type === "AUTH_ERROR") {
+        return event.error?.message || "Unknown error"
       }
       return null
     }
@@ -64,7 +64,7 @@ export const actions = {
 
   updateRefs: assign({
     refs: ({ context, event }) => {
-      if (event.type === 'UPDATE_REFS') {
+      if (event.type === "UPDATE_REFS") {
         return { ...context.refs, ...event.refs }
       }
       return context.refs
@@ -91,35 +91,35 @@ export const actions = {
 
     setTimeout(() => {
       sidebar?.animate(
-        [{ transform: 'translateX(-100%)' }, { transform: 'translateX(0)' }],
+        [{ transform: "translateX(-100%)" }, { transform: "translateX(0)" }],
         {
           duration: 300,
           delay: 200,
-          easing: 'cubic-bezier(0.175, 0.885, 0.32, 1)',
-          fill: 'forwards'
+          easing: "cubic-bezier(0.175, 0.885, 0.32, 1)",
+          fill: "forwards"
         }
       )
 
       video?.animate(
-        [{ transform: 'translateX(0)' }, { transform: 'translateX(15%)' }],
+        [{ transform: "translateX(0)" }, { transform: "translateX(15%)" }],
         {
           duration: 300,
           delay: 200,
-          easing: 'cubic-bezier(0.175, 0.885, 0.32, 1)',
-          fill: 'forwards'
+          easing: "cubic-bezier(0.175, 0.885, 0.32, 1)",
+          fill: "forwards"
         }
       )
 
       loadingSpinner?.animate([{ opacity: 1 }, { opacity: 0 }], {
         duration: 300,
-        easing: 'linear',
-        fill: 'forwards'
+        easing: "linear",
+        fill: "forwards"
       })
 
       backgroundBlur?.animate([{ opacity: 1 }, { opacity: 0 }], {
         duration: 500,
-        easing: 'linear',
-        fill: 'forwards'
+        easing: "linear",
+        fill: "forwards"
       })
     }, 300)
   },
@@ -129,14 +129,14 @@ export const actions = {
 
     loadingSpinner?.animate([{ opacity: 1 }, { opacity: 0 }], {
       duration: 300,
-      easing: 'linear',
-      fill: 'forwards'
+      easing: "linear",
+      fill: "forwards"
     })
 
     backgroundBlur?.animate([{ opacity: 1 }, { opacity: 0 }], {
       duration: 500,
-      easing: 'linear',
-      fill: 'forwards'
+      easing: "linear",
+      fill: "forwards"
     })
   },
 
@@ -145,13 +145,13 @@ export const actions = {
     if (backButton) {
       backButton.animate(
         [
-          { width: '0', margin: '0' },
-          { width: '60%', margin: '0 1rem 0 0' }
+          { width: "0", margin: "0" },
+          { width: "60%", margin: "0 1rem 0 0" }
         ],
         {
           duration: 300,
-          easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-          fill: 'forwards'
+          easing: "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+          fill: "forwards"
         }
       )
     }
@@ -162,38 +162,38 @@ export const actions = {
     if (backButton) {
       backButton.animate(
         [
-          { width: '60%', margin: '0 1rem 0 0' },
-          { width: '0', margin: '0' }
+          { width: "60%", margin: "0 1rem 0 0" },
+          { width: "0", margin: "0" }
         ],
         {
           duration: 300,
-          easing: 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-          fill: 'forwards'
+          easing: "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+          fill: "forwards"
         }
       )
     }
   },
 
   // Seasonal timing sequence
-  startSeasonalTimers: enqueueActions(({ context, enqueue }) => {
+  startSeasonalTimers: enqueueActions(({ enqueue }) => {
     enqueue.sendTo(
-      ({ system }) => system.get('loginMachine'),
-      { type: 'SHOW_SEASONAL_MESSAGE' },
+      ({ system }) => system.get("loginMachine"),
+      { type: "SHOW_SEASONAL_MESSAGE" },
       { delay: 500 }
     )
     enqueue.sendTo(
-      ({ system }) => system.get('loginMachine'),
-      { type: 'SHOW_SEASONAL_BUTTON' },
+      ({ system }) => system.get("loginMachine"),
+      { type: "SHOW_SEASONAL_BUTTON" },
       { delay: 1000 }
     )
   }),
 
   // Logging
   logGDLCheckError: ({ event }: { event: any }) => {
-    console.error('Failed to check GDL account:', event.error)
+    console.error("Failed to check GDL account:", event.error)
   },
 
   logLinkError: ({ event }: { event: any }) => {
-    console.error('Failed to link GDL account:', event.error)
+    console.error("Failed to link GDL account:", event.error)
   }
 }

@@ -1,4 +1,4 @@
-import { setup, assign, type AnyActorLogic } from "xstate"
+import { setup, assign } from "xstate"
 import type {
   LoginMachineContext,
   LoginMachineEvents,

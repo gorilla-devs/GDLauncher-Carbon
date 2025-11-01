@@ -34,7 +34,6 @@ import {
 } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import InstanceTile from "@/components/InstanceTile"
-import skull from "/assets/images/icons/skull.png"
 import UnstableCard from "@/components/UnstableCard"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 import {
@@ -321,7 +320,10 @@ const HomeGrid = () => {
           }
         >
           <div class="mt-12 flex h-full w-full flex-col items-center justify-center gap-6">
-            <PlaceholderGorilla size={14} variant="Welcoming Gorilla - Open Arms" />
+            <PlaceholderGorilla
+              size={14}
+              variant="Welcoming Gorilla - Open Arms"
+            />
             <p class="text-lightSlate-700 max-w-100 text-center">
               <Trans key="instance.no_instances_text" />
             </p>

@@ -89,7 +89,10 @@ export function List() {
             when={(searchContext?.allRows() || []).length > 0}
             fallback={
               <div class="flex flex-col items-center justify-center px-6 py-16 text-center">
-                <PlaceholderGorilla size={12} variant="Searching Gorilla - Magnifying Glass" />
+                <PlaceholderGorilla
+                  size={12}
+                  variant="Searching Gorilla - Magnifying Glass"
+                />
                 <h3 class="mb-2 mt-6 text-xl font-semibold text-gray-300">
                   <Trans key="search.no_results_found" />
                 </h3>
@@ -122,7 +125,9 @@ export function List() {
                     instanceMods={instanceMods()?.data ?? undefined}
                     instanceId={instanceId()}
                     result={result.value!}
-                    isInstalled={lookupTableInstalledMods().has(result.value!.id)}
+                    isInstalled={lookupTableInstalledMods().has(
+                      result.value!.id
+                    )}
                     onItemClick={() => {
                       navigator.navigate(
                         `/addon/${result.value!.id}/${result.value!.platform}?instanceId=${instanceId()}`

@@ -38,14 +38,28 @@ export function PlaceholderGorilla(props: PlaceholderGorillaProps) {
         <circle cx="150" cy="70" r="25" fill="currentColor" />
 
         {/* Face Area (lighter) */}
-        <ellipse cx="100" cy="120" rx="50" ry="40" fill="currentColor" opacity="0.6" />
+        <ellipse
+          cx="100"
+          cy="120"
+          rx="50"
+          ry="40"
+          fill="currentColor"
+          opacity="0.6"
+        />
 
         {/* Eyes */}
         <circle cx="80" cy="100" r="8" fill="currentColor" opacity="0.8" />
         <circle cx="120" cy="100" r="8" fill="currentColor" opacity="0.8" />
 
         {/* Nose/Snout */}
-        <ellipse cx="100" cy="125" rx="15" ry="10" fill="currentColor" opacity="0.8" />
+        <ellipse
+          cx="100"
+          cy="125"
+          rx="15"
+          ry="10"
+          fill="currentColor"
+          opacity="0.8"
+        />
 
         {/* Mouth suggestion */}
         <path
@@ -57,17 +71,20 @@ export function PlaceholderGorilla(props: PlaceholderGorillaProps) {
         />
 
         {/* Top of head/brow ridge */}
-        <ellipse cx="100" cy="80" rx="45" ry="20" fill="currentColor" opacity="0.4" />
+        <ellipse
+          cx="100"
+          cy="80"
+          rx="45"
+          ry="20"
+          fill="currentColor"
+          opacity="0.4"
+        />
       </svg>
 
       {/* Label */}
       <div class="text-lightSlate-600 flex flex-col items-center gap-1 text-center">
-        <div class="font-mono text-sm opacity-50">
-          [Placeholder]
-        </div>
-        <div class="text-lightSlate-500 font-medium">
-          {props.variant}
-        </div>
+        <div class="font-mono text-sm opacity-50">[Placeholder]</div>
+        <div class="text-lightSlate-500 font-medium">{props.variant}</div>
       </div>
     </div>
   )

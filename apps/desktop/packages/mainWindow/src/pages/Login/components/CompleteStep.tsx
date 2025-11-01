@@ -49,7 +49,10 @@ export function CompleteStep(props: CompleteStepProps) {
           </Show>
         </h2>
         <p class="text-lightSlate-600 m-0 text-sm">
-          <Show when={props.hasGDLAccount} fallback={<Trans key="login.ready_to_launch" />}>
+          <Show
+            when={props.hasGDLAccount}
+            fallback={<Trans key="login.ready_to_launch" />}
+          >
             <Trans key="login.cloud_sync_active" />
           </Show>
         </p>
@@ -80,7 +83,9 @@ export function CompleteStep(props: CompleteStepProps) {
                   <h3 class="text-lightSlate-50 m-0 text-base font-bold">
                     <Trans
                       key="login.welcome_back_name"
-                      options={{ name: props.foundGDLAccountData?.nickname || 'User' }}
+                      options={{
+                        name: props.foundGDLAccountData?.nickname || "User"
+                      }}
                     />
                   </h3>
                   <p class="text-lightSlate-500 m-0 text-sm leading-relaxed">
@@ -91,15 +96,21 @@ export function CompleteStep(props: CompleteStepProps) {
               <ul class="text-lightSlate-500 m-0 flex list-none flex-col gap-2 pl-0 text-sm">
                 <li class="flex items-start gap-2">
                   <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
-                  <span><Trans key="login.benefit_shared_instances" /></span>
+                  <span>
+                    <Trans key="login.benefit_shared_instances" />
+                  </span>
                 </li>
                 <li class="flex items-start gap-2">
                   <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
-                  <span><Trans key="login.benefit_metrics_sync" /></span>
+                  <span>
+                    <Trans key="login.benefit_metrics_sync" />
+                  </span>
                 </li>
                 <li class="flex items-start gap-2">
                   <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
-                  <span><Trans key="login.benefit_settings_sync" /></span>
+                  <span>
+                    <Trans key="login.benefit_settings_sync" />
+                  </span>
                 </li>
               </ul>
               <Button
@@ -119,7 +130,13 @@ export function CompleteStep(props: CompleteStepProps) {
         </div>
       </Show>
 
-      <Show when={!props.hasGDLAccount && !props.foundExistingAccount && props.onSetupGDLAccount}>
+      <Show
+        when={
+          !props.hasGDLAccount &&
+          !props.foundExistingAccount &&
+          props.onSetupGDLAccount
+        }
+      >
         {/* No account - can create new one */}
         <div class="flex w-full max-w-96 flex-col gap-4">
           <div class="border-primary-500/40 bg-primary-500/5 relative w-full overflow-hidden rounded-lg border p-5">
@@ -140,15 +157,21 @@ export function CompleteStep(props: CompleteStepProps) {
               <ul class="text-lightSlate-500 m-0 flex list-none flex-col gap-2 pl-0 text-sm">
                 <li class="flex items-start gap-2">
                   <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
-                  <span><Trans key="login.benefit_share_with_friends" /></span>
+                  <span>
+                    <Trans key="login.benefit_share_with_friends" />
+                  </span>
                 </li>
                 <li class="flex items-start gap-2">
                   <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
-                  <span><Trans key="login.benefit_track_metrics" /></span>
+                  <span>
+                    <Trans key="login.benefit_track_metrics" />
+                  </span>
                 </li>
                 <li class="flex items-start gap-2">
                   <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
-                  <span><Trans key="login.benefit_sync_devices" /></span>
+                  <span>
+                    <Trans key="login.benefit_sync_devices" />
+                  </span>
                 </li>
               </ul>
               <p class="text-lightSlate-600 m-0 text-xs">

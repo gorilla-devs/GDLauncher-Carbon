@@ -93,7 +93,10 @@ const OCCASIONS: Occasion[] = [
  * Check if a given date falls within an occasion's date range
  * Handles year wraparound (e.g., Dec 28 - Jan 5)
  */
-function isDateInOccasion(occasion: Occasion, date: Date = new Date()): boolean {
+function _isDateInOccasion(
+  occasion: Occasion,
+  date: Date = new Date()
+): boolean {
   const currentYear = date.getFullYear()
 
   // Parse dates with current year
@@ -112,7 +115,11 @@ function isDateInOccasion(occasion: Occasion, date: Date = new Date()): boolean 
     const prevYearEnd = new Date(currentYear - 1, 11, 31, 23, 59, 59)
 
     const nextYearStart = new Date(currentYear, 0, 1)
-    const nextYearEnd = parse(occasion.endDate, "MM-dd", new Date(currentYear, 0, 1))
+    const nextYearEnd = parse(
+      occasion.endDate,
+      "MM-dd",
+      new Date(currentYear, 0, 1)
+    )
 
     return (
       isWithinInterval(date, {

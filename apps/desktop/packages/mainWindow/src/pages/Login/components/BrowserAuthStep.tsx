@@ -1,6 +1,13 @@
 import { Trans, useTransContext } from "@gd/i18n"
 import { Button, Progress, toast } from "@gd/ui"
-import { Show, Switch, Match, createSignal, createEffect, onCleanup } from "solid-js"
+import {
+  Show,
+  Switch,
+  Match,
+  createSignal,
+  createEffect,
+  onCleanup
+} from "solid-js"
 import { msToMinutes, msToSeconds, parseTwoDigitNumber } from "@/utils/helpers"
 import GateAnimationRiveWrapper from "@/utils/GateAnimationRiveWrapper"
 import GateAnimation from "../../../gate_animation.riv"
@@ -33,7 +40,7 @@ interface BrowserAuthStepProps {
 
 export function BrowserAuthStep(props: BrowserAuthStepProps) {
   const [t] = useTransContext()
-  const [browserOpened, setBrowserOpened] = createSignal(false)
+  const [_browserOpened, setBrowserOpened] = createSignal(false)
 
   // Calculate time remaining
   const expiresAtMs = () => {
@@ -143,7 +150,9 @@ export function BrowserAuthStep(props: BrowserAuthStepProps) {
 
           {/* Manual fallback options */}
           <div class="border-darkSlate-600 flex flex-col items-center gap-2 border-t pt-4">
-            <p class="text-lightSlate-600 text-xs"><Trans key="login.browser_didnt_open" /></p>
+            <p class="text-lightSlate-600 text-xs">
+              <Trans key="login.browser_didnt_open" />
+            </p>
             <Button size="small" type="secondary" onClick={openBrowser}>
               <div class="i-hugeicons:link-square-02" />
               <Trans key="login.open_browser_manually" />
@@ -183,7 +192,9 @@ export function BrowserAuthStep(props: BrowserAuthStepProps) {
 
       {/* Alternative: Switch to device code */}
       <div class="border-darkSlate-600 flex flex-col items-center gap-2 border-t pt-4">
-        <p class="text-lightSlate-600 text-xs"><Trans key="login.still_having_trouble" /></p>
+        <p class="text-lightSlate-600 text-xs">
+          <Trans key="login.still_having_trouble" />
+        </p>
         <button
           class="text-primary-400 hover:text-primary-300 cursor-pointer text-sm underline"
           onClick={props.onSwitchToDeviceCode}

@@ -1,4 +1,10 @@
-import { Show, createSignal, createMemo, createEffect, onCleanup } from "solid-js"
+import {
+  Show,
+  createSignal,
+  createMemo,
+  createEffect,
+  onCleanup
+} from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
 
@@ -188,7 +194,9 @@ const ProfileCreationStep = (props: ProfileCreationStepProps) => {
             >
               <Trans key="profile_creation.requirement_characters" />
             </li>
-            <li><Trans key="profile_creation.requirement_no_profanity" /></li>
+            <li>
+              <Trans key="profile_creation.requirement_no_profanity" />
+            </li>
           </ul>
         </div>
       </div>

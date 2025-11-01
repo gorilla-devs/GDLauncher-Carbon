@@ -42,17 +42,17 @@ const AuthLoadingOverlay = (props: AuthLoadingOverlayProps) => {
     <div class="absolute inset-0 z-20 flex items-center justify-center">
       <PatternBackground>
         <div class="flex flex-col items-center gap-16">
-          <RiveAppWapper
-            src={GDAnimation}
-            width={400}
-            height={400}
-          />
+          <RiveAppWapper src={GDAnimation} width={400} height={400} />
 
           <div class="w-96 text-center">
             <p class="text-lightSlate-50 mb-4 text-lg font-medium">
               {statusText()}
             </p>
-            <Progress value={props.progress} class="h-3" color="bg-primary-500" />
+            <Progress
+              value={props.progress}
+              class="h-3"
+              color="bg-primary-500"
+            />
           </div>
 
           <Show when={Date.now() - startTime() > 5000}>

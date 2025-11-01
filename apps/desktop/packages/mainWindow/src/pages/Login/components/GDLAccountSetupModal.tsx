@@ -1,6 +1,6 @@
 import { Trans } from "@gd/i18n"
 import { Button } from "@gd/ui"
-import { createSignal, Show } from "solid-js"
+import { createSignal, Show, For } from "solid-js"
 import { rspc } from "@/utils/rspcClient"
 
 /**
@@ -127,19 +127,27 @@ export function GDLAccountSetupModal(props: GDLAccountSetupModalProps) {
                 <ul class="text-lightSlate-600 flex flex-col gap-2 text-sm">
                   <li class="flex items-start gap-2">
                     <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-1 shrink-0" />
-                    <span><Trans key="login.benefit_share_instances_friends" /></span>
+                    <span>
+                      <Trans key="login.benefit_share_instances_friends" />
+                    </span>
                   </li>
                   <li class="flex items-start gap-2">
                     <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-1 shrink-0" />
-                    <span><Trans key="login.benefit_track_metrics_playtime" /></span>
+                    <span>
+                      <Trans key="login.benefit_track_metrics_playtime" />
+                    </span>
                   </li>
                   <li class="flex items-start gap-2">
                     <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-1 shrink-0" />
-                    <span><Trans key="login.benefit_sync_settings_preferences" /></span>
+                    <span>
+                      <Trans key="login.benefit_sync_settings_preferences" />
+                    </span>
                   </li>
                   <li class="flex items-start gap-2">
                     <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-1 shrink-0" />
-                    <span><Trans key="login.benefit_access_anywhere" /></span>
+                    <span>
+                      <Trans key="login.benefit_access_anywhere" />
+                    </span>
                   </li>
                 </ul>
               </div>
@@ -199,15 +207,17 @@ export function GDLAccountSetupModal(props: GDLAccountSetupModalProps) {
           <div class="flex gap-2">
             {/* Step indicator */}
             <div class="flex items-center gap-1">
-              {[1, 2, 3].map((step) => (
-                <div
-                  class="h-2 w-2 rounded-full"
-                  classList={{
-                    "bg-primary-400": step === currentStep(),
-                    "bg-darkSlate-600": step !== currentStep()
-                  }}
-                />
-              ))}
+              <For each={[1, 2, 3]}>
+                {(step) => (
+                  <div
+                    class="h-2 w-2 rounded-full"
+                    classList={{
+                      "bg-primary-400": step === currentStep(),
+                      "bg-darkSlate-600": step !== currentStep()
+                    }}
+                  />
+                )}
+              </For>
             </div>
 
             <Button

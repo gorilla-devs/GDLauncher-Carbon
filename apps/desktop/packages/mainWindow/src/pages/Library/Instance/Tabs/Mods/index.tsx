@@ -12,7 +12,6 @@ import {
 import { For, Show, createMemo, createSignal } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import Mod from "./Mod"
-import skull from "/assets/images/icons/skull.png"
 import { useParams, useRouteData } from "@solidjs/router"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 import { rspc } from "@/utils/rspcClient"
@@ -114,7 +113,10 @@ const Mods = () => {
     return (
       <div class="min-h-90 flex h-full w-full items-center justify-center">
         <div class="flex flex-col items-center justify-center gap-6 text-center">
-          <PlaceholderGorilla size={10} variant="Confused Gorilla - Empty Chest" />
+          <PlaceholderGorilla
+            size={10}
+            variant="Confused Gorilla - Empty Chest"
+          />
           <p class="text-lightSlate-700 max-w-100">
             <Trans key="instance.no_mods_text" />
           </p>

@@ -2,8 +2,8 @@ use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing::{debug, error, info, warn};
 use url::Url;
-use tracing::{debug, info, warn, error};
 
 /// Protocol handler for OAuth callbacks via gdlauncher:// custom protocol.
 ///
@@ -50,18 +50,24 @@ impl ProtocolHandler {
         info!("Handling protocol callback: {}", protocol_url);
 
         // Parse the protocol URL
-        let url = Url::parse(protocol_url)
-            .map_err(|e| anyhow::anyhow!("Invalid protocol URL: {}", e))?;
+        let url =
+            Url::parse(protocol_url).map_err(|e| anyhow::anyhow!("Invalid protocol URL: {}", e))?;
 
         // Validate scheme
         if url.scheme() != "gdlauncher" {
-            bail!("Invalid protocol scheme: expected 'gdlauncher', got '{}'", url.scheme());
+            bail!(
+                "Invalid protocol scheme: expected 'gdlauncher', got '{}'",
+                url.scheme()
+            );
         }
 
         // Validate path (should be /oauth/callback)
         let path = url.path();
         if path != "/oauth/callback" && path != "oauth/callback" {
-            bail!("Invalid protocol path: expected '/oauth/callback', got '{}'", path);
+            bail!(
+                "Invalid protocol path: expected '/oauth/callback', got '{}'",
+                path
+            );
         }
 
         // Parse query parameters
@@ -86,7 +92,10 @@ impl ProtocolHandler {
 
         // Check for errors
         if let Some(error) = &callback.error {
-            let description = callback.error_description.as_deref().unwrap_or("Unknown error");
+            let description = callback
+                .error_description
+                .as_deref()
+                .unwrap_or("Unknown error");
             warn!("OAuth protocol callback error: {} - {}", error, description);
             bail!("OAuth error: {} - {}", error, description);
         }
@@ -152,7 +161,8 @@ mod tests {
     #[tokio::test]
     async fn test_parse_error_callback() {
         let handler = ProtocolHandler::new();
-        let url = "gdlauncher://oauth/callback?error=access_denied&error_description=User%20cancelled";
+        let url =
+            "gdlauncher://oauth/callback?error=access_denied&error_description=User%20cancelled";
 
         let result = handler.handle_callback(url).await;
         assert!(result.is_err());

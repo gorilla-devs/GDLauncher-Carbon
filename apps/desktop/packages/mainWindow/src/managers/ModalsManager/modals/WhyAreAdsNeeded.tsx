@@ -18,7 +18,10 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
         <div class="space-y-6 px-8 py-6">
           {/* Gorilla Mascot */}
           <div class="flex justify-center">
-            <PlaceholderGorilla size={8} variant="Thoughtful Gorilla - Explaining Support" />
+            <PlaceholderGorilla
+              size={8}
+              variant="Thoughtful Gorilla - Explaining Support"
+            />
           </div>
 
           {/* Hero Introduction */}

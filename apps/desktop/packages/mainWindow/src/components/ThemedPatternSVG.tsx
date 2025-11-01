@@ -1,8 +1,8 @@
-import { createSignal, onMount, Show } from "solid-js"
+import { onMount } from "solid-js"
 import patternSvgRaw from "/assets/images/gdlauncher_pattern.svg?raw"
 
 const ThemedPatternSVG = () => {
-  const [svgContent, setSvgContent] = createSignal<string>("")
+  let containerRef: HTMLDivElement | undefined
 
   onMount(() => {
     try {
@@ -27,7 +27,14 @@ const ThemedPatternSVG = () => {
         '<svg$1 style="width: 100%; height: 100%;" preserveAspectRatio="xMidYMid slice">'
       )
 
-      setSvgContent(svgText)
+      // Parse and sanitize SVG content
+      const parser = new DOMParser()
+      const doc = parser.parseFromString(svgText, "image/svg+xml")
+      const svgElement = doc.querySelector("svg")
+
+      if (svgElement && containerRef) {
+        containerRef.appendChild(svgElement)
+      }
     } catch (error) {
       console.error("Failed to load pattern SVG:", error)
     }
@@ -43,9 +50,7 @@ const ThemedPatternSVG = () => {
           fill: rgb(var(--darkSlate-800));
         }
       `}</style>
-      <Show when={svgContent()}>
-        <div class="h-full w-full" innerHTML={svgContent()} />
-      </Show>
+      <div ref={containerRef} class="h-full w-full" />
     </>
   )
 }

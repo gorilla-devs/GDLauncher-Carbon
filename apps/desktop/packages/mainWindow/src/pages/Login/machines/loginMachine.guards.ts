@@ -1,4 +1,4 @@
-import type { LoginMachineContext } from './loginMachine.types'
+import type { LoginMachineContext } from "./loginMachine.types"
 
 export const guards = {
   shouldShowSeasonalSplash: ({ context }: { context: LoginMachineContext }) =>
@@ -7,8 +7,11 @@ export const guards = {
   isAddingFromSettings: ({ context }: { context: LoginMachineContext }) =>
     context.isAddingAccount,
 
-  isAddingMicrosoftFromSettings: ({ context }: { context: LoginMachineContext }) =>
-    context.isAddingMicrosoftAccount,
+  isAddingMicrosoftFromSettings: ({
+    context
+  }: {
+    context: LoginMachineContext
+  }) => context.isAddingMicrosoftAccount,
 
   isAddingGdlFromSettings: ({ context }: { context: LoginMachineContext }) =>
     context.isAddingGdlAccount,
@@ -29,15 +32,16 @@ export const guards = {
     context.gdlAccountId === context.activeUuid,
 
   previouslySkippedGDL: ({ context }: { context: LoginMachineContext }) =>
-    context.gdlAccountId === '',
+    context.gdlAccountId === "",
 
   shouldReturnToSettings: ({ context }: { context: LoginMachineContext }) =>
-    (context.isAddingMicrosoftAccount || context.isAddingGdlAccount) && context.returnPath !== null,
+    (context.isAddingMicrosoftAccount || context.isAddingGdlAccount) &&
+    context.returnPath !== null,
 
   shouldUseViewTransitions: ({ context }: { context: LoginMachineContext }) =>
     !context.reducedMotion &&
-    typeof document !== 'undefined' &&
-    'startViewTransition' in document,
+    typeof document !== "undefined" &&
+    "startViewTransition" in document,
 
   accountExists: ({ context }: { context: LoginMachineContext }) =>
     context.accounts.some((acc) => acc.uuid === context.activeUuid)

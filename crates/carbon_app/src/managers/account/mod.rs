@@ -528,7 +528,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
         access_token: String,
         username: String,
     ) -> anyhow::Result<()> {
-        let result = api::create_profile(&self.app.reqwest_client, &access_token, &username).await?;
+        let result =
+            api::create_profile(&self.app.reqwest_client, &access_token, &username).await?;
 
         match result {
             Ok(_) => Ok(()),
@@ -911,9 +912,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         info!("Received protocol callback");
 
         // Parse and store the callback
-        self.protocol_handler
-            .handle_callback(&protocol_url)
-            .await?;
+        self.protocol_handler.handle_callback(&protocol_url).await?;
 
         info!("Protocol callback stored successfully");
         Ok(())
@@ -927,9 +926,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
     /// Retrieve and consume a pending protocol OAuth callback
     ///
     /// Returns None if no callback is pending
-    pub async fn take_protocol_callback(
-        self,
-    ) -> Option<protocol_handler::ProtocolOAuthCallback> {
+    pub async fn take_protocol_callback(self) -> Option<protocol_handler::ProtocolOAuthCallback> {
         self.protocol_handler.take_pending_code().await
     }
 
@@ -994,7 +991,9 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 // Fetch the profile again (should succeed now that user created it)
                 let mc_profile = api::get_profile(&self.app.reqwest_client, &access_token)
                     .await?
-                    .map_err(|e| anyhow::anyhow!("Failed to get profile after creation: {:?}", e))?;
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to get profile after creation: {:?}", e)
+                    })?;
 
                 let account = api::McAccount {
                     entitlement: entitlements,
@@ -1009,7 +1008,8 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
                 // Update status to Complete
                 if let Some(enrollment) = &*self.active_enrollment.read().await {
-                    *enrollment.status.write().await = EnrollmentStatus::Complete(full_account.clone());
+                    *enrollment.status.write().await =
+                        EnrollmentStatus::Complete(full_account.clone());
                 }
 
                 self.app.invalidate(ENROLL_GET_STATUS, None);

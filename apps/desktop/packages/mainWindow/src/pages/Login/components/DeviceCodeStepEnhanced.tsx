@@ -9,14 +9,7 @@
  * - Better visual hierarchy and spacing
  */
 
-import {
-  Button,
-  Progress,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  toast
-} from "@gd/ui"
+import { Button, Progress, toast } from "@gd/ui"
 import {
   createEffect,
   createSignal,
@@ -33,7 +26,7 @@ import { rspc } from "@/utils/rspcClient"
 import { DeviceCodeObjectType } from "../index"
 import { handleStatus } from "@/utils/login"
 import { EnrollmentError } from "@gd/core_module/bindings"
-import QRCode from 'qrcode'
+import QRCode from "qrcode"
 import type { CreateQueryResult } from "@tanstack/solid-query"
 
 interface Props {
@@ -126,36 +119,36 @@ export function DeviceCodeStepEnhanced(props: Props) {
           width: 200,
           margin: 2,
           color: {
-            dark: '#000000',  // Black for maximum contrast and scannability
-            light: '#FFFFFF'  // White background
+            dark: "#000000", // Black for maximum contrast and scannability
+            light: "#FFFFFF" // White background
           }
         })
       } catch (err) {
-        console.error('Error generating QR code:', err)
-        setError('Failed to generate QR code')
+        console.error("Error generating QR code:", err)
+        setError("Failed to generate QR code")
       }
     }
   })
 
   const handleErrorMessages = (error: EnrollmentError) => {
-    const isCodeExpired = error === "deviceCodeExpired"
+    const isCodeExpired = error.errorType === "deviceCodeExpired"
 
     if (isCodeExpired) {
       handleRefresh()
-    } else if (typeof error === "string") {
-      toast.error("Authentication Error", {
-        description: t(`error.${error}`)
-      })
-    } else {
-      if (typeof error.xboxAccount === "string")
+    } else if (error.errorType === "xboxAccount" && error.xboxError) {
+      if (typeof error.xboxError === "string") {
         toast.error("Authentication Error", {
-          description: t(`error.xbox_${error.xboxAccount}`)
+          description: t(`error.xbox_${error.xboxError}`)
         })
-      else {
+      } else {
         toast.error("Authentication Error", {
-          description: `${t("error.xbox_code")} ${error.xboxAccount.unknown}`
+          description: `${t("error.xbox_code")} ${error.xboxError.unknown}`
         })
       }
+    } else {
+      toast.error("Authentication Error", {
+        description: error.description || t(`error.${error.errorType}`)
+      })
     }
   }
 
@@ -187,7 +180,8 @@ export function DeviceCodeStepEnhanced(props: Props) {
         {/* Timer integrated below code */}
         <Show when={!expired()}>
           <p class="text-lightSlate-600 text-xs m-0">
-            <Trans key="login.expires_in" /> <span class="text-lightSlate-400 font-medium">{countDown()}</span>
+            <Trans key="login.expires_in" />{" "}
+            <span class="text-lightSlate-400 font-medium">{countDown()}</span>
           </p>
         </Show>
 
@@ -242,7 +236,7 @@ export function DeviceCodeStepEnhanced(props: Props) {
               <Progress class="flex-1" />
               <span class="text-lightSlate-500 text-xs whitespace-nowrap">
                 <Switch>
-                  <Match when={(props.enrollmentStatus?.data as any)?.pollingCode}>
+                  <Match when={props.enrollmentStatus?.data?.pollingCode}>
                     <Trans key="login.polling_microsoft_auth" />
                   </Match>
                   <Match when={props.enrollmentStatus?.data === "xboxAuth"}>
@@ -254,7 +248,7 @@ export function DeviceCodeStepEnhanced(props: Props) {
                   <Match when={props.enrollmentStatus?.data === "mcProfile"}>
                     <Trans key="login.retrieving_minecraft_profile" />
                   </Match>
-                  <Match when={(props.enrollmentStatus?.data as any)?.mcEntitlements}>
+                  <Match when={props.enrollmentStatus?.data?.mcEntitlements}>
                     <Trans key="login.retrieving_minecraft_entitlements" />
                   </Match>
                 </Switch>
@@ -267,7 +261,9 @@ export function DeviceCodeStepEnhanced(props: Props) {
       {/* Alternative: Switch to browser auth */}
       <Show when={props.onSwitchToBrowser && !expired()}>
         <div class="border-darkSlate-600 flex flex-col items-center gap-2 border-t pt-4">
-          <p class="text-lightSlate-600 text-xs m-0"><Trans key="login.trouble_with_code" /></p>
+          <p class="text-lightSlate-600 text-xs m-0">
+            <Trans key="login.trouble_with_code" />
+          </p>
           <button
             class="text-primary-400 hover:text-primary-300 cursor-pointer text-sm underline transition-colors"
             onClick={props.onSwitchToBrowser}

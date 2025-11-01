@@ -407,7 +407,9 @@ const Accounts = () => {
                     type="outline"
                     onClick={async () => {
                       await removeGDLAccountMutation.mutateAsync(undefined)
-                      gdNavigator.navigate("/?addGdlAccount=true&returnTo=/settings/accounts")
+                      gdNavigator.navigate(
+                        "/?addGdlAccount=true&returnTo=/settings/accounts"
+                      )
                     }}
                   >
                     <div class="i-hugeicons:link-01 text-lg" />
@@ -445,7 +447,9 @@ const Accounts = () => {
                 type="secondary"
                 size="small"
                 onClick={() => {
-                  gdNavigator.navigate("/?addMicrosoftAccount=true&returnTo=/settings/accounts")
+                  gdNavigator.navigate(
+                    "/?addMicrosoftAccount=true&returnTo=/settings/accounts"
+                  )
                 }}
               >
                 <div class="i-hugeicons:add-01 text-lg" />

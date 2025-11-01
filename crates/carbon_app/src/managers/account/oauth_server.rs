@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, sync::Arc};
 use tokio::{
     net::TcpListener,
-    sync::{oneshot, RwLock},
-    time::{timeout, Duration},
+    sync::{RwLock, oneshot},
+    time::{Duration, timeout},
 };
 use tracing::{debug, error, info, warn};
 
@@ -148,7 +148,8 @@ impl OAuthCallbackHandle {
                 }
                 tokio::time::sleep(Duration::from_millis(500)).await;
             }
-        }).await;
+        })
+        .await;
 
         match result {
             Ok(Ok(code)) => {
@@ -192,7 +193,9 @@ async fn oauth_callback(
 
     // Check for error in callback
     if let Some(error) = params.error {
-        let description = params.error_description.unwrap_or_else(|| "Unknown error".to_string());
+        let description = params
+            .error_description
+            .unwrap_or_else(|| "Unknown error".to_string());
         error!("OAuth callback error: {} - {}", error, description);
 
         return Html(error_page(&error, &description));
@@ -207,7 +210,10 @@ async fn oauth_callback(
         Html(success_page())
     } else {
         warn!("OAuth callback received without code or error");
-        Html(error_page("invalid_request", "No authorization code received"))
+        Html(error_page(
+            "invalid_request",
+            "No authorization code received",
+        ))
     }
 }
 

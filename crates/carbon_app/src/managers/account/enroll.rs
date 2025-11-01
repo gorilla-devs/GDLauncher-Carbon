@@ -4,7 +4,7 @@ use super::api::{
     DeviceCode, DeviceCodeExpiredError, FullAccount, GetProfileError, McAccount, McAuth,
     McEntitlementMissingError, MsAuth, XboxAuth, XboxError, get_profile,
 };
-use super::oauth_server::{OAuthCallbackServer, OAuthCallbackHandle};
+use super::oauth_server::{OAuthCallbackHandle, OAuthCallbackServer};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use chrono::Utc;
@@ -13,7 +13,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::RwLock;
 use tokio::time::Duration;
-use tracing::{trace, info, error};
+use tracing::{error, info, trace};
 use url::Url;
 
 /// Active process of adding an account
@@ -169,13 +169,18 @@ impl EnrollmentTask {
 
                 // Build Microsoft OAuth authorization URL
                 // Using Authorization Code Flow (RFC 6749 Section 4.1)
-                let mut auth_url = Url::parse("https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize")
-                    .map_err(|e| anyhow!("Failed to parse OAuth URL: {}", e))?;
-                auth_url.query_pairs_mut()
+                let mut auth_url =
+                    Url::parse("https://login.microsoftonline.com/consumers/oauth2/v2.0/authorize")
+                        .map_err(|e| anyhow!("Failed to parse OAuth URL: {}", e))?;
+                auth_url
+                    .query_pairs_mut()
                     .append_pair("client_id", env!("MS_AUTH_CLIENT_ID"))
                     .append_pair("response_type", "code")
                     .append_pair("redirect_uri", &redirect_uri)
-                    .append_pair("scope", "XboxLive.signin XboxLive.offline_access profile openid email")
+                    .append_pair(
+                        "scope",
+                        "XboxLive.signin XboxLive.offline_access profile openid email",
+                    )
                     .append_pair("response_mode", "query")
                     .append_pair("prompt", "select_account");
 
@@ -218,7 +223,10 @@ impl EnrollmentTask {
                     .post("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
                     .form(&[
                         ("client_id", env!("MS_AUTH_CLIENT_ID")),
-                        ("scope", "XboxLive.signin XboxLive.offline_access profile openid email"),
+                        (
+                            "scope",
+                            "XboxLive.signin XboxLive.offline_access profile openid email",
+                        ),
                         ("code", &code),
                         ("redirect_uri", &redirect_uri),
                         ("grant_type", "authorization_code"),
@@ -494,7 +502,8 @@ impl EnrollmentError {
             Self::GameProfileMissing => vec![
                 "Choose a username for your Minecraft profile".to_string(),
                 "Make sure the username follows Minecraft's guidelines".to_string(),
-                "The profile creation happens automatically - no additional steps needed".to_string(),
+                "The profile creation happens automatically - no additional steps needed"
+                    .to_string(),
             ],
         }
     }
@@ -502,10 +511,14 @@ impl EnrollmentError {
     /// Get a support link for this error
     pub fn support_link(&self) -> &'static str {
         match self {
-            Self::DeviceCodeExpired => "https://help.minecraft.net/hc/en-us/articles/4409159214605-Microsoft-Authentication-Issues",
+            Self::DeviceCodeExpired => {
+                "https://help.minecraft.net/hc/en-us/articles/4409159214605-Microsoft-Authentication-Issues"
+            }
             Self::XboxError(e) => e.support_link(),
             Self::EntitlementMissing => "https://www.minecraft.net/get-minecraft",
-            Self::GameProfileMissing => "https://help.minecraft.net/hc/en-us/articles/4409152531341-Minecraft-Profile-Troubleshooting",
+            Self::GameProfileMissing => {
+                "https://help.minecraft.net/hc/en-us/articles/4409152531341-Minecraft-Profile-Troubleshooting"
+            }
         }
     }
 }

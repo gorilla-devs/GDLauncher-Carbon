@@ -18,7 +18,9 @@ interface TermsAndPrivacyStepProps {
 
 export function TermsAndPrivacyStep(props: TermsAndPrivacyStepProps) {
   const modalsContext = useModal()
-  const [termsAccepted, setTermsAccepted] = createSignal(props.initialAccepted ?? false)
+  const [termsAccepted, setTermsAccepted] = createSignal(
+    props.initialAccepted ?? false
+  )
 
   // Notify parent when acceptance state changes
   const handleAcceptanceChange = (accepted: boolean) => {

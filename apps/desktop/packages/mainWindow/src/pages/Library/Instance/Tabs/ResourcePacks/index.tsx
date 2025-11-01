@@ -11,7 +11,6 @@ import {
 import { For, Show } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import ResourcePack from "./ResourcePack"
-import skull from "/assets/images/icons/skull.png"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 
 interface IResourcepack {
@@ -135,7 +134,10 @@ const NoResourcePacks = () => {
   return (
     <div class="min-h-90 flex h-full w-full items-center justify-center">
       <div class="flex flex-col items-center justify-center gap-6 text-center">
-        <PlaceholderGorilla size={10} variant="Artistic Gorilla - Painter Palette" />
+        <PlaceholderGorilla
+          size={10}
+          variant="Artistic Gorilla - Painter Palette"
+        />
         <p class="text-lightSlate-700 max-w-100">
           <Trans
             key="instance.no_resource_packs_text"

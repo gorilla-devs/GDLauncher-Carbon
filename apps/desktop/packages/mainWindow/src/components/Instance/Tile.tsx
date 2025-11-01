@@ -638,8 +638,7 @@ const Tile = (props: Props) => {
                               classList={{
                                 "text-lightSlate-700 hover:text-lightSlate-100 duration-100 ease-in-out":
                                   !copiedError(),
-                                "text-green-400":
-                                  copiedError()
+                                "text-green-400": copiedError()
                               }}
                               onClick={(e) => {
                                 e.stopPropagation()

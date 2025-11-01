@@ -219,24 +219,12 @@ export const useAddonMutations = (
   }
 
   const handleSwitchVersion = (mod: ModType) => {
-    console.log('[handleSwitchVersion] Called with mod:', {
-      filename: mod.filename,
-      hasCurseforge: !!mod.curseforge,
-      hasModrinth: !!mod.modrinth,
-      curseforgeProjectId: mod.curseforge?.project_id,
-      curseforgeProjectIdType: typeof mod.curseforge?.project_id,
-      modrinthProjectId: mod.modrinth?.project_id,
-      modrinthProjectIdType: typeof mod.modrinth?.project_id,
-      instanceId: params.id
-    })
-
     const hasCurseforge = !!mod.curseforge
     const hasModrinth = !!mod.modrinth
     const modName = mod.metadata?.name || mod.filename
 
     // If no platforms available, do nothing
     if (!hasCurseforge && !hasModrinth) {
-      console.log('[handleSwitchVersion] No platforms available, returning')
       return
     }
 
@@ -245,13 +233,6 @@ export const useAddonMutations = (
       projectId: string | number
     ) => {
       const url = `/addon/${projectId}/${platform}/versions?instanceId=${params.id}`
-      console.log('[handleSwitchVersion] Navigating to:', {
-        platform,
-        projectId,
-        projectIdType: typeof projectId,
-        instanceId: params.id,
-        fullUrl: url
-      })
       navigator.navigate(url)
     }
 

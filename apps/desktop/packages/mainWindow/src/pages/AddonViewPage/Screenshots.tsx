@@ -32,7 +32,10 @@ const Screenshots = () => {
           </Match>
           <Match when={(screenshots()?.length || 0) === 0 && !mod?.isLoading}>
             <div class="flex flex-col items-center justify-center gap-6 py-12 text-center">
-              <PlaceholderGorilla size={8} variant="Gallery Gorilla - Empty Frame" />
+              <PlaceholderGorilla
+                size={8}
+                variant="Gallery Gorilla - Empty Frame"
+              />
               <p class="text-lightSlate-700 max-w-100">
                 <Trans
                   key="modpack.no_screenshot"

@@ -259,7 +259,9 @@ enum EnrollmentStatus {
     XboxAuth,
     MCEntitlements,
     McProfile,
-    NeedsProfileCreation { access_token: String },
+    NeedsProfileCreation {
+        access_token: String,
+    },
     Complete(AccountEntry),
     Failed(EnrollmentError),
 }
@@ -375,11 +377,9 @@ impl From<&account::EnrollmentStatus> for Result<EnrollmentStatus, FeError> {
             &BE::XboxAuth => Api::XboxAuth,
             &BE::MCEntitlements => Api::MCEntitlements,
             &BE::McProfile => Api::McProfile,
-            BE::NeedsProfileCreation { access_token, .. } => {
-                Api::NeedsProfileCreation {
-                    access_token: access_token.clone(),
-                }
-            }
+            BE::NeedsProfileCreation { access_token, .. } => Api::NeedsProfileCreation {
+                access_token: access_token.clone(),
+            },
             BE::Complete(account) => Api::Complete({
                 // this is bad, but it used to be far worse
                 let account: account::FullAccount = account.clone().into();

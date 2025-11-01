@@ -1017,16 +1017,20 @@ export const AddonTable = (props: AddonTableProps) => {
                                 class="text-xs"
                                 classList={{
                                   "i-hugeicons:arrow-up-01": true,
-                                  "text-blue-400": header.column.getIsSorted() === "asc",
-                                  "text-lightSlate-500": header.column.getIsSorted() !== "asc"
+                                  "text-blue-400":
+                                    header.column.getIsSorted() === "asc",
+                                  "text-lightSlate-500":
+                                    header.column.getIsSorted() !== "asc"
                                 }}
                               />
                               <div
                                 class="-mt-1 text-xs"
                                 classList={{
                                   "i-hugeicons:arrow-down-01": true,
-                                  "text-blue-400": header.column.getIsSorted() === "desc",
-                                  "text-lightSlate-500": header.column.getIsSorted() !== "desc"
+                                  "text-blue-400":
+                                    header.column.getIsSorted() === "desc",
+                                  "text-lightSlate-500":
+                                    header.column.getIsSorted() !== "desc"
                                 }}
                               />
                             </div>
@@ -1150,7 +1154,9 @@ export const AddonTable = (props: AddonTableProps) => {
                                 fallback={
                                   <Show
                                     when={item.icon === "modrinth"}
-                                    fallback={<div class={`${item.icon} h-4 w-4`} />}
+                                    fallback={
+                                      <div class={`${item.icon} h-4 w-4`} />
+                                    }
                                   >
                                     <img
                                       src={ModrinthLogo}
@@ -1206,7 +1212,9 @@ export const AddonTable = (props: AddonTableProps) => {
                                             <Show
                                               when={child.icon === "modrinth"}
                                               fallback={
-                                                <div class={`${child.icon} h-4 w-4`} />
+                                                <div
+                                                  class={`${child.icon} h-4 w-4`}
+                                                />
                                               }
                                             >
                                               <img

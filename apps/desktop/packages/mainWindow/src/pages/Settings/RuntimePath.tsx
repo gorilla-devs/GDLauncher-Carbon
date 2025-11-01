@@ -1,10 +1,4 @@
-import {
-  Button,
-  Input,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger
-} from "@gd/ui"
+import { Button, Input, Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
 import { Trans } from "@gd/i18n"
 import PageTitle from "./components/PageTitle"
 import RowsContainer from "./components/RowsContainer"

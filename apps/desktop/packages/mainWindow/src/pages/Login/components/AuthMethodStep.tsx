@@ -52,7 +52,9 @@ export function AuthMethodStep(props: AuthMethodStepProps) {
         {/* Recommended badge */}
         <div class="text-primary-400 flex items-center justify-center gap-1 text-xs font-medium">
           <div class="i-hugeicons:star h-3 w-3" />
-          <span><Trans key="login.recommended" /></span>
+          <span>
+            <Trans key="login.recommended" />
+          </span>
         </div>
       </div>
 

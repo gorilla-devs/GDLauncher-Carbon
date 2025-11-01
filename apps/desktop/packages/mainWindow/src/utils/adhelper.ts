@@ -26,33 +26,41 @@ const init = async () => {
     _setBannerAdSize(bounds.bannerAdSize)
   }
 
-  window.adSizeChanged((_, newBounds: { adSize: Omit<BoundsSize, "shouldShow">, bannerAdSize?: Omit<BoundsSize, "shouldShow"> }) => {
-    _setAdSize({
-      ...newBounds.adSize,
-      shouldShow: false
-    })
-
-    setTimeout(() => {
+  window.adSizeChanged(
+    (
+      _,
+      newBounds: {
+        adSize: Omit<BoundsSize, "shouldShow">
+        bannerAdSize?: Omit<BoundsSize, "shouldShow">
+      }
+    ) => {
       _setAdSize({
         ...newBounds.adSize,
-        shouldShow: true
-      })
-    }, 100)
-
-    if (newBounds.bannerAdSize) {
-      _setBannerAdSize({
-        ...newBounds.bannerAdSize,
         shouldShow: false
       })
 
       setTimeout(() => {
-        _setBannerAdSize({
-          ...newBounds.bannerAdSize,
+        _setAdSize({
+          ...newBounds.adSize,
           shouldShow: true
         })
       }, 100)
+
+      if (newBounds.bannerAdSize) {
+        _setBannerAdSize({
+          ...newBounds.bannerAdSize,
+          shouldShow: false
+        })
+
+        setTimeout(() => {
+          _setBannerAdSize({
+            ...newBounds.bannerAdSize,
+            shouldShow: true
+          })
+        }, 100)
+      }
     }
-  })
+  )
 }
 
 init()

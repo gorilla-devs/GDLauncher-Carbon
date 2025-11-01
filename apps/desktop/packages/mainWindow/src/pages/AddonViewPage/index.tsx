@@ -26,8 +26,6 @@ import {
   createContext,
   createSignal,
   createMemo,
-  createEffect,
-  on,
   onMount
 } from "solid-js"
 import { format } from "date-fns"
@@ -45,7 +43,6 @@ import { CreateQueryResult } from "@tanstack/solid-query"
 import { RSPCError } from "@rspc/client"
 import ModpackDownloadButton from "@/components/ModpackDownloadButton"
 import AuthorAvatars, { Author } from "@/components/AuthorAvatars"
-import useSearchContext from "@/components/SearchInputContext"
 
 const getTabIndexFromPath = (path: string) => {
   if (path.match(/\/(addon)\/.+\/.+/g)) {
@@ -66,13 +63,6 @@ const getTabIndexFromPath = (path: string) => {
 const ModsInfiniteScrollQueryWrapper = () => {
   const params = useParams()
   const platform = () => params.platform as FEUnifiedPlatform
-
-  console.log('[ModsInfiniteScrollQueryWrapper] Route params:', {
-    modId: params.id,
-    modIdType: typeof params.id,
-    platform: platform(),
-    allParams: params
-  })
 
   return (
     <InfiniteScrollVersionsQueryWrapper
@@ -110,7 +100,6 @@ const AddonExplore = () => {
   const indexTab = () => getTabIndexFromPath(location.pathname)
   const [t] = useTransContext()
   const [searchParams] = useSearchParams()
-  const searchContext = useSearchContext()
 
   const selectedInstanceId = () => {
     const id = parseInt(searchParams.instanceId, 10)

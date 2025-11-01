@@ -591,7 +591,8 @@ async function createWindow(): Promise<BrowserWindow> {
     }
 
     lastDisplay = currentDisplay
-    const { minWidth, minHeight, adSize, bannerAdSize } = getAdSize(currentDisplay)
+    const { minWidth, minHeight, adSize, bannerAdSize } =
+      getAdSize(currentDisplay)
     win?.setMinimumSize(minWidth, minHeight)
     win?.setSize(minWidth, minHeight)
     win?.webContents?.send("adSizeChanged", { adSize, bannerAdSize })
@@ -897,7 +898,7 @@ app.whenReady().then(async () => {
 
   app.on("second-instance", (_e, argv) => {
     // Handle protocol URLs on Windows (passed as command line arguments)
-    const protocolUrl = argv.find(arg => arg.startsWith("gdlauncher://"))
+    const protocolUrl = argv.find((arg) => arg.startsWith("gdlauncher://"))
 
     if (win && !win.isDestroyed()) {
       // Focus on the main window if the user tried to open another
@@ -945,7 +946,8 @@ app.whenReady().then(async () => {
 
       lastDisplay = currentDisplay
 
-      const { minWidth, minHeight, adSize, bannerAdSize } = getAdSize(currentDisplay)
+      const { minWidth, minHeight, adSize, bannerAdSize } =
+        getAdSize(currentDisplay)
       if (changedMetrics.includes("workArea")) {
         win?.setMinimumSize(minWidth, minHeight)
         win?.setSize(minWidth, minHeight)

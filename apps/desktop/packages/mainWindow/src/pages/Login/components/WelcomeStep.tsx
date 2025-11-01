@@ -18,24 +18,31 @@ export function WelcomeStep(props: WelcomeStepProps) {
   return (
     <div class="flex w-full flex-1 flex-col items-center justify-center gap-8 p-6 text-center">
       {/* Gorilla Mascot */}
-      <PlaceholderGorilla size={12} variant="Waving Gorilla - Friendly Welcome" />
+      <PlaceholderGorilla
+        size={12}
+        variant="Waving Gorilla - Friendly Welcome"
+      />
 
       {/* Welcome Message */}
       <div class="flex flex-col items-center gap-3">
-        <Show when={props.hasActiveAccount} fallback={
-          <h2 class="text-lightSlate-50 m-0 text-3xl font-bold">
-            Welcome to GDLauncher
-          </h2>
-        }>
+        <Show
+          when={props.hasActiveAccount}
+          fallback={
+            <h2 class="text-lightSlate-50 m-0 text-3xl font-bold">
+              Welcome to GDLauncher
+            </h2>
+          }
+        >
           <h2 class="text-lightSlate-50 m-0 text-3xl font-bold">
             Welcome Back!
           </h2>
         </Show>
 
         <p class="text-lightSlate-400 max-w-md text-base leading-relaxed">
-          <Show when={props.hasActiveAccount} fallback={
-            <Trans key="login.welcome_tagline" />
-          }>
+          <Show
+            when={props.hasActiveAccount}
+            fallback={<Trans key="login.welcome_tagline" />}
+          >
             <Trans key="login.welcome_returning_tagline" />
           </Show>
         </p>

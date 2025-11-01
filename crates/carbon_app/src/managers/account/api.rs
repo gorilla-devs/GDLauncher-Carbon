@@ -406,16 +406,21 @@ impl XboxError {
     /// Get a detailed, user-friendly description of the error
     pub fn description(&self) -> &'static str {
         match self {
-            Self::NoAccount =>
-                "Your Microsoft account is not linked to an Xbox account. An Xbox account is required to play Minecraft.",
-            Self::XboxServicesBanned =>
-                "Xbox Live services are not available in your region. Unfortunately, this prevents authentication with Minecraft.",
-            Self::AdultVerificationRequired =>
-                "Your Xbox account requires adult verification before it can be used with Minecraft. This is a security requirement from Microsoft.",
-            Self::ChildAccount =>
-                "Your Xbox account is registered as a child account and must be part of a Microsoft Family before it can access Minecraft. This is a safety feature from Microsoft.",
-            Self::Unknown(code) =>
-                "An unexpected error occurred during Xbox authentication. This might be a temporary issue with Xbox Live services.",
+            Self::NoAccount => {
+                "Your Microsoft account is not linked to an Xbox account. An Xbox account is required to play Minecraft."
+            }
+            Self::XboxServicesBanned => {
+                "Xbox Live services are not available in your region. Unfortunately, this prevents authentication with Minecraft."
+            }
+            Self::AdultVerificationRequired => {
+                "Your Xbox account requires adult verification before it can be used with Minecraft. This is a security requirement from Microsoft."
+            }
+            Self::ChildAccount => {
+                "Your Xbox account is registered as a child account and must be part of a Microsoft Family before it can access Minecraft. This is a safety feature from Microsoft."
+            }
+            Self::Unknown(code) => {
+                "An unexpected error occurred during Xbox authentication. This might be a temporary issue with Xbox Live services."
+            }
         }
     }
 
@@ -458,8 +463,12 @@ impl XboxError {
     pub fn support_link(&self) -> &'static str {
         match self {
             Self::NoAccount => "https://www.xbox.com/signup",
-            Self::XboxServicesBanned => "https://support.xbox.com/help/account-profile/manage-account/xbox-live-available-countries",
-            Self::AdultVerificationRequired => "https://support.xbox.com/help/account-profile/manage-account/verify-age-adult-account",
+            Self::XboxServicesBanned => {
+                "https://support.xbox.com/help/account-profile/manage-account/xbox-live-available-countries"
+            }
+            Self::AdultVerificationRequired => {
+                "https://support.xbox.com/help/account-profile/manage-account/verify-age-adult-account"
+            }
             Self::ChildAccount => "https://account.microsoft.com/family/about",
             Self::Unknown(_) => "https://support.xbox.com/help/errors/error-code-search",
         }
@@ -769,10 +778,12 @@ impl CreateProfileError {
     /// Get a detailed, user-friendly description of the error
     pub fn description(&self) -> &'static str {
         match self {
-            Self::InvalidUsername =>
-                "The username you chose doesn't meet Minecraft's requirements. Usernames must be 3-16 characters long and can only contain letters, numbers, and underscores.",
-            Self::NameNotAvailable =>
-                "This username is already taken by another player. Please choose a different username.",
+            Self::InvalidUsername => {
+                "The username you chose doesn't meet Minecraft's requirements. Usernames must be 3-16 characters long and can only contain letters, numbers, and underscores."
+            }
+            Self::NameNotAvailable => {
+                "This username is already taken by another player. Please choose a different username."
+            }
         }
     }
 
@@ -833,10 +844,12 @@ impl GetProfileError {
     /// Get a detailed, user-friendly description of the error
     pub fn description(&self) -> &'static str {
         match self {
-            Self::GameProfileMissing =>
-                "Your account needs a Minecraft profile to continue. This is a quick one-time setup where you choose your username.",
-            Self::AuthTokenInvalid =>
-                "Your authentication has expired or become invalid. This can happen after extended periods of time or security changes.",
+            Self::GameProfileMissing => {
+                "Your account needs a Minecraft profile to continue. This is a quick one-time setup where you choose your username."
+            }
+            Self::AuthTokenInvalid => {
+                "Your authentication has expired or become invalid. This can happen after extended periods of time or security changes."
+            }
         }
     }
 
@@ -860,8 +873,12 @@ impl GetProfileError {
     /// Get a support link for this error
     pub fn support_link(&self) -> &'static str {
         match self {
-            Self::GameProfileMissing => "https://help.minecraft.net/hc/en-us/articles/4409152531341-Minecraft-Profile-Troubleshooting",
-            Self::AuthTokenInvalid => "https://help.minecraft.net/hc/en-us/articles/4409159214605-Microsoft-Authentication-Issues",
+            Self::GameProfileMissing => {
+                "https://help.minecraft.net/hc/en-us/articles/4409152531341-Minecraft-Profile-Troubleshooting"
+            }
+            Self::AuthTokenInvalid => {
+                "https://help.minecraft.net/hc/en-us/articles/4409159214605-Microsoft-Authentication-Issues"
+            }
         }
     }
 }

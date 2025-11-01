@@ -123,24 +123,24 @@ const CodeStep = (props: Props) => {
   })
 
   const handleErrorMessages = (error: EnrollmentError) => {
-    const isCodeExpired = error === "deviceCodeExpired"
+    const isCodeExpired = error.errorType === "deviceCodeExpired"
 
     if (isCodeExpired) {
       handleRefersh()
-    } else if (typeof error === "string") {
-      toast.error("Authentication Error", {
-        description: t(`error.${error}`)
-      })
-    } else {
-      if (typeof error.xboxAccount === "string")
+    } else if (error.errorType === "xboxAccount" && error.xboxError) {
+      if (typeof error.xboxError === "string") {
         toast.error("Authentication Error", {
-          description: t(`error.xbox_${error.xboxAccount}`)
+          description: t(`error.xbox_${error.xboxError}`)
         })
-      else {
+      } else {
         toast.error("Authentication Error", {
-          description: `${t("error.xbox_code")} ${error.xboxAccount.unknown}`
+          description: `${t("error.xbox_code")} ${error.xboxError.unknown}`
         })
       }
+    } else {
+      toast.error("Authentication Error", {
+        description: error.description || t(`error.${error.errorType}`)
+      })
     }
   }
 

@@ -110,25 +110,23 @@ export const createServices = (deps: {
   } = deps
 
   const services: LoginMachineServices = {
-    initializeLogin: fromPromise(
-      async ({ input }: { input: Partial<LoginMachineContext> }) => {
-        // Refetch settings
-        await rspcContext.queryClient.refetchQueries({
-          queryKey: ["settings.getSettings"]
-        })
+    initializeLogin: fromPromise(async () => {
+      // Refetch settings
+      await rspcContext.queryClient.refetchQueries({
+        queryKey: ["settings.getSettings"]
+      })
 
-        const accounts = await rspcContext.client.query(["account.getAccounts"])
+      const accounts = await rspcContext.client.query(["account.getAccounts"])
 
-        return {
-          accounts,
-          termsAndPrivacyAccepted:
-            globalStore.settings.data?.termsAndPrivacyAccepted ?? false,
-          gdlAccountId: globalStore.settings.data?.gdlAccountId ?? null,
-          isFirstLaunch: globalStore.settings.data?.isFirstLaunch ?? false,
-          activeUuid: globalStore.currentlySelectedAccountUuid.data ?? null
-        }
+      return {
+        accounts,
+        termsAndPrivacyAccepted:
+          globalStore.settings.data?.termsAndPrivacyAccepted ?? false,
+        gdlAccountId: globalStore.settings.data?.gdlAccountId ?? null,
+        isFirstLaunch: globalStore.settings.data?.isFirstLaunch ?? false,
+        activeUuid: globalStore.currentlySelectedAccountUuid.data ?? null
       }
-    ),
+    }),
 
     beginBrowserEnrollment: fromPromise(async () => {
       await enrollBeginBrowserMutation.mutateAsync(true)
@@ -141,7 +139,7 @@ export const createServices = (deps: {
     cancelEnrollment: fromPromise(async () => {
       try {
         await enrollCancelMutation.mutateAsync(undefined)
-      } catch (err) {
+      } catch (_err) {
         console.log("Cancel failed (expected if no enrollment active)")
       }
     }),
@@ -292,7 +290,7 @@ export const createServices = (deps: {
   const actions: LoginMachineCustomActions = {
     // Fire-and-forget cancel enrollment (doesn't wait for result)
     cancelEnrollmentAction: () => {
-      enrollCancelMutation.mutateAsync(undefined).catch((err: RSPCError) => {
+      enrollCancelMutation.mutateAsync(undefined).catch((_err: RSPCError) => {
         console.log("Cancel failed (expected if no enrollment active)")
       })
     },
@@ -313,13 +311,15 @@ export const createServices = (deps: {
     // Save terms acceptance (fire-and-forget)
     saveTermsAcceptanceAction: () => {
       // Backend automatically saves termsAndPrivacyAcceptedChecksum when this is called
-      settingsMutation.mutateAsync({
-        termsAndPrivacyAccepted: {
-          Set: true
-        }
-      }).catch((err) => {
-        console.error("Failed to save terms acceptance:", err)
-      })
+      settingsMutation
+        .mutateAsync({
+          termsAndPrivacyAccepted: {
+            Set: true
+          }
+        })
+        .catch((err) => {
+          console.error("Failed to save terms acceptance:", err)
+        })
     }
   }
 

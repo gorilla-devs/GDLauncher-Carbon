@@ -2,7 +2,7 @@ import { Show, createEffect, createSignal } from "solid-js"
 import { AddonTypeDropdown } from "./AddonTypeDropdown"
 import useSearchContext from "./SearchInputContext"
 import { useGDNavigate } from "@/managers/NavigationManager"
-import { useMatch, useLocation } from "@solidjs/router"
+import { useMatch } from "@solidjs/router"
 import { useTransContext } from "@gd/i18n"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@gd/ui"
 import { FiltersDropdown } from "@/pages/Search/FiltersDropdown"
@@ -10,7 +10,6 @@ import { FiltersDropdown } from "@/pages/Search/FiltersDropdown"
 export function EnhancedSearchBar() {
   const searchResults = useSearchContext()
   const navigator = useGDNavigate()
-  const location = useLocation()
   const isSearchPage = useMatch(() => "/search/*")
   const isAddonPage = useMatch(() => "/addon/*")
   const [t] = useTransContext()
