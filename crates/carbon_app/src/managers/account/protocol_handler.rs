@@ -10,6 +10,8 @@ use url::Url;
 /// This serves as a fallback mechanism for systems where localhost OAuth
 /// redirects don't work properly (e.g., some security software, corporate proxies).
 ///
+/// Expected URL format: `gdlauncher://oauth/callback?code=...&state=...`
+///
 /// Flow:
 /// 1. Microsoft OAuth redirects to gdlauncher://oauth/callback?code=...&state=...
 /// 2. OS launches GDLauncher with the protocol URL
@@ -45,7 +47,10 @@ impl ProtocolHandler {
 
     /// Parse and store an OAuth callback from a protocol URL
     ///
-    /// Expected URL format: gdlauncher://oauth/callback?code=...&state=...
+    /// Expected URL format: `gdlauncher://oauth/callback?code=...&state=...`
+    ///
+    /// Note: The URL parser interprets `oauth` as the host component and `/callback`
+    /// as the path. The validation logic handles this standard custom protocol format.
     pub async fn handle_callback(&self, protocol_url: &str) -> Result<()> {
         info!("Handling protocol callback: {}", protocol_url);
 
@@ -61,11 +66,23 @@ impl ProtocolHandler {
             );
         }
 
-        // Validate path (should be /oauth/callback)
+        // Validate path
+        // The URL parser treats 'oauth' as the host and '/callback' as the path
+        // For example: gdlauncher://oauth/callback -> host="oauth", path="/callback"
+        let host = url.host_str();
         let path = url.path();
-        if path != "/oauth/callback" && path != "oauth/callback" {
+
+        let is_valid = match (host, path) {
+            (Some("oauth"), "/callback") => true,
+            // Also accept non-standard formats for compatibility
+            (None, "/oauth/callback") | (None, "oauth/callback") => true,
+            _ => false,
+        };
+
+        if !is_valid {
             bail!(
-                "Invalid protocol path: expected '/oauth/callback', got '{}'",
+                "Invalid protocol URL: expected 'gdlauncher://oauth/callback', got host={:?} path='{}'",
+                host,
                 path
             );
         }
@@ -161,6 +178,7 @@ mod tests {
     #[tokio::test]
     async fn test_parse_error_callback() {
         let handler = ProtocolHandler::new();
+        // Test with standard format
         let url =
             "gdlauncher://oauth/callback?error=access_denied&error_description=User%20cancelled";
 
