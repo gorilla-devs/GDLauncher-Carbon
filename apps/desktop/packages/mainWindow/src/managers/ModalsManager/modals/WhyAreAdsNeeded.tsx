@@ -118,7 +118,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
           <div class="bg-darkSlate-700 border-darkSlate-600 rounded-lg border p-6">
             <h3 class="text-lightSlate-300 mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
               <div class="i-hugeicons:pie-chart text-primary-500 text-base" />
-              Revenue Transparency
+              <Trans key="ads.revenue_transparency_title" />
             </h3>
             <div class="space-y-4">
               {/* Visual Revenue Bar */}
@@ -145,10 +145,10 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
                   </div>
                   <div class="flex-1">
                     <div class="text-lightSlate-50 mb-1 text-sm font-semibold">
-                      GDLauncher Team
+                      <Trans key="ads.revenue_split_gdl_title" />
                     </div>
                     <div class="text-lightSlate-500 text-xs">
-                      Development, infrastructure & support
+                      <Trans key="ads.revenue_split_gdl_desc" />
                     </div>
                   </div>
                 </div>
@@ -158,10 +158,10 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
                   </div>
                   <div class="flex-1">
                     <div class="text-lightSlate-50 mb-1 text-sm font-semibold">
-                      Overwolf & Mod Authors
+                      <Trans key="ads.revenue_split_others_title" />
                     </div>
                     <div class="text-lightSlate-500 text-xs">
-                      Platform & creator support
+                      <Trans key="ads.revenue_split_others_desc" />
                     </div>
                   </div>
                 </div>
@@ -220,7 +220,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
                 onClick={() => modalsContext?.closeModal()}
                 class="px-8 py-3 font-semibold transition-all hover:scale-105 active:scale-95"
               >
-                Got it, thanks!
+                <Trans key="ads.got_it_thanks" />
               </Button>
             </div>
           </div>

@@ -95,7 +95,11 @@ const Java = () => {
 
   const renderJavaOption = (id: string) => {
     if (id === "unassigned") {
-      return <div>Unassigned</div>
+      return (
+        <div>
+          <Trans key="java.unassigned" />
+        </div>
+      )
     }
 
     const java = getJavaById(id)
@@ -343,8 +347,7 @@ const Java = () => {
                                                       <div class="i-hugeicons:tick-double-02 flex text-emerald-500 text-lg" />
                                                     </TooltipTrigger>
                                                     <TooltipContent>
-                                                      This java path works and
-                                                      is valid
+                                                      <Trans key="java.tooltip_valid_path" />
                                                     </TooltipContent>
                                                   </Tooltip>
                                                 </Match>
@@ -354,8 +357,7 @@ const Java = () => {
                                                       <div class="i-hugeicons:alert-02 flex text-yellow-500 text-lg" />
                                                     </TooltipTrigger>
                                                     <TooltipContent>
-                                                      This java path doesn't
-                                                      seem to work
+                                                      <Trans key="java.tooltip_invalid_path" />
                                                     </TooltipContent>
                                                   </Tooltip>
                                                 </Match>

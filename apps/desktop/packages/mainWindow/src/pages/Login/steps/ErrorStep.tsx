@@ -1,4 +1,3 @@
-import { Trans } from "@gd/i18n"
 import type { AuthStep } from "../flow/types"
 
 /**

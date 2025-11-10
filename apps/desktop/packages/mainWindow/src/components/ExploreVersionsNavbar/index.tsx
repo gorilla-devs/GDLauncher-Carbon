@@ -189,7 +189,9 @@ const ExploreVersionsNavbar = (props: Props) => {
           placeholder={
             <div class="flex items-center gap-2">
               <div class="i-hugeicons:tag-01" />
-              <span>All modloaders</span>
+              <span>
+                <Trans key="modloader_all" />
+              </span>
             </div>
           }
           onChange={(val) => {

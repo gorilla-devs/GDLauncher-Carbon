@@ -168,7 +168,7 @@ export function GDLAccountSetupModal(props: GDLAccountSetupModalProps) {
               </p>
               {/* TODO: Integrate GDLAccountCompletion component here */}
               <div class="text-lightSlate-500 text-center text-sm">
-                [GDL Account Completion Form - To be integrated]
+                <Trans key="gdl_account.completion_form" />
               </div>
             </div>
           </Show>
@@ -181,7 +181,7 @@ export function GDLAccountSetupModal(props: GDLAccountSetupModalProps) {
               </p>
               {/* TODO: Integrate GDLAccountVerification component here */}
               <div class="text-lightSlate-500 text-center text-sm">
-                [GDL Account Verification - To be integrated]
+                <Trans key="gdl_account.verification" />
               </div>
             </div>
           </Show>

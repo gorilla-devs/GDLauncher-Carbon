@@ -33,7 +33,8 @@ export function GdlAccountStep(props: GdlAccountStepProps) {
     } catch (error) {
       console.error("[GdlAccountStep] Failed to setup GDL account:", error)
       toast.error("Failed to save GDL account preference", {
-        description: error instanceof Error ? error.message : "Unknown error occurred"
+        description:
+          error instanceof Error ? error.message : "Unknown error occurred"
       })
       setLoading(false)
     }
@@ -50,7 +51,8 @@ export function GdlAccountStep(props: GdlAccountStepProps) {
     } catch (error) {
       console.error("[GdlAccountStep] Failed to link GDL account:", error)
       toast.error("Failed to link GDL account", {
-        description: error instanceof Error ? error.message : "Unknown error occurred"
+        description:
+          error instanceof Error ? error.message : "Unknown error occurred"
       })
       setLoading(false)
     }
@@ -103,7 +105,7 @@ export function GdlAccountStep(props: GdlAccountStepProps) {
                       }
                     >
                       <img
-                        src={data.profileIconUrl!}
+                        src={data.profileIconUrl}
                         alt="Profile"
                         class="h-10 w-10 shrink-0 rounded-lg object-cover"
                       />

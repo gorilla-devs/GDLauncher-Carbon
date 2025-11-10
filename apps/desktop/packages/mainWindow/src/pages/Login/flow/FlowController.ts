@@ -1,13 +1,15 @@
 import { createSignal } from "solid-js"
-import { createStore } from "solid-js/store"
-import type { CreateMutationResult, CreateQueryResult } from "@tanstack/solid-query"
+import type {
+  CreateMutationResult,
+  CreateQueryResult
+} from "@tanstack/solid-query"
 import type { RSPCError } from "@rspc/client"
 import type {
   FEGDLAccount,
-  FESettings,
   FESettingsUpdate,
   FECheckUsernameAvailability,
-  FECreateProfile
+  FECreateProfile,
+  UsernameAvailability
 } from "@gd/core_module/bindings"
 import type {
   AuthFlowState,
@@ -16,7 +18,6 @@ import type {
   AuthSharedData,
   FlowController,
   GDLAccountState,
-  EnrollmentStatus,
   AccountEntry,
   LoadingOperation,
   TransitionDirection
@@ -49,7 +50,11 @@ export class FlowControllerImpl implements FlowController {
 
   // External dependencies (injected)
   private rspcContext: RSPCContext
-  private settingsMutation: CreateMutationResult<null, RSPCError, FESettingsUpdate>
+  private settingsMutation: CreateMutationResult<
+    null,
+    RSPCError,
+    FESettingsUpdate
+  >
   private saveGdlAccountMutation: CreateMutationResult<
     null,
     RSPCError,
@@ -63,7 +68,7 @@ export class FlowControllerImpl implements FlowController {
   >
   private enrollCancelMutation: CreateMutationResult<null, RSPCError, undefined>
   private usernameAvailabilityMutation: CreateMutationResult<
-    boolean,
+    UsernameAvailability,
     RSPCError,
     FECheckUsernameAvailability
   >
@@ -85,16 +90,24 @@ export class FlowControllerImpl implements FlowController {
     deps: {
       rspcContext: RSPCContext
       settingsMutation: CreateMutationResult<null, RSPCError, FESettingsUpdate>
-      saveGdlAccountMutation: CreateMutationResult<null, RSPCError, string | null>
+      saveGdlAccountMutation: CreateMutationResult<
+        null,
+        RSPCError,
+        string | null
+      >
       enrollBeginMutation: CreateMutationResult<null, RSPCError, undefined>
       enrollBeginBrowserMutation: CreateMutationResult<null, RSPCError, boolean>
       enrollCancelMutation: CreateMutationResult<null, RSPCError, undefined>
       usernameAvailabilityMutation: CreateMutationResult<
-        boolean,
+        UsernameAvailability,
         RSPCError,
         FECheckUsernameAvailability
       >
-      createProfileMutation: CreateMutationResult<null, RSPCError, FECreateProfile>
+      createProfileMutation: CreateMutationResult<
+        null,
+        RSPCError,
+        FECreateProfile
+      >
       enrollResumeMutation: CreateMutationResult<null, RSPCError, undefined>
       accountsQuery: CreateQueryResult<AccountEntry[], RSPCError>
       gdlAccountQuery: CreateQueryResult<FEGDLAccount | null, RSPCError>
@@ -209,7 +222,10 @@ export class FlowControllerImpl implements FlowController {
   // Navigation
   // ============================================================================
 
-  async goToStep(step: AuthStep, options?: { direction?: TransitionDirection }): Promise<void> {
+  async goToStep(
+    step: AuthStep,
+    options?: { direction?: TransitionDirection }
+  ): Promise<void> {
     const currentState = this.state()
 
     // Block navigation during loading
@@ -234,10 +250,10 @@ export class FlowControllerImpl implements FlowController {
     this.nextDirectionSignal[1](direction)
 
     // Wait for SolidJS to flush DOM updates before capturing old snapshot
-    await new Promise((resolve) => queueMicrotask(resolve))
+    await new Promise((resolve) => queueMicrotask(() => resolve(undefined)))
 
     // Use View Transition API for smooth transitions
-    if ('startViewTransition' in document) {
+    if ("startViewTransition" in document) {
       const transition = (document as any).startViewTransition(() => {
         // Only update state in callback
         this.setState({ phase: "content", step })
@@ -282,10 +298,10 @@ export class FlowControllerImpl implements FlowController {
     this.nextDirectionSignal[1]("backward")
 
     // Wait for SolidJS to flush DOM updates before capturing old snapshot
-    await new Promise((resolve) => queueMicrotask(resolve))
+    await new Promise((resolve) => queueMicrotask(() => resolve(undefined)))
 
     // Use View Transition API for smooth transitions
-    if ('startViewTransition' in document) {
+    if ("startViewTransition" in document) {
       const transition = (document as any).startViewTransition(() => {
         // Only update state in callback
         this.setState({ phase: "content", step: previousStep })
@@ -361,7 +377,7 @@ export class FlowControllerImpl implements FlowController {
   async checkUsernameAvailability(
     accessToken: string,
     username: string
-  ): Promise<boolean> {
+  ): Promise<"available" | "taken" | "notallowed"> {
     try {
       const result = await this.usernameAvailabilityMutation.mutateAsync({
         accessToken,
@@ -411,9 +427,9 @@ export class FlowControllerImpl implements FlowController {
     }
   }
 
-  async linkExistingGDLAccount(gdlAccountData: any): Promise<void> {
+  async linkExistingGDLAccount(_gdlAccountData: any): Promise<void> {
     try {
-      await this.saveGdlAccountMutation.mutateAsync(this.data.activeUuid!)
+      await this.saveGdlAccountMutation.mutateAsync(this.data.activeUuid)
 
       // Refetch settings to update cache
       await this.rspcContext.queryClient.refetchQueries({
@@ -713,11 +729,15 @@ export function createFlowController(
     enrollBeginBrowserMutation: CreateMutationResult<null, RSPCError, boolean>
     enrollCancelMutation: CreateMutationResult<null, RSPCError, undefined>
     usernameAvailabilityMutation: CreateMutationResult<
-      boolean,
+      UsernameAvailability,
       RSPCError,
       FECheckUsernameAvailability
     >
-    createProfileMutation: CreateMutationResult<null, RSPCError, FECreateProfile>
+    createProfileMutation: CreateMutationResult<
+      null,
+      RSPCError,
+      FECreateProfile
+    >
     enrollResumeMutation: CreateMutationResult<null, RSPCError, undefined>
     accountsQuery: CreateQueryResult<AccountEntry[], RSPCError>
     gdlAccountQuery: CreateQueryResult<FEGDLAccount | null, RSPCError>

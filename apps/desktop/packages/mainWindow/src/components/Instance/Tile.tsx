@@ -729,8 +729,13 @@ const Tile = (props: Props) => {
                   }
                 >
                   <p class="text-lightSlate-50 m-0 text-center text-sm">
-                    {Math.round(props.downloaded || 0)}MB/
-                    {Math.round(props.totalDownload || 0)}MB
+                    <Trans
+                      key="common.download_progress_mb"
+                      options={{
+                        downloaded: Math.round(props.downloaded || 0),
+                        total: Math.round(props.totalDownload || 0)
+                      }}
+                    />
                   </p>
                 </Match>
               </Switch>

@@ -24,9 +24,8 @@ import "./styles/viewTransitions.css"
 
 import { FlowProvider, useFlow } from "./flow/FlowContext"
 import { AnimationProvider, useAnimations } from "./animations/AnimationContext"
-import { LoadingOverlay } from "./components/LoadingOverlay"
 import { StepContainer } from "./components/StepContainer"
-import type { AuthFlowConfig, AuthStep } from "./flow/types"
+import type { AuthFlowConfig, AuthStep, AuthFlowState } from "./flow/types"
 import { WelcomeStep } from "./steps/WelcomeStep"
 import { TermsStep } from "./steps/TermsStep"
 import { AuthMethodStep } from "./steps/AuthMethodStep"
@@ -72,7 +71,6 @@ export function AuthFlow() {
 function AuthFlowInner() {
   const globalStore = useGlobalStore()
   const [searchParams] = useSearchParams()
-  const navigator = useGDNavigate()
   const rspcContext = rspc.useContext()
 
   // Extract configuration from global store
@@ -174,35 +172,6 @@ function AuthFlowContent() {
 
   // Track if sidebar initial animation completed
   const [sidebarShown, setSidebarShown] = createSignal(false)
-
-  // Enrollment status query (for enrolling step)
-  const enrollmentStatus = rspc.createQuery(() => ({
-    queryKey: ["account.enroll.getStatus"],
-    enabled: getCurrentStep()?.type === "enrolling",
-    refetchInterval: getCurrentStep()?.type === "enrolling" ? 1000 : false,
-    refetchIntervalInBackground: true
-  }))
-
-  // Check if enrollment is expired
-  const isEnrollmentExpired = createMemo(() => {
-    const step = getCurrentStep()
-    if (step?.type !== "enrolling") return false
-
-    const status = enrollmentStatus.data
-    if (!status || typeof status === "string") return false
-
-    const expiresAtMs = (() => {
-      if ("pollingCode" in status) {
-        return new Date(status.pollingCode.expiresAt).getTime() - Date.now()
-      }
-      if ("waitingForBrowser" in status) {
-        return new Date(status.waitingForBrowser.expires_at).getTime() - Date.now()
-      }
-      return 0
-    })()
-
-    return expiresAtMs <= 0
-  })
 
   // Username validation
   const isUsernameValid = createMemo(() => {
@@ -310,34 +279,6 @@ function AuthFlowContent() {
     }
   }
 
-  const handleBrowserAuth = async () => {
-    setButtonLoading(true)
-    try {
-      await flow.startEnrollment("browser")
-      await flow.goToStep({
-        type: "enrolling",
-        method: "browser"
-      })
-    } catch (error) {
-      console.error("Failed to start browser auth:", error)
-      setButtonLoading(false)
-    }
-  }
-
-  const handleDeviceCodeAuth = async () => {
-    setButtonLoading(true)
-    try {
-      await flow.startEnrollment("device-code")
-      await flow.goToStep({
-        type: "enrolling",
-        method: "device-code"
-      })
-    } catch (error) {
-      console.error("Failed to start device code auth:", error)
-      setButtonLoading(false)
-    }
-  }
-
   const handleCreateProfile = async () => {
     if (!canSubmitProfile()) return
 
@@ -362,53 +303,6 @@ function AuthFlowContent() {
       } else {
         setUsernameError("Failed to create profile")
       }
-    } finally {
-      setButtonLoading(false)
-    }
-  }
-
-  const handleCompleteContinue = async () => {
-    setButtonLoading(true)
-    try {
-      await flow.exitFlow("library", flow.data.isFirstLaunch)
-    } finally {
-      setButtonLoading(false)
-    }
-  }
-
-  const handleSetupGDLAccount = async () => {
-    setButtonLoading(true)
-    try {
-      await flow.setupGDLAccount()
-      await flow.exitFlow("library", flow.data.isFirstLaunch)
-    } finally {
-      setButtonLoading(false)
-    }
-  }
-
-  const handleLinkExistingAccount = async () => {
-    const step = getCurrentStep()
-    if (step?.type !== "gdl-account" || step.gdlAccount?.type !== "found-existing")
-      return
-
-    setButtonLoading(true)
-    try {
-      await flow.linkExistingGDLAccount(step.gdlAccount.data)
-      await flow.exitFlow("library", flow.data.isFirstLaunch)
-    } finally {
-      setButtonLoading(false)
-    }
-  }
-
-  const handleEnrollmentRetry = async () => {
-    const step = getCurrentStep()
-    if (step?.type !== "enrolling") return
-
-    setButtonLoading(true)
-    try {
-      await flow.startEnrollment(step.method)
-    } catch (error) {
-      console.error("Failed to retry enrollment:", error)
     } finally {
       setButtonLoading(false)
     }
@@ -477,66 +371,70 @@ function AuthFlowContent() {
   })
 
   // Handle back button visibility changes (step-based)
-  createEffect(on(
-    () => {
-      const step = getCurrentStepForEffects()
-      if (!step) return null
+  createEffect(
+    on(
+      () => {
+        const step = getCurrentStepForEffects()
+        if (!step) return null
 
-      switch (step.type) {
-        case "welcome":
-          return false
-        case "terms":
-        case "auth-method":
-        case "enrolling":
-        case "profile-creation":
-          return true
-        case "error":
-          return false
-        case "gdl-account":
-          // Show back button when adding from settings (allows cancel)
-          return flow.data.isAddingGdlFromSettings
-        default:
-          return false
-      }
-    },
-    (shouldShowBack) => {
-      if (shouldShowBack === null) return
+        switch (step.type) {
+          case "welcome":
+            return false
+          case "terms":
+          case "auth-method":
+          case "enrolling":
+          case "profile-creation":
+            return true
+          case "error":
+            return false
+          case "gdl-account":
+            // Show back button when adding from settings (allows cancel)
+            return flow.data.isAddingGdlFromSettings
+          default:
+            return false
+        }
+      },
+      (shouldShowBack) => {
+        if (shouldShowBack === null) return
 
-      if (shouldShowBack) {
-        animations.backButton.show()
-      } else {
-        animations.backButton.hide()
+        if (shouldShowBack) {
+          animations.backButton.show()
+        } else {
+          animations.backButton.hide()
+        }
       }
-    }
-  ))
+    )
+  )
 
   // Handle skip button visibility changes
-  createEffect(on(
-    () => {
-      const step = getCurrentStepForEffects()
-      const isAddingFromSettings =
-        flow.data.isAddingMicrosoftFromSettings ||
-        flow.data.isAddingGdlFromSettings
+  createEffect(
+    on(
+      () => {
+        const step = getCurrentStepForEffects()
+        const isAddingFromSettings =
+          flow.data.isAddingMicrosoftFromSettings ||
+          flow.data.isAddingGdlFromSettings
 
-      // Show skip button when:
-      // 1. NOT adding from settings
-      // 2. On gdl-account step
-      // 3. User hasn't made a decision yet (gdlAccountId is null)
-      const shouldShowSkip =
-        !isAddingFromSettings &&
-        step?.type === "gdl-account" &&
-        flow.data.gdlAccountId === null
+        // Show skip button when:
+        // 1. NOT adding from settings
+        // 2. On gdl-account step
+        // 3. User hasn't made a decision yet (gdlAccountId is null)
+        const shouldShowSkip =
+          !isAddingFromSettings &&
+          step?.type === "gdl-account" &&
+          flow.data.gdlAccountId === null
 
-      return shouldShowSkip
-    },
-    (shouldShowSkip) => {
-      if (shouldShowSkip) {
-        animations.skipButton.show()
-      } else {
-        animations.skipButton.hide()
+        return shouldShowSkip
+      },
+      (shouldShowSkip) => {
+        if (shouldShowSkip) {
+          animations.skipButton.show()
+        } else {
+          animations.skipButton.hide()
+        }
       }
-    }
-  ))
+    )
+  )
 
   // Handle exit flow
   const handleExit = async (
@@ -672,7 +570,12 @@ function AuthFlowContent() {
               direction={
                 flow.nextDirection() ||
                 (flow.state().phase === "transitioning"
-                  ? flow.state().direction
+                  ? (
+                      flow.state() as Extract<
+                        AuthFlowState,
+                        { phase: "transitioning" }
+                      >
+                    ).direction
                   : undefined)
               }
             >
@@ -751,7 +654,10 @@ function AuthFlowContent() {
                   // Manual backward navigation with explicit direction
                   switch (step.type) {
                     case "terms":
-                      flow.goToStep({ type: "welcome" }, { direction: "backward" })
+                      flow.goToStep(
+                        { type: "welcome" },
+                        { direction: "backward" }
+                      )
                       break
                     case "auth-method":
                       if (isAddingFromSettings) {
@@ -883,7 +789,6 @@ function AuthFlowContent() {
                 </Show>
               )}
             </Show>
-
           </div>
         </div>
       </div>

@@ -540,7 +540,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                   <div class="flex flex-col items-center gap-0.5">
                     <div class="i-hugeicons:image-01 text-lightSlate-600 group-hover:text-lightSlate-400 transition-colors text-2xl" />
                     <span class="text-lightSlate-600 group-hover:text-lightSlate-400 text-[10px] transition-colors">
-                      Add icon
+                      <Trans key="instance.add_icon" />
                     </span>
                   </div>
                 </Match>
@@ -694,7 +694,9 @@ const Custom = (props: Pick<ModalProps, "data">) => {
               >
                 <div class="flex items-center gap-1">
                   <div class="i-hugeicons:test-tube text-xs" />
-                  <span>Snapshot</span>
+                  <span>
+                    <Trans key="instance.version_type_snapshot" />
+                  </span>
                 </div>
               </Badge>
               <Badge
@@ -707,7 +709,9 @@ const Custom = (props: Pick<ModalProps, "data">) => {
               >
                 <div class="flex items-center gap-1">
                   <div class="i-hugeicons:alpha text-xs" />
-                  <span>Alpha</span>
+                  <span>
+                    <Trans key="instance.version_type_alpha" />
+                  </span>
                 </div>
               </Badge>
               <Badge
@@ -718,7 +722,9 @@ const Custom = (props: Pick<ModalProps, "data">) => {
               >
                 <div class="flex items-center gap-1">
                   <div class="i-hugeicons:beta text-xs" />
-                  <span>Beta</span>
+                  <span>
+                    <Trans key="instance.version_type_beta" />
+                  </span>
                 </div>
               </Badge>
             </div>
@@ -826,7 +832,10 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                   <div class="text-lightSlate-500 bg-darkSlate-800 flex items-center gap-2 rounded-md px-3 py-2 text-sm">
                     <div class="i-hugeicons:alert-circle text-yellow-500" />
                     <span>
-                      No versions available for Minecraft {mcVersion()}
+                      <Trans
+                        key="instance.no_versions_for_mc"
+                        options={{ version: mcVersion() }}
+                      />
                     </span>
                   </div>
                 </Match>

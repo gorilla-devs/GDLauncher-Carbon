@@ -20,8 +20,8 @@ export class AnimationControllerImpl implements AnimationController {
   private readyCallbacks: (() => void)[] = []
 
   // Animation state tracking to prevent duplicate animations
-  private backButtonState: 'hidden' | 'showing' | 'shown' | 'hiding' = 'hidden'
-  private skipButtonState: 'hidden' | 'showing' | 'shown' | 'hiding' = 'hidden'
+  private backButtonState: "hidden" | "showing" | "shown" | "hiding" = "hidden"
+  private skipButtonState: "hidden" | "showing" | "shown" | "hiding" = "hidden"
 
   // Track running animations for cancellation
   private backButtonAnimation: Animation | null = null
@@ -58,6 +58,17 @@ export class AnimationControllerImpl implements AnimationController {
   // Step Animations
   // ============================================================================
   // NOTE: Step transitions are now handled by View Transition API in FlowController
+
+  step = {
+    /**
+     * Slide transition between steps (stub - handled by View Transition API)
+     */
+    slideTransition: async (_direction: TransitionDirection): Promise<void> => {
+      // Step transitions are handled by the View Transition API in FlowController
+      // This is a stub implementation to satisfy the interface
+      return Promise.resolve()
+    }
+  }
 
   // ============================================================================
   // Sidebar Animations
@@ -194,9 +205,7 @@ export class AnimationControllerImpl implements AnimationController {
         refs.map((r) => {
           const element = this.refs[r]
           if (!element) {
-            console.warn(
-              `[AnimationController] Text ref '${r}' not available`
-            )
+            console.warn(`[AnimationController] Text ref '${r}' not available`)
             return Promise.resolve()
           }
 
@@ -259,13 +268,16 @@ export class AnimationControllerImpl implements AnimationController {
      */
     show: async (): Promise<void> => {
       // Guard: Already shown or showing
-      if (this.backButtonState === 'shown' || this.backButtonState === 'showing') {
+      if (
+        this.backButtonState === "shown" ||
+        this.backButtonState === "showing"
+      ) {
         return
       }
 
       // Guard: Reduced motion - just set state
       if (this.reducedMotion) {
-        this.backButtonState = 'shown'
+        this.backButtonState = "shown"
         return
       }
 
@@ -283,7 +295,7 @@ export class AnimationControllerImpl implements AnimationController {
         this.backButtonAnimation = null
       }
 
-      this.backButtonState = 'showing'
+      this.backButtonState = "showing"
 
       this.backButtonAnimation = element.animate(
         [
@@ -299,12 +311,12 @@ export class AnimationControllerImpl implements AnimationController {
 
       await this.backButtonAnimation.finished
         .then(() => {
-          this.backButtonState = 'shown'
+          this.backButtonState = "shown"
           this.backButtonAnimation = null
         })
         .catch((err) => {
           // Animation was cancelled
-          if (err.name === 'AbortError') {
+          if (err.name === "AbortError") {
             // Silently handle cancellation
           }
           this.backButtonAnimation = null
@@ -316,13 +328,16 @@ export class AnimationControllerImpl implements AnimationController {
      */
     hide: async (): Promise<void> => {
       // Guard: Already hidden or hiding
-      if (this.backButtonState === 'hidden' || this.backButtonState === 'hiding') {
+      if (
+        this.backButtonState === "hidden" ||
+        this.backButtonState === "hiding"
+      ) {
         return
       }
 
       // Guard: Reduced motion
       if (this.reducedMotion) {
-        this.backButtonState = 'hidden'
+        this.backButtonState = "hidden"
         return
       }
 
@@ -337,7 +352,7 @@ export class AnimationControllerImpl implements AnimationController {
         this.backButtonAnimation = null
       }
 
-      this.backButtonState = 'hiding'
+      this.backButtonState = "hiding"
 
       this.backButtonAnimation = element.animate(
         [
@@ -353,11 +368,11 @@ export class AnimationControllerImpl implements AnimationController {
 
       await this.backButtonAnimation.finished
         .then(() => {
-          this.backButtonState = 'hidden'
+          this.backButtonState = "hidden"
           this.backButtonAnimation = null
         })
         .catch((err) => {
-          if (err.name === 'AbortError') {
+          if (err.name === "AbortError") {
             // Silently handle cancellation
           }
           this.backButtonAnimation = null
@@ -375,13 +390,16 @@ export class AnimationControllerImpl implements AnimationController {
      */
     show: async (): Promise<void> => {
       // Guard: Already shown or showing
-      if (this.skipButtonState === 'shown' || this.skipButtonState === 'showing') {
+      if (
+        this.skipButtonState === "shown" ||
+        this.skipButtonState === "showing"
+      ) {
         return
       }
 
       // Guard: Reduced motion - just set state
       if (this.reducedMotion) {
-        this.skipButtonState = 'shown'
+        this.skipButtonState = "shown"
         return
       }
 
@@ -399,7 +417,7 @@ export class AnimationControllerImpl implements AnimationController {
         this.skipButtonAnimation = null
       }
 
-      this.skipButtonState = 'showing'
+      this.skipButtonState = "showing"
 
       this.skipButtonAnimation = element.animate(
         [
@@ -415,12 +433,12 @@ export class AnimationControllerImpl implements AnimationController {
 
       await this.skipButtonAnimation.finished
         .then(() => {
-          this.skipButtonState = 'shown'
+          this.skipButtonState = "shown"
           this.skipButtonAnimation = null
         })
         .catch((err) => {
           // Animation was cancelled
-          if (err.name === 'AbortError') {
+          if (err.name === "AbortError") {
             // Silently handle cancellation
           }
           this.skipButtonAnimation = null
@@ -432,13 +450,16 @@ export class AnimationControllerImpl implements AnimationController {
      */
     hide: async (): Promise<void> => {
       // Guard: Already hidden or hiding
-      if (this.skipButtonState === 'hidden' || this.skipButtonState === 'hiding') {
+      if (
+        this.skipButtonState === "hidden" ||
+        this.skipButtonState === "hiding"
+      ) {
         return
       }
 
       // Guard: Reduced motion
       if (this.reducedMotion) {
-        this.skipButtonState = 'hidden'
+        this.skipButtonState = "hidden"
         return
       }
 
@@ -453,7 +474,7 @@ export class AnimationControllerImpl implements AnimationController {
         this.skipButtonAnimation = null
       }
 
-      this.skipButtonState = 'hiding'
+      this.skipButtonState = "hiding"
 
       this.skipButtonAnimation = element.animate(
         [
@@ -469,11 +490,11 @@ export class AnimationControllerImpl implements AnimationController {
 
       await this.skipButtonAnimation.finished
         .then(() => {
-          this.skipButtonState = 'hidden'
+          this.skipButtonState = "hidden"
           this.skipButtonAnimation = null
         })
         .catch((err) => {
-          if (err.name === 'AbortError') {
+          if (err.name === "AbortError") {
             // Silently handle cancellation
           }
           this.skipButtonAnimation = null
@@ -489,7 +510,7 @@ export class AnimationControllerImpl implements AnimationController {
     /**
      * Show seasonal splash message
      */
-    show: async (occasion: Occasion): Promise<void> => {
+    show: async (_occasion: Occasion): Promise<void> => {
       if (this.reducedMotion) return
 
       // Seasonal splash animations would go here

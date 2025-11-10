@@ -1,11 +1,15 @@
 import { createContext, useContext, type JSX } from "solid-js"
-import type { CreateMutationResult, CreateQueryResult } from "@tanstack/solid-query"
+import type {
+  CreateMutationResult,
+  CreateQueryResult
+} from "@tanstack/solid-query"
 import type { RSPCError } from "@rspc/client"
 import type {
   FEGDLAccount,
   FESettingsUpdate,
   FECheckUsernameAvailability,
-  FECreateProfile
+  FECreateProfile,
+  UsernameAvailability
 } from "@gd/core_module/bindings"
 import type { FlowController, AuthFlowConfig, AccountEntry } from "./types"
 import { createFlowController } from "./FlowController"
@@ -29,7 +33,7 @@ export interface FlowProviderProps {
   enrollBeginBrowserMutation: CreateMutationResult<null, RSPCError, boolean>
   enrollCancelMutation: CreateMutationResult<null, RSPCError, undefined>
   usernameAvailabilityMutation: CreateMutationResult<
-    boolean,
+    UsernameAvailability,
     RSPCError,
     FECheckUsernameAvailability
   >

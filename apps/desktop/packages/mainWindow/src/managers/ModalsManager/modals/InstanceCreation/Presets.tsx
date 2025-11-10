@@ -268,7 +268,10 @@ const Presets = () => {
                   </span>
                   <Show when={latestMcVersion()}>
                     <span class="text-lightSlate-300 text-sm">
-                      Minecraft {latestMcVersion()}
+                      <Trans
+                        key="instance.preset_minecraft_version"
+                        options={{ version: latestMcVersion() }}
+                      />
                     </span>
                   </Show>
                 </div>

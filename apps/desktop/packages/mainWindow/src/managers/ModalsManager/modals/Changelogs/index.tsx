@@ -142,7 +142,7 @@ const HeroFeatureCard = (props: HeroFeatureCardProps) => {
           <div class="mb-4 flex items-center gap-3">
             <div class={`${getIcon()} ${getIconColor()} h-8 w-8`} />
             <Badge variant="secondary" class="text-xs font-semibold">
-              Major Feature
+              <Trans key="changelogs.major_feature" />
             </Badge>
           </div>
           <h2 class="text-lightSlate-50 mb-3 text-2xl font-bold">
@@ -377,7 +377,7 @@ const Changelogs = (props: ModalProps) => {
             />
           </h2>
           <p class="text-lightSlate-500 mt-2 text-sm">
-            Discover the latest features, improvements, and fixes
+            <Trans key="changelogs.discover_text" />
           </p>
         </div>
 

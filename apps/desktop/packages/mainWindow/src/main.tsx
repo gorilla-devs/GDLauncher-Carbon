@@ -28,7 +28,6 @@ import RiveAppWapper from "./utils/RiveAppWrapper"
 import GDAnimation from "./gd_logo_animation.riv"
 import { GlobalStoreProvider } from "./components/GlobalStoreContext"
 import AuthLoadingOverlay from "./pages/Login/AuthLoadingOverlay"
-import { isSpecialOccasion } from "@/utils/occasions"
 
 const BackendReadyContext = createContext<boolean>(false)
 

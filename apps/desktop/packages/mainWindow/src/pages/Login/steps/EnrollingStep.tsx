@@ -1,5 +1,12 @@
 import { Trans, useTransContext } from "@gd/i18n"
-import { Button, Progress, toast, Popover, PopoverContent, PopoverTrigger } from "@gd/ui"
+import {
+  Button,
+  Progress,
+  toast,
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from "@gd/ui"
 import {
   Show,
   Switch,
@@ -147,7 +154,10 @@ export function EnrollingStep(props: EnrollingStepProps) {
     }
 
     // Handle profile creation needed
-    if (typeof backendStatus === "object" && "needsProfileCreation" in backendStatus) {
+    if (
+      typeof backendStatus === "object" &&
+      "needsProfileCreation" in backendStatus
+    ) {
       flow.goToStep({
         type: "profile-creation",
         accessToken: backendStatus.needsProfileCreation.access_token
@@ -158,7 +168,8 @@ export function EnrollingStep(props: EnrollingStepProps) {
     // Handle error states
     if (typeof backendStatus === "object" && "failed" in backendStatus) {
       toast.error("Authentication Error", {
-        description: backendStatus.failed.description || t("error.enrollment_failed")
+        description:
+          backendStatus.failed.description || t("error.enrollment_failed")
       })
       return
     }
@@ -333,10 +344,22 @@ export function EnrollingStep(props: EnrollingStepProps) {
         <div class="flex flex-col items-center gap-2">
           <span class="text-lightSlate-700 text-xs">
             <Switch>
-              <Match when={enrollmentStatus.data && typeof enrollmentStatus.data === "object" && "waitingForBrowser" in enrollmentStatus.data}>
+              <Match
+                when={
+                  enrollmentStatus.data &&
+                  typeof enrollmentStatus.data === "object" &&
+                  "waitingForBrowser" in enrollmentStatus.data
+                }
+              >
                 <Trans key="login.waiting_for_browser_confirmation" />
               </Match>
-              <Match when={enrollmentStatus.data && typeof enrollmentStatus.data === "object" && "pollingCode" in enrollmentStatus.data}>
+              <Match
+                when={
+                  enrollmentStatus.data &&
+                  typeof enrollmentStatus.data === "object" &&
+                  "pollingCode" in enrollmentStatus.data
+                }
+              >
                 <Trans key="login.polling_microsoft_auth" />
               </Match>
               <Match when={enrollmentStatus.data === "xboxAuth"}>

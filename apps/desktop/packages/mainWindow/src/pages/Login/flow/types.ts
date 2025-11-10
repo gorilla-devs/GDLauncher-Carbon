@@ -32,7 +32,10 @@ export type {
  * Main auth flow state machine
  * Uses discriminated union for perfect TypeScript narrowing
  */
-export type LoadingOperation = "initializing" | "checking-account" | "checking-gdl"
+export type LoadingOperation =
+  | "initializing"
+  | "checking-account"
+  | "checking-gdl"
 
 export type AuthFlowState =
   // Global loading states (show spinner overlay, no sidebar)
@@ -187,7 +190,10 @@ export interface FlowController {
   nextDirection: () => TransitionDirection | null
 
   // Navigation
-  goToStep(step: AuthStep, options?: { direction?: TransitionDirection }): Promise<void>
+  goToStep(
+    step: AuthStep,
+    options?: { direction?: TransitionDirection }
+  ): Promise<void>
   goBack(): Promise<void>
   exitFlow(
     destination?: "library" | "settings",
@@ -209,7 +215,7 @@ export interface FlowController {
   checkUsernameAvailability(
     accessToken: string,
     username: string
-  ): Promise<boolean>
+  ): Promise<"available" | "taken" | "notallowed">
   createProfile(accessToken: string, username: string): Promise<void>
   checkGDLAccount(showLoading?: boolean): Promise<GDLAccountState>
   setupGDLAccount(): Promise<void>

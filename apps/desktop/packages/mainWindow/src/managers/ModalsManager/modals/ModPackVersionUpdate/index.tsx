@@ -11,9 +11,9 @@ import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { rspc } from "@/utils/rspcClient"
 import { Show, createEffect, createSignal, createMemo } from "solid-js"
+import { Trans, useTransContext } from "@gd/i18n"
 import { Modpack } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
-import { useTransContext } from "@gd/i18n"
 
 interface Props {
   instanceId: number
@@ -176,7 +176,9 @@ const ModPackVersionUpdate = (props: ModalProps) => {
                   <div class="flex w-full justify-between">
                     <span>{version?.name}</span>
                     <Show when={version?.isCurrent}>
-                      <span class="text-green-500">[ Current ]</span>
+                      <span class="text-green-500">
+                        <Trans key="instance.version_current" />
+                      </span>
                     </Show>
                   </div>
                 </SelectItem>
@@ -192,7 +194,9 @@ const ModPackVersionUpdate = (props: ModalProps) => {
                     <div class="flex w-full justify-between">
                       <span>{version?.name}</span>
                       <Show when={version?.isCurrent}>
-                        <span class="text-green-500">[ Current ]</span>
+                        <span class="text-green-500">
+                          <Trans key="instance.version_current" />
+                        </span>
                       </Show>
                     </div>
                   )

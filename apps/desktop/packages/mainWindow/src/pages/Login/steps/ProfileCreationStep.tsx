@@ -66,19 +66,32 @@ export function ProfileCreationStep(props: ProfileCreationStepProps) {
                 <Trans key="profile_creation.checking" />
               </p>
             </Show>
-            <Show when={isValid() && !props.checking && props.available === "available"}>
-              <p class="text-green-400">
-                ✓ <Trans key="profile_creation.available" />
+            <Show
+              when={
+                isValid() && !props.checking && props.available === "available"
+              }
+            >
+              <p class="text-green-400 flex items-center gap-2">
+                <div class="i-hugeicons:checkmark-circle-02 h-4 w-4" />
+                <Trans key="profile_creation.available" />
               </p>
             </Show>
-            <Show when={isValid() && !props.checking && props.available === "taken"}>
-              <p class="text-red-400">
-                ✗ <Trans key="profile_creation.taken" />
+            <Show
+              when={isValid() && !props.checking && props.available === "taken"}
+            >
+              <p class="text-red-400 flex items-center gap-2">
+                <div class="i-hugeicons:cancel-circle h-4 w-4" />
+                <Trans key="profile_creation.taken" />
               </p>
             </Show>
-            <Show when={isValid() && !props.checking && props.available === "notallowed"}>
-              <p class="text-red-400">
-                ✗ <Trans key="profile_creation.not_allowed" />
+            <Show
+              when={
+                isValid() && !props.checking && props.available === "notallowed"
+              }
+            >
+              <p class="text-red-400 flex items-center gap-2">
+                <div class="i-hugeicons:cancel-circle h-4 w-4" />
+                <Trans key="profile_creation.not_allowed" />
               </p>
             </Show>
           </div>
@@ -99,7 +112,9 @@ export function ProfileCreationStep(props: ProfileCreationStepProps) {
               </li>
               <li
                 classList={{
-                  "text-green-400": props.username.length > 0 && /^[a-zA-Z0-9_]*$/.test(props.username)
+                  "text-green-400":
+                    props.username.length > 0 &&
+                    /^[a-zA-Z0-9_]*$/.test(props.username)
                 }}
               >
                 <Trans key="profile_creation.requirement_characters" />

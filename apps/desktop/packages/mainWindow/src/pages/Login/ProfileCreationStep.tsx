@@ -20,7 +20,9 @@ const ProfileCreationStep = (props: ProfileCreationStepProps) => {
   const [t] = useTransContext()
   const [username, setUsername] = createSignal("")
   const [checking, setChecking] = createSignal(false)
-  const [available, setAvailable] = createSignal<boolean | null>(null)
+  const [available, setAvailable] = createSignal<
+    "available" | "taken" | "notallowed" | null
+  >(null)
   const [error, setError] = createSignal<string | null>(null)
 
   // Username validation
@@ -91,7 +93,7 @@ const ProfileCreationStep = (props: ProfileCreationStepProps) => {
         setError(t("profile_creation.username_invalid"))
       } else if (err.message?.includes("NameNotAvailable")) {
         setError(t("profile_creation.username_unavailable"))
-        setAvailable(false)
+        setAvailable("taken")
       } else {
         setError(t("profile_creation.create_failed"))
       }
@@ -115,7 +117,7 @@ const ProfileCreationStep = (props: ProfileCreationStepProps) => {
 
   // Notify parent of validation state changes
   createEffect(() => {
-    const canSubmit = isValid() && available() === true
+    const canSubmit = isValid() && available() === "available"
     props.onValidationChange?.(canSubmit)
   })
 
@@ -161,14 +163,22 @@ const ProfileCreationStep = (props: ProfileCreationStepProps) => {
               <Trans key="profile_creation.checking" />
             </p>
           </Show>
-          <Show when={isValid() && !checking() && available() === true}>
-            <p class="text-green-400">
-              ✓ <Trans key="profile_creation.available" />
+          <Show when={isValid() && !checking() && available() === "available"}>
+            <p class="text-green-400 flex items-center gap-2">
+              <div class="i-hugeicons:checkmark-circle-02 h-4 w-4" />
+              <Trans key="profile_creation.available" />
             </p>
           </Show>
-          <Show when={isValid() && !checking() && available() === false}>
-            <p class="text-red-400">
-              ✗ <Trans key="profile_creation.taken" />
+          <Show when={isValid() && !checking() && available() === "taken"}>
+            <p class="text-red-400 flex items-center gap-2">
+              <div class="i-hugeicons:cancel-circle h-4 w-4" />
+              <Trans key="profile_creation.taken" />
+            </p>
+          </Show>
+          <Show when={isValid() && !checking() && available() === "notallowed"}>
+            <p class="text-red-400 flex items-center gap-2">
+              <div class="i-hugeicons:cancel-circle h-4 w-4" />
+              <Trans key="profile_creation.not_allowed" />
             </p>
           </Show>
         </div>

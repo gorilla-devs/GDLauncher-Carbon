@@ -249,12 +249,15 @@ export const AnimationPresets = {
     options = { duration: 300, delay: 0 }
   ): Promise<void> => {
     return element
-      .animate([{ transform: `scale(${from})` }, { transform: `scale(${to})` }], {
-        duration: options.duration,
-        delay: options.delay,
-        easing: "cubic-bezier(0.175, 0.885, 0.32, 1)",
-        fill: "forwards"
-      })
+      .animate(
+        [{ transform: `scale(${from})` }, { transform: `scale(${to})` }],
+        {
+          duration: options.duration,
+          delay: options.delay,
+          easing: "cubic-bezier(0.175, 0.885, 0.32, 1)",
+          fill: "forwards"
+        }
+      )
       .finished.then(() => {})
   }
 }

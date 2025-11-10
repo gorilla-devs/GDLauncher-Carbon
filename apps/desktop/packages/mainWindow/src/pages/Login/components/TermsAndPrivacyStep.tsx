@@ -35,10 +35,20 @@ export function TermsAndPrivacyStep(props: TermsAndPrivacyStepProps) {
       {/* Title */}
       <div class="flex flex-col items-center gap-2 text-center">
         <h2 class="text-lightSlate-50 m-0 text-2xl font-semibold">
-          <Trans key={props.isForced ? "login.updated_terms_title" : "login.terms_title"} />
+          <Trans
+            key={
+              props.isForced ? "login.updated_terms_title" : "login.terms_title"
+            }
+          />
         </h2>
         <p class="text-lightSlate-400 text-sm">
-          <Trans key={props.isForced ? "login.updated_terms_subtitle" : "login.terms_subtitle"} />
+          <Trans
+            key={
+              props.isForced
+                ? "login.updated_terms_subtitle"
+                : "login.terms_subtitle"
+            }
+          />
         </p>
       </div>
 
@@ -51,7 +61,8 @@ export function TermsAndPrivacyStep(props: TermsAndPrivacyStepProps) {
           <Trans key="login.cmp_instructions" />
         </p>
         <p class="text-lightSlate-500 m-0 text-xs leading-relaxed">
-          Purposes we use: <Trans key="login.we_value_privacy_text5" />
+          <Trans key="login.purposes_we_use" />{" "}
+          <Trans key="login.we_value_privacy_text5" />
         </p>
       </div>
 

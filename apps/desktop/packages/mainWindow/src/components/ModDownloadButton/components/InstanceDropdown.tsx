@@ -188,7 +188,7 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
           when={props.filteredInstances().length > 0}
           fallback={
             <div class="text-lightSlate-400 px-2 py-3 text-center text-sm">
-              No instances found
+              <Trans key="common.no_instances_found" />
             </div>
           }
         >

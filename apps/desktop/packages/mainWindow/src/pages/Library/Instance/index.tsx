@@ -806,12 +806,10 @@ const Instance = () => {
                     <div class="i-hugeicons:alert-01 text-2xl text-yellow-500" />
                     <div>
                       <h3 class="m-0 mb-1 font-semibold text-yellow-200">
-                        Duplicated Mods Detected
+                        <Trans key="instance.duplicated_mods_detected" />
                       </h3>
                       <p class="m-0 text-sm text-yellow-300/70">
-                        {duplicatedMods().length} mod
-                        {duplicatedMods().length > 1 ? "s have" : " has"}{" "}
-                        multiple versions installed. This may cause conflicts.
+                        <Trans key="instance.duplicated_mods_message" />
                       </p>
                     </div>
                   </div>
@@ -829,7 +827,7 @@ const Instance = () => {
                     }}
                   >
                     <div class="i-hugeicons:magic-wand-01" />
-                    Fix Now
+                    <Trans key="instance.fix_now" />
                   </Button>
                 </div>
               </Show>

@@ -129,7 +129,7 @@ export default function ShowcaseScroller(props: ShowcaseScrollerProps) {
         <h2 class="text-2xl font-bold">{props.title}</h2>
         <Show when={props.viewAllAction}>
           <Button type="text" onClick={props.viewAllAction}>
-            View All
+            <Trans key="common.view_all" />
           </Button>
         </Show>
       </div>

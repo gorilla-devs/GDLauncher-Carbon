@@ -386,7 +386,7 @@ const HomeGrid = () => {
                           setInstancesTileSize(2)
                         }}
                       >
-                        Reset
+                        <Trans key="general.reset_filters" />
                       </div>
                     </div>
                   </DropdownMenuLabel>
@@ -701,7 +701,7 @@ const HomeGrid = () => {
               <ContextMenuContent>
                 <ContextMenuGroup>
                   <ContextMenuGroupLabel>
-                    Add New Instance
+                    <Trans key="library.add_new_instance" />
                   </ContextMenuGroupLabel>
                   <ContextMenuSeparator />
                   <ContextMenuItem
@@ -713,7 +713,7 @@ const HomeGrid = () => {
                     }}
                   >
                     <div class="i-hugeicons:file-add h-4 w-4" />
-                    Create New Instance
+                    <Trans key="library.create_new_instance" />
                   </ContextMenuItem>
                   <ContextMenuItem
                     class="flex items-center gap-2"
@@ -729,7 +729,7 @@ const HomeGrid = () => {
                     }}
                   >
                     <div class="i-hugeicons:download-02 h-4 w-4" />
-                    Import Instance
+                    <Trans key="library.import_instance" />
                   </ContextMenuItem>
                 </ContextMenuGroup>
               </ContextMenuContent>

@@ -20,8 +20,6 @@ interface TermsStepProps {
 export function TermsStep(props: TermsStepProps) {
   const modalsContext = useModal()
 
-  const isForced = props.step.variant === "forced"
-
   return (
     <div class="flex w-full flex-1 flex-col items-center justify-center gap-8 p-6 text-center">
       {/* Content */}
@@ -35,7 +33,8 @@ export function TermsStep(props: TermsStepProps) {
             <Trans key="login.cmp_instructions" />
           </p>
           <p class="text-lightSlate-500 m-0 text-xs leading-relaxed">
-            Purposes we use: <Trans key="login.we_value_privacy_text5" />
+            <Trans key="login.purposes_we_use" />{" "}
+            <Trans key="login.we_value_privacy_text5" />
           </p>
         </div>
 

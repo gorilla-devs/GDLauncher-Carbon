@@ -68,7 +68,7 @@ export type Procedures = {
         { key: "vtask.getTasks", input: never, result: FETask[] },
     mutations: 
         { key: "account.changeGdlAccountNickname", input: FEChangeGdlAccountNickname, result: null } | 
-        { key: "account.checkUsernameAvailable", input: FECheckUsernameAvailability, result: boolean } | 
+        { key: "account.checkUsernameAvailable", input: FECheckUsernameAvailability, result: UsernameAvailability } | 
         { key: "account.createProfile", input: FECreateProfile, result: null } | 
         { key: "account.deleteAccount", input: string, result: null } | 
         { key: "account.enroll.begin", input: never, result: null } | 
@@ -507,6 +507,8 @@ export type FERequestDeletionStatus = "success" | { failed: number | null }
 export type FEUnifiedPagination = { index: number; pageSize: number; resultCount: number; totalCount: number }
 
 export type FECheckUsernameAvailability = { accessToken: string; username: string }
+
+export type UsernameAvailability = "available" | "taken" | "notallowed"
 
 export type CFFEFileStatus = "processing" | "changesRequired" | "underReview" | "approved" | "rejected" | "malwareDetected" | "deleted" | "archived" | "testing" | "released" | "readyForReview" | "deprecated" | "baking" | "awaitingPublishing" | "failedPublishing"
 
