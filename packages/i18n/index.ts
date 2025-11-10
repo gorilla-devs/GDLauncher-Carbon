@@ -1,33 +1,34 @@
 export const supportedLanguages = {
-    "english": "united-states"
-};
+  english: "united-states",
+  japanese: "japan"
+}
 
 type NamespacesMap = {
-  [key: string]: Object;
-};
+  [key: string]: Object
+}
 
 const loadLanguageFiles = async (lang: string) => {
-  const namespacesMap: NamespacesMap = {};
-  const namespaces = ["common", "settings"];
+  const namespacesMap: NamespacesMap = {}
+  const namespaces = ["common", "settings"]
 
-  const language = (await import(`./locale/languages.json`)).default;
-  namespacesMap["languages"] = language;
+  const language = (await import(`./locale/languages.json`)).default
+  namespacesMap["languages"] = language
 
   for (const namespace of namespaces) {
     try {
       const language = (await import(`./locale/${lang}/${namespace}.json`))
-        .default;
+        .default
 
-      namespacesMap[namespace] = language;
+      namespacesMap[namespace] = language
     } catch (err) {
-      console.log(err);
+      console.log(err)
     }
   }
 
-  return namespacesMap;
-};
+  return namespacesMap
+}
 
-export { TransProvider, Trans, useTransContext } from "@mbarzda/solid-i18next";
-export { default as i18n } from "i18next";
-export { default as icu } from "i18next-icu";
-export { loadLanguageFiles };
+export { TransProvider, Trans, useTransContext } from "@mbarzda/solid-i18next"
+export { default as i18n } from "i18next"
+export { default as icu } from "i18next-icu"
+export { loadLanguageFiles }

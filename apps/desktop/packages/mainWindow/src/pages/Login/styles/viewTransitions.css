@@ -40,30 +40,28 @@
   overflow: hidden;
 }
 
-/* Prevent vertical movement without stretching */
-::view-transition-old(step-content.forward),
-::view-transition-new(step-content.forward),
-::view-transition-old(step-content.backward),
-::view-transition-new(step-content.backward) {
+/* Disable default fade and prevent vertical stretching */
+::view-transition-old(step-content),
+::view-transition-new(step-content) {
   object-fit: fill;
   overflow: clip;
   mix-blend-mode: normal;
 }
 
 /* Forward transition using view-transition-class */
-::view-transition-old(step-content.forward) {
+::view-transition-old(.forward) {
   animation: 250ms cubic-bezier(0.4, 0, 0.2, 1) both login-slide-out-left;
 }
 
-::view-transition-new(step-content.forward) {
+::view-transition-new(.forward) {
   animation: 250ms cubic-bezier(0.4, 0, 0.2, 1) both login-slide-in-right;
 }
 
 /* Backward transition using view-transition-class */
-::view-transition-old(step-content.backward) {
+::view-transition-old(.backward) {
   animation: 250ms cubic-bezier(0.4, 0, 0.2, 1) both login-slide-out-right;
 }
 
-::view-transition-new(step-content.backward) {
+::view-transition-new(.backward) {
   animation: 250ms cubic-bezier(0.4, 0, 0.2, 1) both login-slide-in-left;
 }

@@ -14,6 +14,8 @@ interface TermsAndPrivacyStepProps {
   initialAccepted?: boolean
   /** Callback when terms acceptance state changes */
   onAcceptanceChange?: (accepted: boolean) => void
+  /** Whether this is a forced re-acceptance (updated terms) */
+  isForced?: boolean
 }
 
 export function TermsAndPrivacyStep(props: TermsAndPrivacyStepProps) {
@@ -33,10 +35,10 @@ export function TermsAndPrivacyStep(props: TermsAndPrivacyStepProps) {
       {/* Title */}
       <div class="flex flex-col items-center gap-2 text-center">
         <h2 class="text-lightSlate-50 m-0 text-2xl font-semibold">
-          <Trans key="login.terms_title" />
+          <Trans key={props.isForced ? "login.updated_terms_title" : "login.terms_title"} />
         </h2>
         <p class="text-lightSlate-400 text-sm">
-          <Trans key="login.terms_subtitle" />
+          <Trans key={props.isForced ? "login.updated_terms_subtitle" : "login.terms_subtitle"} />
         </p>
       </div>
 

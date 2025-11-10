@@ -19,7 +19,7 @@ import { DeviceCode } from "@/components/CodeInput"
 import { toast } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
-import { DeviceCodeObjectType } from "."
+import { DeviceCode as DeviceCodeType } from "@gd/core_module/bindings"
 import GateAnimationRiveWrapper from "@/utils/GateAnimationRiveWrapper"
 import GateAnimation from "../../gate_animation.riv"
 import { handleStatus } from "@/utils/login"
@@ -28,8 +28,8 @@ import fetchData from "./auth.login.data"
 import { EnrollmentError } from "@gd/core_module/bindings"
 
 interface Props {
-  deviceCodeObject: DeviceCodeObjectType | null
-  setDeviceCodeObject: Setter<DeviceCodeObjectType | null>
+  deviceCodeObject: DeviceCodeType | null
+  setDeviceCodeObject: Setter<DeviceCodeType | null>
   nextStep: () => void
   prevStep: () => void
 }
@@ -56,7 +56,7 @@ const CodeStep = (props: Props) => {
 
   const userCode = () => props.deviceCodeObject?.userCode
   const oldUserCode = () => props.deviceCodeObject?.userCode
-  const deviceCodeLink = () => props.deviceCodeObject?.link
+  const deviceCodeLink = () => props.deviceCodeObject?.verificationUri
   const expiresAt = () => props.deviceCodeObject?.expiresAt
   const expiresAtFormat = () => new Date(expiresAt() || "")?.getTime()
   const expiresAtMs = () => expiresAtFormat() - Date.now()

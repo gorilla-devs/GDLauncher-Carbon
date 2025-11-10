@@ -1,41 +1,77 @@
 /**
  * Login Page Entry Point
  *
- * This page has been completely refactored into a modular architecture:
+ * Redesigned auth flow with step-based architecture:
  *
  * Architecture:
- * - LoginContainer: Main orchestrator component (components/LoginContainer.tsx)
- * - Hooks: useAuthFlow, useEnrollmentStatus, useAuthTransitions, useAuthAnimations (hooks/*)
- * - Step Components: WelcomeStep, AuthMethodStep, BrowserAuthStep, DeviceCodeStepEnhanced, CompleteStep (components/*)
- * - Supporting Components: ProgressStepper, GDLAccountSetupModal (components/*)
+ * - AuthFlow: Main orchestrator (AuthFlow.tsx)
+ * - FlowController: State management and navigation (flow/FlowController.ts)
+ * - AnimationController: First-class animation support (animations/AnimationController.ts)
+ * - Step Components: WelcomeStep, TermsStep, AuthMethodStep, EnrollingStep, ProfileCreationStep, GdlAccountStep (steps/*)
  *
- * Flow (4 steps):
- * 1. Welcome: Combined Terms & Privacy acceptance
- * 2. Auth Method: Choose browser OAuth or device code
- * 3. Auth Flow: Browser waiting screen or device code entry (+ profile creation if needed)
- * 4. Complete: Success + optional GDL account setup
+ * Flow:
+ * 1. Welcome: Initial greeting
+ * 2. Terms: Privacy and terms acceptance
+ * 3. Auth Method: Choose browser OAuth or device code
+ * 4. Enrolling: Browser/device code authentication with polling
+ * 5. Profile Creation: For users without Minecraft profile
+ * 6. GDL Account: Success + optional GDL account setup/linking
  *
  * Features:
- * - Browser OAuth with loopback server (RFC 8252)
- * - Device code flow with QR code support
- * - View Transition API for smooth horizontal slides
+ * - Promise-based flow control (no XState)
+ * - Discriminated unions for type-safe state
+ * - Global loading vs button loading patterns
+ * - Real-time enrollment status polling
+ * - Horizontal slide view transitions
  * - First-launch welcome animation
- * - Profile creation for Game Pass users
- * - Optional GDL account setup modal
- * - Enhanced error handling with user-friendly messages
- * - Protocol URL callback support
+ * - Full TypeScript type safety
  */
 
-import { LoginContainer } from "./components/LoginContainer"
-
-// Re-export types that might be used elsewhere
-export interface DeviceCodeObjectType {
-  userCode: string
-  link: string
-  verificationUri: string
-  expiresAt: string
-}
+import { createEffect, createMemo } from "solid-js"
+import { useSearchParams } from "@solidjs/router"
+import { AuthFlow } from "./AuthFlow"
+import { useGlobalStore } from "@/components/GlobalStoreContext"
+import { useGDNavigate } from "@/managers/NavigationManager"
 
 export default function Login() {
-  return <LoginContainer />
+  const globalStore = useGlobalStore()
+  const [searchParams] = useSearchParams()
+  const navigator = useGDNavigate()
+
+  // Determine if we should redirect to library
+  const shouldRedirect = createMemo(() => {
+    // Wait for data to load
+    const activeUuid = globalStore.currentlySelectedAccountUuid.data
+    const settings = globalStore.settings.data
+    const accounts = globalStore.accounts.data
+
+    if (!settings || accounts === undefined || activeUuid === undefined) {
+      return false // Data not loaded yet
+    }
+
+    // Don't redirect if explicitly adding accounts from settings
+    const isAddingAccount =
+      searchParams.addMicrosoftAccount === "true" ||
+      searchParams.addGdlAccount === "true"
+
+    if (isAddingAccount) {
+      return false // Show auth flow
+    }
+
+    // Redirect if user has everything set up
+    return (
+      activeUuid !== null && // Has Microsoft account
+      settings.termsAndPrivacyAccepted && // Accepted terms
+      settings.gdlAccountId !== null // Has made decision about GDL (includes "" for skipped)
+    )
+  })
+
+  // Perform redirect when conditions are met
+  createEffect(() => {
+    if (shouldRedirect()) {
+      navigator.navigate("/library", { replace: true })
+    }
+  })
+
+  return <AuthFlow />
 }

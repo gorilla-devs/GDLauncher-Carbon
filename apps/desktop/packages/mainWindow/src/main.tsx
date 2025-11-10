@@ -147,45 +147,9 @@ render(() => {
     }
   })
 
-  // Smart auth bypass: Skip login screen for logged-in users (unless special occasion)
-  createAsyncEffect(async () => {
-    if (coreModuleLoaded.state === "ready" && coreModuleLoaded()) {
-      const port = coreModuleLoaded() as unknown as number
-      const { client } = initRspc(port)
-
-      try {
-        const settings = await client.query(["settings.getSettings"])
-        const activeUuid = await client.query(["account.getActiveUuid"])
-        const accounts = await client.query(["account.getAccounts"])
-
-        // Check if it's a special occasion
-        const isOccasion = isSpecialOccasion()
-
-        // Skip directly to library if:
-        // 1. User is fully set up (has accounts, terms accepted, made GDL account decision)
-        // 2. AND it's NOT a special occasion (we want to show seasonal splash during occasions)
-        if (
-          settings.termsAndPrivacyAccepted &&
-          activeUuid &&
-          accounts.length > 0 &&
-          settings.gdlAccountId != null &&
-          !isOccasion
-        ) {
-          console.log(
-            "[Auth Bypass] Skipping to library (logged in, no occasion)"
-          )
-          window.location.hash = "#/library"
-        } else if (accounts.length > 0 && isOccasion) {
-          console.log(
-            "[Auth Bypass] Will show seasonal splash (logged in + occasion)"
-          )
-          // Let InnerApp/LoginContainer handle seasonal splash
-        }
-      } catch (e) {
-        console.error("Error checking login status:", e)
-      }
-    }
-  })
+  // Note: Auth bypass logic removed - now handled by login machine
+  // The backend validates terms checksum during initialization and resets
+  // termsAndPrivacyAccepted if needed. The login machine will route accordingly.
 
   return (
     <ProdWrapErrorBoundary>

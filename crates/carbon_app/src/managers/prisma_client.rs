@@ -188,6 +188,9 @@ async fn seed_init_db(db_client: &PrismaClient, gdl_base_api: String) -> Result<
         )));
     }
 
+    // Emit status for frontend progress tracking
+    println!("_STATUS_:VerifyingTermsAndPrivacy");
+
     let latest_tos_privacy_checksum = TermsAndPrivacy::get_latest_consent_sha(gdl_base_api)
         .await
         .map_err(DatabaseError::TermsAndPrivacy);

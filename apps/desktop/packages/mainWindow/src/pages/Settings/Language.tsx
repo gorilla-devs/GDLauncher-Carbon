@@ -40,9 +40,12 @@ const Language = () => {
                     <div class="flex w-full justify-between">
                       <div class="flex items-center gap-2">
                         <div
-                          class={`i-emojione-v1:flag-for- h-5 w-5${value}`}
+                          class={`i-emojione-v1:flag-for-${value} h-5 w-5`}
                         />
+                        <Trans key={`languages:${key}`} />
+                        {" ("}
                         <Trans key={`languages:${key}_native`} />
+                        {")"}
                       </div>
                     </div>
                   )

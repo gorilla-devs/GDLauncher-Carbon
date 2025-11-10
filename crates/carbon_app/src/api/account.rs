@@ -2,7 +2,7 @@ use crate::api::keys::{self, account::*};
 use crate::api::router::router;
 use crate::domain::account as domain;
 use crate::error::{AxumError, FeError};
-use crate::managers::account::api::XboxError;
+use crate::managers::account::api::{UsernameAvailability, XboxError};
 use crate::managers::account::gdl_account::{
     GDLAccountStatus, GDLUser, RegisterAccountBody, RequestGDLAccountDeletionError,
     RequestNewEmailChangeError, RequestNewVerificationTokenError,

@@ -46,6 +46,7 @@ pub struct FEOperatingSystem {
 
 #[derive(Type, Debug, Serialize, Clone)]
 pub enum CoreModuleStatus {
+    VerifyingTermsAndPrivacy,
     LoadAndMigrate,
     LaunchBackgroundTasks,
     RefreshMSAuth,

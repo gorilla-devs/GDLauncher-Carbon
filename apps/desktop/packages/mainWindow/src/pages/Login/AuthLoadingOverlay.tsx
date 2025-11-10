@@ -17,6 +17,8 @@ const AuthLoadingOverlay = (props: AuthLoadingOverlayProps) => {
 
   const statusText = createMemo(() => {
     switch (props.status) {
+      case "VerifyingTermsAndPrivacy":
+        return "Verifying Terms & Privacy..."
       case "LoadAndMigrate":
         return "Initializing database..."
       case "RefreshMSAuth":

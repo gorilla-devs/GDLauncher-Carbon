@@ -519,7 +519,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         self,
         access_token: String,
         username: String,
-    ) -> anyhow::Result<bool> {
+    ) -> anyhow::Result<api::UsernameAvailability> {
         api::check_username_available(&self.app.reqwest_client, &access_token, &username).await
     }
 

@@ -2,18 +2,19 @@ module.exports = {
   env: {
     browser: true,
     es2021: true,
-    node: true,
+    node: true
   },
   overrides: [],
   rules: {
-    "prettier/prettier": ["error", { endOfLine: "lf" }],
+    "prettier/prettier": ["error", { endOfLine: "lf" }]
   },
   parser: "@typescript-eslint/parser",
   plugins: ["@typescript-eslint", "prettier"],
   extends: [
+    "plugin:i18next/recommended",
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended",
-    "prettier",
+    "prettier"
   ],
-  ignorePatterns: ["dist/**/*", "node_modules/**/*"],
-};
+  ignorePatterns: ["dist/**/*", "node_modules/**/*"]
+}

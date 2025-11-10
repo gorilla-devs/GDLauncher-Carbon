@@ -7,7 +7,7 @@ import gitignore from "eslint-config-flat-gitignore"
 import globals from "globals"
 import turboPlugin from "eslint-plugin-turbo"
 // import perfectionist from "eslint-plugin-perfectionist";
-// import i18nLint from "eslint-plugin-i18next";
+import i18nLint from "eslint-plugin-i18next"
 
 /** @type {import("eslint").Linter.Config} */
 export default [
@@ -20,6 +20,7 @@ export default [
   // TypeScript
   ...ts.configs.recommendedTypeChecked,
   ...ts.configs.stylisticTypeChecked,
+
   {
     plugins: {
       turbo: turboPlugin
@@ -49,6 +50,8 @@ export default [
   // JSX/Solid/TailwindCSS
   solid,
   ...tailwind.configs["flat/recommended"],
+
+  i18nLint.configs["flat/recommended"],
 
   // Prettier...because prettier
   prettier,
@@ -119,9 +122,17 @@ export default [
       "@typescript-eslint/no-empty-function": "off",
       "@typescript-eslint/restrict-plus-operands": "off",
       "@typescript-eslint/prefer-for-of": "off",
-      "i18next/no-literal-string": "off",
       "@typescript-eslint/ban-ts-comment": "off",
-      "@typescript-eslint/no-require-imports": "off"
+      "@typescript-eslint/no-require-imports": "off",
+      "i18next/no-literal-string": "off"
+    }
+  },
+
+  // Enable i18n literal string checking only for mainWindow
+  {
+    files: ["apps/desktop/packages/mainWindow/**/*"],
+    rules: {
+      "i18next/no-literal-string": "error"
     }
   },
 
