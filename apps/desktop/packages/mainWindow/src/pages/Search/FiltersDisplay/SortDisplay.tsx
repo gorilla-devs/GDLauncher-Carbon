@@ -44,7 +44,7 @@ export default function SortDisplay() {
           <div class="flex items-center gap-2">
             <div class="i-hugeicons:sort-by-up-01 h-4 w-4" />
             <Trans
-              key="search.sort_by"
+              key="search:_trn_sort_by"
               options={{ sort: capitalize(getCurseforgeSortField()) }}
             />
           </div>
@@ -63,7 +63,7 @@ export default function SortDisplay() {
               }
             />
             <Trans
-              key="search.sort_order"
+              key="search:_trn_sort_order"
               options={{ order: capitalize(getCurseforgeSortOrder()) }}
             />
           </div>
@@ -75,7 +75,7 @@ export default function SortDisplay() {
           <div class="flex items-center gap-2">
             <div class="i-hugeicons:sort-by-up-01 h-4 w-4" />
             <Trans
-              key="search.sort_by"
+              key="search:_trn_sort_by"
               options={{ sort: capitalize(getModrinthSortIndex()) }}
             />
           </div>

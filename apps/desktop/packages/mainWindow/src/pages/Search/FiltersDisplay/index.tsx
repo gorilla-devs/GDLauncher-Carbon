@@ -51,7 +51,7 @@ export default function FiltersDisplay() {
             class="text-xs"
           >
             <div class="i-hugeicons:cancel-circle h-4 w-4" />
-            <Trans key="common.clear_all" />
+            <Trans key="general:_trn_common.clear_all" />
           </Button>
           <div class="bg-darkSlate-600 h-4 w-px" />
           <InstanceDisplay />

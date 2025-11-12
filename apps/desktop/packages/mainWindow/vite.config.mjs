@@ -71,7 +71,8 @@ export default defineConfig({
     alias: {
       "@": join(__dirname, "src"),
       "@package_json": resolve(__dirname, "../../package.json")
-    }
+    },
+    browserField: true
   },
   server: {
     port: pkg.env.PORT

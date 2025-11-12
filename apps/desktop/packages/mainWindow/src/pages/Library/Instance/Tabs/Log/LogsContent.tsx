@@ -230,7 +230,7 @@ function ScrollBottomButton(props: {
               <div class="flex items-center gap-2">
                 <div class="i-hugeicons:arrow-down-01" />
                 <Trans
-                  key="logs.new_logs"
+                  key="logs:_trn_new_logs"
                   options={{
                     logsCount:
                       props.newLogsCount > 999
@@ -243,7 +243,7 @@ function ScrollBottomButton(props: {
             <Match when={props.newLogsCount === 0}>
               <div class="flex items-center gap-2">
                 <div class="i-hugeicons:arrow-down-01" />
-                <Trans key="logs.see_new_logs" />
+                <Trans key="logs:_trn_see_new_logs" />
               </div>
             </Match>
           </Switch>
@@ -251,7 +251,7 @@ function ScrollBottomButton(props: {
         <Match when={!isHovered()}>
           <div class="flex items-center gap-2">
             <div class="i-hugeicons:pause h-4 w-4" />
-            <Trans key="logs.logs_paused_due_to_scroll" />
+            <Trans key="logs:_trn_logs_paused_due_to_scroll" />
           </div>
         </Match>
       </Switch>
@@ -336,7 +336,7 @@ const LogsContent = (props: Props) => {
         <div class="z-1 bg-darkSlate-700 text-lightSlate-700 absolute right-6 top-20 flex h-10 w-fit items-center rounded-3xl px-4">
           <div class="animate-liveCirclePulse mr-2 h-3 w-3 rounded-full bg-red-400 text-red-400" />
           <div>
-            <Trans key="ui.live" />
+            <Trans key="ui:_trn_live" />
           </div>
         </div>
       </Show>
@@ -362,7 +362,7 @@ const LogsContent = (props: Props) => {
           </Match>
           <Match when={props.logs.length === 0}>
             <div class="text-lightSlate-600 flex h-full select-none items-center justify-center text-center text-xl">
-              <Trans key="logs.no_logs" />
+              <Trans key="logs:_trn_no_logs" />
             </div>
           </Match>
           <Match when={props.logs.length > 0}>

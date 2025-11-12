@@ -27,9 +27,9 @@ export function WelcomeStep() {
         <p class="text-lightSlate-400 m-0 max-w-md text-base leading-relaxed">
           <Show
             when={hasActiveAccount}
-            fallback={<Trans key="login.welcome_tagline" />}
+            fallback={<Trans key="auth:_trn_login.welcome_tagline" />}
           >
-            <Trans key="login.welcome_returning_tagline" />
+            <Trans key="auth:_trn_login.welcome_returning_tagline" />
           </Show>
         </p>
       </div>

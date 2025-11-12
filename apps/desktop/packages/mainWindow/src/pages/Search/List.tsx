@@ -94,11 +94,11 @@ export function List() {
                   variant="Searching Gorilla - Magnifying Glass"
                 />
                 <h3 class="mb-2 mt-6 text-xl font-semibold text-gray-300">
-                  <Trans key="search.no_results_found" />
+                  <Trans key="search:_trn_no_results_found" />
                 </h3>
                 <p class="max-w-md text-gray-500">
                   <Trans
-                    key="search.no_results_description"
+                    key="search:_trn_no_results_description"
                     options={{ type: type() }}
                   />
                 </p>

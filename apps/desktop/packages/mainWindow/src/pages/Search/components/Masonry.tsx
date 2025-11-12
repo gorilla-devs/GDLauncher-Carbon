@@ -121,7 +121,7 @@ const Masonry: Component<MasonryProps> = (props) => {
                       }`}
                     >
                       {element.downloadsCount.toLocaleString()}{" "}
-                      <Trans key="search.downloads_label" />
+                      <Trans key="search:_trn_downloads_label" />
                     </p>
                   </Badge>
                   <Badge class="bg-darkSlate-900 w-fit">
@@ -148,7 +148,7 @@ const Masonry: Component<MasonryProps> = (props) => {
                       }`}
                     >
                       <Trans
-                        key="common.last_updated_date"
+                        key="general:_trn_common.last_updated_date"
                         options={{
                           date: new Date(
                             element.lastUpdated

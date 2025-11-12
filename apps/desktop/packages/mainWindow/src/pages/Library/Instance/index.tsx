@@ -189,7 +189,7 @@ const Instance = () => {
       label: (
         <div class="flex items-center gap-2">
           <div class="i-hugeicons:dashboard-square-01 text-lg" />
-          <Trans key="ui.overview" />
+          <Trans key="ui:_trn_overview" />
         </div>
       ),
       path: `/library/${params.id}`
@@ -198,7 +198,7 @@ const Instance = () => {
       label: (
         <div class="flex items-center gap-2">
           <div class="i-hugeicons:puzzle text-lg" />
-          <Trans key="ui.addons" />
+          <Trans key="ui:_trn_addons" />
         </div>
       ),
       path: `/library/${params.id}/addons`,
@@ -208,7 +208,7 @@ const Instance = () => {
       label: (
         <div class="flex items-center gap-2">
           <div class="i-hugeicons:settings-01 text-lg" />
-          <Trans key="ui.settings" />
+          <Trans key="ui:_trn_settings" />
         </div>
       ),
       path: `/library/${params.id}/settings`
@@ -217,7 +217,7 @@ const Instance = () => {
       label: (
         <div class="flex items-center gap-2">
           <div class="i-hugeicons:file-script text-lg" />
-          <Trans key="ui.logs" />
+          <Trans key="ui:_trn_logs" />
           <FeatureStatusBadge type="beta" />
         </div>
       ),
@@ -381,17 +381,17 @@ const Instance = () => {
   const menuItems = () => [
     {
       icon: "i-hugeicons:pencil-edit-01",
-      label: t("instance.action_edit"),
+      label: t("instance:_trn_action_edit"),
       action: handleEdit
     },
     {
       icon: "i-hugeicons:folder-open",
-      label: t("instance.action_open_folder"),
+      label: t("instance:_trn_action_open_folder"),
       action: handleOpenFolder
     },
     {
       icon: "i-hugeicons:file-export",
-      label: t("instance.export_instance"),
+      label: t("instance:_trn_export_instance"),
       action: () => {
         const instanceId = getInstanceIdFromPath(location.pathname)
 
@@ -417,7 +417,7 @@ const Instance = () => {
     },
     {
       icon: "i-hugeicons:delete-02",
-      label: t("instance.action_delete"),
+      label: t("instance:_trn_action_delete"),
       action: handleDelete
     }
   ]
@@ -681,11 +681,11 @@ const Instance = () => {
                           <Switch>
                             <Match when={!isRunning()}>
                               <div class="i-hugeicons:play text-xl" />
-                              <Trans key="instance.play" />
+                              <Trans key="instance:_trn_play" />
                             </Match>
                             <Match when={isRunning()}>
                               <div class="i-hugeicons:stop text-xl" />
-                              <Trans key="instance.stop" />
+                              <Trans key="instance:_trn_stop" />
                             </Match>
                           </Switch>
                         </Button>
@@ -732,7 +732,7 @@ const Instance = () => {
                     size="small"
                     type="secondary"
                   >
-                    <Trans key="instance.step_back" />
+                    <Trans key="instance:_trn_step_back" />
                   </Button>
                 </div>
                 <div
@@ -775,11 +775,11 @@ const Instance = () => {
                   <Switch>
                     <Match when={!isRunning()}>
                       <div class="i-hugeicons:play text-base" />
-                      <Trans key="instance.play" />
+                      <Trans key="instance:_trn_play" />
                     </Match>
                     <Match when={isRunning()}>
                       <div class="i-hugeicons:stop text-base" />
-                      <Trans key="instance.stop" />
+                      <Trans key="instance:_trn_stop" />
                     </Match>
                   </Switch>
                 </Button>
@@ -806,10 +806,10 @@ const Instance = () => {
                     <div class="i-hugeicons:alert-01 text-2xl text-yellow-500" />
                     <div>
                       <h3 class="m-0 mb-1 font-semibold text-yellow-200">
-                        <Trans key="instance.duplicated_mods_detected" />
+                        <Trans key="instance:_trn_duplicated_mods_detected" />
                       </h3>
                       <p class="m-0 text-sm text-yellow-300/70">
-                        <Trans key="instance.duplicated_mods_message" />
+                        <Trans key="instance:_trn_duplicated_mods_message" />
                       </p>
                     </div>
                   </div>
@@ -827,7 +827,7 @@ const Instance = () => {
                     }}
                   >
                     <div class="i-hugeicons:magic-wand-01" />
-                    <Trans key="instance.fix_now" />
+                    <Trans key="instance:_trn_fix_now" />
                   </Button>
                 </div>
               </Show>

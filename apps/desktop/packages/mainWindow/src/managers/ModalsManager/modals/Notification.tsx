@@ -6,7 +6,7 @@ const Notification = (props: ModalProps) => {
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
       <div class="h-130 w-190 overflow-hidden">
-        <Trans key="ui.notification" />
+        <Trans key="ui:_trn_notification" />
       </div>
     </ModalLayout>
   )

@@ -78,9 +78,9 @@ export function GdlAccountStep(props: GdlAccountStepProps) {
       <p class="text-lightSlate-400 m-0 max-w-md text-base leading-relaxed">
         <Show
           when={gdlState().type === "linked"}
-          fallback={<Trans key="login.ready_to_launch" />}
+          fallback={<Trans key="auth:_trn_login.ready_to_launch" />}
         >
-          <Trans key="login.cloud_sync_active" />
+          <Trans key="auth:_trn_login.cloud_sync_active" />
         </Show>
       </p>
 
@@ -113,14 +113,14 @@ export function GdlAccountStep(props: GdlAccountStepProps) {
                     <div class="flex flex-col gap-1 text-left">
                       <h3 class="text-lightSlate-50 m-0 text-base font-bold">
                         <Trans
-                          key="login.welcome_back_name"
+                          key="auth:_trn_login.welcome_back_name"
                           options={{
                             name: data.nickname || "User"
                           }}
                         />
                       </h3>
                       <p class="text-lightSlate-500 m-0 text-sm leading-relaxed">
-                        <Trans key="login.sync_existing_account_description" />
+                        <Trans key="auth:_trn_login.sync_existing_account_description" />
                       </p>
                     </div>
                   </div>
@@ -128,19 +128,19 @@ export function GdlAccountStep(props: GdlAccountStepProps) {
                     <li class="flex items-start gap-2">
                       <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
                       <span>
-                        <Trans key="login.benefit_shared_instances" />
+                        <Trans key="auth:_trn_login.benefit_shared_instances" />
                       </span>
                     </li>
                     <li class="flex items-start gap-2">
                       <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
                       <span>
-                        <Trans key="login.benefit_metrics_sync" />
+                        <Trans key="auth:_trn_login.benefit_metrics_sync" />
                       </span>
                     </li>
                     <li class="flex items-start gap-2">
                       <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
                       <span>
-                        <Trans key="login.benefit_settings_sync" />
+                        <Trans key="auth:_trn_login.benefit_settings_sync" />
                       </span>
                     </li>
                   </ul>
@@ -156,12 +156,12 @@ export function GdlAccountStep(props: GdlAccountStepProps) {
                 loading={loading()}
                 disabled={loading()}
               >
-                <Trans key="login.sync_account" />
+                <Trans key="auth:_trn_login.sync_account" />
                 <div class="i-hugeicons:arrow-right-01 h-4 w-4 ml-2" />
               </Button>
 
               <p class="text-lightSlate-600 m-0 text-center text-xs">
-                <Trans key="login.setup_later_in_settings" />
+                <Trans key="auth:_trn_login.setup_later_in_settings" />
               </p>
             </div>
           )
@@ -179,10 +179,10 @@ export function GdlAccountStep(props: GdlAccountStepProps) {
                 </div>
                 <div class="flex flex-col gap-1 text-left">
                   <h3 class="text-lightSlate-50 m-0 text-base font-bold">
-                    <Trans key="login.enable_cloud_sync" />
+                    <Trans key="auth:_trn_login.enable_cloud_sync" />
                   </h3>
                   <p class="text-lightSlate-500 m-0 text-sm leading-relaxed">
-                    <Trans key="login.unlock_features_description" />
+                    <Trans key="auth:_trn_login.unlock_features_description" />
                   </p>
                 </div>
               </div>
@@ -190,24 +190,24 @@ export function GdlAccountStep(props: GdlAccountStepProps) {
                 <li class="flex items-start gap-2">
                   <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
                   <span>
-                    <Trans key="login.benefit_share_with_friends" />
+                    <Trans key="auth:_trn_login.benefit_share_with_friends" />
                   </span>
                 </li>
                 <li class="flex items-start gap-2">
                   <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
                   <span>
-                    <Trans key="login.benefit_track_metrics" />
+                    <Trans key="auth:_trn_login.benefit_track_metrics" />
                   </span>
                 </li>
                 <li class="flex items-start gap-2">
                   <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
                   <span>
-                    <Trans key="login.benefit_sync_devices" />
+                    <Trans key="auth:_trn_login.benefit_sync_devices" />
                   </span>
                 </li>
               </ul>
               <p class="text-lightSlate-600 m-0 text-xs">
-                <Trans key="login.quick_setup_time" />
+                <Trans key="auth:_trn_login.quick_setup_time" />
               </p>
             </div>
           </div>
@@ -221,12 +221,12 @@ export function GdlAccountStep(props: GdlAccountStepProps) {
             loading={loading()}
             disabled={loading()}
           >
-            <Trans key="login.enable_cloud_sync" />
+            <Trans key="auth:_trn_login.enable_cloud_sync" />
             <div class="i-hugeicons:arrow-right-01 h-4 w-4 ml-2" />
           </Button>
 
           <p class="text-lightSlate-600 m-0 text-center text-xs">
-            <Trans key="login.setup_later_in_settings" />
+            <Trans key="auth:_trn_login.setup_later_in_settings" />
           </p>
         </div>
       </Show>
@@ -247,7 +247,7 @@ export function GdlAccountStep(props: GdlAccountStepProps) {
           loading={loading()}
           disabled={loading()}
         >
-          <Trans key="general.continue" />
+          <Trans key="general:_trn_continue" />
           <div class="i-hugeicons:arrow-right-01 h-4 w-4" />
         </Button>
       </Show>

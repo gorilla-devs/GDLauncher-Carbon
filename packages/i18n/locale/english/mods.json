@@ -1,0 +1,10 @@
+{
+  "_trn_mod.downloaded": "Downloaded",
+  "_trn_search_mods": "Search mods...",
+  "_trn_fetching_no_more_mods": "No more mods to load",
+  "_trn_fetching_mods_text": "Loading mods",
+  "_trn_fetching_mods_error": "There was an error while fetching mods",
+  "_trn_mod.download": "Download",
+  "_trn_mods_updater.updating_mods_count": "Updating {{mods}} / {{total}} mods",
+  "_trn_mods_updater.updating_mod_text": "Updating mod {{mod_name}}"
+}

@@ -11,7 +11,7 @@ const AutomaticStep = () => {
         <img src={JavaLogo} class="h-16 w-16" />
         <h3>
           <Trans
-            key="java.java_missing"
+            key="java:_trn_java_missing"
             options={{
               defaultValue: "Java {{version}} missing",
               version: 8
@@ -23,7 +23,7 @@ const AutomaticStep = () => {
       <p class="mb-0">
         {`${percentage}%`}
         <Trans
-          key="java.automatic_download_progress"
+          key="java:_trn_automatic_download_progress"
           options={{
             defaultValue: "Downloaded"
           }}

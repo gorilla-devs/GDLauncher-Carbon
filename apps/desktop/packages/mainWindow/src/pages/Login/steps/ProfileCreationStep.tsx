@@ -40,7 +40,7 @@ export function ProfileCreationStep(props: ProfileCreationStepProps) {
 
         {/* Description */}
         <p class="text-lightSlate-400 m-0 max-w-md text-base leading-relaxed">
-          <Trans key="profile_creation.description" />
+          <Trans key="auth:_trn_profile_creation.description" />
         </p>
 
         <div class="w-full max-w-md">
@@ -57,13 +57,13 @@ export function ProfileCreationStep(props: ProfileCreationStepProps) {
           <div class="mt-2 min-h-6 text-left text-sm">
             <Show when={props.username && !isValid()}>
               <p class="text-red-400">
-                <Trans key="profile_creation.invalid_format" />
+                <Trans key="auth:_trn_profile_creation.invalid_format" />
               </p>
             </Show>
             <Show when={isValid() && props.checking}>
               <p class="text-lightSlate-500 flex items-center">
                 <span class="i-hugeicons:loading-03 h-3 w-3 mr-2 inline animate-spin" />
-                <Trans key="profile_creation.checking" />
+                <Trans key="auth:_trn_profile_creation.checking" />
               </p>
             </Show>
             <Show
@@ -72,16 +72,16 @@ export function ProfileCreationStep(props: ProfileCreationStepProps) {
               }
             >
               <p class="text-green-400 flex items-center gap-2">
-                <div class="i-hugeicons:checkmark-circle-02 h-4 w-4" />
-                <Trans key="profile_creation.available" />
+                <span class="i-hugeicons:checkmark-circle-02 h-4 w-4" />
+                <Trans key="auth:_trn_profile_creation.available" />
               </p>
             </Show>
             <Show
               when={isValid() && !props.checking && props.available === "taken"}
             >
               <p class="text-red-400 flex items-center gap-2">
-                <div class="i-hugeicons:cancel-circle h-4 w-4" />
-                <Trans key="profile_creation.taken" />
+                <span class="i-hugeicons:cancel-circle h-4 w-4" />
+                <Trans key="auth:_trn_profile_creation.taken" />
               </p>
             </Show>
             <Show
@@ -90,8 +90,8 @@ export function ProfileCreationStep(props: ProfileCreationStepProps) {
               }
             >
               <p class="text-red-400 flex items-center gap-2">
-                <div class="i-hugeicons:cancel-circle h-4 w-4" />
-                <Trans key="profile_creation.not_allowed" />
+                <span class="i-hugeicons:cancel-circle h-4 w-4" />
+                <Trans key="auth:_trn_profile_creation.not_allowed" />
               </p>
             </Show>
           </div>
@@ -99,7 +99,7 @@ export function ProfileCreationStep(props: ProfileCreationStepProps) {
           {/* Requirements */}
           <div class="text-lightSlate-600 mt-4 text-left text-xs">
             <p class="mb-2 font-semibold">
-              <Trans key="profile_creation.requirements" />:
+              <Trans key="auth:_trn_profile_creation.requirements" />:
             </p>
             <ul class="list-disc space-y-1 pl-5">
               <li
@@ -108,7 +108,7 @@ export function ProfileCreationStep(props: ProfileCreationStepProps) {
                     props.username.length >= 3 && props.username.length <= 16
                 }}
               >
-                <Trans key="profile_creation.requirement_length" />
+                <Trans key="auth:_trn_profile_creation.requirement_length" />
               </li>
               <li
                 classList={{
@@ -117,14 +117,14 @@ export function ProfileCreationStep(props: ProfileCreationStepProps) {
                     /^[a-zA-Z0-9_]*$/.test(props.username)
                 }}
               >
-                <Trans key="profile_creation.requirement_characters" />
+                <Trans key="auth:_trn_profile_creation.requirement_characters" />
               </li>
               <li
                 classList={{
                   "text-red-400": props.available === "notallowed"
                 }}
               >
-                <Trans key="profile_creation.requirement_appropriate" />
+                <Trans key="auth:_trn_profile_creation.requirement_appropriate" />
               </li>
             </ul>
           </div>

@@ -1,0 +1,11 @@
+{
+  "_trn_app_update.new_update_available_text": "A new version of GDLauncher is available!",
+  "_trn_app_update.join_our_discord": "MacOS builds are not digitally signed yet. This means that it is not able to auto update. Please join our discord to access the link to the new version",
+  "_trn_app_update.discord_link": "Discord Link",
+  "_trn_app_update.starting_download": "Starting download...",
+  "_trn_app_update.downloading": "Downloading... ({{progress}}%)",
+  "_trn_app_update.apply_and_restart": "Apply And Restart",
+  "_trn_app_update.current_version": "Current Version",
+  "_trn_app_update.available_version": "Available Version",
+  "_trn_app_update.current_release_channel": "Current Release Channel"
+}

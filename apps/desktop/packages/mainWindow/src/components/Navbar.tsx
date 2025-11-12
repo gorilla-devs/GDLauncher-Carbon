@@ -186,18 +186,18 @@ const AppNavbar = () => {
                       <TooltipContent>
                         <Switch>
                           <Match when={updateDownloaded()}>
-                            <Trans key="app_update.apply_and_restart" />
+                            <Trans key="app:_trn_app_update.apply_and_restart" />
                           </Match>
                           <Match when={updateProgress() > 0}>
                             <Trans
-                              key="app_update.downloading"
+                              key="app:_trn_app_update.downloading"
                               options={{
                                 progress: updateProgress()
                               }}
                             />
                           </Match>
                           <Match when={updateAvailable()}>
-                            <Trans key="app_update.new_update_available_text" />
+                            <Trans key="app:_trn_app_update.new_update_available_text" />
                           </Match>
                         </Switch>
                       </TooltipContent>

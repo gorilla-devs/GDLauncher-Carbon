@@ -188,14 +188,14 @@ function AuthFlowContent() {
   // Back button label (Cancel for enrolling/profile-creation, Back for others)
   const backButtonLabel = createMemo(() => {
     const step = getCurrentStep()
-    if (!step) return "general.back"
+    if (!step) return "general:_trn_back"
 
     switch (step.type) {
       case "enrolling":
       case "profile-creation":
-        return "general.cancel"
+        return "general:_trn_cancel"
       default:
-        return "general.back"
+        return "general:_trn_back"
     }
   })
 
@@ -481,27 +481,27 @@ function AuthFlowContent() {
 
     switch (step.type) {
       case "welcome":
-        return <Trans key="login.titles.welcome_to_gdlauncher" />
+        return <Trans key="auth:_trn_login.titles.welcome_to_gdlauncher" />
       case "terms":
         return step.variant === "forced" ? (
-          <Trans key="login.titles.updated_terms" />
+          <Trans key="auth:_trn_login.titles.updated_terms" />
         ) : (
-          <Trans key="login.titles.terms_and_privacy" />
+          <Trans key="auth:_trn_login.titles.terms_and_privacy" />
         )
       case "auth-method":
-        return <Trans key="login.titles.sign_in_with_microsoft" />
+        return <Trans key="auth:_trn_login.titles.sign_in_with_microsoft" />
       case "enrolling":
         return step.method === "browser" ? (
-          <Trans key="login.titles.browser_authentication" />
+          <Trans key="auth:_trn_login.titles.browser_authentication" />
         ) : (
-          <Trans key="login.titles.microsoft_code_step" />
+          <Trans key="auth:_trn_login.titles.microsoft_code_step" />
         )
       case "profile-creation":
-        return <Trans key="login.titles.create_profile" />
+        return <Trans key="auth:_trn_login.titles.create_profile" />
       case "gdl-account":
-        return <Trans key="login.titles.all_set" />
+        return <Trans key="auth:_trn_login.titles.all_set" />
       case "error":
-        return <Trans key="login.titles.something_went_wrong" />
+        return <Trans key="auth:_trn_login.titles.something_went_wrong" />
       default:
         return ""
     }
@@ -720,7 +720,7 @@ function AuthFlowContent() {
                   flow.exitFlow("library", flow.data.isFirstLaunch)
                 }}
               >
-                <Trans key="login.skip_for_now" />
+                <Trans key="auth:_trn_login.skip_for_now" />
                 <div class="i-hugeicons:arrow-right-01" />
               </Button>
             </div>
@@ -736,7 +736,7 @@ function AuthFlowContent() {
                 loading={buttonLoading()}
                 disabled={buttonLoading()}
               >
-                <Trans key="general.continue" />
+                <Trans key="general:_trn_continue" />
                 <div class="i-hugeicons:arrow-right-01 h-4 w-4" />
               </Button>
             </Show>
@@ -751,7 +751,7 @@ function AuthFlowContent() {
                 disabled={!termsAccepted() || buttonLoading()}
                 loading={buttonLoading()}
               >
-                <Trans key="general.continue" />
+                <Trans key="general:_trn_continue" />
                 <div class="i-hugeicons:arrow-right-01 h-4 w-4" />
               </Button>
             </Show>
@@ -766,7 +766,7 @@ function AuthFlowContent() {
                 disabled={!canSubmitProfile() || buttonLoading()}
                 loading={buttonLoading()}
               >
-                <Trans key="profile_creation.create_profile" />
+                <Trans key="auth:_trn_profile_creation.create_profile" />
                 <div class="i-hugeicons:arrow-right-01 h-4 w-4" />
               </Button>
             </Show>
@@ -783,7 +783,7 @@ function AuthFlowContent() {
                     loading={buttonLoading()}
                     disabled={buttonLoading()}
                   >
-                    <Trans key="general.retry" />
+                    <Trans key="general:_trn_retry" />
                     <div class="i-hugeicons:refresh h-4 w-4" />
                   </Button>
                 </Show>
@@ -804,10 +804,10 @@ function AuthFlowContent() {
         />
         <div class="z-1 absolute left-0 top-0 flex h-screen w-full flex-col items-center justify-center p-0 text-7xl font-bold leading-loose">
           <div ref={welcomeToTextRef} class="opacity-0">
-            <Trans key="login.welcome_to" />
+            <Trans key="auth:_trn_login.welcome_to" />
           </div>
           <div ref={gdlauncherTextRef} class="opacity-0">
-            <Trans key="login.gdlauncher" />
+            <Trans key="auth:_trn_login.gdlauncher" />
           </div>
         </div>
         <div

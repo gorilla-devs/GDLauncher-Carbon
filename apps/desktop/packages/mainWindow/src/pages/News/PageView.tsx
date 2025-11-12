@@ -58,16 +58,16 @@ const PageView = () => {
                 fallback={
                   <>
                     <h1 class="mb-6 text-3xl font-bold text-white">
-                      <Trans key="news.article_not_found" />
+                      <Trans key="news:_trn_article_not_found" />
                     </h1>
                     <p class="text-lightSlate-400 mb-8">
-                      <Trans key="news.article_not_found_desc" />
+                      <Trans key="news:_trn_article_not_found_desc" />
                     </p>
                     <Button
                       onClick={() => navigator.navigate("/news")}
                       class="px-8 py-3"
                     >
-                      <Trans key="news.back_to_news" />
+                      <Trans key="news:_trn_back_to_news" />
                     </Button>
                   </>
                 }
@@ -98,7 +98,7 @@ const PageView = () => {
             >
               <div class="i-hugeicons:arrow-left-01 text-lg transition-transform group-hover:-translate-x-1" />
               <span class="font-medium">
-                <Trans key="news.back_to_news" />
+                <Trans key="news:_trn_back_to_news" />
               </span>
             </button>
 
@@ -121,12 +121,12 @@ const PageView = () => {
                 {article().type === "patch" && (
                   <div class="flex flex-col items-end gap-2">
                     <span class="bg-primary-600/20 text-primary-300 border-primary-600/30 rounded-full border px-4 py-2 text-sm font-semibold">
-                      <Trans key="news.minecraft_patches" />
+                      <Trans key="news:_trn_minecraft_patches" />
                     </span>
                     {article().version && (
                       <span class="text-lightSlate-400 font-mono text-xs">
                         <Trans
-                          key="news.version_label"
+                          key="news:_trn_version_label"
                           options={{ version: article().version }}
                         />
                       </span>

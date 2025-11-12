@@ -22,8 +22,10 @@
     "lint": "tsc && pnpm --dir ../.. exec eslint apps/desktop --quiet && pnpm --dir ../.. exec prettier --check apps/desktop",
     "lint-fix": "tsc && pnpm --dir ../.. exec eslint apps/desktop --quiet --fix && pnpm --dir ../.. exec prettier --write apps/desktop",
     "release": "node scripts/releaseDraft.mjs",
-    "translations:check": "node scripts/validateTranslations.mjs check",
-    "translations:fix": "node scripts/validateTranslations.mjs fix"
+    "translations:validate-english-keys": "node scripts/validateEnglishKeys.mjs",
+    "translations:gen-types": "node scripts/generateTranslationTypes.mjs",
+    "translations:validate-sync": "node scripts/validateTranslationSync.mjs",
+    "translations:sync": "node scripts/syncTranslations.mjs"
   },
   "devDependencies": {
     "@electron/notarize": "^3.0.2",
@@ -58,6 +60,7 @@
     "electron": "37.2.6",
     "electron-log": "^5.1.1",
     "electron-updater": "^6.3.9",
+    "fast-glob": "^3.3.3",
     "fs-extra": "^11.2.0",
     "html-parse-string": "^0.0.9",
     "jsdom": "^25.0.1",

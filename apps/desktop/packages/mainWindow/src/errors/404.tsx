@@ -6,7 +6,7 @@ export default function NotFound() {
       <section class="p-8 text-gray-700">
         <h1 class="text-2xl font-bold">
           <Trans
-            key="404_message"
+            key="errors:_trn_404_message"
             options={{
               defaultValue: "404: Not Found"
             }}
@@ -14,7 +14,7 @@ export default function NotFound() {
         </h1>
         <p class="mt-4">
           <Trans
-            key="its_gone"
+            key="errors:_trn_its_gone"
             options={{
               defaultValue: "It's gone 😞"
             }}

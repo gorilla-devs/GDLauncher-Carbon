@@ -27,13 +27,13 @@ function AccountExpired(props: ModalProps) {
       <div class="w-120 flex min-h-60 flex-col justify-between gap-2 overflow-hidden">
         <div class="flex flex-col gap-8">
           <div class="text-xl font-bold">
-            <Trans key="account_expired.expiration_text" />
+            <Trans key="accounts:_trn_account_expired.expiration_text" />
           </div>
           <div>
             {globalStore.currentlySelectedAccount()?.username} - {email()}
           </div>
           <div class="text-sm">
-            <Trans key="account_expired.expiration_description" />
+            <Trans key="accounts:_trn_account_expired.expiration_description" />
           </div>
         </div>
 
@@ -48,7 +48,7 @@ function AccountExpired(props: ModalProps) {
           >
             <div class="flex items-center gap-2">
               <i class="i-hugeicons:play h-4 w-4" />
-              <Trans key="account_expired.launch_anyway" />
+              <Trans key="accounts:_trn_account_expired.launch_anyway" />
             </div>
           </Button>
           <Button
@@ -61,7 +61,7 @@ function AccountExpired(props: ModalProps) {
           >
             <div class="flex items-center gap-2">
               <i class="i-hugeicons:microsoft h-4 w-4" />
-              <Trans key="account_expired.back_to_login" />
+              <Trans key="accounts:_trn_account_expired.back_to_login" />
             </div>
           </Button>
         </div>

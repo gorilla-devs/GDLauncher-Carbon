@@ -43,17 +43,19 @@ export function CompleteStep(props: CompleteStepProps) {
         <h2 class="text-lightSlate-50 m-0 text-2xl font-bold">
           <Show
             when={props.hasGDLAccount}
-            fallback={<Trans key="login.titles.authentication_complete" />}
+            fallback={
+              <Trans key="auth:_trn_login.titles.authentication_complete" />
+            }
           >
-            <Trans key="login.titles.all_set" />
+            <Trans key="auth:_trn_login.titles.all_set" />
           </Show>
         </h2>
         <p class="text-lightSlate-600 m-0 text-sm">
           <Show
             when={props.hasGDLAccount}
-            fallback={<Trans key="login.ready_to_launch" />}
+            fallback={<Trans key="auth:_trn_login.ready_to_launch" />}
           >
-            <Trans key="login.cloud_sync_active" />
+            <Trans key="auth:_trn_login.cloud_sync_active" />
           </Show>
         </p>
       </div>
@@ -82,14 +84,14 @@ export function CompleteStep(props: CompleteStepProps) {
                 <div class="flex flex-col gap-1 text-left">
                   <h3 class="text-lightSlate-50 m-0 text-base font-bold">
                     <Trans
-                      key="login.welcome_back_name"
+                      key="auth:_trn_login.welcome_back_name"
                       options={{
                         name: props.foundGDLAccountData?.nickname || "User"
                       }}
                     />
                   </h3>
                   <p class="text-lightSlate-500 m-0 text-sm leading-relaxed">
-                    <Trans key="login.sync_existing_account_description" />
+                    <Trans key="auth:_trn_login.sync_existing_account_description" />
                   </p>
                 </div>
               </div>
@@ -97,19 +99,19 @@ export function CompleteStep(props: CompleteStepProps) {
                 <li class="flex items-start gap-2">
                   <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
                   <span>
-                    <Trans key="login.benefit_shared_instances" />
+                    <Trans key="auth:_trn_login.benefit_shared_instances" />
                   </span>
                 </li>
                 <li class="flex items-start gap-2">
                   <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
                   <span>
-                    <Trans key="login.benefit_metrics_sync" />
+                    <Trans key="auth:_trn_login.benefit_metrics_sync" />
                   </span>
                 </li>
                 <li class="flex items-start gap-2">
                   <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
                   <span>
-                    <Trans key="login.benefit_settings_sync" />
+                    <Trans key="auth:_trn_login.benefit_settings_sync" />
                   </span>
                 </li>
               </ul>
@@ -119,13 +121,13 @@ export function CompleteStep(props: CompleteStepProps) {
                 fullWidth
                 onClick={props.onLinkExistingAccount}
               >
-                <Trans key="login.sync_account" />
+                <Trans key="auth:_trn_login.sync_account" />
                 <div class="i-hugeicons:arrow-right-01 h-4 w-4 ml-2" />
               </Button>
             </div>
           </div>
           <p class="text-lightSlate-600 m-0 text-center text-xs">
-            <Trans key="login.setup_later_in_settings" />
+            <Trans key="auth:_trn_login.setup_later_in_settings" />
           </p>
         </div>
       </Show>
@@ -147,10 +149,10 @@ export function CompleteStep(props: CompleteStepProps) {
                 </div>
                 <div class="flex flex-col gap-1 text-left">
                   <h3 class="text-lightSlate-50 m-0 text-base font-bold">
-                    <Trans key="login.enable_cloud_sync" />
+                    <Trans key="auth:_trn_login.enable_cloud_sync" />
                   </h3>
                   <p class="text-lightSlate-500 m-0 text-sm leading-relaxed">
-                    <Trans key="login.unlock_features_description" />
+                    <Trans key="auth:_trn_login.unlock_features_description" />
                   </p>
                 </div>
               </div>
@@ -158,24 +160,24 @@ export function CompleteStep(props: CompleteStepProps) {
                 <li class="flex items-start gap-2">
                   <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
                   <span>
-                    <Trans key="login.benefit_share_with_friends" />
+                    <Trans key="auth:_trn_login.benefit_share_with_friends" />
                   </span>
                 </li>
                 <li class="flex items-start gap-2">
                   <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
                   <span>
-                    <Trans key="login.benefit_track_metrics" />
+                    <Trans key="auth:_trn_login.benefit_track_metrics" />
                   </span>
                 </li>
                 <li class="flex items-start gap-2">
                   <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-0.5 shrink-0" />
                   <span>
-                    <Trans key="login.benefit_sync_devices" />
+                    <Trans key="auth:_trn_login.benefit_sync_devices" />
                   </span>
                 </li>
               </ul>
               <p class="text-lightSlate-600 m-0 text-xs">
-                <Trans key="login.quick_setup_time" />
+                <Trans key="auth:_trn_login.quick_setup_time" />
               </p>
               <Button
                 size="large"
@@ -183,13 +185,13 @@ export function CompleteStep(props: CompleteStepProps) {
                 fullWidth
                 onClick={props.onSetupGDLAccount}
               >
-                <Trans key="login.enable_cloud_sync" />
+                <Trans key="auth:_trn_login.enable_cloud_sync" />
                 <div class="i-hugeicons:arrow-right-01 h-4 w-4 ml-2" />
               </Button>
             </div>
           </div>
           <p class="text-lightSlate-600 m-0 text-center text-xs">
-            <Trans key="login.setup_later_in_settings" />
+            <Trans key="auth:_trn_login.setup_later_in_settings" />
           </p>
         </div>
       </Show>

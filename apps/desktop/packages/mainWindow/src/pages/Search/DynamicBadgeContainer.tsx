@@ -89,7 +89,7 @@ export default function DynamicBadgeContainer(props: {
           <TooltipContent>
             <div class="flex flex-col gap-1">
               <div class="font-medium">
-                <Trans key="search.hidden_categories" />
+                <Trans key="search:_trn_hidden_categories" />
               </div>
               <div class="flex flex-wrap gap-1">
                 <For each={hiddenCategories()}>

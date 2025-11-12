@@ -271,7 +271,7 @@ const TransWrapper = (props: TransWrapperProps) => {
 
           await _i18nInstance.init({
             ns: Object.keys(defaultNamespacesMap),
-            defaultNS: "common",
+            defaultNS: "general",
             lng: currentLanguage,
             fallbackLng: "english",
             resources: {

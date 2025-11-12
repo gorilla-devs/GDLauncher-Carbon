@@ -45,7 +45,7 @@ const LogsCollapsable = (props: LogsCollapsableProps) => {
     } else if (diffDays === 1) {
       dateText = "Yesterday"
     } else if (diffDays < 7) {
-      dateText = t("x_days_ago", { count: diffDays })
+      dateText = t("tracking:_trn_x_days_ago", { count: diffDays })
     } else {
       dateText = new Date(logDate).toLocaleDateString(undefined, {
         dateStyle: "short"
@@ -128,7 +128,7 @@ const LogsSidebar = (props: LogsSidebarProps) => {
     <div class="w-50 box-border flex h-full flex-col pr-6">
       <div class="flex h-10 items-center justify-between px-4 py-4">
         <div>
-          <Trans key="logs.all_sessions" />
+          <Trans key="logs:_trn_all_sessions" />
         </div>
         <div
           class={`h-6 w-6 text-lightSlate-600 hover:text-lightSlate-50 duration-100 ease-in-out ${
@@ -160,7 +160,7 @@ const LogsSidebar = (props: LogsSidebarProps) => {
                 <div class="bg-darkSlate-600 relative box-border flex h-full w-full items-center rounded-md px-4 py-1">
                   <div class="animate-liveCirclePulse mr-2 h-4 w-4 rounded-full bg-red-400 text-red-400" />
                   <div>
-                    <Trans key="ui.live" />
+                    <Trans key="ui:_trn_live" />
                   </div>
                   <Show when={props.selectedLog === activeLog()?.id}>
                     <div class="bg-primary-400 absolute right-0 top-0 h-full w-1" />
@@ -184,7 +184,7 @@ const LogsSidebar = (props: LogsSidebarProps) => {
         </Match>
         <Match when={props.availableLogEntries.length === 0}>
           <div class="text-lightSlate-600 flex h-full items-center justify-center text-center">
-            <Trans key="logs.no_log_sessions_available" />
+            <Trans key="logs:_trn_no_log_sessions_available" />
           </div>
         </Match>
       </Switch>

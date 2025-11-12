@@ -123,7 +123,7 @@ export function EnrollingStep(props: EnrollingStepProps) {
     const s = status()
     if (s && typeof s === "object" && "waitingForBrowser" in s) {
       window.openExternalLink(s.waitingForBrowser.auth_url)
-      toast.success(t("login.browser_opened_toast"))
+      toast.success(t("auth:_trn_login.browser_opened_toast"))
     }
   }
 
@@ -169,7 +169,8 @@ export function EnrollingStep(props: EnrollingStepProps) {
     if (typeof backendStatus === "object" && "failed" in backendStatus) {
       toast.error("Authentication Error", {
         description:
-          backendStatus.failed.description || t("error.enrollment_failed")
+          backendStatus.failed.description ||
+          t("errors:_trn_error.enrollment_failed")
       })
       return
     }
@@ -191,10 +192,10 @@ export function EnrollingStep(props: EnrollingStepProps) {
         <Show when={expired()}>
           <div class="flex flex-col items-center gap-4">
             <p class="text-lightSlate-50 text-lg font-semibold">
-              <Trans key="login.session_expired_title" />
+              <Trans key="auth:_trn_login.session_expired_title" />
             </p>
             <p class="text-lightSlate-700 text-sm">
-              <Trans key="login.session_expired_message" />
+              <Trans key="auth:_trn_login.session_expired_message" />
             </p>
           </div>
         </Show>
@@ -205,27 +206,27 @@ export function EnrollingStep(props: EnrollingStepProps) {
             {/* Main message */}
             <div class="flex flex-col gap-2">
               <p class="text-lightSlate-50 text-lg font-semibold">
-                <Trans key="login.waiting_for_browser_auth" />
+                <Trans key="auth:_trn_login.waiting_for_browser_auth" />
               </p>
               <p class="text-lightSlate-700 text-sm">
-                <Trans key="login.complete_signin_browser" />
+                <Trans key="auth:_trn_login.complete_signin_browser" />
               </p>
             </div>
 
             {/* Countdown */}
             <p class="text-lightSlate-700 text-sm">
               <span class="text-lightSlate-500 mr-1">{countDown()}</span>
-              <Trans key="login.before_expiring" />
+              <Trans key="auth:_trn_login.before_expiring" />
             </p>
 
             {/* Manual fallback options */}
             <div class="border-darkSlate-600 flex flex-col items-center gap-2 border-t pt-4">
               <p class="text-lightSlate-600 text-xs">
-                <Trans key="login.browser_didnt_open" />
+                <Trans key="auth:_trn_login.browser_didnt_open" />
               </p>
               <Button size="small" type="secondary" onClick={openBrowser}>
                 <div class="i-hugeicons:link-square-02" />
-                <Trans key="login.open_browser_manually" />
+                <Trans key="auth:_trn_login.open_browser_manually" />
               </Button>
             </div>
           </div>
@@ -240,7 +241,7 @@ export function EnrollingStep(props: EnrollingStepProps) {
             <PopoverTrigger>
               <div class="text-lightSlate-700 hover:text-lightSlate-50 transition-color flex items-center text-sm duration-75">
                 <div>
-                  <Trans key="login.need_help" />
+                  <Trans key="auth:_trn_login.need_help" />
                 </div>
                 <div class="i-hugeicons:help-circle ml-2 h-4 w-4" />
               </div>
@@ -248,10 +249,10 @@ export function EnrollingStep(props: EnrollingStepProps) {
             <PopoverContent>
               <div class="max-w-100 px-4 pb-6 text-sm">
                 <h3>
-                  <Trans key="login.troubles_logging_in" />
+                  <Trans key="auth:_trn_login.troubles_logging_in" />
                 </h3>
                 <div class="pb-8 text-sm">
-                  <Trans key="login.link_not_working_help" />
+                  <Trans key="auth:_trn_login.link_not_working_help" />
                 </div>
                 <div
                   class="text-lightSlate-600 hover:text-lightSlate-50 flex items-center gap-2"
@@ -293,7 +294,7 @@ export function EnrollingStep(props: EnrollingStepProps) {
           />
           <Show when={expired()}>
             <p class="text-sm text-red-500">
-              <Trans key="login.code_expired_message" />
+              <Trans key="auth:_trn_login.code_expired_message" />
             </p>
           </Show>
         </div>
@@ -301,7 +302,7 @@ export function EnrollingStep(props: EnrollingStepProps) {
         <Show when={!expired()}>
           <p class="text-lightSlate-700 mt-2 text-sm">
             <span class="text-lightSlate-500 mr-1">{countDown()}</span>
-            <Trans key="login.before_expiring" />
+            <Trans key="auth:_trn_login.before_expiring" />
           </p>
         </Show>
 
@@ -309,7 +310,7 @@ export function EnrollingStep(props: EnrollingStepProps) {
         <Show when={!expired()}>
           <div class="flex flex-col items-center justify-center">
             <p class="text-lightSlate-700 font-bold">
-              <Trans key="login.enter_code_in_browser" />
+              <Trans key="auth:_trn_login.enter_code_in_browser" />
             </p>
             <Button
               uppercase
@@ -326,7 +327,7 @@ export function EnrollingStep(props: EnrollingStepProps) {
               }}
               disabled={loading()}
             >
-              <Trans key="login.open_in_browser" />
+              <Trans key="auth:_trn_login.open_in_browser" />
               <div class="text-md i-hugeicons:link-square-02" />
             </Button>
           </div>
@@ -351,7 +352,7 @@ export function EnrollingStep(props: EnrollingStepProps) {
                   "waitingForBrowser" in enrollmentStatus.data
                 }
               >
-                <Trans key="login.waiting_for_browser_confirmation" />
+                <Trans key="auth:_trn_login.waiting_for_browser_confirmation" />
               </Match>
               <Match
                 when={
@@ -360,22 +361,22 @@ export function EnrollingStep(props: EnrollingStepProps) {
                   "pollingCode" in enrollmentStatus.data
                 }
               >
-                <Trans key="login.polling_microsoft_auth" />
+                <Trans key="auth:_trn_login.polling_microsoft_auth" />
               </Match>
               <Match when={enrollmentStatus.data === "xboxAuth"}>
-                <Trans key="login.authenticating_xbox" />
+                <Trans key="auth:_trn_login.authenticating_xbox" />
               </Match>
               <Match when={enrollmentStatus.data === "mcLogin"}>
-                <Trans key="login.authenticating_minecraft" />
+                <Trans key="auth:_trn_login.authenticating_minecraft" />
               </Match>
               <Match when={enrollmentStatus.data === "mcProfile"}>
-                <Trans key="login.retrieving_minecraft_profile" />
+                <Trans key="auth:_trn_login.retrieving_minecraft_profile" />
               </Match>
               <Match when={enrollmentStatus.data === "mcentitlements"}>
-                <Trans key="login.retrieving_minecraft_entitlements" />
+                <Trans key="auth:_trn_login.retrieving_minecraft_entitlements" />
               </Match>
               <Match when={true}>
-                <Trans key="login.authenticating" />
+                <Trans key="auth:_trn_login.authenticating" />
               </Match>
             </Switch>
           </span>
@@ -402,7 +403,7 @@ export function EnrollingStep(props: EnrollingStepProps) {
           loading={loading()}
           disabled={loading()}
         >
-          <Trans key="login.try_again" />
+          <Trans key="auth:_trn_login.try_again" />
           <div class="i-hugeicons:refresh h-4 w-4" />
         </Button>
       </Show>
@@ -411,14 +412,14 @@ export function EnrollingStep(props: EnrollingStepProps) {
       <Show when={method() === "browser" && !expired()}>
         <div class="border-darkSlate-600 flex flex-col items-center gap-2 border-t pt-4">
           <p class="text-lightSlate-600 text-xs">
-            <Trans key="login.still_having_trouble" />
+            <Trans key="auth:_trn_login.still_having_trouble" />
           </p>
           <button
             class="text-primary-400 hover:text-primary-300 cursor-pointer text-sm underline disabled:cursor-not-allowed disabled:opacity-50"
             onClick={handleSwitchToDeviceCode}
             disabled={loading()}
           >
-            <Trans key="login.try_device_code_instead" />
+            <Trans key="auth:_trn_login.try_device_code_instead" />
           </button>
         </div>
       </Show>

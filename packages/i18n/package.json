@@ -6,6 +6,9 @@
     ".": {
       "import": "./dist/index.js"
     },
+    "./helpers": {
+      "import": "./dist/helpers.js"
+    },
     "./tsconfig.json": "./tsconfig.json"
   },
   "scripts": {

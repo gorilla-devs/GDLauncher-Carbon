@@ -94,7 +94,7 @@ const AddManagedJava = (props: ModalProps) => {
             <div class="flex items-center justify-between gap-4">
               <h5 class="m-0">
                 <Trans
-                  key="java.java_vendors"
+                  key="java:_trn_java_vendors"
                   options={{
                     defaultValue: "Vendors"
                   }}
@@ -125,7 +125,7 @@ const AddManagedJava = (props: ModalProps) => {
             <div class="flex w-full items-center justify-between gap-4">
               <h5 class="w-30 m-0">
                 <Trans
-                  key="java.java_major"
+                  key="java:_trn_java_major"
                   options={{
                     defaultValue: "Java Major"
                   }}
@@ -165,7 +165,7 @@ const AddManagedJava = (props: ModalProps) => {
                 }
               >
                 <Trans
-                  key="java.no_available_javas"
+                  key="java:_trn_no_available_javas"
                   options={{
                     defaultValue: "No java available for this vendor"
                   }}
@@ -201,7 +201,7 @@ const AddManagedJava = (props: ModalProps) => {
               }}
             >
               <Trans
-                key="java.install"
+                key="java:_trn_install"
                 options={{
                   defaultValue: "Install"
                 }}

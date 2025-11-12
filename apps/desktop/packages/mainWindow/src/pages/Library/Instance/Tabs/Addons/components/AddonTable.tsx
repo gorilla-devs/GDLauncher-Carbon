@@ -32,6 +32,7 @@ import {
   ContextMenuPortal
 } from "@gd/ui"
 import { useTransContext } from "@gd/i18n"
+import { getViewOnKey } from "@gd/i18n/helpers"
 import { Mod as ModType } from "@gd/core_module/bindings"
 import { toast } from "@gd/ui"
 import { useModal } from "@/managers/ModalsManager"
@@ -548,10 +549,10 @@ export const AddonTable = (props: AddonTableProps) => {
       }[] = [
         {
           type: "item",
-          label: t("instance.copy_name"),
+          label: t("instance:_trn_copy_name"),
           action: () => {
             navigator.clipboard.writeText(displayName)
-            toast.success(t("instance.copied_to_clipboard"))
+            toast.success(t("notifications:_trn_copied_to_clipboard"))
           },
           icon: "i-hugeicons:clipboard",
           id: "copy"
@@ -560,8 +561,8 @@ export const AddonTable = (props: AddonTableProps) => {
         {
           type: "item",
           label: mod.enabled
-            ? t("instance.disable_mod")
-            : t("instance.enable_mod"),
+            ? t("instance:_trn_disable_mod")
+            : t("instance:_trn_enable_mod"),
           action: async () => {
             if (props.mutations) {
               await props.mutations.handleToggleMod(mod)
@@ -578,7 +579,7 @@ export const AddonTable = (props: AddonTableProps) => {
       if (mod.has_update) {
         items.push({
           type: "item",
-          label: t("instance.update_mod"),
+          label: t("instance:_trn_update_mod"),
           action: async () => {
             if (props.mutations) {
               await props.mutations.handleUpdateMod(mod)
@@ -594,7 +595,7 @@ export const AddonTable = (props: AddonTableProps) => {
         { type: "separator" },
         {
           type: "item",
-          label: t("instance.view_details"),
+          label: t("instance:_trn_view_details"),
           action: () => {
             modalsContext?.openModal(
               {
@@ -611,7 +612,7 @@ export const AddonTable = (props: AddonTableProps) => {
         },
         {
           type: "item",
-          label: t("instance.open_folder"),
+          label: t("instance:_trn_open_folder"),
           action: () => {
             if (props.mutations) {
               props.mutations.handleOpenFolder()
@@ -627,13 +628,13 @@ export const AddonTable = (props: AddonTableProps) => {
         if (mod.curseforge && mod.modrinth) {
           items.push({
             type: "submenu",
-            label: t("instance.view_on_platform"),
+            label: t("instance:_trn_view_on_platform"),
             icon: "i-hugeicons:link-square-02",
             id: "platform",
             children: [
               {
                 type: "item",
-                label: t("instance.view_on_curseforge"),
+                label: t("instance:_trn_view_on_curseforge"),
                 action: () => {
                   const slug = mod.curseforge!.urlslug
                   window.open(
@@ -646,7 +647,7 @@ export const AddonTable = (props: AddonTableProps) => {
               },
               {
                 type: "item",
-                label: t("instance.view_on_modrinth"),
+                label: t("instance:_trn_view_on_modrinth"),
                 action: () => {
                   window.open(
                     `https://modrinth.com/mod/${mod.modrinth!.project_id}`,
@@ -663,7 +664,7 @@ export const AddonTable = (props: AddonTableProps) => {
           const platformName = mod.curseforge ? "curseforge" : "modrinth"
           items.push({
             type: "item",
-            label: t(`instance.view_on_${platformName}`),
+            label: t(getViewOnKey(platformName)),
             action: () => {
               if (mod.curseforge) {
                 const slug = mod.curseforge.urlslug
@@ -689,7 +690,7 @@ export const AddonTable = (props: AddonTableProps) => {
       // Add delete item at the end with extra separator for spacing
       const deleteItem = {
         type: "item" as const,
-        label: t("instance.delete_mod"),
+        label: t("instance:_trn_delete_mod"),
         action: async () => {
           if (props.mutations) {
             await props.mutations.handleDeleteMod(mod)
@@ -734,7 +735,7 @@ export const AddonTable = (props: AddonTableProps) => {
       }[] = [
         {
           type: "item",
-          label: t("instance.selected_count", { count: selectedCount }),
+          label: t("instance:_trn_selected_count", { count: selectedCount }),
           disabled: true,
           id: "header"
         },
@@ -744,7 +745,7 @@ export const AddonTable = (props: AddonTableProps) => {
       if (!allEnabled) {
         items.push({
           type: "item",
-          label: t("instance.enable_all"),
+          label: t("instance:_trn_enable_all"),
           action: async () => {
             if (props.mutations) {
               await Promise.all(
@@ -763,7 +764,7 @@ export const AddonTable = (props: AddonTableProps) => {
       if (!allDisabled) {
         items.push({
           type: "item",
-          label: t("instance.disable_all"),
+          label: t("instance:_trn_disable_all"),
           action: async () => {
             if (props.mutations) {
               await Promise.all(
@@ -784,7 +785,7 @@ export const AddonTable = (props: AddonTableProps) => {
       if (hasUpdates) {
         items.push({
           type: "item",
-          label: t("instance.update_selected"),
+          label: t("instance:_trn_update_selected"),
           action: async () => {
             if (props.mutations) {
               await props.mutations.handleUpdateSelected(mods)
@@ -800,7 +801,7 @@ export const AddonTable = (props: AddonTableProps) => {
         { type: "separator" },
         {
           type: "item",
-          label: t("instance.delete_selected"),
+          label: t("instance:_trn_delete_selected"),
           action: async () => {
             if (props.mutations) {
               await props.mutations.handleDeleteSelected(mods)

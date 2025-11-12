@@ -170,22 +170,22 @@ const AddonExplore = () => {
 
   const instancePages = () => [
     {
-      label: t("ui.overview"),
+      label: t("ui:_trn_overview"),
       path: `/addon/${params.id}/${params.platform}`,
       icon: "i-hugeicons:dashboard-square-01"
     },
     {
-      label: t("ui.changelog"),
+      label: t("ui:_trn_changelog"),
       path: `/addon/${params.id}/${params.platform}/changelog`,
       icon: "i-hugeicons:note-edit"
     },
     {
-      label: t("ui.screenshots"),
+      label: t("ui:_trn_screenshots"),
       path: `/addon/${params.id}/${params.platform}/screenshots`,
       icon: "i-hugeicons:image-01"
     },
     {
-      label: t("ui.versions"),
+      label: t("ui:_trn_versions"),
       path: `/addon/${params.id}/${params.platform}/versions`,
       icon: "i-hugeicons:package"
     }
@@ -239,7 +239,7 @@ const AddonExplore = () => {
               size="small"
               type="secondary"
             >
-              <Trans key="instance.step_back" />
+              <Trans key="instance:_trn_step_back" />
             </Button>
             <Tooltip>
               <TooltipTrigger>
@@ -263,7 +263,7 @@ const AddonExplore = () => {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <Trans key="instance.open_in_browser" />
+                <Trans key="instance:_trn_open_in_browser" />
               </TooltipContent>
             </Tooltip>
           </div>
@@ -394,7 +394,7 @@ const AddonExplore = () => {
                       type="secondary"
                     >
                       <div class="i-hugeicons:arrow-left-01 text-2xl h-6 w-6" />
-                      <Trans key="instance.step_back" />
+                      <Trans key="instance:_trn_step_back" />
                     </Button>
                   </div>
                   <div

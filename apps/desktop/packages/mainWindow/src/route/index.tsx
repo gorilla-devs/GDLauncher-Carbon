@@ -2,7 +2,6 @@ import { lazy } from "solid-js"
 import { RouteDefinition } from "@solidjs/router"
 import SettingsJavaData from "@/pages/Settings/settings.java.data"
 import SettingsGeneralData from "@/pages/Settings/settings.general.data"
-import LoginData from "@/pages/Login/auth.login.data"
 import AddonVersionsData from "@/pages/AddonViewPage/changelog.data"
 import InstanceData from "@/pages/Library/Instance/instance.data"
 import Login from "@/pages/Login"
@@ -17,8 +16,7 @@ import Search from "@/pages/Search"
 export const routes: RouteDefinition[] = [
   {
     path: "/",
-    component: Login,
-    data: LoginData
+    component: Login
   },
   {
     path: "/",

@@ -90,7 +90,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
                   <TooltipContent>
                     <div class="flex flex-col gap-1">
                       <div class="text-xs font-medium">
-                        <Trans key="instance.additional_versions" />
+                        <Trans key="instance:_trn_additional_versions" />
                       </div>
                       <div class="flex max-w-xs flex-wrap gap-1">
                         <For each={props.modVersion.gameVersions.slice(2)}>

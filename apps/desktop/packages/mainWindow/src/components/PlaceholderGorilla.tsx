@@ -86,7 +86,7 @@ export function PlaceholderGorilla(props: PlaceholderGorillaProps) {
       {/* Label */}
       <div class="text-lightSlate-600 flex flex-col items-center gap-1 text-center">
         <div class="font-mono text-sm opacity-50">
-          <Trans key="ui.placeholder" />
+          <Trans key="ui:_trn_placeholder" />
         </div>
         <div class="text-lightSlate-500 font-medium">{props.variant}</div>
       </div>

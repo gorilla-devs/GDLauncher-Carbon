@@ -80,7 +80,7 @@ export const useAddonData = () => {
         return addon
       })
 
-      setAddonsStore(reconcile(dataWithOptimisticUpdates, { key: "id" }))
+      setAddonsStore(reconcile(dataWithOptimisticUpdates, { key: "_trn_id" }))
 
       // Clean up updatingModIds for mods that truly don't have updates anymore
       // (i.e., the update completed successfully)
@@ -103,14 +103,14 @@ export const useAddonData = () => {
 
   const optimisticDeleteAddon = (addonId: string) => {
     const filteredAddons = addonsStore.filter((addon) => addon.id !== addonId)
-    setAddonsStore(reconcile(filteredAddons, { key: "id" }))
+    setAddonsStore(reconcile(filteredAddons, { key: "_trn_id" }))
   }
 
   const optimisticDeleteAddons = (addonIds: string[]) => {
     const filteredAddons = addonsStore.filter(
       (addon) => !addonIds.includes(addon.id)
     )
-    setAddonsStore(reconcile(filteredAddons, { key: "id" }))
+    setAddonsStore(reconcile(filteredAddons, { key: "_trn_id" }))
   }
 
   const optimisticUpdateAddon = (addonId: string) => {
@@ -139,7 +139,7 @@ export const useAddonData = () => {
 
   const rollbackToServerState = () => {
     if (allAddons.data) {
-      setAddonsStore(reconcile(allAddons.data, { key: "id" }))
+      setAddonsStore(reconcile(allAddons.data, { key: "_trn_id" }))
       setUpdatingModIds(new Set<string>())
     }
   }

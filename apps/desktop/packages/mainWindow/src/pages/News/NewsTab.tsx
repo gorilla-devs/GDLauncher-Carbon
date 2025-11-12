@@ -34,7 +34,7 @@ const NewsTab = (props: NewsTabProps) => {
         <Match when={!news.isPending && (news.data?.length || 0) > 0}>
           <div class="flex flex-col gap-4 p-6">
             <h1 class="text-2xl font-medium">
-              <Trans key="news.minecraft_news" />
+              <Trans key="news:_trn_minecraft_news" />
             </h1>
             <div class="news-grid grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               <For each={news.data}>

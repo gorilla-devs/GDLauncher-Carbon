@@ -59,7 +59,7 @@ const AuthLoadingOverlay = (props: AuthLoadingOverlayProps) => {
 
           <Show when={Date.now() - startTime() > 5000}>
             <p class="text-lightSlate-400 max-w-md text-center text-base">
-              <Trans key="auth.loading.taking_longer" />
+              <Trans key="auth:_trn_auth.loading.taking_longer" />
             </p>
           </Show>
         </div>

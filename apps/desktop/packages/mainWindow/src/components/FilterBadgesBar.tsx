@@ -56,7 +56,7 @@ export function FilterBadgesBar() {
               }}
             >
               <div class="i-hugeicons:arrow-left-01" />
-              <Trans key="search.go_back" />
+              <Trans key="search:_trn_go_back" />
             </Button>
           </Show>
           <div class="flex flex-1 items-center justify-center">
@@ -66,7 +66,7 @@ export function FilterBadgesBar() {
                 onClick={clearAllFilters}
               >
                 <div class="i-hugeicons:delete-02 text-sm" />
-                {t("search.clear_all_filters")}
+                {t("search:_trn_clear_all_filters")}
               </button>
               <div class="bg-darkSlate-600 h-4 w-px shrink-0" />
               <InlineFilterBadges />

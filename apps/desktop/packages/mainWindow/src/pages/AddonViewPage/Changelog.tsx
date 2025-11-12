@@ -38,13 +38,13 @@ const ChangelogCard = (props: {
           <div class="h-6 w-1 shrink-0 rounded-full bg-blue-500" />
           <div>
             <h3 class="text-lightSlate-50 text-sm font-semibold sm:text-base">
-              <Trans key="addons.changelog_release_notes" />
+              <Trans key="addons:_trn_changelog_release_notes" />
             </h3>
             <Show
               when={props.releaseDate}
               fallback={
                 <p class="text-lightSlate-600 text-xs">
-                  <Trans key="addons.no_release_date" />
+                  <Trans key="addons:_trn_no_release_date" />
                 </p>
               }
             >
@@ -66,7 +66,7 @@ const ChangelogCard = (props: {
             <div class="flex items-center gap-1.5 rounded-full bg-orange-500/10 px-2 py-1 text-xs text-orange-500">
               <div class="i-simple-icons:curseforge h-3 w-3 shrink-0" />
               <span class="font-medium">
-                <Trans key="platforms.curseforge" />
+                <Trans key="platforms:_trn_curseforge" />
               </span>
             </div>
           </Show>
@@ -74,7 +74,7 @@ const ChangelogCard = (props: {
             <div class="flex items-center gap-1.5 rounded-full bg-green-500/10 px-2 py-1 text-xs text-green-500">
               <div class="i-simple-icons:modrinth h-3 w-3 shrink-0" />
               <span class="font-medium">
-                <Trans key="platforms.modrinth" />
+                <Trans key="platforms:_trn_modrinth" />
               </span>
             </div>
           </Show>
@@ -144,20 +144,20 @@ const EmptyChangelogState = () => {
         <PlaceholderGorilla size={8} variant="Reading Gorilla - Clipboard" />
       </div>
       <h3 class="text-lightSlate-200 mb-2 text-lg font-semibold sm:text-xl">
-        <Trans key="addons.changelog_no_changelog" />
+        <Trans key="addons:_trn_changelog_no_changelog" />
       </h3>
       <p class="text-lightSlate-600 max-w-md text-sm leading-relaxed sm:text-base">
-        <Trans key="addons.changelog_no_info_text" />
+        <Trans key="addons:_trn_changelog_no_info_text" />
       </p>
       <div class="bg-darkSlate-700 border-darkSlate-600 mt-6 w-full max-w-md rounded-lg border p-3 text-left sm:mt-8 sm:p-4">
         <div class="text-lightSlate-400 mb-2 flex items-center gap-2 text-sm">
           <div class="i-hugeicons:information-circle shrink-0 h-5 w-5" />
           <span class="font-medium">
-            <Trans key="addons.changelog_tip_title" />
+            <Trans key="addons:_trn_changelog_tip_title" />
           </span>
         </div>
         <p class="text-lightSlate-600 text-xs leading-relaxed sm:text-sm">
-          <Trans key="addons.changelog_tip_text" />
+          <Trans key="addons:_trn_changelog_tip_text" />
         </p>
       </div>
     </div>
@@ -341,19 +341,19 @@ const Changelog = () => {
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h1 class="text-lightSlate-50 mb-1 text-xl font-bold md:text-2xl">
-                  <Trans key="addons.changelog_title" />
+                  <Trans key="addons:_trn_changelog_title" />
                 </h1>
                 <p class="text-lightSlate-600 text-sm">
-                  <Trans key="addons.changelog_subtitle" />
+                  <Trans key="addons:_trn_changelog_subtitle" />
                 </p>
               </div>
               <Show when={routeData.modpackDetails.data}>
                 <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
                   <span class="text-lightSlate-400 text-sm font-medium sm:hidden">
-                    <Trans key="addons.version_label" />
+                    <Trans key="addons:_trn_version_label" />
                   </span>
                   <span class="text-lightSlate-400 hidden text-sm font-medium sm:inline">
-                    <Trans key="addons.version_label" />
+                    <Trans key="addons:_trn_version_label" />
                   </span>
                   <div class="w-full sm:w-auto sm:min-w-48">
                     <Select

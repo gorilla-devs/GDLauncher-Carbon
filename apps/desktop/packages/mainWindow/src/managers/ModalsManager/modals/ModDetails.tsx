@@ -39,7 +39,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
     mod().metadata?.version ||
     mod().curseforge?.version ||
     mod().modrinth?.version ||
-    t("modals.mod_details.unknown")
+    t("modals:_trn_mod_details.unknown")
 
   onMount(async () => {
     // Fetch mod description if available from platforms
@@ -96,8 +96,8 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
   }
 
   const tabs = [
-    { label: t("modals.mod_details.overview") },
-    { label: t("modals.mod_details.technical") }
+    { label: t("modals:_trn_mod_details.overview") },
+    { label: t("modals:_trn_mod_details.technical") }
   ]
 
   return (
@@ -138,14 +138,16 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                 </Show>
               </div>
               <Badge variant={mod().enabled ? "success" : "secondary"}>
-                {mod().enabled ? t("instance.enabled") : t("instance.disabled")}
+                {mod().enabled
+                  ? t("instance:_trn_enabled")
+                  : t("instance:_trn_disabled")}
               </Badge>
             </div>
 
             <div class="flex items-center gap-4 text-sm">
               <div class="flex items-center gap-2">
                 <span class="text-lightSlate-600">
-                  {t("modals.mod_details.version")}:
+                  {t("modals:_trn_mod_details.version")}:
                 </span>
                 <span class="font-medium">{version()}</span>
               </div>
@@ -153,7 +155,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
               <Show when={mod().curseforge || mod().modrinth}>
                 <div class="flex items-center gap-2">
                   <span class="text-lightSlate-600">
-                    {t("modals.mod_details.platform")}:
+                    {t("modals:_trn_mod_details.platform")}:
                   </span>
                   <div class="flex gap-1">
                     <Show when={mod().curseforge}>
@@ -162,11 +164,11 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                           <img
                             src={CurseforgeLogo}
                             class="h-4 w-4"
-                            alt={t("platforms.curseforge")}
+                            alt={t("platforms:_trn_curseforge")}
                           />
                         </TooltipTrigger>
                         <TooltipContent>
-                          {t("platforms.curseforge")}
+                          {t("platforms:_trn_curseforge")}
                         </TooltipContent>
                       </Tooltip>
                     </Show>
@@ -176,11 +178,11 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                           <img
                             src={ModrinthLogo}
                             class="h-4 w-4"
-                            alt={t("platforms.modrinth")}
+                            alt={t("platforms:_trn_modrinth")}
                           />
                         </TooltipTrigger>
                         <TooltipContent>
-                          {t("platforms.modrinth")}
+                          {t("platforms:_trn_modrinth")}
                         </TooltipContent>
                       </Tooltip>
                     </Show>
@@ -191,7 +193,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
               <Show when={mod().has_update}>
                 <Badge variant="warning" class="gap-1">
                   <div class="i-hugeicons:download-02" />
-                  {t("modals.mod_details.update_available")}
+                  {t("modals:_trn_mod_details.update_available")}
                 </Badge>
               </Show>
             </div>
@@ -215,12 +217,12 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
               <Show when={mod().metadata?.description || modDescription()}>
                 <div>
                   <h3 class="mb-2 font-semibold">
-                    {t("modals.mod_details.description")}
+                    {t("modals:_trn_mod_details.description")}
                   </h3>
                   <p class="text-lightSlate-300 text-sm">
                     {mod().metadata?.description ||
                       modDescription() ||
-                      t("modals.mod_details.no_description")}
+                      t("modals:_trn_mod_details.no_description")}
                   </p>
                 </div>
               </Show>
@@ -228,7 +230,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
               <Show when={mod().metadata?.authors}>
                 <div>
                   <h3 class="mb-2 font-semibold">
-                    {t("modals.mod_details.authors")}
+                    {t("modals:_trn_mod_details.authors")}
                   </h3>
                   <p class="text-lightSlate-300 text-sm">
                     {mod().metadata!.authors}
@@ -250,7 +252,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                     }}
                   >
                     <div class="i-hugeicons:link-square-02" />
-                    {t("modals.mod_details.view_on_curseforge")}
+                    {t("modals:_trn_mod_details.view_on_curseforge")}
                   </Button>
                 </Show>
                 <Show when={mod().modrinth}>
@@ -265,7 +267,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                     }}
                   >
                     <div class="i-hugeicons:link-square-02" />
-                    {t("modals.mod_details.view_on_modrinth")}
+                    {t("modals:_trn_mod_details.view_on_modrinth")}
                   </Button>
                 </Show>
               </div>
@@ -278,7 +280,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
               <div class="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span class="text-lightSlate-600">
-                    {t("modals.mod_details.file_id")}:
+                    {t("modals:_trn_mod_details.file_id")}:
                   </span>
                   <div class="mt-1 flex items-center gap-2 font-mono">
                     {mod().id}
@@ -289,7 +291,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                 <Show when={mod().metadata?.modid}>
                   <div>
                     <span class="text-lightSlate-600">
-                      {t("modals.mod_details.mod_id")}:
+                      {t("modals:_trn_mod_details.mod_id")}:
                     </span>
                     <div class="mt-1 flex items-center gap-2 font-mono">
                       {mod().metadata!.modid}
@@ -301,7 +303,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                 <Show when={mod().curseforge}>
                   <div>
                     <span class="text-lightSlate-600">
-                      {t("modals.mod_details.curseforge_project_id")}:
+                      {t("modals:_trn_mod_details.curseforge_project_id")}:
                     </span>
                     <div class="mt-1 flex items-center gap-2 font-mono">
                       {mod().curseforge!.project_id}
@@ -312,7 +314,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                   </div>
                   <div>
                     <span class="text-lightSlate-600">
-                      {t("modals.mod_details.curseforge_file_id")}:
+                      {t("modals:_trn_mod_details.curseforge_file_id")}:
                     </span>
                     <div class="mt-1 flex items-center gap-2 font-mono">
                       {mod().curseforge!.file_id}
@@ -324,7 +326,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                 <Show when={mod().modrinth}>
                   <div>
                     <span class="text-lightSlate-600">
-                      {t("modals.mod_details.modrinth_project_id")}:
+                      {t("modals:_trn_mod_details.modrinth_project_id")}:
                     </span>
                     <div class="mt-1 flex items-center gap-2 font-mono">
                       {mod().modrinth!.project_id}
@@ -333,7 +335,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                   </div>
                   <div>
                     <span class="text-lightSlate-600">
-                      {t("modals.mod_details.modrinth_version_id")}:
+                      {t("modals:_trn_mod_details.modrinth_version_id")}:
                     </span>
                     <div class="mt-1 flex items-center gap-2 font-mono">
                       {mod().modrinth!.version_id}
@@ -347,13 +349,13 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
 
               <div>
                 <h4 class="mb-2 font-semibold">
-                  {t("modals.mod_details.file_hashes")}
+                  {t("modals:_trn_mod_details.file_hashes")}
                 </h4>
                 <div class="space-y-2 text-sm">
                   <Show when={mod().metadata?.sha_1}>
                     <div>
                       <span class="text-lightSlate-600">
-                        {t("modals.mod_details.sha1")}:
+                        {t("modals:_trn_mod_details.sha1")}:
                       </span>
                       <div class="mt-1 flex items-start gap-2 font-mono">
                         <span class="flex-1 break-all">
@@ -366,7 +368,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                   <Show when={mod().metadata?.sha_512}>
                     <div>
                       <span class="text-lightSlate-600">
-                        {t("modals.mod_details.sha512")}:
+                        {t("modals:_trn_mod_details.sha512")}:
                       </span>
                       <div class="mt-1 flex items-start gap-2 font-mono">
                         <span class="flex-1 break-all">
@@ -379,7 +381,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                   <Show when={mod().metadata?.murmur_2}>
                     <div>
                       <span class="text-lightSlate-600">
-                        {t("modals.mod_details.murmur2_signed")}:
+                        {t("modals:_trn_mod_details.murmur2_signed")}:
                       </span>
                       <div class="mt-1 flex items-start gap-2 font-mono">
                         <span class="flex-1 break-all">
@@ -390,7 +392,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                     </div>
                     <div>
                       <span class="text-lightSlate-600">
-                        {t("modals.mod_details.murmur2_unsigned")}:
+                        {t("modals:_trn_mod_details.murmur2_unsigned")}:
                       </span>
                       <div class="mt-1 flex items-start gap-2 font-mono">
                         <span class="flex-1 break-all">
@@ -412,7 +414,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
               <Show when={(mod().metadata?.modloaders?.length || 0) > 0}>
                 <div>
                   <h4 class="mb-2 font-semibold">
-                    {t("modals.mod_details.supported_modloaders")}
+                    {t("modals:_trn_mod_details.supported_modloaders")}
                   </h4>
                   <div class="flex gap-2">
                     <For each={mod().metadata?.modloaders || []}>

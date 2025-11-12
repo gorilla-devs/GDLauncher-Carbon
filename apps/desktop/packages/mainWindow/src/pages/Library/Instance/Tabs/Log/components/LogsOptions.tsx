@@ -45,7 +45,7 @@ export default function LogsOptions(props: Props) {
       <DropdownMenuContent>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
-            <Trans key="logs_density" />
+            <Trans key="logs:_trn_logs_density" />
           </DropdownMenuSubTrigger>
           <DropdownMenuPortal>
             <DropdownMenuSubContent>
@@ -54,13 +54,13 @@ export default function LogsOptions(props: Props) {
                 onChange={(value) => props.setLogsDensity(value as LogDensity)}
               >
                 <DropdownMenuRadioItem value="low">
-                  <Trans key="logs_density.low" />
+                  <Trans key="logs:_trn_logs_density.low" />
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="medium">
-                  <Trans key="logs_density.comfortable" />
+                  <Trans key="logs:_trn_logs_density.comfortable" />
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="high">
-                  <Trans key="logs_density.compact" />
+                  <Trans key="logs:_trn_logs_density.compact" />
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
             </DropdownMenuSubContent>
@@ -68,7 +68,7 @@ export default function LogsOptions(props: Props) {
         </DropdownMenuSub>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
-            <Trans key="font_size" />
+            <Trans key="logs:_trn_font_size" />
           </DropdownMenuSubTrigger>
           <DropdownMenuPortal>
             <DropdownMenuSubContent>
@@ -93,7 +93,7 @@ export default function LogsOptions(props: Props) {
         </DropdownMenuSub>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
-            <Trans key="columns" />
+            <Trans key="logs:_trn_columns" />
           </DropdownMenuSubTrigger>
           <DropdownMenuPortal>
             <DropdownMenuSubContent>
@@ -106,7 +106,7 @@ export default function LogsOptions(props: Props) {
                   })
                 }
               >
-                <Trans key="columns.timestamp" />
+                <Trans key="logs:_trn_columns.timestamp" />
               </DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem
                 checked={props.columns.logger}
@@ -117,7 +117,7 @@ export default function LogsOptions(props: Props) {
                   })
                 }
               >
-                <Trans key="columns.logger" />
+                <Trans key="logs:_trn_columns.logger" />
               </DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem
                 checked={props.columns.sourceKind}
@@ -128,7 +128,7 @@ export default function LogsOptions(props: Props) {
                   })
                 }
               >
-                <Trans key="columns.source_kind" />
+                <Trans key="logs:_trn_columns.source_kind" />
               </DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem
                 checked={props.columns.threadName}
@@ -139,7 +139,7 @@ export default function LogsOptions(props: Props) {
                   })
                 }
               >
-                <Trans key="columns.thread_name" />
+                <Trans key="logs:_trn_columns.thread_name" />
               </DropdownMenuCheckboxItem>
               <DropdownMenuCheckboxItem
                 checked={props.columns.level}
@@ -150,7 +150,7 @@ export default function LogsOptions(props: Props) {
                   })
                 }
               >
-                <Trans key="columns.level" />
+                <Trans key="logs:_trn_columns.level" />
               </DropdownMenuCheckboxItem>
             </DropdownMenuSubContent>
           </DropdownMenuPortal>
@@ -162,7 +162,7 @@ export default function LogsOptions(props: Props) {
             props.setAutoFollowPreference(!props.autoFollowPreference)
           }
         >
-          <Trans key="logs.autofollow" />
+          <Trans key="logs:_trn_autofollow" />
         </DropdownMenuCheckboxItem>
         <DropdownMenuCheckboxItem
           checked={props.startLogMessageOnNewLine}
@@ -170,7 +170,7 @@ export default function LogsOptions(props: Props) {
             props.setStartLogMessageOnNewLine(!props.startLogMessageOnNewLine)
           }
         >
-          <Trans key="logs.start_log_message_on_new_line" />
+          <Trans key="logs:_trn_start_log_message_on_new_line" />
         </DropdownMenuCheckboxItem>
       </DropdownMenuContent>
     </DropdownMenu>

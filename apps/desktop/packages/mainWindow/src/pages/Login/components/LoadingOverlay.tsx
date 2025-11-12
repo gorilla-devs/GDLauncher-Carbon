@@ -1,5 +1,5 @@
 import { Spinner } from "@gd/ui"
-import { Trans } from "@gd/i18n"
+import { Trans, NamespacedTranslationKey } from "@gd/i18n"
 import { Show } from "solid-js"
 import type { LoadingOperation } from "../flow/types"
 
@@ -32,16 +32,18 @@ export function LoadingOverlay(props: LoadingOverlayProps) {
 /**
  * Get translation key for loading message based on operation
  */
-function getMessage(operation: LoadingOperation): string | null {
+function getMessage(
+  operation: LoadingOperation
+): NamespacedTranslationKey | null {
   switch (operation) {
     case "initializing":
       return null // No message for initial load
 
     case "checking-account":
-      return "login.checking_account"
+      return "auth:_trn_login.checking_account"
 
     case "checking-gdl":
-      return "login.checking_gdl_account"
+      return "auth:_trn_login.checking_gdl_account"
 
     default:
       return null

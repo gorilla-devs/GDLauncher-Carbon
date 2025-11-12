@@ -74,7 +74,7 @@ function withAdsLayout() {
                       })
                     }}
                   >
-                    <Trans key="why_are_ads_needed" />
+                    <Trans key="ads:_trn_why_are_ads_needed" />
                   </div>
                 </div>
               </div>

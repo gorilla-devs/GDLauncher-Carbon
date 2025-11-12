@@ -24,12 +24,12 @@ const PlatformSelection = (props: ModalProps) => {
   return (
     <ModalLayout
       noHeader={props.noHeader}
-      title={t("instance.select_platform")}
+      title={t("instance:_trn_select_platform")}
       noPadding={false}
     >
       <div class="flex w-96 flex-col gap-4">
         <p class="text-lightSlate-400">
-          {t("instance.select_platform_description", {
+          {t("instance:_trn_select_platform_description", {
             modName: data().modName
           })}
         </p>
@@ -41,9 +41,9 @@ const PlatformSelection = (props: ModalProps) => {
           >
             <img src={CurseforgeLogo} class="h-8 w-8" alt="CurseForge" />
             <div class="flex flex-col items-start">
-              <span class="font-medium">{t("platforms.curseforge")}</span>
+              <span class="font-medium">{t("platforms:_trn_curseforge")}</span>
               <span class="text-lightSlate-500 text-sm">
-                {t("instance.view_versions_on_curseforge")}
+                {t("instance:_trn_view_versions_on_curseforge")}
               </span>
             </div>
           </button>
@@ -54,9 +54,9 @@ const PlatformSelection = (props: ModalProps) => {
           >
             <img src={ModrinthLogo} class="h-8 w-8" alt="Modrinth" />
             <div class="flex flex-col items-start">
-              <span class="font-medium">{t("platforms.modrinth")}</span>
+              <span class="font-medium">{t("platforms:_trn_modrinth")}</span>
               <span class="text-lightSlate-500 text-sm">
-                {t("instance.view_versions_on_modrinth")}
+                {t("instance:_trn_view_versions_on_modrinth")}
               </span>
             </div>
           </button>
@@ -64,7 +64,7 @@ const PlatformSelection = (props: ModalProps) => {
 
         <div class="mt-4 flex justify-end">
           <Button type="secondary" onClick={() => modalContext?.closeModal()}>
-            {t("instance.cancel")}
+            {t("instance:_trn_cancel")}
           </Button>
         </div>
       </div>

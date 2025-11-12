@@ -27,7 +27,7 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
       navigator.navigate("/library")
     },
     onError: (error) => {
-      toast.error(t("notifications.cannot_delete_instance"), {
+      toast.error(t("notifications:_trn_cannot_delete_instance"), {
         description: error.message
       })
     }
@@ -43,7 +43,7 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
       <div class="flex h-full flex-col justify-between">
         <div class="h-h-full">
           <Trans
-            key="instance_confirm_deletion.confirmation_text"
+            key="instance:_trn_instance_confirm_deletion.confirmation_text"
             options={{
               instance_name: props.data?.name
             }}
@@ -60,7 +60,7 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
             }}
           >
             <div class="i-hugeicons:cancel-01" />
-            {t("instance_confirm_deletion.cancel")}
+            {t("instance:_trn_instance_confirm_deletion.cancel")}
           </Button>
           <Button
             type="secondary"
@@ -70,7 +70,7 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
             }}
           >
             <div class="i-hugeicons:delete-02" />
-            {t("instance_confirm_deletion.delete")}
+            {t("instance:_trn_instance_confirm_deletion.delete")}
           </Button>
         </div>
       </div>

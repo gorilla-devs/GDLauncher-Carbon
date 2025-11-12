@@ -129,7 +129,7 @@ const LogsFinders = (props: Props) => {
               </div>
             }
             class="h-6"
-            placeholder={t("placeholders.find_logs")}
+            placeholder={t("placeholders:_trn_find_logs")}
             value={props?.query?.query ?? ""}
             onInput={(e) => props.setQuery("query", e.target.value)}
           />
@@ -137,7 +137,7 @@ const LogsFinders = (props: Props) => {
             <Switch>
               <Match when={!props.logSearchResults?.length}>
                 <div class="w-24">
-                  <Trans key="ui.no_results" />
+                  <Trans key="ui:_trn_no_results" />
                 </div>
               </Match>
               <Match when={props.logSearchResults?.length !== 0}>

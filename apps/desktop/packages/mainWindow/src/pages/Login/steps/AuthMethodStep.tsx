@@ -54,7 +54,7 @@ export function AuthMethodStep() {
 
         {/* Description */}
         <p class="text-lightSlate-400 m-0 max-w-md text-base leading-relaxed">
-          <Trans key="login.sign_in_with_microsoft_text" />
+          <Trans key="auth:_trn_login.sign_in_with_microsoft_text" />
         </p>
 
         {/* Sign-in buttons - moved from footer */}
@@ -69,21 +69,21 @@ export function AuthMethodStep() {
             disabled={loading()}
           >
             <div class="i-hugeicons:microsoft h-4 w-4" />
-            <Trans key="login.sign_in" />
+            <Trans key="auth:_trn_login.sign_in" />
           </Button>
 
           {/* Recommended badge */}
           <div class="text-primary-400 flex items-center justify-center gap-1 text-xs font-medium">
             <div class="i-hugeicons:star h-3 w-3" />
             <span>
-              <Trans key="login.recommended" />
+              <Trans key="auth:_trn_login.recommended" />
             </span>
           </div>
 
           {/* Alternative: Device Code */}
           <div class="border-darkSlate-600 flex flex-col gap-2 border-t pt-3">
             <p class="text-lightSlate-600 m-0 text-xs">
-              <Trans key="login.trouble_browser_signin" />
+              <Trans key="auth:_trn_login.trouble_browser_signin" />
             </p>
             <button
               type="button"
@@ -95,7 +95,7 @@ export function AuthMethodStep() {
               }}
               disabled={loading()}
             >
-              <Trans key="login.use_device_code_instead" />
+              <Trans key="auth:_trn_login.use_device_code_instead" />
             </button>
           </div>
         </div>

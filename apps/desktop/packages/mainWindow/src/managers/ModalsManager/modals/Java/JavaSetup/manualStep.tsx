@@ -11,7 +11,7 @@ const ManualStep = (props: StepsProps) => {
             <div class="i-hugeicons:folder-open text-lightSlate-700 w-6 text-xl" />
             <p class="text-lightSlate-700 m-0">
               <Trans
-                key="java.select_java_zip"
+                key="java:_trn_select_java_zip"
                 options={{
                   defaultValue: "Select java {{version}} zip",
                   version: 8
@@ -22,7 +22,7 @@ const ManualStep = (props: StepsProps) => {
         </div>
         <p class="text-lightSlate-700 text-center">
           <Trans
-            key="java.select_required_java_text"
+            key="java:_trn_select_required_java_text"
             options={{
               defaultValue:
                 "Select the required paths to java. Java 8 is used for all the versions < 1.17"
@@ -39,7 +39,7 @@ const ManualStep = (props: StepsProps) => {
               props.nextStep?.("intro")
             }}
           >
-            <Trans key="java.step_back" />
+            <Trans key="java:_trn_step_back" />
           </Button>
           <Button
             rounded
@@ -50,7 +50,7 @@ const ManualStep = (props: StepsProps) => {
             }}
           >
             <Trans
-              key="java.setup"
+              key="java:_trn_setup"
               options={{
                 defaultValue: "Setup"
               }}
