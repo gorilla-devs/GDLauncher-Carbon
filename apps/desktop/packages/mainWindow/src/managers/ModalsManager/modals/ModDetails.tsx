@@ -139,8 +139,8 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
               </div>
               <Badge variant={mod().enabled ? "success" : "secondary"}>
                 {mod().enabled
-                  ? t("instance:_trn_enabled")
-                  : t("instance:_trn_disabled")}
+                  ? t("instances:_trn_enabled")
+                  : t("instances:_trn_disabled")}
               </Badge>
             </div>
 
@@ -164,11 +164,11 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                           <img
                             src={CurseforgeLogo}
                             class="h-4 w-4"
-                            alt={t("platforms:_trn_curseforge")}
+                            alt={t("enums:_trn_curseforge")}
                           />
                         </TooltipTrigger>
                         <TooltipContent>
-                          {t("platforms:_trn_curseforge")}
+                          {t("enums:_trn_curseforge")}
                         </TooltipContent>
                       </Tooltip>
                     </Show>
@@ -178,11 +178,11 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                           <img
                             src={ModrinthLogo}
                             class="h-4 w-4"
-                            alt={t("platforms:_trn_modrinth")}
+                            alt={t("enums:_trn_modrinth")}
                           />
                         </TooltipTrigger>
                         <TooltipContent>
-                          {t("platforms:_trn_modrinth")}
+                          {t("enums:_trn_modrinth")}
                         </TooltipContent>
                       </Tooltip>
                     </Show>

@@ -27,25 +27,22 @@ const loadLanguageFiles = async (lang: string) => {
   // All translation namespaces (alphabetically sorted for consistency)
   const namespaces = [
     "accounts",
-    "addons",
     "ads",
     "app",
     "auth",
+    "content",
+    "enums",
     "errors",
     "general",
-    "instance",
+    "instances",
     "java",
     "library",
     "logs",
     "modals",
-    "modloaders",
-    "modpacks",
-    "mods",
     "news",
     "notifications",
     "onboarding",
     "placeholders",
-    "platforms",
     "search",
     "settings",
     "tasks",
@@ -61,7 +58,7 @@ const loadLanguageFiles = async (lang: string) => {
 
       namespacesMap[namespace] = language
     } catch (err) {
-      console.log(err)
+      // Silently skip missing language files - i18next fallbackLng will handle it
     }
   }
 
@@ -98,9 +95,9 @@ export const Trans: ParentComponent<TypedTransProps> = OriginalTrans as any
  * These are type-safe mappings from enums to actual translation keys.
  */
 type HelperFunctionKeys =
-  | `instance:tabs.${'mods' | 'resourcepacks' | 'shaders' | 'datapacks' | 'worlds'}`
+  | `content:tabs.${'mods' | 'resourcepacks' | 'shaders' | 'datapacks' | 'worlds'}`
   | `platforms:${'curseforge' | 'modrinth'}`
-  | `instance:view_on_${'curseforge' | 'modrinth'}`
+  | `content:view_on_${'curseforge' | 'modrinth'}`
   | `errors:xbox_${'noAccount' | 'xboxServicesBanned' | 'adultVerificationRequired' | 'childAccount'}`
   | `errors:${'deviceCodeExpired' | 'xboxAccount' | 'noGameOwnership' | 'noGameProfile'}`
   | `settings:theme_${'main' | 'pixelato' | 'win95' | 'inferno' | 'aether' | 'frost'}`
@@ -147,25 +144,22 @@ export type {
   NamespacedTranslationKey,
   TranslationKey,
   AccountsKeys,
-  AddonsKeys,
   AdsKeys,
   AppKeys,
   AuthKeys,
+  ContentKeys,
+  EnumsKeys,
   ErrorsKeys,
   GeneralKeys,
-  InstanceKeys,
+  InstancesKeys,
   JavaKeys,
   LibraryKeys,
   LogsKeys,
   ModalsKeys,
-  ModloadersKeys,
-  ModpacksKeys,
-  ModsKeys,
   NewsKeys,
   NotificationsKeys,
   OnboardingKeys,
   PlaceholdersKeys,
-  PlatformsKeys,
   SearchKeys,
   SettingsKeys,
   TasksKeys,

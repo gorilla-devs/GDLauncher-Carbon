@@ -215,7 +215,7 @@ const ModRow = (props: ModRowProps) => {
                         type="outline"
                         onClick={() => handleExplore()}
                       >
-                        <Trans key="instance:_trn_explore_modpack" />
+                        <Trans key="instances:_trn_explore_modpack" />
                       </Button>
                       <Show when={loading()}>
                         <Button>
@@ -264,7 +264,7 @@ const ModRow = (props: ModRowProps) => {
                             <Spinner />
                           </Show>
                           <Show when={!loading()}>
-                            <Trans key="instance:_trn_download" />
+                            <Trans key="instances:_trn_download" />
                           </Show>
                         </Button>
                       </Show>
@@ -281,7 +281,7 @@ const ModRow = (props: ModRowProps) => {
                         type="outline"
                         onClick={() => handleExplore()}
                       >
-                        <Trans key="instance:_trn_explore_modpack" />
+                        <Trans key="instances:_trn_explore_modpack" />
                       </Button>
                       <ModDownloadButton addon={props.data} />
                     </div>

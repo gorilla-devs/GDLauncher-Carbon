@@ -381,17 +381,17 @@ const Instance = () => {
   const menuItems = () => [
     {
       icon: "i-hugeicons:pencil-edit-01",
-      label: t("instance:_trn_action_edit"),
+      label: t("instances:_trn_action_edit"),
       action: handleEdit
     },
     {
       icon: "i-hugeicons:folder-open",
-      label: t("instance:_trn_action_open_folder"),
+      label: t("instances:_trn_action_open_folder"),
       action: handleOpenFolder
     },
     {
       icon: "i-hugeicons:file-export",
-      label: t("instance:_trn_export_instance"),
+      label: t("instances:_trn_export_instance"),
       action: () => {
         const instanceId = getInstanceIdFromPath(location.pathname)
 
@@ -417,7 +417,7 @@ const Instance = () => {
     },
     {
       icon: "i-hugeicons:delete-02",
-      label: t("instance:_trn_action_delete"),
+      label: t("instances:_trn_action_delete"),
       action: handleDelete
     }
   ]
@@ -681,11 +681,11 @@ const Instance = () => {
                           <Switch>
                             <Match when={!isRunning()}>
                               <div class="i-hugeicons:play text-xl" />
-                              <Trans key="instance:_trn_play" />
+                              <Trans key="instances:_trn_play" />
                             </Match>
                             <Match when={isRunning()}>
                               <div class="i-hugeicons:stop text-xl" />
-                              <Trans key="instance:_trn_stop" />
+                              <Trans key="instances:_trn_stop" />
                             </Match>
                           </Switch>
                         </Button>
@@ -732,7 +732,7 @@ const Instance = () => {
                     size="small"
                     type="secondary"
                   >
-                    <Trans key="instance:_trn_step_back" />
+                    <Trans key="instances:_trn_step_back" />
                   </Button>
                 </div>
                 <div
@@ -775,11 +775,11 @@ const Instance = () => {
                   <Switch>
                     <Match when={!isRunning()}>
                       <div class="i-hugeicons:play text-base" />
-                      <Trans key="instance:_trn_play" />
+                      <Trans key="instances:_trn_play" />
                     </Match>
                     <Match when={isRunning()}>
                       <div class="i-hugeicons:stop text-base" />
-                      <Trans key="instance:_trn_stop" />
+                      <Trans key="instances:_trn_stop" />
                     </Match>
                   </Switch>
                 </Button>
@@ -806,10 +806,10 @@ const Instance = () => {
                     <div class="i-hugeicons:alert-01 text-2xl text-yellow-500" />
                     <div>
                       <h3 class="m-0 mb-1 font-semibold text-yellow-200">
-                        <Trans key="instance:_trn_duplicated_mods_detected" />
+                        <Trans key="content:_trn_duplicated_mods_detected" />
                       </h3>
                       <p class="m-0 text-sm text-yellow-300/70">
-                        <Trans key="instance:_trn_duplicated_mods_message" />
+                        <Trans key="content:_trn_duplicated_mods_message" />
                       </p>
                     </div>
                   </div>
@@ -827,7 +827,7 @@ const Instance = () => {
                     }}
                   >
                     <div class="i-hugeicons:magic-wand-01" />
-                    <Trans key="instance:_trn_fix_now" />
+                    <Trans key="instances:_trn_fix_now" />
                   </Button>
                 </div>
               </Show>

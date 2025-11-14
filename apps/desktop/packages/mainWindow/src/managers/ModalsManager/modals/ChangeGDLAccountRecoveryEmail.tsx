@@ -25,14 +25,14 @@ const ChangeGDLAccountRecoveryEmail = () => {
 
   return (
     <ModalLayout
-      title={t("settings:_trn_change_recovery_email_title")}
+      title={t("accounts:_trn_change_recovery_email_title")}
       height="h-70"
       width="w-140"
     >
       <div class="flex h-full flex-col justify-between">
         <div class="flex flex-col gap-4">
           <div>
-            <Trans key="settings:_trn_change_recovery_email_description" />
+            <Trans key="accounts:_trn_change_recovery_email_description" />
           </div>
           <Input
             placeholder={t("placeholders:_trn_email_example")}
@@ -59,7 +59,7 @@ const ChangeGDLAccountRecoveryEmail = () => {
             }}
             type="secondary"
           >
-            <Trans key="settings:_trn_cancel" />
+            <Trans key="accounts:_trn_cancel" />
           </Button>
           <Button
             type="primary"
@@ -108,7 +108,7 @@ const ChangeGDLAccountRecoveryEmail = () => {
               setIsLoading(false)
             }}
           >
-            <Trans key="settings:_trn_confirm" />
+            <Trans key="accounts:_trn_confirm" />
           </Button>
         </div>
       </div>

@@ -148,7 +148,7 @@ const Masonry: Component<MasonryProps> = (props) => {
                       }`}
                     >
                       <Trans
-                        key="general:_trn_common.last_updated_date"
+                        key="content:_trn_common.last_updated_date"
                         options={{
                           date: new Date(
                             element.lastUpdated

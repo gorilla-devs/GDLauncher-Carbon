@@ -50,43 +50,43 @@ interface EntityValue {
 
 export const ENTITIES: Record<ImportEntity, EntityValue> = {
   LegacyGDLauncher: {
-    translation: "platforms:_trn_entity.legacygdlauncher",
+    translation: "enums:_trn_entity.legacygdlauncher",
     icon: LegacyGDL
   },
   ATLauncher: {
-    translation: "platforms:_trn_entity.atlauncher",
+    translation: "enums:_trn_entity.atlauncher",
     icon: ATLauncherLogo
   },
   CurseForge: {
-    translation: "platforms:_trn_entity.curseforge",
+    translation: "enums:_trn_entity.curseforge",
     icon: CurseForgeLogo
   },
   FTB: {
-    translation: "platforms:_trn_entity.ftb",
+    translation: "enums:_trn_entity.ftb",
     icon: FTBLogo
   },
   MultiMC: {
-    translation: "platforms:_trn_entity.multimc",
+    translation: "enums:_trn_entity.multimc",
     icon: MultiMCLogo
   },
   Technic: {
-    translation: "platforms:_trn_entity.technic",
+    translation: "enums:_trn_entity.technic",
     icon: TechnicLogo
   },
   PrismLauncher: {
-    translation: "platforms:_trn_entity.prismlauncher",
+    translation: "enums:_trn_entity.prismlauncher",
     icon: PrismLogo
   },
   Modrinth: {
-    translation: "platforms:_trn_entity.modrinth",
+    translation: "enums:_trn_entity.modrinth",
     icon: ModrinthLogo
   },
   CurseForgeZip: {
-    translation: "platforms:_trn_entity.curseforgezip",
+    translation: "enums:_trn_entity.curseforgezip",
     icon: CurseForgeLogo
   },
   MRPack: {
-    translation: "platforms:_trn_entity.mrpack",
+    translation: "enums:_trn_entity.mrpack",
     icon: ModrinthLogo
   }
 }

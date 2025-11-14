@@ -124,7 +124,7 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
         <Show when={!loading()}>
           <div class="flex items-center gap-1.5">
             <div class="i-hugeicons:download-02" />
-            <Trans key="instance:_trn_download" />
+            <Trans key="instances:_trn_download" />
           </div>
         </Show>
       </Button>

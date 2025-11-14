@@ -46,15 +46,15 @@ export const InstallButton = (props: InstallButtonProps) => {
           <Show when={!props.loading()}>
             <Switch>
               <Match when={props.isInstalled()}>
-                <Trans key="mods:_trn_mod.downloaded" />
+                <Trans key="content:_trn_mod.downloaded" />
               </Match>
               <Match when={props.instanceLocked()}>
-                <Trans key="instance:_trn_instance_locked" />
+                <Trans key="instances:_trn_instance_locked" />
               </Match>
               <Match when={!props.instanceLocked() && !props.fileId}>
                 <div class="flex items-center gap-1.5">
                   <div class="i-hugeicons:download-02 h-5 w-5" />
-                  <Trans key="instance:_trn_download" />
+                  <Trans key="instances:_trn_download" />
                 </div>
               </Match>
               <Match
@@ -67,13 +67,13 @@ export const InstallButton = (props: InstallButtonProps) => {
               >
                 <div class="flex items-center gap-1.5">
                   <div class="i-hugeicons:download-02 h-5 w-5" />
-                  <Trans key="instance:_trn_switch_version" />
+                  <Trans key="instances:_trn_switch_version" />
                 </div>
               </Match>
               <Match when={!props.instanceLocked() && props.fileId}>
                 <div class="flex items-center gap-1.5">
                   <div class="i-hugeicons:download-02 h-5 w-5" />
-                  <Trans key="instance:_trn_download_version" />
+                  <Trans key="instances:_trn_download_version" />
                 </div>
               </Match>
             </Switch>
@@ -82,7 +82,7 @@ export const InstallButton = (props: InstallButtonProps) => {
       </TooltipTrigger>
       {props.instanceLocked() && (
         <TooltipContent>
-          <Trans key="instance:_trn_locked_cannot_apply_changes" />
+          <Trans key="instances:_trn_locked_cannot_apply_changes" />
         </TooltipContent>
       )}
     </Tooltip>

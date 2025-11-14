@@ -94,7 +94,7 @@ const Versions = () => {
           <Trans key="search:_trn_browser_table_headers.type" />
         </div>
         <div class="text-right">
-          <Trans key="addons:_trn_actions" />
+          <Trans key="content:_trn_actions" />
         </div>
       </div>
       <div class="flex-1 px-6">
@@ -108,7 +108,7 @@ const Versions = () => {
                   <Show when={infiniteQuery.infiniteQuery.error}>
                     <div class="i-hugeicons:alert-02 text-3xl mb-4 text-red-400" />
                     <h3 class="mb-2 text-lg font-semibold text-red-300">
-                      <Trans key="addons:_trn_error_loading_versions" />
+                      <Trans key="content:_trn_error_loading_versions" />
                     </h3>
                     <Button
                       type="secondary"
@@ -121,7 +121,7 @@ const Versions = () => {
                   </Show>
                   <Show when={!infiniteQuery.infiniteQuery.error}>
                     <span class="text-lightSlate-400">
-                      <Trans key="addons:_trn_no_versions_found" />
+                      <Trans key="content:_trn_no_versions_found" />
                     </span>
                   </Show>
                 </div>

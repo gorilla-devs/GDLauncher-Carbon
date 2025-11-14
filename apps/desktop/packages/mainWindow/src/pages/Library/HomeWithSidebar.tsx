@@ -15,7 +15,7 @@ const HomeWithSidebar = () => {
               <img src={skull} class="w-16 h-16" />
               <p class="text-lightSlate-700 text-center max-w-100">
                 <Trans
-                  key="instance:_trn_no_instances_text"
+                  key="instances:_trn_no_instances_text"
                   options={{
                     defaultValue:
                       "At the moment there are not instances. Add one to start playing!"

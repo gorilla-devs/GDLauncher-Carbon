@@ -26,7 +26,7 @@ const Confirmation = (props: ModalProps) => {
         <Show when={data().instanceState === "unpair"}>
           <p>{t("general:_trn_instance_unpair_confirmation")}</p>
         </Show>
-        <p>{t("instance:_trn_instance_confirm_continue")}</p>
+        <p>{t("instances:_trn_instance_confirm_continue")}</p>
         <div class="mt-8 flex justify-between">
           <Button
             type="primary"
@@ -35,7 +35,7 @@ const Confirmation = (props: ModalProps) => {
             }}
           >
             <div class="i-hugeicons:cancel-01" />
-            {t("instance:_trn_instance_cancel")}
+            {t("instances:_trn_instance_cancel")}
           </Button>
           <Button
             type="secondary"
@@ -59,7 +59,7 @@ const Confirmation = (props: ModalProps) => {
             }}
           >
             <div class="i-hugeicons:tick-02" />
-            {t("instance:_trn_instance_confirm")}
+            {t("instances:_trn_instance_confirm")}
           </Button>
         </div>
       </div>

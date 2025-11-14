@@ -65,20 +65,20 @@ const Presets = () => {
     {
       name: "Vanilla",
       loader: undefined,
-      translationKey: "instance:_trn_vanilla"
+      translationKey: "instances:_trn_vanilla"
     },
-    { name: "Forge", loader: "forge", translationKey: "instance:_trn_forge" },
+    { name: "Forge", loader: "forge", translationKey: "instances:_trn_forge" },
     {
       name: "NeoForge",
       loader: "neoforge",
-      translationKey: "instance:_trn_neoforge"
+      translationKey: "instances:_trn_neoforge"
     },
     {
       name: "Fabric",
       loader: "fabric",
-      translationKey: "instance:_trn_fabric"
+      translationKey: "instances:_trn_fabric"
     },
-    { name: "Quilt", loader: "quilt", translationKey: "instance:_trn_quilt" }
+    { name: "Quilt", loader: "quilt", translationKey: "instances:_trn_quilt" }
   ]
 
   const getLatestLoaderVersion = (loader: CFFEModLoaderType | undefined) => {
@@ -219,7 +219,7 @@ const Presets = () => {
           <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
           <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
             <div class="i-hugeicons:zap text-primary-500 text-sm" />
-            <Trans key="instance:_trn_quick_start_presets" />
+            <Trans key="instances:_trn_quick_start_presets" />
           </span>
           <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
         </div>
@@ -251,7 +251,7 @@ const Presets = () => {
 
               {/* Latest badge */}
               <div class="absolute right-2 top-2 rounded-full border border-emerald-500/30 bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-400 backdrop-blur-sm">
-                <Trans key="instance:_trn_latest" />
+                <Trans key="instances:_trn_latest" />
               </div>
 
               <div class="relative z-10 flex flex-col items-center gap-2">
@@ -277,7 +277,7 @@ const Presets = () => {
                   <Show when={latestMcVersion()}>
                     <span class="text-lightSlate-300 text-sm">
                       <Trans
-                        key="instance:_trn_preset_minecraft_version"
+                        key="instances:_trn_preset_minecraft_version"
                         options={{ version: latestMcVersion() }}
                       />
                     </span>
@@ -341,7 +341,7 @@ const Presets = () => {
 
             {/* Footer description */}
             <div class="text-lightSlate-500 mt-2 text-center text-xs">
-              <Trans key="instance:_trn_preset_description" />
+              <Trans key="instances:_trn_preset_description" />
             </div>
           </div>
         </Show>

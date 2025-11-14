@@ -113,14 +113,14 @@ export const AddonFilters = (props: AddonFiltersProps) => {
             <Input
               value={props.searchQuery()}
               onInput={(e) => props.setSearchQuery(e.target.value)}
-              placeholder={t("instance:_trn_search_addons")}
+              placeholder={t("content:_trn_search_addons")}
               icon={<div class="i-hugeicons:search-01" />}
               class="max-w-sm"
             />
 
             <div class="flex items-center gap-2">
               <span class="text-lightSlate-600 text-sm">
-                {t("instance:_trn_platform_filter")}:
+                {t("content:_trn_platform_filter")}:
               </span>
               <Select
                 value={props.platformFilter()}
@@ -133,13 +133,13 @@ export const AddonFilters = (props: AddonFiltersProps) => {
                   const getLabel = (value: string) => {
                     switch (value) {
                       case "all":
-                        return t("instance:_trn_filter.all")
+                        return t("content:_trn_filter.all")
                       case "curseforge":
-                        return t("platforms:_trn_curseforge")
+                        return t("enums:_trn_curseforge")
                       case "modrinth":
-                        return t("platforms:_trn_modrinth")
+                        return t("enums:_trn_modrinth")
                       case "local":
-                        return t("instance:_trn_filter.local")
+                        return t("content:_trn_filter.local")
                       default:
                         return value
                     }
@@ -174,13 +174,13 @@ export const AddonFilters = (props: AddonFiltersProps) => {
                       const getLabel = (value: string) => {
                         switch (value) {
                           case "all":
-                            return t("instance:_trn_filter.all")
+                            return t("content:_trn_filter.all")
                           case "curseforge":
-                            return t("platforms:_trn_curseforge")
+                            return t("enums:_trn_curseforge")
                           case "modrinth":
-                            return t("platforms:_trn_modrinth")
+                            return t("enums:_trn_modrinth")
                           case "local":
-                            return t("instance:_trn_filter.local")
+                            return t("content:_trn_filter.local")
                           default:
                             return value
                         }
@@ -231,13 +231,13 @@ export const AddonFilters = (props: AddonFiltersProps) => {
                   >
                     <div class="i-hugeicons:download-02 text-sm" />
                     <Trans
-                      key="instance:_trn_update_all_count"
+                      key="content:_trn_update_all_count"
                       options={{ count: props.updateCount() }}
                     />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <Trans key="instance:_trn_locked_cannot_apply_changes" />
+                  <Trans key="instances:_trn_locked_cannot_apply_changes" />
                 </TooltipContent>
               </Tooltip>
             </Show>
@@ -261,11 +261,11 @@ export const AddonFilters = (props: AddonFiltersProps) => {
                   class="font-semibold"
                 >
                   <div class="i-hugeicons:add-01" />
-                  <Trans key="instance:_trn_add_addons" />
+                  <Trans key="content:_trn_add_addons" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <Trans key="instance:_trn_locked_cannot_apply_changes" />
+                <Trans key="instances:_trn_locked_cannot_apply_changes" />
               </TooltipContent>
             </Tooltip>
           </div>
@@ -300,9 +300,9 @@ export const AddonFilters = (props: AddonFiltersProps) => {
           </div>
           <div class="text-lightSlate-600 flex items-center gap-2 text-xs">
             <div class="i-hugeicons:mouse-01" />
-            <span>{t("instance:_trn_right_click_hint")}</span>
+            <span>{t("content:_trn_right_click_hint")}</span>
             <span class="text-lightSlate-700">•</span>
-            <span>{t("instance:_trn_multi_select_hint")}</span>
+            <span>{t("content:_trn_multi_select_hint")}</span>
           </div>
         </div>
       </div>

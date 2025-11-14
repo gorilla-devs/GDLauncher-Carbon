@@ -56,7 +56,7 @@ export const InstanceItem = (props: InstanceItemProps) => {
             {props.instance.gameVersion} • {props.instance.modloader}
             <Show when={props.instance.locked}>
               <span class="ml-1 text-orange-400">
-                <Trans key="instance:_trn_status_locked" />
+                <Trans key="instances:_trn_status_locked" />
               </span>
             </Show>
             <Show
@@ -65,7 +65,7 @@ export const InstanceItem = (props: InstanceItemProps) => {
               }
             >
               <span class="ml-1 text-green-400">
-                <Trans key="instance:_trn_status_installed" />
+                <Trans key="instances:_trn_status_installed" />
               </span>
             </Show>
             <Show when={props.isLoading && !props.instance.locked}>

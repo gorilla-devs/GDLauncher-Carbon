@@ -21,5 +21,20 @@
   "_trn_logs": "Logs",
   "_trn_placeholder": "[Placeholder]",
   "_trn_notification": "Notification",
-  "_trn_something_went_wrong": "Something went wrong"
+  "_trn_something_went_wrong": "Something went wrong",
+  "_trn_name": "Name",
+  "_trn_created": "Created",
+  "_trn_group": "Group",
+  "_trn_register": "Register",
+  "_trn_asc": "Ascending",
+  "_trn_desc": "Descending",
+  "_trn_game_version_sort": "Game Version",
+  "_trn_last_played_sort": "Last Played",
+  "_trn_last_updated_sort": "Last Updated",
+  "_trn_most_played_sort": "Most Played",
+  "_trn_most_played": "Most Played",
+  "_trn_last_played": "Last Played",
+  "_trn_last_updated": "Last Updated",
+  "_trn_game_version": "Game Version",
+  "_trn_modloader": "Modloader"
 }

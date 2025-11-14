@@ -36,7 +36,7 @@ export function FiltersDropdown() {
             class="text-lightSlate-900 hover:text-lightSlate-50 cursor-pointer text-xs transition-colors duration-200 ease-[cubic-bezier(.4,0,.2,1)]"
             onClick={resetAllFilters}
           >
-            <Trans key="general:_trn_reset_filters" />
+            <Trans key="search:_trn_clear_all_filters" />
           </div>
         </div>
       </DropdownMenuLabel>

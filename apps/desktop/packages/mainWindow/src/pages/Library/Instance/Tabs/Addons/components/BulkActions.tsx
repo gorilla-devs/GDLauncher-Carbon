@@ -21,7 +21,7 @@ export const BulkActions = (props: BulkActionsProps) => {
         <div class="flex items-center justify-between">
           <span class="text-sm">
             <Trans
-              key="instance:_trn_selected_count"
+              key="content:_trn_selected_count"
               options={{ count: props.selectedRowsLength() }}
             />
           </span>
@@ -34,7 +34,7 @@ export const BulkActions = (props: BulkActionsProps) => {
                 onClick={props.onUpdateSelected}
               >
                 <div class="i-hugeicons:download-02" />
-                <Trans key="instance:_trn_update_selected" />
+                <Trans key="content:_trn_update_selected" />
               </Button>
             </Show>
             <Button
@@ -43,7 +43,7 @@ export const BulkActions = (props: BulkActionsProps) => {
               onClick={props.onDeleteSelected}
             >
               <div class="i-hugeicons:delete-02" />
-              <Trans key="instance:_trn_delete_selected" />
+              <Trans key="content:_trn_delete_selected" />
             </Button>
           </div>
         </div>

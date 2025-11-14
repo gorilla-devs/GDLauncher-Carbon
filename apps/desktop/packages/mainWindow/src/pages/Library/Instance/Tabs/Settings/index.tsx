@@ -189,7 +189,7 @@ const Settings = () => {
       <Show when={routeData?.instanceDetails?.data?.modpack}>
         <Row>
           <Title>
-            <Trans key="instance:_trn_instance_settings.modpack_info" />
+            <Trans key="instances:_trn_instance_settings.modpack_info" />
           </Title>
         </Row>
         <div class="flex flex-col gap-4">
@@ -229,13 +229,13 @@ const Settings = () => {
                 }}
               >
                 <i class="i-hugeicons:lock h-5 w-5" />
-                <Trans key="instance:_trn_instance_settings.unlock" />
+                <Trans key="instances:_trn_instance_settings.unlock" />
               </Button>
             </Show>
             <Show when={!routeData.instanceDetails.data?.modpack?.locked}>
               <div class="flex items-center gap-2">
                 <i class="i-hugeicons:lock-key-open h-5 w-5" />
-                <Trans key="instance:_trn_instance_settings.unlocked" />
+                <Trans key="instances:_trn_instance_settings.unlocked" />
               </div>
             </Show>
             <Button
@@ -254,7 +254,7 @@ const Settings = () => {
               }}
             >
               <i class="i-hugeicons:git-branch h-5 w-5" />
-              <Trans key="instance:_trn_instance_settings.unpair" />
+              <Trans key="instances:_trn_instance_settings.unpair" />
             </Button>
             <Button
               type="outline"
@@ -270,14 +270,14 @@ const Settings = () => {
               }}
             >
               <i class="i-hugeicons:arrow-left-right h-5 w-5" />
-              <Trans key="instance:_trn_instance_settings.change_modpack_version" />
+              <Trans key="instances:_trn_instance_settings.change_modpack_version" />
             </Button>
           </div>
         </div>
       </Show>
       <Row>
         <Title>
-          <Trans key="instance:_trn_instance_settings.java_path_profile" />
+          <Trans key="java:_trn_instance_settings.java_path_profile" />
         </Title>
         <RightHandSide>
           <Switch
@@ -354,7 +354,7 @@ const Settings = () => {
           <Match when={javaOverrideType() === "Profile"}>
             <div class="flex gap-2">
               <div class="text-lightSlate-700">
-                <Trans key="settings:_trn_this_instance_requires" />
+                <Trans key="java:_trn_this_instance_requires" />
               </div>
               <div class="text-lightSlate-100">
                 {routeData.instanceDetails.data?.requiredJavaProfile}
@@ -403,7 +403,7 @@ const Settings = () => {
                   })
                 }}
               >
-                <Trans key="settings:_trn_add_new_profile" />
+                <Trans key="java:_trn_add_new_profile" />
               </Button>
             </div>
           </Match>
@@ -411,7 +411,7 @@ const Settings = () => {
       </Show>
       <Row>
         <Title>
-          <Trans key="instance:_trn_instance_settings.java_memory_title" />
+          <Trans key="java:_trn_instance_settings.java_memory_title" />
         </Title>
         <RightHandSide>
           <Switch
@@ -478,7 +478,7 @@ const Settings = () => {
 
       <Row>
         <Title>
-          <Trans key="instance:_trn_instance_settings.java_arguments_title" />
+          <Trans key="java:_trn_instance_settings.java_arguments_title" />
         </Title>
         <Switch
           checked={
@@ -503,7 +503,7 @@ const Settings = () => {
       >
         <div class="-mt-8 flex w-full items-center justify-between">
           <h5 class="text-lightSlate-700">
-            <Trans key="instance:_trn_instance_settings.prepend_global_java_args" />
+            <Trans key="java:_trn_instance_settings.prepend_global_java_args" />
           </h5>
           <Switch
             checked={routeData?.instanceDetails?.data?.globalJavaArgs}
@@ -565,10 +565,10 @@ const Settings = () => {
       <Row>
         <Title
           description={
-            <Trans key="instance:_trn_instance_settings.game_resolution_text" />
+            <Trans key="instances:_trn_instance_settings.game_resolution_text" />
           }
         >
-          <Trans key="instance:_trn_instance_settings.game_resolution_title" />
+          <Trans key="instances:_trn_instance_settings.game_resolution_title" />
         </Title>
         <RightHandSide>
           <Switch
@@ -642,7 +642,7 @@ const Settings = () => {
             <div class="flex gap-4">
               <div class="flex items-center gap-4">
                 <div>
-                  <Trans key="instance:_trn_instance_settings.width" />
+                  <Trans key="instances:_trn_instance_settings.width" />
                 </div>
                 <Input
                   class="w-24"
@@ -669,7 +669,7 @@ const Settings = () => {
               </div>
               <div class="flex items-center gap-4">
                 <div>
-                  <Trans key="instance:_trn_instance_settings.height" />
+                  <Trans key="instances:_trn_instance_settings.height" />
                 </div>
                 <Input
                   class="w-24"

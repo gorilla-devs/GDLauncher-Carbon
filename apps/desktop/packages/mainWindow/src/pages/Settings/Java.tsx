@@ -148,7 +148,7 @@ const Java = () => {
   return (
     <>
       <PageTitle>
-        <Trans key="settings:_trn_Java" />
+        <Trans key="settings:_trn_java" />
       </PageTitle>
       <RowsContainer>
         <Row forceContentBelow>
@@ -373,7 +373,7 @@ const Java = () => {
                                                 <PopoverTrigger>
                                                   <div class="text-sm underline">
                                                     <Trans
-                                                      key="settings:_trn_used_in_counted_profiles"
+                                                      key="java:_trn_used_in_counted_profiles"
                                                       options={{
                                                         count:
                                                           usedInNProfiles()
@@ -385,7 +385,7 @@ const Java = () => {
                                                 <PopoverContent>
                                                   <div class="p-4">
                                                     <h3>
-                                                      <Trans key="settings:_trn_used_in_the_following_profiles" />
+                                                      <Trans key="java:_trn_used_in_the_following_profiles" />
                                                     </h3>
                                                     <ul class="flex flex-col gap-2">
                                                       <For
@@ -465,10 +465,10 @@ const Java = () => {
                           <h3>
                             <Switch>
                               <Match when={i() === 0}>
-                                <Trans key="settings:_trn_system_profiles" />
+                                <Trans key="java:_trn_system_profiles" />
                               </Match>
                               <Match when={i() === 1}>
-                                <Trans key="settings:_trn_custom_profiles" />
+                                <Trans key="java:_trn_custom_profiles" />
                               </Match>
                             </Switch>
                           </h3>
@@ -551,7 +551,7 @@ const Java = () => {
                                       <PopoverContent>
                                         <div class="max-w-100 flex h-auto flex-col gap-8 p-4">
                                           <div>
-                                            <Trans key="settings:_trn_profile_used_in_mc_versions" />
+                                            <Trans key="java:_trn_profile_used_in_mc_versions" />
                                           </div>
                                           <div class="h-70 flex flex-wrap content-start items-start justify-start gap-4 overflow-y-auto p-4">
                                             <For

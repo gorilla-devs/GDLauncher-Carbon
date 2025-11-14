@@ -221,8 +221,8 @@ const Tile = (props: Props) => {
                   class={`${props.isRunning ? "i-hugeicons:stop" : "i-hugeicons:play"} h-4 w-4`}
                 />
                 {props.isRunning
-                  ? t("instance:_trn_stop")
-                  : t("instance:_trn_action_play")}
+                  ? t("instances:_trn_stop")
+                  : t("instances:_trn_action_play")}
               </ContextMenuItem>
               <ContextMenuItem
                 class="flex items-center gap-2"
@@ -230,7 +230,7 @@ const Tile = (props: Props) => {
                 disabled={isLoading() || isInQueue() || props.isDeleting}
               >
                 <div class="i-hugeicons:pencil-edit-01 h-4 w-4" />
-                {t("instance:_trn_action_edit")}
+                {t("instances:_trn_action_edit")}
               </ContextMenuItem>
               <ContextMenuItem
                 class="flex items-center gap-2"
@@ -238,7 +238,7 @@ const Tile = (props: Props) => {
                 disabled={isLoading() || isInQueue() || props.isDeleting}
               >
                 <div class="i-hugeicons:settings-01 h-4 w-4" />
-                {t("instance:_trn_action_settings")}
+                {t("instances:_trn_action_settings")}
               </ContextMenuItem>
               <ContextMenuItem
                 class="flex items-center gap-2"
@@ -257,8 +257,8 @@ const Tile = (props: Props) => {
                   }}
                 />
                 {props.instance.favorite
-                  ? t("instance:_trn_remove_favorite")
-                  : t("instance:_trn_add_favorite")}
+                  ? t("instances:_trn_remove_favorite")
+                  : t("instances:_trn_add_favorite")}
               </ContextMenuItem>
               <ContextMenuItem
                 class="flex items-center gap-2"
@@ -281,12 +281,12 @@ const Tile = (props: Props) => {
                 disabled={isLoading() || isInQueue() || props.isDeleting}
               >
                 <div class="i-hugeicons:file-export h-4 w-4" />
-                {t("instance:_trn_export_instance")}
+                {t("instances:_trn_export_instance")}
               </ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuSub>
                 <ContextMenuSubTrigger>
-                  {t("instance:_trn_more_options")}
+                  {t("instances:_trn_more_options")}
                 </ContextMenuSubTrigger>
                 <ContextMenuPortal>
                   <ContextMenuSubContent>
@@ -295,7 +295,7 @@ const Tile = (props: Props) => {
                       onClick={handleOpenFolder}
                     >
                       <div class="i-hugeicons:folder-open h-4 w-4" />
-                      {t("instance:_trn_action_open_folder")}
+                      {t("instances:_trn_action_open_folder")}
                     </ContextMenuItem>
                     <ContextMenuItem
                       class="flex items-center gap-2"
@@ -304,7 +304,7 @@ const Tile = (props: Props) => {
                       }}
                     >
                       <div class="i-hugeicons:file-script h-4 w-4" />
-                      {t("instance:_trn_view_logs")}
+                      {t("instances:_trn_view_logs")}
                     </ContextMenuItem>
                     <ContextMenuItem
                       class="flex items-center gap-2"
@@ -315,7 +315,7 @@ const Tile = (props: Props) => {
                       }}
                     >
                       <div class="i-hugeicons:puzzle h-4 w-4" />
-                      {t("instance:_trn_view_mods")}
+                      {t("instances:_trn_view_mods")}
                     </ContextMenuItem>
                     {!props.isInvalid && (
                       <ContextMenuItem
@@ -326,7 +326,7 @@ const Tile = (props: Props) => {
                         }
                       >
                         <div class="i-hugeicons:copy-01 h-4 w-4" />
-                        {t("instance:_trn_action_duplicate")}
+                        {t("instances:_trn_action_duplicate")}
                       </ContextMenuItem>
                     )}
                   </ContextMenuSubContent>
@@ -339,7 +339,7 @@ const Tile = (props: Props) => {
                 disabled={isLoading() || isInQueue() || props.isDeleting}
               >
                 <div class="i-hugeicons:delete-02 h-4 w-4" />
-                {t("instance:_trn_action_delete")}
+                {t("instances:_trn_action_delete")}
               </ContextMenuItem>
             </ContextMenuGroup>
           </ContextMenuContent>
@@ -414,7 +414,7 @@ const Tile = (props: Props) => {
                       />
                       <Show when={props.isInvalid}>
                         <h2 class="z-2 absolute left-0 top-0 text-center text-sm">
-                          <Trans key="instance:_trn_error_invalid" />
+                          <Trans key="instances:_trn_error_invalid" />
                         </h2>
                         <div class="z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-l from-black from-30% opacity-50" />
                         <div class="z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-t from-black opacity-50" />
@@ -519,10 +519,10 @@ const Tile = (props: Props) => {
                           <Spinner />
                           <span class="font-bold">
                             <Show when={props.isDeleting}>
-                              <Trans key="instance:_trn_isDeleting" />
+                              <Trans key="instances:_trn_isDeleting" />
                             </Show>
                             <Show when={isInQueue()}>
-                              <Trans key="instance:_trn_isInQueue" />
+                              <Trans key="instances:_trn_isInQueue" />
                             </Show>
                           </span>
                         </div>
@@ -658,7 +658,7 @@ const Tile = (props: Props) => {
                           <TooltipContent>
                             {copiedError()
                               ? t("notifications:_trn_copied_to_clipboard")
-                              : t("general:_trn_Copy")}
+                              : t("general:_trn_copy")}
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -733,7 +733,7 @@ const Tile = (props: Props) => {
                 >
                   <p class="text-lightSlate-50 m-0 text-center text-sm">
                     <Trans
-                      key="general:_trn_common.download_progress_mb"
+                      key="content:_trn_common.download_progress_mb"
                       options={{
                         downloaded: Math.round(props.downloaded || 0),
                         total: Math.round(props.totalDownload || 0)

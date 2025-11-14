@@ -87,7 +87,7 @@ const General = () => {
   return (
     <>
       <PageTitle>
-        <Trans key="settings:_trn_General" />
+        <Trans key="settings:_trn_general" />
       </PageTitle>
       <RowsContainer>
         <Row>

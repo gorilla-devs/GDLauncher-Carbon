@@ -80,7 +80,7 @@ const AppUpdate = (props: ModalProps) => {
         <div class="flex items-center text-xl">
           <div class="w-140">
             <Trans
-              key="mods:_trn_mods_updater.updating_mods_count"
+              key="content:_trn_mods_updater.updating_mods_count"
               options={{
                 mods: modsUpdated(),
                 total: data().mods.length
@@ -91,7 +91,7 @@ const AppUpdate = (props: ModalProps) => {
         </div>
         <div class="mt-20 flex flex-col items-center text-xl">
           <Trans
-            key="mods:_trn_mods_updater.updating_mod_text"
+            key="content:_trn_mods_updater.updating_mod_text"
             options={{
               mod_name: currentModName()
             }}

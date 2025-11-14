@@ -95,7 +95,7 @@ const ExploreVersionsNavbar = (props: Props) => {
 
   const getGameVersionLabel = (versionId: string | null | undefined) => {
     if (!versionId) {
-      return <Trans key="modloaders:_trn_minecraft_all_versions" />
+      return <Trans key="enums:_trn_minecraft_all_versions" />
     }
     const version = filteredGameVersions()?.find((v) => v.id === versionId)
     if (version) {
@@ -135,14 +135,14 @@ const ExploreVersionsNavbar = (props: Props) => {
                   checked={overrideEnabled()}
                   onChange={setOverrideEnabled}
                 />
-                <Trans key="instance:_trn_rowcontainer.override_filters" />
+                <Trans key="instances:_trn_rowcontainer.override_filters" />
               </div>
             </div>
           </div>
         </Match>
         <Match when={props.type === "mod" && instanceId() === null}>
           <div class="text-lightSlate-700 flex items-center">
-            <Trans key="instance:_trn_rowcontainer.no_instance_selected" />
+            <Trans key="instances:_trn_rowcontainer.no_instance_selected" />
           </div>
         </Match>
       </Switch>
@@ -154,7 +154,7 @@ const ExploreVersionsNavbar = (props: Props) => {
           placeholder={
             <div class="flex items-center gap-2">
               <div class="i-hugeicons:tag-01" />
-              <Trans key="modloaders:_trn_minecraft_all_versions" />
+              <Trans key="enums:_trn_minecraft_all_versions" />
             </div>
           }
           onChange={(val) => {
@@ -190,7 +190,7 @@ const ExploreVersionsNavbar = (props: Props) => {
             <div class="flex items-center gap-2">
               <div class="i-hugeicons:tag-01" />
               <span>
-                <Trans key="modloaders:_trn_modloader_all" />
+                <Trans key="enums:_trn_modloader_all" />
               </span>
             </div>
           }

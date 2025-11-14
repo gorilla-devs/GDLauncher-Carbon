@@ -73,7 +73,7 @@ const JavaProfileCreationModal = (props: ModalProps) => {
               modalsContext?.closeModal()
             }}
           >
-            <Trans key="instance:_trn_instance_confirm_deletion.cancel" />
+            <Trans key="instances:_trn_instance_confirm_deletion.cancel" />
           </Button>
           <Button
             disabled={

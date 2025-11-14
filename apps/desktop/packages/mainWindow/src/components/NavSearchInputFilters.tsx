@@ -161,7 +161,7 @@ export function SearchCategoryDropdown(_props: DropdownProps) {
             >
               <div class="flex items-center gap-2">
                 <img src={CurseforgeLogo} class="h-4 w-4" />
-                <Trans key="platforms:_trn_curseforge" />
+                <Trans key="enums:_trn_curseforge" />
               </div>
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
@@ -216,7 +216,7 @@ export function SearchCategoryDropdown(_props: DropdownProps) {
             >
               <div class="flex items-center gap-2">
                 <img src={ModrinthLogo} class="h-4 w-4" />
-                <Trans key="platforms:_trn_modrinth" />
+                <Trans key="enums:_trn_modrinth" />
               </div>
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
@@ -387,7 +387,7 @@ export function SearchModloaderDropdown(_props: DropdownProps) {
             when={filteredModloaders().length > 0}
             fallback={
               <div class="text-lightSlate-400 px-2 py-3 text-center text-sm">
-                <Trans key="general:_trn_common.no_modloaders_found" />
+                <Trans key="content:_trn_common.no_modloaders_found" />
               </div>
             }
           >
@@ -829,7 +829,7 @@ export function SearchGameVersionDropdown(_props: DropdownProps) {
             when={filteredVersions().length > 0}
             fallback={
               <div class="text-lightSlate-400 px-2 py-3 text-center text-sm">
-                <Trans key="general:_trn_common.no_versions_found" />
+                <Trans key="content:_trn_common.no_versions_found" />
               </div>
             }
           >

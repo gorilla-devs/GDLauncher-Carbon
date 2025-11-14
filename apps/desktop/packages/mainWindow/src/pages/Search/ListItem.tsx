@@ -116,7 +116,7 @@ export function ListItem(props: SearchResultItemProps) {
                   <Match when={props.isInstalled}>
                     <div class="flex items-center gap-2 text-xl font-bold text-green-500">
                       <div class="i-hugeicons:tick-02 text-xl" />
-                      <Trans key="instance:_trn_status_installed" />
+                      <Trans key="instances:_trn_status_installed" />
                     </div>
                   </Match>
                   <Match when={props.result.type === "modpack"}>

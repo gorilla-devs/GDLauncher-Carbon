@@ -177,7 +177,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
                     <span>{version?.name}</span>
                     <Show when={version?.isCurrent}>
                       <span class="text-green-500">
-                        <Trans key="instance:_trn_version_current" />
+                        <Trans key="instances:_trn_version_current" />
                       </span>
                     </Show>
                   </div>
@@ -195,7 +195,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
                       <span>{version?.name}</span>
                       <Show when={version?.isCurrent}>
                         <span class="text-green-500">
-                          <Trans key="instance:_trn_version_current" />
+                          <Trans key="instances:_trn_version_current" />
                         </span>
                       </Show>
                     </div>
@@ -213,14 +213,14 @@ const ModPackVersionUpdate = (props: ModalProps) => {
                 modalContext?.closeModal()
               }}
             >
-              {t("instance:_trn_cancel_export")}
+              {t("instances:_trn_cancel_export")}
             </Button>
             <Button
               type="primary"
               onClick={handleUpdate}
               disabled={!selectedVersion()}
             >
-              {t("instance:_trn_instance_modal_instance_update")}
+              {t("instances:_trn_instance_modal_instance_update")}
             </Button>
           </div>
         </Show>

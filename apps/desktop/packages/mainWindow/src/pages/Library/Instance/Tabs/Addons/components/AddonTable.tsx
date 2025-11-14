@@ -549,7 +549,7 @@ export const AddonTable = (props: AddonTableProps) => {
       }[] = [
         {
           type: "item",
-          label: t("instance:_trn_copy_name"),
+          label: t("content:_trn_copy_name"),
           action: () => {
             navigator.clipboard.writeText(displayName)
             toast.success(t("notifications:_trn_copied_to_clipboard"))
@@ -561,8 +561,8 @@ export const AddonTable = (props: AddonTableProps) => {
         {
           type: "item",
           label: mod.enabled
-            ? t("instance:_trn_disable_mod")
-            : t("instance:_trn_enable_mod"),
+            ? t("content:_trn_disable_mod")
+            : t("content:_trn_enable_mod"),
           action: async () => {
             if (props.mutations) {
               await props.mutations.handleToggleMod(mod)
@@ -579,7 +579,7 @@ export const AddonTable = (props: AddonTableProps) => {
       if (mod.has_update) {
         items.push({
           type: "item",
-          label: t("instance:_trn_update_mod"),
+          label: t("content:_trn_update_mod"),
           action: async () => {
             if (props.mutations) {
               await props.mutations.handleUpdateMod(mod)
@@ -595,7 +595,7 @@ export const AddonTable = (props: AddonTableProps) => {
         { type: "separator" },
         {
           type: "item",
-          label: t("instance:_trn_view_details"),
+          label: t("content:_trn_view_details"),
           action: () => {
             modalsContext?.openModal(
               {
@@ -612,7 +612,7 @@ export const AddonTable = (props: AddonTableProps) => {
         },
         {
           type: "item",
-          label: t("instance:_trn_open_folder"),
+          label: t("instances:_trn_open_folder"),
           action: () => {
             if (props.mutations) {
               props.mutations.handleOpenFolder()
@@ -628,13 +628,13 @@ export const AddonTable = (props: AddonTableProps) => {
         if (mod.curseforge && mod.modrinth) {
           items.push({
             type: "submenu",
-            label: t("instance:_trn_view_on_platform"),
+            label: t("content:_trn_view_on_platform"),
             icon: "i-hugeicons:link-square-02",
             id: "platform",
             children: [
               {
                 type: "item",
-                label: t("instance:_trn_view_on_curseforge"),
+                label: t("content:_trn_view_on_curseforge"),
                 action: () => {
                   const slug = mod.curseforge!.urlslug
                   window.open(
@@ -647,7 +647,7 @@ export const AddonTable = (props: AddonTableProps) => {
               },
               {
                 type: "item",
-                label: t("instance:_trn_view_on_modrinth"),
+                label: t("content:_trn_view_on_modrinth"),
                 action: () => {
                   window.open(
                     `https://modrinth.com/mod/${mod.modrinth!.project_id}`,
@@ -690,7 +690,7 @@ export const AddonTable = (props: AddonTableProps) => {
       // Add delete item at the end with extra separator for spacing
       const deleteItem = {
         type: "item" as const,
-        label: t("instance:_trn_delete_mod"),
+        label: t("content:_trn_delete_mod"),
         action: async () => {
           if (props.mutations) {
             await props.mutations.handleDeleteMod(mod)
@@ -735,7 +735,7 @@ export const AddonTable = (props: AddonTableProps) => {
       }[] = [
         {
           type: "item",
-          label: t("instance:_trn_selected_count", { count: selectedCount }),
+          label: t("content:_trn_selected_count", { count: selectedCount }),
           disabled: true,
           id: "header"
         },
@@ -745,7 +745,7 @@ export const AddonTable = (props: AddonTableProps) => {
       if (!allEnabled) {
         items.push({
           type: "item",
-          label: t("instance:_trn_enable_all"),
+          label: t("content:_trn_enable_all"),
           action: async () => {
             if (props.mutations) {
               await Promise.all(
@@ -764,7 +764,7 @@ export const AddonTable = (props: AddonTableProps) => {
       if (!allDisabled) {
         items.push({
           type: "item",
-          label: t("instance:_trn_disable_all"),
+          label: t("content:_trn_disable_all"),
           action: async () => {
             if (props.mutations) {
               await Promise.all(
@@ -785,7 +785,7 @@ export const AddonTable = (props: AddonTableProps) => {
       if (hasUpdates) {
         items.push({
           type: "item",
-          label: t("instance:_trn_update_selected"),
+          label: t("content:_trn_update_selected"),
           action: async () => {
             if (props.mutations) {
               await props.mutations.handleUpdateSelected(mods)
@@ -801,7 +801,7 @@ export const AddonTable = (props: AddonTableProps) => {
         { type: "separator" },
         {
           type: "item",
-          label: t("instance:_trn_delete_selected"),
+          label: t("content:_trn_delete_selected"),
           action: async () => {
             if (props.mutations) {
               await props.mutations.handleDeleteSelected(mods)

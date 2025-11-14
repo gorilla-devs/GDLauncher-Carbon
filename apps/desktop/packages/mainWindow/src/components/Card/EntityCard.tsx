@@ -31,7 +31,7 @@ const EntityCard = (props: EntityCardProps) => {
       {/* <div class={`${props.icon} text-red-400 text-5xl`}></div> */}
       {/* absolute left-0 right-0 text-center ml-auto mr-auto top-[30%] */}
       <Show when={!props.entity.supported}>
-        <span class="font-bold text-teal-600">{t("tracking:_trn_SOON")}</span>
+        <span class="font-bold text-teal-600">{t("tracking:_trn_soon")}</span>
       </Show>
       <div class="relative">
         <img

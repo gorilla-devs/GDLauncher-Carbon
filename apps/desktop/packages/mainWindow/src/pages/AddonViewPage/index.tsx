@@ -239,7 +239,7 @@ const AddonExplore = () => {
               size="small"
               type="secondary"
             >
-              <Trans key="instance:_trn_step_back" />
+              <Trans key="instances:_trn_step_back" />
             </Button>
             <Tooltip>
               <TooltipTrigger>
@@ -263,7 +263,7 @@ const AddonExplore = () => {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <Trans key="instance:_trn_open_in_browser" />
+                <Trans key="content:_trn_open_in_browser" />
               </TooltipContent>
             </Tooltip>
           </div>
@@ -394,7 +394,7 @@ const AddonExplore = () => {
                       type="secondary"
                     >
                       <div class="i-hugeicons:arrow-left-01 text-2xl h-6 w-6" />
-                      <Trans key="instance:_trn_step_back" />
+                      <Trans key="instances:_trn_step_back" />
                     </Button>
                   </div>
                   <div

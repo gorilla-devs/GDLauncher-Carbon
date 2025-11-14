@@ -132,14 +132,14 @@ const AuthorAvatars = (props: AuthorAvatarsProps) => {
             <Show when={author.role}>
               <div class="text-lightSlate-400 text-xs">
                 <Trans
-                  key="addons:_trn_author_role"
+                  key="content:_trn_author_role"
                   options={{ role: author.role }}
                 />
               </div>
             </Show>
             <Show when={author.platform === "modrinth" && author.url}>
               <div class="text-xs text-blue-400">
-                <Trans key="addons:_trn_author_click_to_view" />
+                <Trans key="content:_trn_author_click_to_view" />
               </div>
             </Show>
           </div>

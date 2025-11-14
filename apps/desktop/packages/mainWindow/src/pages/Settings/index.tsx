@@ -19,17 +19,17 @@ function Settings() {
 
   const settings: settingsItem[] = [
     {
-      name: t("settings:_trn_General"),
+      name: t("settings:_trn_general"),
       icon: "i-hugeicons:home-05",
       path: "/settings"
     },
     {
-      name: t("settings:_trn_Accounts"),
+      name: t("accounts:_trn_accounts"),
       icon: "i-hugeicons:user-account",
       path: "/settings/accounts"
     },
     {
-      name: t("settings:_trn_Language"),
+      name: t("settings:_trn_language"),
       icon: "i-hugeicons:globe",
       path: "/settings/language"
     },
@@ -46,7 +46,7 @@ function Settings() {
       path: "/settings/appearance"
     },
     {
-      name: t("settings:_trn_Java"),
+      name: t("settings:_trn_java"),
       icon: "i-hugeicons:java",
       path: "/settings/java"
     },
@@ -56,12 +56,12 @@ function Settings() {
       path: "/settings/custom-commands"
     },
     {
-      name: t("settings:_trn_Privacy"),
+      name: t("settings:_trn_privacy"),
       icon: "i-hugeicons:security-lock",
       path: "/settings/privacy"
     },
     {
-      name: t("settings:_trn_runtime_path"),
+      name: t("java:_trn_runtime_path"),
       icon: "i-hugeicons:folder-01",
       path: "/settings/runtime-path"
     }

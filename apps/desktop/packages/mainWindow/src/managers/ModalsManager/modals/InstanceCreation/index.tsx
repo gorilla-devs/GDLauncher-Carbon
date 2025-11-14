@@ -33,13 +33,13 @@ const InstanceCreation = (props: ModalProps) => {
                 <Tab class="w-1/2" centerContent>
                   <div class="flex items-center gap-2">
                     <div class="i-hugeicons:add-01" />
-                    <Trans key="instance:_trn_instance_creation_custom_tab" />
+                    <Trans key="instances:_trn_instance_creation_custom_tab" />
                   </div>
                 </Tab>
                 <Tab class="w-1/2" centerContent>
                   <div class="flex items-center gap-2">
                     <div class="i-hugeicons:upload-01" />
-                    <Trans key="instance:_trn_instance_import_tab" />
+                    <Trans key="instances:_trn_instance_import_tab" />
                   </div>
                 </Tab>
               </TabList>

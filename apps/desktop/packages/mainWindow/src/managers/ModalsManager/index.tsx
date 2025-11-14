@@ -133,11 +133,11 @@ const getDefaultModals = (t: TypedTFunction) => ({
   },
   platformSelection: {
     component: lazy(() => import("./modals/PlatformSelection")),
-    title: t("instance:_trn_select_platform")
+    title: t("instances:_trn_select_platform")
   },
   duplicatedModsResolution: {
     component: lazy(() => import("./modals/DuplicatedModsResolution")),
-    title: t("instance:_trn_duplicated_mods_detected")
+    title: t("content:_trn_duplicated_mods_detected")
   }
 })
 

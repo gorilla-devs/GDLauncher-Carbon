@@ -297,11 +297,11 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     label: string
     key: CFFEModLoaderType | undefined
   }[] = [
-    { label: t("instance:_trn_vanilla"), key: undefined },
-    { label: t("instance:_trn_forge"), key: "forge" },
-    { label: t("instance:_trn_neoforge"), key: "neoforge" },
-    { label: t("instance:_trn_fabric"), key: "fabric" },
-    { label: t("instance:_trn_quilt"), key: "quilt" }
+    { label: t("instances:_trn_vanilla"), key: undefined },
+    { label: t("instances:_trn_forge"), key: "forge" },
+    { label: t("instances:_trn_neoforge"), key: "neoforge" },
+    { label: t("instances:_trn_fabric"), key: "fabric" },
+    { label: t("instances:_trn_quilt"), key: "quilt" }
   ]
 
   const defaultGroup = rspc.createQuery(() => ({
@@ -540,7 +540,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                   <div class="flex flex-col items-center gap-0.5">
                     <div class="i-hugeicons:image-01 text-lightSlate-600 group-hover:text-lightSlate-400 transition-colors text-2xl" />
                     <span class="text-lightSlate-600 group-hover:text-lightSlate-400 text-[10px] transition-colors">
-                      <Trans key="instance:_trn_add_icon" />
+                      <Trans key="instances:_trn_add_icon" />
                     </span>
                   </div>
                 </Match>
@@ -560,12 +560,12 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             </div>
             <div class="flex flex-1 flex-col gap-2">
               <label class="text-lightSlate-400 text-xs font-medium">
-                <Trans key="instance:_trn_instance_name" />
+                <Trans key="instances:_trn_instance_name" />
               </label>
               <Input
                 class="w-full"
                 required
-                placeholder={t("instance:_trn_new_instance")}
+                placeholder={t("instances:_trn_new_instance")}
                 inputColor="bg-darkSlate-800"
                 onInput={(e) => {
                   setCustomTitle(e.currentTarget.value)
@@ -587,7 +587,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
             <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
               <div class="i-hugeicons:minecraft text-primary-500 text-sm" />
-              <Trans key="instance:_trn_instance_mc_version" />
+              <Trans key="instances:_trn_instance_mc_version" />
             </span>
             <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
           </div>
@@ -695,7 +695,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 <div class="flex items-center gap-1">
                   <div class="i-hugeicons:test-tube text-xs" />
                   <span>
-                    <Trans key="instance:_trn_version_type_snapshot" />
+                    <Trans key="instances:_trn_version_type_snapshot" />
                   </span>
                 </div>
               </Badge>
@@ -710,7 +710,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 <div class="flex items-center gap-1">
                   <div class="i-hugeicons:alpha text-xs" />
                   <span>
-                    <Trans key="instance:_trn_version_type_alpha" />
+                    <Trans key="instances:_trn_version_type_alpha" />
                   </span>
                 </div>
               </Badge>
@@ -723,7 +723,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 <div class="flex items-center gap-1">
                   <div class="i-hugeicons:beta text-xs" />
                   <span>
-                    <Trans key="instance:_trn_version_type_beta" />
+                    <Trans key="instances:_trn_version_type_beta" />
                   </span>
                 </div>
               </Badge>
@@ -737,7 +737,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
             <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
               <div class="i-hugeicons:package text-primary-500 text-sm" />
-              <Trans key="general:_trn_modloader" />
+              <Trans key="content:_trn_modloader" />
             </span>
             <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
           </div>
@@ -779,7 +779,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
           <Show when={loader()}>
             <div class="border-primary-500/30 flex flex-col gap-2 border-l-2 pl-4">
               <label class="text-lightSlate-400 text-xs font-medium">
-                <Trans key="instance:_trn_instance_loader_version" />
+                <Trans key="instances:_trn_instance_loader_version" />
               </label>
               <Switch>
                 <Match
@@ -833,7 +833,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                     <div class="i-hugeicons:alert-circle text-yellow-500" />
                     <span>
                       <Trans
-                        key="instance:_trn_no_versions_for_mc"
+                        key="instances:_trn_no_versions_for_mc"
                         options={{ version: mcVersion() }}
                       />
                     </span>
@@ -865,7 +865,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
               <div class="flex items-center gap-1.5">
                 <div class="i-hugeicons:add-01" />
                 <Trans
-                  key="instance:_trn_instance_modal_instance_creation_create"
+                  key="instances:_trn_instance_modal_instance_creation_create"
                   options={{
                     defaultValue: "Create"
                   }}
@@ -875,7 +875,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             <Match when={instanceData()}>
               <div class="flex items-center gap-1.5">
                 <div class="i-hugeicons:pencil-edit-01" />
-                <Trans key="instance:_trn_instance_modal_instance_update" />
+                <Trans key="instances:_trn_instance_modal_instance_update" />
               </div>
             </Match>
           </Switch>

@@ -20,7 +20,7 @@ const Privacy = () => {
   return (
     <>
       <PageTitle>
-        <Trans key="settings:_trn_Privacy" />
+        <Trans key="settings:_trn_privacy" />
       </PageTitle>
       <RowsContainer>
         <Row>

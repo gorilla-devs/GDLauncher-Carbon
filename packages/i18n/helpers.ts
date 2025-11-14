@@ -6,8 +6,8 @@
  */
 
 import type {
-  InstanceKeys,
-  PlatformsKeys,
+  InstancesKeys,
+  EnumsKeys,
   SettingsKeys,
   ErrorsKeys,
   TasksKeys,
@@ -21,57 +21,57 @@ import { supportedLanguages } from "./index"
 type SupportedLanguageCode = keyof typeof supportedLanguages
 
 /**
- * Maps AddonType enum values to instance:tabs.* translation keys
+ * Maps AddonType enum values to content:tabs.* translation keys
  * @param addonType - The addon type (mods, resourcepacks, shaders, datapacks, worlds)
  * @returns The fully qualified translation key
  */
 export function getAddonTabKey(
   addonType: "mods" | "resourcepacks" | "shaders" | "datapacks" | "worlds"
 ):
-  | "instance:_trn_tabs.mods"
-  | "instance:_trn_tabs.resourcepacks"
-  | "instance:_trn_tabs.shaders"
-  | "instance:_trn_tabs.datapacks"
-  | "instance:_trn_tabs.worlds" {
+  | "content:_trn_tabs.mods"
+  | "content:_trn_tabs.resourcepacks"
+  | "content:_trn_tabs.shaders"
+  | "content:_trn_tabs.datapacks"
+  | "content:_trn_tabs.worlds" {
   const keyMap = {
-    mods: "instance:_trn_tabs.mods",
-    resourcepacks: "instance:_trn_tabs.resourcepacks",
-    shaders: "instance:_trn_tabs.shaders",
-    datapacks: "instance:_trn_tabs.datapacks",
-    worlds: "instance:_trn_tabs.worlds"
+    mods: "content:_trn_tabs.mods",
+    resourcepacks: "content:_trn_tabs.resourcepacks",
+    shaders: "content:_trn_tabs.shaders",
+    datapacks: "content:_trn_tabs.datapacks",
+    worlds: "content:_trn_tabs.worlds"
   } as const
 
   return keyMap[addonType]
 }
 
 /**
- * Maps platform names to platforms:* translation keys
+ * Maps platform names to enums:* translation keys
  * @param platform - The platform name (curseforge or modrinth)
  * @returns The fully qualified translation key
  */
 export function getPlatformKey(
   platform: "curseforge" | "modrinth"
-): "platforms:_trn_curseforge" | "platforms:_trn_modrinth" {
+): "enums:_trn_curseforge" | "enums:_trn_modrinth" {
   const keyMap = {
-    curseforge: "platforms:_trn_curseforge",
-    modrinth: "platforms:_trn_modrinth"
+    curseforge: "enums:_trn_curseforge",
+    modrinth: "enums:_trn_modrinth"
   } as const
 
   return keyMap[platform]
 }
 
 /**
- * Maps platform names to instance:view_on_* translation keys
+ * Maps platform names to content:view_on_* translation keys
  * Used for context menu items when viewing mods on different platforms
  * @param platform - The platform name (curseforge or modrinth)
  * @returns The fully qualified translation key
  */
 export function getViewOnKey(
   platform: "curseforge" | "modrinth"
-): "instance:_trn_view_on_curseforge" | "instance:_trn_view_on_modrinth" {
+): "content:_trn_view_on_curseforge" | "content:_trn_view_on_modrinth" {
   const keyMap = {
-    curseforge: "instance:_trn_view_on_curseforge",
-    modrinth: "instance:_trn_view_on_modrinth"
+    curseforge: "content:_trn_view_on_curseforge",
+    modrinth: "content:_trn_view_on_modrinth"
   } as const
 
   return keyMap[platform]
@@ -187,32 +187,32 @@ export function getLanguageNativeKey(
 export function getTaskTranslationKey(taskType: string): NamespacedTranslationKey {
   const mapping: Record<string, NamespacedTranslationKey> = {
     // Instance tasks - only include ones with actual translations
-    'InstanceTaskLaunch': 'tasks:_trn_InstanceTaskLaunch',
-    'InstanceTaskPrepare': 'tasks:_trn_InstanceTaskPrepare',
-    'InstanceTaskLaunchRequestVersions': 'tasks:_trn_InstanceTaskLaunchRequestVersions',
-    'InstanceTaskLaunchRequestModpack': 'tasks:_trn_InstanceTaskLaunchRequestModpack',
-    'InstanceTaskLaunchDownloadModpack': 'tasks:_trn_InstanceTaskLaunchDownloadModpack',
-    'InstanceTaskLaunchDownloadModpackFiles': 'tasks:_trn_InstanceTaskLaunchDownloadModpackFiles',
-    'InstanceTaskLaunchExtractModpackFiles': 'tasks:_trn_InstanceTaskLaunchExtractModpackFiles',
-    'InstanceTaskLaunchRequestAddonMetadata': 'tasks:_trn_InstanceTaskLaunchRequestAddonMetadata',
-    'InstanceTaskLaunchApplyStagedPatches': 'tasks:_trn_InstanceTaskLaunchApplyStagedPatches',
-    'InstanceTaskLaunchDownloadJava': 'tasks:_trn_InstanceTaskLaunchDownloadJava',
-    'InstanceTaskLaunchExtractJava': 'tasks:_trn_InstanceTaskLaunchExtractJava',
-    'InstanceTaskRequestModloaderInfo': 'tasks:_trn_InstanceTaskRequestModloaderInfo',
-    'InstanceTaskRequestMinecraftFiles': 'tasks:_trn_InstanceTaskRequestMinecraftFiles',
-    'InstanceTaskLaunchCheckingFiles': 'tasks:_trn_InstanceTaskLaunchCheckingFiles',
-    'InstanceTaskLaunchDownloadFiles': 'tasks:_trn_InstanceTaskLaunchDownloadFiles',
-    'InstanceTaskGeneratingPackInfo': 'tasks:_trn_InstanceTaskGeneratingPackInfo',
-    'InstanceTaskFillCache': 'tasks:_trn_InstanceTaskFillCache',
-    'InstanceTaskLaunchExtractNatives': 'tasks:_trn_InstanceTaskLaunchExtractNatives',
-    'InstanceTaskReconstructAssets': 'tasks:_trn_InstanceTaskReconstructAssets',
-    'InstanceTaskLaunchRunForgeProcessors': 'tasks:_trn_InstanceTaskLaunchRunForgeProcessors',
-    'InstanceTaskLaunchRunNeoforgeProcessors': 'tasks:_trn_InstanceTaskLaunchRunNeoforgeProcessors',
-    'InstanceTaskInstallMod': 'tasks:_trn_InstanceTaskInstallMod',
-    'InstanceTaskLaunchInstallJava': 'tasks:_trn_InstanceTaskLaunchInstallJava',
-    'FinalizingImport': 'tasks:_trn_FinalizingImport',
-    'InstanceTaskLaunchWaiting': 'tasks:_trn_InstanceTaskLaunchWaiting',
+    'InstanceTaskLaunch': 'tasks:_trn_instance_task_launch',
+    'InstanceTaskPrepare': 'tasks:_trn_instance_task_prepare',
+    'InstanceTaskLaunchRequestVersions': 'tasks:_trn_instance_task_launch_request_versions',
+    'InstanceTaskLaunchRequestModpack': 'tasks:_trn_instance_task_launch_request_modpack',
+    'InstanceTaskLaunchDownloadModpack': 'tasks:_trn_instance_task_launch_download_modpack',
+    'InstanceTaskLaunchDownloadModpackFiles': 'tasks:_trn_instance_task_launch_download_modpack_files',
+    'InstanceTaskLaunchExtractModpackFiles': 'tasks:_trn_instance_task_launch_extract_modpack_files',
+    'InstanceTaskLaunchRequestAddonMetadata': 'tasks:_trn_instance_task_launch_request_addon_metadata',
+    'InstanceTaskLaunchApplyStagedPatches': 'tasks:_trn_instance_task_launch_apply_staged_patches',
+    'InstanceTaskLaunchDownloadJava': 'tasks:_trn_instance_task_launch_download_java',
+    'InstanceTaskLaunchExtractJava': 'tasks:_trn_instance_task_launch_extract_java',
+    'InstanceTaskRequestModloaderInfo': 'tasks:_trn_instance_task_request_modloader_info',
+    'InstanceTaskRequestMinecraftFiles': 'tasks:_trn_instance_task_request_minecraft_files',
+    'InstanceTaskLaunchCheckingFiles': 'tasks:_trn_instance_task_launch_checking_files',
+    'InstanceTaskLaunchDownloadFiles': 'tasks:_trn_instance_task_launch_download_files',
+    'InstanceTaskGeneratingPackInfo': 'tasks:_trn_instance_task_generating_pack_info',
+    'InstanceTaskFillCache': 'tasks:_trn_instance_task_fill_cache',
+    'InstanceTaskLaunchExtractNatives': 'tasks:_trn_instance_task_launch_extract_natives',
+    'InstanceTaskReconstructAssets': 'tasks:_trn_instance_task_reconstruct_assets',
+    'InstanceTaskLaunchRunForgeProcessors': 'tasks:_trn_instance_task_launch_run_forge_processors',
+    'InstanceTaskLaunchRunNeoforgeProcessors': 'tasks:_trn_instance_task_launch_run_neoforge_processors',
+    'InstanceTaskInstallMod': 'tasks:_trn_instance_task_install_mod',
+    'InstanceTaskLaunchInstallJava': 'tasks:_trn_instance_task_launch_install_java',
+    'FinalizingImport': 'tasks:_trn_finalizing_import',
+    'InstanceTaskLaunchWaiting': 'tasks:_trn_instance_task_launch_waiting',
   }
   // Default to a valid key if type isn't mapped
-  return mapping[taskType] ?? ('tasks:_trn_InstanceTaskPrepare' as NamespacedTranslationKey)
+  return mapping[taskType] ?? ('tasks:_trn_instance_task_prepare' as NamespacedTranslationKey)
 }

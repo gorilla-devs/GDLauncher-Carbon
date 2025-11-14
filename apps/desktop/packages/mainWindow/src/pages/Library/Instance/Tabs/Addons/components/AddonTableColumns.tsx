@@ -140,7 +140,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
 
     // Filename column
     columnHelper.accessor("filename", {
-      header: t("instance:_trn_table.filename"),
+      header: t("content:_trn_table.filename"),
       sortingFn: (rowA, rowB) => {
         const modA = rowA.original
         const modB = rowB.original
@@ -198,7 +198,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
                 <div class="i-hugeicons:alert-01 text-lg text-yellow-500" />
               </TooltipTrigger>
               <TooltipContent>
-                <Trans key="instance:_trn_duplicate_mod_warning" />
+                <Trans key="content:_trn_duplicate_mod_warning" />
               </TooltipContent>
             </Tooltip>
           </Show>
@@ -210,7 +210,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
     // Type column
     columnHelper.display({
       id: "type",
-      header: t("instance:_trn_table.type"),
+      header: t("content:_trn_table.type"),
       size: 104,
       cell: (props) => {
         const mod = props.row.original
@@ -228,7 +228,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
     // Platform column
     columnHelper.display({
       id: "platform",
-      header: t("instance:_trn_table.platform"),
+      header: t("content:_trn_table.platform"),
       size: 78,
       cell: (props) => {
         const mod = props.row.original
@@ -243,7 +243,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
               <TooltipTrigger>
                 <div class="i-hugeicons:folder-01 text-lg text-gray-500" />
               </TooltipTrigger>
-              <TooltipContent>{t("instance:_trn_table.local")}</TooltipContent>
+              <TooltipContent>{t("content:_trn_table.local")}</TooltipContent>
             </Tooltip>
           )
         }
@@ -275,11 +275,11 @@ export const createAddonColumns = (config: ColumnConfig) => {
                   <img
                     src={CurseforgeLogo}
                     class="h-full w-full"
-                    alt={t("platforms:_trn_curseforge")}
+                    alt={t("enums:_trn_curseforge")}
                   />
                 </div>
               </TooltipTrigger>
-              <TooltipContent>{t("platforms:_trn_curseforge")}</TooltipContent>
+              <TooltipContent>{t("enums:_trn_curseforge")}</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger>
@@ -287,11 +287,11 @@ export const createAddonColumns = (config: ColumnConfig) => {
                   <img
                     src={ModrinthLogo}
                     class="h-full w-full"
-                    alt={t("platforms:_trn_modrinth")}
+                    alt={t("enums:_trn_modrinth")}
                   />
                 </div>
               </TooltipTrigger>
-              <TooltipContent>{t("platforms:_trn_modrinth")}</TooltipContent>
+              <TooltipContent>{t("enums:_trn_modrinth")}</TooltipContent>
             </Tooltip>
           </div>
         )
@@ -300,7 +300,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
 
     // Update Available column
     columnHelper.accessor("has_update", {
-      header: t("instance:_trn_table.update"),
+      header: t("content:_trn_table.update"),
       size: 80,
       cell: (props) => {
         const mod = props.row.original
@@ -341,13 +341,13 @@ export const createAddonColumns = (config: ColumnConfig) => {
                   fallback={
                     <Show
                       when={isUpdating()}
-                      fallback={<Trans key="instance:_trn_update_mod" />}
+                      fallback={<Trans key="content:_trn_update_mod" />}
                     >
                       <Trans key="general:_trn_updating" />
                     </Show>
                   }
                 >
-                  <Trans key="instance:_trn_locked_cannot_apply_changes" />
+                  <Trans key="instances:_trn_locked_cannot_apply_changes" />
                 </Show>
               </TooltipContent>
             </Tooltip>
@@ -358,7 +358,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
 
     // Status/Enable column
     columnHelper.accessor("enabled", {
-      header: t("instance:_trn_table.status"),
+      header: t("content:_trn_table.status"),
       size: 100,
       cell: (props) => {
         const mod = props.row.original
@@ -371,7 +371,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
                   <Switch checked={props.getValue()} disabled />
                 </TooltipTrigger>
                 <TooltipContent>
-                  <Trans key="instance:_trn_locked_cannot_apply_changes" />
+                  <Trans key="instances:_trn_locked_cannot_apply_changes" />
                 </TooltipContent>
               </Tooltip>
             }
@@ -390,7 +390,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
     // Actions column
     columnHelper.display({
       id: "actions",
-      header: t("instance:_trn_table.actions"),
+      header: t("content:_trn_table.actions"),
       size: 80,
       cell: (props) => {
         const mod = props.row.original
@@ -410,7 +410,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
                   />
                 </TooltipTrigger>
                 <TooltipContent>
-                  <Trans key="instance:_trn_switch_version" />
+                  <Trans key="instances:_trn_switch_version" />
                 </TooltipContent>
               </Tooltip>
             </div>

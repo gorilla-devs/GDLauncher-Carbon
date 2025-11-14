@@ -1,0 +1,22 @@
+{
+  "_trn_minecraft_all_versions": "Tutte le Versioni",
+  "_trn_modloader_Any": "Qualsiasi modloader",
+  "_trn_modloader_cauldron": "Cauldron",
+  "_trn_modloader_liteLoader": "LiteLoader",
+  "_trn_modloader_quilt": "Quilt",
+  "_trn_modloader_forge": "Forge",
+  "_trn_modloader_fabric": "Fabric",
+  "_trn_modloader_all": "Tutti i modloader",
+  "_trn_curseforge": "CurseForge",
+  "_trn_modrinth": "Modrinth",
+  "_trn_entity.legacygdlauncher": "GDLauncher legacy",
+  "_trn_entity.mrpack": "MRpack",
+  "_trn_entity.modrinth": "Modrinth",
+  "_trn_entity.curseforgezip": "CurseForge Zip",
+  "_trn_entity.curseforge": "CurseForge",
+  "_trn_entity.ftb": "FTB",
+  "_trn_entity.multimc": "MultiMC",
+  "_trn_entity.technic": "Technic",
+  "_trn_entity.atlauncher": "ATLauncher",
+  "_trn_entity.prismlauncher": "PrismLauncher"
+}

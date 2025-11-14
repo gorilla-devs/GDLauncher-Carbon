@@ -95,7 +95,7 @@ const HomeGrid = () => {
     if (globalStore.settings.data?.instancesGroupBy === "group") {
       _groups.favorites = {
         id: -1,
-        name: t("general:_trn_favorites"),
+        name: t("instances:_trn_favorites"),
         instances: []
       }
     }
@@ -231,11 +231,11 @@ const HomeGrid = () => {
       })
     } else {
       iterable.sort((a, b) => {
-        if (a.name === t("general:_trn_favorites")) {
+        if (a.name === t("instances:_trn_favorites")) {
           return -1
         }
 
-        if (b.name === t("general:_trn_favorites")) {
+        if (b.name === t("instances:_trn_favorites")) {
           return 1
         }
 
@@ -260,27 +260,27 @@ const HomeGrid = () => {
   }[] = [
     {
       key: "name",
-      label: t("general:_trn_name")
+      label: t("ui:_trn_name")
     },
     {
       key: "mostPlayed",
-      label: t("general:_trn_most_played")
+      label: t("ui:_trn_most_played")
     },
     {
       key: "lastPlayed",
-      label: t("general:_trn_last_played")
+      label: t("ui:_trn_last_played")
     },
     {
       key: "lastUpdated",
-      label: t("general:_trn_last_updated")
+      label: t("ui:_trn_last_updated")
     },
     {
       key: "gameVersion",
-      label: t("general:_trn_game_version")
+      label: t("ui:_trn_game_version")
     },
     {
       key: "created",
-      label: t("general:_trn_created")
+      label: t("ui:_trn_created")
     }
   ]
 
@@ -290,19 +290,19 @@ const HomeGrid = () => {
   }[] = [
     {
       key: "group",
-      label: t("general:_trn_group")
+      label: t("ui:_trn_group")
     },
     {
       key: "gameVersion",
-      label: t("general:_trn_game_version")
+      label: t("ui:_trn_game_version")
     },
     {
       key: "modloader",
-      label: t("general:_trn_modloader")
+      label: t("ui:_trn_modloader")
     },
     {
       key: "modplatform",
-      label: t("general:_trn_modplatform")
+      label: t("content:_trn_modplatform")
     }
   ]
 
@@ -327,7 +327,7 @@ const HomeGrid = () => {
               variant="Welcoming Gorilla - Open Arms"
             />
             <p class="text-lightSlate-700 max-w-100 text-center">
-              <Trans key="instance:_trn_no_instances_text" />
+              <Trans key="instances:_trn_no_instances_text" />
             </p>
           </div>
         </Match>
@@ -372,7 +372,7 @@ const HomeGrid = () => {
                   <DropdownMenuLabel>
                     <div class="flex items-center justify-between gap-2">
                       <div>
-                        <Trans key="general:_trn_platform" />
+                        <Trans key="content:_trn_platform" />
                       </div>
                       <div
                         class="text-lightSlate-900 hover:text-lightSlate-50 text-xs transition-colors duration-200 ease-[cubic-bezier(.4,0,.2,1)]"
@@ -388,7 +388,7 @@ const HomeGrid = () => {
                           setInstancesTileSize(2)
                         }}
                       >
-                        <Trans key="general:_trn_reset_filters" />
+                        <Trans key="instances:_trn_reset_filters" />
                       </div>
                     </div>
                   </DropdownMenuLabel>
@@ -398,7 +398,7 @@ const HomeGrid = () => {
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger class="w-full">
                         <div class="flex w-full items-center justify-between">
-                          <Trans key="general:_trn_instance_tile_size" />
+                          <Trans key="instances:_trn_instance_tile_size" />
                           <div class="flex items-center gap-2">
                             <span>{instancesTileSize()}</span>
                           </div>
@@ -437,7 +437,7 @@ const HomeGrid = () => {
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger class="w-full">
                         <div class="flex w-full items-center justify-between">
-                          <Trans key="general:_trn_sort_by" />
+                          <Trans key="search:_trn_sort_by" />
                           <div class="flex items-center gap-2">
                             <span>
                               {sortByOptions.find(
@@ -516,7 +516,7 @@ const HomeGrid = () => {
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger class="w-full">
                         <div class="flex w-full items-center justify-between">
-                          <Trans key="general:_trn_group_by" />
+                          <Trans key="search:_trn_group_by" />
                           <div class="flex items-center gap-2">
                             <span>
                               {groupByOptions.find(

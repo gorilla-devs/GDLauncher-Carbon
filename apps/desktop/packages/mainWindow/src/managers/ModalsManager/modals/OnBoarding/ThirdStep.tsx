@@ -72,7 +72,7 @@ const ThirdStep = (props: Props) => {
                 <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
                 <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
                   <div class="i-hugeicons:rocket-02 text-primary-500 text-sm" />
-                  <Trans key="instance:_trn_import_instance" />
+                  <Trans key="instances:_trn_import_instance" />
                 </span>
                 <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
               </div>

@@ -32,7 +32,7 @@ const Appearance = () => {
     <LoadingError routeData={routeData}>
       <div class="w-full">
         <PageTitle>
-          <Trans key="settings:_trn_Appearance" />
+          <Trans key="settings:_trn_appearance" />
         </PageTitle>
         <Row forceContentBelow class="border-box w-full max-w-full">
           <Title

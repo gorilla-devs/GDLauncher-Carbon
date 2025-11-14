@@ -140,7 +140,7 @@ const NoResourcePacks = () => {
         />
         <p class="text-lightSlate-700 max-w-100">
           <Trans
-            key="instance:_trn_no_resource_packs_text"
+            key="content:_trn_no_resource_packs_text"
             options={{
               defaultValue:
                 "At the moment this modpack does not contain resource packs, but you can add packs yourself from your folder"
@@ -149,7 +149,7 @@ const NoResourcePacks = () => {
         </p>
         <Button type="outline" size="medium">
           <Trans
-            key="instance:_trn_add_resource_pack"
+            key="content:_trn_add_resource_pack"
             options={{
               defaultValue: "+ Add pack"
             }}
@@ -175,7 +175,7 @@ const ResourcePacks = () => {
           <div class="flex items-center gap-3">
             <p class="text-lightSlate-700">
               <Trans
-                key="instance:_trn_sort_by"
+                key="content:_trn_sort_by"
                 options={{
                   defaultValue: "Sort by:"
                 }}
@@ -187,8 +187,8 @@ const ResourcePacks = () => {
               itemComponent={(props) => (
                 <SelectItem item={props.item}>
                   {props.item.rawValue === "asc"
-                    ? t("instance:_trn_sort_by_asc")
-                    : t("instance:_trn_sort_by_desc")}
+                    ? t("content:_trn_sort_by_asc")
+                    : t("content:_trn_sort_by_desc")}
                 </SelectItem>
               )}
             >
@@ -196,8 +196,8 @@ const ResourcePacks = () => {
                 <SelectValue<string>>
                   {(state) =>
                     state.selectedOption() === "asc"
-                      ? t("instance:_trn_sort_by_asc")
-                      : t("instance:_trn_sort_by_desc")
+                      ? t("content:_trn_sort_by_asc")
+                      : t("content:_trn_sort_by_desc")
                   }
                 </SelectValue>
               </SelectTrigger>
@@ -206,7 +206,7 @@ const ResourcePacks = () => {
           </div>
           <Button type="outline" size="medium">
             <Trans
-              key="instance:_trn_add_resource_pack_pack"
+              key="content:_trn_add_resource_pack"
               options={{
                 defaultValue: "+ Add ResourcePack"
               }}
@@ -218,7 +218,7 @@ const ResourcePacks = () => {
             <div class="flex cursor-pointer items-center gap-2">
               <Checkbox checked={true} disabled={false} />
               <Trans
-                key="instance:_trn_select_all_resource_pack"
+                key="content:_trn_select_all_resource_pack"
                 options={{
                   defaultValue: "Select All"
                 }}
@@ -227,7 +227,7 @@ const ResourcePacks = () => {
             <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
               <div class="i-hugeicons:folder-open text-2xl" />
               <Trans
-                key="instance:_trn_open_resource_packs_folder"
+                key="content:_trn_open_resource_packs_folder"
                 options={{
                   defaultValue: "Open folder"
                 }}
@@ -236,7 +236,7 @@ const ResourcePacks = () => {
             <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
               <div class="i-hugeicons:unavailable text-2xl" />
               <Trans
-                key="instance:_trn_disable_resource_pack"
+                key="content:_trn_disable_resource_pack"
                 options={{
                   defaultValue: "disable"
                 }}
@@ -245,7 +245,7 @@ const ResourcePacks = () => {
             <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
               <div class="i-hugeicons:delete-02 text-2xl" />
               <Trans
-                key="instance:_trn_delete_resource_pack"
+                key="content:_trn_delete_resource_pack"
                 options={{
                   defaultValue: "delete"
                 }}
@@ -255,7 +255,7 @@ const ResourcePacks = () => {
           <div>
             {resourcePacks.length}
             <Trans
-              key="instance:_trn_resource_packs"
+              key="content:_trn_resource_packs"
               options={{
                 defaultValue: "Resource packs"
               }}
