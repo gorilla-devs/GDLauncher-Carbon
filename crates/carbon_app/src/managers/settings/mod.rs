@@ -15,6 +15,7 @@ pub(crate) struct SettingsManager {
     pub runtime_path: carbon_rt_path::RuntimePath,
     pub terms_and_privacy: TermsAndPrivacy,
     pub gdl_base_api_url: String,
+    pub latest_consent_checksum: Option<String>,
 }
 
 impl SettingsManager {
@@ -22,11 +23,13 @@ impl SettingsManager {
         runtime_path: PathBuf,
         http_client: ClientWithMiddleware,
         gdl_base_api_url: String,
+        latest_consent_checksum: Option<String>,
     ) -> Self {
         Self {
             runtime_path: carbon_rt_path::RuntimePath::new(runtime_path),
             terms_and_privacy: TermsAndPrivacy::new(http_client, gdl_base_api_url.clone()),
             gdl_base_api_url,
+            latest_consent_checksum,
         }
     }
 }
@@ -312,15 +315,20 @@ impl ManagerRef<'_, SettingsManager> {
                 )],
             ));
 
-            let latest_consent_sha =
-                TermsAndPrivacy::get_latest_consent_sha(self.gdl_base_api_url.clone()).await?;
+            // We default to empty value in case our APIs fail so we don't block the user.
+            // We are gonna ask again on next run anyway once the APIs are back up
+            let latest_consent_sha = self
+                .latest_consent_checksum
+                .as_ref()
+                .map(|v| v.to_string())
+                .unwrap_or_default();
 
             queries.push(self.app.prisma_client.app_configuration().update(
                 app_configuration::id::equals(0),
                 vec![
                     app_configuration::terms_and_privacy_accepted::set(true),
                     app_configuration::terms_and_privacy_accepted_checksum::set(Some(
-                        latest_consent_sha.to_string(),
+                        latest_consent_sha,
                     )),
                 ],
             ));

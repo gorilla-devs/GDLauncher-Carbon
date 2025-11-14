@@ -53,6 +53,7 @@ mod app {
         api::{CoreModuleStatus, update_core_module_status},
         cache_middleware, domain,
         iridium_client::get_client,
+        managers::{prisma_client::DatabaseError, settings::terms_and_privacy::TermsAndPrivacy},
     };
 
     use self::java::{
@@ -100,16 +101,24 @@ mod app {
             runtime_path: PathBuf,
             gdl_base_api: String,
         ) -> App {
-            let db_client =
-                match prisma_client::load_and_migrate(runtime_path.clone(), gdl_base_api.clone())
+            let latest_tos_privacy_checksum =
+                TermsAndPrivacy::get_latest_consent_sha(&gdl_base_api)
                     .await
-                {
-                    Ok(client) => Arc::new(client),
-                    Err(e) => {
-                        error!("Database migration failed: {}", e);
-                        panic!("Database migration failed: {}", e);
-                    }
-                };
+                    .map_err(DatabaseError::TermsAndPrivacy)
+                    .ok();
+
+            let db_client = match prisma_client::load_and_migrate(
+                runtime_path.clone(),
+                latest_tos_privacy_checksum.clone(),
+            )
+            .await
+            {
+                Ok(client) => Arc::new(client),
+                Err(e) => {
+                    error!("Database migration failed: {}", e);
+                    panic!("Database migration failed: {}", e);
+                }
+            };
 
             update_core_module_status(CoreModuleStatus::LoadAndMigrate);
 
@@ -128,6 +137,7 @@ mod app {
                         runtime_path,
                         http_client.clone(),
                         gdl_base_api.clone(),
+                        latest_tos_privacy_checksum,
                     ),
                     java_manager: JavaManager::new(),
                     minecraft_manager: MinecraftManager::new(),
