@@ -17,7 +17,7 @@ function Settings() {
   const navigator = useGDNavigate()
   const [t] = useTransContext()
 
-  const settings: settingsItem[] = [
+  const settings = (): settingsItem[] => [
     {
       name: t("settings:_trn_general"),
       icon: "i-hugeicons:home-05",
@@ -73,13 +73,13 @@ function Settings() {
         <div class="sticky top-0 z-50 box-border w-full px-6">
           <Tabs
             orientation="horizontal"
-            defaultIndex={settings.findIndex(
+            defaultIndex={settings().findIndex(
               (item) => item.path === location.pathname
             )}
           >
             <div class="h-26">
               <TabList>
-                <For each={settings}>
+                <For each={settings()}>
                   {(item) => (
                     <Tab
                       onClick={() => {

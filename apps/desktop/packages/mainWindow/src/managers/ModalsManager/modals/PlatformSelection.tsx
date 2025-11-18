@@ -1,7 +1,7 @@
 import { Button } from "@gd/ui"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
-import { useTransContext } from "@gd/i18n"
+import { Trans, useTransContext } from "@gd/i18n"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import { FEUnifiedPlatform } from "@gd/core_module/bindings"
@@ -29,9 +29,12 @@ const PlatformSelection = (props: ModalProps) => {
     >
       <div class="flex w-96 flex-col gap-4">
         <p class="text-lightSlate-400">
-          {t("instances:_trn_select_platform_description", {
-            modName: data().modName
-          })}
+          <Trans
+            key="instances:_trn_select_platform_description"
+            options={{
+              modName: data().modName
+            }}
+          />
         </p>
 
         <div class="mt-4 flex flex-col gap-3">

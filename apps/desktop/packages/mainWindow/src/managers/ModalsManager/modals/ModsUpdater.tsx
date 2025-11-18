@@ -1,4 +1,4 @@
-import { Progress, toast } from "@gd/ui"
+import { Progress, toast, Spinner } from "@gd/ui"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
 import { Trans } from "@gd/i18n"
@@ -14,7 +14,7 @@ interface Props {
   onComplete?: () => void
 }
 
-const AppUpdate = (props: ModalProps) => {
+const ModsUpdater = (props: ModalProps) => {
   const data: () => Props = () => props?.data
   const modalsContext = useModal()
   const [modsUpdated, setModsUpdated] = createSignal(0)
@@ -96,11 +96,13 @@ const AppUpdate = (props: ModalProps) => {
               mod_name: currentModName()
             }}
           />
-          <div class="i-hugeicons:loading-03 mt-10 animate-spin text-6xl" />
+          <div class="mt-10">
+            <Spinner class="h-10 w-10" />
+          </div>
         </div>
       </div>
     </ModalLayout>
   )
 }
 
-export default AppUpdate
+export default ModsUpdater

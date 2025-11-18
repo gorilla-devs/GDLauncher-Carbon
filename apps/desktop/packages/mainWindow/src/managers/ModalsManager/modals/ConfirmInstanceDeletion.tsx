@@ -44,9 +44,7 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
         <div class="h-h-full">
           <Trans
             key="instances:_trn_instance_confirm_deletion.confirmation_text"
-            options={{
-              instance_name: props.data?.name
-            }}
+            options={{ instance_name: props.data?.name }}
           >
             {""}
             <span class="font-bold" />

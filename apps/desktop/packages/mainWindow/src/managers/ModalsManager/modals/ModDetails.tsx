@@ -11,7 +11,7 @@ import {
   TooltipTrigger,
   TooltipContent
 } from "@gd/ui"
-import { ModalProps } from ".."
+import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
 import { Mod as ModType } from "@gd/core_module/bindings"
 import CopyIcon from "@/components/CopyIcon"
@@ -19,6 +19,7 @@ import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import { rspc } from "@/utils/rspcClient"
 import { getModImageUrl } from "@/utils/instances"
+import { useGDNavigate } from "@/managers/NavigationManager"
 
 interface ModDetailsProps extends ModalProps {
   data: {
@@ -29,6 +30,8 @@ interface ModDetailsProps extends ModalProps {
 
 const ModDetails: Component<ModDetailsProps> = (props) => {
   const [t] = useTransContext()
+  const navigator = useGDNavigate()
+  const modalsContext = useModal()
   const [selectedTab, setSelectedTab] = createSignal(0)
   const [modDescription, setModDescription] = createSignal("")
   const [_isLoadingDescription, setIsLoadingDescription] = createSignal(false)
@@ -95,7 +98,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
     return null
   }
 
-  const tabs = [
+  const tabs = () => [
     { label: t("modals:_trn_mod_details.overview") },
     { label: t("modals:_trn_mod_details.technical") }
   ]
@@ -205,7 +208,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
         {/* Tabs */}
         <Tabs index={selectedTab()} onChange={setSelectedTab}>
           <TabList>
-            <For each={tabs}>{(tab) => <Tab>{tab.label}</Tab>}</For>
+            <For each={tabs()}>{(tab) => <Tab>{tab.label}</Tab>}</For>
           </TabList>
         </Tabs>
 
@@ -238,37 +241,88 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                 </div>
               </Show>
 
-              <div class="flex gap-4">
+              <div class="flex flex-col gap-4">
                 <Show when={mod().curseforge}>
-                  <Button
-                    size="small"
-                    type="secondary"
-                    onClick={() => {
-                      const slug = mod().curseforge!.urlslug
-                      window.open(
-                        `https://www.curseforge.com/minecraft/mc-mods/${slug}`,
-                        "_blank"
-                      )
-                    }}
-                  >
-                    <div class="i-hugeicons:link-square-02" />
-                    {t("modals:_trn_mod_details.view_on_curseforge")}
-                  </Button>
+                  <div class="flex flex-col gap-2">
+                    <div class="flex items-center gap-2">
+                      <img
+                        src={CurseforgeLogo}
+                        class="h-4 w-4"
+                        alt="CurseForge"
+                      />
+                      <span class="text-sm font-semibold">
+                        {t("content:_trn_view_on_curseforge")}
+                      </span>
+                    </div>
+                    <div class="flex gap-2">
+                      <Button
+                        size="small"
+                        type="secondary"
+                        onClick={() => {
+                          const projectId = mod().curseforge!.project_id
+                          navigator.navigate(`/addon/${projectId}/curseforge`)
+                          modalsContext.closeModal()
+                        }}
+                      >
+                        <div class="i-hugeicons:dashboard-square-01" />
+                        {t("content:_trn_open_in_app")}
+                      </Button>
+                      <Button
+                        size="small"
+                        type="secondary"
+                        onClick={() => {
+                          const slug = mod().curseforge!.urlslug
+                          window.open(
+                            `https://www.curseforge.com/minecraft/mc-mods/${slug}`,
+                            "_blank"
+                          )
+                        }}
+                      >
+                        <div class="i-hugeicons:link-square-02" />
+                        {t("content:_trn_open_in_browser")}
+                      </Button>
+                    </div>
+                  </div>
                 </Show>
                 <Show when={mod().modrinth}>
-                  <Button
-                    size="small"
-                    type="secondary"
-                    onClick={() => {
-                      window.open(
-                        `https://modrinth.com/mod/${mod().modrinth!.project_id}`,
-                        "_blank"
-                      )
-                    }}
-                  >
-                    <div class="i-hugeicons:link-square-02" />
-                    {t("modals:_trn_mod_details.view_on_modrinth")}
-                  </Button>
+                  <div class="flex flex-col gap-2">
+                    <div class="flex items-center gap-2">
+                      <img
+                        src={ModrinthLogo}
+                        class="h-4 w-4"
+                        alt="Modrinth"
+                      />
+                      <span class="text-sm font-semibold">
+                        {t("content:_trn_view_on_modrinth")}
+                      </span>
+                    </div>
+                    <div class="flex gap-2">
+                      <Button
+                        size="small"
+                        type="secondary"
+                        onClick={() => {
+                          navigator.navigate(`/addon/${mod().modrinth!.project_id}/modrinth`)
+                          modalsContext.closeModal()
+                        }}
+                      >
+                        <div class="i-hugeicons:dashboard-square-01" />
+                        {t("content:_trn_open_in_app")}
+                      </Button>
+                      <Button
+                        size="small"
+                        type="secondary"
+                        onClick={() => {
+                          window.open(
+                            `https://modrinth.com/mod/${mod().modrinth!.project_id}`,
+                            "_blank"
+                          )
+                        }}
+                      >
+                        <div class="i-hugeicons:link-square-02" />
+                        {t("content:_trn_open_in_browser")}
+                      </Button>
+                    </div>
+                  </div>
                 </Show>
               </div>
             </div>

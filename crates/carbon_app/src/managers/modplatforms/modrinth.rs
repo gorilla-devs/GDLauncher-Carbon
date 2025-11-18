@@ -463,7 +463,7 @@ mod test {
             .await?;
         tracing::debug!("Project: {:?}", result);
         assert!(result.id == "u6dRKJwZ");
-        assert!(result.title == "Just Enough Items");
+        assert!(result.title == "Just Enough Items (JEI)");
         Ok(())
     }
 

@@ -286,22 +286,9 @@ const General = () => {
         </Row>
         <Row>
           <Title
-            description={
-              <Trans
-                key="settings:_trn_discord_integration_text"
-                options={{
-                  defaultValue:
-                    "Enable or disable discord integration. This display what are you playing in discord"
-                }}
-              />
-            }
+            description={<Trans key="settings:_trn_discord_integration_text" />}
           >
-            <Trans
-              key="settings:_trn_discord_integration_title"
-              options={{
-                defaultValue: "Discord Integration"
-              }}
-            />
+            <Trans key="settings:_trn_discord_integration_title" />
           </Title>
           <RightHandSide>
             <Switch

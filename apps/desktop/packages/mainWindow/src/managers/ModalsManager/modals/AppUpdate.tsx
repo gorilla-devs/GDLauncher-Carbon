@@ -94,9 +94,7 @@ const AppUpdate = (props: ModalProps) => {
                 <Match when={updateProgress() !== 0}>
                   <Trans
                     key="app:_trn_app_update.downloading"
-                    options={{
-                      progress: Math.round(updateProgress())
-                    }}
+                    options={{ progress: Math.round(updateProgress()) }}
                   />
                 </Match>
               </Switch>

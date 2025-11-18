@@ -148,8 +148,8 @@ const theme = {
         "{ 0% { opacity: 0; transform: scaleY(0.95) translateY(-2.5%); } 100% { opacity: 1; transform: scaleY(1) translateY(0); } }",
       searchbarLeave:
         "{ 0% { opacity: 1; transform: scaleY(1) translateY(0); } 100% { opacity: 0; transform: scaleY(0.95) translateY(-2.5%); } }",
-      logoReveal: `{ 
-        0% { 
+      logoReveal: `{
+        0% {
           clip-path: polygon(0 0, 0 0, 0 100%, 0 100%);
           transform: scale(1.1);
           opacity: 0;
@@ -167,12 +167,14 @@ const theme = {
         85% {
           transform: scale(0.95);
         }
-        100% { 
+        100% {
           transform: scale(1);
           opacity: 1;
           clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);
         }
-      }`
+      }`,
+      modalEnter:
+        "{ 0% { opacity: 0; transform: scale(0.9); } 100% { opacity: 1; transform: scale(1); } }"
     },
 
     durations: {
@@ -189,7 +191,8 @@ const theme = {
       selectLeave: "150ms",
       searchbarEnter: "200ms",
       searchbarLeave: "150ms",
-      logoReveal: "1.3s"
+      logoReveal: "1.3s",
+      modalEnter: "300ms"
     },
     timingFns: {
       loadingbar: "cubic-bezier(.4,0,.2,1)",
@@ -205,7 +208,8 @@ const theme = {
       selectLeave: "cubic-bezier(.4,0,.2,1)",
       searchbarEnter: "cubic-bezier(.4,0,.2,1)",
       searchbarLeave: "cubic-bezier(.4,0,.2,1)",
-      logoReveal: "cubic-bezier(0.22, 1, 0.36, 1)"
+      logoReveal: "cubic-bezier(0.22, 1, 0.36, 1)",
+      modalEnter: "cubic-bezier(0.34, 1.56, 0.64, 1)"
     },
     counts: {
       loadingbar: "infinite",
@@ -219,7 +223,8 @@ const theme = {
       selectLeave: "forwards",
       searchbarEnter: "forwards",
       searchbarLeave: "forwards",
-      logoReveal: "forwards"
+      logoReveal: "forwards",
+      modalEnter: "forwards"
     }
   },
   screens: {

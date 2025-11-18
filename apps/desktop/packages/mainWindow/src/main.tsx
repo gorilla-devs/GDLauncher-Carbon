@@ -15,7 +15,7 @@ import {
 import { createAsyncEffect } from "@/utils/asyncEffect"
 import { Router, hashIntegration } from "@solidjs/router"
 import initRspc, { rspc, queryClient } from "@/utils/rspcClient"
-import { i18n, TransProvider, icu, loadLanguageFiles } from "@gd/i18n"
+import { i18n, TransProvider, loadLanguageFiles } from "@gd/i18n"
 import App from "@/app"
 import { ModalProvider } from "@/managers/ModalsManager"
 import "virtual:uno.css"
@@ -209,10 +209,13 @@ interface TransWrapperProps {
   isBackendReady: boolean
 }
 
-const _i18nInstance = i18n.use(icu).createInstance()
+// Use global i18n instance instead of creating a new one
+// This prevents TransProvider from trying to reinitialize
+const _i18nInstance = i18n
 
 const TransWrapper = (props: TransWrapperProps) => {
   const [isI18nReady, setIsI18nReady] = createSignal(false)
+  const [i18nOptions, setI18nOptions] = createSignal<any>(null)
   // const rspcContext = rspc.useContext();
 
   // onMount(async () => {
@@ -244,51 +247,57 @@ const TransWrapper = (props: TransWrapperProps) => {
     queryKey: ["settings.getSettings"]
   }))
 
-  createAsyncEffect<string>((isStale, prevLanguage) => {
+  createAsyncEffect((isStale, prevLanguage) => {
     if (settings.isSuccess) {
       const { language } = settings.data
 
-      if (!_i18nInstance.isInitialized) {
-        const currentLanguage = language
-
-        const initI18n = async () => {
-          let maybeEnglish = null
-          if (currentLanguage !== "english") {
-            maybeEnglish = await loadLanguageFiles("english")
-          }
-
-          // Check if language hasn't changed during async load
-          if (isStale()) {
-            return
-          }
-
-          const defaultNamespacesMap = await loadLanguageFiles(currentLanguage)
-
-          // Check again after second async load
-          if (isStale()) {
-            return
-          }
-
-          await _i18nInstance.init({
-            ns: Object.keys(defaultNamespacesMap),
-            defaultNS: "general",
-            lng: currentLanguage,
-            fallbackLng: "english",
-            resources: {
-              [currentLanguage]: defaultNamespacesMap,
-              ...(maybeEnglish && { english: maybeEnglish })
-            },
-            partialBundledLanguages: true,
-            debug: true
-          })
-
-          setIsI18nReady(true)
+      // Step 1: Always load English as fallback
+      loadLanguageFiles("english").then((englishResources) => {
+        if (isStale()) {
+          return
         }
 
-        initI18n()
-      }
+        // Step 2: Load target language resources
+        const resources: any = { english: englishResources }
 
-      return language
+        if (language !== "english") {
+          loadLanguageFiles(language).then((targetResources) => {
+            if (isStale()) {
+              return
+            }
+
+            resources[language] = targetResources
+
+            // Step 3: Build initialization options for TransProvider
+            const options = {
+              ns: Object.keys(englishResources),
+              defaultNS: "general",
+              lng: language,
+              fallbackLng: "english",
+              resources,
+              partialBundledLanguages: true,
+              react: { useSuspense: false }
+            }
+
+            setI18nOptions(options)
+            setIsI18nReady(true)
+          })
+        } else {
+          // Step 3: Build initialization options for TransProvider
+          const options = {
+            ns: Object.keys(englishResources),
+            defaultNS: "general",
+            lng: language,
+            fallbackLng: "english",
+            resources,
+            partialBundledLanguages: true,
+            react: { useSuspense: false }
+          }
+
+          setI18nOptions(options)
+          setIsI18nReady(true)
+        }
+      })
     }
 
     return prevLanguage
@@ -309,8 +318,8 @@ const TransWrapper = (props: TransWrapperProps) => {
   })
 
   return (
-    <Show when={!settings.isInitialLoading && isI18nReady()}>
-      <TransProvider instance={_i18nInstance}>
+    <Show when={!settings.isInitialLoading && isI18nReady() && i18nOptions()}>
+      <TransProvider instance={_i18nInstance} options={i18nOptions()}>
         <BackendReadyContext.Provider value={props.isBackendReady}>
           <Router source={hashIntegration()}>
             <GlobalStoreProvider>

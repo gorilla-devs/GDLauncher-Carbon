@@ -369,14 +369,14 @@ const AddonExplore = () => {
       </div>
       <div class="bg-darkSlate-800 sticky">
         <div class="flex justify-center px-6 py-0">
-          <div class="bg-darkSlate-800 w-full">
+          <div class="bg-darkSlate-800 flex-1">
             <div
               ref={(el) => {
                 refStickyTabs = el
               }}
               class="bg-darkSlate-800 sticky top-0 z-30 flex flex-col pb-0"
             >
-              <div class="mb-4 flex h-14 w-full items-center justify-between">
+              <div class="mb-4 flex h-14 items-center justify-between">
                 <div class="flex h-full items-center">
                   <div
                     class="mr-4 origin-left transition-transform duration-100 ease-in-out"

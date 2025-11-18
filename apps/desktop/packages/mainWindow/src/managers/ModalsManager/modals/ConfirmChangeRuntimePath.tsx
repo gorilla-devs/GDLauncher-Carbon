@@ -151,17 +151,13 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                     <Match when={RTprogress()?.action === "copy"}>
                       <Trans
                         key="java:_trn_copying_file"
-                        options={{
-                          file: RTprogress()?.currentName
-                        }}
+                        options={{ file: RTprogress()?.currentName }}
                       />
                     </Match>
                     <Match when={RTprogress()?.action === "remove"}>
                       <Trans
                         key="java:_trn_removing_file"
-                        options={{
-                          file: RTprogress()?.currentName
-                        }}
+                        options={{ file: RTprogress()?.currentName }}
                       />
                     </Match>
                   </Switch>

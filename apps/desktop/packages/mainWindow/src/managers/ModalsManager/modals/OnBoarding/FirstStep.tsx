@@ -27,9 +27,7 @@ const FirstStep = (props: Props) => {
         <pre class="text-lightSlate-700 max-w-140 whitespace-pre-line text-left text-xs leading-5 lg:text-base">
           <Trans
             key="onboarding:_trn_welcome_gdlauncher_text"
-            options={{
-              user: currentAccount?.username
-            }}
+            options={{ user: currentAccount?.username || "there" }}
           />
         </pre>
       </div>

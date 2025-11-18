@@ -157,7 +157,7 @@ const HeroFeatureCard = (props: HeroFeatureCardProps) => {
 
         {/* Media Section */}
         <Show when={props.entry.media}>
-          <div class="relative overflow-hidden rounded-xl p-6">
+          <div class="relative overflow-hidden rounded-xl p-6 flex items-center">
             <div class="relative aspect-[4/3] w-full">
               {/* Loading skeleton - absolute positioned as background */}
               <Show when={!mediaLoaded()}>

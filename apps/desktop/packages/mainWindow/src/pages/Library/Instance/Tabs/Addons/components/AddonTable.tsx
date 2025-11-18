@@ -36,6 +36,7 @@ import { getViewOnKey } from "@gd/i18n/helpers"
 import { Mod as ModType } from "@gd/core_module/bindings"
 import { toast } from "@gd/ui"
 import { useModal } from "@/managers/ModalsManager"
+import { useGDNavigate } from "@/managers/NavigationManager"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 
@@ -123,6 +124,7 @@ class RowHeightCache {
 export const AddonTable = (props: AddonTableProps) => {
   const [t] = useTransContext()
   const modalsContext = useModal()
+  const navigator = useGDNavigate()
   const [scrollTop, setScrollTop] = createSignal(0)
   const [containerHeight, setContainerHeight] = createSignal(window.innerHeight)
   let tableRef: HTMLDivElement | undefined
@@ -505,6 +507,7 @@ export const AddonTable = (props: AddonTableProps) => {
     label?: string
     action?: () => void
     icon?: string
+    rightIcon?: string
     id?: string
     destructive?: boolean
     disabled?: boolean
@@ -513,6 +516,7 @@ export const AddonTable = (props: AddonTableProps) => {
       label?: string
       action?: () => void
       icon?: string
+      rightIcon?: string
       id?: string
       destructive?: boolean
       disabled?: boolean
@@ -624,7 +628,7 @@ export const AddonTable = (props: AddonTableProps) => {
       )
 
       if (mod.curseforge || mod.modrinth) {
-        // If both platforms exist, show them as a submenu
+        // If both platforms exist, show them as a submenu with flattened items
         if (mod.curseforge && mod.modrinth) {
           items.push({
             type: "submenu",
@@ -634,7 +638,17 @@ export const AddonTable = (props: AddonTableProps) => {
             children: [
               {
                 type: "item",
-                label: t("content:_trn_view_on_curseforge"),
+                label: t("content:_trn_curseforge_open_in_app"),
+                action: () => {
+                  const projectId = mod.curseforge!.project_id
+                  navigator.navigate(`/addon/${projectId}/curseforge`)
+                },
+                icon: "curseforge",
+                id: "platform-curseforge-app"
+              },
+              {
+                type: "item",
+                label: t("content:_trn_curseforge_open_in_browser"),
                 action: () => {
                   const slug = mod.curseforge!.urlslug
                   window.open(
@@ -643,11 +657,22 @@ export const AddonTable = (props: AddonTableProps) => {
                   )
                 },
                 icon: "curseforge",
-                id: "platform-curseforge"
+                rightIcon: "i-hugeicons:link-square-02",
+                id: "platform-curseforge-browser"
+              },
+              { type: "separator" },
+              {
+                type: "item",
+                label: t("content:_trn_modrinth_open_in_app"),
+                action: () => {
+                  navigator.navigate(`/addon/${mod.modrinth!.project_id}/modrinth`)
+                },
+                icon: "modrinth",
+                id: "platform-modrinth-app"
               },
               {
                 type: "item",
-                label: t("content:_trn_view_on_modrinth"),
+                label: t("content:_trn_modrinth_open_in_browser"),
                 action: () => {
                   window.open(
                     `https://modrinth.com/mod/${mod.modrinth!.project_id}`,
@@ -655,32 +680,56 @@ export const AddonTable = (props: AddonTableProps) => {
                   )
                 },
                 icon: "modrinth",
-                id: "platform-modrinth"
+                rightIcon: "i-hugeicons:link-square-02",
+                id: "platform-modrinth-browser"
               }
             ]
           })
         } else {
-          // Single platform
+          // Single platform - create submenu with both options
           const platformName = mod.curseforge ? "curseforge" : "modrinth"
           items.push({
-            type: "item",
+            type: "submenu",
             label: t(getViewOnKey(platformName)),
-            action: () => {
-              if (mod.curseforge) {
-                const slug = mod.curseforge.urlslug
-                window.open(
-                  `https://www.curseforge.com/minecraft/mc-mods/${slug}`,
-                  "_blank"
-                )
-              } else if (mod.modrinth) {
-                window.open(
-                  `https://modrinth.com/mod/${mod.modrinth.project_id}`,
-                  "_blank"
-                )
-              }
-            },
             icon: platformName,
-            id: "platform"
+            id: "platform",
+            children: [
+              {
+                type: "item",
+                label: t("content:_trn_open_in_app"),
+                action: () => {
+                  if (mod.curseforge) {
+                    const projectId = mod.curseforge.project_id
+                    navigator.navigate(`/addon/${projectId}/curseforge`)
+                  } else if (mod.modrinth) {
+                    navigator.navigate(`/addon/${mod.modrinth.project_id}/modrinth`)
+                  }
+                },
+                icon: "i-hugeicons:dashboard-square-01",
+                id: "platform-app"
+              },
+              {
+                type: "item",
+                label: t("content:_trn_open_in_browser"),
+                action: () => {
+                  if (mod.curseforge) {
+                    const slug = mod.curseforge.urlslug
+                    window.open(
+                      `https://www.curseforge.com/minecraft/mc-mods/${slug}`,
+                      "_blank"
+                    )
+                  } else if (mod.modrinth) {
+                    window.open(
+                      `https://modrinth.com/mod/${mod.modrinth.project_id}`,
+                      "_blank"
+                    )
+                  }
+                },
+                icon: "i-hugeicons:dashboard-square-01",
+                rightIcon: "i-hugeicons:link-square-02",
+                id: "platform-browser"
+              }
+            ]
           })
         }
       }
@@ -1148,33 +1197,38 @@ export const AddonTable = (props: AddonTableProps) => {
                           }
                           onSelect={item.action}
                         >
-                          <div class="flex items-center gap-2">
-                            <Show when={item.icon}>
-                              <Show
-                                when={item.icon === "curseforge"}
-                                fallback={
-                                  <Show
-                                    when={item.icon === "modrinth"}
-                                    fallback={
-                                      <div class={`${item.icon} h-4 w-4`} />
-                                    }
-                                  >
-                                    <img
-                                      src={ModrinthLogo}
-                                      class="h-4 w-4"
-                                      alt="Modrinth"
-                                    />
-                                  </Show>
-                                }
-                              >
-                                <img
-                                  src={CurseforgeLogo}
-                                  class="h-4 w-4"
-                                  alt="CurseForge"
-                                />
+                          <div class="flex items-center justify-between gap-2 flex-1">
+                            <div class="flex items-center gap-2">
+                              <Show when={item.icon}>
+                                <Show
+                                  when={item.icon === "curseforge"}
+                                  fallback={
+                                    <Show
+                                      when={item.icon === "modrinth"}
+                                      fallback={
+                                        <div class={`${item.icon} h-4 w-4`} />
+                                      }
+                                    >
+                                      <img
+                                        src={ModrinthLogo}
+                                        class="h-4 w-4"
+                                        alt="Modrinth"
+                                      />
+                                    </Show>
+                                  }
+                                >
+                                  <img
+                                    src={CurseforgeLogo}
+                                    class="h-4 w-4"
+                                    alt="CurseForge"
+                                  />
+                                </Show>
                               </Show>
+                              <span>{item.label}</span>
+                            </div>
+                            <Show when={item.rightIcon}>
+                              <div class={`${item.rightIcon} h-4 w-4 text-lightSlate-500`} />
                             </Show>
-                            <span>{item.label}</span>
                           </div>
                         </ContextMenuItem>
                       )
@@ -1190,7 +1244,7 @@ export const AddonTable = (props: AddonTableProps) => {
                         </div>
                       </ContextMenuSubTrigger>
                       <ContextMenuPortal>
-                        <ContextMenuSubContent class="z-[210]">
+                        <ContextMenuSubContent>
                           <For each={item.children || []}>
                             {(child) => (
                               <Show
@@ -1205,35 +1259,40 @@ export const AddonTable = (props: AddonTableProps) => {
                                     }
                                     onSelect={child.action}
                                   >
-                                    <div class="flex items-center gap-2">
-                                      <Show when={child.icon}>
-                                        <Show
-                                          when={child.icon === "curseforge"}
-                                          fallback={
-                                            <Show
-                                              when={child.icon === "modrinth"}
-                                              fallback={
-                                                <div
-                                                  class={`${child.icon} h-4 w-4`}
+                                    <div class="flex items-center justify-between gap-2 flex-1">
+                                      <div class="flex items-center gap-2">
+                                        <Show when={child.icon}>
+                                          <Show
+                                            when={child.icon === "curseforge"}
+                                            fallback={
+                                              <Show
+                                                when={child.icon === "modrinth"}
+                                                fallback={
+                                                  <div
+                                                    class={`${child.icon} h-4 w-4`}
+                                                  />
+                                                }
+                                              >
+                                                <img
+                                                  src={ModrinthLogo}
+                                                  class="h-4 w-4"
+                                                  alt="Modrinth"
                                                 />
-                                              }
-                                            >
-                                              <img
-                                                src={ModrinthLogo}
-                                                class="h-4 w-4"
-                                                alt="Modrinth"
-                                              />
-                                            </Show>
-                                          }
-                                        >
-                                          <img
-                                            src={CurseforgeLogo}
-                                            class="h-4 w-4"
-                                            alt="CurseForge"
-                                          />
+                                              </Show>
+                                            }
+                                          >
+                                            <img
+                                              src={CurseforgeLogo}
+                                              class="h-4 w-4"
+                                              alt="CurseForge"
+                                            />
+                                          </Show>
                                         </Show>
+                                        <span>{child.label}</span>
+                                      </div>
+                                      <Show when={child.rightIcon}>
+                                        <div class={`${child.rightIcon} h-4 w-4 text-lightSlate-500`} />
                                       </Show>
-                                      <span>{child.label}</span>
                                     </div>
                                   </ContextMenuItem>
                                 }

@@ -11,7 +11,7 @@ import languagesData from "./languages.json" with { type: "json" }
 
 export const supportedLanguages = {
   english: "united-states",
-  japanese: "japan"
+  italian: "italy"
 }
 
 type NamespacesMap = {
@@ -136,7 +136,6 @@ export const useTransContext = (): [
 
 export { TransProvider }
 export { default as i18n } from "i18next"
-export { default as icu } from "i18next-icu"
 export { loadLanguageFiles }
 
 // Export generated types for advanced use cases

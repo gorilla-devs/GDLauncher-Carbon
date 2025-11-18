@@ -2,7 +2,7 @@ import { screen, Display } from "electron"
 import os from "os"
 
 // Ad Configuration
-const USE_HIGH_IMPACT_AD = false
+const USE_HIGH_IMPACT_AD = true
 
 const AD_SIZES = {
   STANDARD: { width: 400, height: 600 },

@@ -8,11 +8,12 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 
 export function FilterBadgesBar() {
   const isSearchPage = useMatch(() => "/search/*")
+  const isAddonViewPage = useMatch(() => "/addon/*/*")
   const searchContext = useSearchContext()
   const [t] = useTransContext()
   const navigator = useGDNavigate()
 
-  const isExpanded = () => !!isSearchPage()
+  const isExpanded = () => !!isSearchPage() || !!isAddonViewPage()
 
   const hasActiveFilters = () => {
     const query = searchContext?.searchQuery()
@@ -41,7 +42,7 @@ export function FilterBadgesBar() {
   return (
     <Show when={isExpanded() && hasActiveFilters()}>
       <div
-        class="bg-darkSlate-800 border-darkSlate-700 w-full border-b transition-all duration-300 ease-in-out"
+        class="bg-darkSlate-800 border-darkSlate-700 border-b transition-all duration-300 ease-in-out"
         style={{ "view-transition-name": "filter-badges-bar" }}
       >
         <div class="flex items-center gap-4 px-6 py-3">

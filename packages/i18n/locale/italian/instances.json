@@ -130,8 +130,8 @@
   "_trn_select_files_text": "Seleziona quali file esportare",
   "_trn_select_platform": "Seleziona Piattaforma",
   "_trn_select_platform_description": "Scegli da quale piattaforma scaricare",
-  "_trn_self_contained_addons_bundling": "Raggruppa Componenti Aggiuntivi",
-  "_trn_self_contained_addons_bundling_tooltip": "Includi tutti i componenti aggiuntivi nell'istanza esportata",
+  "_trn_self_contained_addons_bundling": "Raggruppa Addons",
+  "_trn_self_contained_addons_bundling_tooltip": "Includi tutti gli addons nell'istanza esportata",
   "_trn_view_mods": "Visualizza Mod",
   "_trn_view_versions_on_curseforge": "Visualizza versioni su CurseForge",
   "_trn_view_versions_on_modrinth": "Visualizza versioni su Modrinth"

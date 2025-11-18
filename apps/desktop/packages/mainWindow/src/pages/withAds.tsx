@@ -22,7 +22,6 @@ function withAdsLayout() {
   return (
     <SearchInputContext.Provider value={searchResults}>
       <AppNavbar />
-      <FilterBadgesBar />
       <div class="z-99 flex h-auto w-screen">
         <main class="relative grow">
           <div class="flex h-[calc(100vh-60px)] justify-end">
@@ -31,6 +30,7 @@ function withAdsLayout() {
                 width: `calc(100vw - ${adSize.width}px)`
               }}
             >
+              <FilterBadgesBar />
               <Outlet />
             </div>
             <Show when={adSize.shouldShow}>

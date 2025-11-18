@@ -116,6 +116,7 @@ const getVariant = (
       "border-2": true,
       "hover:border-darkSlate-500": !isDisabled,
       "border-darkSlate-600": !isDisabled,
+      "border-darkSlate-700": isDisabled,
       "bg-darkSlate-700": true,
       "text-lightSlate-700": isDisabled,
       "cursor-not-allowed": isDisabled
@@ -252,7 +253,7 @@ function Button(props: Props) {
           props.backgroundColor,
           props.fullWidth
         ),
-        "animate-icons-on-hover": true,
+        "animate-icons-on-hover": !props.disabled,
         ...props.classList
       }}
       style={{

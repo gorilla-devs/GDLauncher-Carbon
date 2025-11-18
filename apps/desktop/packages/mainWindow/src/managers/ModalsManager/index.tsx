@@ -199,7 +199,10 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
     if (modalStack().length === 0) {
       const overlay = document.getElementById("overlay")!
-      overlay.style.display = "none"
+      overlay.style.opacity = "0"
+      setTimeout(() => {
+        overlay.style.display = "none"
+      }, 100) // Wait for transition to complete
     }
   }
 
@@ -207,6 +210,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
     openModal: (modal: Modal, data: any) => {
       const overlay = document.getElementById("overlay")!
       overlay.style.display = "flex"
+      overlay.style.transition = "opacity 100ms ease-in-out"
       overlay.style.opacity = "0" // Set initial opacity to 0
       setTimeout(() => (overlay.style.opacity = "1"), 10) // Transition to opacity 1
       setModalStack((currentStack) => [
@@ -258,7 +262,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                     <div
                       style={{ "z-index": `${index() + 1}` }}
                       onMouseDown={(e) => e.stopPropagation()}
-                      class="animate-enterWithOpacityChange duration-100 ease-in-out"
+                      class="animate-modalEnter"
                     >
                       <Dynamic
                         component={ModalComponent}
@@ -267,11 +271,11 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                         title={title}
                       />
                     </div>
-                    <div class="bg-darkSlate-900 absolute inset-0 opacity-80" />
+                    <div class="bg-darkSlate-900 absolute inset-0 opacity-95 transition-opacity duration-100" />
                   </div>
 
                   <div
-                    class="text-lightSlate-50 z-999 bg-darkSlate-900 h-screen origin-center place-items-center opacity-80 duration-100 ease-in-out"
+                    class="text-lightSlate-50 z-999 bg-darkSlate-900 h-screen origin-center place-items-center opacity-95 transition-opacity duration-100"
                     style={{
                       width: `${adSize.width}px`
                     }}

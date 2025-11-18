@@ -864,12 +864,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             <Match when={!instanceData()}>
               <div class="flex items-center gap-1.5">
                 <div class="i-hugeicons:add-01" />
-                <Trans
-                  key="instances:_trn_instance_modal_instance_creation_create"
-                  options={{
-                    defaultValue: "Create"
-                  }}
-                />
+                <Trans key="instances:_trn_instance_modal_instance_creation_create" />
               </div>
             </Match>
             <Match when={instanceData()}>

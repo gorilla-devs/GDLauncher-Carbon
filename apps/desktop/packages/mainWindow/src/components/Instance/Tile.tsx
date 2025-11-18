@@ -502,12 +502,12 @@ const Tile = (props: Props) => {
                                     "text-md": props.subTasks?.length === 1
                                   }}
                                 >
-                                  <Trans
-                                    key={getTaskTranslationKey(
+                                  {t(
+                                    getTaskTranslationKey(
                                       subTask.name.translation
-                                    )}
-                                    options={getTranslationArgs(subTask.name)}
-                                  />
+                                    ),
+                                    getTranslationArgs(subTask.name)
+                                  )}
                                 </div>
                               )}
                             </For>
