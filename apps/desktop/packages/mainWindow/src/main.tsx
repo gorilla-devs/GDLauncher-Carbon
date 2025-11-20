@@ -23,7 +23,6 @@ import "@gd/ui/style.css"
 import { ContextMenuProvider, Toaster } from "@gd/ui"
 import "@unocss/reset/tailwind.css"
 import { NavigationManager } from "./managers/NavigationManager"
-// import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
 import RiveAppWapper from "./utils/RiveAppWrapper"
 import GDAnimation from "./gd_logo_animation.riv"
 import { GlobalStoreProvider } from "./components/GlobalStoreContext"
@@ -146,10 +145,6 @@ render(() => {
     }
   })
 
-  // Note: Auth bypass logic removed - now handled by login machine
-  // The backend validates terms checksum during initialization and resets
-  // termsAndPrivacyAccepted if needed. The login machine will route accordingly.
-
   return (
     <ProdWrapErrorBoundary>
       <Switch>
@@ -209,28 +204,11 @@ interface TransWrapperProps {
   isBackendReady: boolean
 }
 
-// Use global i18n instance instead of creating a new one
-// This prevents TransProvider from trying to reinitialize
 const _i18nInstance = i18n
 
 const TransWrapper = (props: TransWrapperProps) => {
   const [isI18nReady, setIsI18nReady] = createSignal(false)
   const [i18nOptions, setI18nOptions] = createSignal<any>(null)
-  // const rspcContext = rspc.useContext();
-
-  // onMount(async () => {
-  //   while (true) {
-  //     let initialTime = Date.now();
-
-  //     await rspcContext.client.query(["echo", "something"]);
-
-  //     let elapsed = Date.now() - initialTime;
-
-  //     console.log("rspc latency (ms)", elapsed);
-
-  //     await new Promise((resolve) => setTimeout(resolve, 200));
-  //   }
-  // });
 
   const trackPageView = rspc.createMutation(() => ({
     mutationKey: "metrics.sendEvent"
@@ -251,13 +229,11 @@ const TransWrapper = (props: TransWrapperProps) => {
     if (settings.isSuccess) {
       const { language } = settings.data
 
-      // Step 1: Always load English as fallback
       loadLanguageFiles("english").then((englishResources) => {
         if (isStale()) {
           return
         }
 
-        // Step 2: Load target language resources
         const resources: any = { english: englishResources }
 
         if (language !== "english") {
@@ -268,7 +244,6 @@ const TransWrapper = (props: TransWrapperProps) => {
 
             resources[language] = targetResources
 
-            // Step 3: Build initialization options for TransProvider
             const options = {
               ns: Object.keys(englishResources),
               defaultNS: "general",
@@ -283,7 +258,6 @@ const TransWrapper = (props: TransWrapperProps) => {
             setIsI18nReady(true)
           })
         } else {
-          // Step 3: Build initialization options for TransProvider
           const options = {
             ns: Object.keys(englishResources),
             defaultNS: "general",

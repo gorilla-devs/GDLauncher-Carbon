@@ -194,7 +194,9 @@ export const createAddonColumns = (config: ColumnConfig) => {
                 <div class="flex flex-col gap-1">
                   <div class="font-medium">{displayName}</div>
                   <Show when={mod.metadata?.name}>
-                    <div class="text-lightSlate-400 text-xs">{mod.filename}</div>
+                    <div class="text-lightSlate-400 text-xs">
+                      {mod.filename}
+                    </div>
                   </Show>
                 </div>
               </TooltipContent>
@@ -229,7 +231,9 @@ export const createAddonColumns = (config: ColumnConfig) => {
     // Type column
     columnHelper.display({
       id: "type",
-      header: () => <span class="hidden lg:inline">{t("content:_trn_table.type")}</span>,
+      header: () => (
+        <span class="hidden lg:inline">{t("content:_trn_table.type")}</span>
+      ),
       size: 104,
       cell: (props) => {
         const mod = props.row.original
@@ -249,7 +253,9 @@ export const createAddonColumns = (config: ColumnConfig) => {
     // Platform column
     columnHelper.display({
       id: "platform",
-      header: () => <span class="hidden md:inline">{t("content:_trn_table.platform")}</span>,
+      header: () => (
+        <span class="hidden md:inline">{t("content:_trn_table.platform")}</span>
+      ),
       size: 78,
       cell: (props) => {
         const mod = props.row.original
@@ -379,7 +385,9 @@ export const createAddonColumns = (config: ColumnConfig) => {
 
     // Status/Enable column
     columnHelper.accessor("enabled", {
-      header: () => <span class="hidden md:inline">{t("content:_trn_table.status")}</span>,
+      header: () => (
+        <span class="hidden md:inline">{t("content:_trn_table.status")}</span>
+      ),
       size: 100,
       cell: (props) => {
         const mod = props.row.original
@@ -413,7 +421,9 @@ export const createAddonColumns = (config: ColumnConfig) => {
     // Actions column
     columnHelper.display({
       id: "actions",
-      header: () => <span class="hidden lg:inline">{t("content:_trn_table.actions")}</span>,
+      header: () => (
+        <span class="hidden lg:inline">{t("content:_trn_table.actions")}</span>
+      ),
       size: 80,
       cell: (props) => {
         const mod = props.row.original

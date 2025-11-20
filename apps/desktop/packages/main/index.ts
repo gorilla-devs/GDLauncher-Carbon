@@ -719,7 +719,35 @@ ipcMain.handle("showSaveDialog", async (_, opts: SaveDialogOptions) => {
 })
 
 ipcMain.handle("getCurrentOS", async () => {
-  return { platform: os.platform(), arch: os.arch() }
+  const platform = os.platform()
+  const arch = os.arch()
+
+  // Determine if this build supports auto-updates
+  // electron-updater only works with:
+  // - Windows: NSIS installer (not portable ZIP)
+  // - Linux: AppImage (not other formats)
+  // - macOS: DMG and ZIP distributions
+  let supportsAutoUpdate = false
+
+  if (platform === "win32") {
+    // On Windows, NSIS builds support auto-update
+    // Portable builds (ZIP) do not
+    // We can detect this by checking if we're installed or portable
+    supportsAutoUpdate = app.isPackaged && !process.env.PORTABLE_EXECUTABLE_DIR
+  } else if (platform === "linux") {
+    // On Linux, only AppImage supports auto-update
+    // AppImage sets the APPIMAGE environment variable
+    supportsAutoUpdate = !!process.env.APPIMAGE
+  } else if (platform === "darwin") {
+    // On macOS, packaged builds (DMG/ZIP) support auto-update
+    supportsAutoUpdate = app.isPackaged
+  }
+
+  return {
+    platform,
+    arch,
+    supportsAutoUpdate
+  }
 })
 
 ipcMain.handle("openFolder", async (_, path) => {

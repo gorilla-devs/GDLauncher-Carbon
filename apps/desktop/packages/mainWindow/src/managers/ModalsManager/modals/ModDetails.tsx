@@ -261,7 +261,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                         onClick={() => {
                           const projectId = mod().curseforge!.project_id
                           navigator.navigate(`/addon/${projectId}/curseforge`)
-                          modalsContext.closeModal()
+                          modalsContext?.closeModal()
                         }}
                       >
                         <div class="i-hugeicons:dashboard-square-01" />
@@ -287,11 +287,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                 <Show when={mod().modrinth}>
                   <div class="flex flex-col gap-2">
                     <div class="flex items-center gap-2">
-                      <img
-                        src={ModrinthLogo}
-                        class="h-4 w-4"
-                        alt="Modrinth"
-                      />
+                      <img src={ModrinthLogo} class="h-4 w-4" alt="Modrinth" />
                       <span class="text-sm font-semibold">
                         {t("content:_trn_view_on_modrinth")}
                       </span>
@@ -301,8 +297,10 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                         size="small"
                         type="secondary"
                         onClick={() => {
-                          navigator.navigate(`/addon/${mod().modrinth!.project_id}/modrinth`)
-                          modalsContext.closeModal()
+                          navigator.navigate(
+                            `/addon/${mod().modrinth!.project_id}/modrinth`
+                          )
+                          modalsContext?.closeModal()
                         }}
                       >
                         <div class="i-hugeicons:dashboard-square-01" />

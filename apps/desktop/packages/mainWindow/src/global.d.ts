@@ -1,11 +1,28 @@
 import type { FEReleaseChannel } from "@gd/core_module/bindings"
 import { BoundsSize } from "./utils/adhelper"
-import type {
-  ProgressInfo,
-  UpdateCheckResult,
-  UpdateInfo
-} from "electron-updater"
+import type { ProgressInfo, UpdateInfo } from "electron-updater"
 import type { Log } from "../../main/coreModule"
+
+type UpdateState =
+  | "idle"
+  | "checking"
+  | "available"
+  | "downloading"
+  | "downloaded"
+  | "error"
+  | "no-update"
+
+interface UpdateStateData {
+  state: UpdateState
+  updateInfo: (UpdateInfo & { downloadUrl: string }) | null
+  progress: number
+  error: { message: string; details: string } | null
+}
+
+interface CheckForUpdatesResult {
+  status: "checking" | "busy" | "snapshot-version"
+  currentState: UpdateStateData
+}
 
 declare global {
   interface Window {
@@ -27,13 +44,20 @@ declare global {
     ) => void
     checkForUpdates: (
       releaseChannel: FEReleaseChannel
-    ) => Promise<UpdateCheckResult | null>
+    ) => Promise<CheckForUpdatesResult | null>
+    getUpdateState: () => Promise<UpdateStateData | null>
+    onUpdateStateChanged: (
+      cb: (event: Electron.IpcRendererEvent, state: UpdateStateData) => void
+    ) => void
     onDownloadProgress: (
       cb: (event: Electron.IpcRendererEvent, progressInfo: ProgressInfo) => void
     ) => void
     updateDownloaded: (cb: (event: Electron.IpcRendererEvent) => void) => void
     updateAvailable: (
-      cb: (event: Electron.IpcRendererEvent, updateInfo: UpdateInfo) => void
+      cb: (
+        event: Electron.IpcRendererEvent,
+        updateInfo: UpdateInfo & { downloadUrl: string }
+      ) => void
     ) => void
     updateNotAvailable: (cb: (event: Electron.IpcRendererEvent) => void) => void
     installUpdate: () => void
@@ -51,7 +75,11 @@ declare global {
           logs: Log[]
         }
     >
-    getCurrentOS: () => Promise<{ platform: string; arch: string }>
+    getCurrentOS: () => Promise<{
+      platform: string
+      arch: string
+      supportsAutoUpdate: boolean
+    }>
     getInitialRuntimePath: () => Promise<string>
     getRuntimePath: () => Promise<string>
     changeRuntimePath: (newPath: string | null) => Promise<void>

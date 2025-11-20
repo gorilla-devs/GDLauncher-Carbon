@@ -56,6 +56,7 @@
   "_trn_enable_metrics_text": "Seleziona se abilitare o meno le metriche anonime e le funzioni sperimentali tramite flag di funzionalità.",
   "_trn_restart_app": "Riavvia App",
   "_trn_reset_all_data": "Ripristina Tutti i Dati",
+  "_trn_check_for_updates": "Controlla Aggiornamenti",
   "_trn_custom_commands_title": "Comandi Personalizzati",
   "_trn_pre_launch_hook_title": "Hook Pre-Avvio",
   "_trn_pre_launch_hook_text": "Esegui uno script prima di avviare il gioco. Questo può essere utile per il modding o altri scopi.",

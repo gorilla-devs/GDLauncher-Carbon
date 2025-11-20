@@ -546,6 +546,7 @@ export const AddonTable = (props: AddonTableProps) => {
           label?: string
           action?: () => void
           icon?: string
+          rightIcon?: string
           id?: string
           destructive?: boolean
           disabled?: boolean
@@ -555,7 +556,7 @@ export const AddonTable = (props: AddonTableProps) => {
           type: "item",
           label: t("content:_trn_copy_name"),
           action: () => {
-            navigator.clipboard.writeText(displayName)
+            window.navigator.clipboard.writeText(displayName)
             toast.success(t("notifications:_trn_copied_to_clipboard"))
           },
           icon: "i-hugeicons:clipboard",
@@ -665,7 +666,9 @@ export const AddonTable = (props: AddonTableProps) => {
                 type: "item",
                 label: t("content:_trn_modrinth_open_in_app"),
                 action: () => {
-                  navigator.navigate(`/addon/${mod.modrinth!.project_id}/modrinth`)
+                  navigator.navigate(
+                    `/addon/${mod.modrinth!.project_id}/modrinth`
+                  )
                 },
                 icon: "modrinth",
                 id: "platform-modrinth-app"
@@ -702,7 +705,9 @@ export const AddonTable = (props: AddonTableProps) => {
                     const projectId = mod.curseforge.project_id
                     navigator.navigate(`/addon/${projectId}/curseforge`)
                   } else if (mod.modrinth) {
-                    navigator.navigate(`/addon/${mod.modrinth.project_id}/modrinth`)
+                    navigator.navigate(
+                      `/addon/${mod.modrinth.project_id}/modrinth`
+                    )
                   }
                 },
                 icon: "i-hugeicons:dashboard-square-01",
@@ -777,6 +782,7 @@ export const AddonTable = (props: AddonTableProps) => {
           label?: string
           action?: () => void
           icon?: string
+          rightIcon?: string
           id?: string
           destructive?: boolean
           disabled?: boolean
@@ -1227,7 +1233,9 @@ export const AddonTable = (props: AddonTableProps) => {
                               <span>{item.label}</span>
                             </div>
                             <Show when={item.rightIcon}>
-                              <div class={`${item.rightIcon} h-4 w-4 text-lightSlate-500`} />
+                              <div
+                                class={`${item.rightIcon} h-4 w-4 text-lightSlate-500`}
+                              />
                             </Show>
                           </div>
                         </ContextMenuItem>
@@ -1291,7 +1299,9 @@ export const AddonTable = (props: AddonTableProps) => {
                                         <span>{child.label}</span>
                                       </div>
                                       <Show when={child.rightIcon}>
-                                        <div class={`${child.rightIcon} h-4 w-4 text-lightSlate-500`} />
+                                        <div
+                                          class={`${child.rightIcon} h-4 w-4 text-lightSlate-500`}
+                                        />
                                       </Show>
                                     </div>
                                   </ContextMenuItem>

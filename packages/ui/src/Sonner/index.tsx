@@ -110,17 +110,21 @@ const InfoIcon = () => (
   </svg>
 )
 
+const CloseIcon = () => <div class="i-hugeicons:cancel-01 h-4 w-4" />
+
 export const Toaster = (props: Parameters<typeof Sonner>[0]) => {
   return (
     <Sonner
       position="bottom-left"
       richColors
       theme="dark"
+      closeButton
       icons={{
         success: <SuccessIcon />,
         error: <ErrorIcon />,
         warning: <WarningIcon />,
-        info: <InfoIcon />
+        info: <InfoIcon />,
+        close: <CloseIcon />
       }}
       toastOptions={{
         classNames: {
@@ -131,7 +135,13 @@ export const Toaster = (props: Parameters<typeof Sonner>[0]) => {
           error: "bg-darkSlate-800 text-lightSlate-50 border-red-500/20",
           warning: "bg-darkSlate-800 text-lightSlate-50 border-yellow-500/20",
           info: "bg-darkSlate-800 text-lightSlate-50 border-primary-500/20",
-          default: "bg-darkSlate-800 text-lightSlate-50 border-darkSlate-600"
+          default: "bg-darkSlate-800 text-lightSlate-50 border-darkSlate-600",
+          closeButton:
+            "!bg-darkSlate-700/50 !text-lightSlate-300 hover:!bg-darkSlate-600 hover:!text-lightSlate-50 !border-0 !shadow-none !rounded-md !p-1 transition-colors",
+          actionButton:
+            "transition-all duration-100 ease-in-out hover:brightness-110 font-bold rounded-md",
+          cancelButton:
+            "transition-all duration-100 ease-in-out hover:brightness-110 hover:bg-darkSlate-500 font-bold rounded-md"
         },
         style: {
           "background-color": "rgb(var(--darkSlate-800))",
@@ -140,11 +150,25 @@ export const Toaster = (props: Parameters<typeof Sonner>[0]) => {
         },
         actionButtonStyle: {
           "background-color": "rgb(var(--primary-500))",
-          color: "rgb(var(--lightSlate-50))"
+          color: "rgb(var(--lightSlate-50))",
+          padding: "0.75rem 1.25rem",
+          "border-radius": "0.375rem",
+          "font-weight": "700",
+          border: "none",
+          cursor: "pointer",
+          transition: "all 100ms ease-in-out",
+          "font-family": "inherit"
         },
         cancelButtonStyle: {
           "background-color": "rgb(var(--darkSlate-600))",
-          color: "rgb(var(--lightSlate-300))"
+          color: "rgb(var(--lightSlate-300))",
+          padding: "0.75rem 1.25rem",
+          "border-radius": "0.375rem",
+          "font-weight": "700",
+          border: "2px solid rgb(var(--darkSlate-600))",
+          cursor: "pointer",
+          transition: "all 100ms ease-in-out",
+          "font-family": "inherit"
         }
       }}
       {...props}

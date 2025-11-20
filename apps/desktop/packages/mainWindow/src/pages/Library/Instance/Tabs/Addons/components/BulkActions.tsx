@@ -35,7 +35,9 @@ export const BulkActions = (props: BulkActionsProps) => {
                 class="flex-1 md:flex-initial"
               >
                 <div class="i-hugeicons:download-02" />
-                <span class="hidden md:inline"><Trans key="content:_trn_update_selected" /></span>
+                <span class="hidden md:inline">
+                  <Trans key="content:_trn_update_selected" />
+                </span>
               </Button>
             </Show>
             <Button
@@ -45,7 +47,9 @@ export const BulkActions = (props: BulkActionsProps) => {
               class="flex-1 md:flex-initial"
             >
               <div class="i-hugeicons:delete-02" />
-              <span class="hidden md:inline"><Trans key="content:_trn_delete_selected" /></span>
+              <span class="hidden md:inline">
+                <Trans key="content:_trn_delete_selected" />
+              </span>
             </Button>
           </div>
         </div>

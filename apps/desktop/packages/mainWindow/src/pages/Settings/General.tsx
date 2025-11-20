@@ -26,6 +26,7 @@ import PageTitle from "./components/PageTitle"
 import Title from "./components/Title"
 import RowsContainer from "./components/RowsContainer"
 import { useModal } from "@/managers/ModalsManager"
+import { manualCheckForUpdates, isCheckingForUpdates } from "@/utils/updater"
 
 const General = () => {
   const routeData: ReturnType<typeof SettingsData> = useRouteData()
@@ -471,6 +472,20 @@ const General = () => {
           <RightHandSide>
             <div>
               <div class="flex flex-col items-center justify-end gap-4 2xl:flex-row">
+                <Button
+                  type="secondary"
+                  disabled={isCheckingForUpdates()}
+                  onClick={() => {
+                    manualCheckForUpdates(settings.releaseChannel)
+                  }}
+                >
+                  <div class="flex items-center gap-2">
+                    <div class="i-hugeicons:installing-updates-01 h-5 w-5" />
+                    <div>
+                      <Trans key="settings:_trn_check_for_updates" />
+                    </div>
+                  </div>
+                </Button>
                 <Button
                   type="secondary"
                   onClick={() => {

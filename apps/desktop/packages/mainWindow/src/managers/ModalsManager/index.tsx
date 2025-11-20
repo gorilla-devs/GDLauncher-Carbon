@@ -83,10 +83,6 @@ const getDefaultModals = (t: TypedTFunction) => ({
     component: lazy(() => import("./modals/ConfirmChangeRuntimePath")),
     title: t("modals:_trn_confirm_change_runtime_path")
   },
-  appUpdate: {
-    component: lazy(() => import("./modals/AppUpdate")),
-    title: t("modals:_trn_new_app_version_available")
-  },
   onBoarding: {
     component: lazy(() => import("./modals/OnBoarding")),
     noHeader: true

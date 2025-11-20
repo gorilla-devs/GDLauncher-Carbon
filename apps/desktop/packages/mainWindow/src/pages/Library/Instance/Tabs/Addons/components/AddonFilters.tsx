@@ -185,13 +185,9 @@ export const AddonFilters = (props: AddonFiltersProps) => {
                       case "all":
                         return <div class="i-hugeicons:globe h-4 w-4" />
                       case "curseforge":
-                        return (
-                          <div class="i-simple-icons:curseforge h-4 w-4" />
-                        )
+                        return <div class="i-simple-icons:curseforge h-4 w-4" />
                       case "modrinth":
-                        return (
-                          <div class="i-simple-icons:modrinth h-4 w-4" />
-                        )
+                        return <div class="i-simple-icons:modrinth h-4 w-4" />
                       case "local":
                         return <div class="i-hugeicons:folder-01 h-4 w-4" />
                       default:
@@ -202,7 +198,9 @@ export const AddonFilters = (props: AddonFiltersProps) => {
                   return (
                     <div class="flex items-center gap-2">
                       {getIcon(selectedValue)}
-                      <span class="hidden sm:inline">{getLabel(selectedValue)}</span>
+                      <span class="hidden sm:inline">
+                        {getLabel(selectedValue)}
+                      </span>
                     </div>
                   )
                 }}
@@ -227,7 +225,9 @@ export const AddonFilters = (props: AddonFiltersProps) => {
               <TooltipContent>
                 <Show
                   when={!props.isInstanceLocked()}
-                  fallback={<Trans key="instances:_trn_locked_cannot_apply_changes" />}
+                  fallback={
+                    <Trans key="instances:_trn_locked_cannot_apply_changes" />
+                  }
                 >
                   <Trans
                     key="content:_trn_update_all_count"
@@ -264,7 +264,9 @@ export const AddonFilters = (props: AddonFiltersProps) => {
                 class="font-semibold"
               >
                 <div class="i-hugeicons:add-01" />
-                <span class="hidden md:inline"><Trans key="content:_trn_add_addons" /></span>
+                <span class="hidden md:inline">
+                  <Trans key="content:_trn_add_addons" />
+                </span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>
@@ -292,7 +294,9 @@ export const AddonFilters = (props: AddonFiltersProps) => {
                   }}
                 >
                   <div class={`${getAddonTypeIcon(type)} text-sm`} />
-                  <span class="hidden md:inline">{getAddonTypeLabel(type)}</span>
+                  <span class="hidden md:inline">
+                    {getAddonTypeLabel(type)}
+                  </span>
                   <Show when={props.enabledAddonTypes[type]}>
                     <div class="i-hugeicons:tick-02 ml-1" />
                   </Show>
