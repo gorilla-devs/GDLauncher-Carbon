@@ -137,7 +137,7 @@ test.describe("Init Tests", () => {
     expect(getActualUrl(currentUrl)).toBe("/")
 
     const loginContainer = await (
-      await page.waitForSelector("#main-login-page")
+      await page.waitForSelector("#auth-flow")
     )?.innerHTML()
 
     expect(loginContainer).not.toBeUndefined()
