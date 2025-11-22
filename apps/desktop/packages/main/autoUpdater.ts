@@ -5,7 +5,6 @@ import { autoUpdater, UpdateInfo } from "electron-updater"
 type UpdateState =
   | "idle"
   | "checking"
-  | "available"
   | "downloading"
   | "downloaded"
   | "error"
@@ -77,7 +76,7 @@ export default function initAutoUpdater(_win: BrowserWindow | null) {
       setUpdateState({
         state: "checking",
         error: null,
-        progress: undefined
+        progress: 0
       })
 
       let selectedChannelNumber: number
@@ -128,37 +127,6 @@ export default function initAutoUpdater(_win: BrowserWindow | null) {
     }
   )
 
-  ipcMain.handle("downloadUpdate", async () => {
-    if (autoUpdaterLock) {
-      return {
-        status: "busy",
-        currentState
-      }
-    }
-
-    autoUpdaterLock = true
-    setUpdateState({ state: "downloading", progress: 0 })
-
-    try {
-      await autoUpdater.downloadUpdate()
-      return {
-        status: "downloading",
-        currentState
-      }
-    } catch (error) {
-      console.error("[updater] Error downloading update", error)
-      releaseAutoUpdaterLock()
-      setUpdateState({
-        state: "error",
-        error: {
-          message: "Failed to download update",
-          details: String(error)
-        }
-      })
-      throw error
-    }
-  })
-
   ipcMain.handle("installUpdate", async () => {
     autoUpdater.quitAndInstall(true, true)
   })
@@ -168,16 +136,16 @@ export default function initAutoUpdater(_win: BrowserWindow | null) {
   })
 
   autoUpdater.on("update-available", (updateInfo) => {
-    releaseAutoUpdaterLock()
+    // Don't release lock here - auto-download continues immediately
+    // Lock will be released in downloaded/error handlers
 
-    const downloadUrl = `${
-      (process.env.GENERIC_PUBLISH_URL || "http://localhost:9000") +
-        "/" +
-        process.env.PUBLISH_URL_FOLDER || ""
-    }/${updateInfo.path}`
+    const baseUrl = process.env.GENERIC_PUBLISH_URL || "http://localhost:9000"
+    const folder = process.env.PUBLISH_URL_FOLDER || ""
+    const downloadUrl = `${baseUrl}${folder ? "/" + folder : ""}/${updateInfo.path}`
 
     setUpdateState({
-      state: "available",
+      state: "downloading",
+      progress: 0,
       updateInfo: { ...updateInfo, downloadUrl }
     })
   })

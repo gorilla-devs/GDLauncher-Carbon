@@ -1,12 +1,11 @@
 import type { FEReleaseChannel } from "@gd/core_module/bindings"
 import { BoundsSize } from "./utils/adhelper"
-import type { ProgressInfo, UpdateInfo } from "electron-updater"
+import type { UpdateInfo } from "electron-updater"
 import type { Log } from "../../main/coreModule"
 
 type UpdateState =
   | "idle"
   | "checking"
-  | "available"
   | "downloading"
   | "downloaded"
   | "error"
@@ -49,17 +48,6 @@ declare global {
     onUpdateStateChanged: (
       cb: (event: Electron.IpcRendererEvent, state: UpdateStateData) => void
     ) => void
-    onDownloadProgress: (
-      cb: (event: Electron.IpcRendererEvent, progressInfo: ProgressInfo) => void
-    ) => void
-    updateDownloaded: (cb: (event: Electron.IpcRendererEvent) => void) => void
-    updateAvailable: (
-      cb: (
-        event: Electron.IpcRendererEvent,
-        updateInfo: UpdateInfo & { downloadUrl: string }
-      ) => void
-    ) => void
-    updateNotAvailable: (cb: (event: Electron.IpcRendererEvent) => void) => void
     installUpdate: () => void
     openExternalLink: (link: string) => void
     openFolder: (path: string) => void

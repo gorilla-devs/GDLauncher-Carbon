@@ -3,7 +3,7 @@ use super::ManagerRef;
 use crate::api::{keys::settings::*, settings::FESettingsUpdate};
 use anyhow::{Context, anyhow};
 use carbon_platforms::{ModChannelWithUsage, ModPlatform};
-use carbon_repos::db::app_configuration::{self, hashed_email_accepted, last_app_version};
+use carbon_repos::db::app_configuration::{self, last_app_version};
 use chrono::Utc;
 use itertools::Itertools;
 use reqwest_middleware::ClientWithMiddleware;
@@ -332,16 +332,6 @@ impl ManagerRef<'_, SettingsManager> {
                     )),
                 ],
             ));
-        }
-
-        if let Some(hashed_email_accepted) = incoming_settings.hashed_email_accepted {
-            let hashed_email_accepted = hashed_email_accepted.inner();
-            queries.push(self.app.prisma_client.app_configuration().update(
-                app_configuration::id::equals(0),
-                vec![app_configuration::hashed_email_accepted::set(
-                    hashed_email_accepted,
-                )],
-            ))
         }
 
         if !queries.is_empty() {

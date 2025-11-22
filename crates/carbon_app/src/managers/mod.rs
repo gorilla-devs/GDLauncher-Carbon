@@ -198,6 +198,27 @@ mod app {
                 };
             });
 
+            // Send GDL account email for Overwolf ad personalization
+            let _app = app.clone();
+            tokio::spawn(async move {
+                match _app.account_manager().get_gdl_account().await {
+                    Ok(account::gdl_account::GDLAccountStatus::Valid(user)) => {
+                        info!("_GDL_ACCOUNT_EMAIL_:{}", user.email);
+                        println!("_GDL_ACCOUNT_EMAIL_:{}", user.email);
+                    }
+                    Ok(_) => {
+                        // No valid GDL account, send empty
+                        info!("_GDL_ACCOUNT_EMAIL_:");
+                        println!("_GDL_ACCOUNT_EMAIL_:");
+                    }
+                    Err(e) => {
+                        error!("Error getting GDL account: {e}");
+                        // Send empty on error
+                        println!("_GDL_ACCOUNT_EMAIL_:");
+                    }
+                }
+            });
+
             let _app = app.clone();
             tokio::spawn(async move {
                 let _ = _app.clone().rich_presence_manager().start_presence().await;

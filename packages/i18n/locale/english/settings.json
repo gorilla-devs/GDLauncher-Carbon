@@ -50,8 +50,6 @@
   "_trn_theme_frost": "Frost",
   "_trn_ads_personalization_title": "Ads Personalization & Data",
   "_trn_ads_personalization_text": "View and manage how GDLauncher may use your data for ad personalization.",
-  "_trn_email_personalization_title": "Email-Based Ad Personalization",
-  "_trn_email_personalization_description": "Your email is converted to an irreversible code (hash) and shared with advertising partners for personalized ads. This helps keep GDLauncher free while protecting your privacy.",
   "_trn_enable_metrics_title": "Enable Anonymous Metrics & Experimental Features",
   "_trn_enable_metrics_text": "Select whether or not to enable anonymous metrics and experimental features through feature flags.",
   "_trn_restart_app": "Restart App",

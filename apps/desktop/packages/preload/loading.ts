@@ -176,7 +176,6 @@ function useLoading() {
       let updateState:
         | "idle"
         | "checking"
-        | "available"
         | "downloading"
         | "ready"
         | "error"
@@ -203,17 +202,6 @@ function useLoading() {
             checkUpdatesBtn.textContent = "Checking..."
             checkUpdatesBtn.disabled = true
             checkUpdatesBtn.style.opacity = "0.6"
-            break
-
-          case "available":
-            updateStatusText.textContent = `Update v${data.version} available`
-            updateStatusText.style.whiteSpace = "nowrap"
-            updateProgressContainer.style.display = "none"
-            checkUpdatesBtn.textContent = "Download"
-            checkUpdatesBtn.disabled = false
-            checkUpdatesBtn.style.opacity = "1"
-            checkUpdatesBtn.style.background = "rgb(var(--primary-500))"
-            updateInfo = data
             break
 
           case "downloading":
@@ -324,9 +312,6 @@ function useLoading() {
           updateState === "no-update"
         ) {
           await checkForUpdates()
-        } else if (updateState === "available") {
-          await ipcRenderer.invoke("downloadUpdate")
-          setUpdateState("downloading")
         } else if (updateState === "ready") {
           await ipcRenderer.invoke("installUpdate")
         }
@@ -405,12 +390,6 @@ ${error.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "")}`
 
           case "error":
             setUpdateState("error", stateData.error)
-            break
-
-          case "available":
-            if (stateData.updateInfo) {
-              setUpdateState("available", stateData.updateInfo)
-            }
             break
         }
       })

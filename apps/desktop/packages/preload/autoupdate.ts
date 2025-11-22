@@ -5,7 +5,6 @@ import type { UpdateInfo } from "electron-updater"
 type UpdateState =
   | "idle"
   | "checking"
-  | "available"
   | "downloading"
   | "downloaded"
   | "error"
@@ -28,10 +27,6 @@ contextBridge.exposeInMainWorld("installUpdate", async () =>
   ipcRenderer.invoke("installUpdate")
 )
 
-contextBridge.exposeInMainWorld("downloadUpdate", async () =>
-  ipcRenderer.invoke("downloadUpdate")
-)
-
 contextBridge.exposeInMainWorld("getUpdateState", async () =>
   ipcRenderer.invoke("getUpdateState")
 )
@@ -40,10 +35,4 @@ contextBridge.exposeInMainWorld(
   "onUpdateStateChanged",
   (cb: (_ev: IpcRendererEvent, _state: UpdateStateData) => void) =>
     ipcRenderer.on("gd-update-state-changed", cb)
-)
-
-contextBridge.exposeInMainWorld(
-  "updateNotAvailable",
-  (cb: (_ev: IpcRendererEvent) => void) =>
-    ipcRenderer.on("updateNotAvailable", cb)
 )

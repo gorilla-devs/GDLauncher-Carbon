@@ -28,7 +28,7 @@ import type { ChildProcessWithoutNullStreams } from "child_process"
 import { spawn } from "child_process"
 import crypto from "crypto"
 import log from "electron-log/main"
-import { hashEmail } from "./utils/emailHash"
+import { hashEmailForOverwolf } from "./utils/emailHash"
 import * as Sentry from "@sentry/electron/main"
 import "./preloadListeners"
 import getAdSize from "./adSize"
@@ -448,24 +448,21 @@ const loadCoreModule: CoreModule = () =>
           const rightPart = row.split(":")[1]
           showAppCloseWarning = rightPart === "true"
           console.log("Show app close warning:", showAppCloseWarning)
-        } else if (row.startsWith("_HASHED_EMAIL_PREFERENCE_CHANGED_:")) {
-          const rightPart = row.split(":")[1]
-          const enabled = rightPart.split("|")[0] === "true"
-          const email = rightPart.split("|")[1]
-          if (enabled) {
-            if ((app as any).overwolf) {
-              // Hash email client-side per UID2 specification for better privacy/security
-              const sha256Hash = hashEmail(email)
-              ;(app as any).overwolf.setUserEmailHashes({
-                SHA256: sha256Hash
-              })
-              console.log("Hashed email enabled - hash sent to Overwolf")
-            }
-          } else {
-            if ((app as any).overwolf) {
-              // Clear hashes when user opts out
+        } else if (row.startsWith("_GDL_ACCOUNT_EMAIL_:")) {
+          const email = row.split(":")[1]?.trim() || ""
+          if ((app as any).overwolf) {
+            if (email) {
+              try {
+                const hashes = hashEmailForOverwolf(email)
+                ;(app as any).overwolf.setUserEmailHashes(hashes)
+                console.log("GDL account email hashes sent to Overwolf")
+              } catch (error) {
+                console.error("Failed to hash GDL account email:", error)
+              }
+            } else {
+              // Clear hashes when no GDL account
               ;(app as any).overwolf.setUserEmailHashes({})
-              console.log("Hashed email disabled - hashes cleared")
+              console.log("GDL account email cleared - hashes cleared")
             }
           }
         }

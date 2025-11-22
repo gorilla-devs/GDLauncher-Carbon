@@ -14,7 +14,15 @@ export const [isCheckingForUpdates, setIsCheckingForUpdates] =
 
 let lastChannel: FEReleaseChannel | null = null
 let updateCheckInterval: ReturnType<typeof setInterval> | null = null
+let manualCheckTimeout: ReturnType<typeof setTimeout> | null = null
 let hadError = false
+
+function clearManualCheckTimeout() {
+  if (manualCheckTimeout) {
+    clearTimeout(manualCheckTimeout)
+    manualCheckTimeout = null
+  }
+}
 
 ;(async () => {
   const os = await window.getCurrentOS()
@@ -24,13 +32,27 @@ let hadError = false
 window.onUpdateStateChanged((_, stateData) => {
   switch (stateData.state) {
     case "idle":
+      clearManualCheckTimeout()
       setIsCheckingForUpdates(false)
       break
 
-    case "no-update":
+    case "no-update": {
+      clearManualCheckTimeout()
       setIsCheckingForUpdates(false)
       toast.dismiss(TOAST_ID_CHECKING)
+
+      const wasManualCheck = isManualCheck()
+      setIsManualCheck(false)
+
+      if (wasManualCheck) {
+        toast.success("You're up to date!", {
+          id: TOAST_ID_CHECKING,
+          description: `GDLauncher ${__APP_VERSION__} is the latest version`,
+          duration: 5000
+        })
+      }
       break
+    }
 
     case "checking":
       setIsCheckingForUpdates(true)
@@ -38,6 +60,7 @@ window.onUpdateStateChanged((_, stateData) => {
       break
 
     case "downloading": {
+      clearManualCheckTimeout()
       setIsCheckingForUpdates(false)
       toast.dismiss(TOAST_ID_CHECKING)
 
@@ -58,11 +81,39 @@ window.onUpdateStateChanged((_, stateData) => {
           ),
           duration: Infinity
         })
+      } else if (stateData.updateInfo) {
+        // For builds without auto-update, show manual download link
+        toast(`Update available: v${version}`, {
+          id: TOAST_ID_MANUAL_UPDATE,
+          description:
+            "Auto-update not available. Download manually to update.",
+          duration: Infinity,
+          action: {
+            label: "Copy Download Link",
+            onClick: async () => {
+              try {
+                await navigator.clipboard.writeText(
+                  stateData.updateInfo!.downloadUrl
+                )
+                toast.success("Download link copied to clipboard", {
+                  duration: 3000
+                })
+              } catch (error) {
+                console.error("Failed to copy to clipboard:", error)
+                toast.error("Failed to copy link", {
+                  description: "Please try copying manually",
+                  duration: 3000
+                })
+              }
+            }
+          }
+        })
       }
       break
     }
 
     case "downloaded":
+      clearManualCheckTimeout()
       toast.dismiss(TOAST_ID_CHECKING)
       toast.dismiss(TOAST_ID_DOWNLOADING)
       setIsCheckingForUpdates(false)
@@ -100,6 +151,7 @@ window.onUpdateStateChanged((_, stateData) => {
       break
 
     case "error":
+      clearManualCheckTimeout()
       setIsCheckingForUpdates(false)
       hadError = true
       setIsManualCheck(false)
@@ -112,57 +164,6 @@ window.onUpdateStateChanged((_, stateData) => {
         duration: 8000
       })
       break
-
-    case "available": {
-      toast.dismiss(TOAST_ID_CHECKING)
-      setIsCheckingForUpdates(false)
-      hadError = false
-      setIsManualCheck(false)
-
-      const info = stateData.updateInfo
-      if (!supportsAutoUpdate() && info) {
-        toast(`Update available: v${info.version}`, {
-          id: TOAST_ID_MANUAL_UPDATE,
-          description:
-            "Auto-update not available. Download manually to update.",
-          duration: Infinity,
-          action: {
-            label: "Copy Download Link",
-            onClick: async () => {
-              try {
-                await navigator.clipboard.writeText(info.downloadUrl)
-                toast.success("Download link copied to clipboard", {
-                  duration: 3000
-                })
-              } catch (error) {
-                console.error("Failed to copy to clipboard:", error)
-                toast.error("Failed to copy link", {
-                  description: "Please try copying manually",
-                  duration: 3000
-                })
-              }
-            }
-          }
-        })
-      }
-      break
-    }
-  }
-})
-
-window.updateNotAvailable((_) => {
-  toast.dismiss(TOAST_ID_CHECKING)
-  setIsCheckingForUpdates(false)
-
-  const wasManualCheck = isManualCheck()
-  setIsManualCheck(false)
-
-  if (wasManualCheck) {
-    toast.success("You're up to date!", {
-      id: TOAST_ID_CHECKING,
-      description: `GDLauncher ${__APP_VERSION__} is the latest version`,
-      duration: 5000
-    })
   }
 })
 
@@ -248,7 +249,9 @@ export const manualCheckForUpdates = async (
     duration: Infinity
   })
 
-  const uiTimeout = setTimeout(() => {
+  // Clear any existing timeout and set a new one
+  clearManualCheckTimeout()
+  manualCheckTimeout = setTimeout(() => {
     setIsManualCheck(false)
     setIsCheckingForUpdates(false)
     toast.error("Update check timed out", {
@@ -261,9 +264,9 @@ export const manualCheckForUpdates = async (
 
   try {
     const result = await window.checkForUpdates(releaseChannel)
-    clearTimeout(uiTimeout)
 
     if (result?.status === "busy") {
+      clearManualCheckTimeout()
       setIsManualCheck(false)
       setIsCheckingForUpdates(false)
       toast.info("Update in progress", {
@@ -275,6 +278,7 @@ export const manualCheckForUpdates = async (
     }
 
     if (result?.status === "snapshot-version") {
+      clearManualCheckTimeout()
       setIsManualCheck(false)
       setIsCheckingForUpdates(false)
       toast.info("Snapshot version", {
@@ -284,8 +288,9 @@ export const manualCheckForUpdates = async (
       })
       return
     }
+    // Note: timeout will be cleared by state change handlers
   } catch (error) {
-    clearTimeout(uiTimeout)
+    clearManualCheckTimeout()
     console.error("Failed to trigger update check:", error)
     setIsManualCheck(false)
     setIsCheckingForUpdates(false)

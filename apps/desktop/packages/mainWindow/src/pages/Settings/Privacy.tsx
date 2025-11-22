@@ -1,4 +1,4 @@
-import { Button, Switch } from "@gd/ui"
+import { Button } from "@gd/ui"
 import { Trans } from "@gd/i18n"
 import PageTitle from "./components/PageTitle"
 import RowsContainer from "./components/RowsContainer"
@@ -6,16 +6,9 @@ import Row from "./components/Row"
 import Title from "./components/Title"
 import RightHandSide from "./components/RightHandSide"
 import { useModal } from "@/managers/ModalsManager"
-import { rspc } from "@/utils/rspcClient"
-import { useGlobalStore } from "@/components/GlobalStoreContext"
 
 const Privacy = () => {
   const modalsContext = useModal()
-  const globalStore = useGlobalStore()
-
-  const settingsMutation = rspc.createMutation(() => ({
-    mutationKey: ["settings.setSettings"]
-  }))
 
   return (
     <>
@@ -40,27 +33,6 @@ const Privacy = () => {
             >
               <Trans key="auth:_trn_login.manage" />
             </Button>
-          </RightHandSide>
-        </Row>
-        <Row>
-          <Title
-            description={
-              <Trans key="settings:_trn_email_personalization_description" />
-            }
-          >
-            <Trans key="settings:_trn_email_personalization_title" />
-          </Title>
-          <RightHandSide>
-            <Switch
-              checked={globalStore.settings.data?.hashedEmailAccepted ?? true}
-              onChange={(e) => {
-                settingsMutation.mutate({
-                  hashedEmailAccepted: {
-                    Set: e.currentTarget.checked
-                  }
-                })
-              }}
-            />
           </RightHandSide>
         </Row>
         <Row forceContentBelow>
