@@ -113,16 +113,18 @@ export default function initAutoUpdater(_win: BrowserWindow | null) {
           currentState
         }
       } catch (error) {
-        console.error("[updater] Error checking for updates", error)
+        const errorDetails = error instanceof Error ? error.message : String(error)
+        console.error("[updater] Error checking for updates:", errorDetails)
+        console.error("[updater] Update URL:", autoUpdater.getFeedURL())
         releaseAutoUpdaterLock()
         setUpdateState({
           state: "error",
           error: {
             message: "Failed to check for updates",
-            details: String(error)
+            details: errorDetails
           }
         })
-        throw error
+        return null
       }
     }
   )
@@ -172,7 +174,8 @@ export default function initAutoUpdater(_win: BrowserWindow | null) {
   })
 
   autoUpdater.on("error", (error) => {
-    console.error("[updater] Error:", error)
+    console.error("[updater] Error:", error.message)
+    console.error("[updater] Update URL:", autoUpdater.getFeedURL())
 
     releaseAutoUpdaterLock()
 
