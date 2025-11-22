@@ -113,7 +113,8 @@ export default function initAutoUpdater(_win: BrowserWindow | null) {
           currentState
         }
       } catch (error) {
-        const errorDetails = error instanceof Error ? error.message : String(error)
+        const errorDetails =
+          error instanceof Error ? error.message : String(error)
         console.error("[updater] Error checking for updates:", errorDetails)
         console.error("[updater] Update URL:", autoUpdater.getFeedURL())
         releaseAutoUpdaterLock()
