@@ -146,9 +146,10 @@ jobs:
           sudo apt-get install -y xvfb
           /usr/bin/Xvfb :1 -screen 0 1280x960x24 &
           export DISPLAY=:1
-          sleep 2
+          sleep 5
           ps aux | grep Xvfb
           ls -l /tmp/.X11-unix/
+          echo "DISPLAY=$DISPLAY"
           pnpm test:all
       - name: Upload Playwright report
         if: always()
