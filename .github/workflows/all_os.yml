@@ -70,6 +70,12 @@ jobs:
         with:
           name: playwright-report-macos
           path: ./GDLauncher/apps/desktop/playwright-report/
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-macos
+          path: ./GDLauncher/apps/desktop/test-results/
       - name: Upload main.log for debugging
         uses: actions/upload-artifact@v4
         if: always()
@@ -154,8 +160,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report-linux
-          path: ./GDLauncher/apps/desktop/playwright-report/
+          name: test-results-linux
+          path: ./GDLauncher/apps/desktop/test-results/
       - name: Upload main.log for debugging
         uses: actions/upload-artifact@v4
         if: always()
@@ -242,6 +248,12 @@ jobs:
         with:
           name: playwright-report-win
           path: ./GDLauncher/apps/desktop/playwright-report/
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-windows
+          path: ./GDLauncher/apps/desktop/test-results/
       - name: Upload main.log for debugging
         uses: actions/upload-artifact@v4
         if: always()
