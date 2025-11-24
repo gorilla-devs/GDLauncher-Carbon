@@ -84,20 +84,28 @@ test.describe("Init Tests", () => {
     console.log("Binary exists:", fs.existsSync(binaryPath!))
     if (binaryPath) {
       const stats = fs.statSync(binaryPath)
-      console.log("Binary is executable:", !!(stats.mode & fs.constants.S_IXUSR))
+      console.log(
+        "Binary is executable:",
+        !!(stats.mode & fs.constants.S_IXUSR)
+      )
       console.log("Binary size:", stats.size)
     }
-    console.log("Environment:", { DISPLAY: process.env.DISPLAY, CI: process.env.CI })
-
-    electronApp = await electron.launch({
-      args: [],
-      executablePath: binaryPath,
-      env: { ...process.env } as any
-    }).catch((error) => {
-      console.error("Failed to launch Electron:", error)
-      console.error("Error details:", JSON.stringify(error, null, 2))
-      throw error
+    console.log("Environment:", {
+      DISPLAY: process.env.DISPLAY,
+      CI: process.env.CI
     })
+
+    electronApp = await electron
+      .launch({
+        args: [],
+        executablePath: binaryPath,
+        env: { ...process.env } as any
+      })
+      .catch((error) => {
+        console.error("Failed to launch Electron:", error)
+        console.error("Error details:", JSON.stringify(error, null, 2))
+        throw error
+      })
 
     electronApp.on("console", (msg) => {
       console.log(msg.text())
