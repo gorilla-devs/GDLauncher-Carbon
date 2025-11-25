@@ -125,13 +125,8 @@ test.describe("Init Tests", () => {
         executablePath: binaryPath,
         env: {
           ...process.env,
-          ELECTRON_ENABLE_LOGGING: "1",
-          ELECTRON_LOG_FILE: "electron-debug.log"
+          ELECTRON_ENABLE_LOGGING: "1"
         } as any,
-        recordVideo: {
-          dir: "test-results/videos",
-          size: { width: 1280, height: 960 }
-        },
         timeout: 60000 // Increase timeout to see if it's a timing issue
       })
       .catch((error) => {
@@ -145,7 +140,10 @@ test.describe("Init Tests", () => {
           console.error("Error cause:", error.cause)
         }
 
-        console.error("Full error object:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
+        console.error(
+          "Full error object:",
+          JSON.stringify(error, Object.getOwnPropertyNames(error), 2)
+        )
         throw error
       })
 

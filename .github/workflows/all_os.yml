@@ -68,13 +68,13 @@ jobs:
         run: pnpm test:all
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
-        if: always()
+        if: failure()
         with:
           name: playwright-report-macos
           path: ./GDLauncher/apps/desktop/playwright-report/
       - name: Upload test results
         uses: actions/upload-artifact@v4
-        if: always()
+        if: failure()
         with:
           name: test-results-macos
           path: ./GDLauncher/apps/desktop/test-results/
@@ -86,7 +86,6 @@ jobs:
           path: |
             ./GDLauncher/apps/desktop/release/mac-universal/gdl_data/main.log
             ./GDLauncher/apps/desktop/release/mac-universal/gdl_data/data/__gdl_logs__/*.log
-            ./GDLauncher/apps/desktop/electron-debug.log
       - name: Fail if lint failed
         if: steps.lint.outcome == 'failure'
         run: exit 1
@@ -160,13 +159,13 @@ jobs:
           echo "DISPLAY=$DISPLAY"
           pnpm test:all
       - name: Upload Playwright report
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: ./GDLauncher/apps/desktop/playwright-report/
       - name: Upload test results
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: test-results-linux
@@ -179,7 +178,6 @@ jobs:
           path: |
             ./GDLauncher/apps/desktop/release/linux-unpacked/gdl_data/main.log
             ./GDLauncher/apps/desktop/release/linux-unpacked/gdl_data/data/__gdl_logs__/*.log
-            ./GDLauncher/apps/desktop/electron-debug.log
       - name: Fail if lint failed
         if: steps.lint.outcome == 'failure'
         run: exit 1
@@ -259,13 +257,13 @@ jobs:
         run: pnpm test:all
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
-        if: always()
+        if: failure()
         with:
           name: playwright-report-win
           path: ./GDLauncher/apps/desktop/playwright-report/
       - name: Upload test results
         uses: actions/upload-artifact@v4
-        if: always()
+        if: failure()
         with:
           name: test-results-windows
           path: ./GDLauncher/apps/desktop/test-results/
@@ -277,7 +275,6 @@ jobs:
           path: |
             ./GDLauncher/apps/desktop/release/win-unpacked/gdl_data/main.log
             ./GDLauncher/apps/desktop/release/win-unpacked/gdl_data/data/__gdl_logs__/*.log
-            ./GDLauncher/apps/desktop/electron-debug.log
       - name: Fail if lint failed
         if: steps.lint.outcome == 'failure'
         run: exit 1

@@ -42,7 +42,7 @@ const config: PlaywrightTestConfig = {
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: {
-      mode: "on",
+      mode: "retain-on-failure",
       screenshots: true,
       snapshots: true,
       sources: true

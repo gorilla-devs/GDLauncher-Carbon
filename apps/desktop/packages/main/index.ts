@@ -42,6 +42,46 @@ import {
 
 console.log("Modules imported successfully")
 
+// Overwolf ready state and pending email
+let overwolfReady = false
+let pendingEmail: string | null | undefined = null
+
+function setOverwolfEmail(email: string) {
+  if (overwolfReady && (app as any).overwolf) {
+    try {
+      const hashes = hashEmailForOverwolf(email)
+      ;(app as any).overwolf.setUserEmailHashes(hashes)
+      console.log("GDL account email hashes sent to Overwolf")
+    } catch (error) {
+      console.error("Failed to set email hashes:", error)
+    }
+  } else {
+    pendingEmail = email
+  }
+}
+
+function clearOverwolfEmail() {
+  if (overwolfReady && (app as any).overwolf) {
+    try {
+      ;(app as any).overwolf.setUserEmailHashes({})
+      console.log("GDL account email hashes cleared")
+    } catch (error) {
+      console.error("Failed to clear email hashes:", error)
+    }
+  } else {
+    pendingEmail = null
+  }
+}
+
+function applyPendingEmail() {
+  if (pendingEmail) {
+    setOverwolfEmail(pendingEmail)
+  } else if (pendingEmail === null) {
+    clearOverwolfEmail()
+  }
+  pendingEmail = undefined
+}
+
 export const RUNTIME_PATH_OVERRIDE_NAME = "runtime_path_override"
 const RUNTIME_PATH_DEFAULT_NAME = "data"
 
@@ -450,20 +490,10 @@ const loadCoreModule: CoreModule = () =>
           console.log("Show app close warning:", showAppCloseWarning)
         } else if (row.startsWith("_GDL_ACCOUNT_EMAIL_:")) {
           const email = row.split(":")[1]?.trim() || ""
-          if ((app as any).overwolf) {
-            if (email) {
-              try {
-                const hashes = hashEmailForOverwolf(email)
-                ;(app as any).overwolf.setUserEmailHashes(hashes)
-                console.log("GDL account email hashes sent to Overwolf")
-              } catch (error) {
-                console.error("Failed to hash GDL account email:", error)
-              }
-            } else {
-              // Clear hashes when no GDL account
-              ;(app as any).overwolf.setUserEmailHashes({})
-              console.log("GDL account email cleared - hashes cleared")
-            }
+          if (email) {
+            setOverwolfEmail(email)
+          } else {
+            clearOverwolfEmail()
           }
         }
       }
@@ -898,6 +928,13 @@ app.whenReady().then(async () => {
   }
 
   console.log("OVERWOLF APP ID", process.env.OVERWOLF_APP_UID)
+
+  // Mark Overwolf as ready and apply any pending email
+  if ((app as any).overwolf && process.env.OVERWOLF_APP_UID) {
+    overwolfReady = true
+    applyPendingEmail()
+  }
+
   session.defaultSession.webRequest.onBeforeSendHeaders(
     {
       urls: ["http://*/*", "https://*/*"]
