@@ -6,6 +6,7 @@ import type { ElectronApplication, Page } from "playwright"
 import { getActualUrl } from "./tests_helpers.js"
 import { fileURLToPath } from "url"
 import { dirname } from "path"
+import { spawnSync } from "child_process"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -95,15 +96,56 @@ test.describe("Init Tests", () => {
       CI: process.env.CI
     })
 
+    // Try running binary directly to capture any immediate crash output
+    console.log("=== Testing direct binary execution ===")
+    try {
+      const result = spawnSync(binaryPath!, ["--version"], {
+        timeout: 5000,
+        encoding: "utf8",
+        env: { ...process.env, DISPLAY: process.env.DISPLAY || ":1" }
+      })
+      console.log("Direct execution exit code:", result.status)
+      console.log("Direct execution signal:", result.signal)
+      if (result.stdout) console.log("Direct execution stdout:", result.stdout)
+      if (result.stderr) console.log("Direct execution stderr:", result.stderr)
+      if (result.error) console.error("Direct execution error:", result.error)
+    } catch (e: any) {
+      console.error("Direct execution exception:", e.message)
+    }
+    console.log("=== End direct binary test ===\n")
+
     electronApp = await electron
       .launch({
-        args: [],
+        args: [
+          "--enable-logging",
+          "--v=1",
+          "--no-sandbox", // Might help in CI
+          "--disable-gpu-sandbox"
+        ],
         executablePath: binaryPath,
-        env: { ...process.env } as any
+        env: {
+          ...process.env,
+          ELECTRON_ENABLE_LOGGING: "1",
+          ELECTRON_LOG_FILE: "electron-debug.log"
+        } as any,
+        recordVideo: {
+          dir: "test-results/videos",
+          size: { width: 1280, height: 960 }
+        },
+        timeout: 60000 // Increase timeout to see if it's a timing issue
       })
       .catch((error) => {
-        console.error("Failed to launch Electron:", error)
-        console.error("Error details:", JSON.stringify(error, null, 2))
+        console.error("=== Electron Launch Failed ===")
+        console.error("Error message:", error.message)
+        console.error("Error name:", error.name)
+        console.error("Error stack:", error.stack)
+
+        // Try to get process exit info if available
+        if (error.cause) {
+          console.error("Error cause:", error.cause)
+        }
+
+        console.error("Full error object:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
         throw error
       })
 

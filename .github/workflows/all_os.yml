@@ -49,6 +49,8 @@ jobs:
           CURSEFORGE_API_KEY: "${{ vars.CURSEFORGE_API_KEY }}"
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
       - name: Lint
+        id: lint
+        continue-on-error: true
         run: pnpm lint
       - name: Clear target before tests to avoid folder getting too big
         run: rm -rf target
@@ -84,6 +86,10 @@ jobs:
           path: |
             ./GDLauncher/apps/desktop/release/mac-universal/gdl_data/main.log
             ./GDLauncher/apps/desktop/release/mac-universal/gdl_data/data/__gdl_logs__/*.log
+            ./GDLauncher/apps/desktop/electron-debug.log
+      - name: Fail if lint failed
+        if: steps.lint.outcome == 'failure'
+        run: exit 1
   ubuntu_x64:
     defaults:
       run:
@@ -127,6 +133,8 @@ jobs:
           CURSEFORGE_API_KEY: "${{ vars.CURSEFORGE_API_KEY }}"
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
       - name: Lint
+        id: lint
+        continue-on-error: true
         run: pnpm lint
       - name: Clear target before tests to avoid folder getting too big
         run: rm -rf target
@@ -171,6 +179,10 @@ jobs:
           path: |
             ./GDLauncher/apps/desktop/release/linux-unpacked/gdl_data/main.log
             ./GDLauncher/apps/desktop/release/linux-unpacked/gdl_data/data/__gdl_logs__/*.log
+            ./GDLauncher/apps/desktop/electron-debug.log
+      - name: Fail if lint failed
+        if: steps.lint.outcome == 'failure'
+        run: exit 1
   windows_x64:
     defaults:
       run:
@@ -224,6 +236,8 @@ jobs:
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
           CARGO_NET_GIT_FETCH_WITH_CLI: true
       - name: Lint
+        id: lint
+        continue-on-error: true
         shell: bash
         run: pnpm lint
       - name: Clear target before tests to avoid folder getting too big
@@ -263,3 +277,7 @@ jobs:
           path: |
             ./GDLauncher/apps/desktop/release/win-unpacked/gdl_data/main.log
             ./GDLauncher/apps/desktop/release/win-unpacked/gdl_data/data/__gdl_logs__/*.log
+            ./GDLauncher/apps/desktop/electron-debug.log
+      - name: Fail if lint failed
+        if: steps.lint.outcome == 'failure'
+        run: exit 1
