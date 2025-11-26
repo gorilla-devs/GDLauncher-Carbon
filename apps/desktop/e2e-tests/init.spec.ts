@@ -6,7 +6,6 @@ import type { ElectronApplication, Page } from "playwright"
 import { getActualUrl } from "./tests_helpers.js"
 import { fileURLToPath } from "url"
 import { dirname } from "path"
-import { spawnSync } from "child_process"
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
