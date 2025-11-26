@@ -96,23 +96,24 @@ test.describe("Init Tests", () => {
       CI: process.env.CI
     })
 
-    // Try running binary directly to capture any immediate crash output
-    console.log("=== Testing direct binary execution ===")
-    try {
-      const result = spawnSync(binaryPath!, ["--version"], {
-        timeout: 5000,
-        encoding: "utf8",
-        env: { ...process.env, DISPLAY: process.env.DISPLAY || ":1" }
-      })
-      console.log("Direct execution exit code:", result.status)
-      console.log("Direct execution signal:", result.signal)
-      if (result.stdout) console.log("Direct execution stdout:", result.stdout)
-      if (result.stderr) console.log("Direct execution stderr:", result.stderr)
-      if (result.error) console.error("Direct execution error:", result.error)
-    } catch (e: any) {
-      console.error("Direct execution exception:", e.message)
-    }
-    console.log("=== End direct binary test ===\n")
+    // Direct execution test - commented out but kept for debugging if needed
+    // Useful for capturing early startup errors before Playwright launch
+    // console.log("=== Testing direct binary execution ===")
+    // try {
+    //   const result = spawnSync(binaryPath!, ["--version"], {
+    //     timeout: 5000,
+    //     encoding: "utf8",
+    //     env: { ...process.env, DISPLAY: process.env.DISPLAY || ":1" }
+    //   })
+    //   console.log("Direct execution exit code:", result.status)
+    //   console.log("Direct execution signal:", result.signal)
+    //   if (result.stdout) console.log("Direct execution stdout:", result.stdout)
+    //   if (result.stderr) console.log("Direct execution stderr:", result.stderr)
+    //   if (result.error) console.error("Direct execution error:", result.error)
+    // } catch (e: any) {
+    //   console.error("Direct execution exception:", e.message)
+    // }
+    // console.log("=== End direct binary test ===\n")
 
     electronApp = await electron
       .launch({
