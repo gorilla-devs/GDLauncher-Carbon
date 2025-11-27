@@ -11,9 +11,9 @@ import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { rspc } from "@/utils/rspcClient"
 import { Show, createEffect, createSignal, createMemo } from "solid-js"
+import { Trans, useTransContext } from "@gd/i18n"
 import { Modpack } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
-import { useTransContext } from "@gd/i18n"
 
 interface Props {
   instanceId: number
@@ -176,7 +176,9 @@ const ModPackVersionUpdate = (props: ModalProps) => {
                   <div class="flex w-full justify-between">
                     <span>{version?.name}</span>
                     <Show when={version?.isCurrent}>
-                      <span class="text-green-500">[ Current ]</span>
+                      <span class="text-green-500">
+                        <Trans key="instances:_trn_version_current" />
+                      </span>
                     </Show>
                   </div>
                 </SelectItem>
@@ -192,7 +194,9 @@ const ModPackVersionUpdate = (props: ModalProps) => {
                     <div class="flex w-full justify-between">
                       <span>{version?.name}</span>
                       <Show when={version?.isCurrent}>
-                        <span class="text-green-500">[ Current ]</span>
+                        <span class="text-green-500">
+                          <Trans key="instances:_trn_version_current" />
+                        </span>
                       </Show>
                     </div>
                   )
@@ -209,14 +213,14 @@ const ModPackVersionUpdate = (props: ModalProps) => {
                 modalContext?.closeModal()
               }}
             >
-              {t("instance.cancel_export")}
+              {t("instances:_trn_cancel_export")}
             </Button>
             <Button
               type="primary"
               onClick={handleUpdate}
               disabled={!selectedVersion()}
             >
-              {t("instance.instance_modal_instance_update")}
+              {t("instances:_trn_instance_modal_instance_update")}
             </Button>
           </div>
         </Show>

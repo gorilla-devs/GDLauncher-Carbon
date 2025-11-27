@@ -79,11 +79,64 @@ test.describe("Init Tests", () => {
     // set the CI environment variable to true
     process.env.CI = "e2e"
 
-    electronApp = await electron.launch({
-      args: [],
-      executablePath: await getBinaryPath(),
-      env: { ...process.env } as any
+    const binaryPath = await getBinaryPath()
+    console.log("Launching Electron from:", binaryPath)
+    console.log("Binary exists:", fs.existsSync(binaryPath!))
+    if (binaryPath) {
+      const stats = fs.statSync(binaryPath)
+      console.log(
+        "Binary is executable:",
+        !!(stats.mode & fs.constants.S_IXUSR)
+      )
+      console.log("Binary size:", stats.size)
+    }
+    console.log("Environment:", {
+      DISPLAY: process.env.DISPLAY,
+      CI: process.env.CI
     })
+
+    // Direct execution test - commented out but kept for debugging if needed
+    // Useful for capturing early startup errors before Playwright launch
+    // console.log("=== Testing direct binary execution ===")
+    // try {
+    //   const result = spawnSync(binaryPath!, ["--version"], {
+    //     timeout: 5000,
+    //     encoding: "utf8",
+    //     env: { ...process.env, DISPLAY: process.env.DISPLAY || ":1" }
+    //   })
+    //   console.log("Direct execution exit code:", result.status)
+    //   console.log("Direct execution signal:", result.signal)
+    //   if (result.stdout) console.log("Direct execution stdout:", result.stdout)
+    //   if (result.stderr) console.log("Direct execution stderr:", result.stderr)
+    //   if (result.error) console.error("Direct execution error:", result.error)
+    // } catch (e: any) {
+    //   console.error("Direct execution exception:", e.message)
+    // }
+    // console.log("=== End direct binary test ===\n")
+
+    electronApp = await electron
+      .launch({
+        args: [],
+        executablePath: binaryPath,
+        env: { ...process.env } as any
+      })
+      .catch((error) => {
+        console.error("=== Electron Launch Failed ===")
+        console.error("Error message:", error.message)
+        console.error("Error name:", error.name)
+        console.error("Error stack:", error.stack)
+
+        // Try to get process exit info if available
+        if (error.cause) {
+          console.error("Error cause:", error.cause)
+        }
+
+        console.error(
+          "Full error object:",
+          JSON.stringify(error, Object.getOwnPropertyNames(error), 2)
+        )
+        throw error
+      })
 
     electronApp.on("console", (msg) => {
       console.log(msg.text())
@@ -137,7 +190,7 @@ test.describe("Init Tests", () => {
     expect(getActualUrl(currentUrl)).toBe("/")
 
     const loginContainer = await (
-      await page.waitForSelector("#main-login-page")
+      await page.waitForSelector("#auth-flow")
     )?.innerHTML()
 
     expect(loginContainer).not.toBeUndefined()

@@ -1,5 +1,6 @@
 import { Badge } from "@gd/ui"
 import { For, Show } from "solid-js"
+import { Trans } from "@gd/i18n"
 import { CategoryIcon } from "@/utils/instances"
 import { FEUnifiedCategory } from "@gd/core_module/bindings"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
@@ -87,7 +88,9 @@ export default function DynamicBadgeContainer(props: {
           </TooltipTrigger>
           <TooltipContent>
             <div class="flex flex-col gap-1">
-              <div class="font-medium">Hidden Categories:</div>
+              <div class="font-medium">
+                <Trans key="search:_trn_hidden_categories" />
+              </div>
               <div class="flex flex-wrap gap-1">
                 <For each={hiddenCategories()}>
                   {(category) => {

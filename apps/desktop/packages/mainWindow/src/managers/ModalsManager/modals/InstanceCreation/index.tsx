@@ -17,8 +17,8 @@ const InstanceCreation = (props: ModalProps) => {
 
   const title = () =>
     data()?.id !== undefined && data()?.id !== null
-      ? t("modals.title.modify_instance")
-      : t("modals.title.new_instance")
+      ? t("modals:_trn_title.modify_instance")
+      : t("modals:_trn_title.new_instance")
 
   return (
     <ModalLayout noHeader={props.noHeader} title={title()} noPadding={true}>
@@ -33,13 +33,13 @@ const InstanceCreation = (props: ModalProps) => {
                 <Tab class="w-1/2" centerContent>
                   <div class="flex items-center gap-2">
                     <div class="i-hugeicons:add-01" />
-                    <Trans key="instance.instance_creation_custom_tab" />
+                    <Trans key="instances:_trn_instance_creation_custom_tab" />
                   </div>
                 </Tab>
                 <Tab class="w-1/2" centerContent>
                   <div class="flex items-center gap-2">
                     <div class="i-hugeicons:upload-01" />
-                    <Trans key="instance.instance_import_tab" />
+                    <Trans key="instances:_trn_instance_import_tab" />
                   </div>
                 </Tab>
               </TabList>

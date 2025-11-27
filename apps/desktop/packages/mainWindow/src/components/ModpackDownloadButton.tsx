@@ -24,13 +24,13 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
     mutationKey: ["instance.prepareInstance"],
     async onSuccess() {
       setLoading(false)
-      toast.success(t("notifications.instance_created_success"))
+      toast.success(t("notifications:_trn_instance_created_success"))
 
       navigator.navigate(`/library`)
     },
     onError() {
       setLoading(false)
-      toast.error(t("notifications.instance_created_error"))
+      toast.error(t("notifications:_trn_instance_created_error"))
     }
   }))
 
@@ -46,7 +46,7 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
     },
     onError() {
       setLoading(false)
-      toast.error(t("notifications.modpack_download_error"))
+      toast.error(t("notifications:_trn_modpack_download_error"))
     }
   }))
 
@@ -124,7 +124,7 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
         <Show when={!loading()}>
           <div class="flex items-center gap-1.5">
             <div class="i-hugeicons:download-02" />
-            <Trans key="instance.download" />
+            <Trans key="instances:_trn_download" />
           </div>
         </Show>
       </Button>

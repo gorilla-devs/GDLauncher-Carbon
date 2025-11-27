@@ -70,7 +70,7 @@ const Overview = () => {
           }
         >
           <Card
-            title={t("instance.overview_card_mods_title")}
+            title={t("content:_trn_overview_card_mods_title")}
             text={routeData.instanceMods?.length || 0}
             icon="cart"
             class="flex-1"
@@ -78,7 +78,7 @@ const Overview = () => {
         </Show>
         <Show when={routeData.instanceDetails.data?.secondsPlayed}>
           <Card
-            title={t("instance.overview_card_played_time_title")}
+            title={t("instances:_trn_overview_card_played_time_title")}
             text={formatDuration(
               intervalToDuration({
                 start: 0,
@@ -91,7 +91,7 @@ const Overview = () => {
         </Show>
         <Show when={routeData.instanceDetails.data?.lastPlayed}>
           <Card
-            title={t("instance.overview_card_last_played_title")}
+            title={t("instances:_trn_overview_card_last_played_title")}
             text={format(
               new Date(routeData.instanceDetails.data?.lastPlayed!),
               "PPP"
@@ -162,7 +162,7 @@ const Overview = () => {
                       }
                     }}
                   >
-                    <Trans key="instance.modpack_open_website" />
+                    <Trans key="instances:_trn_modpack_open_website" />
                     <div class="i-hugeicons:link-square-02" />
                   </Button>
                   <Button
@@ -180,7 +180,7 @@ const Overview = () => {
                       }
                     }}
                   >
-                    <Trans key="instance.modpack_view" />
+                    <Trans key="instances:_trn_modpack_view" />
                     <div class="i-hugeicons:arrow-right-01 h-4 w-4" />
                   </Button>
                 </div>
@@ -194,7 +194,7 @@ const Overview = () => {
         <div class="bg-darkSlate-700 w-59 box-border flex w-full flex-col items-start justify-between gap-2 rounded-xl p-5">
           <div class="text-lightSlate-700 uppercase">
             <Trans
-              key="instance.notes"
+              key="instances:_trn_notes"
               options={{
                 defaultValue: "notes"
               }}

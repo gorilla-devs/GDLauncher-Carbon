@@ -118,7 +118,7 @@ const Mods = () => {
             variant="Confused Gorilla - Empty Chest"
           />
           <p class="text-lightSlate-700 max-w-100">
-            <Trans key="instance.no_mods_text" />
+            <Trans key="content:_trn_no_mods_text" />
           </p>
           <Button
             type="outline"
@@ -127,7 +127,7 @@ const Mods = () => {
               gotoSearchPage()
             }}
           >
-            <Trans key="instance.add_mod" />
+            <Trans key="content:_trn_add_mod" />
           </Button>
         </div>
       </div>
@@ -167,7 +167,7 @@ const Mods = () => {
           </div>
           <div class="text-lightSlate-700">
             <Trans
-              key="instance_selected_mods_count"
+              key="content:_trn_instance_selected_mods_count"
               options={{
                 total: routeData.instanceMods?.length,
                 selected: selectedMods()?.length
@@ -185,7 +185,7 @@ const Mods = () => {
                 />
               </TooltipTrigger>
               <TooltipContent class="max-w-38 overflow-hidden text-ellipsis">
-                <Trans key="instance.locked_cannot_apply_changes" />
+                <Trans key="instances:_trn_locked_cannot_apply_changes" />
               </TooltipContent>
             </Tooltip>
           </Show>
@@ -240,11 +240,11 @@ const Mods = () => {
               <TooltipTrigger>
                 <div class="text-lightSlate-700 flex cursor-pointer items-center gap-2">
                   <div class="i-hugeicons:delete-02 text-2xl" />
-                  <Trans key="instance.delete_mod" />
+                  <Trans key="content:_trn_delete_mod" />
                 </div>
               </TooltipTrigger>
               <TooltipContent class="max-w-38 overflow-hidden text-ellipsis">
-                <Trans key="instance.locked_cannot_apply_changes" />
+                <Trans key="instances:_trn_locked_cannot_apply_changes" />
               </TooltipContent>
             </Tooltip>
           </Show>
@@ -261,7 +261,7 @@ const Mods = () => {
               }}
             >
               <div class="i-hugeicons:delete-02 text-2xl" />
-              <Trans key="instance.delete_mod" />
+              <Trans key="content:_trn_delete_mod" />
             </div>
           </Show>
           <Show
@@ -272,11 +272,11 @@ const Mods = () => {
                 <TooltipTrigger>
                   <div class="text-lightSlate-700 flex items-center gap-2">
                     <div class="i-hugeicons:download-02 text-2xl" />
-                    <Trans key="instance.update_mods" />
+                    <Trans key="content:_trn_update_mods" />
                   </div>
                 </TooltipTrigger>
                 <TooltipContent class="max-w-38 overflow-hidden text-ellipsis">
-                  <Trans key="instance.locked_cannot_apply_changes" />
+                  <Trans key="instances:_trn_locked_cannot_apply_changes" />
                 </TooltipContent>
               </Tooltip>
             </Show>
@@ -288,7 +288,7 @@ const Mods = () => {
                 }}
               >
                 <div class="i-hugeicons:download-02 text-2xl" />
-                <Trans key="instance.update_mods" />
+                <Trans key="content:_trn_update_mods" />
               </div>
             </Show>
           </Show>
@@ -327,19 +327,19 @@ const Mods = () => {
             />
             <Input
               onInput={(e) => setFilter(e.target.value)}
-              placeholder={t("instance.mods.search")}
+              placeholder={t("content:_trn_mods.search")}
               icon={<div class="i-hugeicons:search-01" />}
               class="text-lightSlate-700 rounded-full"
             />
           </div>
           <div class="flex items-center gap-4">
             {/* <p class="text-lightSlate-700">
-              <Trans key="instance.sort_by" />
+              <Trans key="content:_trn_sort_by" />
             </p>
             <Dropdown
               options={[
-                { label: t("instance.sort_by_asc"), key: "asc" },
-                { label: t("instance.sort_by_desc"), key: "desc" }
+                { label: t("content:_trn_sort_by_asc"), key: "_trn_asc" },
+                { label: t("content:_trn_sort_by_desc"), key: "_trn_desc" }
               ]}
               value={"asc"}
               rounded
@@ -359,11 +359,11 @@ const Mods = () => {
               <Tooltip placement="top">
                 <TooltipTrigger>
                   <Button disabled type="outline" size="medium">
-                    <Trans key="instance.add_mod" />
+                    <Trans key="content:_trn_add_mod" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent class="max-w-38 overflow-hidden text-ellipsis">
-                  <Trans key="instance.locked_cannot_apply_changes" />
+                  <Trans key="instances:_trn_locked_cannot_apply_changes" />
                 </TooltipContent>
               </Tooltip>
             </Show>
@@ -376,7 +376,7 @@ const Mods = () => {
                   gotoSearchPage()
                 }}
               >
-                <Trans key="instance.add_mod" />
+                <Trans key="content:_trn_add_mod" />
               </Button>
             </Show>
 
@@ -409,10 +409,10 @@ const Mods = () => {
                 </TooltipTrigger>
                 <TooltipContent class="max-w-38 overflow-hidden text-ellipsis">
                   <Show when={isInstanceLocked()}>
-                    <Trans key="instance.locked_cannot_apply_changes" />
+                    <Trans key="instances:_trn_locked_cannot_apply_changes" />
                   </Show>
                   <Show when={!isInstanceLocked()}>
-                    <Trans key="instance.update_all_mods" />
+                    <Trans key="content:_trn_update_all_mods" />
                   </Show>
                 </TooltipContent>
               </Tooltip>
@@ -433,7 +433,7 @@ const Mods = () => {
                 </div>
               </TooltipTrigger>
               <TooltipContent class="max-w-38 overflow-hidden text-ellipsis">
-                <Trans key="instance.open_mods_folder" />
+                <Trans key="content:_trn_open_mods_folder" />
               </TooltipContent>
             </Tooltip>
           </div>

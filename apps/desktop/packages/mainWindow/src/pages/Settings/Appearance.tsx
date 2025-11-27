@@ -1,6 +1,7 @@
 import ThemePreview from "@/components/ThemePreview"
 import { queryClient, rspc } from "@/utils/rspcClient"
 import { Trans } from "@gd/i18n"
+import { getThemeKey } from "@gd/i18n/helpers"
 import { useRouteData } from "@solidjs/router"
 import { For } from "solid-js"
 import fetchData from "./settings.general.data"
@@ -31,11 +32,13 @@ const Appearance = () => {
     <LoadingError routeData={routeData}>
       <div class="w-full">
         <PageTitle>
-          <Trans key="settings:Appearance" />
+          <Trans key="settings:_trn_appearance" />
         </PageTitle>
         <Row forceContentBelow class="border-box w-full max-w-full">
-          <Title description={<Trans key="settings:default_themes_text" />}>
-            <Trans key="settings:default_themes_title" />
+          <Title
+            description={<Trans key="settings:_trn_default_themes_text" />}
+          >
+            <Trans key="settings:_trn_default_themes_title" />
           </Title>
           <div class="flex w-full flex-wrap gap-6">
             <For each={themes}>
@@ -83,7 +86,7 @@ const Appearance = () => {
                     </div>
                     <div class="box-border flex w-full items-center justify-start gap-2 px-2 py-4">
                       <p class="text-lightSlate-700 m-0">
-                        <Trans key={`settings:theme_${theme}`} />
+                        <Trans key={getThemeKey(theme)} />
                       </p>
                     </div>
                   </div>
@@ -93,11 +96,11 @@ const Appearance = () => {
           </div>
         </Row>
         <Row forceContentBelow class="border-box w-full max-w-full">
-          <Title description={<Trans key="settings:custom_themes_text" />}>
-            <Trans key="settings:custom_themes_title" />
+          <Title description={<Trans key="settings:_trn_custom_themes_text" />}>
+            <Trans key="settings:_trn_custom_themes_title" />
           </Title>
           <div class="flex w-full flex-wrap gap-6">
-            <Trans key="general.coming_soon" />
+            <Trans key="general:_trn_coming_soon" />
           </div>
         </Row>
       </div>

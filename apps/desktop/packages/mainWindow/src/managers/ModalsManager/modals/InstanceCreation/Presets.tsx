@@ -1,6 +1,6 @@
 import { toast } from "@gd/ui"
 import { useModal } from "../.."
-import { Trans, useTransContext } from "@gd/i18n"
+import { Trans, useTransContext, NamespacedTranslationKey } from "@gd/i18n"
 import { createSignal, For, Show, createMemo } from "solid-js"
 import { rspc } from "@/utils/rspcClient"
 import { CFFEModLoaderType, ModLoader } from "@gd/core_module/bindings"
@@ -11,7 +11,7 @@ import { getModloaderIcon } from "@/utils/sidebar"
 interface PresetOption {
   name: string
   loader: CFFEModLoaderType | undefined
-  translationKey: string
+  translationKey: NamespacedTranslationKey
 }
 
 const Presets = () => {
@@ -62,15 +62,23 @@ const Presets = () => {
   const DUMMY_META_VERSION = "${gdlauncher.gameVersion}"
 
   const presetOptions: PresetOption[] = [
-    { name: "Vanilla", loader: undefined, translationKey: "instance.vanilla" },
-    { name: "Forge", loader: "forge", translationKey: "instance.forge" },
+    {
+      name: "Vanilla",
+      loader: undefined,
+      translationKey: "instances:_trn_vanilla"
+    },
+    { name: "Forge", loader: "forge", translationKey: "instances:_trn_forge" },
     {
       name: "NeoForge",
       loader: "neoforge",
-      translationKey: "instance.neoforge"
+      translationKey: "instances:_trn_neoforge"
     },
-    { name: "Fabric", loader: "fabric", translationKey: "instance.fabric" },
-    { name: "Quilt", loader: "quilt", translationKey: "instance.quilt" }
+    {
+      name: "Fabric",
+      loader: "fabric",
+      translationKey: "instances:_trn_fabric"
+    },
+    { name: "Quilt", loader: "quilt", translationKey: "instances:_trn_quilt" }
   ]
 
   const getLatestLoaderVersion = (loader: CFFEModLoaderType | undefined) => {
@@ -211,7 +219,7 @@ const Presets = () => {
           <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
           <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
             <div class="i-hugeicons:zap text-primary-500 text-sm" />
-            <Trans key="instance.quick_start_presets" />
+            <Trans key="instances:_trn_quick_start_presets" />
           </span>
           <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
         </div>
@@ -243,7 +251,7 @@ const Presets = () => {
 
               {/* Latest badge */}
               <div class="absolute right-2 top-2 rounded-full border border-emerald-500/30 bg-emerald-500/20 px-2 py-0.5 text-xs font-semibold text-emerald-400 backdrop-blur-sm">
-                <Trans key="instance.latest" />
+                <Trans key="instances:_trn_latest" />
               </div>
 
               <div class="relative z-10 flex flex-col items-center gap-2">
@@ -268,7 +276,10 @@ const Presets = () => {
                   </span>
                   <Show when={latestMcVersion()}>
                     <span class="text-lightSlate-300 text-sm">
-                      Minecraft {latestMcVersion()}
+                      <Trans
+                        key="instances:_trn_preset_minecraft_version"
+                        options={{ version: latestMcVersion() }}
+                      />
                     </span>
                   </Show>
                 </div>
@@ -330,7 +341,7 @@ const Presets = () => {
 
             {/* Footer description */}
             <div class="text-lightSlate-500 mt-2 text-center text-xs">
-              <Trans key="instance.preset_description" />
+              <Trans key="instances:_trn_preset_description" />
             </div>
           </div>
         </Show>

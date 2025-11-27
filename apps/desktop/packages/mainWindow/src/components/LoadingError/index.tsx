@@ -22,7 +22,7 @@ const LoadingError = (props: Props) => {
       </Match>
       <Match when={props.routeData.data.isError}>
         <div class="flex h-full w-full items-center justify-center">
-          <Trans key="errors.some_error" />
+          <Trans key="errors:_trn_some_error" />
         </div>
       </Match>
       <Match when={props.routeData.data.isSuccess}>{props.children}</Match>

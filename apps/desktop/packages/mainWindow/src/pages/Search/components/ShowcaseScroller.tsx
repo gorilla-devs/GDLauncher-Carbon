@@ -129,7 +129,7 @@ export default function ShowcaseScroller(props: ShowcaseScrollerProps) {
         <h2 class="text-2xl font-bold">{props.title}</h2>
         <Show when={props.viewAllAction}>
           <Button type="text" onClick={props.viewAllAction}>
-            View All
+            <Trans key="general:_trn_common.view_all" />
           </Button>
         </Show>
       </div>
@@ -217,7 +217,7 @@ export default function ShowcaseScroller(props: ShowcaseScrollerProps) {
               }}
             >
               <h3 class="p-2 font-bold text-white">
-                <Trans key="search.show_more" />
+                <Trans key="search:_trn_show_more" />
               </h3>
             </div>
           </Show>

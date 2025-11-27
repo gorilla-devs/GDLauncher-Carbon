@@ -72,7 +72,7 @@ const ThirdStep = (props: Props) => {
                 <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
                 <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
                   <div class="i-hugeicons:rocket-02 text-primary-500 text-sm" />
-                  <Trans key="instance.import_instance" />
+                  <Trans key="instances:_trn_import_instance" />
                 </span>
                 <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
               </div>
@@ -105,7 +105,7 @@ const ThirdStep = (props: Props) => {
                 size="large"
                 type="secondary"
               >
-                <Trans key="onboarding.prev" />
+                <Trans key="onboarding:_trn_prev" />
               </Button>
               <Button
                 onClick={() => {
@@ -115,9 +115,9 @@ const ThirdStep = (props: Props) => {
                 type="primary"
               >
                 {isDownloaded() ? (
-                  <Trans key="onboarding.done" />
+                  <Trans key="onboarding:_trn_done" />
                 ) : (
-                  <Trans key="onboarding.skip" />
+                  <Trans key="onboarding:_trn_skip" />
                 )}
               </Button>
             </div>

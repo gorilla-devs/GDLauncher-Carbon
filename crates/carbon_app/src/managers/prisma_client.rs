@@ -33,7 +33,7 @@ pub enum DatabaseError {
 #[instrument]
 pub(super) async fn load_and_migrate(
     runtime_path: PathBuf,
-    gdl_base_api: String,
+    latest_consent_sha: Option<String>,
 ) -> Result<PrismaClient, anyhow::Error> {
     let runtime_path = dunce::simplified(&runtime_path);
 
@@ -111,7 +111,7 @@ pub(super) async fn load_and_migrate(
         .await
         .unwrap();
 
-    seed_init_db(&db_client, gdl_base_api).await?;
+    seed_init_db(&db_client, latest_consent_sha).await?;
 
     Ok(db_client)
 }
@@ -128,7 +128,10 @@ async fn find_appropriate_default_xmx() -> i32 {
     }
 }
 
-async fn seed_init_db(db_client: &PrismaClient, gdl_base_api: String) -> Result<(), anyhow::Error> {
+async fn seed_init_db(
+    db_client: &PrismaClient,
+    latest_consent_sha: Option<String>,
+) -> Result<(), anyhow::Error> {
     let release_channel = match APP_VERSION {
         v if v.contains("alpha") => "alpha",
         v if v.contains("beta") => "beta",
@@ -188,39 +191,28 @@ async fn seed_init_db(db_client: &PrismaClient, gdl_base_api: String) -> Result<
         )));
     }
 
-    let latest_tos_privacy_checksum = TermsAndPrivacy::get_latest_consent_sha(gdl_base_api)
-        .await
-        .map_err(DatabaseError::TermsAndPrivacy);
+    // Emit status for frontend progress tracking
+    println!("_STATUS_:VerifyingTermsAndPrivacy");
 
-    match latest_tos_privacy_checksum {
-        Ok(latest_tos_privacy_checksum) => {
-            let mut should_empty_tos_privacy = false;
+    if latest_consent_sha.is_some() {
+        let mut should_empty_tos_privacy = false;
 
-            if app_config.terms_and_privacy_accepted_checksum
-                != Some(latest_tos_privacy_checksum.clone())
-            {
-                should_empty_tos_privacy = true;
-            }
-
-            tracing::info!(
-                "Should empty tos_privacy: {}, latest tos_privacy checksum: {}, current tos_privacy checksum: {:?}",
-                should_empty_tos_privacy,
-                latest_tos_privacy_checksum,
-                app_config.terms_and_privacy_accepted_checksum
-            );
-
-            if should_empty_tos_privacy {
-                updates.push(app_configuration::terms_and_privacy_accepted::set(false));
-                updates.push(app_configuration::terms_and_privacy_accepted_checksum::set(
-                    None,
-                ));
-            }
+        if app_config.terms_and_privacy_accepted_checksum != latest_consent_sha {
+            should_empty_tos_privacy = true;
         }
-        Err(err) => {
-            tracing::error!(
-                "Error while fetching latest terms and privacy checksum: {:?}",
-                err
-            );
+
+        tracing::info!(
+            "Should empty tos_privacy: {}, latest tos_privacy checksum: {}, current tos_privacy checksum: {:?}",
+            should_empty_tos_privacy,
+            latest_consent_sha.expect("We just checked .is_some()"),
+            app_config.terms_and_privacy_accepted_checksum
+        );
+
+        if should_empty_tos_privacy {
+            updates.push(app_configuration::terms_and_privacy_accepted::set(false));
+            updates.push(app_configuration::terms_and_privacy_accepted_checksum::set(
+                None,
+            ));
         }
     }
 
@@ -243,43 +235,18 @@ mod test {
 
     #[tokio::test]
     async fn test_migrate_tos_privacy_should_reset_status_200() {
-        let mut server = mockito::Server::new_async().await;
-        let mock_url = server.url();
-
-        let mock = server
-            .mock("GET", "/v1/latest_consent_checksum")
-            .with_status(200)
-            .with_body("1234567890")
-            .expect(1)
-            .create_async()
-            .await;
-
         let temp_dir = tempfile::tempdir().unwrap();
         let temp_path = dunce::canonicalize(temp_dir.into_path()).unwrap();
 
-        let db_client = load_and_migrate(temp_path.clone(), mock_url.to_string())
+        let initial_checksum = Some(String::from("initial"));
+
+        let db_client = load_and_migrate(temp_path.clone(), initial_checksum)
             .await
             .unwrap();
 
-        db_client
-            .app_configuration()
-            .update(
-                db::app_configuration::id::equals(0),
-                vec![
-                    db::app_configuration::terms_and_privacy_accepted_checksum::set(Some(
-                        "something else".to_string(),
-                    )),
-                ],
-            )
-            .exec()
-            .await
-            .unwrap();
+        let new_checksum = Some(String::from("new"));
 
-        drop(db_client);
-
-        let db_client = load_and_migrate(temp_path, mock_url.to_string())
-            .await
-            .unwrap();
+        let db_client = load_and_migrate(temp_path, new_checksum).await.unwrap();
 
         assert_eq!(
             db_client
@@ -296,31 +263,11 @@ mod test {
 
     #[tokio::test]
     async fn test_migrate_tos_privacy_should_not_reset_status_500() {
-        let mut server_500 = mockito::Server::new_async().await;
-        let mock_url_500 = server_500.url();
-        let mut server_200 = mockito::Server::new_async().await;
-        let mock_url_200 = server_200.url();
-
-        server_500
-            .mock("GET", "/v1/latest_consent_checksum")
-            .with_status(500)
-            .with_body("1234567890")
-            .expect(1)
-            .create_async()
-            .await;
-
-        server_200
-            .mock("GET", "/v1/latest_consent_checksum")
-            .with_status(200)
-            .with_body("1234567890")
-            .expect(1)
-            .create_async()
-            .await;
-
         let temp_dir = tempfile::tempdir().unwrap();
         let temp_path = dunce::canonicalize(temp_dir.into_path()).unwrap();
+        let initial_checksum = Some(String::from("initial"));
 
-        let db_client = load_and_migrate(temp_path.clone(), mock_url_200)
+        let db_client = load_and_migrate(temp_path.clone(), initial_checksum.clone())
             .await
             .unwrap();
 
@@ -329,19 +276,19 @@ mod test {
             .update(
                 db::app_configuration::id::equals(0),
                 vec![
-                    db::app_configuration::terms_and_privacy_accepted_checksum::set(Some(
-                        "something else".to_string(),
-                    )),
+                    db::app_configuration::terms_and_privacy_accepted_checksum::set(
+                        initial_checksum.clone(),
+                    ),
                 ],
             )
             .exec()
             .await
             .unwrap();
 
-        drop(db_client);
+        let new_checksum = None;
 
         // Since it's a 500 we should not reset the status
-        let db_client = load_and_migrate(temp_path, mock_url_500).await.unwrap();
+        let db_client = load_and_migrate(temp_path, new_checksum).await.unwrap();
 
         assert_eq!(
             db_client
@@ -352,7 +299,7 @@ mod test {
                 .unwrap()
                 .unwrap()
                 .terms_and_privacy_accepted_checksum,
-            Some("something else".to_string())
+            initial_checksum
         );
     }
 }

@@ -142,7 +142,7 @@ const HeroFeatureCard = (props: HeroFeatureCardProps) => {
           <div class="mb-4 flex items-center gap-3">
             <div class={`${getIcon()} ${getIconColor()} h-8 w-8`} />
             <Badge variant="secondary" class="text-xs font-semibold">
-              Major Feature
+              <Trans key="news:_trn_changelogs.major_feature" />
             </Badge>
           </div>
           <h2 class="text-lightSlate-50 mb-3 text-2xl font-bold">
@@ -157,7 +157,7 @@ const HeroFeatureCard = (props: HeroFeatureCardProps) => {
 
         {/* Media Section */}
         <Show when={props.entry.media}>
-          <div class="relative overflow-hidden rounded-xl p-6">
+          <div class="relative overflow-hidden rounded-xl p-6 flex items-center">
             <div class="relative aspect-[4/3] w-full">
               {/* Loading skeleton - absolute positioned as background */}
               <Show when={!mediaLoaded()}>
@@ -370,14 +370,14 @@ const Changelogs = (props: ModalProps) => {
         <div class="border-darkSlate-600 border-b px-8 py-6">
           <h2 class="text-lightSlate-50 m-0 text-2xl font-bold">
             <Trans
-              key="changelogs.whats_new_in"
+              key="news:_trn_changelogs.whats_new_in"
               options={{
                 version: __APP_VERSION__
               }}
             />
           </h2>
           <p class="text-lightSlate-500 mt-2 text-sm">
-            Discover the latest features, improvements, and fixes
+            <Trans key="news:_trn_changelogs.discover_text" />
           </p>
         </div>
 
@@ -433,10 +433,10 @@ const Changelogs = (props: ModalProps) => {
             <div class="border-darkSlate-600 flex flex-col items-center gap-4 rounded-xl border p-6">
               <div class="text-center">
                 <h3 class="text-lightSlate-50 mb-2 text-lg font-semibold">
-                  <Trans key="changelogs.cta_discord_title" />
+                  <Trans key="news:_trn_changelogs.cta_discord_title" />
                 </h3>
                 <p class="text-lightSlate-500 text-sm">
-                  <Trans key="changelogs.cta_discord_description" />
+                  <Trans key="news:_trn_changelogs.cta_discord_description" />
                 </p>
               </div>
               <Button
@@ -447,7 +447,7 @@ const Changelogs = (props: ModalProps) => {
               >
                 <div class="flex items-center justify-center gap-2">
                   <div class="i-hugeicons:discord inline-block h-5 w-5" />
-                  <Trans key="changelogs.cta_discord_button" />
+                  <Trans key="news:_trn_changelogs.cta_discord_button" />
                 </div>
               </Button>
             </div>
@@ -456,10 +456,10 @@ const Changelogs = (props: ModalProps) => {
             <div class="border-darkSlate-600 flex flex-col items-center gap-4 rounded-xl border p-6">
               <div class="text-center">
                 <h3 class="text-lightSlate-50 mb-2 text-lg font-semibold">
-                  <Trans key="changelogs.cta_github_title" />
+                  <Trans key="news:_trn_changelogs.cta_github_title" />
                 </h3>
                 <p class="text-lightSlate-500 text-sm">
-                  <Trans key="changelogs.cta_github_description" />
+                  <Trans key="news:_trn_changelogs.cta_github_description" />
                 </p>
               </div>
               <Button
@@ -473,7 +473,7 @@ const Changelogs = (props: ModalProps) => {
               >
                 <div class="flex items-center justify-center gap-2">
                   <div class="i-hugeicons:github inline-block h-5 w-5" />
-                  <Trans key="changelogs.cta_github_button" />
+                  <Trans key="news:_trn_changelogs.cta_github_button" />
                 </div>
               </Button>
             </div>
@@ -483,10 +483,10 @@ const Changelogs = (props: ModalProps) => {
           <div class="border-darkSlate-600 mt-4 flex items-center justify-between gap-4 rounded-xl border p-6">
             <div>
               <h3 class="text-lightSlate-50 mb-1 text-base font-semibold">
-                <Trans key="changelogs.cta_report_title" />
+                <Trans key="news:_trn_changelogs.cta_report_title" />
               </h3>
               <p class="text-lightSlate-500 text-sm">
-                <Trans key="changelogs.cta_report_description" />
+                <Trans key="news:_trn_changelogs.cta_report_description" />
               </p>
             </div>
             <Button
@@ -500,7 +500,7 @@ const Changelogs = (props: ModalProps) => {
             >
               <div class="flex items-center justify-center gap-2">
                 <div class="i-hugeicons:alert-02 inline-block h-5 w-5" />
-                <Trans key="changelogs.cta_report_button" />
+                <Trans key="news:_trn_changelogs.cta_report_button" />
               </div>
             </Button>
           </div>

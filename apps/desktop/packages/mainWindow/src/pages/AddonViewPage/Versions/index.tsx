@@ -82,18 +82,20 @@ const Versions = () => {
         style={{ top: mod?.data?.type === "modpack" ? "72px" : "136px" }}
       >
         <div>
-          <Trans key="browser_table_headers.name" />
+          <Trans key="search:_trn_browser_table_headers.name" />
         </div>
         <div>
-          <Trans key="browser_table_headers.published" />
+          <Trans key="search:_trn_browser_table_headers.published" />
         </div>
         <div>
-          <Trans key="browser_table_headers.downloads" />
+          <Trans key="search:_trn_browser_table_headers.downloads" />
         </div>
         <div>
-          <Trans key="browser_table_headers.type" />
+          <Trans key="search:_trn_browser_table_headers.type" />
         </div>
-        <div class="text-right">Actions</div>
+        <div class="text-right">
+          <Trans key="content:_trn_actions" />
+        </div>
       </div>
       <div class="flex-1 px-6">
         <Show
@@ -106,7 +108,7 @@ const Versions = () => {
                   <Show when={infiniteQuery.infiniteQuery.error}>
                     <div class="i-hugeicons:alert-02 text-3xl mb-4 text-red-400" />
                     <h3 class="mb-2 text-lg font-semibold text-red-300">
-                      Error loading versions
+                      <Trans key="content:_trn_error_loading_versions" />
                     </h3>
                     <Button
                       type="secondary"
@@ -114,11 +116,13 @@ const Versions = () => {
                       onClick={() => infiniteQuery.infiniteQuery.refetch()}
                     >
                       <div class="i-hugeicons:refresh mr-2 h-4 w-4" />
-                      Retry
+                      <Trans key="general:_trn_retry" />
                     </Button>
                   </Show>
                   <Show when={!infiniteQuery.infiniteQuery.error}>
-                    <span class="text-lightSlate-400">No versions found</span>
+                    <span class="text-lightSlate-400">
+                      <Trans key="content:_trn_no_versions_found" />
+                    </span>
                   </Show>
                 </div>
               }

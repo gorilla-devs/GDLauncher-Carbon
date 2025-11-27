@@ -95,7 +95,11 @@ const Java = () => {
 
   const renderJavaOption = (id: string) => {
     if (id === "unassigned") {
-      return <div>Unassigned</div>
+      return (
+        <div>
+          <Trans key="java:_trn_unassigned" />
+        </div>
+      )
     }
 
     const java = getJavaById(id)
@@ -144,12 +148,12 @@ const Java = () => {
   return (
     <>
       <PageTitle>
-        <Trans key="settings:Java" />
+        <Trans key="settings:_trn_java" />
       </PageTitle>
       <RowsContainer>
         <Row forceContentBelow>
           <Title>
-            <Trans key="java.java_memory_title" />
+            <Trans key="java:_trn_java_memory_title" />
           </Title>
           <Center>
             <Slider
@@ -181,7 +185,7 @@ const Java = () => {
         </Row>
         <Row class="flex-col items-stretch">
           <Title>
-            <Trans key="java.java_arguments_title" />
+            <Trans key="java:_trn_java_arguments_title" />
           </Title>
           <div class="flex items-center justify-center gap-4">
             <Input
@@ -213,7 +217,7 @@ const Java = () => {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <Trans key="tooltip.undo" />
+                <Trans key="ui:_trn_tooltip.undo" />
               </TooltipContent>
             </Tooltip>
             <Tooltip>
@@ -234,7 +238,7 @@ const Java = () => {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <Trans key="tooltip.reset" />
+                <Trans key="ui:_trn_tooltip.reset" />
               </TooltipContent>
             </Tooltip>
           </div>
@@ -242,10 +246,10 @@ const Java = () => {
         <Row>
           <Title
             description={
-              <Trans key="java.auto_manage_java_system_profiles_text" />
+              <Trans key="java:_trn_auto_manage_java_system_profiles_text" />
             }
           >
-            <Trans key="java.auto_manage_java_system_profiles" />
+            <Trans key="java:_trn_auto_manage_java_system_profiles" />
           </Title>
           <RightHandSide>
             <GDSwitch
@@ -265,10 +269,10 @@ const Java = () => {
             <Tabs>
               <TabList heightClass="h-14">
                 <Tab class="w-1/2" centerContent>
-                  <Trans key="java.manage_paths" />
+                  <Trans key="java:_trn_manage_paths" />
                 </Tab>
                 <Tab class="w-1/2" centerContent>
-                  <Trans key="java.manage_profiles" />
+                  <Trans key="java:_trn_manage_profiles" />
                 </Tab>
               </TabList>
               <TabPanel>
@@ -276,16 +280,16 @@ const Java = () => {
                   <div class="mb-4 flex items-center justify-between">
                     <div>
                       <div class="m-0 text-sm font-normal">
-                        <Trans key="java.java_description_text" />
+                        <Trans key="java:_trn_java_description_text" />
                       </div>
                       <div class="m-0 text-sm font-normal">
-                        <Trans key="java.java_description_local_text" />
+                        <Trans key="java:_trn_java_description_local_text" />
                       </div>
                       <div class="m-0 text-sm font-normal">
-                        <Trans key="java.java_description_managed_text" />
+                        <Trans key="java:_trn_java_description_managed_text" />
                       </div>
                       <div class="m-0 text-sm font-normal">
-                        <Trans key="java.java_description_custom_text" />
+                        <Trans key="java:_trn_java_description_custom_text" />
                       </div>
                     </div>
                     <DropdownMenu placement="bottom-end">
@@ -314,7 +318,7 @@ const Java = () => {
                         <div class="border-1 border-darkSlate-600 rounded-xl border-solid">
                           <h3 class="px-4">
                             <Trans
-                              key="java.java_version_number"
+                              key="java:_trn_java_version_number"
                               options={{
                                 version: javaVersion
                               }}
@@ -343,8 +347,7 @@ const Java = () => {
                                                       <div class="i-hugeicons:tick-double-02 flex text-emerald-500 text-lg" />
                                                     </TooltipTrigger>
                                                     <TooltipContent>
-                                                      This java path works and
-                                                      is valid
+                                                      <Trans key="java:_trn_tooltip_valid_path" />
                                                     </TooltipContent>
                                                   </Tooltip>
                                                 </Match>
@@ -354,8 +357,7 @@ const Java = () => {
                                                       <div class="i-hugeicons:alert-02 flex text-yellow-500 text-lg" />
                                                     </TooltipTrigger>
                                                     <TooltipContent>
-                                                      This java path doesn't
-                                                      seem to work
+                                                      <Trans key="java:_trn_tooltip_invalid_path" />
                                                     </TooltipContent>
                                                   </Tooltip>
                                                 </Match>
@@ -371,7 +373,7 @@ const Java = () => {
                                                 <PopoverTrigger>
                                                   <div class="text-sm underline">
                                                     <Trans
-                                                      key="settings:used_in_counted_profiles"
+                                                      key="java:_trn_used_in_counted_profiles"
                                                       options={{
                                                         count:
                                                           usedInNProfiles()
@@ -383,7 +385,7 @@ const Java = () => {
                                                 <PopoverContent>
                                                   <div class="p-4">
                                                     <h3>
-                                                      <Trans key="settings:used_in_the_following_profiles" />
+                                                      <Trans key="java:_trn_used_in_the_following_profiles" />
                                                     </h3>
                                                     <ul class="flex flex-col gap-2">
                                                       <For
@@ -440,7 +442,7 @@ const Java = () => {
                           </Show>
                           <Show when={obj.length === 0}>
                             <p>
-                              <Trans key="java.no_found_java_text" />
+                              <Trans key="java:_trn_no_found_java_text" />
                             </p>
                           </Show>
                         </div>
@@ -453,7 +455,7 @@ const Java = () => {
                 <div class="flex h-full min-h-96 flex-col gap-4 p-4">
                   <div class="mb-4 flex items-center justify-between">
                     <h2 class="m-0 text-sm font-normal">
-                      <Trans key="java.profiles_description_text" />
+                      <Trans key="java:_trn_profiles_description_text" />
                     </h2>
                   </div>
                   <For each={javaProfiles()}>
@@ -463,10 +465,10 @@ const Java = () => {
                           <h3>
                             <Switch>
                               <Match when={i() === 0}>
-                                <Trans key="settings:system_profiles" />
+                                <Trans key="java:_trn_system_profiles" />
                               </Match>
                               <Match when={i() === 1}>
-                                <Trans key="settings:custom_profiles" />
+                                <Trans key="java:_trn_custom_profiles" />
                               </Match>
                             </Switch>
                           </h3>
@@ -549,7 +551,7 @@ const Java = () => {
                                       <PopoverContent>
                                         <div class="max-w-100 flex h-auto flex-col gap-8 p-4">
                                           <div>
-                                            <Trans key="settings:profile_used_in_mc_versions" />
+                                            <Trans key="java:_trn_profile_used_in_mc_versions" />
                                           </div>
                                           <div class="h-70 flex flex-wrap content-start items-start justify-start gap-4 overflow-y-auto p-4">
                                             <For

@@ -29,16 +29,16 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
           <div class="h-h-full">
             <Switch>
               <Match when={props.data.isTargetFolderAlreadyUsed}>
-                <Trans key="settings:confirm_change_runtime_path_already_used_text" />
+                <Trans key="java:_trn_confirm_change_runtime_path_already_used_text" />
               </Match>
               <Match when={!props.data.isTargetFolderAlreadyUsed}>
-                <Trans key="settings:confirm_change_runtime_path_text" />
+                <Trans key="java:_trn_confirm_change_runtime_path_text" />
               </Match>
             </Switch>
           </div>
           <div class="h-h-full">
             <div class="font-bold text-red-400">
-              <Trans key="settings:runtime_path_old_path" />
+              <Trans key="java:_trn_runtime_path_old_path" />
             </div>
             <div class="bg-darkSlate-900 mt-4 p-4">
               <div>{currentRuntimePath()?.replaceAll("\\\\", "/")}</div>
@@ -52,7 +52,7 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                 "text-yellow-400": props.data.isTargetFolderAlreadyUsed
               }}
             >
-              <Trans key="settings:runtime_path_new_path" />
+              <Trans key="java:_trn_runtime_path_new_path" />
             </div>
             <div
               class="bg-darkSlate-900 mt-4 p-4"
@@ -69,7 +69,7 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                 modalsContext?.closeModal()
               }}
             >
-              <Trans key="settings:confirm_change_cancel_button" />
+              <Trans key="settings:_trn_confirm_change_cancel_button" />
             </Button>
             <Button
               type="secondary"
@@ -88,7 +88,7 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                 props.data.setIsChangingRuntimePath(false)
               }}
             >
-              <Trans key="settings:confirm_change_confirm_button" />
+              <Trans key="settings:_trn_confirm_change_confirm_button" />
             </Button>
           </div>
         </div>
@@ -107,7 +107,7 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                 <Match when={migrationError()}>
                   <div class="flex items-center text-center text-2xl">
                     <div>
-                      <Trans key="settings:migration_errored">
+                      <Trans key="java:_trn_migration_errored">
                         {""}
                         <span
                           class="text-lightSlate-50 hover:text-lightSlate-400 cursor-pointer underline"
@@ -124,7 +124,7 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                 </Match>
                 <Match when={!migrationError()}>
                   <div class="flex items-center text-2xl">
-                    <Trans key="settings:applying_new_runtime_path" />
+                    <Trans key="java:_trn_applying_new_runtime_path" />
                     <div class="i-hugeicons:loading-03 ml-2 animate-spin" />
                   </div>
                 </Match>
@@ -134,7 +134,7 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
               <Switch>
                 <Match when={migrationError()}>{migrationError()}</Match>
                 <Match when={!migrationError()}>
-                  <Trans key="settings:do_not_close_app" />
+                  <Trans key="java:_trn_do_not_close_app" />
                 </Match>
               </Switch>
               <div
@@ -150,18 +150,14 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                   <Switch>
                     <Match when={RTprogress()?.action === "copy"}>
                       <Trans
-                        key="settings:copying_file"
-                        options={{
-                          file: RTprogress()?.currentName
-                        }}
+                        key="java:_trn_copying_file"
+                        options={{ file: RTprogress()?.currentName }}
                       />
                     </Match>
                     <Match when={RTprogress()?.action === "remove"}>
                       <Trans
-                        key="settings:removing_file"
-                        options={{
-                          file: RTprogress()?.currentName
-                        }}
+                        key="java:_trn_removing_file"
+                        options={{ file: RTprogress()?.currentName }}
                       />
                     </Match>
                   </Switch>

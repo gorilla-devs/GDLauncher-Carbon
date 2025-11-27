@@ -47,7 +47,7 @@ const PatchesTab = (props: PatchesTabProps) => {
   return (
     <div class="p-6">
       <h1 class="mb-6 text-2xl font-medium">
-        <Trans key="news.minecraft_patches">Minecraft Patch Notes</Trans>
+        <Trans key="news:_trn_minecraft_patches">Minecraft Patch Notes</Trans>
       </h1>
 
       <Switch>
@@ -127,7 +127,9 @@ const PatchesTab = (props: PatchesTabProps) => {
                             })}
                           </span>
                           <div class="text-primary-400 flex items-center text-sm opacity-0 transition-opacity group-hover:opacity-100">
-                            <span class="mr-2 font-medium">Read More</span>
+                            <span class="mr-2 font-medium">
+                              <Trans key="general:_trn_common.read_more" />
+                            </span>
                             <div class="i-hugeicons:arrow-right-01 text-lg" />
                           </div>
                         </div>

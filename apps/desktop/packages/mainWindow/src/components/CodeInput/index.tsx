@@ -55,7 +55,7 @@ export const DeviceCode = (props: Props) => {
         }}
       >
         <i class="i-hugeicons:tick-02 mr-2 h-4 w-4" />
-        <Trans key="genera.copied_to_clipboard" />
+        <Trans key="general:_trn_general_copied_to_clipboard" />
       </div>
 
       <span

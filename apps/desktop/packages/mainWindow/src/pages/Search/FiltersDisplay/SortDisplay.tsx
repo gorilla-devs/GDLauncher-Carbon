@@ -1,5 +1,6 @@
 import useSearchContext from "@/components/SearchInputContext"
 import { Show } from "solid-js"
+import { Trans } from "@gd/i18n"
 import { FilterBadge } from "./FilterBadge"
 import { capitalize } from "@/utils/helpers"
 
@@ -42,7 +43,10 @@ export default function SortDisplay() {
         <FilterBadge onClick={clearPlatformFilters}>
           <div class="flex items-center gap-2">
             <div class="i-hugeicons:sort-by-up-01 h-4 w-4" />
-            Sort: {capitalize(getCurseforgeSortField())}
+            <Trans
+              key="search:_trn_sort_by"
+              options={{ sort: capitalize(getCurseforgeSortField()) }}
+            />
           </div>
         </FilterBadge>
       </Show>
@@ -58,7 +62,10 @@ export default function SortDisplay() {
                   : "i-hugeicons:sort-by-down-01")
               }
             />
-            Order: {capitalize(getCurseforgeSortOrder())}
+            <Trans
+              key="search:_trn_sort_order"
+              options={{ order: capitalize(getCurseforgeSortOrder()) }}
+            />
           </div>
         </FilterBadge>
       </Show>
@@ -67,7 +74,10 @@ export default function SortDisplay() {
         <FilterBadge onClick={clearPlatformFilters}>
           <div class="flex items-center gap-2">
             <div class="i-hugeicons:sort-by-up-01 h-4 w-4" />
-            Sort: {capitalize(getModrinthSortIndex())}
+            <Trans
+              key="search:_trn_sort_by"
+              options={{ sort: capitalize(getModrinthSortIndex()) }}
+            />
           </div>
         </FilterBadge>
       </Show>

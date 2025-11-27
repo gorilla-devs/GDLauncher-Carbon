@@ -1,0 +1,22 @@
+{
+  "_trn_no_logs": "Nessun Log Disponibile",
+  "_trn_all_sessions": "Tutte le Sessioni",
+  "_trn_no_log_sessions_available": "Nessuna Sessione di Log Disponibile",
+  "_trn_copy": "Copia log",
+  "_trn_new_logs": "{{logsCount}} Nuovi Log",
+  "_trn_see_new_logs": "Visualizza Nuovi Log",
+  "_trn_logs_paused_due_to_scroll": "Log in Pausa a Causa dello Scorrimento",
+  "_trn_autofollow": "Scorri Automaticamente su Nuovi Log",
+  "_trn_start_log_message_on_new_line": "Inizia Messaggio di Log su Nuova Riga",
+  "_trn_logs_density": "Densità Log",
+  "_trn_logs_density.low": "Bassa",
+  "_trn_logs_density.comfortable": "Confortevole",
+  "_trn_logs_density.compact": "Compatta",
+  "_trn_columns": "Colonne",
+  "_trn_columns.timestamp": "Timestamp",
+  "_trn_columns.logger": "Logger",
+  "_trn_columns.source_kind": "Tipo di Fonte",
+  "_trn_columns.thread_name": "Nome Thread",
+  "_trn_columns.level": "Livello Log",
+  "_trn_font_size": "Dimensione Font"
+}

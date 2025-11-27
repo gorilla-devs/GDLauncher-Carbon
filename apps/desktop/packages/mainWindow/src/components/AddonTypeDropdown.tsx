@@ -38,7 +38,7 @@ export function AddonTypeDropdown() {
 
     if (!instanceId()) {
       options.push({
-        label: t("search.modpacks"),
+        label: t("search:_trn_modpacks"),
         value: "modpack",
         icon: getAddonTypeIcon("modpack"),
         path: "/search/modpack"
@@ -50,7 +50,7 @@ export function AddonTypeDropdown() {
       (instanceId() && (instance.data?.modloaders?.length ?? 0) > 0)
     ) {
       options.push({
-        label: t("search.mods"),
+        label: t("search:_trn_mods"),
         value: "mod",
         icon: getAddonTypeIcon("mod"),
         path: "/search/mod"
@@ -59,25 +59,25 @@ export function AddonTypeDropdown() {
 
     options = options.concat([
       {
-        label: t("search.shaders"),
+        label: t("search:_trn_shaders"),
         value: "shader",
         icon: getAddonTypeIcon("shader"),
         path: "/search/shader"
       },
       {
-        label: t("search.resource_packs"),
+        label: t("search:_trn_resource_packs"),
         value: "resourcePack",
         icon: getAddonTypeIcon("resourcePack"),
         path: "/search/resourcePack"
       },
       {
-        label: t("search.data_packs"),
+        label: t("search:_trn_data_packs"),
         value: "datapack",
         icon: getAddonTypeIcon("datapack"),
         path: "/search/datapack"
       },
       {
-        label: t("search.worlds"),
+        label: t("search:_trn_worlds"),
         value: "world",
         icon: getAddonTypeIcon("world"),
         path: "/search/world"

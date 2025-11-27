@@ -73,7 +73,7 @@ const CopiableEntity = (props: {
 //     <div class="text-lightSlate-200 h-40 flex flex-col items-center gap-4 w-80">
 //       <div class="text-lg mb-4">
 //         <Trans
-//           key="instance.update_available_from"
+//           key="content:_trn_update_available_from"
 //           options={{
 //             platform: updatePreview.data?.platform
 //           }}
@@ -332,7 +332,7 @@ const Mod = (props: Props) => {
                 <div class="i-hugeicons:alert-01 h-5 w-5 text-yellow-500" />
               </TooltipTrigger>
               <TooltipContent>
-                <Trans key="instance.duplicate_mod_warning" />
+                <Trans key="content:_trn_duplicate_mod_warning" />
               </TooltipContent>
             </Tooltip>
           </Show>
@@ -342,7 +342,7 @@ const Mod = (props: Props) => {
                 <div class="i-hugeicons:download-02 h-5 w-5 text-lightSlate-700" />
               </TooltipTrigger>
               <TooltipContent>
-                <Trans key="instance.locked_cannot_apply_changes" />
+                <Trans key="instances:_trn_locked_cannot_apply_changes" />
               </TooltipContent>
             </Tooltip>
           </Show>
@@ -389,7 +389,7 @@ const Mod = (props: Props) => {
                 <Switch disabled checked={props.mod.enabled} />
               </TooltipTrigger>
               <TooltipContent class="max-w-38 overflow-hidden text-ellipsis">
-                <Trans key="instance.locked_cannot_apply_changes" />
+                <Trans key="instances:_trn_locked_cannot_apply_changes" />
               </TooltipContent>
             </Tooltip>
           </Show>
@@ -431,7 +431,7 @@ const Mod = (props: Props) => {
                 />
               </TooltipTrigger>
               <TooltipContent class="max-w-38 overflow-hidden text-ellipsis">
-                <Trans key="instance.locked_cannot_apply_changes" />
+                <Trans key="instances:_trn_locked_cannot_apply_changes" />
               </TooltipContent>
             </Tooltip>
           </Show>
@@ -470,7 +470,7 @@ const Mod = (props: Props) => {
                 >
                   <div class="text-lightSlate-50 mb-4 text-xl font-bold">
                     <Trans
-                      key="instance.mods_technical_info_for"
+                      key="content:_trn_mods_technical_info_for"
                       options={{
                         mod_name:
                           props.mod.curseforge?.name ||
@@ -485,66 +485,66 @@ const Mod = (props: Props) => {
                   <div class="flex w-full flex-col">
                     <div class="flex w-full justify-between text-sm">
                       <div class="w-50">
-                        <Trans key="instance.id" />
+                        <Trans key="content:_trn_id" />
                       </div>
                       <CopiableEntity text={props.mod.id} />
                     </div>
                     <div class="flex w-full justify-between text-sm">
                       <div class="w-50">
-                        <Trans key="instance.file_name" />
+                        <Trans key="content:_trn_file_name" />
                       </div>
                       <CopiableEntity text={props.mod.filename} />
                     </div>
 
                     <Show when={props.mod.metadata}>
                       <div class="text-lightSlate-50 mt-4 text-xl">
-                        <Trans key="instance.local_metadata" />
+                        <Trans key="content:_trn_local_metadata" />
                       </div>
                       <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
-                          <Trans key="instance.metadata_id" />
+                          <Trans key="content:_trn_metadata_id" />
                         </div>
                         <CopiableEntity text={props.mod.metadata?.id} />
                       </div>
                       <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
-                          <Trans key="instance.metadata_name" />
+                          <Trans key="content:_trn_metadata_name" />
                         </div>
                         <CopiableEntity text={props.mod.metadata?.modid} />
                       </div>
                       <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
-                          <Trans key="instance.metadata_version" />
+                          <Trans key="content:_trn_metadata_version" />
                         </div>
                         <CopiableEntity text={props.mod.metadata?.version} />
                       </div>
                       <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
-                          <Trans key="instance.metadata_sha_1" />
+                          <Trans key="content:_trn_metadata_sha_1" />
                         </div>
                         <CopiableEntity text={props.mod.metadata?.sha_1} />
                       </div>
                       <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
-                          <Trans key="instance.metadata_sha_512" />
+                          <Trans key="content:_trn_metadata_sha_512" />
                         </div>
                         <CopiableEntity text={props.mod.metadata?.sha_512} />
                       </div>
                       <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
-                          <Trans key="instance.metadata_murmur_2" />
+                          <Trans key="content:_trn_metadata_murmur_2" />
                         </div>
                         <CopiableEntity text={props.mod.metadata?.murmur_2} />
                       </div>
                       <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
-                          <Trans key="instance.metadata_murmur_2_unsigned" />
+                          <Trans key="content:_trn_metadata_murmur_2_unsigned" />
                         </div>
                         <CopiableEntity text={unsigned_murmur2()} />
                       </div>
                       <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
-                          <Trans key="instance.metadata_modloaders" />
+                          <Trans key="content:_trn_metadata_modloaders" />
                         </div>
                         <div class="text-lightSlate-200 flex w-60 items-center gap-2">
                           <For each={props.mod.metadata?.modloaders}>
@@ -567,13 +567,13 @@ const Mod = (props: Props) => {
                     <Show when={props.mod.curseforge}>
                       <div class="mt-4 flex items-center justify-between text-xl">
                         <div class="text-lightSlate-50 flex items-center">
-                          <Trans key="instance.curseforge" />
+                          <Trans key="content:_trn_curseforge" />
                           <img src={CurseforgeLogo} class="ml-2 h-4 w-4" />
                         </div>
                       </div>
                       <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
-                          <Trans key="instance.curseforge_project_id" />
+                          <Trans key="content:_trn_curseforge_project_id" />
                         </div>
                         <CopiableEntity
                           text={props.mod.curseforge?.project_id}
@@ -581,7 +581,7 @@ const Mod = (props: Props) => {
                       </div>
                       <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
-                          <Trans key="instance.curseforge_file_id" />
+                          <Trans key="content:_trn_curseforge_file_id" />
                         </div>
                         <CopiableEntity text={props.mod.curseforge?.file_id} />
                       </div>
@@ -598,7 +598,7 @@ const Mod = (props: Props) => {
                             )
                           }}
                         >
-                          <Trans key="instance.open_mod_page" />
+                          <Trans key="content:_trn_open_mod_page" />
                           <div class="i-hugeicons:arrow-right-01 ml-1" />
                         </Button>
                         <Button
@@ -611,7 +611,7 @@ const Mod = (props: Props) => {
                             )
                           }}
                         >
-                          <Trans key="instance.open_in_browser" />
+                          <Trans key="content:_trn_open_in_browser" />
                           <div class="i-hugeicons:link-square-02 ml-1" />
                         </Button>
                       </div>
@@ -620,19 +620,19 @@ const Mod = (props: Props) => {
                     <Show when={props.mod.modrinth}>
                       <div class="mt-4 flex items-center justify-between text-xl">
                         <div class="text-lightSlate-50 flex items-center">
-                          <Trans key="instance.modrinth" />
+                          <Trans key="content:_trn_modrinth" />
                           <img src={ModrinthLogo} class="ml-2 h-4 w-4" />
                         </div>
                       </div>
                       <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
-                          <Trans key="instance.modrinth_project_id" />
+                          <Trans key="content:_trn_modrinth_project_id" />
                         </div>
                         <CopiableEntity text={props.mod.modrinth?.project_id} />
                       </div>
                       <div class="flex w-full justify-between text-sm">
                         <div class="w-50">
-                          <Trans key="instance.modrinth_version_id" />
+                          <Trans key="content:_trn_modrinth_version_id" />
                         </div>
                         <CopiableEntity text={props.mod.modrinth?.version_id} />
                       </div>
@@ -649,7 +649,7 @@ const Mod = (props: Props) => {
                             )
                           }}
                         >
-                          <Trans key="instance.open_mod_page" />
+                          <Trans key="content:_trn_open_mod_page" />
                           <div class="i-hugeicons:arrow-right-01 ml-1" />
                         </Button>
                         <Button
@@ -662,7 +662,7 @@ const Mod = (props: Props) => {
                             )
                           }}
                         >
-                          <Trans key="instance.open_in_browser" />
+                          <Trans key="content:_trn_open_in_browser" />
                           <div class="i-hugeicons:link-square-02 ml-1" />
                         </Button>
                       </div>
@@ -710,7 +710,7 @@ const Mod = (props: Props) => {
                         }}
                       >
                         <div>
-                          <Trans key="instance.switch_version" />
+                          <Trans key="instances:_trn_switch_version" />
                         </div>
                         <div class="flex items-center justify-center">
                           <img src={ModrinthLogo} class="h-4 w-4" />
@@ -729,7 +729,7 @@ const Mod = (props: Props) => {
                         }}
                       >
                         <div>
-                          <Trans key="instance.switch_version" />
+                          <Trans key="instances:_trn_switch_version" />
                         </div>
                         <div class="flex items-center justify-center">
                           <img src={CurseforgeLogo} class="h-4 w-4" />
@@ -740,7 +740,7 @@ const Mod = (props: Props) => {
                 </Show>
                 <Show when={props.isInstanceLocked}>
                   <div class="p-4">
-                    <Trans key="instance.locked_cannot_apply_changes" />
+                    <Trans key="instances:_trn_locked_cannot_apply_changes" />
                   </div>
                 </Show>
               </PopoverContent>

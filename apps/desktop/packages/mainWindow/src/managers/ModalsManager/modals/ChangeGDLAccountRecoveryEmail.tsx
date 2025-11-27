@@ -25,17 +25,17 @@ const ChangeGDLAccountRecoveryEmail = () => {
 
   return (
     <ModalLayout
-      title={t("settings:change_recovery_email_title")}
+      title={t("accounts:_trn_change_recovery_email_title")}
       height="h-70"
       width="w-140"
     >
       <div class="flex h-full flex-col justify-between">
         <div class="flex flex-col gap-4">
           <div>
-            <Trans key="settings:change_recovery_email_description" />
+            <Trans key="accounts:_trn_change_recovery_email_description" />
           </div>
           <Input
-            placeholder={t("placeholders.email_example")}
+            placeholder={t("placeholders:_trn_email_example")}
             value={newRecoveryEmail()}
             onInput={(e) => setNewRecoveryEmail(e.currentTarget.value)}
             disabled={!!cooldown()}
@@ -43,7 +43,7 @@ const ChangeGDLAccountRecoveryEmail = () => {
           <Show when={cooldown()}>
             <div class="text-lightSlate-500 text-sm">
               <Trans
-                key="login.new_email_request_wait"
+                key="auth:_trn_login.new_email_request_wait"
                 options={{
                   time: convertSecondsToHumanTime(cooldown())
                 }}
@@ -59,7 +59,7 @@ const ChangeGDLAccountRecoveryEmail = () => {
             }}
             type="secondary"
           >
-            <Trans key="settings:cancel" />
+            <Trans key="accounts:_trn_cancel" />
           </Button>
           <Button
             type="primary"
@@ -108,7 +108,7 @@ const ChangeGDLAccountRecoveryEmail = () => {
               setIsLoading(false)
             }}
           >
-            <Trans key="settings:confirm" />
+            <Trans key="accounts:_trn_confirm" />
           </Button>
         </div>
       </div>

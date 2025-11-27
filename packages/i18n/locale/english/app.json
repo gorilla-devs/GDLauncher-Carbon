@@ -1,0 +1,14 @@
+{
+  "_trn_update_available_title": "Update Available",
+  "_trn_update_downloading": "Downloading Update",
+  "_trn_update_ready": "Update Ready to Install",
+  "_trn_update_download_button": "Download",
+  "_trn_update_install_button": "Install & Restart",
+  "_trn_update_later_button": "Later",
+  "_trn_update_copy_link": "Copy Download Link",
+  "_trn_update_view_release": "View Release Notes",
+  "_trn_update_link_copied": "Download link copied to clipboard",
+  "_trn_update_version": "Version {{version}} is now available",
+  "_trn_update_progress": "Downloading: {{percent}}%",
+  "_trn_update_manual_required": "Auto-update not available for this installation method"
+}

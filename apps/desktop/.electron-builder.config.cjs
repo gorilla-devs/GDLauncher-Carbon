@@ -41,9 +41,9 @@ let publish =
     : {
         provider: "generic",
         url:
-          (process.env.GENERIC_PUBLISH_URL || "http://localhost:9000/raw-cdn") +
+          (process.env.GENERIC_PUBLISH_URL || "http://localhost:9000") +
           "/" +
-          process.env.PUBLISH_URL_FOLDER
+          (process.env.PUBLISH_URL_FOLDER || "")
       }
 
 const appId = "org.gorilladevs.GDLauncher"

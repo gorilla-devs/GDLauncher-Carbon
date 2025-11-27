@@ -18,12 +18,14 @@ const CustomCommands = () => {
   return (
     <>
       <PageTitle>
-        <Trans key="settings:custom_commands_title" />
+        <Trans key="settings:_trn_custom_commands_title" />
       </PageTitle>
       <RowsContainer>
         <Row forceContentBelow>
-          <Title description={<Trans key="settings:pre_launch_hook_text" />}>
-            <Trans key="settings:pre_launch_hook_title" />
+          <Title
+            description={<Trans key="settings:_trn_pre_launch_hook_text" />}
+          >
+            <Trans key="settings:_trn_pre_launch_hook_title" />
           </Title>
           <Input
             value={settings.data?.preLaunchHook || ""}
@@ -37,8 +39,10 @@ const CustomCommands = () => {
           />
         </Row>
         <Row forceContentBelow>
-          <Title description={<Trans key="settings:post_exit_hook_text" />}>
-            <Trans key="settings:post_exit_hook_title" />
+          <Title
+            description={<Trans key="settings:_trn_post_exit_hook_text" />}
+          >
+            <Trans key="settings:_trn_post_exit_hook_title" />
           </Title>
           <Input
             value={settings.data?.postExitHook || ""}
@@ -52,8 +56,10 @@ const CustomCommands = () => {
           />
         </Row>
         <Row forceContentBelow>
-          <Title description={<Trans key="settings:wrapper_command_text" />}>
-            <Trans key="settings:wrapper_command_title" />
+          <Title
+            description={<Trans key="settings:_trn_wrapper_command_text" />}
+          >
+            <Trans key="settings:_trn_wrapper_command_title" />
           </Title>
           <Input
             value={settings.data?.wrapperCommand || ""}

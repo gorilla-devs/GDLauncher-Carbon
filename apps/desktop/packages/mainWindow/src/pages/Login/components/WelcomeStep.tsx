@@ -29,21 +29,21 @@ export function WelcomeStep(props: WelcomeStepProps) {
           when={props.hasActiveAccount}
           fallback={
             <h2 class="text-lightSlate-50 m-0 text-3xl font-bold">
-              Welcome to GDLauncher
+              <Trans key="auth:_trn_login.welcome_title" />
             </h2>
           }
         >
           <h2 class="text-lightSlate-50 m-0 text-3xl font-bold">
-            Welcome Back!
+            <Trans key="auth:_trn_login.welcome_back" />
           </h2>
         </Show>
 
         <p class="text-lightSlate-400 max-w-md text-base leading-relaxed">
           <Show
             when={props.hasActiveAccount}
-            fallback={<Trans key="login.welcome_tagline" />}
+            fallback={<Trans key="auth:_trn_login.welcome_tagline" />}
           >
-            <Trans key="login.welcome_returning_tagline" />
+            <Trans key="auth:_trn_login.welcome_returning_tagline" />
           </Show>
         </p>
       </div>

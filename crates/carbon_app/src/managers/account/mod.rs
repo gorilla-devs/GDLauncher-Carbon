@@ -325,11 +325,37 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
         self.app
             .settings_manager()
-            .set(SetParam::SetGdlAccountUuid(uuid))
+            .set(SetParam::SetGdlAccountUuid(uuid.clone()))
             .await?;
 
         self.app.invalidate(GET_GDL_ACCOUNT, None);
         self.app.invalidate(GET_SETTINGS, None);
+
+        // Notify Electron main process of GDL account email change for Overwolf ad personalization
+        if let Some(account_uuid) = uuid {
+            // Fetch the account to get the email
+            if let Some(id_token) = self
+                .get_account_entries()
+                .await?
+                .into_iter()
+                .find(|account| account.uuid == account_uuid)
+                .and_then(|account| account.id_token)
+            {
+                if let Ok(Some(user)) = self.gdl_account_task.get_account(id_token).await {
+                    info!("_GDL_ACCOUNT_EMAIL_:{}", user.email);
+                    println!("_GDL_ACCOUNT_EMAIL_:{}", user.email);
+                } else {
+                    info!("_GDL_ACCOUNT_EMAIL_:");
+                    println!("_GDL_ACCOUNT_EMAIL_:");
+                }
+            } else {
+                info!("_GDL_ACCOUNT_EMAIL_:");
+                println!("_GDL_ACCOUNT_EMAIL_:");
+            }
+        } else {
+            info!("_GDL_ACCOUNT_EMAIL_:");
+            println!("_GDL_ACCOUNT_EMAIL_:");
+        }
 
         // TODO!: Should get status from the API
 
@@ -461,6 +487,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
         self.app.invalidate(GET_GDL_ACCOUNT, None);
         self.app.invalidate(GET_SETTINGS, None);
 
+        // Notify Electron main process that GDL account was removed for Overwolf ad personalization
+        info!("_GDL_ACCOUNT_EMAIL_:");
+        println!("_GDL_ACCOUNT_EMAIL_:");
+
         Ok(())
     }
 
@@ -519,7 +549,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
         self,
         access_token: String,
         username: String,
-    ) -> anyhow::Result<bool> {
+    ) -> anyhow::Result<api::UsernameAvailability> {
         api::check_username_available(&self.app.reqwest_client, &access_token, &username).await
     }
 

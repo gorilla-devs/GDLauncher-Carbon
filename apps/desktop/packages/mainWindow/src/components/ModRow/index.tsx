@@ -43,11 +43,11 @@ const ModRow = (props: ModRowProps) => {
     mutationKey: ["instance.prepareInstance"],
     onSuccess() {
       setLoading(false)
-      toast.success(t("notifications.instance_created_success"))
+      toast.success(t("notifications:_trn_instance_created_success"))
     },
     onError() {
       setLoading(false)
-      toast.error(t("notifications.instance_created_error"))
+      toast.error(t("notifications:_trn_instance_created_error"))
     },
     onSettled() {
       setLoading(false)
@@ -69,7 +69,7 @@ const ModRow = (props: ModRowProps) => {
     },
     onError() {
       setLoading(false)
-      toast.error(t("notifications.modpack_download_error"))
+      toast.error(t("notifications:_trn_modpack_download_error"))
     }
   }))
 
@@ -215,7 +215,7 @@ const ModRow = (props: ModRowProps) => {
                         type="outline"
                         onClick={() => handleExplore()}
                       >
-                        <Trans key="instance.explore_modpack" />
+                        <Trans key="instances:_trn_explore_modpack" />
                       </Button>
                       <Show when={loading()}>
                         <Button>
@@ -264,7 +264,7 @@ const ModRow = (props: ModRowProps) => {
                             <Spinner />
                           </Show>
                           <Show when={!loading()}>
-                            <Trans key="instance.download" />
+                            <Trans key="instances:_trn_download" />
                           </Show>
                         </Button>
                       </Show>
@@ -281,7 +281,7 @@ const ModRow = (props: ModRowProps) => {
                         type="outline"
                         onClick={() => handleExplore()}
                       >
-                        <Trans key="instance.explore_modpack" />
+                        <Trans key="instances:_trn_explore_modpack" />
                       </Button>
                       <ModDownloadButton addon={props.data} />
                     </div>

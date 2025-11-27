@@ -15,7 +15,7 @@ import {
 import { createAsyncEffect } from "@/utils/asyncEffect"
 import { Router, hashIntegration } from "@solidjs/router"
 import initRspc, { rspc, queryClient } from "@/utils/rspcClient"
-import { i18n, TransProvider, icu, loadLanguageFiles } from "@gd/i18n"
+import { i18n, TransProvider, loadLanguageFiles } from "@gd/i18n"
 import App from "@/app"
 import { ModalProvider } from "@/managers/ModalsManager"
 import "virtual:uno.css"
@@ -23,12 +23,10 @@ import "@gd/ui/style.css"
 import { ContextMenuProvider, Toaster } from "@gd/ui"
 import "@unocss/reset/tailwind.css"
 import { NavigationManager } from "./managers/NavigationManager"
-// import { ContextMenuProvider } from "./components/ContextMenu/ContextMenuContext";
 import RiveAppWapper from "./utils/RiveAppWrapper"
 import GDAnimation from "./gd_logo_animation.riv"
 import { GlobalStoreProvider } from "./components/GlobalStoreContext"
 import AuthLoadingOverlay from "./pages/Login/AuthLoadingOverlay"
-import { isSpecialOccasion } from "@/utils/occasions"
 
 const BackendReadyContext = createContext<boolean>(false)
 
@@ -147,46 +145,6 @@ render(() => {
     }
   })
 
-  // Smart auth bypass: Skip login screen for logged-in users (unless special occasion)
-  createAsyncEffect(async () => {
-    if (coreModuleLoaded.state === "ready" && coreModuleLoaded()) {
-      const port = coreModuleLoaded() as unknown as number
-      const { client } = initRspc(port)
-
-      try {
-        const settings = await client.query(["settings.getSettings"])
-        const activeUuid = await client.query(["account.getActiveUuid"])
-        const accounts = await client.query(["account.getAccounts"])
-
-        // Check if it's a special occasion
-        const isOccasion = isSpecialOccasion()
-
-        // Skip directly to library if:
-        // 1. User is fully set up (has accounts, terms accepted, made GDL account decision)
-        // 2. AND it's NOT a special occasion (we want to show seasonal splash during occasions)
-        if (
-          settings.termsAndPrivacyAccepted &&
-          activeUuid &&
-          accounts.length > 0 &&
-          settings.gdlAccountId != null &&
-          !isOccasion
-        ) {
-          console.log(
-            "[Auth Bypass] Skipping to library (logged in, no occasion)"
-          )
-          window.location.hash = "#/library"
-        } else if (accounts.length > 0 && isOccasion) {
-          console.log(
-            "[Auth Bypass] Will show seasonal splash (logged in + occasion)"
-          )
-          // Let InnerApp/LoginContainer handle seasonal splash
-        }
-      } catch (e) {
-        console.error("Error checking login status:", e)
-      }
-    }
-  })
-
   return (
     <ProdWrapErrorBoundary>
       <Switch>
@@ -246,25 +204,11 @@ interface TransWrapperProps {
   isBackendReady: boolean
 }
 
-const _i18nInstance = i18n.use(icu).createInstance()
+const _i18nInstance = i18n
 
 const TransWrapper = (props: TransWrapperProps) => {
   const [isI18nReady, setIsI18nReady] = createSignal(false)
-  // const rspcContext = rspc.useContext();
-
-  // onMount(async () => {
-  //   while (true) {
-  //     let initialTime = Date.now();
-
-  //     await rspcContext.client.query(["echo", "something"]);
-
-  //     let elapsed = Date.now() - initialTime;
-
-  //     console.log("rspc latency (ms)", elapsed);
-
-  //     await new Promise((resolve) => setTimeout(resolve, 200));
-  //   }
-  // });
+  const [i18nOptions, setI18nOptions] = createSignal<any>(null)
 
   const trackPageView = rspc.createMutation(() => ({
     mutationKey: "metrics.sendEvent"
@@ -281,51 +225,53 @@ const TransWrapper = (props: TransWrapperProps) => {
     queryKey: ["settings.getSettings"]
   }))
 
-  createAsyncEffect<string>((isStale, prevLanguage) => {
+  createAsyncEffect((isStale, prevLanguage) => {
     if (settings.isSuccess) {
       const { language } = settings.data
 
-      if (!_i18nInstance.isInitialized) {
-        const currentLanguage = language
-
-        const initI18n = async () => {
-          let maybeEnglish = null
-          if (currentLanguage !== "english") {
-            maybeEnglish = await loadLanguageFiles("english")
-          }
-
-          // Check if language hasn't changed during async load
-          if (isStale()) {
-            return
-          }
-
-          const defaultNamespacesMap = await loadLanguageFiles(currentLanguage)
-
-          // Check again after second async load
-          if (isStale()) {
-            return
-          }
-
-          await _i18nInstance.init({
-            ns: Object.keys(defaultNamespacesMap),
-            defaultNS: "common",
-            lng: currentLanguage,
-            fallbackLng: "english",
-            resources: {
-              [currentLanguage]: defaultNamespacesMap,
-              ...(maybeEnglish && { english: maybeEnglish })
-            },
-            partialBundledLanguages: true,
-            debug: true
-          })
-
-          setIsI18nReady(true)
+      loadLanguageFiles("english").then((englishResources) => {
+        if (isStale()) {
+          return
         }
 
-        initI18n()
-      }
+        const resources: any = { english: englishResources }
 
-      return language
+        if (language !== "english") {
+          loadLanguageFiles(language).then((targetResources) => {
+            if (isStale()) {
+              return
+            }
+
+            resources[language] = targetResources
+
+            const options = {
+              ns: Object.keys(englishResources),
+              defaultNS: "general",
+              lng: language,
+              fallbackLng: "english",
+              resources,
+              partialBundledLanguages: true,
+              react: { useSuspense: false }
+            }
+
+            setI18nOptions(options)
+            setIsI18nReady(true)
+          })
+        } else {
+          const options = {
+            ns: Object.keys(englishResources),
+            defaultNS: "general",
+            lng: language,
+            fallbackLng: "english",
+            resources,
+            partialBundledLanguages: true,
+            react: { useSuspense: false }
+          }
+
+          setI18nOptions(options)
+          setIsI18nReady(true)
+        }
+      })
     }
 
     return prevLanguage
@@ -346,8 +292,8 @@ const TransWrapper = (props: TransWrapperProps) => {
   })
 
   return (
-    <Show when={!settings.isInitialLoading && isI18nReady()}>
-      <TransProvider instance={_i18nInstance}>
+    <Show when={!settings.isInitialLoading && isI18nReady() && i18nOptions()}>
+      <TransProvider instance={_i18nInstance} options={i18nOptions()}>
         <BackendReadyContext.Provider value={props.isBackendReady}>
           <Router source={hashIntegration()}>
             <GlobalStoreProvider>

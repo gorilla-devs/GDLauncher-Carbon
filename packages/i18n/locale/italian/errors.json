@@ -1,0 +1,18 @@
+{
+  "_trn_error.missing_field_title": "Il titolo non può essere vuoto",
+  "_trn_error.no_mc_versions": "Nessuna versione Minecraft disponibile in questo momento, riprova più tardi!",
+  "_trn_profile_name_exists": "Il nome del profilo esiste già",
+  "_trn_some_error": "Si è verificato un errore",
+  "_trn_xbox_noAccount": "Nessun account Xbox trovato",
+  "_trn_xbox_xboxServicesBanned": "Il tuo account è bannato dai servizi Xbox",
+  "_trn_xbox_adultVerificationRequired": "La verifica per adulti è richiesta",
+  "_trn_xbox_childAccount": "Gli account bambini non sono supportati",
+  "_trn_deviceCodeExpired": "Il codice dispositivo è scaduto",
+  "_trn_xboxAccount": "Errore account Xbox",
+  "_trn_noGameOwnership": "Non possiedi Minecraft Java Edition",
+  "_trn_noGameProfile": "Nessun profilo di gioco trovato",
+  "_trn_404_message": "Pagina non trovata",
+  "_trn_its_gone": "È sparito",
+  "_trn_error.enrollment_failed": "Impossibile completare l'iscrizione",
+  "_trn_error.xbox_code": "Codice di errore Xbox"
+}

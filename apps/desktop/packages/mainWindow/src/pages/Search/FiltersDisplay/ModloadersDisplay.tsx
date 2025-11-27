@@ -54,7 +54,7 @@ export default function ModloadersDisplay() {
             </TooltipTrigger>
             <TooltipContent>
               <span class="text-xs">
-                <Trans key="search.modloader_hidden" />
+                <Trans key="search:_trn_modloader_hidden" />
               </span>
             </TooltipContent>
           </Tooltip>

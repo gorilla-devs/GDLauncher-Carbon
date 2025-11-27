@@ -166,7 +166,7 @@ export const AccountsDropdown = (props: Props) => {
             <div class="flex items-center gap-4 px-4 py-2 text-xl">
               <img src={gdlLogo} class="h-6 w-6" />
               <div>
-                <Trans key="GDLauncher_account" />
+                <Trans key="accounts:_trn_gdlauncher_account" />
               </div>
             </div>
             <hr class="border-darkSlate-50 w-full opacity-20" />
@@ -175,7 +175,7 @@ export const AccountsDropdown = (props: Props) => {
                 <div class="flex items-center gap-4 rounded-lg px-4 py-2">
                   <div class="bg-darkSlate-600 h-6 w-6 rounded-md" />
                   <div>
-                    <Trans key="No_account_synced" />
+                    <Trans key="accounts:_trn_no_account_synced" />
                   </div>
                 </div>
               }
@@ -200,7 +200,7 @@ export const AccountsDropdown = (props: Props) => {
             <div class="flex items-center gap-4 px-4 py-2 text-xl">
               <img src={defaultInstanceImg} class="h-6 w-6" />
               <div>
-                <Trans key="Minecraft_accounts" />
+                <Trans key="accounts:_trn_minecraft_accounts" />
               </div>
             </div>
             <hr class="border-darkSlate-50 w-full opacity-20" />
@@ -275,7 +275,7 @@ export const AccountsDropdown = (props: Props) => {
                 }}
               />
               <div>
-                <Trans key="settings:manage_accounts" />
+                <Trans key="accounts:_trn_manage_accounts" />
               </div>
             </Button>
           </div>

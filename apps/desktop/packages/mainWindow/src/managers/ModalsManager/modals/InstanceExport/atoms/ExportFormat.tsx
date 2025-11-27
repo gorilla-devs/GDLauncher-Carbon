@@ -32,7 +32,7 @@ const ExportFormat = () => {
 
   return (
     <div class="flex flex-col">
-      <span>{t("instance.export_format")}</span>
+      <span>{t("instances:_trn_export_format")}</span>
       <ul class="flex gap-2 p-0">
         <For each={options}>
           {(entity) => (

@@ -51,10 +51,12 @@ const AdTrackingSettingsSlider = (props: Props) => {
           steps={1000}
           value={mapMetricLevelToValue(props.metricLevel)}
           marks={{
-            0: t("tracking.setting_disabled"),
-            250: t("tracking.setting_anonymous"),
-            600: t("tracking.setting_anonymous_with_session_recordings"),
-            1000: t("tracking.settings_authenticated_with_session_recordings")
+            0: t("tracking:_trn_setting_disabled"),
+            250: t("tracking:_trn_setting_anonymous"),
+            600: t("tracking:_trn_setting_anonymous_with_session_recordings"),
+            1000: t(
+              "tracking:_trn_settings_authenticated_with_session_recordings"
+            )
           }}
           onChange={(val) => {
             props.onChange(mapValueToMetricLevel(val))

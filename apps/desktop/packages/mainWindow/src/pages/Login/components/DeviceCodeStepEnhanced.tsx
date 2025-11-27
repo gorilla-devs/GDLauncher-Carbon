@@ -22,16 +22,17 @@ import { msToMinutes, msToSeconds, parseTwoDigitNumber } from "@/utils/helpers"
 import { Setter } from "solid-js"
 import { DeviceCode } from "@/components/CodeInput"
 import { Trans, useTransContext } from "@gd/i18n"
+import { getXboxErrorKey, getEnrollmentErrorKey } from "@gd/i18n/helpers"
 import { rspc } from "@/utils/rspcClient"
-import { DeviceCodeObjectType } from "../index"
+import { DeviceCode as DeviceCodeType } from "@gd/core_module/bindings"
 import { handleStatus } from "@/utils/login"
 import { EnrollmentError } from "@gd/core_module/bindings"
 import QRCode from "qrcode"
 import type { CreateQueryResult } from "@tanstack/solid-query"
 
 interface Props {
-  deviceCodeObject: DeviceCodeObjectType | null
-  setDeviceCodeObject: Setter<DeviceCodeObjectType | null>
+  deviceCodeObject: DeviceCodeType | null
+  setDeviceCodeObject: Setter<DeviceCodeType | null>
   nextStep: () => void
   prevStep: () => void
   onSwitchToBrowser?: () => void
@@ -52,7 +53,7 @@ export function DeviceCodeStepEnhanced(props: Props) {
 
   const userCode = () => props.deviceCodeObject?.userCode
   const oldUserCode = () => props.deviceCodeObject?.userCode
-  const deviceCodeLink = () => props.deviceCodeObject?.link
+  const deviceCodeLink = () => props.deviceCodeObject?.verificationUri
   const expiresAt = () => props.deviceCodeObject?.expiresAt
   const expiresAtFormat = () => new Date(expiresAt() || "")?.getTime()
   const expiresAtMs = () => expiresAtFormat() - Date.now()
@@ -138,16 +139,17 @@ export function DeviceCodeStepEnhanced(props: Props) {
     } else if (error.errorType === "xboxAccount" && error.xboxError) {
       if (typeof error.xboxError === "string") {
         toast.error("Authentication Error", {
-          description: t(`error.xbox_${error.xboxError}`)
+          description: t(getXboxErrorKey(error.xboxError as any))
         })
       } else {
         toast.error("Authentication Error", {
-          description: `${t("error.xbox_code")} ${error.xboxError.unknown}`
+          description: `${t("errors:_trn_error.xbox_code")} ${error.xboxError.unknown}`
         })
       }
     } else {
       toast.error("Authentication Error", {
-        description: error.description || t(`error.${error.errorType}`)
+        description:
+          error.description || t(getEnrollmentErrorKey(error.errorType as any))
       })
     }
   }
@@ -180,14 +182,14 @@ export function DeviceCodeStepEnhanced(props: Props) {
         {/* Timer integrated below code */}
         <Show when={!expired()}>
           <p class="text-lightSlate-600 text-xs m-0">
-            <Trans key="login.expires_in" />{" "}
+            <Trans key="auth:_trn_login.expires_in" />{" "}
             <span class="text-lightSlate-400 font-medium">{countDown()}</span>
           </p>
         </Show>
 
         <Show when={expired()}>
           <p class="text-sm text-red-400 m-0">
-            <Trans key="login.code_expired_message" />
+            <Trans key="auth:_trn_login.code_expired_message" />
           </p>
         </Show>
       </div>
@@ -204,7 +206,7 @@ export function DeviceCodeStepEnhanced(props: Props) {
             />
           </div>
           <p class="text-lightSlate-500 text-xs m-0">
-            <Trans key="login.scan_qr_code" />
+            <Trans key="auth:_trn_login.scan_qr_code" />
           </p>
         </div>
       </Show>
@@ -227,7 +229,7 @@ export function DeviceCodeStepEnhanced(props: Props) {
             fullWidth
           >
             <div class="i-hugeicons:link-square-02 h-5 w-5" />
-            <Trans key="login.open_microsoft_login" />
+            <Trans key="auth:_trn_login.open_microsoft_login" />
           </Button>
 
           {/* Loading progress - Inline when active */}
@@ -237,19 +239,19 @@ export function DeviceCodeStepEnhanced(props: Props) {
               <span class="text-lightSlate-500 text-xs whitespace-nowrap">
                 <Switch>
                   <Match when={props.enrollmentStatus?.data?.pollingCode}>
-                    <Trans key="login.polling_microsoft_auth" />
+                    <Trans key="auth:_trn_login.polling_microsoft_auth" />
                   </Match>
                   <Match when={props.enrollmentStatus?.data === "xboxAuth"}>
-                    <Trans key="login.authenticating_xbox" />
+                    <Trans key="auth:_trn_login.authenticating_xbox" />
                   </Match>
                   <Match when={props.enrollmentStatus?.data === "mcLogin"}>
-                    <Trans key="login.authenticating_minecraft" />
+                    <Trans key="auth:_trn_login.authenticating_minecraft" />
                   </Match>
                   <Match when={props.enrollmentStatus?.data === "mcProfile"}>
-                    <Trans key="login.retrieving_minecraft_profile" />
+                    <Trans key="auth:_trn_login.retrieving_minecraft_profile" />
                   </Match>
                   <Match when={props.enrollmentStatus?.data?.mcEntitlements}>
-                    <Trans key="login.retrieving_minecraft_entitlements" />
+                    <Trans key="auth:_trn_login.retrieving_minecraft_entitlements" />
                   </Match>
                 </Switch>
               </span>
@@ -262,13 +264,13 @@ export function DeviceCodeStepEnhanced(props: Props) {
       <Show when={props.onSwitchToBrowser && !expired()}>
         <div class="border-darkSlate-600 flex flex-col items-center gap-2 border-t pt-4">
           <p class="text-lightSlate-600 text-xs m-0">
-            <Trans key="login.trouble_with_code" />
+            <Trans key="auth:_trn_login.trouble_with_code" />
           </p>
           <button
             class="text-primary-400 hover:text-primary-300 cursor-pointer text-sm underline transition-colors"
             onClick={props.onSwitchToBrowser}
           >
-            <Trans key="login.try_browser_instead" />
+            <Trans key="auth:_trn_login.try_browser_instead" />
           </button>
         </div>
       </Show>

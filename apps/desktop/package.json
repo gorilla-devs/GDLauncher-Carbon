@@ -21,7 +21,11 @@
     "clean": "node scripts/cleanReleaseFolder.mjs",
     "lint": "tsc && pnpm --dir ../.. exec eslint apps/desktop --quiet && pnpm --dir ../.. exec prettier --check apps/desktop",
     "lint-fix": "tsc && pnpm --dir ../.. exec eslint apps/desktop --quiet --fix && pnpm --dir ../.. exec prettier --write apps/desktop",
-    "release": "node scripts/releaseDraft.mjs"
+    "release": "node scripts/releaseDraft.mjs",
+    "translations:validate-english-keys": "node scripts/validateEnglishKeys.mjs",
+    "translations:gen-types": "node scripts/generateTranslationTypes.mjs",
+    "translations:validate-sync": "node scripts/validateTranslationSync.mjs",
+    "translations:sync": "node scripts/syncTranslations.mjs"
   },
   "devDependencies": {
     "@electron/notarize": "^3.0.2",
@@ -51,12 +55,12 @@
     "@types/qrcode": "^1.5.6",
     "@types/sanitize-html": "^2.9.1",
     "@unocss/reset": "^0.65.1",
-    "@xstate/solid": "^2.0.0",
     "date-fns": "^2.30.0",
     "dotenv": "^16.3.1",
     "electron": "37.2.6",
     "electron-log": "^5.1.1",
     "electron-updater": "^6.3.9",
+    "fast-glob": "^3.3.3",
     "fs-extra": "^11.2.0",
     "html-parse-string": "^0.0.9",
     "jsdom": "^25.0.1",
@@ -70,8 +74,7 @@
     "virtua": "0.41.2",
     "vite": "^6.3.4",
     "vite-plugin-solid": "^2.11.6",
-    "vitest": "^2.1.8",
-    "xstate": "^5.0.0"
+    "vitest": "^2.1.8"
   },
   "env": {
     "//": "Used in build scripts",

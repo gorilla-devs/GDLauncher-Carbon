@@ -102,10 +102,10 @@ const JavaPathAutoComplete = (props: Props) => {
                   >
                     <div class="flex justify-between">
                       <div>
-                        <Trans key="java_autocomplete.not_found" />
+                        <Trans key="java:_trn_java_autocomplete.not_found" />
                       </div>
                       <div>
-                        <Trans key="java_autocomplete.create_new_custom" />
+                        <Trans key="java:_trn_java_autocomplete.create_new_custom" />
                       </div>
                     </div>
                     <Tooltip>
@@ -136,7 +136,7 @@ const JavaPathAutoComplete = (props: Props) => {
       <Input
         value={value()}
         disabled={props.disabled}
-        placeholder={t("placeholders.type_java_path")}
+        placeholder={t("placeholders:_trn_type_java_path")}
         inputColor={props.inputColor || ""}
         icon={
           <Switch>

@@ -41,24 +41,30 @@ export function normalizeEmail(email: string): string {
 }
 
 /**
- * Generate SHA-256 hash of normalized email, encoded as Base64
+ * Hash formats required by Overwolf's setUserEmailHashes API
+ */
+export interface EmailHashes {
+  SHA1: string
+  SHA256: string
+  MD5: string
+}
+
+/**
+ * Generate all hash formats required by Overwolf's setUserEmailHashes API
  *
- * Per UID2 specification:
- * - Normalize email first
- * - Apply SHA-256 to get bytes
- * - Base64 encode the bytes (NOT hex)
- *
- * Verify hashes at: https://unifiedid.com/examples/hashing-tool/
+ * Per Overwolf documentation, hashes should be:
+ * - Normalized email (lowercase, trimmed, Gmail rules applied)
+ * - Hex-encoded (lowercase)
  *
  * @param email - Raw email address
- * @returns Base64-encoded SHA-256 hash
+ * @returns Object with SHA1, SHA256, and MD5 hex hashes
  */
-export function hashEmail(email: string): string {
+export function hashEmailForOverwolf(email: string): EmailHashes {
   const normalized = normalizeEmail(email)
 
-  // SHA-256 produces a buffer of bytes
-  const hashBytes = crypto.createHash("sha256").update(normalized).digest() // Returns Buffer (bytes)
-
-  // Base64 encode the bytes
-  return hashBytes.toString("base64")
+  return {
+    SHA1: crypto.createHash("sha1").update(normalized).digest("hex"),
+    SHA256: crypto.createHash("sha256").update(normalized).digest("hex"),
+    MD5: crypto.createHash("md5").update(normalized).digest("hex")
+  }
 }

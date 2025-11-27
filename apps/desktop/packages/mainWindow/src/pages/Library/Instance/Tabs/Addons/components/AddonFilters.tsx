@@ -13,6 +13,7 @@ import {
 } from "@gd/ui"
 import { For, Show, onMount, onCleanup, createEffect } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
+import { getAddonTabKey } from "@gd/i18n/helpers"
 import { AddonType, Mod } from "@gd/core_module/bindings"
 import { getAddonTypeIcon } from "@/utils/addonIcons"
 
@@ -48,7 +49,7 @@ export const AddonFilters = (props: AddonFiltersProps) => {
   let containerRef: HTMLDivElement | undefined
 
   const getAddonTypeLabel = (type: AddonType) => {
-    return t(`instance.tabs.${type}`)
+    return t(getAddonTabKey(type))
   }
 
   const visibleAddonTypes = () => {
@@ -107,38 +108,74 @@ export const AddonFilters = (props: AddonFiltersProps) => {
     >
       <div class="flex flex-col gap-4">
         {/* Search and main actions */}
-        <div class="flex items-center justify-between gap-4">
-          <div class="flex flex-1 items-center gap-4">
-            <Input
-              value={props.searchQuery()}
-              onInput={(e) => props.setSearchQuery(e.target.value)}
-              placeholder={t("instance.search_addons")}
-              icon={<div class="i-hugeicons:search-01" />}
-              class="max-w-sm"
-            />
+        <div class="flex items-center gap-2">
+          <Input
+            value={props.searchQuery()}
+            onInput={(e) => props.setSearchQuery(e.target.value)}
+            placeholder={t("content:_trn_search_addons")}
+            icon={<div class="i-hugeicons:search-01" />}
+            class="hidden lg:flex flex-1 min-w-0"
+          />
 
-            <div class="flex items-center gap-2">
-              <span class="text-lightSlate-600 text-sm">
-                {t("instance.platform_filter")}:
-              </span>
-              <Select
-                value={props.platformFilter()}
-                onChange={(value) => value && props.setPlatformFilter(value)}
-                options={["all", "curseforge", "modrinth", "local"]}
-                placeholder=""
-                disallowEmptySelection={true}
-                selectionBehavior="replace"
-                itemComponent={(itemProps) => {
+          <Select
+            value={props.platformFilter()}
+            onChange={(value) => value && props.setPlatformFilter(value)}
+            options={["all", "curseforge", "modrinth", "local"]}
+            placeholder=""
+            disallowEmptySelection={true}
+            selectionBehavior="replace"
+            itemComponent={(itemProps) => {
+              const getLabel = (value: string) => {
+                switch (value) {
+                  case "all":
+                    return t("content:_trn_filter.all")
+                  case "curseforge":
+                    return t("enums:_trn_curseforge")
+                  case "modrinth":
+                    return t("enums:_trn_modrinth")
+                  case "local":
+                    return t("content:_trn_filter.local")
+                  default:
+                    return value
+                }
+              }
+              const getIcon = (value: string) => {
+                switch (value) {
+                  case "all":
+                    return <div class="i-hugeicons:globe h-4 w-4" />
+                  case "curseforge":
+                    return <div class="i-simple-icons:curseforge h-4 w-4" />
+                  case "modrinth":
+                    return <div class="i-simple-icons:modrinth h-4 w-4" />
+                  case "local":
+                    return <div class="i-hugeicons:folder-01 h-4 w-4" />
+                  default:
+                    return null
+                }
+              }
+              return (
+                <SelectItem item={itemProps.item}>
+                  <div class="flex items-center gap-2">
+                    {getIcon(itemProps.item.rawValue)}
+                    {getLabel(itemProps.item.rawValue)}
+                  </div>
+                </SelectItem>
+              )
+            }}
+          >
+            <SelectTrigger class="w-32 md:w-40">
+              <SelectValue<string>>
+                {(state) => {
                   const getLabel = (value: string) => {
                     switch (value) {
                       case "all":
-                        return t("instance.filter.all")
+                        return t("content:_trn_filter.all")
                       case "curseforge":
-                        return t("platforms.curseforge")
+                        return t("enums:_trn_curseforge")
                       case "modrinth":
-                        return t("platforms.modrinth")
+                        return t("enums:_trn_modrinth")
                       case "local":
-                        return t("instance.filter.local")
+                        return t("content:_trn_filter.local")
                       default:
                         return value
                     }
@@ -157,121 +194,89 @@ export const AddonFilters = (props: AddonFiltersProps) => {
                         return null
                     }
                   }
+                  const selectedValue = state.selectedOption()
                   return (
-                    <SelectItem item={itemProps.item}>
-                      <div class="flex items-center gap-2">
-                        {getIcon(itemProps.item.rawValue)}
-                        {getLabel(itemProps.item.rawValue)}
-                      </div>
-                    </SelectItem>
+                    <div class="flex items-center gap-2">
+                      {getIcon(selectedValue)}
+                      <span class="hidden sm:inline">
+                        {getLabel(selectedValue)}
+                      </span>
+                    </div>
                   )
                 }}
-              >
-                <SelectTrigger class="w-40">
-                  <SelectValue<string>>
-                    {(state) => {
-                      const getLabel = (value: string) => {
-                        switch (value) {
-                          case "all":
-                            return t("instance.filter.all")
-                          case "curseforge":
-                            return t("platforms.curseforge")
-                          case "modrinth":
-                            return t("platforms.modrinth")
-                          case "local":
-                            return t("instance.filter.local")
-                          default:
-                            return value
-                        }
-                      }
-                      const getIcon = (value: string) => {
-                        switch (value) {
-                          case "all":
-                            return <div class="i-hugeicons:globe h-4 w-4" />
-                          case "curseforge":
-                            return (
-                              <div class="i-simple-icons:curseforge h-4 w-4" />
-                            )
-                          case "modrinth":
-                            return (
-                              <div class="i-simple-icons:modrinth h-4 w-4" />
-                            )
-                          case "local":
-                            return <div class="i-hugeicons:folder-01 h-4 w-4" />
-                          default:
-                            return null
-                        }
-                      }
-                      const selectedValue = state.selectedOption()
-                      return (
-                        <div class="flex items-center gap-2">
-                          {getIcon(selectedValue)}
-                          {getLabel(selectedValue)}
-                        </div>
-                      )
-                    }}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent />
-              </Select>
-            </div>
-          </div>
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent />
+          </Select>
 
-          <div class="flex items-center gap-3">
-            <Show when={props.updateCount() > 0}>
-              <Tooltip open={props.isInstanceLocked() ? undefined : false}>
-                <TooltipTrigger>
-                  <Button
-                    type="outline"
-                    size="small"
-                    onClick={props.onUpdateAll}
-                    disabled={props.isInstanceLocked()}
-                    class="text-xs"
-                  >
-                    <div class="i-hugeicons:download-02 text-sm" />
-                    <Trans
-                      key="instance.update_all_count"
-                      options={{ count: props.updateCount() }}
-                    />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <Trans key="instance.locked_cannot_apply_changes" />
-                </TooltipContent>
-              </Tooltip>
-            </Show>
-
-            <Button
-              type="secondary"
-              size="small"
-              onClick={props.onOpenFolder}
-              class="px-3"
-            >
-              <div class="i-hugeicons:folder-open" />
-            </Button>
-
-            <Tooltip open={props.isInstanceLocked() ? undefined : false}>
+          <Show when={props.updateCount() > 0}>
+            <Tooltip>
               <TooltipTrigger>
                 <Button
-                  type="primary"
+                  type="secondary"
                   size="small"
-                  onClick={props.onAddAddons}
+                  onClick={props.onUpdateAll}
                   disabled={props.isInstanceLocked()}
-                  class="font-semibold"
+                  class="px-2"
                 >
-                  <div class="i-hugeicons:add-01" />
-                  <Trans key="instance.add_addons" />
+                  <div class="i-hugeicons:download-02" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <Trans key="instance.locked_cannot_apply_changes" />
+                <Show
+                  when={!props.isInstanceLocked()}
+                  fallback={
+                    <Trans key="instances:_trn_locked_cannot_apply_changes" />
+                  }
+                >
+                  <Trans
+                    key="content:_trn_update_all_count"
+                    options={{ count: props.updateCount() }}
+                  />
+                </Show>
               </TooltipContent>
             </Tooltip>
-          </div>
+          </Show>
+
+          <Tooltip>
+            <TooltipTrigger>
+              <Button
+                type="secondary"
+                size="small"
+                onClick={props.onOpenFolder}
+                class="px-2"
+              >
+                <div class="i-hugeicons:folder-open" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <Trans key="instances:_trn_open_folder" />
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip open={props.isInstanceLocked() ? undefined : false}>
+            <TooltipTrigger>
+              <Button
+                type="primary"
+                size="small"
+                onClick={props.onAddAddons}
+                disabled={props.isInstanceLocked()}
+                class="font-semibold"
+              >
+                <div class="i-hugeicons:add-01" />
+                <span class="hidden md:inline">
+                  <Trans key="content:_trn_add_addons" />
+                </span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <Trans key="instances:_trn_locked_cannot_apply_changes" />
+            </TooltipContent>
+          </Tooltip>
         </div>
 
         {/* Addon type filters */}
-        <div class="flex items-center justify-between gap-4">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div class="flex flex-wrap items-center gap-2">
             <div class="text-lightSlate-600 h-5 w-5" />
             <For each={visibleAddonTypes()}>
@@ -289,7 +294,9 @@ export const AddonFilters = (props: AddonFiltersProps) => {
                   }}
                 >
                   <div class={`${getAddonTypeIcon(type)} text-sm`} />
-                  {getAddonTypeLabel(type)}
+                  <span class="hidden md:inline">
+                    {getAddonTypeLabel(type)}
+                  </span>
                   <Show when={props.enabledAddonTypes[type]}>
                     <div class="i-hugeicons:tick-02 ml-1" />
                   </Show>
@@ -297,11 +304,11 @@ export const AddonFilters = (props: AddonFiltersProps) => {
               )}
             </For>
           </div>
-          <div class="text-lightSlate-600 flex items-center gap-2 text-xs">
+          <div class="text-lightSlate-600 hidden xl:flex items-center gap-2 text-xs flex-shrink-0">
             <div class="i-hugeicons:mouse-01" />
-            <span>{t("instance.right_click_hint")}</span>
+            <span>{t("content:_trn_right_click_hint")}</span>
             <span class="text-lightSlate-700">•</span>
-            <span>{t("instance.multi_select_hint")}</span>
+            <span>{t("content:_trn_multi_select_hint")}</span>
           </div>
         </div>
       </div>

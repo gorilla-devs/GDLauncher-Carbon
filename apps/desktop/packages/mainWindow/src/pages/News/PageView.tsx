@@ -1,5 +1,6 @@
 import { Show, createMemo } from "solid-js"
 import { useParams } from "@solidjs/router"
+import { Trans } from "@gd/i18n"
 import { useNews, usePatchNotes } from "@/utils/news"
 import { Button, Spinner } from "@gd/ui"
 import { useGDNavigate } from "@/managers/NavigationManager"
@@ -57,17 +58,16 @@ const PageView = () => {
                 fallback={
                   <>
                     <h1 class="mb-6 text-3xl font-bold text-white">
-                      Article not found
+                      <Trans key="news:_trn_article_not_found" />
                     </h1>
                     <p class="text-lightSlate-400 mb-8">
-                      The article you're looking for doesn't exist or has been
-                      removed.
+                      <Trans key="news:_trn_article_not_found_desc" />
                     </p>
                     <Button
                       onClick={() => navigator.navigate("/news")}
                       class="px-8 py-3"
                     >
-                      Back to News
+                      <Trans key="news:_trn_back_to_news" />
                     </Button>
                   </>
                 }
@@ -97,7 +97,9 @@ const PageView = () => {
               class="text-lightSlate-400 hover:text-lightSlate-200 group mb-2 flex items-center gap-3 self-start transition-colors"
             >
               <div class="i-hugeicons:arrow-left-01 text-lg transition-transform group-hover:-translate-x-1" />
-              <span class="font-medium">Back to News</span>
+              <span class="font-medium">
+                <Trans key="news:_trn_back_to_news" />
+              </span>
             </button>
 
             {/* Hero Image */}
@@ -119,11 +121,14 @@ const PageView = () => {
                 {article().type === "patch" && (
                   <div class="flex flex-col items-end gap-2">
                     <span class="bg-primary-600/20 text-primary-300 border-primary-600/30 rounded-full border px-4 py-2 text-sm font-semibold">
-                      Patch Notes
+                      <Trans key="news:_trn_minecraft_patches" />
                     </span>
                     {article().version && (
                       <span class="text-lightSlate-400 font-mono text-xs">
-                        v{article().version}
+                        <Trans
+                          key="news:_trn_version_label"
+                          options={{ version: article().version }}
+                        />
                       </span>
                     )}
                   </div>

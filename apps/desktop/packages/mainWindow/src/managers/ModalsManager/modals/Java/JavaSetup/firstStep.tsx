@@ -10,23 +10,11 @@ const FirstStep = (props: StepsProps) => {
         <div class="flex flex-col items-center">
           <img src={JavaLogo} class="h-16 w-16" />
           <h3 class="mb-0">
-            <Trans
-              key="java.java_missing"
-              options={{
-                defaultValue: "Java {{version}} missing",
-                version: 8
-              }}
-            />
+            <Trans key="java:_trn_java_missing" options={{ version: 8 }} />
           </h3>
         </div>
         <p class="text-darkSlate-300 m-0 text-center">
-          <Trans
-            key="java.missing_java_text"
-            options={{
-              defaultValue:
-                "For an optimal experience, we sugges letting us take care of java for you. Only manually manage java if you know what yur're doing, it may result in GDLauncher not working!"
-            }}
-          />
+          <Trans key="java:_trn_missing_java_text" />
         </p>
         <div class="flex w-full justify-between gap-4">
           <Button
@@ -38,12 +26,7 @@ const FirstStep = (props: StepsProps) => {
               props.nextStep?.("manual")
             }}
           >
-            <Trans
-              key="java.manual_setup"
-              options={{
-                defaultValue: "Manual setup"
-              }}
-            />
+            <Trans key="java:_trn_manual_setup" />
           </Button>
           <Button
             rounded
@@ -53,12 +36,7 @@ const FirstStep = (props: StepsProps) => {
               props.nextStep?.("automatic")
             }}
           >
-            <Trans
-              key="java.automatic_setup"
-              options={{
-                defaultValue: "Automatic setup"
-              }}
-            />
+            <Trans key="java:_trn_automatic_setup" />
           </Button>
         </div>
       </div>

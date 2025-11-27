@@ -10,7 +10,7 @@ export default function ExportDone(props: { path: string }) {
     <div class="flex h-full flex-col items-center justify-center gap-2 gap-4 p-4">
       <Show when={!failedMsg()}>
         <CheckIcon />
-        <span>{`${t("instance.exported_to")} :`}</span>
+        <span>{`${t("instances:_trn_exported_to")} :`}</span>
       </Show>
 
       <div class="w-full rounded-md bg-[#1D2028] p-2 text-center leading-10">
@@ -26,7 +26,7 @@ export default function ExportDone(props: { path: string }) {
           }}
         >
           <div class="i-hugeicons:folder-open" />
-          <span>{t("instance.open_folder")}</span>
+          <span>{t("instances:_trn_open_folder")}</span>
         </Button>
       </Show>
     </div>

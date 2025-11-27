@@ -19,11 +19,11 @@ export default function FeatureStatusBadge(props: Props) {
   const text = () => {
     switch (props.type) {
       case "new":
-        return <Trans key="badge_new" />
+        return <Trans key="general:_trn_badge_new" />
       case "beta":
-        return <Trans key="badge_beta" />
+        return <Trans key="general:_trn_badge_beta" />
       case "soon":
-        return <Trans key="badge_soon" />
+        return <Trans key="general:_trn_badge_soon" />
     }
   }
 

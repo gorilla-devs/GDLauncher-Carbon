@@ -21,12 +21,12 @@ const Confirmation = (props: ModalProps) => {
     <ModalLayout noHeader={props.noHeader} title={props.title} noPadding={true}>
       <div class="w-120 flex flex-col p-4">
         <Show when={data().instanceState === "unlock"}>
-          <p>{t("instance_unlock_confirmation")}</p>
+          <p>{t("general:_trn_instance_unlock_confirmation")}</p>
         </Show>
         <Show when={data().instanceState === "unpair"}>
-          <p>{t("instance_unpair_confirmation")}</p>
+          <p>{t("general:_trn_instance_unpair_confirmation")}</p>
         </Show>
-        <p>{t("instance_confirm_continue")}</p>
+        <p>{t("instances:_trn_instance_confirm_continue")}</p>
         <div class="mt-8 flex justify-between">
           <Button
             type="primary"
@@ -35,7 +35,7 @@ const Confirmation = (props: ModalProps) => {
             }}
           >
             <div class="i-hugeicons:cancel-01" />
-            {t("instance_cancel")}
+            {t("instances:_trn_instance_cancel")}
           </Button>
           <Button
             type="secondary"
@@ -59,7 +59,7 @@ const Confirmation = (props: ModalProps) => {
             }}
           >
             <div class="i-hugeicons:tick-02" />
-            {t("instance_confirm")}
+            {t("instances:_trn_instance_confirm")}
           </Button>
         </div>
       </div>

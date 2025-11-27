@@ -1,12 +1,12 @@
 import { ImportEntityStatus } from "@gd/core_module/bindings"
-import { useTransContext } from "@gd/i18n"
+import { useTransContext, NamespacedTranslationKey } from "@gd/i18n"
 import { Show } from "solid-js"
 
 export interface EntityCardProps {
   entity: ImportEntityStatus
   icon: string
   onClick?: [(_entity: ImportEntityStatus) => void, ImportEntityStatus]
-  translation: string
+  translation: NamespacedTranslationKey
   className?: string
   selected?: boolean
 }
@@ -31,7 +31,7 @@ const EntityCard = (props: EntityCardProps) => {
       {/* <div class={`${props.icon} text-red-400 text-5xl`}></div> */}
       {/* absolute left-0 right-0 text-center ml-auto mr-auto top-[30%] */}
       <Show when={!props.entity.supported}>
-        <span class="font-bold text-teal-600">{t("SOON")}</span>
+        <span class="font-bold text-teal-600">{t("tracking:_trn_soon")}</span>
       </Show>
       <div class="relative">
         <img

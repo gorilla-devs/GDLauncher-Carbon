@@ -233,7 +233,6 @@ struct FESettings {
     auto_manage_java_system_profiles: bool,
     mod_sources: ModSources,
     terms_and_privacy_accepted: bool,
-    hashed_email_accepted: bool,
     gdl_account_id: Option<String>,
 }
 
@@ -291,7 +290,6 @@ impl TryFrom<carbon_repos::db::app_configuration::Data> for FESettings {
                     .collect::<Result<_, _>>()?,
             },
             terms_and_privacy_accepted: data.terms_and_privacy_accepted,
-            hashed_email_accepted: data.hashed_email_accepted,
             gdl_account_id: data.gdl_account_uuid,
         })
     }
@@ -395,8 +393,6 @@ pub struct FESettingsUpdate {
     pub mod_sources: Option<Set<ModSources>>,
     #[specta(optional)]
     pub terms_and_privacy_accepted: Option<Set<bool>>,
-    #[specta(optional)]
-    pub hashed_email_accepted: Option<Set<bool>>,
     #[specta(optional)]
     pub gdl_account_id: Option<Set<Option<String>>>,
 }

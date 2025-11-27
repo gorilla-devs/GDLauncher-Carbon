@@ -33,29 +33,29 @@ const SummaryStep = (props: Props) => {
         <div class="mb-2 flex items-center gap-3">
           <div class="i-hugeicons:checkmark-badge-01 text-3xl text-green-500" />
           <h2 class="m-0 text-xl font-bold">
-            <Trans key="instance.duplicates.summary.title" />
+            <Trans key="content:_trn_duplicates.summary.title" />
           </h2>
         </div>
 
         <p class="text-lightSlate-700 text-sm leading-6">
-          <Trans key="instance.duplicates.summary.description" />
+          <Trans key="content:_trn_duplicates.summary.description" />
         </p>
 
         <div class="bg-darkSlate-600 mb-2 rounded-lg p-4">
           <div class="mb-3 flex items-center gap-2">
             <div class="i-hugeicons:information-circle text-primary-500" />
             <h3 class="m-0 text-sm font-semibold">
-              <Trans key="instance.duplicates.summary.action_title" />
+              <Trans key="content:_trn_duplicates.summary.action_title" />
             </h3>
           </div>
           <p class="text-lightSlate-700 m-0 ml-6 text-sm">
             <Show
               when={props.action === "disable"}
               fallback={
-                <Trans key="instance.duplicates.summary.action_remove" />
+                <Trans key="content:_trn_duplicates.summary.action_remove" />
               }
             >
-              <Trans key="instance.duplicates.summary.action_disable" />
+              <Trans key="content:_trn_duplicates.summary.action_disable" />
             </Show>
           </p>
         </div>
@@ -95,7 +95,7 @@ const SummaryStep = (props: Props) => {
                           <div class="flex items-center gap-2 text-xs">
                             <div class="i-hugeicons:tick-02 text-green-500" />
                             <span class="text-green-400">
-                              <Trans key="instance.duplicates.summary.status_keep" />
+                              <Trans key="content:_trn_duplicates.summary.status_keep" />
                             </span>
                             <span class="text-lightSlate-500">
                               {version().fileName}
@@ -127,10 +127,10 @@ const SummaryStep = (props: Props) => {
                               <Show
                                 when={props.action === "disable"}
                                 fallback={
-                                  <Trans key="instance.duplicates.summary.status_remove" />
+                                  <Trans key="content:_trn_duplicates.summary.status_remove" />
                                 }
                               >
-                                <Trans key="instance.duplicates.summary.status_disable" />
+                                <Trans key="content:_trn_duplicates.summary.status_disable" />
                               </Show>
                             </span>
                             <span>{version.fileName}</span>
@@ -154,7 +154,7 @@ const SummaryStep = (props: Props) => {
           onClick={() => props.prevStep()}
           disabled={props.isApplying}
         >
-          <Trans key="instance.duplicates.summary.button_back" />
+          <Trans key="content:_trn_duplicates.summary.button_back" />
         </Button>
         <Button
           type="primary"
@@ -163,7 +163,7 @@ const SummaryStep = (props: Props) => {
           loading={props.isApplying}
           disabled={props.isApplying}
         >
-          <Trans key="instance.duplicates.summary.button_apply" />
+          <Trans key="content:_trn_duplicates.summary.button_apply" />
         </Button>
       </div>
     </div>

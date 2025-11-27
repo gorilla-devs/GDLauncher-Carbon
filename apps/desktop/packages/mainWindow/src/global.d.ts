@@ -1,11 +1,27 @@
 import type { FEReleaseChannel } from "@gd/core_module/bindings"
 import { BoundsSize } from "./utils/adhelper"
-import type {
-  ProgressInfo,
-  UpdateCheckResult,
-  UpdateInfo
-} from "electron-updater"
+import type { UpdateInfo } from "electron-updater"
 import type { Log } from "../../main/coreModule"
+
+type UpdateState =
+  | "idle"
+  | "checking"
+  | "downloading"
+  | "downloaded"
+  | "error"
+  | "no-update"
+
+interface UpdateStateData {
+  state: UpdateState
+  updateInfo: (UpdateInfo & { downloadUrl: string }) | null
+  progress: number
+  error: { message: string; details: string } | null
+}
+
+interface CheckForUpdatesResult {
+  status: "checking" | "busy" | "snapshot-version"
+  currentState: UpdateStateData
+}
 
 declare global {
   interface Window {
@@ -27,15 +43,11 @@ declare global {
     ) => void
     checkForUpdates: (
       releaseChannel: FEReleaseChannel
-    ) => Promise<UpdateCheckResult | null>
-    onDownloadProgress: (
-      cb: (event: Electron.IpcRendererEvent, progressInfo: ProgressInfo) => void
+    ) => Promise<CheckForUpdatesResult | null>
+    getUpdateState: () => Promise<UpdateStateData | null>
+    onUpdateStateChanged: (
+      cb: (event: Electron.IpcRendererEvent, state: UpdateStateData) => void
     ) => void
-    updateDownloaded: (cb: (event: Electron.IpcRendererEvent) => void) => void
-    updateAvailable: (
-      cb: (event: Electron.IpcRendererEvent, updateInfo: UpdateInfo) => void
-    ) => void
-    updateNotAvailable: (cb: (event: Electron.IpcRendererEvent) => void) => void
     installUpdate: () => void
     openExternalLink: (link: string) => void
     openFolder: (path: string) => void
@@ -51,7 +63,11 @@ declare global {
           logs: Log[]
         }
     >
-    getCurrentOS: () => Promise<{ platform: string; arch: string }>
+    getCurrentOS: () => Promise<{
+      platform: string
+      arch: string
+      supportsAutoUpdate: boolean
+    }>
     getInitialRuntimePath: () => Promise<string>
     getRuntimePath: () => Promise<string>
     changeRuntimePath: (newPath: string | null) => Promise<void>

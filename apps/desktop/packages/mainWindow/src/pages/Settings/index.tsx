@@ -17,19 +17,19 @@ function Settings() {
   const navigator = useGDNavigate()
   const [t] = useTransContext()
 
-  const settings: settingsItem[] = [
+  const settings = (): settingsItem[] => [
     {
-      name: t("settings:General"),
+      name: t("settings:_trn_general"),
       icon: "i-hugeicons:home-05",
       path: "/settings"
     },
     {
-      name: t("settings:Accounts"),
+      name: t("accounts:_trn_accounts"),
       icon: "i-hugeicons:user-account",
       path: "/settings/accounts"
     },
     {
-      name: t("settings:Language"),
+      name: t("settings:_trn_language"),
       icon: "i-hugeicons:globe",
       path: "/settings/language"
     },
@@ -46,22 +46,22 @@ function Settings() {
       path: "/settings/appearance"
     },
     {
-      name: t("settings:Java"),
+      name: t("settings:_trn_java"),
       icon: "i-hugeicons:java",
       path: "/settings/java"
     },
     {
-      name: t("settings:custom_commands"),
+      name: t("settings:_trn_custom_commands"),
       icon: "i-hugeicons:computer-terminal-01",
       path: "/settings/custom-commands"
     },
     {
-      name: t("settings:Privacy"),
+      name: t("settings:_trn_privacy"),
       icon: "i-hugeicons:security-lock",
       path: "/settings/privacy"
     },
     {
-      name: t("settings:runtime_path"),
+      name: t("java:_trn_runtime_path"),
       icon: "i-hugeicons:folder-01",
       path: "/settings/runtime-path"
     }
@@ -73,13 +73,13 @@ function Settings() {
         <div class="sticky top-0 z-50 box-border w-full px-6">
           <Tabs
             orientation="horizontal"
-            defaultIndex={settings.findIndex(
+            defaultIndex={settings().findIndex(
               (item) => item.path === location.pathname
             )}
           >
             <div class="h-26">
               <TabList>
-                <For each={settings}>
+                <For each={settings()}>
                   {(item) => (
                     <Tab
                       onClick={() => {

@@ -1,0 +1,14 @@
+{
+  "_trn_update_available_title": "Aggiornamento Disponibile",
+  "_trn_update_downloading": "Download Aggiornamento",
+  "_trn_update_ready": "Aggiornamento Pronto per l'Installazione",
+  "_trn_update_download_button": "Scarica",
+  "_trn_update_install_button": "Installa e Riavvia",
+  "_trn_update_later_button": "Più Tardi",
+  "_trn_update_copy_link": "Copia Link Download",
+  "_trn_update_view_release": "Visualizza Note di Rilascio",
+  "_trn_update_link_copied": "Link di download copiato negli appunti",
+  "_trn_update_version": "La versione {{version}} è ora disponibile",
+  "_trn_update_progress": "Download in corso: {{percent}}%",
+  "_trn_update_manual_required": "Aggiornamento automatico non disponibile per questo metodo di installazione"
+}

@@ -1,0 +1,18 @@
+{
+  "_trn_error.missing_field_title": "Title can't be empty",
+  "_trn_error.no_mc_versions": "No mc versions available right now, try later!",
+  "_trn_profile_name_exists": "Profile name already exists",
+  "_trn_some_error": "Some error occurred",
+  "_trn_xbox_noAccount": "No Xbox account found",
+  "_trn_xbox_xboxServicesBanned": "Your account is banned from Xbox services",
+  "_trn_xbox_adultVerificationRequired": "Adult verification is required",
+  "_trn_xbox_childAccount": "Child accounts are not supported",
+  "_trn_deviceCodeExpired": "Device code has expired",
+  "_trn_xboxAccount": "Xbox account error",
+  "_trn_noGameOwnership": "You don't own Minecraft Java Edition",
+  "_trn_noGameProfile": "No game profile found",
+  "_trn_404_message": "Page not found",
+  "_trn_its_gone": "It's gone",
+  "_trn_error.enrollment_failed": "Failed to complete enrollment",
+  "_trn_error.xbox_code": "Xbox error code"
+}

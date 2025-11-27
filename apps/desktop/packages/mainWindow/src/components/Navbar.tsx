@@ -1,24 +1,11 @@
 import { useLocation, useMatch } from "@solidjs/router"
-import { Match, Show, Switch, createMemo } from "solid-js"
+import { Show, createMemo } from "solid-js"
 import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg"
-import {
-  Tab,
-  TabList,
-  Tabs,
-  Tooltip,
-  Button,
-  TooltipContent,
-  TooltipTrigger
-} from "@gd/ui"
+import { Tab, TabList, Tabs, Button } from "@gd/ui"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { AccountsDropdown } from "./AccountsDropdown"
 import { AccountStatus, AccountType } from "@gd/core_module/bindings"
 import { port } from "@/utils/rspcClient"
-import updateAvailable, {
-  updateDownloaded,
-  updateProgress
-} from "@/utils/updater"
-import { Trans } from "@gd/i18n"
 import { useModal } from "@/managers/ModalsManager"
 import { useGlobalStore } from "./GlobalStoreContext"
 import { EnhancedSearchBar } from "./EnhancedSearchBar"
@@ -159,51 +146,7 @@ const AppNavbar = () => {
                     />
                   </Tab>
                 </div>
-                <Show
-                  when={
-                    updateAvailable() ||
-                    updateDownloaded() ||
-                    updateProgress() > 0
-                  }
-                >
-                  <Tab ignored>
-                    <Tooltip>
-                      <TooltipTrigger>
-                        <div
-                          class="i-hugeicons:download-02 text-2xl text-green-500"
-                          classList={{
-                            "hover:text-green-100": !updateDownloaded()
-                          }}
-                          onClick={() => {
-                            if (updateDownloaded()) {
-                              window.installUpdate()
-                            } else {
-                              modalsContext?.openModal({ name: "appUpdate" })
-                            }
-                          }}
-                        />
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <Switch>
-                          <Match when={updateDownloaded()}>
-                            <Trans key="app_update.apply_and_restart" />
-                          </Match>
-                          <Match when={updateProgress() > 0}>
-                            <Trans
-                              key="app_update.downloading"
-                              options={{
-                                progress: updateProgress()
-                              }}
-                            />
-                          </Match>
-                          <Match when={updateAvailable()}>
-                            <Trans key="app_update.new_update_available_text" />
-                          </Match>
-                        </Switch>
-                      </TooltipContent>
-                    </Tooltip>
-                  </Tab>
-                </Show>
+                {/* Update notification now handled by toast - removed navbar icon */}
               </div>
             </TabList>
           </Tabs>

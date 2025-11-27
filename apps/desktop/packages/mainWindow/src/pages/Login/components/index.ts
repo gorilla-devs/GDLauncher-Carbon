@@ -4,7 +4,6 @@
  * Centralizes exports for all modular Login components.
  */
 
-export { LoginContainer } from "./LoginContainer"
 export { ProgressStepper } from "./ProgressStepper"
 export { WelcomeStep } from "./WelcomeStep"
 export { AuthMethodStep } from "./AuthMethodStep"

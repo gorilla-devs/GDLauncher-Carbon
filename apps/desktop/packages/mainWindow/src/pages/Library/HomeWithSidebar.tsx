@@ -15,7 +15,7 @@ const HomeWithSidebar = () => {
               <img src={skull} class="w-16 h-16" />
               <p class="text-lightSlate-700 text-center max-w-100">
                 <Trans
-                  key="instance.no_instances_text"
+                  key="instances:_trn_no_instances_text"
                   options={{
                     defaultValue:
                       "At the moment there are not instances. Add one to start playing!"
@@ -41,7 +41,7 @@ const HomeWithSidebar = () => {
                     !routeData.instances.isLoading
                   }
                 >
-                  <Carousel title={t("jump_back_in")}>
+                  <Carousel title={t("general:_trn_jump_back_in")}>
                     <For
                       each={routeData.instances.data
                         ?.slice()
@@ -79,7 +79,7 @@ const HomeWithSidebar = () => {
                     !routeData.instances.isLoading
                   }
                 >
-                  <Carousel title={t("have_not_played_in_a_while")}>
+                  <Carousel title={t("general:_trn_have_not_played_in_a_while")}>
                     <For
                       each={routeData.instances.data
                         ?.slice()

@@ -108,8 +108,8 @@ impl TermsAndPrivacy {
     }
 
     #[tracing::instrument]
-    pub async fn get_latest_consent_sha(gdl_base_api: String) -> anyhow::Result<String> {
-        let client = crate::iridium_client::get_client(gdl_base_api.clone()).build();
+    pub async fn get_latest_consent_sha(gdl_base_api: &str) -> anyhow::Result<String> {
+        let client = crate::iridium_client::get_client(gdl_base_api.to_string()).build();
 
         let url = format!("{}/v1/latest_consent_checksum", gdl_base_api);
 

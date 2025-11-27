@@ -2,7 +2,7 @@ import { JSX, Show, createEffect, createSignal } from "solid-js"
 import { cva, type VariantProps } from "class-variance-authority"
 
 const switchStyles = cva(
-  "absolute top-0 left-0 right-0 bottom-0 transition-colors duration-100 ease-in-out rounded-full",
+  "absolute top-0 left-0 right-0 bottom-0 transition-colors duration-100 ease-in-out rounded-md",
   {
     variants: {
       state: {
@@ -26,7 +26,7 @@ const switchStyles = cva(
 )
 
 const toggleStyles = cva(
-  "absolute content-[] w-4 h-4 bottom-0.5 left-0.5 rounded-full transition-all duration-100 ease-in-out",
+  "absolute content-[] w-4 h-4 bottom-0.5 left-0.5 rounded-md transition-all duration-100 ease-in-out",
   {
     variants: {
       position: {
@@ -144,7 +144,7 @@ function Switch(props: Props) {
         />
       </span>
       <Show when={!props.disabled}>
-        <span class="absolute inset-0 rounded-full transition-all duration-200 ease-in-out group-hover:ring-1 group-hover:ring-darkSlate-200" />
+        <span class="absolute inset-0 rounded-md transition-all duration-200 ease-in-out group-hover:ring-1 group-hover:ring-darkSlate-200" />
       </Show>
     </label>
   )

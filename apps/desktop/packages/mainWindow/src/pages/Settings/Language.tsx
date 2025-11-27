@@ -1,4 +1,5 @@
 import { Trans, supportedLanguages } from "@gd/i18n"
+import { getLanguageKey, getLanguageNativeKey } from "@gd/i18n/helpers"
 import PageTitle from "./components/PageTitle"
 import Row from "./components/Row"
 import RowsContainer from "./components/RowsContainer"
@@ -18,12 +19,12 @@ const Language = () => {
   return (
     <>
       <PageTitle>
-        <Trans key="settings:language" />
+        <Trans key="settings:_trn_language" />
       </PageTitle>
       <RowsContainer>
         <Row class="flex-col justify-start">
           <Title class="w-full">
-            <Trans key="settings:select_a_language" />
+            <Trans key="settings:_trn_select_a_language" />
           </Title>
           <div class="divide-darkSlate-600 flex w-full flex-col divide-y">
             <Radio.group
@@ -34,19 +35,26 @@ const Language = () => {
               }}
               value={settings.data?.language}
               options={Object.entries(supportedLanguages).map(
-                ([key, value]) => ({
-                  value: key,
-                  label: (
-                    <div class="flex w-full justify-between">
-                      <div class="flex items-center gap-2">
-                        <div
-                          class={`i-emojione-v1:flag-for- h-5 w-5${value}`}
-                        />
-                        <Trans key={`languages:${key}_native`} />
+                ([key, value]) => {
+                  // Type-safe: Object.entries on supportedLanguages ensures key is a valid language code
+                  const langCode = key as keyof typeof supportedLanguages
+                  return {
+                    value: key,
+                    label: (
+                      <div class="flex w-full justify-between">
+                        <div class="flex items-center gap-2">
+                          <div
+                            class={`i-emojione-v1:flag-for-${value} h-5 w-5`}
+                          />
+                          <Trans key={getLanguageKey(langCode)} />
+                          {" ("}
+                          <Trans key={getLanguageNativeKey(langCode)} />
+                          {")"}
+                        </div>
                       </div>
-                    </div>
-                  )
-                })
+                    )
+                  }
+                }
               )}
             />
           </div>

@@ -87,7 +87,7 @@ const ExportCheckboxParent = (props: Props) => {
           indeterminate={someSelected()}
           children={
             <span class="text-sm text-[#8A8B8F]">
-              {t("instance.select_all_mods")}
+              {t("content:_trn_select_all_mods")}
             </span>
           }
         />

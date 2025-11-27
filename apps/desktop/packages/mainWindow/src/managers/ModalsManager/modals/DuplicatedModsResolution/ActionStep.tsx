@@ -29,12 +29,12 @@ const ActionStep = (props: Props) => {
         <div class="mb-2 flex items-center gap-3">
           <div class="i-hugeicons:settings-01 text-primary-500 text-3xl" />
           <h2 class="m-0 text-xl font-bold">
-            <Trans key="instance.duplicates.action.title" />
+            <Trans key="content:_trn_duplicates.action.title" />
           </h2>
         </div>
 
         <p class="text-lightSlate-700 text-sm leading-6">
-          <Trans key="instance.duplicates.action.question" />
+          <Trans key="content:_trn_duplicates.action.question" />
         </p>
 
         <div class="mt-4 flex flex-col gap-3">
@@ -56,11 +56,11 @@ const ActionStep = (props: Props) => {
                 <div class="flex items-center gap-2">
                   <div class="i-hugeicons:view-off-slash text-lg" />
                   <span class="font-semibold">
-                    <Trans key="instance.duplicates.action.disable_title" />
+                    <Trans key="content:_trn_duplicates.action.disable_title" />
                   </span>
                 </div>
                 <p class="text-lightSlate-600 m-0 ml-6 text-sm">
-                  <Trans key="instance.duplicates.action.disable_description" />
+                  <Trans key="content:_trn_duplicates.action.disable_description" />
                 </p>
               </div>
             </Radio>
@@ -83,11 +83,11 @@ const ActionStep = (props: Props) => {
                 <div class="flex items-center gap-2">
                   <div class="i-hugeicons:delete-02 text-lg text-red-500" />
                   <span class="font-semibold">
-                    <Trans key="instance.duplicates.action.remove_title" />
+                    <Trans key="content:_trn_duplicates.action.remove_title" />
                   </span>
                 </div>
                 <p class="text-lightSlate-600 m-0 ml-6 text-sm">
-                  <Trans key="instance.duplicates.action.remove_description" />
+                  <Trans key="content:_trn_duplicates.action.remove_description" />
                 </p>
               </div>
             </Radio>
@@ -97,10 +97,10 @@ const ActionStep = (props: Props) => {
 
       <div class="mt-6 flex justify-between">
         <Button type="secondary" size="large" onClick={() => props.prevStep()}>
-          <Trans key="instance.duplicates.action.button_back" />
+          <Trans key="content:_trn_duplicates.action.button_back" />
         </Button>
         <Button type="primary" size="large" onClick={() => props.nextStep()}>
-          <Trans key="instance.duplicates.action.button_continue" />
+          <Trans key="content:_trn_duplicates.action.button_continue" />
         </Button>
       </div>
     </div>

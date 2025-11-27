@@ -84,7 +84,7 @@ const FeaturedModpackTile = () => {
               }}
             />
             <div class="absolute left-0 top-0 duration-200 ease-in-out group-hover:-translate-y-full">
-              <Trans key="featured.try_featured_modpack" />
+              <Trans key="library:_trn_featured.try_featured_modpack" />
             </div>
             <Switch>
               <Match when={hexingTales()?.data}>
@@ -105,7 +105,7 @@ const FeaturedModpackTile = () => {
                   </div>
 
                   <div class="absolute left-40 top-1/2 -translate-y-1/2 translate-x-[150%] duration-200 ease-in-out group-hover:translate-x-0">
-                    <Trans key="featured.show_more" />
+                    <Trans key="library:_trn_featured.show_more" />
                   </div>
                 </div>
               </Match>

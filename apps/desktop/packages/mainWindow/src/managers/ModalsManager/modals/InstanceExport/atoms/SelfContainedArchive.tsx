@@ -13,13 +13,13 @@ const SelfContainedArchive = () => {
   return (
     <div class="flex w-full items-center justify-between pt-4">
       <div class="flex items-center gap-2">
-        <div>{t("instance.self_contained_addons_bundling")}</div>
+        <div>{t("instances:_trn_self_contained_addons_bundling")}</div>
         <Tooltip>
           <TooltipTrigger>
             <div class="i-hugeicons:information-circle text-darkSlate-400 hover:text-lightSlate-50 cursor-pointer transition-color duration-100 ease-in-out text-2xl" />
           </TooltipTrigger>
           <TooltipContent>
-            {t("instance.self_contained_addons_bundling_tooltip")}
+            {t("instances:_trn_self_contained_addons_bundling_tooltip")}
           </TooltipContent>
         </Tooltip>
       </div>

@@ -30,13 +30,13 @@ export function FiltersDropdown() {
       <DropdownMenuLabel>
         <div class="flex items-center justify-between gap-2">
           <div>
-            <Trans key="search.filters" />
+            <Trans key="search:_trn_filters" />
           </div>
           <div
             class="text-lightSlate-900 hover:text-lightSlate-50 cursor-pointer text-xs transition-colors duration-200 ease-[cubic-bezier(.4,0,.2,1)]"
             onClick={resetAllFilters}
           >
-            <Trans key="general.reset_filters" />
+            <Trans key="search:_trn_clear_all_filters" />
           </div>
         </div>
       </DropdownMenuLabel>
@@ -44,7 +44,7 @@ export function FiltersDropdown() {
       <SearchApiDropdown />
       <DropdownMenuSeparator />
       <DropdownMenuLabel>
-        <Trans key="search.universal_filters" />
+        <Trans key="search:_trn_universal_filters" />
       </DropdownMenuLabel>
       <SearchCategoryDropdown />
       <SearchModloaderDropdown />

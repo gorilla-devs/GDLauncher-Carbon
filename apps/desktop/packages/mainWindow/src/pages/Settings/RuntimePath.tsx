@@ -49,12 +49,12 @@ const RuntimePath = () => {
   return (
     <>
       <PageTitle>
-        <Trans key="settings:RuntimePath" />
+        <Trans key="java:_trn_runtime_path" />
       </PageTitle>
       <RowsContainer>
         <Row forceContentBelow>
-          <Title description={<Trans key="settings:runtime_path_text" />}>
-            <Trans key="settings:runtime_path_title" />
+          <Title description={<Trans key="java:_trn_runtime_path_text" />}>
+            <Trans key="java:_trn_runtime_path_title" />
           </Title>
           <Center>
             <Input
@@ -97,7 +97,7 @@ const RuntimePath = () => {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <Trans key="tooltip.undo" />
+                <Trans key="ui:_trn_tooltip.undo" />
               </TooltipContent>
             </Tooltip>
             <Tooltip>
@@ -115,7 +115,7 @@ const RuntimePath = () => {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <Trans key="tooltip.reset" />
+                <Trans key="ui:_trn_tooltip.reset" />
               </TooltipContent>
             </Tooltip>
             <Tooltip>
@@ -158,7 +158,7 @@ const RuntimePath = () => {
               <TooltipContent>
                 <Switch>
                   <Match when={currentRuntimePath() === runtimePath()}>
-                    <Trans key="tooltip.rtp_unchanged" />
+                    <Trans key="ui:_trn_tooltip.rtp_unchanged" />
                   </Match>
                   <Match
                     when={
@@ -166,10 +166,10 @@ const RuntimePath = () => {
                       isPathValid() === "potentially_valid"
                     }
                   >
-                    <Trans key="tooltip.apply_and_restart" />
+                    <Trans key="ui:_trn_tooltip.apply_and_restart" />
                   </Match>
                   <Match when={!isPathValid() || isPathValid() === "invalid"}>
-                    <Trans key="tooltip.rtp_not_valid" />
+                    <Trans key="ui:_trn_tooltip.rtp_not_valid" />
                   </Match>
                 </Switch>
               </TooltipContent>

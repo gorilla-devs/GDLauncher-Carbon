@@ -83,7 +83,7 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
     cell: (info) => info.getValue(),
     header: () => (
       <span>
-        <Trans key="settings:active" />
+        <Trans key="accounts:_trn_active" />
       </span>
     )
   },
@@ -103,7 +103,7 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
     ),
     header: () => (
       <span>
-        <Trans key="settings:username" />
+        <Trans key="accounts:_trn_username" />
       </span>
     )
   },
@@ -113,7 +113,7 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
     cell: (info) => info.getValue(),
     header: () => (
       <span>
-        <Trans key="settings:type" />
+        <Trans key="accounts:_trn_type" />
       </span>
     )
   },
@@ -140,7 +140,7 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
     ),
     header: () => (
       <span>
-        <Trans key="settings:status" />
+        <Trans key="accounts:_trn_status" />
       </span>
     )
   },
@@ -156,7 +156,7 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
     ),
     header: () => (
       <span>
-        <Trans key="settings:uuid" />
+        <Trans key="accounts:_trn_uuid" />
       </span>
     )
   },
@@ -166,7 +166,7 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
     cell: (info) => info.getValue(),
     header: () => (
       <span>
-        <Trans key="settings:actions" />
+        <Trans key="accounts:_trn_actions" />
       </span>
     )
   }
@@ -206,7 +206,7 @@ const Accounts = () => {
     if (validGDLUser()?.deletionTimeout) {
       return (
         <Trans
-          key="settings:cannot_request_deletion_for_time"
+          key="accounts:_trn_cannot_request_deletion_for_time"
           options={{
             time: convertSecondsToHumanTime(validGDLUser()?.deletionTimeout!)
           }}
@@ -221,7 +221,7 @@ const Accounts = () => {
     if (validGDLUser()?.verificationTimeout) {
       return (
         <Trans
-          key="settings:cannot_request_deletion_for_time"
+          key="accounts:_trn_cannot_request_deletion_for_time"
           options={{
             time: convertSecondsToHumanTime(
               validGDLUser()?.verificationTimeout!
@@ -245,12 +245,12 @@ const Accounts = () => {
   return (
     <>
       <PageTitle>
-        <Trans key="settings:accounts" />
+        <Trans key="accounts:_trn_accounts" />
       </PageTitle>
       <RowsContainer>
         <Row forceContentBelow>
           <Title>
-            <Trans key="settings:gdl_account_title" />
+            <Trans key="accounts:_trn_gdl_account_title" />
           </Title>
           <div class="bg-darkSlate-700 mb-6 p-4">
             <Switch>
@@ -258,14 +258,14 @@ const Accounts = () => {
                 <div class="flex flex-col gap-4">
                   <div class="flex items-center justify-between gap-2">
                     <div class="text-xl text-green-400">
-                      <Trans key="settings:gdl_account_synced" />
+                      <Trans key="accounts:_trn_gdl_account_synced" />
                     </div>
 
                     <Popover>
                       <PopoverTrigger>
                         <Button type="outline">
                           <div class="i-hugeicons:logout-01 block h-6 w-6" />
-                          <Trans key="settings:log_out_gdl_account" />
+                          <Trans key="accounts:_trn_log_out_gdl_account" />
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent>
@@ -276,7 +276,7 @@ const Accounts = () => {
                           }}
                         >
                           <div class="i-hugeicons:logout-01 block h-6 w-6" />
-                          <Trans key="settings:confirm" />
+                          <Trans key="accounts:_trn_confirm" />
                         </Button>
                       </PopoverContent>
                     </Popover>
@@ -287,7 +287,7 @@ const Accounts = () => {
                     <div class="mb-4 flex items-center justify-between gap-8 rounded-md p-4 text-yellow-500 outline outline-yellow-500">
                       <div class="flex items-center gap-4">
                         <div class="i-hugeicons:alert-01 block h-6 w-6" />
-                        <Trans key="settings:gdl_account_not_verified" />
+                        <Trans key="accounts:_trn_gdl_account_not_verified" />
                       </div>
                       <Tooltip>
                         <TooltipTrigger>
@@ -320,7 +320,7 @@ const Accounts = () => {
                             }}
                           >
                             <div class="i-hugeicons:mail-send-01 text-lg" />
-                            <Trans key="settings:send_new_verification_email" />
+                            <Trans key="accounts:_trn_send_new_verification_email" />
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>{verificationContent()}</TooltipContent>
@@ -336,11 +336,11 @@ const Accounts = () => {
                       {validGDLUser()?.nickname}
                     </div>
                     <GDLAccountRowItem
-                      title={t("settings:friend_code")}
+                      title={t("accounts:_trn_friend_code")}
                       value={validGDLUser()?.friendCode}
                     />
                     <GDLAccountRowItem
-                      title={t("settings:microsoft_username")}
+                      title={t("accounts:_trn_microsoft_username")}
                       value={
                         globalStore.accounts.data?.find(
                           (account) =>
@@ -350,11 +350,11 @@ const Accounts = () => {
                       }
                     />
                     <GDLAccountRowItem
-                      title={t("settings:microsoft_oid")}
+                      title={t("accounts:_trn_microsoft_oid")}
                       value={validGDLUser()?.microsoftOid}
                     />
                     <GDLAccountRowItem
-                      title={t("settings:recovery_email")}
+                      title={t("accounts:_trn_recovery_email")}
                       value={validGDLUser()?.email}
                       onEdit={() => {
                         modalsContext?.openModal({
@@ -363,7 +363,7 @@ const Accounts = () => {
                       }}
                     />
                     <GDLAccountRowItem
-                      title={t("settings:microsoft_email")}
+                      title={t("accounts:_trn_microsoft_email")}
                       value={validGDLUser()?.microsoftEmail}
                     />
                   </div>
@@ -371,11 +371,11 @@ const Accounts = () => {
 
                 <div class="my-10 flex items-center gap-2 text-xl text-red-500">
                   <div class="i-hugeicons:alert-01 h-4 w-4" />
-                  <Trans key="settings:danger_zone" />
+                  <Trans key="accounts:_trn_danger_zone" />
                 </div>
                 <div class="text-lightSlate-700 flex items-center justify-between gap-12">
                   <div>
-                    <Trans key="settings:request_account_deletion_description" />
+                    <Trans key="accounts:_trn_request_account_deletion_description" />
                   </div>
                   <Tooltip>
                     <TooltipTrigger>
@@ -390,7 +390,7 @@ const Accounts = () => {
                         }}
                       >
                         <div class="i-hugeicons:delete-02 block h-6 w-6" />
-                        <Trans key="settings:request_account_deletion" />
+                        <Trans key="accounts:_trn_request_account_deletion" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>{deleteAccountContent()}</TooltipContent>
@@ -400,7 +400,7 @@ const Accounts = () => {
               <Match when={!validGDLUser() && !invalidGDLUser()}>
                 <div class="flex items-center justify-between gap-2">
                   <div class="text-xl text-red-400">
-                    <Trans key="settings:gdl_account_not_synced" />
+                    <Trans key="accounts:_trn_gdl_account_not_synced" />
                   </div>
 
                   <Button
@@ -413,14 +413,14 @@ const Accounts = () => {
                     }}
                   >
                     <div class="i-hugeicons:link-01 text-lg" />
-                    <Trans key="settings:link_gdl_account" />
+                    <Trans key="accounts:_trn_link_gdl_account" />
                   </Button>
                 </div>
               </Match>
               <Match when={invalidGDLUser()}>
                 <div class="flex items-center justify-between gap-2">
                   <div class="text-xl text-yellow-400">
-                    <Trans key="settings:gdl_account_error" />
+                    <Trans key="accounts:_trn_gdl_account_error" />
                   </div>
 
                   <Button
@@ -430,7 +430,7 @@ const Accounts = () => {
                     }}
                   >
                     <div class="i-hugeicons:logout-01 block h-6 w-6" />
-                    <Trans key="settings:log_out_gdl_account" />
+                    <Trans key="accounts:_trn_log_out_gdl_account" />
                   </Button>
                 </div>
               </Match>
@@ -442,7 +442,7 @@ const Accounts = () => {
         <Row forceContentBelow>
           <Title>
             <div class="flex items-center gap-4">
-              <Trans key="settings:minecraft_accounts" />
+              <Trans key="accounts:_trn_minecraft_accounts" />
               <Button
                 type="secondary"
                 size="small"

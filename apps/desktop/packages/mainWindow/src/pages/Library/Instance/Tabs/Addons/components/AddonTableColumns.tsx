@@ -11,6 +11,7 @@ import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import { Show, createSignal } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
+import { getAddonTabKey, getPlatformKey } from "@gd/i18n/helpers"
 import { createColumnHelper } from "@tanstack/solid-table"
 import { Mod as ModType } from "@gd/core_module/bindings"
 import CopyIcon from "@/components/CopyIcon"
@@ -139,7 +140,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
 
     // Filename column
     columnHelper.accessor("filename", {
-      header: t("instance.table.filename"),
+      header: t("content:_trn_table.filename"),
       sortingFn: (rowA, rowB) => {
         const modA = rowA.original
         const modB = rowB.original
@@ -157,28 +158,49 @@ export const createAddonColumns = (config: ColumnConfig) => {
 
         return (
           <div
-            class="group flex items-center gap-2"
+            class="group flex min-w-0 items-center gap-2"
             onMouseEnter={() => setShowCopy(true)}
             onMouseLeave={() => setShowCopy(false)}
           >
-            <div class="flex flex-1 flex-col">
-              <div class="flex items-center gap-2">
-                <span class="font-medium">{displayName}</span>
-                <div
-                  class="transition-opacity duration-200"
-                  classList={{
-                    "opacity-0 invisible": !showCopy(),
-                    "opacity-100 visible": showCopy()
-                  }}
-                  onMouseDown={(e) => e.stopPropagation()}
-                >
-                  <CopyIcon text={displayName} />
+            <Tooltip>
+              <TooltipTrigger class="block w-full">
+                <div class="flex min-w-0 flex-1 flex-col">
+                  <div class="flex min-w-0 items-center gap-2">
+                    <div class="min-w-0 flex-1 truncate text-left font-medium">
+                      {displayName}
+                    </div>
+                    <div
+                      class="transition-opacity duration-200 flex-shrink-0"
+                      classList={{
+                        "opacity-0 invisible": !showCopy(),
+                        "opacity-100 visible": showCopy()
+                      }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                    >
+                      <CopyIcon text={displayName} />
+                    </div>
+                  </div>
+                  <Show when={mod.metadata?.name}>
+                    <div class="flex min-w-0 items-center gap-2">
+                      <div class="min-w-0 flex-1 truncate text-left text-lightSlate-600 text-sm">
+                        {mod.filename}
+                      </div>
+                      <div class="flex-shrink-0 w-4" />
+                    </div>
+                  </Show>
                 </div>
-              </div>
-              <Show when={mod.metadata?.name}>
-                <span class="text-lightSlate-600 text-sm">{mod.filename}</span>
-              </Show>
-            </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div class="flex flex-col gap-1">
+                  <div class="font-medium">{displayName}</div>
+                  <Show when={mod.metadata?.name}>
+                    <div class="text-lightSlate-400 text-xs">
+                      {mod.filename}
+                    </div>
+                  </Show>
+                </div>
+              </TooltipContent>
+            </Tooltip>
           </div>
         )
       }
@@ -194,10 +216,10 @@ export const createAddonColumns = (config: ColumnConfig) => {
           <Show when={mod.is_duplicate}>
             <Tooltip>
               <TooltipTrigger>
-                <div class="i-hugeicons:alert-01 text-lg text-yellow-500" />
+                <div class="i-hugeicons:alert-01 text-lg text-yellow-500 hidden lg:flex" />
               </TooltipTrigger>
               <TooltipContent>
-                <Trans key="instance.duplicate_mod_warning" />
+                <Trans key="content:_trn_duplicate_mod_warning" />
               </TooltipContent>
             </Tooltip>
           </Show>
@@ -209,17 +231,21 @@ export const createAddonColumns = (config: ColumnConfig) => {
     // Type column
     columnHelper.display({
       id: "type",
-      header: t("instance.table.type"),
+      header: () => (
+        <span class="hidden lg:inline">{t("content:_trn_table.type")}</span>
+      ),
       size: 104,
       cell: (props) => {
         const mod = props.row.original
         return (
-          <Badge variant="secondary" class="flex items-center gap-1.5">
-            <div
-              class={`${getAddonTypeIcon(mod.addon_type)} shrink-0 text-base`}
-            />
-            {t(`instance.tabs.${mod.addon_type}`)}
-          </Badge>
+          <div class="hidden lg:flex">
+            <Badge variant="secondary" class="flex items-center gap-1.5">
+              <div
+                class={`${getAddonTypeIcon(mod.addon_type)} shrink-0 text-base`}
+              />
+              {t(getAddonTabKey(mod.addon_type))}
+            </Badge>
+          </div>
         )
       }
     }),
@@ -227,7 +253,9 @@ export const createAddonColumns = (config: ColumnConfig) => {
     // Platform column
     columnHelper.display({
       id: "platform",
-      header: t("instance.table.platform"),
+      header: () => (
+        <span class="hidden md:inline">{t("content:_trn_table.platform")}</span>
+      ),
       size: 78,
       cell: (props) => {
         const mod = props.row.original
@@ -240,9 +268,9 @@ export const createAddonColumns = (config: ColumnConfig) => {
           return (
             <Tooltip>
               <TooltipTrigger>
-                <div class="i-hugeicons:folder-01 text-lg text-gray-500" />
+                <div class="i-hugeicons:folder-01 text-lg text-gray-500 hidden md:flex" />
               </TooltipTrigger>
-              <TooltipContent>{t("instance.table.local")}</TooltipContent>
+              <TooltipContent>{t("content:_trn_table.local")}</TooltipContent>
             </Tooltip>
           )
         }
@@ -256,29 +284,29 @@ export const createAddonColumns = (config: ColumnConfig) => {
               <TooltipTrigger>
                 <img
                   src={logo}
-                  class="h-4 w-4"
-                  alt={t(`platforms.${platform}`)}
+                  class="h-4 w-4 hidden md:block"
+                  alt={t(getPlatformKey(platform))}
                 />
               </TooltipTrigger>
-              <TooltipContent>{t(`platforms.${platform}`)}</TooltipContent>
+              <TooltipContent>{t(getPlatformKey(platform))}</TooltipContent>
             </Tooltip>
           )
         }
 
         // Both platforms - diagonal arrangement
         return (
-          <div class="relative h-6 w-6">
+          <div class="relative h-6 w-6 hidden md:block">
             <Tooltip>
               <TooltipTrigger>
                 <div class="bg-darkSlate-800 absolute -left-0.5 -top-0.5 h-4 w-4 rounded-full p-0.5">
                   <img
                     src={CurseforgeLogo}
                     class="h-full w-full"
-                    alt={t("platforms.curseforge")}
+                    alt={t("enums:_trn_curseforge")}
                   />
                 </div>
               </TooltipTrigger>
-              <TooltipContent>{t("platforms.curseforge")}</TooltipContent>
+              <TooltipContent>{t("enums:_trn_curseforge")}</TooltipContent>
             </Tooltip>
             <Tooltip>
               <TooltipTrigger>
@@ -286,11 +314,11 @@ export const createAddonColumns = (config: ColumnConfig) => {
                   <img
                     src={ModrinthLogo}
                     class="h-full w-full"
-                    alt={t("platforms.modrinth")}
+                    alt={t("enums:_trn_modrinth")}
                   />
                 </div>
               </TooltipTrigger>
-              <TooltipContent>{t("platforms.modrinth")}</TooltipContent>
+              <TooltipContent>{t("enums:_trn_modrinth")}</TooltipContent>
             </Tooltip>
           </div>
         )
@@ -299,7 +327,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
 
     // Update Available column
     columnHelper.accessor("has_update", {
-      header: t("instance.table.update"),
+      header: t("content:_trn_table.update"),
       size: 80,
       cell: (props) => {
         const mod = props.row.original
@@ -340,13 +368,13 @@ export const createAddonColumns = (config: ColumnConfig) => {
                   fallback={
                     <Show
                       when={isUpdating()}
-                      fallback={<Trans key="instance.update_mod" />}
+                      fallback={<Trans key="content:_trn_update_mod" />}
                     >
-                      <Trans key="updating" />
+                      <Trans key="general:_trn_updating" />
                     </Show>
                   }
                 >
-                  <Trans key="instance.locked_cannot_apply_changes" />
+                  <Trans key="instances:_trn_locked_cannot_apply_changes" />
                 </Show>
               </TooltipContent>
             </Tooltip>
@@ -357,31 +385,35 @@ export const createAddonColumns = (config: ColumnConfig) => {
 
     // Status/Enable column
     columnHelper.accessor("enabled", {
-      header: t("instance.table.status"),
+      header: () => (
+        <span class="hidden md:inline">{t("content:_trn_table.status")}</span>
+      ),
       size: 100,
       cell: (props) => {
         const mod = props.row.original
         return (
-          <Show
-            when={!config.isInstanceLocked()}
-            fallback={
-              <Tooltip>
-                <TooltipTrigger>
-                  <Switch checked={props.getValue()} disabled />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <Trans key="instance.locked_cannot_apply_changes" />
-                </TooltipContent>
-              </Tooltip>
-            }
-          >
-            <div class="group" onMouseDown={(e) => e.stopPropagation()}>
-              <Switch
-                checked={mod.enabled}
-                onChange={() => config.onToggleMod(mod)}
-              />
-            </div>
-          </Show>
+          <div class="hidden md:flex">
+            <Show
+              when={!config.isInstanceLocked()}
+              fallback={
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Switch checked={props.getValue()} disabled />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <Trans key="instances:_trn_locked_cannot_apply_changes" />
+                  </TooltipContent>
+                </Tooltip>
+              }
+            >
+              <div class="group" onMouseDown={(e) => e.stopPropagation()}>
+                <Switch
+                  checked={mod.enabled}
+                  onChange={() => config.onToggleMod(mod)}
+                />
+              </div>
+            </Show>
+          </div>
         )
       }
     }),
@@ -389,7 +421,9 @@ export const createAddonColumns = (config: ColumnConfig) => {
     // Actions column
     columnHelper.display({
       id: "actions",
-      header: t("instance.table.actions"),
+      header: () => (
+        <span class="hidden lg:inline">{t("content:_trn_table.actions")}</span>
+      ),
       size: 80,
       cell: (props) => {
         const mod = props.row.original
@@ -398,7 +432,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
         return (
           <Show when={hasPlatformData}>
             <div
-              class="flex items-center justify-center"
+              class="hidden lg:flex items-center justify-center"
               onMouseDown={(e) => e.stopPropagation()}
             >
               <Tooltip>
@@ -409,7 +443,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
                   />
                 </TooltipTrigger>
                 <TooltipContent>
-                  <Trans key="instance.switch_version" />
+                  <Trans key="instances:_trn_switch_version" />
                 </TooltipContent>
               </Tooltip>
             </div>

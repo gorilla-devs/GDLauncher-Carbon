@@ -86,7 +86,7 @@ export function applyTheme(theme: UITheme) {
   }
 }
 
-export function getAvailableThemes(): string[] {
+export function getAvailableThemes(): _Theme[] {
   return Object.values(_Theme)
 }
 

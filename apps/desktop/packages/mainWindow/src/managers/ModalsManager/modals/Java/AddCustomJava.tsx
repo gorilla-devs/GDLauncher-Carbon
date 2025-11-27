@@ -28,7 +28,7 @@ const AddCustomJava = (props: ModalProps) => {
               class="w-full"
               value={value()}
               inputColor="bg-darkSlate-600"
-              placeholder={t("placeholders.type_custom_java_path")}
+              placeholder={t("placeholders:_trn_type_custom_java_path")}
               icon={
                 <Switch>
                   <Match when={validateJavaPath.isPending}>
@@ -69,11 +69,11 @@ const AddCustomJava = (props: ModalProps) => {
               }
               onClick={() => {
                 createCustomJavaVersionMutation.mutate(value())
-                toast.success(t("notifications.custom_java_added"))
+                toast.success(t("notifications:_trn_custom_java_added"))
                 modalsContext?.closeModal()
               }}
             >
-              <Trans key="add_custom_java_path" />
+              <Trans key="general:_trn_add_custom_java_path" />
             </Button>
           </div>
         </div>

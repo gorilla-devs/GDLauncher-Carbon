@@ -91,7 +91,7 @@ export function GDLAccountSetupModal(props: GDLAccountSetupModalProps) {
         {/* Header */}
         <div class="border-darkSlate-600 flex items-center justify-between border-b px-6 py-4">
           <h2 class="text-lightSlate-50 text-lg font-bold">
-            <Trans key="login.gdl_account_setup_title" />
+            <Trans key="auth:_trn_login.gdl_account_setup_title" />
           </h2>
           <button
             onClick={handleClose}
@@ -112,41 +112,41 @@ export function GDLAccountSetupModal(props: GDLAccountSetupModalProps) {
                 </div>
                 <div class="flex flex-col gap-1">
                   <h3 class="text-lightSlate-50 m-0 text-lg font-semibold">
-                    <Trans key="login.unlock_cloud_features" />
+                    <Trans key="auth:_trn_login.unlock_cloud_features" />
                   </h3>
                   <p class="text-lightSlate-600 m-0 text-sm">
-                    <Trans key="login.create_account_description" />
+                    <Trans key="auth:_trn_login.create_account_description" />
                   </p>
                 </div>
               </div>
 
               <div class="flex flex-col gap-3">
                 <h4 class="text-lightSlate-50 m-0 text-sm font-semibold">
-                  <Trans key="login.benefits_label" />
+                  <Trans key="auth:_trn_login.benefits_label" />
                 </h4>
                 <ul class="text-lightSlate-600 flex flex-col gap-2 text-sm">
                   <li class="flex items-start gap-2">
                     <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-1 shrink-0" />
                     <span>
-                      <Trans key="login.benefit_share_instances_friends" />
+                      <Trans key="auth:_trn_login.benefit_share_instances_friends" />
                     </span>
                   </li>
                   <li class="flex items-start gap-2">
                     <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-1 shrink-0" />
                     <span>
-                      <Trans key="login.benefit_track_metrics_playtime" />
+                      <Trans key="auth:_trn_login.benefit_track_metrics_playtime" />
                     </span>
                   </li>
                   <li class="flex items-start gap-2">
                     <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-1 shrink-0" />
                     <span>
-                      <Trans key="login.benefit_sync_settings_preferences" />
+                      <Trans key="auth:_trn_login.benefit_sync_settings_preferences" />
                     </span>
                   </li>
                   <li class="flex items-start gap-2">
                     <div class="i-hugeicons:tick-02 h-4 w-4 text-primary-400 mt-1 shrink-0" />
                     <span>
-                      <Trans key="login.benefit_access_anywhere" />
+                      <Trans key="auth:_trn_login.benefit_access_anywhere" />
                     </span>
                   </li>
                 </ul>
@@ -154,7 +154,7 @@ export function GDLAccountSetupModal(props: GDLAccountSetupModalProps) {
 
               <div class="border-darkSlate-600 bg-darkSlate-700/50 rounded-lg border p-4">
                 <p class="text-lightSlate-600 m-0 text-xs">
-                  <Trans key="login.account_security_notice" />
+                  <Trans key="auth:_trn_login.account_security_notice" />
                 </p>
               </div>
             </div>
@@ -164,11 +164,11 @@ export function GDLAccountSetupModal(props: GDLAccountSetupModalProps) {
             {/* Step 2: Email and nickname */}
             <div class="flex flex-col gap-4">
               <p class="text-lightSlate-600 text-sm">
-                <Trans key="login.enter_recovery_email_nickname" />
+                <Trans key="auth:_trn_login.enter_recovery_email_nickname" />
               </p>
               {/* TODO: Integrate GDLAccountCompletion component here */}
               <div class="text-lightSlate-500 text-center text-sm">
-                [GDL Account Completion Form - To be integrated]
+                <Trans key="accounts:_trn_gdl_account.completion_form" />
               </div>
             </div>
           </Show>
@@ -177,11 +177,11 @@ export function GDLAccountSetupModal(props: GDLAccountSetupModalProps) {
             {/* Step 3: Email verification */}
             <div class="flex flex-col gap-4">
               <p class="text-lightSlate-600 text-sm">
-                <Trans key="login.check_email_verification" />
+                <Trans key="auth:_trn_login.check_email_verification" />
               </p>
               {/* TODO: Integrate GDLAccountVerification component here */}
               <div class="text-lightSlate-500 text-center text-sm">
-                [GDL Account Verification - To be integrated]
+                <Trans key="accounts:_trn_gdl_account.verification" />
               </div>
             </div>
           </Show>
@@ -195,11 +195,11 @@ export function GDLAccountSetupModal(props: GDLAccountSetupModalProps) {
             onClick={currentStep() === ModalStep.Info ? handleSkip : handleBack}
           >
             {currentStep() === ModalStep.Info ? (
-              <Trans key="general.skip" />
+              <Trans key="general:_trn_skip" />
             ) : (
               <>
                 <div class="i-hugeicons:arrow-left-01" />
-                <Trans key="general.back" />
+                <Trans key="general:_trn_back" />
               </>
             )}
           </Button>
@@ -229,10 +229,10 @@ export function GDLAccountSetupModal(props: GDLAccountSetupModalProps) {
               }
             >
               {currentStep() === ModalStep.Verification ? (
-                <Trans key="general.finish" />
+                <Trans key="general:_trn_finish" />
               ) : (
                 <>
-                  <Trans key="general.next" />
+                  <Trans key="general:_trn_next" />
                   <div class="i-hugeicons:arrow-right-01" />
                 </>
               )}

@@ -83,7 +83,7 @@ const BeginExport = (props: Props) => {
           modalsContext?.closeModal()
         }}
       >
-        {t("instance.cancel_export")}
+        {t("instances:_trn_cancel_export")}
       </Button>
       <Button
         onClick={() => {
@@ -93,7 +93,7 @@ const BeginExport = (props: Props) => {
         size="large"
         disabled={!validatePayload(payload as ExportArgs)}
       >
-        {t("instance.begin_export")}
+        {t("instances:_trn_begin_export")}
       </Button>
     </div>
   )

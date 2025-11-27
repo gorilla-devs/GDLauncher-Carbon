@@ -15,12 +15,12 @@ export const NoAddons = (props: NoAddonsProps) => {
           variant="Curious Gorilla - Holding Puzzle Piece"
         />
         <p class="text-lightSlate-700 max-w-100">
-          <Trans key="instance.no_addons_text" />
+          <Trans key="content:_trn_no_addons_text" />
         </p>
       </div>
       <Button type="outline" size="medium" onClick={props.onAddAddons}>
         <div class="i-hugeicons:add-01 h-4 w-4" />
-        <Trans key="instance.add_addons" />
+        <Trans key="content:_trn_add_addons" />
       </Button>
     </div>
   )

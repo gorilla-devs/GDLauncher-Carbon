@@ -24,7 +24,7 @@ const ConfirmGDLAccountDeletion = (props: ModalProps) => {
     >
       <div class="flex h-full flex-col justify-between">
         <div class="h-h-full">
-          <Trans key="settings:request_account_deletion_description" />
+          <Trans key="accounts:_trn_request_account_deletion_description" />
         </div>
         <div class="flex w-full justify-between">
           <Button
@@ -32,7 +32,7 @@ const ConfirmGDLAccountDeletion = (props: ModalProps) => {
               modalsContext?.closeModal()
             }}
           >
-            {t("instance_confirm_deletion.cancel")}
+            {t("instances:_trn_instance_confirm_deletion.cancel")}
           </Button>
           <Button
             type="secondary"
@@ -54,7 +54,7 @@ const ConfirmGDLAccountDeletion = (props: ModalProps) => {
               modalsContext?.closeModal()
             }}
           >
-            {t("instance_confirm_deletion.delete")}
+            {t("instances:_trn_instance_confirm_deletion.delete")}
           </Button>
         </div>
       </div>

@@ -28,10 +28,10 @@ export function AuthMethodStep(props: AuthMethodStepProps) {
       {/* Heading and description */}
       <div class="flex flex-col gap-2">
         <h2 class="text-lightSlate-50 m-0 text-xl font-bold">
-          <Trans key="login.titles.sign_in_with_microsoft" />
+          <Trans key="auth:_trn_login.titles.sign_in_with_microsoft" />
         </h2>
         <p class="text-lightSlate-700 m-0 max-w-80 text-sm">
-          <Trans key="login.sign_in_with_microsoft_text" />
+          <Trans key="auth:_trn_login.sign_in_with_microsoft_text" />
         </p>
       </div>
 
@@ -46,14 +46,14 @@ export function AuthMethodStep(props: AuthMethodStepProps) {
           disabled={props.loading}
         >
           <div class="i-hugeicons:microsoft h-4 w-4" />
-          <Trans key="login.sign_in" />
+          <Trans key="auth:_trn_login.sign_in" />
         </Button>
 
         {/* Recommended badge */}
         <div class="text-primary-400 flex items-center justify-center gap-1 text-xs font-medium">
           <div class="i-hugeicons:star h-3 w-3" />
           <span>
-            <Trans key="login.recommended" />
+            <Trans key="auth:_trn_login.recommended" />
           </span>
         </div>
       </div>
@@ -61,7 +61,7 @@ export function AuthMethodStep(props: AuthMethodStepProps) {
       {/* Alternative method: Device Code */}
       <div class="border-darkSlate-600 flex flex-col gap-2 border-t pt-6">
         <p class="text-lightSlate-600 m-0 text-xs">
-          <Trans key="login.trouble_browser_signin" />
+          <Trans key="auth:_trn_login.trouble_browser_signin" />
         </p>
         <button
           type="button"
@@ -73,14 +73,14 @@ export function AuthMethodStep(props: AuthMethodStepProps) {
           }}
           disabled={props.loading}
         >
-          <Trans key="login.use_device_code_instead" />
+          <Trans key="auth:_trn_login.use_device_code_instead" />
         </button>
       </div>
 
       {/* Info about device code */}
       <div class="text-lightSlate-700 max-w-80 text-xs leading-relaxed">
         <p class="m-0">
-          <Trans key="login.device_code_explanation" />
+          <Trans key="auth:_trn_login.device_code_explanation" />
         </p>
       </div>
     </div>

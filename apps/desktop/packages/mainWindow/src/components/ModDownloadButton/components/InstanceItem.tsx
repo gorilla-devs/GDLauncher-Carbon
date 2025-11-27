@@ -1,4 +1,5 @@
 import { Show, createMemo } from "solid-js"
+import { Trans } from "@gd/i18n"
 import { DropdownMenuRadioItem, Spinner } from "@gd/ui"
 import DefaultImg from "/assets/images/default-instance-img.png"
 
@@ -54,14 +55,18 @@ export const InstanceItem = (props: InstanceItemProps) => {
           <div class="text-lightSlate-400 truncate text-xs">
             {props.instance.gameVersion} • {props.instance.modloader}
             <Show when={props.instance.locked}>
-              <span class="ml-1 text-orange-400">• Locked modpack</span>
+              <span class="ml-1 text-orange-400">
+                <Trans key="instances:_trn_status_locked" />
+              </span>
             </Show>
             <Show
               when={
                 props.isInstalled && !props.isLoading && !props.instance.locked
               }
             >
-              <span class="ml-1 text-green-400">• Installed</span>
+              <span class="ml-1 text-green-400">
+                <Trans key="instances:_trn_status_installed" />
+              </span>
             </Show>
             <Show when={props.isLoading && !props.instance.locked}>
               <span class="ml-1 text-blue-400">• Installing...</span>

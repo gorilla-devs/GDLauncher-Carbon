@@ -105,7 +105,7 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
               <span class="flex items-center gap-2">
                 <div class="i-hugeicons:user h-4 w-4 text-lightSlate-100 shrink-0" />
                 <p class="text-lightSlate-100 m-0 text-sm">
-                  <Trans key="modpack.authors" />
+                  <Trans key="content:_trn_modpack.authors" />
                 </p>
               </span>
               <Authors data={props.data} />
@@ -114,11 +114,11 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
             <div class="text-lightSlate-700 flex items-center gap-2">
               <div class="i-hugeicons:clock-01 text-lightSlate-100 h-5 w-5 shrink-0" />
               <p class="text-lightSlate-100 m-0 text-sm">
-                <Trans key="modpack.last_updated" />
+                <Trans key="content:_trn_modpack.last_updated" />
               </p>
               <div class="whitespace-nowrap text-sm">
                 <Trans
-                  key="modpack.last_updated_time"
+                  key="content:_trn_modpack.last_updated_time"
                   options={{
                     time: formatDistanceToNowStrict(
                       new Date(props.data.data.lastUpdated).getTime()
@@ -131,11 +131,11 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
             <div class="text-lightSlate-700 flex items-center gap-2">
               <div class="i-hugeicons:calendar-01 text-lightSlate-100 h-5 w-5 shrink-0" />
               <p class="text-lightSlate-100 m-0 text-sm">
-                <Trans key="modpack.release_date" />
+                <Trans key="content:_trn_modpack.release_date" />
               </p>
               <div class="whitespace-nowrap text-sm">
                 <Trans
-                  key="modpack.release_date_time"
+                  key="content:_trn_modpack.release_date_time"
                   options={{
                     time: formatDistanceToNowStrict(
                       new Date(props.data.data.releaseDate).getTime()
@@ -148,7 +148,7 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
             <div class="text-lightSlate-700 flex items-center gap-2">
               <div class="i-hugeicons:download-02 text-lightSlate-100 h-5 w-5 shrink-0" />
               <p class="text-lightSlate-100 m-0 text-sm">
-                <Trans key="modpack.total_download" />
+                <Trans key="content:_trn_modpack.total_download" />
               </p>
               <div class="whitespace-nowrap text-sm">
                 {formatDownloadCount(props.data.data.downloadsCount)}
@@ -157,7 +157,7 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
             <div class="text-lightSlate-700 flex w-full items-center gap-2">
               <div class="i-hugeicons:joystick-01 text-lightSlate-100 h-5 w-5 shrink-0" />
               <p class="text-lightSlate-100 m-0 text-sm">
-                <Trans key="modpack.mcVersion" />
+                <Trans key="content:_trn_modpack.mcVersion" />
               </p>
               <div class="flex max-h-20 w-full flex-wrap gap-2 overflow-auto text-sm">
                 {props.data.data.minecraftVersions.join(" - ")}

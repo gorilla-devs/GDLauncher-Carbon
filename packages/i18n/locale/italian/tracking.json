@@ -1,0 +1,11 @@
+{
+  "_trn_setting_disabled": "Disabilitato",
+  "_trn_x_days_ago": "{{count}} giorni fa",
+  "_trn_soon": "PRESTO",
+  "_trn_setting_disabled_text": "Disabilita quasi completamente l'invio di metriche a noi. Fare questo disabiliterà anche alcune funzionalità come l'invio di segnalazioni automatiche di bug e l'accesso alle funzionalità di anteprima.",
+  "_trn_setting_anonymous": "Anonimo",
+  "_trn_setting_anonymous_text": "Riduce al minimo la quantità di metriche inviate. Tutte le metriche raccolte sono completamente anonime. Questo non influisce su alcuna funzionalità.",
+  "_trn_setting_anonymous_with_session_recordings": "Anonimo con Registrazioni Sessioni",
+  "_trn_setting_anonymous_with_session_recordings_text": "Invia la stessa quantità di dati di Anonimo, ma include anche registrazioni di sessioni, che sono brevi registrazioni dell'utilizzo dell'app.",
+  "_trn_settings_authenticated_with_session_recordings": "Autenticato con Registrazioni Sessioni"
+}

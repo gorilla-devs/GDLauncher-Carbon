@@ -662,12 +662,21 @@ pub async fn get_profile(
     }
 }
 
+/// Username availability status
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
+#[serde(rename_all = "lowercase")]
+pub enum UsernameAvailability {
+    Available,
+    Taken,
+    NotAllowed,
+}
+
 /// Check if a Minecraft username is available
 pub async fn check_username_available(
     client: &ClientWithMiddleware,
     access_token: &str,
     username: &str,
-) -> anyhow::Result<bool> {
+) -> anyhow::Result<UsernameAvailability> {
     #[derive(Debug, Deserialize)]
     struct AvailabilityResponse {
         status: String,
@@ -688,7 +697,13 @@ pub async fn check_username_available(
         .await
         .map_err(RequestError::from_error)?;
 
-    Ok(availability.status == "AVAILABLE")
+    let status = match availability.status.as_str() {
+        "AVAILABLE" => UsernameAvailability::Available,
+        "NOT_ALLOWED" => UsernameAvailability::NotAllowed,
+        _ => UsernameAvailability::Taken, // DUPLICATE or any other status
+    };
+
+    Ok(status)
 }
 
 /// Create a new Minecraft profile with the given username

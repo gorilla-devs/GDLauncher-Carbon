@@ -41,21 +41,21 @@ const JavaProfileCreationModal = (props: ModalProps) => {
       <div class="flex h-full flex-col justify-between">
         <div class="flex flex-col gap-4">
           <h4>
-            <Trans key="profile_name" />
+            <Trans key="general:_trn_profile_name" />
           </h4>
           <Input
             disabled={createCustomJavaVersionMutation.isPending}
-            placeholder={t("placeholders.type_profile_name")}
+            placeholder={t("placeholders:_trn_type_profile_name")}
             value={profileName()}
             onInput={(e) => setProfileName(e.currentTarget.value)}
             errorMessage={
               profileAlreadyExists()
-                ? t("errors.profile_name_exists")
+                ? t("errors:_trn_profile_name_exists")
                 : undefined
             }
           />
           <h4>
-            <Trans key="assigned_java_path" />
+            <Trans key="general:_trn_assigned_java_path" />
           </h4>
           <JavaPathAutoComplete
             inputColor="bg-darkSlate-600"
@@ -73,7 +73,7 @@ const JavaProfileCreationModal = (props: ModalProps) => {
               modalsContext?.closeModal()
             }}
           >
-            <Trans key="instance_confirm_deletion.cancel" />
+            <Trans key="instances:_trn_instance_confirm_deletion.cancel" />
           </Button>
           <Button
             disabled={
@@ -93,7 +93,7 @@ const JavaProfileCreationModal = (props: ModalProps) => {
               modalsContext?.closeModal()
             }}
           >
-            <Trans key="create" />
+            <Trans key="general:_trn_create" />
           </Button>
         </div>
       </div>

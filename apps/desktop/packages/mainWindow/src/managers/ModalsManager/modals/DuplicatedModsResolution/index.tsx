@@ -52,7 +52,7 @@ const DuplicatedModsResolution = (props: ModalProps) => {
 
   const resolutionSteps = [
     {
-      label: t("instance.duplicates.steps.introduction"),
+      label: t("content:_trn_duplicates.steps.introduction"),
       icon: <div>1</div>,
       onClick: () => {
         setCurrentStep(0)
@@ -60,7 +60,7 @@ const DuplicatedModsResolution = (props: ModalProps) => {
       }
     },
     {
-      label: t("instance.duplicates.steps.select_mods"),
+      label: t("content:_trn_duplicates.steps.select_mods"),
       icon: <div>2</div>,
       onClick: () => {
         setCurrentStep(1)
@@ -68,12 +68,12 @@ const DuplicatedModsResolution = (props: ModalProps) => {
       }
     },
     {
-      label: t("instance.duplicates.steps.action"),
+      label: t("content:_trn_duplicates.steps.action"),
       icon: <div>3</div>,
       onClick: () => setCurrentStep(2)
     },
     {
-      label: t("instance.duplicates.steps.summary"),
+      label: t("content:_trn_duplicates.steps.summary"),
       icon: <div>4</div>,
       onClick: () => setCurrentStep(3)
     }

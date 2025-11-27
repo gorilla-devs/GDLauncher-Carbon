@@ -38,7 +38,7 @@ const Screenshots = () => {
               />
               <p class="text-lightSlate-700 max-w-100">
                 <Trans
-                  key="modpack.no_screenshot"
+                  key="content:_trn_modpack.no_screenshot"
                   options={{
                     defaultValue: "No screenshots"
                   }}

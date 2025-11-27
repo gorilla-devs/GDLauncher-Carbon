@@ -10,24 +10,13 @@ const AutomaticStep = () => {
       <div class="flex flex-col items-center">
         <img src={JavaLogo} class="h-16 w-16" />
         <h3>
-          <Trans
-            key="java.java_missing"
-            options={{
-              defaultValue: "Java {{version}} missing",
-              version: 8
-            }}
-          />
+          <Trans key="java:_trn_java_missing" options={{ version: 8 }} />
         </h3>
       </div>
       <Progress value={percentage} />
       <p class="mb-0">
         {`${percentage}%`}
-        <Trans
-          key="java.automatic_download_progress"
-          options={{
-            defaultValue: "Downloaded"
-          }}
-        />
+        <Trans key="java:_trn_automatic_download_progress" />
       </p>
     </div>
   )

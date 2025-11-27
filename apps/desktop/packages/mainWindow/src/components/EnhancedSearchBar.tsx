@@ -78,7 +78,7 @@ export function EnhancedSearchBar() {
       <Show when={!isExpanded()}>
         <input
           ref={simpleInputRef}
-          placeholder={t("search.search_discover_anything")}
+          placeholder={t("search:_trn_search_discover_anything")}
           class="placeholder:text-darkSlate-400 text-lightSlate-50 h-full flex-1 cursor-pointer bg-transparent text-sm outline-none"
           value=""
           readOnly
@@ -89,7 +89,7 @@ export function EnhancedSearchBar() {
       <Show when={isExpanded()}>
         <input
           ref={expandedInputRef}
-          placeholder={t("search.search_discover_anything")}
+          placeholder={t("search:_trn_search_discover_anything")}
           class="placeholder:text-darkSlate-400 text-lightSlate-50 h-full flex-1 bg-transparent text-sm outline-none"
           value={searchResults?.searchQuery().searchQuery ?? ""}
           onInput={(e) => {
@@ -138,7 +138,7 @@ export function EnhancedSearchBar() {
         <DropdownMenu>
           <DropdownMenuTrigger
             class="text-lightSlate-50 hover:bg-darkSlate-600 data-[expanded]:bg-darkSlate-600 flex items-center justify-center rounded p-1.5 transition-colors hover:text-white data-[expanded]:text-white"
-            title={t("search.filters")}
+            title={t("search:_trn_filters")}
           >
             <div class="i-hugeicons:filter text-lg" />
           </DropdownMenuTrigger>

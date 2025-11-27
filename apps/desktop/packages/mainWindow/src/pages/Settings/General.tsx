@@ -26,6 +26,7 @@ import PageTitle from "./components/PageTitle"
 import Title from "./components/Title"
 import RowsContainer from "./components/RowsContainer"
 import { useModal } from "@/managers/ModalsManager"
+import { manualCheckForUpdates, isCheckingForUpdates } from "@/utils/updater"
 
 const General = () => {
   const routeData: ReturnType<typeof SettingsData> = useRouteData()
@@ -44,12 +45,6 @@ const General = () => {
   createEffect(() => {
     if (routeData.data.data) setSettings(routeData.data.data)
   })
-
-  const handleClearCache = () => {
-    modalsContext?.openModal({
-      name: "confirmCacheClear"
-    })
-  }
 
   const templateGameResolution = () => {
     return [
@@ -93,12 +88,14 @@ const General = () => {
   return (
     <>
       <PageTitle>
-        <Trans key="settings:General" />
+        <Trans key="settings:_trn_general" />
       </PageTitle>
       <RowsContainer>
         <Row>
-          <Title description={<Trans key="settings:release_channel_text" />}>
-            <Trans key="settings:release_channel_title" />
+          <Title
+            description={<Trans key="settings:_trn_release_channel_text" />}
+          >
+            <Trans key="settings:_trn_release_channel_title" />
           </Title>
           <RightHandSide>
             <Select
@@ -116,11 +113,11 @@ const General = () => {
               itemComponent={(props) => (
                 <SelectItem item={props.item}>
                   {props.item.rawValue === "stable" &&
-                    t("settings:release_channel_stable")}
+                    t("settings:_trn_release_channel_stable")}
                   {props.item.rawValue === "beta" &&
-                    t("settings:release_channel_beta")}
+                    t("settings:_trn_release_channel_beta")}
                   {props.item.rawValue === "alpha" &&
-                    t("settings:release_channel_alpha")}
+                    t("settings:_trn_release_channel_alpha")}
                 </SelectItem>
               )}
             >
@@ -129,11 +126,11 @@ const General = () => {
                   {(state) => {
                     const val = state.selectedOption()
                     return val === "stable"
-                      ? t("settings:release_channel_stable")
+                      ? t("settings:_trn_release_channel_stable")
                       : val === "beta"
-                        ? t("settings:release_channel_beta")
+                        ? t("settings:_trn_release_channel_beta")
                         : val === "alpha"
-                          ? t("settings:release_channel_alpha")
+                          ? t("settings:_trn_release_channel_alpha")
                           : ""
                   }}
                 </SelectValue>
@@ -144,9 +141,11 @@ const General = () => {
         </Row>
         <Row>
           <Title
-            description={<Trans key="settings:concurrent_downloads_text" />}
+            description={
+              <Trans key="settings:_trn_concurrent_downloads_text" />
+            }
           >
-            <Trans key="settings:concurrent_downloads_title" />
+            <Trans key="settings:_trn_concurrent_downloads_title" />
           </Title>
           <RightHandSide>
             <Select
@@ -175,14 +174,16 @@ const General = () => {
           </RightHandSide>
         </Row>
         <Row>
-          <Title description={<Trans key="settings:game_resolution_text" />}>
-            <Trans key="settings:game_resolution_title" />
+          <Title
+            description={<Trans key="settings:_trn_game_resolution_text" />}
+          >
+            <Trans key="settings:_trn_game_resolution_title" />
           </Title>
           <RightHandSide>
             <div class="flex flex-col items-end gap-4">
               <Select
                 value={gameResolutionDropdownKey()}
-                placeholder={t("settings:resolution_presets")}
+                placeholder={t("settings:_trn_resolution_presets")}
                 onChange={(key) => {
                   if (!key) return
 
@@ -235,7 +236,7 @@ const General = () => {
                 <div class="flex flex-col gap-4">
                   <div class="flex items-center justify-end gap-4">
                     <div>
-                      <Trans key="settings:width" />
+                      <Trans key="settings:_trn_width" />
                     </div>
                     <Input
                       class="w-24"
@@ -258,7 +259,7 @@ const General = () => {
                   </div>
                   <div class="flex items-center justify-end gap-4">
                     <div>
-                      <Trans key="settings:height" />
+                      <Trans key="settings:_trn_height" />
                     </div>
                     <Input
                       class="w-24"
@@ -286,22 +287,9 @@ const General = () => {
         </Row>
         <Row>
           <Title
-            description={
-              <Trans
-                key="settings:discord_integration_text"
-                options={{
-                  defaultValue:
-                    "Enable or disable discord integration. This display what are you playing in discord"
-                }}
-              />
-            }
+            description={<Trans key="settings:_trn_discord_integration_text" />}
           >
-            <Trans
-              key="settings:discord_integration_title"
-              options={{
-                defaultValue: "Discord Integration"
-              }}
-            />
+            <Trans key="settings:_trn_discord_integration_title" />
           </Title>
           <RightHandSide>
             <Switch
@@ -319,10 +307,10 @@ const General = () => {
         <Row id="launcher_action_on_game_launch">
           <Title
             description={
-              <Trans key="settings:launcher_action_on_game_launch_text" />
+              <Trans key="settings:_trn_launcher_action_on_game_launch_text" />
             }
           >
-            <Trans key="settings:launcher_action_on_game_launch_title" />
+            <Trans key="settings:_trn_launcher_action_on_game_launch_title" />
           </Title>
           <RightHandSide>
             <Select
@@ -348,17 +336,21 @@ const General = () => {
               itemComponent={(props) => (
                 <SelectItem item={props.item}>
                   {props.item.rawValue === "none" &&
-                    t("settings:launcher_action_on_game_launch_none")}
+                    t("settings:_trn_launcher_action_on_game_launch_none")}
                   {props.item.rawValue === "minimizeWindow" &&
                     t(
-                      "settings:launcher_action_on_game_launch_minimize_window"
+                      "settings:_trn_launcher_action_on_game_launch_minimize_window"
                     )}
                   {props.item.rawValue === "closeWindow" &&
-                    t("settings:launcher_action_on_game_launch_close_window")}
+                    t(
+                      "settings:_trn_launcher_action_on_game_launch_close_window"
+                    )}
                   {props.item.rawValue === "hideWindow" &&
-                    t("settings:launcher_action_on_game_launch_hide_window")}
+                    t(
+                      "settings:_trn_launcher_action_on_game_launch_hide_window"
+                    )}
                   {props.item.rawValue === "quitApp" &&
-                    t("settings:launcher_action_on_game_launch_quit_app")}
+                    t("settings:_trn_launcher_action_on_game_launch_quit_app")}
                 </SelectItem>
               )}
             >
@@ -367,22 +359,22 @@ const General = () => {
                   {(state) => {
                     const val = state.selectedOption()
                     return val === "none"
-                      ? t("settings:launcher_action_on_game_launch_none")
+                      ? t("settings:_trn_launcher_action_on_game_launch_none")
                       : val === "minimizeWindow"
                         ? t(
-                            "settings:launcher_action_on_game_launch_minimize_window"
+                            "settings:_trn_launcher_action_on_game_launch_minimize_window"
                           )
                         : val === "closeWindow"
                           ? t(
-                              "settings:launcher_action_on_game_launch_close_window"
+                              "settings:_trn_launcher_action_on_game_launch_close_window"
                             )
                           : val === "hideWindow"
                             ? t(
-                                "settings:launcher_action_on_game_launch_hide_window"
+                                "settings:_trn_launcher_action_on_game_launch_hide_window"
                               )
                             : val === "quitApp"
                               ? t(
-                                  "settings:launcher_action_on_game_launch_quit_app"
+                                  "settings:_trn_launcher_action_on_game_launch_quit_app"
                                 )
                               : ""
                   }}
@@ -395,10 +387,10 @@ const General = () => {
         <Row>
           <Title
             description={
-              <Trans key="settings:show_window_close_warning_text" />
+              <Trans key="settings:_trn_show_window_close_warning_text" />
             }
           >
-            <Trans key="settings:show_window_close_warning_title" />
+            <Trans key="settings:_trn_show_window_close_warning_title" />
           </Title>
           <RightHandSide>
             <Switch
@@ -416,10 +408,10 @@ const General = () => {
         <Row>
           <Title
             description={
-              <Trans key="settings:deletion_through_recycle_bin_text" />
+              <Trans key="settings:_trn_deletion_through_recycle_bin_text" />
             }
           >
-            <Trans key="settings:deletion_through_recycle_bin_title" />
+            <Trans key="settings:_trn_deletion_through_recycle_bin_title" />
           </Title>
           <RightHandSide>
             <Switch
@@ -435,8 +427,8 @@ const General = () => {
           </RightHandSide>
         </Row>
         <Row>
-          <Title description={<Trans key="settings:potato_mode_text" />}>
-            <Trans key="settings:potato_mode_title" />
+          <Title description={<Trans key="settings:_trn_potato_mode_text" />}>
+            <Trans key="settings:_trn_potato_mode_title" />
           </Title>
           <RightHandSide>
             <Switch
@@ -453,7 +445,7 @@ const General = () => {
         </Row>
         <Row>
           <Title>
-            <Trans key="settings:rerun_onboarding" />
+            <Trans key="settings:_trn_rerun_onboarding" />
           </Title>
           <RightHandSide>
             <Button
@@ -463,7 +455,7 @@ const General = () => {
               }}
             >
               <div class="i-hugeicons:refresh text-lg" />
-              <Trans key="settings:rerun_onboarding" />
+              <Trans key="settings:_trn_rerun_onboarding" />
             </Button>
           </RightHandSide>
         </Row>
@@ -480,11 +472,17 @@ const General = () => {
           <RightHandSide>
             <div>
               <div class="flex flex-col items-center justify-end gap-4 2xl:flex-row">
-                <Button type="secondary" onClick={handleClearCache}>
+                <Button
+                  type="secondary"
+                  disabled={isCheckingForUpdates()}
+                  onClick={() => {
+                    manualCheckForUpdates(settings.releaseChannel)
+                  }}
+                >
                   <div class="flex items-center gap-2">
-                    <div class="i-hugeicons:delete-02 h-5 w-5" />
+                    <div class="i-hugeicons:installing-updates-01 h-5 w-5" />
                     <div>
-                      <Trans key="settings:clear_cache_button" />
+                      <Trans key="settings:_trn_check_for_updates" />
                     </div>
                   </div>
                 </Button>
@@ -497,7 +495,7 @@ const General = () => {
                   <div class="flex items-center gap-2">
                     <div class="i-hugeicons:arrow-reload-horizontal h-5 w-5" />
                     <div>
-                      <Trans key="settings:restart_app" />
+                      <Trans key="settings:_trn_restart_app" />
                     </div>
                   </div>
                 </Button>
@@ -505,7 +503,7 @@ const General = () => {
                   <div class="flex items-center gap-2">
                     <div class="i-hugeicons:delete-02 h-5 w-5" />
                     <div>
-                      <Trans key="settings:reset_all_data" />
+                      <Trans key="settings:_trn_reset_all_data" />
                     </div>
                   </div>
                 </Button>

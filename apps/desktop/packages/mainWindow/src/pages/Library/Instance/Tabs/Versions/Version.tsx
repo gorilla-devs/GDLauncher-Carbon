@@ -25,7 +25,7 @@ const Active = () => {
   return (
     <div class="flex items-center gap-2 text-green-500">
       <Trans
-        key="instance.active_version"
+        key="instances:_trn_active_version"
         options={{
           defaultValue: "Active"
         }}
@@ -66,7 +66,7 @@ const Version = (props: Props) => {
         >
           <div class="text-darkSlate-300 hover:text-lightSlate-700 group flex cursor-pointer items-center gap-2 transition ease-in-out">
             <Trans
-              key="instance.switch_version"
+              key="instances:_trn_switch_version"
               options={{
                 defaultValue: "Switch Version"
               }}

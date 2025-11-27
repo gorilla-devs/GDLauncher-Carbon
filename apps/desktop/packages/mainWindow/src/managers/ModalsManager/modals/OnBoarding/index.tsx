@@ -15,17 +15,17 @@ const OnBoarding = (props: ModalProps) => {
 
   const onBoardingSteps = [
     {
-      label: t("introduction"),
+      label: t("onboarding:_trn_introduction"),
       icon: <div>1</div>,
       onClick: () => setCurrentStep(0)
     },
     {
-      label: t("handle_preferences"),
+      label: t("onboarding:_trn_handle_preferences"),
       icon: <div>2</div>,
       onClick: () => setCurrentStep(1)
     },
     {
-      label: t("import_instances"),
+      label: t("onboarding:_trn_import_instances"),
       icon: <div>3</div>,
       onClick: () => setCurrentStep(2)
     }

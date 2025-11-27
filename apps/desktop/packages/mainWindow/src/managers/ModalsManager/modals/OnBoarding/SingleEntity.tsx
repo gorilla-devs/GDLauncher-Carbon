@@ -163,7 +163,7 @@ const SingleEntity = (props: {
       {/* Fixed Header - path input */}
       <div class="flex w-full shrink-0 flex-col items-start justify-start gap-2 p-4">
         <span class="font-bold">
-          {props.entity.entity} <Trans key="instance.import_path" />:
+          {props.entity.entity} <Trans key="instances:_trn_import_path" />:
         </span>
         <div class="flex w-full items-center gap-2">
           <Input
@@ -201,7 +201,7 @@ const SingleEntity = (props: {
                   </div>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <Trans key="tooltip.reset" />
+                  <Trans key="ui:_trn_tooltip.reset" />
                 </TooltipContent>
               </Tooltip>
             </Show>
@@ -213,7 +213,7 @@ const SingleEntity = (props: {
                       class="i-hugeicons:folder-02"
                       onClick={async () => {
                         const result = await window.openFileDialog({
-                          title: t("instance.select_path"),
+                          title: t("instances:_trn_select_path"),
                           defaultPath: path() || "",
                           properties: ["openFile", "openDirectory"]
                         })
@@ -228,7 +228,7 @@ const SingleEntity = (props: {
                   </div>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <Trans key="instance.select_path" />
+                  <Trans key="instances:_trn_select_path" />
                 </TooltipContent>
               </Tooltip>
             </Show>
@@ -240,7 +240,7 @@ const SingleEntity = (props: {
                       class="i-hugeicons:zip-02"
                       onClick={async () => {
                         const result = await window.openFileDialog({
-                          title: t("instance.select_zip"),
+                          title: t("instances:_trn_select_zip"),
                           defaultPath: path() || "",
                           properties: ["openFile"],
                           filters: [
@@ -265,7 +265,7 @@ const SingleEntity = (props: {
                   </div>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <Trans key="instance.select_zip" />
+                  <Trans key="instances:_trn_select_zip" />
                 </TooltipContent>
               </Tooltip>
             </Show>
@@ -295,8 +295,8 @@ const SingleEntity = (props: {
                       <div class="flex h-full w-full items-center justify-center">
                         <p class="text-xl text-gray-500">
                           {path()
-                            ? t("instance.no_instance_found")
-                            : t("instance.select_path")}
+                            ? t("instances:_trn_no_instance_found")
+                            : t("instances:_trn_select_path")}
                         </p>
                       </div>
                     </Show>
@@ -308,7 +308,7 @@ const SingleEntity = (props: {
                     <Checkbox
                       children={
                         <span class="text-sm text-[#8A8B8F]">
-                          {t("instance.select_all_mods")}
+                          {t("content:_trn_select_all_mods")}
                         </span>
                       }
                       checked={
@@ -379,7 +379,7 @@ const SingleEntity = (props: {
             setInstances([])
           }}
         >
-          <Trans key="onboarding.go_back" />
+          <Trans key="onboarding:_trn_go_back" />
         </Button>
 
         <Show when={step() === "selectionStep"} fallback={<div />}>
@@ -391,7 +391,7 @@ const SingleEntity = (props: {
               setStep("importStep")
             }}
           >
-            <Trans key="onboarding.begin_import" />
+            <Trans key="onboarding:_trn_begin_import" />
           </Button>
         </Show>
       </div>

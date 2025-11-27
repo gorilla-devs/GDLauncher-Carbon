@@ -11,6 +11,7 @@ import {
   ImportEntity,
   MRFESearchIndex
 } from "@gd/core_module/bindings"
+import type { NamespacedTranslationKey } from "@gd/i18n"
 
 export const NEWS_URL =
   "https://www.minecraft.net/en-us/feeds/community-content/rss"
@@ -43,49 +44,49 @@ export const ModpackPlatforms: ("curseforge" | "modrinth")[] = [
 ]
 
 interface EntityValue {
-  translation: string
+  translation: NamespacedTranslationKey
   icon: string
 }
 
 export const ENTITIES: Record<ImportEntity, EntityValue> = {
   LegacyGDLauncher: {
-    translation: "entity.legacygdlauncher",
+    translation: "enums:_trn_entity.legacygdlauncher",
     icon: LegacyGDL
   },
   ATLauncher: {
-    translation: "entity.atlauncher",
+    translation: "enums:_trn_entity.atlauncher",
     icon: ATLauncherLogo
   },
   CurseForge: {
-    translation: "entity.curseforge",
+    translation: "enums:_trn_entity.curseforge",
     icon: CurseForgeLogo
   },
   FTB: {
-    translation: "entity.ftb",
+    translation: "enums:_trn_entity.ftb",
     icon: FTBLogo
   },
   MultiMC: {
-    translation: "entity.multimc",
+    translation: "enums:_trn_entity.multimc",
     icon: MultiMCLogo
   },
   Technic: {
-    translation: "entity.technic",
+    translation: "enums:_trn_entity.technic",
     icon: TechnicLogo
   },
   PrismLauncher: {
-    translation: "entity.prismlauncher",
+    translation: "enums:_trn_entity.prismlauncher",
     icon: PrismLogo
   },
   Modrinth: {
-    translation: "entity.modrinth",
+    translation: "enums:_trn_entity.modrinth",
     icon: ModrinthLogo
   },
   CurseForgeZip: {
-    translation: "entity.curseforgezip",
+    translation: "enums:_trn_entity.curseforgezip",
     icon: CurseForgeLogo
   },
   MRPack: {
-    translation: "entity.mrpack",
+    translation: "enums:_trn_entity.mrpack",
     icon: ModrinthLogo
   }
 }

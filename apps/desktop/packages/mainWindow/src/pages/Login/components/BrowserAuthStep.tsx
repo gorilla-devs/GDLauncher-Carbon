@@ -100,7 +100,7 @@ export function BrowserAuthStep(props: BrowserAuthStepProps) {
     if (props.authUrl) {
       window.openExternalLink(props.authUrl)
       setBrowserOpened(true)
-      toast.success(t("login.browser_opened_toast"))
+      toast.success(t("auth:_trn_login.browser_opened_toast"))
     }
   }
 
@@ -113,17 +113,17 @@ export function BrowserAuthStep(props: BrowserAuthStepProps) {
       <Show when={expired()}>
         <div class="flex flex-col items-center gap-4">
           <p class="text-lightSlate-50 text-lg font-semibold">
-            <Trans key="login.session_expired_title" />
+            <Trans key="auth:_trn_login.session_expired_title" />
           </p>
           <p class="text-lightSlate-700 text-sm">
-            <Trans key="login.session_expired_message" />
+            <Trans key="auth:_trn_login.session_expired_message" />
           </p>
           <div class="flex gap-2">
             <Button size="medium" type="secondary" onClick={props.onCancel}>
-              <Trans key="general.back" />
+              <Trans key="general:_trn_back" />
             </Button>
             <Button size="medium" onClick={props.onRetry}>
-              <Trans key="login.try_again" />
+              <Trans key="auth:_trn_login.try_again" />
             </Button>
           </div>
         </div>
@@ -135,27 +135,27 @@ export function BrowserAuthStep(props: BrowserAuthStepProps) {
           {/* Main message */}
           <div class="flex flex-col gap-2">
             <p class="text-lightSlate-50 text-lg font-semibold">
-              <Trans key="login.waiting_for_browser_auth" />
+              <Trans key="auth:_trn_login.waiting_for_browser_auth" />
             </p>
             <p class="text-lightSlate-700 text-sm">
-              <Trans key="login.complete_signin_browser" />
+              <Trans key="auth:_trn_login.complete_signin_browser" />
             </p>
           </div>
 
           {/* Countdown */}
           <p class="text-lightSlate-700 text-sm">
             <span class="text-lightSlate-500 mr-1">{countDown()}</span>
-            <Trans key="login.before_expiring" />
+            <Trans key="auth:_trn_login.before_expiring" />
           </p>
 
           {/* Manual fallback options */}
           <div class="border-darkSlate-600 flex flex-col items-center gap-2 border-t pt-4">
             <p class="text-lightSlate-600 text-xs">
-              <Trans key="login.browser_didnt_open" />
+              <Trans key="auth:_trn_login.browser_didnt_open" />
             </p>
             <Button size="small" type="secondary" onClick={openBrowser}>
               <div class="i-hugeicons:link-square-02" />
-              <Trans key="login.open_browser_manually" />
+              <Trans key="auth:_trn_login.open_browser_manually" />
             </Button>
           </div>
         </div>
@@ -167,22 +167,22 @@ export function BrowserAuthStep(props: BrowserAuthStepProps) {
           <span class="text-lightSlate-700 text-xs">
             <Switch>
               <Match when={props.currentStage === "waitingForBrowser"}>
-                <Trans key="login.waiting_for_browser_confirmation" />
+                <Trans key="auth:_trn_login.waiting_for_browser_confirmation" />
               </Match>
               <Match when={props.currentStage === "xboxAuth"}>
-                <Trans key="login.authenticating_xbox" />
+                <Trans key="auth:_trn_login.authenticating_xbox" />
               </Match>
               <Match when={props.currentStage === "mcLogin"}>
-                <Trans key="login.authenticating_minecraft" />
+                <Trans key="auth:_trn_login.authenticating_minecraft" />
               </Match>
               <Match when={props.currentStage === "mcProfile"}>
-                <Trans key="login.retrieving_minecraft_profile" />
+                <Trans key="auth:_trn_login.retrieving_minecraft_profile" />
               </Match>
               <Match when={props.currentStage === "mcEntitlements"}>
-                <Trans key="login.retrieving_minecraft_entitlements" />
+                <Trans key="auth:_trn_login.retrieving_minecraft_entitlements" />
               </Match>
               <Match when={true}>
-                <Trans key="login.authenticating" />
+                <Trans key="auth:_trn_login.authenticating" />
               </Match>
             </Switch>
           </span>
@@ -193,13 +193,13 @@ export function BrowserAuthStep(props: BrowserAuthStepProps) {
       {/* Alternative: Switch to device code */}
       <div class="border-darkSlate-600 flex flex-col items-center gap-2 border-t pt-4">
         <p class="text-lightSlate-600 text-xs">
-          <Trans key="login.still_having_trouble" />
+          <Trans key="auth:_trn_login.still_having_trouble" />
         </p>
         <button
           class="text-primary-400 hover:text-primary-300 cursor-pointer text-sm underline"
           onClick={props.onSwitchToDeviceCode}
         >
-          <Trans key="login.try_device_code_instead" />
+          <Trans key="auth:_trn_login.try_device_code_instead" />
         </button>
       </div>
     </div>

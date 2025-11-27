@@ -15,7 +15,7 @@ const NoVersions = () => {
         <PlaceholderGorilla size={8} variant="Shrugging Gorilla - No Options" />
         <p class="text-lightSlate-700 max-w-100">
           <Trans
-            key="modpack.no_versions_text"
+            key="content:_trn_modpack.no_versions_text"
             options={{
               defaultValue:
                 "At the moment this modpack does not contain any other versions"
@@ -24,7 +24,7 @@ const NoVersions = () => {
         </p>
         <Button type="outline" size="medium">
           <Trans
-            key="modpack.no_versions"
+            key="content:_trn_modpack.no_versions"
             options={{
               defaultValue: "No versions"
             }}

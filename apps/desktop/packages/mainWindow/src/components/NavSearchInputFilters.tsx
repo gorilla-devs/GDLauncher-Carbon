@@ -46,7 +46,7 @@ function FilterWarning() {
       <div class="flex items-start gap-2 text-sm text-yellow-200">
         <div class="i-hugeicons:alert-01 mt-0.5 shrink-0 text-yellow-500 h-4 w-4" />
         <span class="leading-relaxed">
-          <Trans key="search.instance_compatibility_warning" />
+          <Trans key="search:_trn_instance_compatibility_warning" />
         </span>
       </div>
     </div>
@@ -59,7 +59,7 @@ export function SearchApiDropdown() {
   return (
     <>
       <DropdownMenuLabel>
-        <Trans key="search.platform" />
+        <Trans key="search:_trn_platform" />
       </DropdownMenuLabel>
       <DropdownMenuSeparator />
       <DropdownMenuGroup>
@@ -146,7 +146,7 @@ export function SearchCategoryDropdown(_props: DropdownProps) {
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger class="w-full">
-        <Trans key="search.categories" />
+        <Trans key="search:_trn_categories" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent class="max-h-[300px] overflow-y-auto">
@@ -161,7 +161,7 @@ export function SearchCategoryDropdown(_props: DropdownProps) {
             >
               <div class="flex items-center gap-2">
                 <img src={CurseforgeLogo} class="h-4 w-4" />
-                CurseForge
+                <Trans key="enums:_trn_curseforge" />
               </div>
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
@@ -197,7 +197,7 @@ export function SearchCategoryDropdown(_props: DropdownProps) {
                   </Match>
                   <Match when={!getCurseforgeCategories()?.length}>
                     <div class="text-lightSlate-900 text-sm">
-                      <Trans key="search.no_categories_found" />
+                      <Trans key="search:_trn_no_categories_found" />
                     </div>
                   </Match>
                 </Switch>
@@ -216,7 +216,7 @@ export function SearchCategoryDropdown(_props: DropdownProps) {
             >
               <div class="flex items-center gap-2">
                 <img src={ModrinthLogo} class="h-4 w-4" />
-                Modrinth
+                <Trans key="enums:_trn_modrinth" />
               </div>
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
@@ -252,7 +252,7 @@ export function SearchCategoryDropdown(_props: DropdownProps) {
                   </Match>
                   <Match when={!getModrinthCategories()?.length}>
                     <div class="text-lightSlate-900 text-sm">
-                      <Trans key="search.no_categories_found" />
+                      <Trans key="search:_trn_no_categories_found" />
                     </div>
                   </Match>
                 </Switch>
@@ -326,7 +326,7 @@ export function SearchModloaderDropdown(_props: DropdownProps) {
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger>
-        <Trans key="search.modloaders" />
+        <Trans key="search:_trn_modloaders" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent class="w-64 p-0">
@@ -387,7 +387,7 @@ export function SearchModloaderDropdown(_props: DropdownProps) {
             when={filteredModloaders().length > 0}
             fallback={
               <div class="text-lightSlate-400 px-2 py-3 text-center text-sm">
-                No modloaders found
+                <Trans key="content:_trn_common.no_modloaders_found" />
               </div>
             }
           >
@@ -450,7 +450,7 @@ export function SearchEnvironmentDropdown(_props: DropdownProps) {
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger>
-        <Trans key="search.environment" />
+        <Trans key="search:_trn_environment" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent>
@@ -499,12 +499,12 @@ export function CurseforgeFiltersDropdown(_props: DropdownProps) {
   const searchResults = useSearchContext()
 
   const sortFieldOptions = [
-    { value: "featured", key: "search.featured" },
-    { value: "popularity", key: "search.popularity" },
-    { value: "totalDownloads", key: "search.downloads" },
-    { value: "lastUpdated", key: "search.last_updated" },
-    { value: "name", key: "search.name" },
-    { value: "author", key: "search.author" }
+    { value: "featured", key: "search:_trn_featured" },
+    { value: "popularity", key: "search:_trn_popularity" },
+    { value: "totalDownloads", key: "search:_trn_downloads" },
+    { value: "lastUpdated", key: "search:_trn_last_updated" },
+    { value: "name", key: "search:_trn_name" },
+    { value: "author", key: "search:_trn_author" }
   ] as const
 
   const currentFilters = () => {
@@ -532,7 +532,7 @@ export function CurseforgeFiltersDropdown(_props: DropdownProps) {
     <>
       <DropdownMenuSub>
         <DropdownMenuSubTrigger>
-          <Trans key="search.sort_by" />
+          <Trans key="search:_trn_sort_by" />
         </DropdownMenuSubTrigger>
         <DropdownMenuPortal>
           <DropdownMenuSubContent>
@@ -560,7 +560,7 @@ export function CurseforgeFiltersDropdown(_props: DropdownProps) {
 
       <DropdownMenuSub>
         <DropdownMenuSubTrigger>
-          <Trans key="search.order" />
+          <Trans key="search:_trn_order" />
         </DropdownMenuSubTrigger>
         <DropdownMenuPortal>
           <DropdownMenuSubContent>
@@ -593,11 +593,11 @@ export function ModrinthFiltersDropdown(_props: DropdownProps) {
   const searchResults = useSearchContext()
 
   const sortOptions = [
-    { value: "relevance", key: "search.relevance" },
-    { value: "downloads", key: "search.downloads" },
-    { value: "follows", key: "search.follows" },
-    { value: "newest", key: "search.newest" },
-    { value: "updated", key: "search.updated" }
+    { value: "relevance", key: "search:_trn_relevance" },
+    { value: "downloads", key: "search:_trn_downloads" },
+    { value: "follows", key: "search:_trn_follows" },
+    { value: "newest", key: "search:_trn_newest" },
+    { value: "updated", key: "search:_trn_updated" }
   ] as const
 
   const currentFilters = () => {
@@ -624,7 +624,7 @@ export function ModrinthFiltersDropdown(_props: DropdownProps) {
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger>
-        <Trans key="search.sort_by" />
+        <Trans key="search:_trn_sort_by" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent>
@@ -768,7 +768,7 @@ export function SearchGameVersionDropdown(_props: DropdownProps) {
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger>
-        <Trans key="search.game_versions" />
+        <Trans key="search:_trn_game_versions" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent class="w-64 p-0">
@@ -829,7 +829,7 @@ export function SearchGameVersionDropdown(_props: DropdownProps) {
             when={filteredVersions().length > 0}
             fallback={
               <div class="text-lightSlate-400 px-2 py-3 text-center text-sm">
-                No versions found
+                <Trans key="content:_trn_common.no_versions_found" />
               </div>
             }
           >
@@ -905,7 +905,7 @@ export function SearchViewModeDropdown(_props: DropdownProps) {
   return (
     <DropdownMenuSub>
       <DropdownMenuSubTrigger>
-        <Trans key="search.view_mode" />
+        <Trans key="search:_trn_view_mode" />
       </DropdownMenuSubTrigger>
       <DropdownMenuPortal>
         <DropdownMenuSubContent>
@@ -946,7 +946,10 @@ export function PlatformSpecificFilters(_props: DropdownProps) {
             src={selectedApi() === "curseforge" ? CurseforgeLogo : ModrinthLogo}
             class="h-4 w-4"
           />
-          {capitalize(selectedApi())} Filters
+          <Trans
+            key="search:_trn_platform_filters"
+            options={{ platform: capitalize(selectedApi()) }}
+          />
         </div>
       </DropdownMenuLabel>
       <DropdownMenuSeparator />

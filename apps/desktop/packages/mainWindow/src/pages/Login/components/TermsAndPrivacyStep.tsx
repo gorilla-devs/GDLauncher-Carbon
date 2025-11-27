@@ -14,6 +14,8 @@ interface TermsAndPrivacyStepProps {
   initialAccepted?: boolean
   /** Callback when terms acceptance state changes */
   onAcceptanceChange?: (accepted: boolean) => void
+  /** Whether this is a forced re-acceptance (updated terms) */
+  isForced?: boolean
 }
 
 export function TermsAndPrivacyStep(props: TermsAndPrivacyStepProps) {
@@ -33,23 +35,36 @@ export function TermsAndPrivacyStep(props: TermsAndPrivacyStepProps) {
       {/* Title */}
       <div class="flex flex-col items-center gap-2 text-center">
         <h2 class="text-lightSlate-50 m-0 text-2xl font-semibold">
-          <Trans key="login.terms_title" />
+          <Trans
+            key={
+              props.isForced
+                ? "auth:_trn_login.updated_terms_title"
+                : "auth:_trn_login.terms_title"
+            }
+          />
         </h2>
         <p class="text-lightSlate-400 text-sm">
-          <Trans key="login.terms_subtitle" />
+          <Trans
+            key={
+              props.isForced
+                ? "auth:_trn_login.updated_terms_subtitle"
+                : "auth:_trn_login.terms_subtitle"
+            }
+          />
         </p>
       </div>
 
       {/* Overwolf CMP Notice */}
       <div class="bg-darkSlate-700/20 border-darkSlate-600/50 max-w-md rounded-lg border px-6 py-4 text-left overflow-y-auto max-h-[400px] flex-shrink">
         <p class="text-lightSlate-400 m-0 mb-3 text-sm leading-relaxed">
-          <Trans key="login.cmp_notice_paragraph1" />
+          <Trans key="auth:_trn_login.cmp_notice_paragraph1" />
         </p>
         <p class="text-lightSlate-400 m-0 mb-3 text-sm leading-relaxed">
-          <Trans key="login.cmp_instructions" />
+          <Trans key="auth:_trn_login.cmp_instructions" />
         </p>
         <p class="text-lightSlate-500 m-0 text-xs leading-relaxed">
-          Purposes we use: <Trans key="login.we_value_privacy_text5" />
+          <Trans key="auth:_trn_login.purposes_we_use" />{" "}
+          <Trans key="auth:_trn_login.we_value_privacy_text5" />
         </p>
       </div>
 
@@ -60,7 +75,7 @@ export function TermsAndPrivacyStep(props: TermsAndPrivacyStepProps) {
           onChange={() => handleAcceptanceChange(!termsAccepted())}
         >
           <span class="text-lightSlate-100 select-none text-base font-medium leading-relaxed ml-2">
-            <Trans key="login.terms_checkbox_label" />
+            <Trans key="auth:_trn_login.terms_checkbox_label" />
           </span>
         </Checkbox>
 
@@ -75,7 +90,7 @@ export function TermsAndPrivacyStep(props: TermsAndPrivacyStepProps) {
             }}
           >
             <div class="i-hugeicons:file-02 h-4 w-4 shrink-0" />
-            <Trans key="login.terms_link_label" />
+            <Trans key="auth:_trn_login.terms_link_label" />
           </button>
 
           <span class="text-darkSlate-500">•</span>
@@ -89,7 +104,7 @@ export function TermsAndPrivacyStep(props: TermsAndPrivacyStepProps) {
             }}
           >
             <div class="i-hugeicons:shield-user h-4 w-4 shrink-0" />
-            <Trans key="login.privacy_link_label" />
+            <Trans key="auth:_trn_login.privacy_link_label" />
           </button>
 
           <span class="text-darkSlate-500">•</span>
@@ -101,7 +116,7 @@ export function TermsAndPrivacyStep(props: TermsAndPrivacyStepProps) {
             }}
           >
             <div class="i-hugeicons:settings-02 h-4 w-4 shrink-0" />
-            <Trans key="login.manage_cmp" />
+            <Trans key="auth:_trn_login.manage_cmp" />
           </button>
         </div>
       </div>

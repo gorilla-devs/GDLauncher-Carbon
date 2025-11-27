@@ -10,7 +10,7 @@ const ExportPath = () => {
 
   return (
     <div class="flex w-full flex-col gap-2 pt-4">
-      <span>{`${t("instance.export_path")} :`}</span>
+      <span>{`${t("instances:_trn_export_path")} :`}</span>
       <div class="flex gap-2">
         <Input
           value={path()}

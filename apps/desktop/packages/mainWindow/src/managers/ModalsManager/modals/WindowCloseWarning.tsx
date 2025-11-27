@@ -38,14 +38,14 @@ const WindowCloseWarning = (props: ModalProps) => {
       <div class="text-lightSlate-300 flex h-full flex-col justify-between overflow-y-auto">
         <div class="flex flex-col gap-8">
           <div class="text-center text-xl font-bold text-yellow-400">
-            <Trans key="window_close_title" />
+            <Trans key="window:_trn_window_close_title" />
           </div>
           <div class="flex flex-col gap-4">
             <div>
-              <Trans key="window_close_text_1" />
+              <Trans key="window:_trn_window_close_text_1" />
             </div>
             <div>
-              <Trans key="window_close_text_2">
+              <Trans key="window:_trn_window_close_text_2">
                 {""}
                 <span
                   class="text-lightSlate-300 hover:text-lightSlate-100 underline transition-colors duration-100 ease-in-out"
@@ -79,7 +79,7 @@ const WindowCloseWarning = (props: ModalProps) => {
               })
             }}
           >
-            <Trans key="window_close_never_show" />
+            <Trans key="window:_trn_window_close_never_show" />
           </Checkbox>
           <Button
             type="secondary"
@@ -88,7 +88,7 @@ const WindowCloseWarning = (props: ModalProps) => {
               window.closeWindow()
             }}
           >
-            <Trans key="window_close_quit_app" />
+            <Trans key="window:_trn_window_close_quit_app" />
           </Button>
         </div>
       </div>

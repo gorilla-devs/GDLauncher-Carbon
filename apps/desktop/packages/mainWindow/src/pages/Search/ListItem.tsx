@@ -1,4 +1,5 @@
 import { FEUnifiedSearchResult, Mod } from "@gd/core_module/bindings"
+import { Trans } from "@gd/i18n"
 import { formatDownloadCount } from "@/utils/helpers"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
@@ -115,7 +116,7 @@ export function ListItem(props: SearchResultItemProps) {
                   <Match when={props.isInstalled}>
                     <div class="flex items-center gap-2 text-xl font-bold text-green-500">
                       <div class="i-hugeicons:tick-02 text-xl" />
-                      Installed
+                      <Trans key="instances:_trn_status_installed" />
                     </div>
                   </Match>
                   <Match when={props.result.type === "modpack"}>

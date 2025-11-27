@@ -95,7 +95,7 @@ const HomeGrid = () => {
     if (globalStore.settings.data?.instancesGroupBy === "group") {
       _groups.favorites = {
         id: -1,
-        name: t("favorites"),
+        name: t("instances:_trn_favorites"),
         instances: []
       }
     }
@@ -113,7 +113,9 @@ const HomeGrid = () => {
         )?.name
 
         groupName =
-          _groupName === "localize➽default" ? t("default") : _groupName
+          _groupName === "localize➽default"
+            ? t("general:_trn_default")
+            : _groupName
         groupId = instance.group_id
       } else if (
         globalStore.settings.data?.instancesGroupBy === "gameVersion"
@@ -229,11 +231,11 @@ const HomeGrid = () => {
       })
     } else {
       iterable.sort((a, b) => {
-        if (a.name === t("favorites")) {
+        if (a.name === t("instances:_trn_favorites")) {
           return -1
         }
 
-        if (b.name === t("favorites")) {
+        if (b.name === t("instances:_trn_favorites")) {
           return 1
         }
 
@@ -258,27 +260,27 @@ const HomeGrid = () => {
   }[] = [
     {
       key: "name",
-      label: t("general.name")
+      label: t("ui:_trn_name")
     },
     {
       key: "mostPlayed",
-      label: t("general.most_played")
+      label: t("ui:_trn_most_played")
     },
     {
       key: "lastPlayed",
-      label: t("general.last_played")
+      label: t("ui:_trn_last_played")
     },
     {
       key: "lastUpdated",
-      label: t("general.last_updated")
+      label: t("ui:_trn_last_updated")
     },
     {
       key: "gameVersion",
-      label: t("general.game_version")
+      label: t("ui:_trn_game_version")
     },
     {
       key: "created",
-      label: t("general.created")
+      label: t("ui:_trn_created")
     }
   ]
 
@@ -288,19 +290,19 @@ const HomeGrid = () => {
   }[] = [
     {
       key: "group",
-      label: t("general.group")
+      label: t("ui:_trn_group")
     },
     {
       key: "gameVersion",
-      label: t("general.game_version")
+      label: t("ui:_trn_game_version")
     },
     {
       key: "modloader",
-      label: t("general.modloader")
+      label: t("ui:_trn_modloader")
     },
     {
       key: "modplatform",
-      label: t("general.modplatform")
+      label: t("content:_trn_modplatform")
     }
   ]
 
@@ -325,7 +327,7 @@ const HomeGrid = () => {
               variant="Welcoming Gorilla - Open Arms"
             />
             <p class="text-lightSlate-700 max-w-100 text-center">
-              <Trans key="instance.no_instances_text" />
+              <Trans key="instances:_trn_no_instances_text" />
             </p>
           </div>
         </Match>
@@ -339,7 +341,7 @@ const HomeGrid = () => {
             <div class="bg-darkSlate-800 z-5 sticky top-0 flex items-center gap-4 py-4">
               <Input
                 ref={inputRef}
-                placeholder={t("search_instances")}
+                placeholder={t("search:_trn_search_instances")}
                 value={filter()}
                 class="w-full rounded-full"
                 onInput={(e) => setFilter(e.target.value)}
@@ -370,7 +372,7 @@ const HomeGrid = () => {
                   <DropdownMenuLabel>
                     <div class="flex items-center justify-between gap-2">
                       <div>
-                        <Trans key="general.platform" />
+                        <Trans key="content:_trn_platform" />
                       </div>
                       <div
                         class="text-lightSlate-900 hover:text-lightSlate-50 text-xs transition-colors duration-200 ease-[cubic-bezier(.4,0,.2,1)]"
@@ -386,7 +388,7 @@ const HomeGrid = () => {
                           setInstancesTileSize(2)
                         }}
                       >
-                        Reset
+                        <Trans key="instances:_trn_reset_filters" />
                       </div>
                     </div>
                   </DropdownMenuLabel>
@@ -396,7 +398,7 @@ const HomeGrid = () => {
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger class="w-full">
                         <div class="flex w-full items-center justify-between">
-                          <Trans key="general.instance_tile_size" />
+                          <Trans key="instances:_trn_instance_tile_size" />
                           <div class="flex items-center gap-2">
                             <span>{instancesTileSize()}</span>
                           </div>
@@ -405,7 +407,7 @@ const HomeGrid = () => {
                       <DropdownMenuPortal>
                         <DropdownMenuSubContent>
                           <DropdownMenuLabel>
-                            <Trans key="ui.tile_size" />
+                            <Trans key="ui:_trn_tile_size" />
                           </DropdownMenuLabel>
                           <DropdownMenuRadioGroup
                             value={instancesTileSize().toString()}
@@ -435,7 +437,7 @@ const HomeGrid = () => {
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger class="w-full">
                         <div class="flex w-full items-center justify-between">
-                          <Trans key="general.sort_by" />
+                          <Trans key="search:_trn_sort_by" />
                           <div class="flex items-center gap-2">
                             <span>
                               {sortByOptions.find(
@@ -455,7 +457,7 @@ const HomeGrid = () => {
                       <DropdownMenuPortal>
                         <DropdownMenuSubContent>
                           <DropdownMenuLabel>
-                            <Trans key="ui.sort_options" />
+                            <Trans key="ui:_trn_sort_options" />
                           </DropdownMenuLabel>
                           <DropdownMenuRadioGroup
                             value={
@@ -514,7 +516,7 @@ const HomeGrid = () => {
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger class="w-full">
                         <div class="flex w-full items-center justify-between">
-                          <Trans key="general.group_by" />
+                          <Trans key="search:_trn_group_by" />
                           <div class="flex items-center gap-2">
                             <span>
                               {groupByOptions.find(
@@ -534,7 +536,7 @@ const HomeGrid = () => {
                       <DropdownMenuPortal>
                         <DropdownMenuSubContent>
                           <DropdownMenuLabel>
-                            <Trans key="ui.group_options" />
+                            <Trans key="ui:_trn_group_options" />
                           </DropdownMenuLabel>
                           <DropdownMenuRadioGroup
                             value={
@@ -701,7 +703,7 @@ const HomeGrid = () => {
               <ContextMenuContent>
                 <ContextMenuGroup>
                   <ContextMenuGroupLabel>
-                    Add New Instance
+                    <Trans key="library:_trn_add_new_instance" />
                   </ContextMenuGroupLabel>
                   <ContextMenuSeparator />
                   <ContextMenuItem
@@ -713,7 +715,7 @@ const HomeGrid = () => {
                     }}
                   >
                     <div class="i-hugeicons:file-add h-4 w-4" />
-                    Create New Instance
+                    <Trans key="library:_trn_create_new_instance" />
                   </ContextMenuItem>
                   <ContextMenuItem
                     class="flex items-center gap-2"
@@ -729,7 +731,7 @@ const HomeGrid = () => {
                     }}
                   >
                     <div class="i-hugeicons:download-02 h-4 w-4" />
-                    Import Instance
+                    <Trans key="library:_trn_import_instance" />
                   </ContextMenuItem>
                 </ContextMenuGroup>
               </ContextMenuContent>

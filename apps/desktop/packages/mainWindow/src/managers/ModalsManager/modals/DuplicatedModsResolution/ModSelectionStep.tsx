@@ -73,7 +73,7 @@ const ModSelectionStep = (props: Props) => {
               <h2 class="m-0 text-xl font-bold">{props.mod.name}</h2>
               <p class="text-lightSlate-600 m-0 text-sm">
                 <Trans
-                  key="instance.duplicates.selection.step_indicator"
+                  key="content:_trn_duplicates.selection.step_indicator"
                   options={{
                     current: props.currentModIndex + 1,
                     total: props.totalMods
@@ -85,7 +85,7 @@ const ModSelectionStep = (props: Props) => {
         </div>
 
         <p class="text-lightSlate-700 text-sm">
-          <Trans key="instance.duplicates.selection.instruction" />
+          <Trans key="content:_trn_duplicates.selection.instruction" />
         </p>
       </div>
 
@@ -118,7 +118,7 @@ const ModSelectionStep = (props: Props) => {
                     </div>
                     <div class="text-lightSlate-600 mt-1 flex gap-4 text-xs">
                       <span>
-                        <Trans key="instance.duplicates.selection.version_label" />{" "}
+                        <Trans key="content:_trn_duplicates.selection.version_label" />{" "}
                         {version.version}
                       </span>
                     </div>
@@ -132,13 +132,13 @@ const ModSelectionStep = (props: Props) => {
 
       <div class="mt-6 flex shrink-0 justify-between">
         <Button type="secondary" size="large" onClick={() => props.prevStep()}>
-          <Trans key="instance.duplicates.selection.button_back" />
+          <Trans key="content:_trn_duplicates.selection.button_back" />
         </Button>
         <Button type="primary" size="large" onClick={() => props.nextStep()}>
           {props.currentModIndex + 1 === props.totalMods ? (
-            <Trans key="instance.duplicates.selection.button_continue" />
+            <Trans key="content:_trn_duplicates.selection.button_continue" />
           ) : (
-            <Trans key="instance.duplicates.selection.button_next" />
+            <Trans key="content:_trn_duplicates.selection.button_next" />
           )}
         </Button>
       </div>

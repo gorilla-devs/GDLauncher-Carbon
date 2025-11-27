@@ -1,6 +1,21 @@
 import { FEReleaseChannel } from "@gd/core_module/bindings"
 import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron"
-import type { ProgressInfo, UpdateInfo } from "electron-updater"
+import type { UpdateInfo } from "electron-updater"
+
+type UpdateState =
+  | "idle"
+  | "checking"
+  | "downloading"
+  | "downloaded"
+  | "error"
+  | "no-update"
+
+interface UpdateStateData {
+  state: UpdateState
+  updateInfo: (UpdateInfo & { downloadUrl: string }) | null
+  progress: number
+  error: { message: string; details: string } | null
+}
 
 contextBridge.exposeInMainWorld(
   "checkForUpdates",
@@ -12,30 +27,12 @@ contextBridge.exposeInMainWorld("installUpdate", async () =>
   ipcRenderer.invoke("installUpdate")
 )
 
-contextBridge.exposeInMainWorld("downloadUpdate", async () =>
-  ipcRenderer.invoke("downloadUpdate")
+contextBridge.exposeInMainWorld("getUpdateState", async () =>
+  ipcRenderer.invoke("getUpdateState")
 )
 
 contextBridge.exposeInMainWorld(
-  "onDownloadProgress",
-  async (cb: (_ev: IpcRendererEvent, _progressInfo: ProgressInfo) => void) =>
-    ipcRenderer.on("downloadProgress", cb)
-)
-
-contextBridge.exposeInMainWorld(
-  "updateDownloaded",
-  async (cb: (_ev: IpcRendererEvent) => void) =>
-    ipcRenderer.on("updateDownloaded", cb)
-)
-
-contextBridge.exposeInMainWorld(
-  "updateAvailable",
-  async (cb: (_ev: IpcRendererEvent, _updateInfo: UpdateInfo) => void) =>
-    ipcRenderer.on("updateAvailable", cb)
-)
-
-contextBridge.exposeInMainWorld(
-  "updateNotAvailable",
-  async (cb: (_ev: IpcRendererEvent) => void) =>
-    ipcRenderer.on("updateNotAvailable", cb)
+  "onUpdateStateChanged",
+  (cb: (_ev: IpcRendererEvent, _state: UpdateStateData) => void) =>
+    ipcRenderer.on("gd-update-state-changed", cb)
 )

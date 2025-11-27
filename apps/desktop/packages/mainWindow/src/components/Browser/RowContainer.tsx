@@ -4,6 +4,7 @@ import {
   InstanceDetails,
   Mod
 } from "@gd/core_module/bindings"
+import { Trans } from "@gd/i18n"
 import { VersionRowTypeData } from "../InfiniteScrollVersionsQueryWrapper"
 import { For, Match, Show, Switch, createMemo } from "solid-js"
 import { format } from "date-fns"
@@ -89,7 +90,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
                   <TooltipContent>
                     <div class="flex flex-col gap-1">
                       <div class="text-xs font-medium">
-                        Additional versions:
+                        <Trans key="instances:_trn_additional_versions" />
                       </div>
                       <div class="flex max-w-xs flex-wrap gap-1">
                         <For each={props.modVersion.gameVersions.slice(2)}>

@@ -95,7 +95,7 @@ const ExploreVersionsNavbar = (props: Props) => {
 
   const getGameVersionLabel = (versionId: string | null | undefined) => {
     if (!versionId) {
-      return <Trans key="minecraft_all_versions" />
+      return <Trans key="enums:_trn_minecraft_all_versions" />
     }
     const version = filteredGameVersions()?.find((v) => v.id === versionId)
     if (version) {
@@ -110,7 +110,7 @@ const ExploreVersionsNavbar = (props: Props) => {
   }
 
   return (
-    <div class="mb-4 flex h-12 w-full gap-4">
+    <div class="mb-4 flex h-12 gap-4">
       <Switch>
         <Match when={instanceId() !== null}>
           <div class="flex gap-2">
@@ -135,14 +135,14 @@ const ExploreVersionsNavbar = (props: Props) => {
                   checked={overrideEnabled()}
                   onChange={setOverrideEnabled}
                 />
-                <Trans key="rowcontainer.override_filters" />
+                <Trans key="instances:_trn_rowcontainer.override_filters" />
               </div>
             </div>
           </div>
         </Match>
         <Match when={props.type === "mod" && instanceId() === null}>
           <div class="text-lightSlate-700 flex items-center">
-            <Trans key="rowcontainer.no_instance_selected" />
+            <Trans key="instances:_trn_rowcontainer.no_instance_selected" />
           </div>
         </Match>
       </Switch>
@@ -154,7 +154,7 @@ const ExploreVersionsNavbar = (props: Props) => {
           placeholder={
             <div class="flex items-center gap-2">
               <div class="i-hugeicons:tag-01" />
-              <Trans key="minecraft_all_versions" />
+              <Trans key="enums:_trn_minecraft_all_versions" />
             </div>
           }
           onChange={(val) => {
@@ -189,7 +189,9 @@ const ExploreVersionsNavbar = (props: Props) => {
           placeholder={
             <div class="flex items-center gap-2">
               <div class="i-hugeicons:tag-01" />
-              <span>All modloaders</span>
+              <span>
+                <Trans key="enums:_trn_modloader_all" />
+              </span>
             </div>
           }
           onChange={(val) => {

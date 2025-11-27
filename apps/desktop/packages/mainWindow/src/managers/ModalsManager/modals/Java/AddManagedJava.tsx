@@ -93,12 +93,7 @@ const AddManagedJava = (props: ModalProps) => {
           <div class="flex flex-col gap-4">
             <div class="flex items-center justify-between gap-4">
               <h5 class="m-0">
-                <Trans
-                  key="java.java_vendors"
-                  options={{
-                    defaultValue: "Vendors"
-                  }}
-                />
+                <Trans key="java:_trn_java_vendors" />
               </h5>
               <Show when={!javaVendors.isLoading}>
                 <Select
@@ -124,12 +119,7 @@ const AddManagedJava = (props: ModalProps) => {
             </div>
             <div class="flex w-full items-center justify-between gap-4">
               <h5 class="w-30 m-0">
-                <Trans
-                  key="java.java_major"
-                  options={{
-                    defaultValue: "Java Major"
-                  }}
-                />
+                <Trans key="java:_trn_java_major" />
               </h5>
               <Show
                 when={!versionsByVendor.isLoading && javaVersions().length > 0}
@@ -164,12 +154,7 @@ const AddManagedJava = (props: ModalProps) => {
                   javaVersions().length === 0 && !versionsByVendor.isLoading
                 }
               >
-                <Trans
-                  key="java.no_available_javas"
-                  options={{
-                    defaultValue: "No java available for this vendor"
-                  }}
-                />
+                <Trans key="java:_trn_no_available_javas" />
               </Show>
             </div>
           </div>
@@ -200,12 +185,7 @@ const AddManagedJava = (props: ModalProps) => {
                 }
               }}
             >
-              <Trans
-                key="java.install"
-                options={{
-                  defaultValue: "Install"
-                }}
-              />
+              <Trans key="java:_trn_install" />
             </Button>
           </div>
         </div>

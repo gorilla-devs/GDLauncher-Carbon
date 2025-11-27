@@ -1,4 +1,5 @@
 import { Component, For, Suspense, createMemo } from "solid-js"
+import { Trans } from "@gd/i18n"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import { Badge, Skeleton } from "@gd/ui"
@@ -119,7 +120,8 @@ const Masonry: Component<MasonryProps> = (props) => {
                             : "text-xs"
                       }`}
                     >
-                      {element.downloadsCount.toLocaleString()} downloads
+                      {element.downloadsCount.toLocaleString()}{" "}
+                      <Trans key="search:_trn_downloads_label" />
                     </p>
                   </Badge>
                   <Badge class="bg-darkSlate-900 w-fit">
@@ -145,8 +147,14 @@ const Masonry: Component<MasonryProps> = (props) => {
                             : "text-xs"
                       }`}
                     >
-                      Last updated:{" "}
-                      {new Date(element.lastUpdated).toLocaleDateString()}
+                      <Trans
+                        key="content:_trn_common.last_updated_date"
+                        options={{
+                          date: new Date(
+                            element.lastUpdated
+                          ).toLocaleDateString()
+                        }}
+                      />
                     </p>
                   </Badge>
                 </div>

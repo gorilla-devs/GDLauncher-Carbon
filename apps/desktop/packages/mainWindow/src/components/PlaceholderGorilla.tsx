@@ -1,3 +1,5 @@
+import { Trans } from "@gd/i18n"
+
 interface PlaceholderGorillaProps {
   size?: number // Size in rem (default: 10rem = 160px)
   variant: string // Label describing the illustration type
@@ -83,7 +85,9 @@ export function PlaceholderGorilla(props: PlaceholderGorillaProps) {
 
       {/* Label */}
       <div class="text-lightSlate-600 flex flex-col items-center gap-1 text-center">
-        <div class="font-mono text-sm opacity-50">[Placeholder]</div>
+        <div class="font-mono text-sm opacity-50">
+          <Trans key="ui:_trn_placeholder" />
+        </div>
         <div class="text-lightSlate-500 font-medium">{props.variant}</div>
       </div>
     </div>

@@ -45,7 +45,7 @@ const NoMods = () => {
         <PlaceholderGorilla size={10} variant="Camera Gorilla - Photographer" />
         <p class="text-lightSlate-700 max-w-100">
           <Trans
-            key="instance.no_screenshots_text"
+            key="content:_trn_no_screenshots_text"
             options={{
               defaultValue:
                 "You don't have any screenshots related to this modpack at the moment, to take a screenshot press the print screen key during the game"
@@ -108,7 +108,7 @@ const Screenshots = () => {
             <div class="flex cursor-pointer items-center gap-2">
               <Checkbox checked={true} disabled={false} />
               <Trans
-                key="instance.select_all_screenshots"
+                key="content:_trn_select_all_screenshots"
                 options={{
                   defaultValue: "Select All"
                 }}
@@ -117,7 +117,7 @@ const Screenshots = () => {
             <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
               <div class="i-hugeicons:folder-open text-2xl" />
               <Trans
-                key="instance.open_screenshots_folder"
+                key="content:_trn_open_screenshots_folder"
                 options={{
                   defaultValue: "Open folder"
                 }}
@@ -126,7 +126,7 @@ const Screenshots = () => {
             <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
               <div class="i-hugeicons:unavailable text-2xl" />
               <Trans
-                key="instance.disable_screenshot"
+                key="content:_trn_disable_screenshot"
                 options={{
                   defaultValue: "disable"
                 }}
@@ -135,7 +135,7 @@ const Screenshots = () => {
             <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
               <div class="i-hugeicons:delete-02 text-2xl" />
               <Trans
-                key="instance.delete_screenshot"
+                key="content:_trn_delete_screenshot"
                 options={{
                   defaultValue: "delete"
                 }}
@@ -145,7 +145,7 @@ const Screenshots = () => {
           <div class="flex gap-2">
             <p class="m-0">{screenshots.length}</p>
             <Trans
-              key="instance.screenshots"
+              key="content:_trn_screenshots"
               options={{
                 defaultValue: "Screenshots"
               }}

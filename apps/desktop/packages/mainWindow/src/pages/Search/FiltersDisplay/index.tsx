@@ -1,4 +1,5 @@
 import useSearchContext from "@/components/SearchInputContext"
+import { Trans } from "@gd/i18n"
 import { Show } from "solid-js"
 import { Button } from "@gd/ui"
 import InstanceDisplay from "./InstanceDisplay"
@@ -50,7 +51,7 @@ export default function FiltersDisplay() {
             class="text-xs"
           >
             <div class="i-hugeicons:cancel-circle h-4 w-4" />
-            Clear all
+            <Trans key="general:_trn_common.clear_all" />
           </Button>
           <div class="bg-darkSlate-600 h-4 w-px" />
           <InstanceDisplay />

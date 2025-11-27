@@ -170,22 +170,22 @@ const AddonExplore = () => {
 
   const instancePages = () => [
     {
-      label: t("ui.overview"),
+      label: t("ui:_trn_overview"),
       path: `/addon/${params.id}/${params.platform}`,
       icon: "i-hugeicons:dashboard-square-01"
     },
     {
-      label: t("ui.changelog"),
+      label: t("ui:_trn_changelog"),
       path: `/addon/${params.id}/${params.platform}/changelog`,
       icon: "i-hugeicons:note-edit"
     },
     {
-      label: t("ui.screenshots"),
+      label: t("ui:_trn_screenshots"),
       path: `/addon/${params.id}/${params.platform}/screenshots`,
       icon: "i-hugeicons:image-01"
     },
     {
-      label: t("ui.versions"),
+      label: t("ui:_trn_versions"),
       path: `/addon/${params.id}/${params.platform}/versions`,
       icon: "i-hugeicons:package"
     }
@@ -239,7 +239,7 @@ const AddonExplore = () => {
               size="small"
               type="secondary"
             >
-              <Trans key="instance.step_back" />
+              <Trans key="instances:_trn_step_back" />
             </Button>
             <Tooltip>
               <TooltipTrigger>
@@ -263,7 +263,7 @@ const AddonExplore = () => {
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <Trans key="instance.open_in_browser" />
+                <Trans key="content:_trn_open_in_browser" />
               </TooltipContent>
             </Tooltip>
           </div>
@@ -369,14 +369,14 @@ const AddonExplore = () => {
       </div>
       <div class="bg-darkSlate-800 sticky">
         <div class="flex justify-center px-6 py-0">
-          <div class="bg-darkSlate-800 w-full">
+          <div class="bg-darkSlate-800 flex-1">
             <div
               ref={(el) => {
                 refStickyTabs = el
               }}
               class="bg-darkSlate-800 sticky top-0 z-30 flex flex-col pb-0"
             >
-              <div class="mb-4 flex h-14 w-full items-center justify-between">
+              <div class="mb-4 flex h-14 items-center justify-between">
                 <div class="flex h-full items-center">
                   <div
                     class="mr-4 origin-left transition-transform duration-100 ease-in-out"
@@ -394,7 +394,7 @@ const AddonExplore = () => {
                       type="secondary"
                     >
                       <div class="i-hugeicons:arrow-left-01 text-2xl h-6 w-6" />
-                      <Trans key="instance.step_back" />
+                      <Trans key="instances:_trn_step_back" />
                     </Button>
                   </div>
                   <div

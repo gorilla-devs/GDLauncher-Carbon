@@ -31,7 +31,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
             </div>
             <div class="flex-1">
               <p class="text-lightSlate-300 text-base leading-relaxed">
-                <Trans key="ads.paragraph-1" />
+                <Trans key="ads:_trn_paragraph-1" />
               </p>
             </div>
           </div>
@@ -40,7 +40,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
           <div class="bg-darkSlate-700 border-darkSlate-600 rounded-lg border p-6">
             <h3 class="text-lightSlate-300 mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
               <div class="i-hugeicons:code text-primary-500 text-base" />
-              <Trans key="ads.paragraph-2" />
+              <Trans key="ads:_trn_paragraph-2" />
             </h3>
             <div class="grid grid-cols-3 gap-6">
               {/* Card 1 - Minecraft Updates */}
@@ -49,7 +49,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
                   <div class="i-hugeicons:rocket-01 text-emerald-500 text-[2rem]" />
                 </div>
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
-                  <Trans key="ads.paragraph-2-list-element-1" />
+                  <Trans key="ads:_trn_paragraph-2-list-element-1" />
                 </p>
               </div>
 
@@ -59,7 +59,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
                   <div class="i-hugeicons:tick-02 text-primary-500 text-[2rem]" />
                 </div>
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
-                  <Trans key="ads.paragraph-2-list-element-2" />
+                  <Trans key="ads:_trn_paragraph-2-list-element-2" />
                 </p>
               </div>
 
@@ -69,7 +69,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
                   <div class="i-hugeicons:sparkles text-blue-500 text-[2rem]" />
                 </div>
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
-                  <Trans key="ads.paragraph-2-list-element-3" />
+                  <Trans key="ads:_trn_paragraph-2-list-element-3" />
                 </p>
               </div>
             </div>
@@ -79,7 +79,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
           <div class="bg-darkSlate-700 border-darkSlate-600 rounded-lg border p-6">
             <h3 class="text-lightSlate-300 mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
               <div class="i-hugeicons:dollar-circle text-primary-500 text-base" />
-              <Trans key="ads.paragraph-3" />
+              <Trans key="ads:_trn_paragraph-3" />
             </h3>
             <div class="grid grid-cols-3 gap-6">
               {/* Card 1 - Team Support */}
@@ -88,7 +88,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
                   <div class="i-hugeicons:user-multiple-02 text-purple-500 text-[2rem]" />
                 </div>
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
-                  <Trans key="ads.paragraph-3-list-element-1" />
+                  <Trans key="ads:_trn_paragraph-3-list-element-1" />
                 </p>
               </div>
 
@@ -98,7 +98,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
                   <div class="i-hugeicons:bulb text-cyan-500 text-[2rem]" />
                 </div>
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
-                  <Trans key="ads.paragraph-3-list-element-2" />
+                  <Trans key="ads:_trn_paragraph-3-list-element-2" />
                 </p>
               </div>
 
@@ -108,7 +108,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
                   <div class="i-hugeicons:clock-01 text-pink-500 text-[2rem]" />
                 </div>
                 <p class="text-lightSlate-400 text-center text-sm leading-relaxed">
-                  <Trans key="ads.paragraph-3-list-element-3" />
+                  <Trans key="ads:_trn_paragraph-3-list-element-3" />
                 </p>
               </div>
             </div>
@@ -118,7 +118,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
           <div class="bg-darkSlate-700 border-darkSlate-600 rounded-lg border p-6">
             <h3 class="text-lightSlate-300 mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider">
               <div class="i-hugeicons:pie-chart text-primary-500 text-base" />
-              Revenue Transparency
+              <Trans key="ads:_trn_revenue_transparency_title" />
             </h3>
             <div class="space-y-4">
               {/* Visual Revenue Bar */}
@@ -145,10 +145,10 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
                   </div>
                   <div class="flex-1">
                     <div class="text-lightSlate-50 mb-1 text-sm font-semibold">
-                      GDLauncher Team
+                      <Trans key="ads:_trn_revenue_split_gdl_title" />
                     </div>
                     <div class="text-lightSlate-500 text-xs">
-                      Development, infrastructure & support
+                      <Trans key="ads:_trn_revenue_split_gdl_desc" />
                     </div>
                   </div>
                 </div>
@@ -158,17 +158,17 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
                   </div>
                   <div class="flex-1">
                     <div class="text-lightSlate-50 mb-1 text-sm font-semibold">
-                      Overwolf & Mod Authors
+                      <Trans key="ads:_trn_revenue_split_others_title" />
                     </div>
                     <div class="text-lightSlate-500 text-xs">
-                      Platform & creator support
+                      <Trans key="ads:_trn_revenue_split_others_desc" />
                     </div>
                   </div>
                 </div>
               </div>
 
               <p class="text-lightSlate-400 mt-4 text-sm leading-relaxed">
-                <Trans key="ads.paragraph-4" />
+                <Trans key="ads:_trn_paragraph-4" />
               </p>
             </div>
           </div>
@@ -183,7 +183,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
                 </div>
                 <div class="flex-1">
                   <p class="text-lightSlate-300 text-sm leading-relaxed">
-                    <Trans key="ads.paragraph-5" />
+                    <Trans key="ads:_trn_paragraph-5" />
                   </p>
                 </div>
               </div>
@@ -195,7 +195,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
                 </div>
                 <div class="flex-1">
                   <p class="text-lightSlate-300 text-sm leading-relaxed">
-                    <Trans key="ads.paragraph-6" />
+                    <Trans key="ads:_trn_paragraph-6" />
                   </p>
                 </div>
               </div>
@@ -208,10 +208,10 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
               <div class="i-hugeicons:thumbs-up text-primary-500 text-2xl" />
             </div>
             <p class="text-lightSlate-300 mx-auto max-w-2xl text-base leading-relaxed">
-              <Trans key="ads.paragraph-7" />
+              <Trans key="ads:_trn_paragraph-7" />
             </p>
             <p class="text-lightSlate-400 mt-4 text-sm italic">
-              <Trans key="ads.paragraph-8" />
+              <Trans key="ads:_trn_paragraph-8" />
             </p>
 
             <div class="mt-6">
@@ -220,7 +220,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
                 onClick={() => modalsContext?.closeModal()}
                 class="px-8 py-3 font-semibold transition-all hover:scale-105 active:scale-95"
               >
-                Got it, thanks!
+                <Trans key="ads:_trn_got_it_thanks" />
               </Button>
             </div>
           </div>

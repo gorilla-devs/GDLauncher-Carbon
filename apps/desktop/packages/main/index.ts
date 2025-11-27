@@ -28,7 +28,7 @@ import type { ChildProcessWithoutNullStreams } from "child_process"
 import { spawn } from "child_process"
 import crypto from "crypto"
 import log from "electron-log/main"
-import { hashEmail } from "./utils/emailHash"
+import { hashEmailForOverwolf } from "./utils/emailHash"
 import * as Sentry from "@sentry/electron/main"
 import "./preloadListeners"
 import getAdSize from "./adSize"
@@ -41,6 +41,46 @@ import {
 } from "@gd/core_module/bindings"
 
 console.log("Modules imported successfully")
+
+// Overwolf ready state and pending email
+let overwolfReady = false
+let pendingEmail: string | null | undefined = null
+
+function setOverwolfEmail(email: string) {
+  if (overwolfReady && (app as any).overwolf) {
+    try {
+      const hashes = hashEmailForOverwolf(email)
+      ;(app as any).overwolf.setUserEmailHashes(hashes)
+      console.log("GDL account email hashes sent to Overwolf")
+    } catch (error) {
+      console.error("Failed to set email hashes:", error)
+    }
+  } else {
+    pendingEmail = email
+  }
+}
+
+function clearOverwolfEmail() {
+  if (overwolfReady && (app as any).overwolf) {
+    try {
+      ;(app as any).overwolf.setUserEmailHashes({})
+      console.log("GDL account email hashes cleared")
+    } catch (error) {
+      console.error("Failed to clear email hashes:", error)
+    }
+  } else {
+    pendingEmail = null
+  }
+}
+
+function applyPendingEmail() {
+  if (pendingEmail) {
+    setOverwolfEmail(pendingEmail)
+  } else if (pendingEmail === null) {
+    clearOverwolfEmail()
+  }
+  pendingEmail = undefined
+}
 
 export const RUNTIME_PATH_OVERRIDE_NAME = "runtime_path_override"
 const RUNTIME_PATH_DEFAULT_NAME = "data"
@@ -362,26 +402,29 @@ const loadCoreModule: CoreModule = () =>
           } else {
             let progress = 0
             switch (event as CoreModuleStatus) {
+              case "VerifyingTermsAndPrivacy":
+                progress = 10
+                break
               case "LoadAndMigrate":
-                progress = 15
+                progress = 20
                 break
               case "RefreshMSAuth":
-                progress = 30
+                progress = 35
                 break
               case "XboxAuth":
-                progress = 45
+                progress = 50
                 break
               case "McLogin":
-                progress = 60
+                progress = 65
                 break
               case "MCEntitlements":
-                progress = 72
+                progress = 77
                 break
               case "McProfile":
-                progress = 84
+                progress = 88
                 break
               case "AccountRefreshComplete":
-                progress = 92
+                progress = 95
                 break
               case "LaunchBackgroundTasks":
                 progress = 100
@@ -445,25 +488,12 @@ const loadCoreModule: CoreModule = () =>
           const rightPart = row.split(":")[1]
           showAppCloseWarning = rightPart === "true"
           console.log("Show app close warning:", showAppCloseWarning)
-        } else if (row.startsWith("_HASHED_EMAIL_PREFERENCE_CHANGED_:")) {
-          const rightPart = row.split(":")[1]
-          const enabled = rightPart.split("|")[0] === "true"
-          const email = rightPart.split("|")[1]
-          if (enabled) {
-            if ((app as any).overwolf) {
-              // Hash email client-side per UID2 specification for better privacy/security
-              const sha256Hash = hashEmail(email)
-              ;(app as any).overwolf.setUserEmailHashes({
-                SHA256: sha256Hash
-              })
-              console.log("Hashed email enabled - hash sent to Overwolf")
-            }
+        } else if (row.startsWith("_GDL_ACCOUNT_EMAIL_:")) {
+          const email = row.split(":")[1]?.trim() || ""
+          if (email) {
+            setOverwolfEmail(email)
           } else {
-            if ((app as any).overwolf) {
-              // Clear hashes when user opts out
-              ;(app as any).overwolf.setUserEmailHashes({})
-              console.log("Hashed email disabled - hashes cleared")
-            }
+            clearOverwolfEmail()
           }
         }
       }
@@ -716,7 +746,35 @@ ipcMain.handle("showSaveDialog", async (_, opts: SaveDialogOptions) => {
 })
 
 ipcMain.handle("getCurrentOS", async () => {
-  return { platform: os.platform(), arch: os.arch() }
+  const platform = os.platform()
+  const arch = os.arch()
+
+  // Determine if this build supports auto-updates
+  // electron-updater only works with:
+  // - Windows: NSIS installer (not portable ZIP)
+  // - Linux: AppImage (not other formats)
+  // - macOS: DMG and ZIP distributions
+  let supportsAutoUpdate = false
+
+  if (platform === "win32") {
+    // On Windows, NSIS builds support auto-update
+    // Portable builds (ZIP) do not
+    // We can detect this by checking if we're installed or portable
+    supportsAutoUpdate = app.isPackaged && !process.env.PORTABLE_EXECUTABLE_DIR
+  } else if (platform === "linux") {
+    // On Linux, only AppImage supports auto-update
+    // AppImage sets the APPIMAGE environment variable
+    supportsAutoUpdate = !!process.env.APPIMAGE
+  } else if (platform === "darwin") {
+    // On macOS, packaged builds (DMG/ZIP) support auto-update
+    supportsAutoUpdate = app.isPackaged
+  }
+
+  return {
+    platform,
+    arch,
+    supportsAutoUpdate
+  }
 })
 
 ipcMain.handle("openFolder", async (_, path) => {
@@ -870,6 +928,13 @@ app.whenReady().then(async () => {
   }
 
   console.log("OVERWOLF APP ID", process.env.OVERWOLF_APP_UID)
+
+  // Mark Overwolf as ready and apply any pending email
+  if ((app as any).overwolf && process.env.OVERWOLF_APP_UID) {
+    overwolfReady = true
+    applyPendingEmail()
+  }
+
   session.defaultSession.webRequest.onBeforeSendHeaders(
     {
       urls: ["http://*/*", "https://*/*"]

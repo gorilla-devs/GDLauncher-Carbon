@@ -8,11 +8,12 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 
 export function FilterBadgesBar() {
   const isSearchPage = useMatch(() => "/search/*")
+  const isAddonViewPage = useMatch(() => "/addon/*/*")
   const searchContext = useSearchContext()
   const [t] = useTransContext()
   const navigator = useGDNavigate()
 
-  const isExpanded = () => !!isSearchPage()
+  const isExpanded = () => !!isSearchPage() || !!isAddonViewPage()
 
   const hasActiveFilters = () => {
     const query = searchContext?.searchQuery()
@@ -41,7 +42,7 @@ export function FilterBadgesBar() {
   return (
     <Show when={isExpanded() && hasActiveFilters()}>
       <div
-        class="bg-darkSlate-800 border-darkSlate-700 w-full border-b transition-all duration-300 ease-in-out"
+        class="bg-darkSlate-800 border-darkSlate-700 border-b transition-all duration-300 ease-in-out"
         style={{ "view-transition-name": "filter-badges-bar" }}
       >
         <div class="flex items-center gap-4 px-6 py-3">
@@ -56,7 +57,7 @@ export function FilterBadgesBar() {
               }}
             >
               <div class="i-hugeicons:arrow-left-01" />
-              <Trans key="search.go_back" />
+              <Trans key="search:_trn_go_back" />
             </Button>
           </Show>
           <div class="flex flex-1 items-center justify-center">
@@ -66,7 +67,7 @@ export function FilterBadgesBar() {
                 onClick={clearAllFilters}
               >
                 <div class="i-hugeicons:delete-02 text-sm" />
-                {t("search.clear_all_filters")}
+                {t("search:_trn_clear_all_filters")}
               </button>
               <div class="bg-darkSlate-600 h-4 w-px shrink-0" />
               <InlineFilterBadges />

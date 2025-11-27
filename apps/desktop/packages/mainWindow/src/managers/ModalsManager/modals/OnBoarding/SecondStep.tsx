@@ -25,10 +25,10 @@ const SecondStep = (props: Props) => {
         <Row>
           <Title
             description={
-              <Trans key="java.auto_manage_java_system_profiles_text" />
+              <Trans key="java:_trn_auto_manage_java_system_profiles_text" />
             }
           >
-            <Trans key="java.auto_manage_java_system_profiles" />
+            <Trans key="java:_trn_auto_manage_java_system_profiles" />
           </Title>
           <RightHandSide>
             <Switch
@@ -46,10 +46,10 @@ const SecondStep = (props: Props) => {
         <Row>
           <Title
             description={
-              <Trans key="settings:deletion_through_recycle_bin_text" />
+              <Trans key="settings:_trn_deletion_through_recycle_bin_text" />
             }
           >
-            <Trans key="settings:deletion_through_recycle_bin_title" />
+            <Trans key="settings:_trn_deletion_through_recycle_bin_title" />
           </Title>
           <RightHandSide>
             <Switch
@@ -65,7 +65,7 @@ const SecondStep = (props: Props) => {
           </RightHandSide>
         </Row>
         <Row>
-          <Trans key="onboarding.manage_more_options_from_settings" />
+          <Trans key="onboarding:_trn_manage_more_options_from_settings" />
         </Row>
       </RowsContainer>
       <div class="flex w-full justify-between">
@@ -76,7 +76,7 @@ const SecondStep = (props: Props) => {
             props.prevStep()
           }}
         >
-          <Trans key="onboarding.prev" />
+          <Trans key="onboarding:_trn_prev" />
         </Button>
         <Button
           onClick={() => {
@@ -84,7 +84,7 @@ const SecondStep = (props: Props) => {
           }}
           size="large"
         >
-          <Trans key="onboarding.next" />
+          <Trans key="onboarding:_trn_next" />
         </Button>
       </div>
     </div>

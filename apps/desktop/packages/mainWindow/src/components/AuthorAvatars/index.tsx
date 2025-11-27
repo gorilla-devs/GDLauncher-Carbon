@@ -1,4 +1,5 @@
 import { For, Show, createMemo } from "solid-js"
+import { Trans } from "@gd/i18n"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
 import {
   getAuthorColor,
@@ -129,10 +130,17 @@ const AuthorAvatars = (props: AuthorAvatarsProps) => {
               </span>
             </div>
             <Show when={author.role}>
-              <div class="text-lightSlate-400 text-xs">Role: {author.role}</div>
+              <div class="text-lightSlate-400 text-xs">
+                <Trans
+                  key="content:_trn_author_role"
+                  options={{ role: author.role }}
+                />
+              </div>
             </Show>
             <Show when={author.platform === "modrinth" && author.url}>
-              <div class="text-xs text-blue-400">Click to view profile</div>
+              <div class="text-xs text-blue-400">
+                <Trans key="content:_trn_author_click_to_view" />
+              </div>
             </Show>
           </div>
         </TooltipContent>
