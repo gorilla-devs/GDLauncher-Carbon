@@ -116,18 +116,9 @@ test.describe("Init Tests", () => {
 
     electronApp = await electron
       .launch({
-        args: [
-          "--enable-logging",
-          "--v=1",
-          "--no-sandbox", // Might help in CI
-          "--disable-gpu-sandbox"
-        ],
+        args: [],
         executablePath: binaryPath,
-        env: {
-          ...process.env,
-          ELECTRON_ENABLE_LOGGING: "1"
-        } as any,
-        timeout: 60000 // Increase timeout to see if it's a timing issue
+        env: { ...process.env } as any
       })
       .catch((error) => {
         console.error("=== Electron Launch Failed ===")
