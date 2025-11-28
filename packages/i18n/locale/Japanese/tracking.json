@@ -1,0 +1,11 @@
+{
+"_trn_setting_disabled": "無効",
+"_trn_x_days_ago": "{{count}}日前",
+"_trn_soon": "近日公開",
+"_trn_setting_disabled_text": "メトリクスの送信をほぼ完全に無効化します。これにより、自動バグ報告の送信やプレビュー機能へのアクセスなど、一部の機能も無効になります。",
+"_trn_setting_anonymous": "匿名",
+"_trn_setting_anonymous_text": "送信されるメトリクスの量を最小限に抑えます。収集されるすべてのメトリクスは完全に匿名化されます。機能への影響はありません。",
+"_trn_setting_anonymous_with_session_recordings": "匿名（セッション録画あり）",
+"_trn_setting_anonymous_with_session_recordings_text": "「匿名」と同じ量のデータを送信しますが、アプリの使用状況の短い記録であるセッション録画も含まれます。",
+"_trn_settings_authenticated_with_session_recordings": "認証済み（セッション録画あり）"
+}
