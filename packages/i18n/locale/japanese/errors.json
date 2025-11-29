@@ -1,0 +1,18 @@
+{
+"_trn_error.missing_field_title": "タイトルは空にできません",
+"_trn_error.no_mc_versions": "現在利用可能なMCバージョンがありません。後でもう一度お試しください！",
+"_trn_profile_name_exists": "プロファイル名は既に存在します",
+"_trn_some_error": "エラーが発生しました",
+"_trn_xbox_noAccount": "Xboxアカウントが見つかりません",
+"_trn_xbox_xboxServicesBanned": "アカウントがXboxサービスから利用停止されています",
+"_trn_xbox_adultVerificationRequired": "成人確認が必要です",
+"_trn_xbox_childAccount": "子供用アカウントはサポートされていません",
+"_trn_deviceCodeExpired": "デバイスコードの有効期限が切れました",
+"_trn_xboxAccount": "Xboxアカウントエラー",
+"_trn_noGameOwnership": "Minecraft Java Editionを所有していません",
+"_trn_noGameProfile": "ゲームプロファイルが見つかりません",
+"_trn_404_message": "ページが見つかりません",
+"_trn_its_gone": "見つかりません",
+"_trn_error.enrollment_failed": "登録を完了できませんでした",
+"_trn_error.xbox_code": "Xboxエラーコード"
+}
