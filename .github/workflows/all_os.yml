@@ -273,8 +273,7 @@ jobs:
         with:
           name: logs-windows
           path: |
-            ./GDLauncher/apps/desktop/release/win-unpacked/gdl_data/main.log
-            ./GDLauncher/apps/desktop/release/win-unpacked/gdl_data/data/__gdl_logs__/*.log
+           ./apps/desktop/release/win-unpacked/resources/app.asar
       - name: Fail if lint failed
         if: steps.lint.outcome == 'failure'
         run: exit 1
