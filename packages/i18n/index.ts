@@ -11,7 +11,8 @@ import languagesData from "./languages.json" with { type: "json" }
 
 export const supportedLanguages = {
   english: "united-states",
-  italian: "italy"
+  italian: "italy",
+  japanese: "japan"
 }
 
 type NamespacesMap = {
