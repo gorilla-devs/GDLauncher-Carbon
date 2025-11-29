@@ -97,6 +97,9 @@ export function EnhancedSearchBar() {
               ...prev,
               searchQuery: e.target.value
             }))
+            if (isAddonPage()) {
+              navigator.prev()
+            }
           }}
         />
       </Show>
@@ -116,6 +119,9 @@ export function EnhancedSearchBar() {
               ...prev,
               searchQuery: ""
             }))
+            if (isAddonPage()) {
+              navigator.prev()
+            }
           }}
         />
       </Show>
