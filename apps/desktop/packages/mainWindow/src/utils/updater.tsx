@@ -128,7 +128,6 @@ window.onUpdateStateChanged((_, stateData) => {
     case "downloaded":
       clearManualCheckTimeout()
       toast.dismiss(TOAST_ID_CHECKING)
-      toast.dismiss(TOAST_ID_DOWNLOADING)
       setIsCheckingForUpdates(false)
       isShowingDownloadToast = false
 

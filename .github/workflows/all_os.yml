@@ -9,13 +9,13 @@ jobs:
   mac_universal:
     defaults:
       run:
-        working-directory: ./GDLauncher
+        working-directory: ./GDL
     runs-on: macos-13
     timeout-minutes: 80
     steps:
       - uses: actions/checkout@v3
         with:
-          path: GDLauncher
+          path: GDL
       - uses: actions/setup-node@v3
         with:
           node-version: "22.12.0"
@@ -71,34 +71,34 @@ jobs:
         if: failure()
         with:
           name: playwright-report-macos
-          path: ./GDLauncher/apps/desktop/playwright-report/
+          path: ./GDL/apps/desktop/playwright-report/
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: test-results-macos
-          path: ./GDLauncher/apps/desktop/test-results/
+          path: ./GDL/apps/desktop/test-results/
       - name: Upload main.log for debugging
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: logs-macos
           path: |
-            ./GDLauncher/apps/desktop/release/mac-universal/gdl_data/main.log
-            ./GDLauncher/apps/desktop/release/mac-universal/gdl_data/data/__gdl_logs__/*.log
+            ./GDL/apps/desktop/release/mac-universal/gdl_data/main.log
+            ./GDL/apps/desktop/release/mac-universal/gdl_data/data/__gdl_logs__/*.log
       - name: Fail if lint failed
         if: steps.lint.outcome == 'failure'
         run: exit 1
   ubuntu_x64:
     defaults:
       run:
-        working-directory: ./GDLauncher
+        working-directory: ./GDL
     runs-on: ubuntu-22.04
     timeout-minutes: 80
     steps:
       - uses: actions/checkout@v3
         with:
-          path: GDLauncher
+          path: GDL
       - uses: actions/setup-node@v3
         with:
           node-version: "22.12.0"
@@ -163,34 +163,34 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
-          path: ./GDLauncher/apps/desktop/playwright-report/
+          path: ./GDL/apps/desktop/playwright-report/
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: test-results-linux
-          path: ./GDLauncher/apps/desktop/test-results/
+          path: ./GDL/apps/desktop/test-results/
       - name: Upload main.log for debugging
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: logs-linux
           path: |
-            ./GDLauncher/apps/desktop/release/linux-unpacked/gdl_data/main.log
-            ./GDLauncher/apps/desktop/release/linux-unpacked/gdl_data/data/__gdl_logs__/*.log
+            ./GDL/apps/desktop/release/linux-unpacked/gdl_data/main.log
+            ./GDL/apps/desktop/release/linux-unpacked/gdl_data/data/__gdl_logs__/*.log
       - name: Fail if lint failed
         if: steps.lint.outcome == 'failure'
         run: exit 1
   windows_x64:
     defaults:
       run:
-        working-directory: ./GDLauncher
+        working-directory: ./GDL
     runs-on: windows-2022
     timeout-minutes: 80
     steps:
       - uses: actions/checkout@v3
         with:
-          path: GDLauncher
+          path: GDL
       - uses: actions/setup-node@v3
         with:
           node-version: "22.12.0"
@@ -260,21 +260,21 @@ jobs:
         if: failure()
         with:
           name: playwright-report-win
-          path: ./GDLauncher/apps/desktop/playwright-report/
+          path: ./GDL/apps/desktop/playwright-report/
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: test-results-windows
-          path: ./GDLauncher/apps/desktop/test-results/
+          path: ./GDL/apps/desktop/test-results/
       - name: Upload main.log for debugging
         uses: actions/upload-artifact@v4
         if: always()
         with:
           name: logs-windows
           path: |
-            ./GDLauncher/apps/desktop/release/win-unpacked/gdl_data/main.log
-            ./GDLauncher/apps/desktop/release/win-unpacked/gdl_data/data/__gdl_logs__/*.log
+            ./GDL/apps/desktop/release/win-unpacked/gdl_data/main.log
+            ./GDL/apps/desktop/release/win-unpacked/gdl_data/data/__gdl_logs__/*.log
       - name: Fail if lint failed
         if: steps.lint.outcome == 'failure'
         run: exit 1

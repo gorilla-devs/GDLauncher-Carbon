@@ -33,7 +33,7 @@ import * as Sentry from "@sentry/electron/main"
 import "./preloadListeners"
 import getAdSize from "./adSize"
 import handleUncaughtException from "./handleUncaughtException"
-import initAutoUpdater from "./autoUpdater"
+import initAutoUpdater, { installPendingUpdateOnQuit } from "./autoUpdater"
 import "./appMenu"
 import {
   CoreModuleStatus,
@@ -1047,7 +1047,14 @@ app.on("window-all-closed", async () => {
   app.quit()
 })
 
-app.on("before-quit", async () => {
+app.on("before-quit", async (event) => {
+  // If installing an update, prevent normal quit and let quitAndInstall handle it
+  // (quitAndInstall closes windows and emits its own before-quit when ready)
+  if (installPendingUpdateOnQuit()) {
+    event.preventDefault()
+    return
+  }
+
   try {
     const _coreModule = await coreModule
     if (_coreModule.type === "success") {

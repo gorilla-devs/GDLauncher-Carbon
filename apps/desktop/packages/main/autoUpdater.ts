@@ -1,6 +1,7 @@
 import { FEReleaseChannel } from "@gd/core_module/bindings"
 import { BrowserWindow, ipcMain } from "electron"
 import { autoUpdater, UpdateInfo } from "electron-updater"
+import log from "electron-log/main"
 
 type UpdateState =
   | "idle"
@@ -43,16 +44,33 @@ function releaseAutoUpdaterLock() {
   autoUpdaterLock = false
 }
 
-export default function initAutoUpdater(_win: BrowserWindow | null) {
-  autoUpdater.logger = {
-    info: (...args: any[]) => console.log("[updater:info]", ...args),
-    warn: (...args: any[]) => console.warn("[updater:warn]", ...args),
-    error: (...args: any[]) => console.error("[updater:error]", ...args),
-    debug: (...args: any[]) => console.debug("[updater:debug]", ...args)
-  } as any
+let isInstallingUpdate = false
 
+export function installPendingUpdateOnQuit(): boolean {
+  // Prevent multiple install attempts
+  if (isInstallingUpdate) {
+    return true
+  }
+
+  if (currentState.state === "downloaded") {
+    isInstallingUpdate = true
+    log.info("[updater] Installing pending update on quit...")
+    try {
+      autoUpdater.quitAndInstall(true, false)
+      return true
+    } catch (error) {
+      log.error("[updater] Failed to install update on quit:", error)
+      isInstallingUpdate = false
+    }
+  }
+  return false
+}
+
+export default function initAutoUpdater(_win: BrowserWindow | null) {
+  log.transports.file.level = "info"
+  autoUpdater.logger = log
   autoUpdater.autoDownload = true
-  autoUpdater.autoInstallOnAppQuit = true
+  autoUpdater.autoInstallOnAppQuit = false
 
   ipcMain.handle(
     "checkForUpdates",
@@ -115,8 +133,8 @@ export default function initAutoUpdater(_win: BrowserWindow | null) {
       } catch (error) {
         const errorDetails =
           error instanceof Error ? error.message : String(error)
-        console.error("[updater] Error checking for updates:", errorDetails)
-        console.error("[updater] Update URL:", autoUpdater.getFeedURL())
+        log.error("[updater] Error checking for updates:", errorDetails)
+        log.error("[updater] Update URL:", autoUpdater.getFeedURL())
         releaseAutoUpdaterLock()
         setUpdateState({
           state: "error",
@@ -175,8 +193,8 @@ export default function initAutoUpdater(_win: BrowserWindow | null) {
   })
 
   autoUpdater.on("error", (error) => {
-    console.error("[updater] Error:", error.message)
-    console.error("[updater] Update URL:", autoUpdater.getFeedURL())
+    log.error("[updater] Error:", error.message)
+    log.error("[updater] Update URL:", autoUpdater.getFeedURL())
 
     releaseAutoUpdaterLock()
 
