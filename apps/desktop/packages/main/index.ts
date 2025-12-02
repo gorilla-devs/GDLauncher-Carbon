@@ -23,7 +23,7 @@ import path, { join, resolve } from "path"
 import fs from "fs/promises"
 import fss from "fs"
 import fse, { ensureDirSync } from "fs-extra"
-import { glob } from "glob"
+import fg from "fast-glob"
 import type { ChildProcessWithoutNullStreams } from "child_process"
 import { spawn } from "child_process"
 import crypto from "crypto"
@@ -834,11 +834,10 @@ ipcMain.handle("changeRuntimePath", async (_, newPath: string) => {
     // No op
   }
 
-  const files = await glob("**/*", {
+  const files = await fg("**/*", {
     cwd: CURRENT_RUNTIME_PATH!,
-    nodir: true,
+    onlyFiles: true,
     dot: true,
-    stat: false,
     ignore: ["**/.DS_Store", RUNTIME_PATH_OVERRIDE_NAME]
   })
 
