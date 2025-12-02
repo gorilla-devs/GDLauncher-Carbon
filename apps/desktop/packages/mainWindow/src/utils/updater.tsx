@@ -11,6 +11,20 @@ export const [supportsAutoUpdate, setSupportsAutoUpdate] = createSignal(false)
 export const [isManualCheck, setIsManualCheck] = createSignal(false)
 export const [isCheckingForUpdates, setIsCheckingForUpdates] =
   createSignal(false)
+export const [downloadProgress, setDownloadProgress] = createSignal(0)
+
+let isShowingDownloadToast = false
+
+function DownloadProgress() {
+  return (
+    <div class="flex flex-col gap-2 w-full">
+      <div class="flex items-center justify-between text-sm">
+        <span>{`${Math.round(downloadProgress())}%`}</span>
+      </div>
+      <Progress value={downloadProgress()} size="small" />
+    </div>
+  )
+}
 
 let lastChannel: FEReleaseChannel | null = null
 let updateCheckInterval: ReturnType<typeof setInterval> | null = null
@@ -34,12 +48,13 @@ window.onUpdateStateChanged((_, stateData) => {
     case "idle":
       clearManualCheckTimeout()
       setIsCheckingForUpdates(false)
+      isShowingDownloadToast = false
       break
 
     case "no-update": {
       clearManualCheckTimeout()
       setIsCheckingForUpdates(false)
-      toast.dismiss(TOAST_ID_CHECKING)
+      isShowingDownloadToast = false
 
       const wasManualCheck = isManualCheck()
       setIsManualCheck(false)
@@ -56,6 +71,7 @@ window.onUpdateStateChanged((_, stateData) => {
 
     case "checking":
       setIsCheckingForUpdates(true)
+      setDownloadProgress(0)
       hadError = false
       break
 
@@ -65,24 +81,21 @@ window.onUpdateStateChanged((_, stateData) => {
       toast.dismiss(TOAST_ID_CHECKING)
 
       const version = stateData.updateInfo?.version || "..."
-      const percent = Math.round(stateData.progress)
+      setDownloadProgress(stateData.progress)
 
       if (supportsAutoUpdate()) {
-        toast.loading(`Downloading update v${version}`, {
-          id: TOAST_ID_DOWNLOADING,
-          description: (
-            <div class="flex flex-col gap-2 w-full">
-              <div class="flex items-center justify-between text-sm">
-                <span>{`${percent}%`}</span>
-                <span class="text-lightSlate-400">{`${percent}/100`}</span>
-              </div>
-              <Progress value={percent} size="small" />
-            </div>
-          ),
-          duration: Infinity
-        })
-      } else if (stateData.updateInfo) {
+        // Only create the toast once, let the signal update the UI
+        if (!isShowingDownloadToast) {
+          isShowingDownloadToast = true
+          toast.loading(`Downloading update v${version}`, {
+            id: TOAST_ID_DOWNLOADING,
+            description: <DownloadProgress />,
+            duration: Infinity
+          })
+        }
+      } else if (stateData.updateInfo && !isShowingDownloadToast) {
         // For builds without auto-update, show manual download link
+        isShowingDownloadToast = true
         toast(`Update available: v${version}`, {
           id: TOAST_ID_MANUAL_UPDATE,
           description:
@@ -117,6 +130,7 @@ window.onUpdateStateChanged((_, stateData) => {
       toast.dismiss(TOAST_ID_CHECKING)
       toast.dismiss(TOAST_ID_DOWNLOADING)
       setIsCheckingForUpdates(false)
+      isShowingDownloadToast = false
 
       if (hadError) {
         setIsManualCheck(false)
@@ -153,6 +167,7 @@ window.onUpdateStateChanged((_, stateData) => {
     case "error":
       clearManualCheckTimeout()
       setIsCheckingForUpdates(false)
+      isShowingDownloadToast = false
       hadError = true
       setIsManualCheck(false)
 
