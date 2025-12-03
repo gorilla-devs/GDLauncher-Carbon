@@ -47,9 +47,9 @@ function releaseAutoUpdaterLock() {
 let isInstallingUpdate = false
 
 export function installPendingUpdateOnQuit(): boolean {
-  // Prevent multiple install attempts
+  // If already installing, DON'T prevent quit - let quitAndInstall complete its own quit
   if (isInstallingUpdate) {
-    return true
+    return false
   }
 
   if (currentState.state === "downloaded") {

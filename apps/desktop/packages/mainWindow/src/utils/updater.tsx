@@ -1,7 +1,7 @@
 import { FEReleaseChannel } from "@gd/core_module/bindings"
 import { createEffect, createSignal, onCleanup } from "solid-js"
 import { rspc } from "./rspcClient"
-import { toast, Progress } from "@gd/ui"
+import { toast, Progress, Button } from "@gd/ui"
 
 const TOAST_ID_CHECKING = "updater-checking"
 const TOAST_ID_DOWNLOADING = "updater-downloading"
@@ -12,6 +12,7 @@ export const [isManualCheck, setIsManualCheck] = createSignal(false)
 export const [isCheckingForUpdates, setIsCheckingForUpdates] =
   createSignal(false)
 export const [downloadProgress, setDownloadProgress] = createSignal(0)
+const [isInstallingManually, setIsInstallingManually] = createSignal(false)
 
 let isShowingDownloadToast = false
 
@@ -22,6 +23,41 @@ function DownloadProgress() {
         <span>{`${Math.round(downloadProgress())}%`}</span>
       </div>
       <Progress value={downloadProgress()} size="small" />
+    </div>
+  )
+}
+
+function UpdateReadyActions() {
+  return (
+    <div class="flex flex-col gap-2 w-full">
+      <span class="text-sm text-lightSlate-400">
+        Install now or wait until you quit the app
+      </span>
+      <div class="flex gap-2">
+        <Button
+          size="small"
+          loading={isInstallingManually()}
+          disabled={isInstallingManually()}
+          onClick={() => {
+            setIsInstallingManually(true)
+            setIsManualCheck(false)
+            window.installUpdate()
+          }}
+        >
+          Install Now
+        </Button>
+        <Button
+          size="small"
+          type="secondary"
+          disabled={isInstallingManually()}
+          onClick={() => {
+            setIsManualCheck(false)
+            toast.dismiss(TOAST_ID_DOWNLOADING)
+          }}
+        >
+          Later
+        </Button>
+      </div>
     </div>
   )
 }
@@ -130,6 +166,7 @@ window.onUpdateStateChanged((_, stateData) => {
       toast.dismiss(TOAST_ID_CHECKING)
       setIsCheckingForUpdates(false)
       isShowingDownloadToast = false
+      setIsInstallingManually(false)
 
       if (hadError) {
         setIsManualCheck(false)
@@ -141,23 +178,10 @@ window.onUpdateStateChanged((_, stateData) => {
 
         toast.success(`Update v${ver} ready to install`, {
           id: TOAST_ID_DOWNLOADING,
-          description: "Install now or wait until you quit the app",
+          description: <UpdateReadyActions />,
           duration: Infinity,
           onDismiss: () => {
             setIsManualCheck(false)
-          },
-          action: {
-            label: "Install Now",
-            onClick: () => {
-              setIsManualCheck(false)
-              window.installUpdate()
-            }
-          },
-          cancel: {
-            label: "Later",
-            onClick: () => {
-              setIsManualCheck(false)
-            }
           }
         })
       }
@@ -235,18 +259,11 @@ export const manualCheckForUpdates = async (
     const currentState = await window.getUpdateState()
     if (currentState?.state === "downloaded" && supportsAutoUpdate()) {
       const ver = currentState.updateInfo?.version || "..."
+      setIsInstallingManually(false)
       toast.success(`Update v${ver} ready to install`, {
         id: TOAST_ID_DOWNLOADING,
-        description: "Install now or wait until you quit the app",
-        duration: Infinity,
-        action: {
-          label: "Install Now",
-          onClick: () => window.installUpdate()
-        },
-        cancel: {
-          label: "Later",
-          onClick: () => {}
-        }
+        description: <UpdateReadyActions />,
+        duration: Infinity
       })
       return
     }
