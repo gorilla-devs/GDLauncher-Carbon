@@ -44,33 +44,11 @@ function releaseAutoUpdaterLock() {
   autoUpdaterLock = false
 }
 
-let isInstallingUpdate = false
-
-export function installPendingUpdateOnQuit(): boolean {
-  // If already installing, DON'T prevent quit - let quitAndInstall complete its own quit
-  if (isInstallingUpdate) {
-    return false
-  }
-
-  if (currentState.state === "downloaded") {
-    isInstallingUpdate = true
-    log.info("[updater] Installing pending update on quit...")
-    try {
-      autoUpdater.quitAndInstall(true, false)
-      return true
-    } catch (error) {
-      log.error("[updater] Failed to install update on quit:", error)
-      isInstallingUpdate = false
-    }
-  }
-  return false
-}
-
-export default function initAutoUpdater(_win: BrowserWindow | null) {
+export default function initAutoUpdater() {
   log.transports.file.level = "info"
   autoUpdater.logger = log
   autoUpdater.autoDownload = true
-  autoUpdater.autoInstallOnAppQuit = false
+  autoUpdater.autoInstallOnAppQuit = true
 
   ipcMain.handle(
     "checkForUpdates",
@@ -97,27 +75,17 @@ export default function initAutoUpdater(_win: BrowserWindow | null) {
         progress: 0
       })
 
-      let selectedChannelNumber: number
-      switch (selectedChannel) {
-        case "stable":
-          selectedChannelNumber = 0
-          break
-        case "beta":
-          selectedChannelNumber = 1
-          break
-        case "alpha":
-          selectedChannelNumber = 2
-          break
+      const channelNumbers: Record<FEReleaseChannel, number> = {
+        stable: 0,
+        beta: 1,
+        alpha: 2
       }
-
-      let currentChannelNumber: number
-      if (__APP_VERSION__.includes("beta")) {
-        currentChannelNumber = 1
-      } else if (__APP_VERSION__.includes("alpha")) {
-        currentChannelNumber = 2
-      } else {
-        currentChannelNumber = 0
-      }
+      const selectedChannelNumber = channelNumbers[selectedChannel]
+      const currentChannelNumber = __APP_VERSION__.includes("alpha")
+        ? 2
+        : __APP_VERSION__.includes("beta")
+          ? 1
+          : 0
 
       autoUpdater.channel =
         selectedChannel === "stable" ? "latest" : selectedChannel

@@ -33,7 +33,7 @@ import * as Sentry from "@sentry/electron/main"
 import "./preloadListeners"
 import getAdSize from "./adSize"
 import handleUncaughtException from "./handleUncaughtException"
-import initAutoUpdater, { installPendingUpdateOnQuit } from "./autoUpdater"
+import initAutoUpdater from "./autoUpdater"
 import "./appMenu"
 import {
   CoreModuleStatus,
@@ -716,7 +716,33 @@ async function createWindow(): Promise<BrowserWindow> {
 
 // Handlers
 ipcMain.handle("relaunch", async () => {
-  console.info("relaunching app...")
+  console.log("relaunching app...")
+
+  try {
+    const _coreModule = await coreModule
+    if (_coreModule.type === "success") {
+      _coreModule.result.kill()
+    }
+  } catch {
+    // No op
+  }
+
+  app.relaunch()
+  app.exit()
+})
+
+ipcMain.handle("deleteDbAndRestart", async () => {
+  console.log("deleting database and restarting app...")
+
+  const dbPath = path.join(CURRENT_RUNTIME_PATH!, "gdl_conf.db")
+
+  try {
+    await fs.unlink(dbPath)
+    console.log("database deleted successfully")
+  } catch (e) {
+    // File might not exist, that's ok
+    console.log("database file not found or already deleted")
+  }
 
   try {
     const _coreModule = await coreModule
@@ -1020,7 +1046,7 @@ app.whenReady().then(async () => {
     }
   )
 
-  initAutoUpdater(win)
+  initAutoUpdater()
 })
 
 app.on("window-all-closed", async () => {
@@ -1046,14 +1072,7 @@ app.on("window-all-closed", async () => {
   app.quit()
 })
 
-app.on("before-quit", async (event) => {
-  // If installing an update, prevent normal quit and let quitAndInstall handle it
-  // (quitAndInstall closes windows and emits its own before-quit when ready)
-  if (installPendingUpdateOnQuit()) {
-    event.preventDefault()
-    return
-  }
-
+app.on("before-quit", async () => {
   try {
     const _coreModule = await coreModule
     if (_coreModule.type === "success") {

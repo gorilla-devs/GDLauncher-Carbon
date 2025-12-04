@@ -37,40 +37,63 @@ function useLoading() {
       const _fontSize = isString ? "1.3rem" : "1rem"
       const dbPath = pathJoin(runtimePath, "gdl_conf.db")
 
-      const errorText = `
-      <div style="font-size: 0.8rem; font-weight: 300; background: rgb(var(--darkSlate-900)); max-height: 150px; overflow-y: auto; padding: 12px; text-align: left; border-radius: 6px; overflow-wrap: break-word; font-family: 'Ubuntu Mono', monospace; border: 1px solid rgb(var(--darkSlate-600)); line-height: 1.4;">
-        ${error}
-      </div>`
-
       oDiv.innerHTML = `
-      <div style="height: 100vh; overflow-y: auto; padding: 16px 20px;">
-        <div style="max-width: 900px; margin: 0 auto;">
-          <div style="text-align: center; margin-bottom: 24px;">
-            <div style="font-size: 1.8rem; font-weight: 800; background: linear-gradient(135deg, rgb(var(--primary-400)), rgb(var(--primary-600))); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 8px;">
+      <div style="height: 100vh; overflow-y: auto; padding: 16px 20px; text-align: left;">
+        <div style="max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
+
+          <!-- Header -->
+          <div style="text-align: left;">
+            <div style="font-size: 1.6rem; font-weight: 800; background: linear-gradient(135deg, rgb(var(--primary-400)), rgb(var(--primary-600))); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 6px;">
               GDLauncher Couldn't Launch
             </div>
-            <div style="font-size: 0.9rem; color: rgb(var(--lightSlate-300)); margin-bottom: 4px;">
+            <div style="font-size: 0.85rem; color: rgb(var(--lightSlate-400));">
               Failed to load: <span style="color: rgb(var(--primary-400)); font-weight: 600;">${moduleName}</span> • v${__APP_VERSION__}
             </div>
           </div>
 
-          ${errorText}
-
-          <div style="background: rgb(var(--darkSlate-700)); border-radius: 12px; padding: 16px; border: 1px solid rgb(var(--primary-500)); margin-top: 20px;">
-            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-              <span style="color: rgb(var(--lightSlate-700)); font-weight: 600;">1.</span>
-              <span style="font-size: 1rem; font-weight: 600; color: rgb(var(--primary-400));">Check for Updates</span>
+          <!-- Error Details -->
+          <div style="display: flex; flex-direction: column; gap: 6px; text-align: left;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <span style="font-size: 0.8rem; font-weight: 600; color: rgb(var(--lightSlate-400));">Error Details</span>
+              <button id="copy-error-detail-btn" style="padding: 4px 10px; background: rgb(var(--darkSlate-600)); color: rgb(var(--lightSlate-50)); border: 1px solid rgb(var(--darkSlate-500)); border-radius: 4px; font-weight: 500; cursor: pointer; font-size: 0.7rem; transition: all 0.2s;">
+                Copy
+              </button>
             </div>
+            <div id="error-detail-content" style="font-size: 0.75rem; font-weight: 300; background: rgb(var(--darkSlate-900)); max-height: 120px; overflow-y: auto; padding: 10px; text-align: left; border-radius: 6px; overflow-wrap: break-word; font-family: 'Ubuntu Mono', monospace; border: 1px solid rgb(var(--darkSlate-600)); line-height: 1.4;">
+              ${error}
+            </div>
+          </div>
+
+          <!-- Step 1: Restart -->
+          <div style="background: rgb(var(--darkSlate-700)); border-radius: 10px; padding: 14px; border: 1px solid rgb(var(--darkSlate-600)); text-align: left;">
+            <div style="font-size: 0.7rem; font-weight: 700; color: rgb(var(--lightSlate-500)); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Step 1</div>
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-              <div id="update-status-text" style="font-size: 0.85rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; text-align: left; color: rgb(var(--lightSlate-300));">
-                -
+              <div style="text-align: left;">
+                <div style="font-size: 0.95rem; font-weight: 600; color: rgb(var(--lightSlate-50)); margin-bottom: 2px;">Restart GDLauncher</div>
+                <div style="font-size: 0.8rem; color: rgb(var(--lightSlate-400));">A simple restart often fixes temporary issues.</div>
               </div>
-              <div id="update-progress-container" style="display: none; flex: 1; max-width: 120px;">
-                <div style="background: rgb(var(--darkSlate-600)); border-radius: 3px; height: 4px; overflow: hidden;">
-                  <div id="update-progress-bar" style="background: rgb(var(--primary-500)); height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+              <button id="restart-btn" style="padding: 8px 16px; background: rgb(var(--primary-500)); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.8rem; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">
+                Restart
+              </button>
+            </div>
+          </div>
+
+          <!-- Step 2: Check for Updates -->
+          <div style="background: rgb(var(--darkSlate-700)); border-radius: 10px; padding: 14px; border: 1px solid rgb(var(--darkSlate-600)); text-align: left;">
+            <div style="font-size: 0.7rem; font-weight: 700; color: rgb(var(--lightSlate-500)); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Step 2</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+              <div style="flex: 1; min-width: 0; text-align: left;">
+                <div style="font-size: 0.95rem; font-weight: 600; color: rgb(var(--lightSlate-50)); margin-bottom: 2px;">Check for Updates</div>
+                <div id="update-status-text" style="font-size: 0.8rem; color: rgb(var(--lightSlate-400)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                  An update may have fixed this issue.
+                </div>
+                <div id="update-progress-container" style="display: none; margin-top: 6px;">
+                  <div style="background: rgb(var(--darkSlate-600)); border-radius: 3px; height: 4px; overflow: hidden;">
+                    <div id="update-progress-bar" style="background: rgb(var(--primary-500)); height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+                  </div>
                 </div>
               </div>
-              <button id="check-updates-btn" style="padding: 8px 16px; background: rgb(var(--primary-500)); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.85rem; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">
+              <button id="check-updates-btn" style="padding: 8px 16px; background: rgb(var(--primary-500)); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.8rem; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">
                 Check for Updates
               </button>
             </div>
@@ -80,63 +103,42 @@ function useLoading() {
           <div id="update-progress-text" style="display: none;"></div>
           <button id="update-action-btn" style="display: none;"></button>
 
-          <div style="margin-top: 16px;">
-            <div style="background: rgb(var(--darkSlate-700)); border-radius: 12px; padding: 16px; border: 1px solid rgb(var(--darkSlate-600));">
-              <div style="font-size: 1rem; font-weight: 600; margin-bottom: 12px; color: rgb(var(--primary-400));">
-                Additional Troubleshooting
-              </div>
-              <div style="display: grid; gap: 10px; font-size: 0.85rem; line-height: 1.5;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="color: rgb(var(--lightSlate-700)); font-weight: 500;">2.</span>
-                <span style="color: rgb(var(--lightSlate-50));">Restart GDLauncher</span>
-                <button id="restart-btn" style="margin-left: auto; padding: 8px 16px; background: rgb(var(--primary-500)); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.8rem; transition: all 0.2s;">
-                  Restart
-                </button>
-              </div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="color: rgb(var(--lightSlate-700)); font-weight: 500;">3.</span>
-                <span style="color: rgb(var(--lightSlate-300));">Restart your computer</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="color: rgb(var(--lightSlate-700)); font-weight: 500;">4.</span>
-                <span style="color: rgb(var(--lightSlate-300));">Reinstall GDLauncher</span>
-              </div>
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="color: rgb(var(--lightSlate-700)); font-weight: 500;">5.</span>
-                <span style="color: rgb(var(--lightSlate-50));">Ask for help on Discord</span>
-                <button id="discord-btn" style="margin-left: auto; padding: 8px 16px; background: rgb(var(--brands-discord)); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.8rem; transition: all 0.2s;">
-                  Discord
-                </button>
-              </div>
-              <div style="display: flex; flex-direction: column; gap: 8px; background: rgb(var(--darkSlate-900)); padding: 12px; border-radius: 6px; border: 1px solid rgb(var(--darkSlate-600));">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                  <span style="color: rgb(var(--lightSlate-700)); font-weight: 500;">6.</span>
-                  <span style="font-size: 0.8rem; color: rgb(var(--lightSlate-300));">Delete database (last resort)</span>
-                </div>
-                <div style="margin-left: 20px; font-size: 0.75rem; color: rgb(var(--lightSlate-700)); line-height: 1.4;">
-                  This will reset all settings and log you out. Your instances and game files will not be affected.
-                </div>
-                <div style="display: flex; gap: 6px; margin-left: 20px; flex-wrap: wrap; align-items: center;">
-                  <code style="flex: 1; min-width: 250px; background: rgb(var(--darkSlate-800)); padding: 8px 10px; border-radius: 6px; font-size: 0.75rem; font-family: 'Ubuntu Mono', monospace; overflow-wrap: break-word; border: 1px solid rgb(var(--darkSlate-600)); color: rgb(var(--lightSlate-300));">
-                    ${dbPath}
-                  </code>
-                  <button id="open-db-folder-btn" style="padding: 6px 12px; background: rgb(var(--darkSlate-600)); color: white; border: 2px solid rgb(var(--darkSlate-500)); border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.75rem; transition: all 0.2s; white-space: nowrap;">
-                    Open
-                  </button>
-                  <button id="copy-db-path-btn" style="padding: 6px 12px; background: rgb(var(--darkSlate-600)); color: white; border: 2px solid rgb(var(--darkSlate-500)); border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.75rem; transition: all 0.2s; white-space: nowrap;">
-                    Copy
-                  </button>
-                </div>
-              </div>
+          <!-- Step 3: Reset Database (Highlighted) -->
+          <div style="background: rgb(var(--darkSlate-700)); border-radius: 10px; padding: 14px; border: 1px solid rgb(var(--amber-600)); text-align: left;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <span style="font-size: 0.7rem; font-weight: 700; color: rgb(var(--lightSlate-500)); text-transform: uppercase; letter-spacing: 0.5px;">Step 3</span>
+              <span style="font-size: 0.65rem; font-weight: 600; color: rgb(var(--amber-400)); background: rgba(251, 191, 36, 0.15); padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px;">Most common fix</span>
+            </div>
+            <div style="font-size: 0.95rem; font-weight: 600; color: rgb(var(--lightSlate-50)); margin-bottom: 4px;">Reset Database</div>
+            <div style="font-size: 0.8rem; color: rgb(var(--lightSlate-400)); margin-bottom: 12px;">This fixes most launch issues. Your settings will be reset but <strong style="color: rgb(var(--lightSlate-200));">instances are NOT affected</strong>.</div>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              <code style="flex: 1; min-width: 180px; background: rgb(var(--darkSlate-800)); padding: 8px 10px; border-radius: 6px; font-size: 0.7rem; font-family: 'Ubuntu Mono', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid rgb(var(--darkSlate-600)); color: rgb(var(--lightSlate-400)); text-align: left;">
+                ${dbPath}
+              </code>
+              <button id="open-db-folder-btn" style="padding: 8px 12px; background: transparent; color: rgb(var(--lightSlate-300)); border: 1px solid rgb(var(--darkSlate-500)); border-radius: 6px; font-weight: 500; cursor: pointer; font-size: 0.75rem; transition: all 0.2s; white-space: nowrap;">
+                Open Folder
+              </button>
+              <button id="reset-db-btn" style="padding: 8px 14px; background: rgb(var(--darkSlate-600)); color: rgb(var(--lightSlate-50)); border: 1px solid rgb(var(--darkSlate-500)); border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.75rem; transition: all 0.2s; white-space: nowrap;">
+                Reset & Restart
+              </button>
             </div>
           </div>
 
-          <button id="copy-error-btn" style="margin-top: 12px; padding: 8px 16px; background: rgb(var(--darkSlate-700)); color: rgb(var(--lightSlate-50)); border: 1px solid rgb(var(--darkSlate-600)); border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.8rem; transition: all 0.2s; width: 100%;">
-            Copy Full Error Log
-          </button>
+          <!-- Discord Help -->
+          <div style="background: rgb(var(--darkSlate-700)); border-radius: 10px; padding: 14px; border: 1px solid rgb(var(--brands-discord)); text-align: left;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+              <div style="text-align: left;">
+                <div style="font-size: 0.95rem; font-weight: 600; color: rgb(var(--lightSlate-50)); margin-bottom: 2px;">Need Help?</div>
+                <div style="font-size: 0.8rem; color: rgb(var(--lightSlate-400));">Join our Discord community for support.</div>
+              </div>
+              <button id="discord-btn" style="padding: 8px 16px; background: rgb(var(--brands-discord)); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.8rem; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">
+                Discord
+              </button>
+            </div>
+          </div>
+
         </div>
-      </div>
-    </div>`
+      </div>`
 
       const restartBtn: HTMLButtonElement =
         document.querySelector("#restart-btn")!
@@ -145,10 +147,10 @@ function useLoading() {
       const openDbFolderBtn: HTMLButtonElement = document.querySelector(
         "#open-db-folder-btn"
       )!
-      const copyDbPathBtn: HTMLButtonElement =
-        document.querySelector("#copy-db-path-btn")!
-      const copyErrorBtn: HTMLButtonElement =
-        document.querySelector("#copy-error-btn")!
+      const resetDbBtn: HTMLButtonElement =
+        document.querySelector("#reset-db-btn")!
+      const copyErrorDetailBtn: HTMLButtonElement =
+        document.querySelector("#copy-error-detail-btn")!
       const checkUpdatesBtn: HTMLButtonElement =
         document.querySelector("#check-updates-btn")!
 
@@ -186,7 +188,7 @@ function useLoading() {
 
         switch (state) {
           case "idle":
-            updateStatusText.textContent = "-"
+            updateStatusText.textContent = "An update may have fixed this issue."
             updateStatusText.style.whiteSpace = "nowrap"
             updateProgressContainer.style.display = "none"
             checkUpdatesBtn.textContent = "Check for Updates"
@@ -279,8 +281,8 @@ function useLoading() {
         restartBtn,
         discordBtn,
         openDbFolderBtn,
-        copyDbPathBtn,
-        copyErrorBtn,
+        resetDbBtn,
+        copyErrorDetailBtn,
         updateActionBtn
       ].forEach(addHoverEffect)
 
@@ -329,34 +331,23 @@ function useLoading() {
         await ipcRenderer.invoke("openFolder", dbPath)
         openDbFolderBtn.textContent = "Opened!"
         setTimeout(() => {
-          openDbFolderBtn.textContent = "Open"
+          openDbFolderBtn.textContent = "Open Folder"
         }, 2000)
       })
 
-      copyDbPathBtn.addEventListener("click", async () => {
-        await navigator.clipboard.writeText(dbPath)
-        copyDbPathBtn.textContent = "Copied!"
-        setTimeout(() => {
-          copyDbPathBtn.textContent = "Copy"
-        }, 2000)
+      resetDbBtn.addEventListener("click", async () => {
+        resetDbBtn.textContent = "Resetting..."
+        resetDbBtn.disabled = true
+        resetDbBtn.style.opacity = "0.6"
+        await ipcRenderer.invoke("deleteDbAndRestart")
       })
 
-      copyErrorBtn.addEventListener("click", async () => {
-        const fullLog = `GDLauncher Error Report
-Version: ${__APP_VERSION__}
-Module: ${moduleName}
-User Data: ${userData}
-Initial Runtime: ${initialRuntimePath}
-Runtime Path: ${runtimePath}
-Database Path: ${dbPath}
-
-Error Details:
-${error.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "")}`
-
-        await navigator.clipboard.writeText(fullLog)
-        copyErrorBtn.textContent = "Copied!"
+      copyErrorDetailBtn.addEventListener("click", async () => {
+        const errorDetail = error.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "")
+        await navigator.clipboard.writeText(errorDetail)
+        copyErrorDetailBtn.textContent = "Copied!"
         setTimeout(() => {
-          copyErrorBtn.textContent = "Copy Full Error Log"
+          copyErrorDetailBtn.textContent = "Copy"
         }, 2000)
       })
 
@@ -381,6 +372,9 @@ ${error.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "")}`
           }
 
           case "downloaded":
+            if (stateData.updateInfo) {
+              updateInfo = stateData.updateInfo
+            }
             setUpdateState("ready")
             break
 
@@ -412,6 +406,9 @@ ${error.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "")}`
             }
             break
           case "downloaded":
+            if (currentState.updateInfo) {
+              updateInfo = currentState.updateInfo
+            }
             setUpdateState("ready")
             break
           case "no-update":

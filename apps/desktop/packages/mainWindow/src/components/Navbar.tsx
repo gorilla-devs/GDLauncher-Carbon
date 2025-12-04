@@ -10,6 +10,11 @@ import { useModal } from "@/managers/ModalsManager"
 import { useGlobalStore } from "./GlobalStoreContext"
 import { EnhancedSearchBar } from "./EnhancedSearchBar"
 import { getAccountImageUuid } from "@/utils/showcaseHelpers"
+import {
+  hasPendingUpdate,
+  showPendingUpdateToast
+} from "@/utils/updater"
+import { useTransContext } from "@gd/i18n"
 
 export interface AccountsStatus {
   label: {
@@ -27,6 +32,7 @@ const AppNavbar = () => {
   const navigator = useGDNavigate()
   const globalStore = useGlobalStore()
   const modalsContext = useModal()
+  const [t] = useTransContext()
 
   const isLogin = useMatch(() => "/")
   const isSettings = useMatch(() => "/settings")
@@ -113,6 +119,15 @@ const AppNavbar = () => {
           </Button>
         </div>
         <div class="text-lightSlate-50 flex h-full list-none items-center gap-6">
+          <Show when={hasPendingUpdate()}>
+            <div
+              class="cursor-pointer text-green-500 hover:text-green-400 transition-colors"
+              onClick={showPendingUpdateToast}
+              title={t("app:_trn_update_pending_tooltip")}
+            >
+              <div class="i-hugeicons:download-04 text-2xl" />
+            </div>
+          </Show>
           <Tabs index={selectedIndex()}>
             <TabList aligment="between">
               <div class="flex items-center gap-6">
@@ -146,7 +161,6 @@ const AppNavbar = () => {
                     />
                   </Tab>
                 </div>
-                {/* Update notification now handled by toast - removed navbar icon */}
               </div>
             </TabList>
           </Tabs>
