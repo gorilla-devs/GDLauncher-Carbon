@@ -31,6 +31,7 @@ declare global {
     getAdSize: () => Promise<{
       adSize: BoundsSize
       bannerAdSize?: BoundsSize
+      hideAdText?: boolean
     }>
     openFileDialog: (
       filters: Electron.OpenDialogOptions

@@ -22,7 +22,9 @@ export const [pendingUpdateVersion, setPendingUpdateVersion] = createSignal<
 const [downloadingVersion, setDownloadingVersion] = createSignal("...")
 
 // Language signal for reactive translations - updates when i18next language changes
-const [currentLanguage, setCurrentLanguage] = createSignal(i18n.language || "english")
+const [currentLanguage, setCurrentLanguage] = createSignal(
+  i18n.language || "english"
+)
 
 // Subscribe to i18next language changes (runs once at module load)
 i18n.on("languageChanged", (lang: string) => {
@@ -37,7 +39,11 @@ function t(key: string, options?: Record<string, unknown>) {
 
 // Reactive toast components that update when language changes
 function UpdateReadyTitle() {
-  return <>{t("app:_trn_update_ready", { version: pendingUpdateVersion() || "..." })}</>
+  return (
+    <>
+      {t("app:_trn_update_ready", { version: pendingUpdateVersion() || "..." })}
+    </>
+  )
 }
 
 function UpdateReadyDescription() {
@@ -61,7 +67,9 @@ function LaterButtonLabel() {
 }
 
 function DownloadingTitle() {
-  return <>{t("app:_trn_update_downloading", { version: downloadingVersion() })}</>
+  return (
+    <>{t("app:_trn_update_downloading", { version: downloadingVersion() })}</>
+  )
 }
 
 function ManualUpdateTitle() {
@@ -146,7 +154,9 @@ window.onUpdateStateChanged((_, stateData) => {
       if (wasManualCheck) {
         toast.success(i18n.t("app:_trn_update_up_to_date"), {
           id: TOAST_ID_CHECKING,
-          description: i18n.t("app:_trn_update_latest_version", { version: __APP_VERSION__ }),
+          description: i18n.t("app:_trn_update_latest_version", {
+            version: __APP_VERSION__
+          }),
           duration: 5000
         })
       }
@@ -197,7 +207,9 @@ window.onUpdateStateChanged((_, stateData) => {
               } catch (error) {
                 console.error("Failed to copy to clipboard:", error)
                 toast.error(i18n.t("app:_trn_update_copy_failed"), {
-                  description: i18n.t("app:_trn_update_copy_failed_description"),
+                  description: i18n.t(
+                    "app:_trn_update_copy_failed_description"
+                  ),
                   duration: 3000
                 })
               }

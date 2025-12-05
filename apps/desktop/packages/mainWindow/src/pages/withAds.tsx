@@ -4,7 +4,7 @@ import AppNavbar from "@/components/Navbar"
 import { Outlet } from "@solidjs/router"
 import { Show } from "solid-js"
 
-import adSize, { bannerAdSize } from "@/utils/adhelper"
+import adSize, { bannerAdSize, hideAdText } from "@/utils/adhelper"
 import { Trans } from "@gd/i18n"
 import { useModal } from "@/managers/ModalsManager"
 import { SearchInputContext } from "@/components/SearchInputContext"
@@ -65,18 +65,20 @@ function withAdsLayout() {
                 >
                   <AdsBanner />
                 </div>
-                <div class="relative z-10 flex justify-center">
-                  <div
-                    class="hover:text-lightSlate-50 text-lightSlate-700 text-center transition-colors duration-200"
-                    onClick={() => {
-                      modalContext?.openModal({
-                        name: "whyAreAdsNeeded"
-                      })
-                    }}
-                  >
-                    <Trans key="ads:_trn_why_are_ads_needed" />
+                <Show when={!hideAdText()}>
+                  <div class="relative z-10 flex justify-center">
+                    <div
+                      class="hover:text-lightSlate-50 text-lightSlate-700 text-center transition-colors duration-200"
+                      onClick={() => {
+                        modalContext?.openModal({
+                          name: "whyAreAdsNeeded"
+                        })
+                      }}
+                    >
+                      <Trans key="ads:_trn_why_are_ads_needed" />
+                    </div>
                   </div>
-                </div>
+                </Show>
               </div>
             </Show>
           </div>

@@ -18,12 +18,40 @@ const TITLEBAR_HEIGHT = {
   linux: 30 // Linux (TODO: varies by DE. Best approach: ??)
 }
 const NAVBAR_HEIGHT = 60
-const GAP = 16
-const TEXT_HEIGHT = 100
+
+// Gap and text height configurations for different tiers
+const GAP_LARGE = 16
+const GAP_SMALL = 10
+const TEXT_HEIGHT_FULL = 100
+const TEXT_HEIGHT_SMALL = 60
 
 const getTitlebarHeight = () => {
   const platform = os.platform() as keyof typeof TITLEBAR_HEIGHT
   return TITLEBAR_HEIGHT[platform] || 30
+}
+
+/**
+ * Get the effective display size accounting for:
+ * - Work area (excludes taskbar/dock)
+ * - DPI scaling (on Windows, workArea is in physical pixels)
+ */
+function getEffectiveDisplaySize(display: Display) {
+  const workArea = display.workArea
+  const scaleFactor = display.scaleFactor || 1
+
+  // Windows returns workArea in physical pixels, divide by scaleFactor
+  // macOS/Linux return logical pixels already
+  const isWindows = os.platform() === "win32"
+
+  return {
+    width: isWindows
+      ? Math.floor(workArea.width / scaleFactor)
+      : workArea.width,
+    height: isWindows
+      ? Math.floor(workArea.height / scaleFactor)
+      : workArea.height,
+    scaleFactor
+  }
 }
 
 export default function getAdSize(display?: Display) {
@@ -42,24 +70,30 @@ export default function getAdSize(display?: Display) {
         width: 0,
         height: 0,
         shouldShow: false
-      }
+      },
+      hideAdText: true
     }
   }
 
   const primaryDisplay = display || screen.getPrimaryDisplay()
-  const { width, height } = primaryDisplay.size
+  const { width, height } = getEffectiveDisplaySize(primaryDisplay)
 
-  // Tier 1: Large displays (≥1920×1080)
-  if (width >= 1920 && height >= 1080) {
+  // Tier 1: Large displays (≥1600×900 effective)
+  // Uses HIGH_IMPACT (440px) + BANNER, minWidth 1260px for ≤35% coverage (34.9%)
+  if (width >= 1600 && height >= 900) {
     const mainAd = USE_HIGH_IMPACT_AD ? AD_SIZES.HIGH_IMPACT : AD_SIZES.STANDARD
     const minHeight =
-      getTitlebarHeight() + NAVBAR_HEIGHT + mainAd.height + GAP + TEXT_HEIGHT
+      getTitlebarHeight() +
+      NAVBAR_HEIGHT +
+      mainAd.height +
+      GAP_LARGE +
+      TEXT_HEIGHT_FULL
 
     return {
-      minWidth: 1200,
+      minWidth: 1260,
       minHeight,
-      width: 1400,
-      height: minHeight,
+      width: Math.min(width - 60, 1600),
+      height: Math.min(height - 40, minHeight + 50),
       adSize: {
         width: mainAd.width,
         height: mainAd.height,
@@ -69,24 +103,26 @@ export default function getAdSize(display?: Display) {
         width: AD_SIZES.BANNER.width,
         height: AD_SIZES.BANNER.height,
         shouldShow: true
-      }
+      },
+      hideAdText: false
     }
   }
 
-  // Tier 2: Medium-Large displays (≥1680×1050) - Comfortable (Standard Ad only)
-  if (width >= 1680 && height >= 1050) {
+  // Tier 2: Medium-Large displays (≥1400×850 effective)
+  // Uses STANDARD (400px), minWidth 1145px for ≤35% coverage (34.9%)
+  if (width >= 1400 && height >= 850) {
     const minHeight =
       getTitlebarHeight() +
       NAVBAR_HEIGHT +
       AD_SIZES.STANDARD.height +
-      GAP +
-      TEXT_HEIGHT
+      GAP_LARGE +
+      TEXT_HEIGHT_FULL
 
     return {
-      minWidth: 1200,
+      minWidth: 1145,
       minHeight,
-      width: 1350,
-      height: 850,
+      width: Math.min(width - 60, 1450),
+      height: Math.min(height - 40, 870),
       adSize: {
         width: AD_SIZES.STANDARD.width,
         height: AD_SIZES.STANDARD.height,
@@ -96,24 +132,33 @@ export default function getAdSize(display?: Display) {
         width: 0,
         height: 0,
         shouldShow: false
-      }
+      },
+      hideAdText: false
     }
   }
 
-  // Tier 3: Medium displays (≥1366×768) - Efficient (Standard Ad only)
-  if (width >= 1366 && height >= 768) {
+  // Tier 3: Medium displays (≥1024×700 effective)
+  // Designed for 1366×768 laptops with taskbar
+  // Uses STANDARD (400px), minWidth 1145px for ≤35% coverage (34.9%)
+  if (width >= 1024 && height >= 700) {
+    // Determine if we have enough height for text (768px - 40px taskbar = 728px usable)
+    // With text (762px min) doesn't fit, without text (702px min) fits
+    const hasSpaceForText = height >= 780
+    const textHeight = hasSpaceForText ? TEXT_HEIGHT_SMALL : 0
+    const gap = GAP_SMALL
+
     const minHeight =
       getTitlebarHeight() +
       NAVBAR_HEIGHT +
       AD_SIZES.STANDARD.height +
-      GAP +
-      TEXT_HEIGHT
+      gap +
+      textHeight
 
     return {
-      minWidth: 1200,
+      minWidth: 1145,
       minHeight,
-      width: Math.min(width - 80, 1280),
-      height: Math.max(minHeight, Math.min(height - 48, 820)),
+      width: Math.min(width - 60, 1280),
+      height: Math.min(height - 40, Math.max(minHeight, 780)),
       adSize: {
         width: AD_SIZES.STANDARD.width,
         height: AD_SIZES.STANDARD.height,
@@ -123,23 +168,23 @@ export default function getAdSize(display?: Display) {
         width: 0,
         height: 0,
         shouldShow: false
-      }
+      },
+      hideAdText: !hasSpaceForText
     }
   }
 
-  // Tier 4: Small displays (<1366×768) - Adaptive (Skyscraper only)
+  // Tier 4: Small displays (<1024 width or <700 height effective)
+  // Uses SKYSCRAPER (160px), minWidth 460px for ≤35% coverage (34.8%)
+  // But we set minWidth 800px for usability
+  // Always hides ad text to minimize height requirements
   const minHeight =
-    getTitlebarHeight() +
-    NAVBAR_HEIGHT +
-    AD_SIZES.SKYSCRAPER.height +
-    GAP +
-    TEXT_HEIGHT
+    getTitlebarHeight() + NAVBAR_HEIGHT + AD_SIZES.SKYSCRAPER.height + GAP_SMALL
 
   return {
-    minWidth: 960,
+    minWidth: 800,
     minHeight,
-    width: Math.min(width - 48, 1150),
-    height: Math.min(height - 48, 820),
+    width: Math.min(width - 40, 1000),
+    height: Math.min(height - 30, Math.max(minHeight, 720)),
     adSize: {
       width: AD_SIZES.SKYSCRAPER.width,
       height: AD_SIZES.SKYSCRAPER.height,
@@ -149,6 +194,7 @@ export default function getAdSize(display?: Display) {
       width: 0,
       height: 0,
       shouldShow: false
-    }
+    },
+    hideAdText: true
   }
 }

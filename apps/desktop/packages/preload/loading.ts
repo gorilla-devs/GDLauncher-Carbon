@@ -19,10 +19,6 @@ let oDiv: HTMLDivElement
 function useLoading() {
   return {
     async fatalError(error: string | Log[], moduleName: string) {
-      const userData = await ipcRenderer.invoke("getUserData")
-      const initialRuntimePath = await ipcRenderer.invoke(
-        "getInitialRuntimePath"
-      )
       const runtimePath = await ipcRenderer.invoke("getRuntimePath")
       const isString = typeof error === "string"
 
@@ -149,8 +145,9 @@ function useLoading() {
       )!
       const resetDbBtn: HTMLButtonElement =
         document.querySelector("#reset-db-btn")!
-      const copyErrorDetailBtn: HTMLButtonElement =
-        document.querySelector("#copy-error-detail-btn")!
+      const copyErrorDetailBtn: HTMLButtonElement = document.querySelector(
+        "#copy-error-detail-btn"
+      )!
       const checkUpdatesBtn: HTMLButtonElement =
         document.querySelector("#check-updates-btn")!
 
@@ -188,7 +185,8 @@ function useLoading() {
 
         switch (state) {
           case "idle":
-            updateStatusText.textContent = "An update may have fixed this issue."
+            updateStatusText.textContent =
+              "An update may have fixed this issue."
             updateStatusText.style.whiteSpace = "nowrap"
             updateProgressContainer.style.display = "none"
             checkUpdatesBtn.textContent = "Check for Updates"
@@ -343,7 +341,9 @@ function useLoading() {
       })
 
       copyErrorDetailBtn.addEventListener("click", async () => {
-        const errorDetail = error.replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]*>/g, "")
+        const errorDetail = error
+          .replace(/<br\s*\/?>/gi, "\n")
+          .replace(/<[^>]*>/g, "")
         await navigator.clipboard.writeText(errorDetail)
         copyErrorDetailBtn.textContent = "Copied!"
         setTimeout(() => {
