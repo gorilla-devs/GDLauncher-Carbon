@@ -10,8 +10,10 @@ jobs:
     defaults:
       run:
         working-directory: ./GDL
-    runs-on: macos-13
+    runs-on: macos-15
     timeout-minutes: 80
+    env:
+      MACOSX_DEPLOYMENT_TARGET: "11.0"
     steps:
       - uses: actions/checkout@v3
         with:

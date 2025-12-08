@@ -101,6 +101,7 @@ module.exports = {
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
     entitlements: "./entitlements.mac.plist",
     extendInfo: "./entitlements.mac.plist",
+    minimumSystemVersion: "11.0",
     hardenedRuntime: true,
     gatekeeperAssess: false,
     notarize: false
