@@ -40,6 +40,7 @@ impl ManagerRef<'_, InstanceExportManager> {
         save_path: PathBuf,
         self_contained_addons_bundling: bool,
         filter: ExportEntry,
+        version: String,
     ) -> anyhow::Result<VisualTaskId> {
         match target {
             ExportTarget::Curseforge => {
@@ -49,6 +50,7 @@ impl ManagerRef<'_, InstanceExportManager> {
                     save_path,
                     self_contained_addons_bundling,
                     filter,
+                    version,
                 )
                 .await
             }
@@ -59,6 +61,7 @@ impl ManagerRef<'_, InstanceExportManager> {
                     save_path,
                     self_contained_addons_bundling,
                     filter,
+                    version,
                 )
                 .await
             }

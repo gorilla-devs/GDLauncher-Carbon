@@ -56,7 +56,11 @@ function Checkbox(props: Props) {
 
   return (
     <div
-      class="flex items-center gap-2 rounded-md"
+      class="flex items-center gap-2 rounded-md transition-transform duration-100 active:scale-95"
+      classList={{
+        "cursor-pointer": !props.disabled,
+        "cursor-not-allowed": props.disabled
+      }}
       onClick={() => {
         if (!props.disabled) {
           const check = !checked()

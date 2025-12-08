@@ -42,9 +42,9 @@ const Radio = (props: Props) => {
   const id = `radio-${nextId++}`
 
   // Determine base and conditional classes based on buttonStyle
-  const baseClasses = "relative flex gap-3 items-center"
-  const indicatorBaseClasses = "w-5 h-5 min-w-5 min-h-5 rounded-full"
-  const indicatorCheckedClasses = "border-transparent"
+  const baseClasses =
+    "relative flex gap-4 items-center w-full rounded-lg px-4 py-3 transition-colors"
+  const indicatorBaseClasses = "w-5 h-5 min-w-5 min-h-5 rounded-full shrink-0"
 
   return (
     <>
@@ -57,7 +57,11 @@ const Radio = (props: Props) => {
       />
       <label
         for={id}
-        class={`${baseClasses}`}
+        class={`${baseClasses} cursor-pointer`}
+        classList={{
+          "hover:bg-darkSlate-700": !props.checked,
+          "bg-darkSlate-600": props.checked
+        }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         onClick={() => {
@@ -71,20 +75,20 @@ const Radio = (props: Props) => {
         </Show>
         <Show when={local?.buttonStyle !== "button"}>
           <div
-            class={`flex justify-center items-center bg-darkSlate-500 box-border ${indicatorBaseClasses} ${
-              props.checked ? indicatorCheckedClasses : ""
-            } ${
-              isHovered()
-                ? "border-darkSlate-300 border-solid border-1 border"
-                : ""
-            }`}
+            class={`flex justify-center items-center box-border transition-colors ${indicatorBaseClasses} ${
+              props.checked
+                ? "bg-primary-500"
+                : "bg-darkSlate-500 border border-darkSlate-300"
+            } ${isHovered() && !props.checked ? "border-darkSlate-200" : ""}`}
           >
-            <Show when={props.checked}>
-              <div class="w-4 h-4 rounded-full bg-blue-500" />
-            </Show>
+            <div
+              class={`w-2 h-2 rounded-full bg-lightSlate-100 transition-transform ${
+                props.checked ? "scale-100" : "scale-0"
+              }`}
+            />
           </div>
           <Show when={props.children}>
-            <span class="ml-2">{props.children}</span>
+            <span class="flex-1">{props.children}</span>
           </Show>
         </Show>
       </label>

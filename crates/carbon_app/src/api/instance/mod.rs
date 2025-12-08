@@ -444,6 +444,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
                     args.save_path.into(),
                     args.self_contained_addons_bundling,
                     args.filter.into(),
+                    args.version,
                 ).await?;
 
             Ok(FETaskId::from(task))
@@ -1098,6 +1099,7 @@ struct ExportArgs {
     save_path: String,
     self_contained_addons_bundling: bool,
     filter: ExportEntry,
+    version: String,
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]

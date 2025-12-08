@@ -15,7 +15,7 @@ const Collapsable = (props: Props) => {
   return (
     <div class="w-full box-border flex flex-col py-2 select-none max-w-full">
       <div
-        class="max-w-full h-8 flex gap-2 items-center cursor-pointer"
+        class="max-w-full h-8 flex gap-2 items-center cursor-pointer transition-transform duration-100 active:scale-95"
         classList={{
           "px-6": props.size !== "small" && !props.noPadding,
           "px-2": props.size === "small" && !props.noPadding,

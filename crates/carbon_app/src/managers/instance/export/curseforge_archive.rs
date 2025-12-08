@@ -27,6 +27,7 @@ pub async fn export_curseforge(
     save_path: PathBuf,
     self_contained_addons_bundling: bool,
     mut filter: ExportEntry,
+    version: String,
 ) -> anyhow::Result<VisualTaskId> {
     let instance_manager = app.instance_manager();
     let instances = instance_manager.instances.read().await;
@@ -49,13 +50,13 @@ pub async fn export_curseforge(
 
     drop(instances);
 
-    let Some(version) = config.game_configuration.version else {
+    let Some(game_version) = config.game_configuration.version else {
         return Err(anyhow!(
             "Instance {instance_id}'s game version is not known so it cannot be exported"
         ));
     };
 
-    let GameVersion::Standard(version) = version else {
+    let GameVersion::Standard(game_version) = game_version else {
         return Err(anyhow!(
             "Instance {instance_id} has a custom game version file so it cannot be exported"
         ));
@@ -143,11 +144,11 @@ pub async fn export_curseforge(
             t_create_bundle.update_items(0, file_count);
 
             let manifest = Manifest {
-                minecraft: convert_standard_version_to_cf_version(version.clone())?,
+                minecraft: convert_standard_version_to_cf_version(game_version.clone())?,
                 manifest_type: String::from("minecraftModpack"),
                 manifest_version: 1,
                 name: config.name,
-                version: None,
+                version: Some(version),
                 author: String::new(),
                 overrides: String::from("overrides"),
                 files: mods
@@ -310,6 +311,7 @@ mod test {
                 target_file.clone(),
                 self_contained_addons_bundling,
                 export_entry,
+                String::from("1.0.0"),
             )
             .await?;
 
@@ -373,7 +375,7 @@ mod test {
   "manifestType": "minecraftModpack",
   "manifestVersion": 1,
   "name": "test",
-  "version": null,
+  "version": "1.0.0",
   "author": "",
   "overrides": "overrides",
   "files": [
@@ -425,7 +427,7 @@ mod test {
   "manifestType": "minecraftModpack",
   "manifestVersion": 1,
   "name": "test",
-  "version": null,
+  "version": "1.0.0",
   "author": "",
   "overrides": "overrides",
   "files": []
@@ -471,7 +473,7 @@ mod test {
   "manifestType": "minecraftModpack",
   "manifestVersion": 1,
   "name": "test",
-  "version": null,
+  "version": "1.0.0",
   "author": "",
   "overrides": "overrides",
   "files": []
@@ -517,7 +519,7 @@ mod test {
   "manifestType": "minecraftModpack",
   "manifestVersion": 1,
   "name": "test",
-  "version": null,
+  "version": "1.0.0",
   "author": "",
   "overrides": "overrides",
   "files": []
@@ -569,7 +571,7 @@ mod test {
   "manifestType": "minecraftModpack",
   "manifestVersion": 1,
   "name": "test",
-  "version": null,
+  "version": "1.0.0",
   "author": "",
   "overrides": "overrides",
   "files": []

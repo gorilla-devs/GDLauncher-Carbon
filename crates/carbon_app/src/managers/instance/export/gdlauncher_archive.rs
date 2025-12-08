@@ -309,6 +309,7 @@ mod test {
                 target_file.clone(),
                 self_contained_addons_bundling,
                 export_entry,
+                "1.0.0".to_string(),
             )
             .await?;
 
@@ -372,7 +373,7 @@ mod test {
   "manifestType": "minecraftModpack",
   "manifestVersion": 1,
   "name": "test",
-  "version": null,
+  "version": "1.0.0",
   "author": "",
   "overrides": "overrides",
   "files": [
@@ -424,7 +425,7 @@ mod test {
   "manifestType": "minecraftModpack",
   "manifestVersion": 1,
   "name": "test",
-  "version": null,
+  "version": "1.0.0",
   "author": "",
   "overrides": "overrides",
   "files": []
@@ -470,7 +471,7 @@ mod test {
   "manifestType": "minecraftModpack",
   "manifestVersion": 1,
   "name": "test",
-  "version": null,
+  "version": "1.0.0",
   "author": "",
   "overrides": "overrides",
   "files": []
@@ -516,7 +517,7 @@ mod test {
   "manifestType": "minecraftModpack",
   "manifestVersion": 1,
   "name": "test",
-  "version": null,
+  "version": "1.0.0",
   "author": "",
   "overrides": "overrides",
   "files": []
@@ -568,7 +569,7 @@ mod test {
   "manifestType": "minecraftModpack",
   "manifestVersion": 1,
   "name": "test",
-  "version": null,
+  "version": "1.0.0",
   "author": "",
   "overrides": "overrides",
   "files": []

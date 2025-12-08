@@ -4,10 +4,11 @@ import {
   Input,
   Slider,
   Switch as GDSwitch,
-  Tab,
-  TabList,
-  TabPanel,
   Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+  TabsIndicator,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -266,16 +267,17 @@ const Java = () => {
         </Row>
         <div class="flex flex-col">
           <div class="overflow-hidden">
-            <Tabs>
-              <TabList heightClass="h-14">
-                <Tab class="w-1/2" centerContent>
+            <Tabs defaultValue="paths">
+              <TabsList class="w-full">
+                <TabsIndicator />
+                <TabsTrigger value="paths" class="flex-1">
                   <Trans key="java:_trn_manage_paths" />
-                </Tab>
-                <Tab class="w-1/2" centerContent>
+                </TabsTrigger>
+                <TabsTrigger value="profiles" class="flex-1">
                   <Trans key="java:_trn_manage_profiles" />
-                </Tab>
-              </TabList>
-              <TabPanel>
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="paths">
                 <div class="h-full min-h-96 p-4">
                   <div class="mb-4 flex items-center justify-between">
                     <div>
@@ -450,8 +452,8 @@ const Java = () => {
                     </For>
                   </div>
                 </div>
-              </TabPanel>
-              <TabPanel>
+              </TabsContent>
+              <TabsContent value="profiles">
                 <div class="flex h-full min-h-96 flex-col gap-4 p-4">
                   <div class="mb-4 flex items-center justify-between">
                     <h2 class="m-0 text-sm font-normal">
@@ -581,7 +583,7 @@ const Java = () => {
                     )}
                   </For>
                 </div>
-              </TabPanel>
+              </TabsContent>
             </Tabs>
           </div>
         </div>

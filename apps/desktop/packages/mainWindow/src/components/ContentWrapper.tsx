@@ -12,7 +12,7 @@ const ContentWrapper = (props: Props) => {
           "p-6": !props.zeroPadding
         }}
         style={{
-          "scrollbar-gutter": !props.zeroPadding ? "stable" : undefined
+          "scrollbar-gutter": "stable"
         }}
       >
         {props.children}

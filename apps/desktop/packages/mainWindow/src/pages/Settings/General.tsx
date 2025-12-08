@@ -8,7 +8,7 @@ import {
   Input,
   Switch
 } from "@gd/ui"
-import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg"
+import { wideLogoUrl } from "@/utils/logos"
 import { Trans, useTransContext } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
 import SettingsData from "./settings.general.data"
@@ -461,7 +461,7 @@ const General = () => {
         </Row>
         <Row class="bg-darkSlate-900 rounded-xl px-6 py-4">
           <img
-            src={GDLauncherWideLogo}
+            src={wideLogoUrl}
             class="h-14 cursor-pointer transition-opacity duration-200 ease-in-out hover:opacity-80"
             onClick={() => {
               modalsContext?.openModal({

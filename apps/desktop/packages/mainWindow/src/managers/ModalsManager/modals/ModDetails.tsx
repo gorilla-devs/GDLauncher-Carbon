@@ -4,8 +4,9 @@ import {
   Button,
   Badge,
   Tabs,
-  TabList,
-  Tab,
+  TabsList,
+  TabsTrigger,
+  TabsIndicator,
   Separator,
   Tooltip,
   TooltipTrigger,
@@ -32,7 +33,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
   const [t] = useTransContext()
   const navigator = useGDNavigate()
   const modalsContext = useModal()
-  const [selectedTab, setSelectedTab] = createSignal(0)
+  const [selectedTab, setSelectedTab] = createSignal("overview")
   const [modDescription, setModDescription] = createSignal("")
   const [_isLoadingDescription, setIsLoadingDescription] = createSignal(false)
 
@@ -99,8 +100,8 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
   }
 
   const tabs = () => [
-    { label: t("modals:_trn_mod_details.overview") },
-    { label: t("modals:_trn_mod_details.technical") }
+    { value: "overview", label: t("modals:_trn_mod_details.overview") },
+    { value: "technical", label: t("modals:_trn_mod_details.technical") }
   ]
 
   return (
@@ -206,15 +207,20 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
         <Separator />
 
         {/* Tabs */}
-        <Tabs index={selectedTab()} onChange={setSelectedTab}>
-          <TabList>
-            <For each={tabs()}>{(tab) => <Tab>{tab.label}</Tab>}</For>
-          </TabList>
+        <Tabs value={selectedTab()} onChange={setSelectedTab}>
+          <TabsList class="w-fit">
+            <TabsIndicator />
+            <For each={tabs()}>
+              {(tab) => (
+                <TabsTrigger value={tab.value}>{tab.label}</TabsTrigger>
+              )}
+            </For>
+          </TabsList>
         </Tabs>
 
         {/* Tab Content */}
         <div class="min-h-[200px]">
-          <Show when={selectedTab() === 0}>
+          <Show when={selectedTab() === "overview"}>
             {/* Overview Tab */}
             <div class="space-y-4">
               <Show when={mod().metadata?.description || modDescription()}>
@@ -326,7 +332,7 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
             </div>
           </Show>
 
-          <Show when={selectedTab() === 1}>
+          <Show when={selectedTab() === "technical"}>
             {/* Technical Tab */}
             <div class="space-y-3">
               <div class="grid grid-cols-2 gap-4 text-sm">

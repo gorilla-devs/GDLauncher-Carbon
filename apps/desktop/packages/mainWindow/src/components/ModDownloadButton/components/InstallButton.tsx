@@ -18,6 +18,7 @@ interface InstallButtonProps {
   installedMod: () => any
   onDownload: () => void
   size?: "small" | "medium" | "large"
+  iconOnly?: boolean
 }
 
 export const InstallButton = (props: InstallButtonProps) => {
@@ -25,7 +26,7 @@ export const InstallButton = (props: InstallButtonProps) => {
     <Tooltip>
       <TooltipTrigger>
         <Button
-          uppercase
+          uppercase={!props.iconOnly}
           variant={props.isInstalled() ? "green" : "primary"}
           disabled={props.instanceLocked() && !props.isInstalled()}
           size={props.size || "medium"}
@@ -33,50 +34,66 @@ export const InstallButton = (props: InstallButtonProps) => {
         >
           <Show when={props.loading()}>
             <Spinner />
-            <div
-              class="transition-width duration-100 ease-in-out"
-              classList={{
-                "w-0": props.progress() === null,
-                "w-14": props.progress() !== null
-              }}
-            >
-              <Progress color="bg-white" value={props.progress()!} />
-            </div>
+            <Show when={!props.iconOnly}>
+              <div
+                class="transition-width duration-100 ease-in-out"
+                classList={{
+                  "w-0": props.progress() === null,
+                  "w-14": props.progress() !== null
+                }}
+              >
+                <Progress color="bg-white" value={props.progress()!} />
+              </div>
+            </Show>
           </Show>
           <Show when={!props.loading()}>
-            <Switch>
-              <Match when={props.isInstalled()}>
-                <Trans key="content:_trn_mod.downloaded" />
-              </Match>
-              <Match when={props.instanceLocked()}>
-                <Trans key="instances:_trn_instance_locked" />
-              </Match>
-              <Match when={!props.instanceLocked() && !props.fileId}>
-                <div class="flex items-center gap-1.5">
-                  <div class="i-hugeicons:download-02 h-5 w-5" />
-                  <Trans key="instances:_trn_download" />
-                </div>
-              </Match>
-              <Match
-                when={
-                  !props.instanceLocked() &&
-                  props.fileId &&
-                  props.installedMod() &&
-                  !props.isInstalled()
-                }
-              >
-                <div class="flex items-center gap-1.5">
-                  <div class="i-hugeicons:download-02 h-5 w-5" />
-                  <Trans key="instances:_trn_switch_version" />
-                </div>
-              </Match>
-              <Match when={!props.instanceLocked() && props.fileId}>
-                <div class="flex items-center gap-1.5">
-                  <div class="i-hugeicons:download-02 h-5 w-5" />
-                  <Trans key="instances:_trn_download_version" />
-                </div>
-              </Match>
-            </Switch>
+            <Show
+              when={props.iconOnly}
+              fallback={
+                <Switch>
+                  <Match when={props.isInstalled()}>
+                    <Trans key="content:_trn_mod.downloaded" />
+                  </Match>
+                  <Match when={props.instanceLocked()}>
+                    <Trans key="instances:_trn_instance_locked" />
+                  </Match>
+                  <Match when={!props.instanceLocked() && !props.fileId}>
+                    <div class="flex items-center gap-1.5">
+                      <div class="i-hugeicons:download-02 h-5 w-5" />
+                      <Trans key="instances:_trn_download" />
+                    </div>
+                  </Match>
+                  <Match
+                    when={
+                      !props.instanceLocked() &&
+                      props.fileId &&
+                      props.installedMod() &&
+                      !props.isInstalled()
+                    }
+                  >
+                    <div class="flex items-center gap-1.5">
+                      <div class="i-hugeicons:download-02 h-5 w-5" />
+                      <Trans key="instances:_trn_switch_version" />
+                    </div>
+                  </Match>
+                  <Match when={!props.instanceLocked() && props.fileId}>
+                    <div class="flex items-center gap-1.5">
+                      <div class="i-hugeicons:download-02 h-5 w-5" />
+                      <Trans key="instances:_trn_download_version" />
+                    </div>
+                  </Match>
+                </Switch>
+              }
+            >
+              <Switch>
+                <Match when={props.isInstalled()}>
+                  <div class="i-hugeicons:tick-02 text-xl" />
+                </Match>
+                <Match when={!props.isInstalled()}>
+                  <div class="i-hugeicons:download-02 text-xl" />
+                </Match>
+              </Switch>
+            </Show>
           </Show>
         </Button>
       </TooltipTrigger>

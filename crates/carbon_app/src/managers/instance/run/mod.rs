@@ -656,6 +656,10 @@ impl ManagerRef<'_, InstanceManager> {
                 }
             }
 
+            // Drop the log sender so the receiver sees the channel as closed
+            // This must happen BEFORE invalidation so the frontend sees active: false
+            drop(log);
+
             app.invalidate(GET_LOGS, Some(instance_id.0.into()));
 
             let now = Utc::now();

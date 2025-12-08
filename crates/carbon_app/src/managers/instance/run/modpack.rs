@@ -529,33 +529,40 @@ pub async fn process_modpack(
             app.invalidate(GET_MODPACK_INFO, Some(instance_id.0.into()));
         }
 
-        // normally there would be a problem here because we would be skipping any mods removed by users
-        // but since we dont try to update those anyway its fine.
-        let mut files = skipped_mods;
-        // snapshot filetree before applying
-        let mut walker = NormalizedWalkdir::new(&staging_dir.join("instance"))?;
-        while let Some(entry) = walker.next()? {
-            if entry.is_dir {
-                continue;
+        // Only generate staging-packinfo if we actually processed a modpack
+        // (i.e., file was Some). Otherwise this is just a version/modloader change
+        // and we should not touch the existing mods.
+        if file.is_some() {
+            // normally there would be a problem here because we would be skipping any mods removed by users
+            // but since we dont try to update those anyway its fine.
+            let mut files = skipped_mods;
+            // snapshot filetree before applying
+            let mut walker = NormalizedWalkdir::new(&staging_dir.join("instance"))?;
+            while let Some(entry) = walker.next()? {
+                if entry.is_dir {
+                    continue;
+                }
+                files.push(entry.relative_path.to_string());
             }
-            files.push(entry.relative_path.to_string());
+
+            let snapshot = serde_json::to_string_pretty(&files)?;
+            tokio::fs::write(staging_packinfo_path, snapshot).await?;
+
+            t_generating_packinfo.start_opaque();
+
+            let files_refs: Vec<&str> = files.iter().map(|s| s.as_str()).collect();
+            // At this point the modpack files are all in the staging directory, so that's the path we need to scan.
+            // The packinfo on the other hand is in the instance folder itself.
+            let packinfo =
+                packinfo::scan_dir(&instance_prep_path.get_data_path(), Some(&files_refs)).await?;
+
+            let packinfo_str = packinfo::make_packinfo(packinfo)?;
+            tokio::fs::write(tmp_packinfo_path, packinfo_str).await?;
+
+            t_generating_packinfo.complete_opaque();
+        } else {
+            t_generating_packinfo.complete_opaque();
         }
-
-        let snapshot = serde_json::to_string_pretty(&files)?;
-        tokio::fs::write(staging_packinfo_path, snapshot).await?;
-
-        t_generating_packinfo.start_opaque();
-
-        let files_refs: Vec<&str> = files.iter().map(|s| s.as_str()).collect();
-        // At this point the modpack files are all in the staging directory, so that's the path we need to scan.
-        // The packinfo on the other hand is in the instance folder itself.
-        let packinfo =
-            packinfo::scan_dir(&instance_prep_path.get_data_path(), Some(&files_refs)).await?;
-
-        let packinfo_str = packinfo::make_packinfo(packinfo)?;
-        tokio::fs::write(tmp_packinfo_path, packinfo_str).await?;
-
-        t_generating_packinfo.complete_opaque();
 
         trace!("marking modpack initialization as complete");
 
@@ -612,12 +619,24 @@ pub async fn process_modpack_staging(
     let staging_dir = setup_path.join("staging");
 
     if staging_dir.exists() {
+        let staging_packinfo = setup_path.join("staging-packinfo.json");
+
+        // Check if staging-packinfo.json exists - if not, this was a version/modloader-only change
+        // and we should skip staging entirely to avoid deleting existing mods
+        if !staging_packinfo.exists() {
+            trace!(
+                "No staging-packinfo.json found, skipping staging (version/modloader-only change)"
+            );
+            tokio::fs::remove_dir_all(&staging_dir).await?;
+            tokio::fs::write(setup_path.join("modpack-complete"), "").await?;
+            t_subtasks.t_apply_staging.complete_opaque();
+            return Ok(());
+        }
+
         t_subtasks.t_apply_staging.start_opaque();
 
         let change_version_path = setup_path.join("change-pack-version.json");
         let overwrite_changed = !change_version_path.exists(); // TODO
-
-        let staging_packinfo = setup_path.join("staging-packinfo.json");
 
         let staged_text = tokio::fs::read_to_string(&staging_packinfo).await?;
         let staging_snapshot = serde_json::from_str::<Vec<&str>>(&staged_text)

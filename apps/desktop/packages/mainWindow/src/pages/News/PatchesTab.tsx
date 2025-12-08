@@ -1,7 +1,10 @@
-import { For, Match, Switch } from "solid-js"
+import { For, Match, Switch, createSignal, createMemo } from "solid-js"
 import { usePatchNotes } from "@/utils/news"
 import { Trans } from "@gd/i18n"
 import { useGDNavigate } from "@/managers/NavigationManager"
+import { Badge } from "@gd/ui"
+
+type VersionFilter = "all" | "release" | "snapshot" | "pre-release"
 
 const getVersionTypeColor = (versionType?: string) => {
   switch (versionType?.toLowerCase()) {
@@ -40,24 +43,74 @@ interface PatchesTabProps {
   onNavigateToDetail?: () => void
 }
 
+const filterButtons = [
+  {
+    filter: "all" as const,
+    labelKey: "news:_trn_filter_all" as const,
+    label: "All"
+  },
+  {
+    filter: "release" as const,
+    labelKey: "news:_trn_filter_releases" as const,
+    label: "Releases"
+  },
+  {
+    filter: "snapshot" as const,
+    labelKey: "news:_trn_filter_snapshots" as const,
+    label: "Snapshots"
+  },
+  {
+    filter: "pre-release" as const,
+    labelKey: "news:_trn_filter_prereleases" as const,
+    label: "Pre-releases"
+  }
+]
+
 const PatchesTab = (props: PatchesTabProps) => {
   const navigator = useGDNavigate()
   const patchNotes = usePatchNotes()
+  const [activeFilter, setActiveFilter] = createSignal<VersionFilter>("all")
+
+  const filteredPatchNotes = createMemo(() => {
+    const filter = activeFilter()
+    const data = patchNotes.data || []
+
+    if (filter === "all") {
+      return data
+    }
+
+    return data.filter((item) => {
+      const versionType = item.versionType?.toLowerCase()
+      return versionType === filter
+    })
+  })
 
   return (
     <div class="p-6">
-      <h1 class="mb-6 text-2xl font-medium">
+      <h1 class="mb-4 text-2xl font-medium">
         <Trans key="news:_trn_minecraft_patches">Minecraft Patch Notes</Trans>
       </h1>
 
+      <div class="mb-6 flex flex-wrap gap-2">
+        <For each={filterButtons}>
+          {(btn) => (
+            <Badge
+              variant={activeFilter() === btn.filter ? "default" : "secondary"}
+              class="cursor-pointer"
+              onClick={() => setActiveFilter(btn.filter)}
+            >
+              <Trans key={btn.labelKey}>{btn.label}</Trans>
+            </Badge>
+          )}
+        </For>
+      </div>
+
       <Switch>
-        <Match
-          when={!patchNotes.isPending && (patchNotes.data?.length || 0) > 0}
-        >
+        <Match when={!patchNotes.isPending && filteredPatchNotes().length > 0}>
           <div class="patch-timeline relative">
             <div class="from-lightSlate-600 to-lightSlate-700 absolute bottom-8 left-8 top-8 w-px bg-gradient-to-b" />
 
-            <For each={patchNotes.data}>
+            <For each={filteredPatchNotes()}>
               {(item) => (
                 <div class="group relative mb-8 flex">
                   <div class="relative z-10 mr-8 flex flex-col items-center">
@@ -163,6 +216,18 @@ const PatchesTab = (props: PatchesTabProps) => {
                 </div>
               )}
             </For>
+          </div>
+        </Match>
+        <Match
+          when={!patchNotes.isPending && filteredPatchNotes().length === 0}
+        >
+          <div class="flex flex-col items-center justify-center py-16 text-center">
+            <div class="i-hugeicons:note text-lightSlate-500 mb-4 h-16 w-16" />
+            <p class="text-lightSlate-400 text-lg">
+              <Trans key="news:_trn_no_patch_notes_found">
+                No patch notes found for this filter
+              </Trans>
+            </p>
           </div>
         </Match>
       </Switch>

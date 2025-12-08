@@ -166,9 +166,9 @@ const DuplicatedModsResolution = (props: ModalProps) => {
       title={props?.title}
       noPadding={true}
     >
-      <div class="w-200 box-border flex h-[700px] select-none flex-col p-6">
-        <div class="mb-8 flex h-20 w-full items-center justify-center overflow-x-auto overflow-y-hidden">
-          <div class="w-[90%]">
+      <div class="w-180 box-border flex h-[600px] select-none flex-col p-6">
+        <div class="flex h-16 w-full items-center justify-center overflow-hidden pb-6 mb-6">
+          <div class="w-[75%]">
             <Steps steps={resolutionSteps} currentStep={currentStep()} />
           </div>
         </div>

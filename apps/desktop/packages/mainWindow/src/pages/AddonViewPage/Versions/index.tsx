@@ -3,6 +3,7 @@ import VersionRow from "./VersionRow"
 import { rspc } from "@/utils/rspcClient"
 import { useInfiniteVersionsQuery } from "@/components/InfiniteScrollVersionsQueryWrapper"
 import { useContext, For, Show } from "solid-js"
+import { StickyHeaderHeightContext } from "@/pages/AddonViewPage"
 import { Trans } from "@gd/i18n"
 import { AddonContext } from "@/pages/AddonViewPage"
 import { Button, Spinner, Skeleton } from "@gd/ui"
@@ -11,6 +12,7 @@ import { createVirtualizer } from "@tanstack/solid-virtual"
 const Versions = () => {
   const [searchParams] = useSearchParams()
   const mod = useContext(AddonContext)
+  const stickyHeaderHeight = useContext(StickyHeaderHeightContext)
 
   const infiniteQuery = useInfiniteVersionsQuery()
 
@@ -79,7 +81,7 @@ const Versions = () => {
     <div class="flex h-full flex-col" ref={versionsContainerRef}>
       <div
         class="bg-darkSlate-800 border-darkSlate-600 text-lightSlate-400 sticky z-20 mb-4 grid grid-cols-[4fr_130px_100px_120px_150px] gap-4 border-b px-6 pb-3 pt-4 text-xs font-medium uppercase tracking-wide"
-        style={{ top: mod?.data?.type === "modpack" ? "72px" : "136px" }}
+        style={{ top: `${stickyHeaderHeight()}px` }}
       >
         <div>
           <Trans key="search:_trn_browser_table_headers.name" />

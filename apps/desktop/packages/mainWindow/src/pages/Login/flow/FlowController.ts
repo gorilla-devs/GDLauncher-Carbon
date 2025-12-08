@@ -400,8 +400,32 @@ export class FlowControllerImpl implements FlowController {
         username
       })
 
-      // Resume enrollment flow
+      // Resume enrollment flow - this saves the account and sets it as active on the backend
       await this.enrollResumeMutation.mutateAsync(undefined)
+
+      // Sync frontend state with backend after enrollment is finalized
+      await Promise.all([
+        this.rspcContext.queryClient.refetchQueries({
+          queryKey: ["account.getAccounts"]
+        }),
+        this.rspcContext.queryClient.refetchQueries({
+          queryKey: ["account.getActiveUuid"]
+        })
+      ])
+
+      // Get the new active UUID from the backend
+      const activeUuid = await this.rspcContext.client.query([
+        "account.getActiveUuid"
+      ])
+
+      // Update local state with the newly enrolled account
+      if (activeUuid) {
+        this.data.activeUuid = activeUuid
+      }
+
+      // Update accounts list
+      const accountsResult = await this.accountsQuery.refetch()
+      this.data.accounts = accountsResult.data || []
     } catch (error) {
       console.error("[FlowController] Failed to create profile:", error)
       throw error

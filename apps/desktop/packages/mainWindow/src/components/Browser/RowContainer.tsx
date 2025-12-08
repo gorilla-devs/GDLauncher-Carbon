@@ -126,8 +126,8 @@ const RowContainer = (props: Props & AdditionalProps) => {
                 "bg-green-500":
                   props.modVersion.releaseType === "stable" ||
                   props.modVersion.releaseType === "release",
-                "bg-yellow-500": props.modVersion.releaseType === "beta",
-                "bg-red-500": props.modVersion.releaseType === "alpha"
+                "bg-yellow-900": props.modVersion.releaseType === "beta",
+                "bg-red-900": props.modVersion.releaseType === "alpha"
               }}
             />
             <span
@@ -136,8 +136,8 @@ const RowContainer = (props: Props & AdditionalProps) => {
                 "text-green-400":
                   props.modVersion.releaseType === "stable" ||
                   props.modVersion.releaseType === "release",
-                "text-yellow-400": props.modVersion.releaseType === "beta",
-                "text-red-400": props.modVersion.releaseType === "alpha"
+                "text-yellow-200": props.modVersion.releaseType === "beta",
+                "text-red-200": props.modVersion.releaseType === "alpha"
               }}
             >
               {props.modVersion.releaseType}

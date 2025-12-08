@@ -35,6 +35,15 @@ for (const file of files) {
 }
 
 let appChannel = require("../../packages/config/version.json").channel
+
+// Select icon based on release channel
+let iconName =
+  appChannel === "alpha"
+    ? "icon_alpha"
+    : appChannel === "beta"
+      ? "icon_beta"
+      : "icon"
+
 let publish =
   appChannel === "snapshot"
     ? undefined
@@ -75,6 +84,7 @@ module.exports = {
     }
   ],
   win: {
+    icon: `build/${iconName}.png`,
     target: appChannel === "snapshot" ? ["zip"] : ["zip", "nsis"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
     verifyUpdateCodeSignature: false
@@ -86,6 +96,7 @@ module.exports = {
     deleteAppDataOnUninstall: false
   },
   mac: {
+    icon: `build/${iconName}.png`,
     target: appChannel === "snapshot" ? ["zip"] : ["zip", "dmg"],
     artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
     entitlements: "./entitlements.mac.plist",
@@ -98,8 +109,14 @@ module.exports = {
     sign: false
   },
   linux: {
-    target: appChannel === "snapshot" ? ["zip"] : ["zip", "appImage"],
-    artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}"
+    icon: `build/${iconName}.png`,
+    target:
+      appChannel === "snapshot" ? ["zip"] : ["zip", "appImage", "deb", "rpm"],
+    artifactName: "${productName}__${version}__${os}__" + arch + ".${ext}",
+    category: "Game",
+    synopsis: "Custom Minecraft Launcher",
+    description:
+      "GDLauncher is a custom Minecraft launcher with built-in mod management, modpack support, and a modern interface."
   },
   afterAllArtifactBuild: (_buildResult) => {
     const path = require("path")

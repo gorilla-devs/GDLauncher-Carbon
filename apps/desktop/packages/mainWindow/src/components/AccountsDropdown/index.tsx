@@ -5,7 +5,7 @@ import { AccountStatus, AccountType } from "@gd/core_module/bindings"
 import { Trans } from "@gd/i18n"
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@gd/ui"
 import { For, Switch, Match, createSignal } from "solid-js"
-import gdlLogo from "/assets/images/gdlauncher_logo.svg"
+import { logoUrl } from "@/utils/logos"
 import defaultInstanceImg from "/assets/images/default-instance-img.png"
 import { useGlobalStore } from "../GlobalStoreContext"
 import { getAccountImageUuid } from "@/utils/showcaseHelpers"
@@ -164,7 +164,7 @@ export const AccountsDropdown = (props: Props) => {
             ref={gdlAccountRef}
           >
             <div class="flex items-center gap-4 px-4 py-2 text-xl">
-              <img src={gdlLogo} class="h-6 w-6" />
+              <img src={logoUrl} class="h-6 w-6" />
               <div>
                 <Trans key="accounts:_trn_gdlauncher_account" />
               </div>

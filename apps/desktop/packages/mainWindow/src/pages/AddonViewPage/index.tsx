@@ -4,9 +4,10 @@ import {
   AuthorsSkeleton,
   Button,
   Skeleton,
-  Tab,
-  TabList,
   Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsIndicator,
   Tooltip,
   TooltipContent,
   TooltipTrigger
@@ -26,7 +27,8 @@ import {
   createContext,
   createSignal,
   createMemo,
-  onMount
+  onMount,
+  onCleanup
 } from "solid-js"
 import { format } from "date-fns"
 import ExploreVersionsNavbar from "@/components/ExploreVersionsNavbar"
@@ -44,20 +46,20 @@ import { RSPCError } from "@rspc/client"
 import ModpackDownloadButton from "@/components/ModpackDownloadButton"
 import AuthorAvatars, { Author } from "@/components/AuthorAvatars"
 
-const getTabIndexFromPath = (path: string) => {
+const getTabValueFromPath = (path: string, id: string, platform: string) => {
   if (path.match(/\/(addon)\/.+\/.+/g)) {
     if (path.endsWith("/changelog")) {
-      return 1
+      return `/addon/${id}/${platform}/changelog`
     } else if (path.endsWith("/screenshots")) {
-      return 2
+      return `/addon/${id}/${platform}/screenshots`
     } else if (path.endsWith("/versions")) {
-      return 3
+      return `/addon/${id}/${platform}/versions`
     } else {
-      return 0
+      return `/addon/${id}/${platform}`
     }
   }
 
-  return 0
+  return `/addon/${id}/${platform}`
 }
 
 const ModsInfiniteScrollQueryWrapper = () => {
@@ -81,6 +83,8 @@ export const AddonContext = createContext<CreateQueryResult<
   RSPCError
 > | null>(null)
 
+export const StickyHeaderHeightContext = createContext<() => number>(() => 0)
+
 const ModContextProvider = (props: {
   mod: CreateQueryResult<FEUnifiedSearchResultWithDescription, RSPCError>
   children: JSX.Element
@@ -97,7 +101,8 @@ const AddonExplore = () => {
   const params = useParams()
   const platform = () => params.platform as FEUnifiedPlatform
   const location = useLocation()
-  const indexTab = () => getTabIndexFromPath(location.pathname)
+  const tabValue = () =>
+    getTabValueFromPath(location.pathname, params.id, params.platform)
   const [t] = useTransContext()
   const [searchParams] = useSearchParams()
 
@@ -170,56 +175,77 @@ const AddonExplore = () => {
 
   const instancePages = () => [
     {
-      label: t("ui:_trn_overview"),
-      path: `/addon/${params.id}/${params.platform}`,
-      icon: "i-hugeicons:dashboard-square-01"
+      label: (
+        <div class="flex items-center gap-2">
+          <div class="i-hugeicons:dashboard-square-01 text-lg" />
+          {t("ui:_trn_overview")}
+        </div>
+      ),
+      path: `/addon/${params.id}/${params.platform}`
     },
     {
-      label: t("ui:_trn_changelog"),
-      path: `/addon/${params.id}/${params.platform}/changelog`,
-      icon: "i-hugeicons:note-edit"
+      label: (
+        <div class="flex items-center gap-2">
+          <div class="i-hugeicons:note-edit text-lg" />
+          {t("ui:_trn_changelog")}
+        </div>
+      ),
+      path: `/addon/${params.id}/${params.platform}/changelog`
     },
     {
-      label: t("ui:_trn_screenshots"),
-      path: `/addon/${params.id}/${params.platform}/screenshots`,
-      icon: "i-hugeicons:image-01"
+      label: (
+        <div class="flex items-center gap-2">
+          <div class="i-hugeicons:image-01 text-lg" />
+          {t("ui:_trn_screenshots")}
+        </div>
+      ),
+      path: `/addon/${params.id}/${params.platform}/screenshots`
     },
     {
-      label: t("ui:_trn_versions"),
-      path: `/addon/${params.id}/${params.platform}/versions`,
-      icon: "i-hugeicons:package"
+      label: (
+        <div class="flex items-center gap-2">
+          <div class="i-hugeicons:package text-lg" />
+          {t("ui:_trn_versions")}
+        </div>
+      ),
+      path: `/addon/${params.id}/${params.platform}/versions`
     }
   ]
 
   let refStickyTabs: HTMLDivElement
-  let backButtonRef: HTMLSpanElement
   const [isSticky, setIsSticky] = createSignal(false)
-  const [tabsTranslate, setTabsTranslate] = createSignal(0)
+  const [stickyHeaderHeight, setStickyHeaderHeight] = createSignal(0)
+
+  const handleScroll = () => {
+    if (!refStickyTabs) return
+
+    requestAnimationFrame(() => {
+      const rect = refStickyTabs.getBoundingClientRect()
+      setIsSticky(rect.top <= 104)
+    })
+  }
 
   onMount(() => {
-    setTabsTranslate(-backButtonRef.offsetWidth)
+    const scrollContainer = document.getElementById("gdl-content-wrapper")
+    if (scrollContainer) {
+      scrollContainer.addEventListener("scroll", handleScroll)
+      onCleanup(() =>
+        scrollContainer.removeEventListener("scroll", handleScroll)
+      )
+    }
+
+    // Measure sticky header height for versions table positioning
+    if (refStickyTabs) {
+      const resizeObserver = new ResizeObserver(() => {
+        setStickyHeaderHeight(refStickyTabs.getBoundingClientRect().height)
+      })
+      resizeObserver.observe(refStickyTabs)
+      onCleanup(() => resizeObserver.disconnect())
+    }
   })
 
   return (
-    <div
-      class="bg-darkSlate-800 relative flex h-full flex-col overflow-y-auto overflow-x-hidden"
-      style={{
-        "scrollbar-gutter": "stable"
-      }}
-      onScroll={() => {
-        if (!refStickyTabs) return
-
-        requestAnimationFrame(() => {
-          const rect = refStickyTabs.getBoundingClientRect()
-          setIsSticky(rect.top <= 104)
-          if (rect.top <= 104) {
-            setTabsTranslate(0)
-          } else {
-            setTabsTranslate(-backButtonRef.offsetWidth)
-          }
-        })
-      }}
-    >
+    <div class="bg-darkSlate-800 relative flex h-full flex-col">
       <div class="h-58 max-h-58 min-h-58 flex flex-col items-stretch justify-between transition-all ease-in-out">
         <div class="relative h-full">
           <div class="from-darkSlate-700 absolute left-0 right-0 top-0 z-20 h-full bg-gradient-to-t from-30%" />
@@ -367,25 +393,22 @@ const AddonExplore = () => {
           </div>
         </div>
       </div>
-      <div class="bg-darkSlate-800 sticky">
+      <div class="bg-darkSlate-800 sticky top-0">
         <div class="flex justify-center px-6 py-0">
-          <div class="bg-darkSlate-800 flex-1">
+          <div class="bg-darkSlate-800 flex-1 min-w-0">
             <div
               ref={(el) => {
                 refStickyTabs = el
               }}
               class="bg-darkSlate-800 sticky top-0 z-30 flex flex-col pb-0"
             >
-              <div class="mb-4 flex h-14 items-center justify-between">
-                <div class="flex h-full items-center">
+              <div class="my-2 flex h-14 items-center justify-between">
+                <div class="flex items-center">
                   <div
-                    class="mr-4 origin-left transition-transform duration-100 ease-in-out"
+                    class="overflow-hidden transition-all duration-150 ease-in-out flex items-center"
                     classList={{
-                      "scale-x-100": isSticky(),
-                      "scale-x-0": !isSticky()
-                    }}
-                    ref={(el) => {
-                      backButtonRef = el
+                      "w-14 mr-4 opacity-100": isSticky(),
+                      "w-0 mr-0 opacity-0": !isSticky()
                     }}
                   >
                     <Button
@@ -393,46 +416,39 @@ const AddonExplore = () => {
                       size="small"
                       type="secondary"
                     >
-                      <div class="i-hugeicons:arrow-left-01 text-2xl h-6 w-6" />
-                      <Trans key="instances:_trn_step_back" />
+                      <div class="i-hugeicons:arrow-left-01 text-xl" />
                     </Button>
                   </div>
-                  <div
-                    class="flex h-full origin-left items-center transition-transform duration-100 ease-in-out"
-                    style={{
-                      transform: `translateX(${tabsTranslate()}px)`
-                    }}
-                  >
-                    <Tabs index={indexTab()}>
-                      <TabList>
+                  <div class="flex items-center">
+                    <Tabs value={tabValue()} class="h-auto">
+                      <TabsList class="w-fit gap-0">
+                        <TabsIndicator />
                         <For each={instancePages()}>
                           {(page) => (
-                            <Tab
-                              onClick={() => {
+                            <TabsTrigger
+                              value={page.path}
+                              onClick={() =>
                                 navigator.navigate(
                                   `${page.path}${location.search}`,
                                   {
                                     replace: true
                                   }
                                 )
-                              }}
+                              }
                             >
-                              <div class="flex items-center gap-2">
-                                <div class={`${page.icon} text-lg`} />
-                                {page.label}
-                              </div>
-                            </Tab>
+                              {page.label}
+                            </TabsTrigger>
                           )}
                         </For>
-                      </TabList>
+                      </TabsList>
                     </Tabs>
                   </div>
                 </div>
                 <div
-                  class="ml-4 origin-right transition-transform duration-100 ease-in-out"
+                  class="overflow-hidden transition-all duration-150 ease-in-out flex items-center justify-end"
                   classList={{
-                    "scale-x-100": isSticky(),
-                    "scale-x-0": !isSticky()
+                    "w-14 ml-4 opacity-100": isSticky(),
+                    "w-0 ml-0 opacity-0": !isSticky()
                   }}
                 >
                   <Switch fallback={<></>}>
@@ -444,6 +460,7 @@ const AddonExplore = () => {
                       <ModpackDownloadButton
                         addon={project.data}
                         size="small"
+                        iconOnly
                       />
                     </Match>
                     <Match
@@ -456,6 +473,7 @@ const AddonExplore = () => {
                         selectedInstanceId={selectedInstanceId()}
                         selectedInstanceMods={instanceMods.data ?? undefined}
                         size="small"
+                        iconOnly
                       />
                     </Match>
                   </Switch>
@@ -463,7 +481,7 @@ const AddonExplore = () => {
               </div>
               <Show
                 when={
-                  indexTab() === 3 &&
+                  location.pathname.endsWith("/versions") &&
                   project.data?.type &&
                   project.data?.type !== "modpack"
                 }
@@ -471,10 +489,12 @@ const AddonExplore = () => {
                 <ExploreVersionsNavbar modplatform={platform()} type="mod" />
               </Show>
             </div>
-            <div class="z-0 flex flex-1 flex-col px-0 pt-4">
-              <ModContextProvider mod={project}>
-                <Outlet />
-              </ModContextProvider>
+            <div class="z-0 flex flex-1 flex-col px-0 pt-4 min-w-0">
+              <StickyHeaderHeightContext.Provider value={stickyHeaderHeight}>
+                <ModContextProvider mod={project}>
+                  <Outlet />
+                </ModContextProvider>
+              </StickyHeaderHeightContext.Provider>
             </div>
           </div>
         </div>

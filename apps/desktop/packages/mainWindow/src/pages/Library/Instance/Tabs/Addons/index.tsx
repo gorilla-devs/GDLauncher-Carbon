@@ -56,12 +56,12 @@ const Addons = () => {
 
   // Calculate dynamic table header offset based on filter height
   const tableHeaderOffset = createMemo(() => {
-    const baseTabHeight = 56 // top-14 = 56px
+    const baseTabHeight = 80
     const currentFilterHeight = filterHeight()
 
     // If no filter height measured yet, use default
     if (currentFilterHeight === 0) {
-      return 170 // Default fallback
+      return 200 // Default fallback
     }
 
     return baseTabHeight + currentFilterHeight

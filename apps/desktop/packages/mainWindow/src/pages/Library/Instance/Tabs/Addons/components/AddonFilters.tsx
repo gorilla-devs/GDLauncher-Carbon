@@ -104,7 +104,7 @@ export const AddonFilters = (props: AddonFiltersProps) => {
   return (
     <div
       ref={containerRef}
-      class="bg-darkSlate-800 border-darkSlate-700 sticky top-14 z-20 border-b px-6 py-4"
+      class="bg-darkSlate-800 border-darkSlate-700 sticky top-20 z-30 border-b px-6 pb-6 pt-0"
     >
       <div class="flex flex-col gap-4">
         {/* Search and main actions */}
@@ -276,16 +276,15 @@ export const AddonFilters = (props: AddonFiltersProps) => {
         </div>
 
         {/* Addon type filters */}
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mt-2">
           <div class="flex flex-wrap items-center gap-2">
-            <div class="text-lightSlate-600 h-5 w-5" />
             <For each={visibleAddonTypes()}>
               {(type) => (
                 <Badge
                   variant={
                     props.enabledAddonTypes[type] ? "default" : "secondary"
                   }
-                  class="flex cursor-pointer items-center gap-1.5 transition-colors"
+                  class="flex cursor-pointer items-center gap-1.5"
                   onClick={() => {
                     props.setEnabledAddonTypes(
                       type,

@@ -10,6 +10,7 @@ interface ModDownloadButtonProps {
   name?: string
   addon: FEUnifiedSearchResult | undefined
   size?: "small" | "medium" | "large"
+  iconOnly?: boolean
 }
 
 const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
@@ -122,10 +123,17 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
           <Spinner />
         </Show>
         <Show when={!loading()}>
-          <div class="flex items-center gap-1.5">
-            <div class="i-hugeicons:download-02" />
-            <Trans key="instances:_trn_download" />
-          </div>
+          <Show
+            when={props.iconOnly}
+            fallback={
+              <div class="flex items-center gap-1.5">
+                <div class="i-hugeicons:download-02" />
+                <Trans key="instances:_trn_download" />
+              </div>
+            }
+          >
+            <div class="i-hugeicons:download-02 text-xl" />
+          </Show>
         </Show>
       </Button>
     </div>

@@ -62,6 +62,11 @@ const changelogs: Changelog = {
       title: "Bulk Addon Operations",
       description:
         "Multi-select support in addon tables with bulk update, enable, disable, and delete operations."
+    },
+    {
+      title: "Version Type Filtering in Patch Notes",
+      description:
+        "Filter patch notes by release type (release, snapshot, etc.) to easily find the updates you're looking for."
     }
   ],
   fixed: [
@@ -114,6 +119,24 @@ const changelogs: Changelog = {
     {
       title:
         "Fixed caching errors that were causing the cache subroutine to hang/crash"
+    },
+    {
+      title: "Fixed GDL account verification sometimes hanging"
+    },
+    {
+      title: "Fixed mods deletion on version/modloader update",
+      description:
+        "Resolved an issue where mods could be incorrectly deleted when changing the game version or modloader."
+    },
+    {
+      title: "Fixed account state synchronization",
+      description:
+        "Account state now properly syncs after enrollment, ensuring your account status is always up to date."
+    },
+    {
+      title: "Fixed game log active state updates",
+      description:
+        "Game logs now correctly update their active state before cache invalidation."
     }
   ],
   improved: [
@@ -180,7 +203,12 @@ const changelogs: Changelog = {
     {
       title: "Updated Electron and dependencies",
       description:
-        "Updated to Electron 37.2.6 and Node.js 22.12.0 for better performance and security."
+        "Updated to Electron 37.7.0 and Node.js 22.12.0 for better performance and security."
+    },
+    {
+      title: "Improved auto update system",
+      description:
+        "Enhanced update installation flow with better error handling, improved download UI, and reliable update installation on quit."
     },
     {
       title: "Better loading indicators",
@@ -191,6 +219,31 @@ const changelogs: Changelog = {
       title: "Smoother animations",
       description:
         "Enhanced searchbar and page transition animations for a more polished experience, especially noticeable when first opening the app."
+    },
+    {
+      title: "Enhanced Addon View & Install Experience",
+      description:
+        "Improved addon detail pages with better instance selection and clearer mod installation workflow."
+    },
+    {
+      title: "Better Default Instance Sorting",
+      description:
+        "Instances now sort by creation date (newest first) by default, making your latest instances easier to find."
+    },
+    {
+      title: "Improved Logs Tab Sidebar",
+      description:
+        "Reorganized logs tab with better component organization for easier log file navigation."
+    },
+    {
+      title: "Clearer Update Instructions for Package Manager Users",
+      description:
+        "Manual update messages now mention package manager as an update option for users who installed via package managers."
+    },
+    {
+      title: "Redesigned Tabs Component",
+      description:
+        "Tabs throughout the app have been redesigned with improved styling and better accessibility using modern UI primitives."
     }
   ]
 }

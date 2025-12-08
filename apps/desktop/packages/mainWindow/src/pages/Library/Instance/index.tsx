@@ -2,8 +2,9 @@ import getRouteIndex from "@/route/getRouteIndex"
 import { Trans, useTransContext } from "@gd/i18n"
 import {
   Tabs,
-  TabList,
-  Tab,
+  TabsList,
+  TabsTrigger,
+  TabsIndicator,
   Button,
   DropdownMenu,
   DropdownMenuTrigger,
@@ -60,7 +61,6 @@ const Instance = () => {
   const location = useLocation()
   const [editableName, setEditableName] = createSignal(false)
   const [isFavorite, setIsFavorite] = createSignal(false)
-  const [tabsTranslate, setTabsTranslate] = createSignal(0)
   const [isSticky, setIsSticky] = createSignal(false)
   const routeData: ReturnType<typeof fetchData> = useRouteData()
   const [newName, setNewName] = createSignal(
@@ -77,7 +77,6 @@ const Instance = () => {
     return detectDuplicatedMods(routeData.instanceMods)
   })
 
-  let backButtonRef: HTMLSpanElement
   let headerRef: HTMLElement
   let innerContainerRef: HTMLDivElement | undefined
   let refStickyTabs: HTMLDivElement
@@ -93,17 +92,11 @@ const Instance = () => {
       // Handle sticky tabs
       const rect = refStickyTabs.getBoundingClientRect()
       setIsSticky(rect.top <= 104)
-      if (rect.top <= 104) {
-        setTabsTranslate(0)
-      } else {
-        setTabsTranslate(-backButtonRef.offsetWidth)
-      }
     })
   }
 
   onMount(() => {
     headerRef.parentElement?.addEventListener("scroll", handleScroll)
-    setTabsTranslate(-backButtonRef.offsetWidth)
   })
 
   onCleanup(() => {
@@ -233,8 +226,10 @@ const Instance = () => {
     // },
   ]
 
-  const selectedIndex = () =>
-    getRouteIndex(instancePages(), location.pathname, true)
+  const selectedValue = () => {
+    const index = getRouteIndex(instancePages(), location.pathname, true)
+    return instancePages()[index]?.path || instancePages()[0]?.path
+  }
 
   const launchInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.launchInstance"]
@@ -702,14 +697,16 @@ const Instance = () => {
         <div
           class="flex justify-center py-0"
           classList={{
-            "px-6": !instancePages()[selectedIndex()]?.noPadding
+            "px-6": !instancePages().find((p) => p.path === selectedValue())
+              ?.noPadding
           }}
         >
           <div class="bg-darkSlate-800 w-full">
             <div
-              class="bg-darkSlate-800 sticky top-0 z-30 flex h-14 items-center justify-between"
+              class="bg-darkSlate-800 sticky top-0 z-30 flex h-14 items-center justify-between py-10"
               classList={{
-                "px-6": instancePages()[selectedIndex()]?.noPadding
+                "px-6": instancePages().find((p) => p.path === selectedValue())
+                  ?.noPadding
               }}
               ref={(el) => {
                 refStickyTabs = el
@@ -717,56 +714,46 @@ const Instance = () => {
             >
               <div class="flex h-full items-center">
                 <div
-                  class="mr-4 origin-left transition-transform duration-100 ease-in-out"
+                  class="overflow-hidden transition-all duration-150 ease-in-out flex items-center"
                   classList={{
-                    "scale-x-100": isSticky(),
-                    "scale-x-0": !isSticky()
-                  }}
-                  ref={(el) => {
-                    backButtonRef = el
+                    "w-14 mr-4 opacity-100": isSticky(),
+                    "w-0 mr-0 opacity-0": !isSticky()
                   }}
                 >
                   <Button
                     onClick={() => navigator.navigate("/library")}
-                    icon={<div class="i-hugeicons:arrow-left-01 text-2xl" />}
                     size="small"
                     type="secondary"
                   >
-                    <Trans key="instances:_trn_step_back" />
+                    <div class="i-hugeicons:arrow-left-01 text-xl" />
                   </Button>
                 </div>
-                <div
-                  class="flex h-full origin-left items-center transition-transform duration-100 ease-in-out"
-                  style={{
-                    transform: `translateX(${tabsTranslate()}px)`
-                  }}
-                >
-                  <Tabs index={selectedIndex()}>
-                    <TabList>
+                <div class="flex items-center">
+                  <Tabs value={selectedValue()} class="h-auto">
+                    <TabsList class="w-fit gap-0">
+                      <TabsIndicator />
                       <For each={instancePages()}>
                         {(page: InstancePage) => (
-                          <Tab
-                            onClick={() => {
-                              navigator.navigate(page.path)
-                            }}
+                          <TabsTrigger
+                            value={page.path}
+                            onClick={() => navigator.navigate(page.path)}
                           >
                             {page.label}
-                          </Tab>
+                          </TabsTrigger>
                         )}
                       </For>
-                    </TabList>
+                    </TabsList>
                   </Tabs>
                 </div>
               </div>
               <div
-                class="ml-4 origin-right transition-transform duration-100 ease-in-out"
+                class="overflow-hidden transition-all duration-150 ease-in-out flex items-center justify-end"
                 classList={{
-                  "scale-x-100": isSticky(),
-                  "scale-x-0": !isSticky()
+                  "w-14 ml-4 opacity-100": isSticky(),
+                  "w-0 ml-0 opacity-0": !isSticky()
                 }}
               >
                 <Button
-                  uppercase
                   size="small"
                   variant={isRunning() && "red"}
                   loading={isPreparing() !== undefined}
@@ -774,12 +761,10 @@ const Instance = () => {
                 >
                   <Switch>
                     <Match when={!isRunning()}>
-                      <div class="i-hugeicons:play text-base" />
-                      <Trans key="instances:_trn_play" />
+                      <div class="i-hugeicons:play text-xl" />
                     </Match>
                     <Match when={isRunning()}>
-                      <div class="i-hugeicons:stop text-base" />
-                      <Trans key="instances:_trn_stop" />
+                      <div class="i-hugeicons:stop text-xl" />
                     </Match>
                   </Switch>
                 </Button>
@@ -790,12 +775,21 @@ const Instance = () => {
               classList={{
                 "pt-14": isFullScreen(),
                 "pt-0":
-                  !isFullScreen() && location.pathname.includes("/addons"),
+                  !isFullScreen() &&
+                  (location.pathname.includes("/addons") ||
+                    location.pathname.includes("/logs")),
                 "pt-4 px-4":
-                  !isFullScreen() && !location.pathname.includes("/addons")
+                  !isFullScreen() &&
+                  !location.pathname.includes("/addons") &&
+                  !location.pathname.includes("/logs")
               }}
             >
-              <Show when={duplicatedMods().length > 0}>
+              <Show
+                when={
+                  duplicatedMods().length > 0 &&
+                  !routeData.instanceDetails.data?.modpack?.locked
+                }
+              >
                 <div
                   class="mb-4 flex items-center justify-between rounded-xl border border-yellow-600/30 bg-yellow-900/20 p-4"
                   classList={{

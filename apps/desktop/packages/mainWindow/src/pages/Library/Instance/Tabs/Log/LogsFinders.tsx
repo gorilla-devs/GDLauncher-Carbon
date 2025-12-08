@@ -67,9 +67,14 @@ const LogsFinders = (props: Props) => {
 
   return (
     <Popover open={props.open} gutter={4} placement="bottom">
-      <PopoverTrigger as="div" onClick={() => props.setOpen(!props.open)}>
+      <PopoverTrigger
+        as="div"
+        onClick={() => props.setOpen(!props.open)}
+        class="animate-icons-on-hover cursor-pointer"
+        classList={{ "bg-darkSlate-700": props.open }}
+      >
         <div
-          class={`i-hugeicons:search-01 hover:bg-lightSlate-50 transition-colors duration-200 ease-in-out h-6 w-6 ${props.open ? "bg-lightSlate-50" : "bg-lightSlate-800"}`}
+          class={`i-hugeicons:search-01 transition-all duration-200 ease-in-out h-5 w-5 ${props.open ? "bg-lightSlate-50 rotate-12 scale-110" : "bg-lightSlate-800"}`}
         />
       </PopoverTrigger>
       <PopoverContent

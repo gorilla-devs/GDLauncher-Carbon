@@ -299,7 +299,7 @@ const LogsContent = (props: Props) => {
 
   return (
     <div class="border-darkSlate-700 border-l-solid relative flex min-w-0 flex-1 flex-col border">
-      <div class="bg-darkSlate-800 box-border flex h-10 w-full shrink-0 items-center justify-between gap-4 px-4 py-8">
+      <div class="bg-darkSlate-800 box-border flex h-8 w-full shrink-0 items-center justify-between gap-4 px-4 py-6">
         <div />
         <div class="flex items-center gap-4">
           <LogsFinders
@@ -344,7 +344,7 @@ const LogsContent = (props: Props) => {
         class="hidden justify-center"
         ref={(el) => props.assignScrollBottomRef(el)}
       >
-        <div class="fixed bottom-6 z-20 flex w-60 justify-center">
+        <div class="fixed bottom-6 z-20 flex w-72 justify-center">
           <ScrollBottomButton
             onClick={props.scrollToBottom}
             newLogsCount={props.newLogsCount}

@@ -310,7 +310,7 @@ function Slider(props: Props) {
           </Show>
           <div
             ref={setHandleRef}
-            class="w-4 h-4 bg-darkSlate-800 rounded-full border-4 border-solid border-primary-500 cursor-pointer z-20"
+            class="w-4 h-4 bg-darkSlate-800 rounded-full border-4 border-solid border-primary-500 cursor-pointer z-20 transition-transform duration-100 active:scale-90"
             style={{
               position: "absolute",
               ...(props.vertical

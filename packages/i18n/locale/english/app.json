@@ -10,7 +10,7 @@
   "_trn_update_link_copied": "Download link copied to clipboard",
   "_trn_update_version": "Update available: v{{version}}",
   "_trn_update_progress": "Downloading: {{percent}}%",
-  "_trn_update_manual_required": "Auto-update not available. Download manually to update.",
+  "_trn_update_manual_required": "Auto-update not available. Download manually or update through your package manager.",
   "_trn_update_pending_title": "Update v{{version}} pending",
   "_trn_update_pending_description": "The update will be installed when you close the app",
   "_trn_update_up_to_date": "You're up to date!",

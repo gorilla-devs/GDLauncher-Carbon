@@ -83,6 +83,13 @@ export const InstanceItem = (props: InstanceItemProps) => {
           <Show when={props.instance.locked}>
             <div class="i-hugeicons:lock h-4 w-4 text-lightSlate-500" />
           </Show>
+          <Show
+            when={
+              !props.isLoading && !props.isInstalled && !props.instance.locked
+            }
+          >
+            <div class="i-hugeicons:package-add h-4 w-4 text-lightSlate-400" />
+          </Show>
         </div>
       </div>
     </DropdownMenuRadioItem>

@@ -1,7 +1,7 @@
 import { useLocation, useMatch } from "@solidjs/router"
 import { Show, createMemo } from "solid-js"
-import GDLauncherWideLogo from "/assets/images/gdlauncher_wide_logo_blue.svg"
-import { Tab, TabList, Tabs, Button } from "@gd/ui"
+import { wideLogoUrl } from "@/utils/logos"
+import { Tabs, TabsList, TabsTrigger, TabsIndicator, Button } from "@gd/ui"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { AccountsDropdown } from "./AccountsDropdown"
 import { AccountStatus, AccountType } from "@gd/core_module/bindings"
@@ -35,10 +35,10 @@ const AppNavbar = () => {
   const isSettings = useMatch(() => "/settings")
   const isSettingsNested = useMatch(() => "/settings/*")
   const isNews = useMatch(() => "/news/*")
-  const selectedIndex = () => {
-    if (isSettings() || isSettingsNested()) return 0
-    if (isNews()) return 1
-    return -1
+  const selectedValue = () => {
+    if (isSettings() || isSettingsNested()) return "settings"
+    if (isNews()) return "news"
+    return ""
   }
 
   const accounts = createMemo(() => {
@@ -89,7 +89,7 @@ const AppNavbar = () => {
               }}
             />
             <img
-              src={GDLauncherWideLogo}
+              src={wideLogoUrl}
               class="h-9 max-w-none transition-transform duration-200 ease-[cubic-bezier(.4,0,.2,1)]"
               classList={{
                 "-translate-x-4": location.pathname === "/library"
@@ -125,41 +125,29 @@ const AppNavbar = () => {
               <div class="i-hugeicons:download-04 text-2xl" />
             </div>
           </Show>
-          <Tabs index={selectedIndex()}>
-            <TabList aligment="between">
-              <div class="flex items-center gap-6">
-                <div
-                  onClick={() => {
-                    if (!(!!isSettings() || !!isSettingsNested()))
-                      navigator.navigate("/settings")
-                  }}
-                >
-                  <Tab>
-                    <div
-                      class="i-hugeicons:settings-01 text-2xl"
-                      classList={{
-                        "text-lightSlate-50":
-                          !!isSettings() || !!isSettingsNested()
-                      }}
-                    />
-                  </Tab>
-                </div>
-                <div
-                  onClick={() => {
-                    navigator.navigate("/news")
-                  }}
-                >
-                  <Tab>
-                    <div
-                      class="i-hugeicons:news text-2xl"
-                      classList={{
-                        "text-lightSlate-50": !!isNews()
-                      }}
-                    />
-                  </Tab>
-                </div>
-              </div>
-            </TabList>
+          <Tabs
+            value={selectedValue()}
+            class="h-auto w-auto flex-row items-center"
+          >
+            <TabsList class="bg-transparent gap-4 h-auto">
+              <Show when={selectedValue()}>
+                <TabsIndicator />
+              </Show>
+              <TabsTrigger
+                value="settings"
+                class="p-2"
+                onClick={() => navigator.navigate("/settings")}
+              >
+                <div class="i-hugeicons:settings-01 h-6 w-6" />
+              </TabsTrigger>
+              <TabsTrigger
+                value="news"
+                class="p-2"
+                onClick={() => navigator.navigate("/news")}
+              >
+                <div class="i-hugeicons:news h-6 w-6" />
+              </TabsTrigger>
+            </TabsList>
           </Tabs>
           <div class="mr-6 flex justify-end lg:min-w-fit">
             <Show when={globalStore.accounts.data}>

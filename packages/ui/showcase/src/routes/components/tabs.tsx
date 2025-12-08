@@ -1,5 +1,11 @@
 import { createFileRoute } from "@tanstack/solid-router"
-import { Tabs, TabList, TabPanel, Tab } from "../../../../src"
+import {
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+  TabsIndicator
+} from "../../../../src"
 import ComponentDemo from "../../components/ComponentDemo"
 
 export const Route = createFileRoute("/components/tabs")({
@@ -20,13 +26,14 @@ function TabsPage() {
         title="Basic Tabs"
         description="Simple tab interface with multiple panels"
       >
-        <Tabs>
-          <TabList>
-            <Tab>Overview</Tab>
-            <Tab>Analytics</Tab>
-            <Tab>Settings</Tab>
-          </TabList>
-          <TabPanel>
+        <Tabs defaultValue="overview">
+          <TabsList>
+            <TabsIndicator />
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="settings">Settings</TabsTrigger>
+          </TabsList>
+          <TabsContent value="overview">
             <div class="p-4">
               <h3 class="font-semibold text-gray-900 mb-2">Overview</h3>
               <p class="text-gray-600">
@@ -34,8 +41,8 @@ function TabsPage() {
                 of your account activity.
               </p>
             </div>
-          </TabPanel>
-          <TabPanel>
+          </TabsContent>
+          <TabsContent value="analytics">
             <div class="p-4">
               <h3 class="font-semibold text-gray-900 mb-2">Analytics</h3>
               <p class="text-gray-600">
@@ -43,15 +50,15 @@ function TabsPage() {
                 account.
               </p>
             </div>
-          </TabPanel>
-          <TabPanel>
+          </TabsContent>
+          <TabsContent value="settings">
             <div class="p-4">
               <h3 class="font-semibold text-gray-900 mb-2">Settings</h3>
               <p class="text-gray-600">
                 Configure your account settings and preferences.
               </p>
             </div>
-          </TabPanel>
+          </TabsContent>
         </Tabs>
       </ComponentDemo>
 
@@ -59,13 +66,14 @@ function TabsPage() {
         title="Content-Rich Tabs"
         description="Tabs with more complex content in each panel"
       >
-        <Tabs>
-          <TabList>
-            <Tab>Profile</Tab>
-            <Tab>Security</Tab>
-            <Tab>Notifications</Tab>
-          </TabList>
-          <TabPanel>
+        <Tabs defaultValue="profile">
+          <TabsList>
+            <TabsIndicator />
+            <TabsTrigger value="profile">Profile</TabsTrigger>
+            <TabsTrigger value="security">Security</TabsTrigger>
+            <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          </TabsList>
+          <TabsContent value="profile">
             <div class="p-4 space-y-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700">
@@ -88,8 +96,8 @@ function TabsPage() {
                 />
               </div>
             </div>
-          </TabPanel>
-          <TabPanel>
+          </TabsContent>
+          <TabsContent value="security">
             <div class="p-4 space-y-4">
               <div class="flex items-center justify-between">
                 <div>
@@ -114,8 +122,8 @@ function TabsPage() {
                 </button>
               </div>
             </div>
-          </TabPanel>
-          <TabPanel>
+          </TabsContent>
+          <TabsContent value="notifications">
             <div class="p-4 space-y-4">
               <div class="flex items-center justify-between">
                 <div>
@@ -136,7 +144,7 @@ function TabsPage() {
                 <input type="checkbox" class="rounded" />
               </div>
             </div>
-          </TabPanel>
+          </TabsContent>
         </Tabs>
       </ComponentDemo>
     </div>

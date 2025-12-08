@@ -69,6 +69,7 @@ const getVariant = (
     "overflow-hidden": true,
     "duration-100": true,
     "ease-in-out": true,
+    "active:scale-95": !isDisabled,
     "font-main": true,
     "max-w-max": !isLoading && !fullWidth,
     "w-full": fullWidth,
@@ -254,6 +255,7 @@ function Button(props: Props) {
           props.fullWidth
         ),
         "animate-icons-on-hover": !props.disabled,
+        "pointer-events-none": !!props.loading,
         ...props.classList
       }}
       style={{

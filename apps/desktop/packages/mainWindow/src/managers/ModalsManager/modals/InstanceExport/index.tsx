@@ -1,6 +1,7 @@
 import { ModalProps } from "../.."
 import ModalLayout from "../../ModalLayout"
 import ExportFormat from "./atoms/ExportFormat"
+import ExportVersion from "./atoms/ExportVersion"
 import FilesSelection from "./atoms/FilesSelection"
 import SelfContainedArchive from "./atoms/SelfContainedArchive"
 import ExportPath from "./atoms/ExportPath"
@@ -24,6 +25,7 @@ interface IPayload {
   save_path: string | undefined
   self_contained_addons_bundling: boolean
   filter: {}
+  version: string
 }
 
 const [payload, setPayload] = createStore<IPayload>({
@@ -31,7 +33,8 @@ const [payload, setPayload] = createStore<IPayload>({
   target: "Curseforge",
   save_path: undefined,
   self_contained_addons_bundling: false,
-  filter: { entries: {} }
+  filter: { entries: {} },
+  version: "1.0.0"
 })
 
 export { payload, setPayload }
@@ -49,7 +52,7 @@ const InstanceExport = (props: ModalProps) => {
         <Switch>
           <Match when={exportStep() === 0}>
             <ExportFormat />
-            {/* <ExportNameVersion /> */}
+            <ExportVersion />
             <FilesSelection instanceId={instanceId()} />
             <SelfContainedArchive />
             <ExportPath />

@@ -54,7 +54,7 @@ const ContextMenuItem = <T extends ValidComponent = "div">(
   return (
     <ContextMenuPrimitive.Item
       class={cn(
-        "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-darkSlate-700 focus:text-lightSlate-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-darkSlate-700 focus:text-lightSlate-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 active:scale-95",
         local.class
       )}
       {...others}
@@ -107,7 +107,7 @@ const ContextMenuSubTrigger = <T extends ValidComponent = "div">(
   return (
     <ContextMenuPrimitive.SubTrigger
       class={cn(
-        "flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-darkSlate-700 data-[state=open]:bg-darkSlate-700",
+        "flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-darkSlate-700 data-[state=open]:bg-darkSlate-700 active:scale-95",
         local.class
       )}
       {...others}
@@ -167,7 +167,7 @@ const ContextMenuCheckboxItem = <T extends ValidComponent = "div">(
   return (
     <ContextMenuPrimitive.CheckboxItem
       class={cn(
-        "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-darkSlate-700 focus:text-lightSlate-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-darkSlate-700 focus:text-lightSlate-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 active:scale-95",
         local.class
       )}
       {...others}
@@ -231,7 +231,7 @@ const ContextMenuRadioItem = <T extends ValidComponent = "div">(
   return (
     <ContextMenuPrimitive.RadioItem
       class={cn(
-        "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-darkSlate-700 focus:text-lightSlate-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-darkSlate-700 focus:text-lightSlate-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 active:scale-95",
         local.class
       )}
       {...others}

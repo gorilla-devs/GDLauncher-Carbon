@@ -10,7 +10,7 @@ export default function FeatureStatusBadge(props: Props) {
       case "new":
         return "bg-green-400 text-lightSlate-50"
       case "beta":
-        return "bg-yellow-400 text-darkSlate-900"
+        return "bg-yellow-900 text-lightSlate-50"
       case "soon":
         return "bg-primary-400 text-lightSlate-50"
     }
@@ -29,7 +29,7 @@ export default function FeatureStatusBadge(props: Props) {
 
   return (
     <div
-      class={`flex items-center justify-center rounded-md px-2 py-1 text-center text-[0.6rem] font-bold uppercase ${colors()}`}
+      class={`flex items-center justify-center rounded px-1.5 text-center text-[0.55rem] font-bold uppercase ${colors()}`}
     >
       {text()}
     </div>

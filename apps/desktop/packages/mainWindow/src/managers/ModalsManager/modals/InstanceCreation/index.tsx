@@ -1,4 +1,4 @@
-import { Tab, TabList, TabPanel, Tabs } from "@gd/ui"
+import { Tabs, TabsList, TabsTrigger, TabsContent, TabsIndicator } from "@gd/ui"
 import { ModalProps } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { Trans, useTransContext } from "@gd/i18n"
@@ -28,27 +28,28 @@ const InstanceCreation = (props: ModalProps) => {
             <Custom data={data()} />
           </Match>
           <Match when={data()?.id === undefined || data()?.id === null}>
-            <Tabs defaultIndex={data()?.import ? 1 : 0}>
-              <TabList heightClass="h-14">
-                <Tab class="w-1/2" centerContent>
+            <Tabs defaultValue={data()?.import ? "import" : "custom"}>
+              <TabsList class="w-full">
+                <TabsIndicator />
+                <TabsTrigger value="custom" class="flex-1">
                   <div class="flex items-center gap-2">
                     <div class="i-hugeicons:add-01" />
                     <Trans key="instances:_trn_instance_creation_custom_tab" />
                   </div>
-                </Tab>
-                <Tab class="w-1/2" centerContent>
+                </TabsTrigger>
+                <TabsTrigger value="import" class="flex-1">
                   <div class="flex items-center gap-2">
                     <div class="i-hugeicons:upload-01" />
                     <Trans key="instances:_trn_instance_import_tab" />
                   </div>
-                </Tab>
-              </TabList>
-              <TabPanel>
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="custom">
                 <Custom data={data()} />
-              </TabPanel>
-              <TabPanel>
+              </TabsContent>
+              <TabsContent value="import">
                 <Import />
-              </TabPanel>
+              </TabsContent>
             </Tabs>
           </Match>
         </Switch>

@@ -31,6 +31,7 @@ pub async fn export_modrinth(
     save_path: PathBuf,
     self_contained_addons_bundling: bool,
     mut filter: ExportEntry,
+    version: String,
 ) -> anyhow::Result<VisualTaskId> {
     let instance_manager = app.instance_manager();
     let instances = instance_manager.instances.read().await;
@@ -53,13 +54,13 @@ pub async fn export_modrinth(
 
     drop(instances);
 
-    let Some(version) = config.game_configuration.version else {
+    let Some(game_version) = config.game_configuration.version else {
         return Err(anyhow!(
             "Instance {instance_id}'s game version is not known so it cannot be exported"
         ));
     };
 
-    let GameVersion::Standard(version) = version else {
+    let GameVersion::Standard(game_version) = game_version else {
         return Err(anyhow!(
             "Instance {instance_id} has a custom game version file so it cannot be exported"
         ));
@@ -156,7 +157,7 @@ pub async fn export_modrinth(
             let manifest = ModpackIndex {
                 format_version: 1,
                 game: ModrinthGame::Minecraft,
-                version_id: String::new(),
+                version_id: version,
                 name: config.name,
                 summary: None,
                 files: mods
@@ -175,7 +176,7 @@ pub async fn export_modrinth(
                         },
                     )
                     .collect(),
-                dependencies: convert_standard_version_to_mr_version(version),
+                dependencies: convert_standard_version_to_mr_version(game_version),
             };
 
             let tmpfile = app
@@ -333,6 +334,7 @@ mod test {
                 target_file.clone(),
                 self_contained_addons_bundling,
                 export_entry,
+                String::from("1.0.0"),
             )
             .await?;
 
@@ -386,7 +388,7 @@ mod test {
                     r#"{
   "formatVersion": 1,
   "game": "minecraft",
-  "versionId": "",
+  "versionId": "1.0.0",
   "name": "test",
   "summary": null,
   "files": [
@@ -439,7 +441,7 @@ mod test {
                     r#"{
   "formatVersion": 1,
   "game": "minecraft",
-  "versionId": "",
+  "versionId": "1.0.0",
   "name": "test",
   "summary": null,
   "files": [],
@@ -482,7 +484,7 @@ mod test {
                     r#"{
   "formatVersion": 1,
   "game": "minecraft",
-  "versionId": "",
+  "versionId": "1.0.0",
   "name": "test",
   "summary": null,
   "files": [],
@@ -522,7 +524,7 @@ mod test {
                     r#"{
   "formatVersion": 1,
   "game": "minecraft",
-  "versionId": "",
+  "versionId": "1.0.0",
   "name": "test",
   "summary": null,
   "files": [],
@@ -568,7 +570,7 @@ mod test {
                     r#"{
   "formatVersion": 1,
   "game": "minecraft",
-  "versionId": "",
+  "versionId": "1.0.0",
   "name": "test",
   "summary": null,
   "files": [],

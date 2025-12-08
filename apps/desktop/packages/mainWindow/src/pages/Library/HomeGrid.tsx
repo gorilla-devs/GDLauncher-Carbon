@@ -380,8 +380,8 @@ const HomeGrid = () => {
                           // Reset all filter settings to defaults
                           settingsMutation.mutate({
                             instancesTileSize: { Set: 2 },
-                            instancesSortBy: { Set: "name" },
-                            instancesSortByAsc: { Set: true },
+                            instancesSortBy: { Set: "created" },
+                            instancesSortByAsc: { Set: false },
                             instancesGroupBy: { Set: "group" },
                             instancesGroupByAsc: { Set: true }
                           })

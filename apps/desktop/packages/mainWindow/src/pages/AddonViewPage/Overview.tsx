@@ -14,7 +14,7 @@ const Description = () => {
     <Suspense fallback={<Skeleton.modpackOverviewPage />}>
       <div>
         <div
-          class="w-full max-w-full overflow-hidden"
+          class="w-full max-w-full overflow-hidden [&_img]:max-w-full [&_img]:h-auto break-words"
           // eslint-disable-next-line solid/no-innerhtml
           innerHTML={description()}
         />

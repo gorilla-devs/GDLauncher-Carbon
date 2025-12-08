@@ -132,6 +132,7 @@
   "_trn_select_platform_description": "Choose which platform to download from",
   "_trn_self_contained_addons_bundling": "Bundle Addons",
   "_trn_self_contained_addons_bundling_tooltip": "Include all addons in the exported instance",
+  "_trn_export_version": "Version",
   "_trn_view_mods": "View Mods",
   "_trn_view_versions_on_curseforge": "View versions on CurseForge",
   "_trn_view_versions_on_modrinth": "View versions on Modrinth"

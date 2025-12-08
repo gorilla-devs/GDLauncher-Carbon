@@ -26,7 +26,7 @@ const Language = () => {
           <Title class="w-full">
             <Trans key="settings:_trn_select_a_language" />
           </Title>
-          <div class="divide-darkSlate-600 flex w-full flex-col divide-y">
+          <div class="flex w-full flex-col gap-1">
             <Radio.group
               onChange={(value) => {
                 runWithOwner(owner, () => {
@@ -35,21 +35,22 @@ const Language = () => {
               }}
               value={settings.data?.language}
               options={Object.entries(supportedLanguages).map(
-                ([key, value]) => {
-                  // Type-safe: Object.entries on supportedLanguages ensures key is a valid language code
+                ([key, flagCode]) => {
                   const langCode = key as keyof typeof supportedLanguages
                   return {
                     value: key,
                     label: (
-                      <div class="flex w-full justify-between">
-                        <div class="flex items-center gap-2">
-                          <div
-                            class={`i-emojione-v1:flag-for-${value} h-5 w-5`}
-                          />
-                          <Trans key={getLanguageKey(langCode)} />
-                          {" ("}
+                      <div class="flex flex-1 items-center justify-between">
+                        <span class="text-lightSlate-100 font-medium">
                           <Trans key={getLanguageNativeKey(langCode)} />
-                          {")"}
+                        </span>
+                        <div class="flex items-center gap-3">
+                          <span class="text-lightSlate-400">
+                            <Trans key={getLanguageKey(langCode)} />
+                          </span>
+                          <div
+                            class={`i-emojione-v1:flag-for-${flagCode} h-5 w-5 shrink-0`}
+                          />
                         </div>
                       </div>
                     )

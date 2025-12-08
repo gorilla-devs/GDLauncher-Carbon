@@ -274,9 +274,10 @@ const Tile = (props: Props) => {
                   })
                   setExportStep(0)
                   setCheckedFiles([])
-                  modalsContext?.openModal({
-                    name: "exportInstance"
-                  })
+                  modalsContext?.openModal(
+                    { name: "exportInstance" },
+                    { instanceId: instanceId }
+                  )
                 }}
                 disabled={isLoading() || isInQueue() || props.isDeleting}
               >

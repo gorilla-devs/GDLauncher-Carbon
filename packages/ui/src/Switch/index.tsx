@@ -117,7 +117,7 @@ function Switch(props: Props) {
   })
 
   return (
-    <label class="relative inline-block w-10 h-5 group">
+    <label class="relative inline-block w-10 h-5 group transition-transform duration-100 active:scale-95">
       <input
         {...props}
         class="opacity-0 w-0 h-0 peer"

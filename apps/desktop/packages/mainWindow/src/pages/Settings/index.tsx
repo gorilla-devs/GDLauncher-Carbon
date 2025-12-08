@@ -1,10 +1,11 @@
 import { Outlet, useLocation } from "@solidjs/router"
 import ContentWrapper from "@/components/ContentWrapper"
-import { Tab, TabList, Tabs } from "@gd/ui"
-import { For, JSX } from "solid-js"
+import { Tabs, TabsList, TabsTrigger, TabsIndicator } from "@gd/ui"
+import { For, JSX, Show } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import FeatureStatusBadge from "@/components/FeatureStatusBadge"
 import { useTransContext } from "@gd/i18n"
+import { rspc } from "@/utils/rspcClient"
 
 export interface settingsItem {
   name: string | JSX.Element
@@ -16,8 +17,11 @@ function Settings() {
   const location = useLocation()
   const navigator = useGDNavigate()
   const [t] = useTransContext()
+  const settingsQuery = rspc.createQuery(() => ({
+    queryKey: ["settings.getSettings"]
+  }))
 
-  const settings = (): settingsItem[] => [
+  const settingsItems = (): settingsItem[] => [
     {
       name: t("settings:_trn_general"),
       icon: "i-hugeicons:home-05",
@@ -37,7 +41,7 @@ function Settings() {
       name: (
         <div class="relative flex items-center gap-2">
           {"Appearance"}
-          <div class="absolute -top-14 right-0">
+          <div class="absolute -top-10 right-0">
             <FeatureStatusBadge type="beta" />
           </div>
         </div>
@@ -70,32 +74,31 @@ function Settings() {
   return (
     <>
       <ContentWrapper zeroPadding>
-        <div class="sticky top-0 z-50 box-border w-full px-6">
-          <Tabs
-            orientation="horizontal"
-            defaultIndex={settings().findIndex(
-              (item) => item.path === location.pathname
-            )}
-          >
-            <div class="h-26">
-              <TabList>
-                <For each={settings()}>
-                  {(item) => (
-                    <Tab
-                      onClick={() => {
-                        navigator.navigate(item.path)
-                      }}
-                    >
-                      <div class="flex flex-col items-center justify-center gap-2">
-                        <i class={"w-5 h-5 " + item.icon} />
-                        <div class="whitespace-nowrap text-center">
-                          {item.name}
-                        </div>
-                      </div>
-                    </Tab>
-                  )}
-                </For>
-              </TabList>
+        <div class="sticky top-0 z-50 box-border w-full px-6 pt-6 bg-darkSlate-800">
+          <Tabs value={location.pathname}>
+            <div class="overflow-x-auto scrollbar-hide">
+              <Show when={settingsQuery.data?.language} keyed>
+                {(_lang) => (
+                  <TabsList class="gap-1 w-max h-auto mx-auto">
+                    <TabsIndicator />
+                    <For each={settingsItems()}>
+                      {(item) => (
+                        <TabsTrigger
+                          value={item.path}
+                          onClick={() => navigator.navigate(item.path)}
+                        >
+                          <div class="flex flex-col items-center justify-center gap-2 py-2">
+                            <i class={"w-5 h-5 " + item.icon} />
+                            <div class="whitespace-nowrap text-center">
+                              {item.name}
+                            </div>
+                          </div>
+                        </TabsTrigger>
+                      )}
+                    </For>
+                  </TabsList>
+                )}
+              </Show>
             </div>
           </Tabs>
         </div>

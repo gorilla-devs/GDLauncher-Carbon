@@ -24,8 +24,8 @@ model AppConfiguration {
   instancesTileSize               Int      @default(2) // 1-5
   instancesGroupBy                String   @default("group")
   instancesGroupByAsc             Boolean  @default(true)
-  instancesSortBy                 String   @default("name")
-  instancesSortByAsc              Boolean  @default(true)
+  instancesSortBy                 String   @default("created")
+  instancesSortByAsc              Boolean  @default(false)
   showFeatured                    Boolean  @default(true)
   // Other settings
   deletionThroughRecycleBin       Boolean  @default(true)

@@ -66,7 +66,8 @@ const BeginExport = (props: Props) => {
       instance_id: payload.instance_id!,
       save_path: payload.save_path!,
       target: payload.target,
-      self_contained_addons_bundling: payload.self_contained_addons_bundling
+      self_contained_addons_bundling: payload.self_contained_addons_bundling,
+      version: payload.version
     }
 
     if (validatePayload(exportObj)) {

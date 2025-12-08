@@ -3,6 +3,7 @@ import ModalLayout from "../ModalLayout"
 import { Trans } from "@gd/i18n"
 import { Button } from "@gd/ui"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
+import { logoUrl } from "@/utils/logos"
 
 const WhyAreAdsNeeded = (props: ModalProps) => {
   const modalsContext = useModal()
@@ -138,7 +139,7 @@ const WhyAreAdsNeeded = (props: ModalProps) => {
                 <div class="flex items-start gap-3">
                   <div class="bg-primary-500/20 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg p-1.5">
                     <img
-                      src="/assets/images/gdlauncher_logo.svg"
+                      src={logoUrl}
                       alt="GDLauncher"
                       class="h-full w-full object-contain"
                     />

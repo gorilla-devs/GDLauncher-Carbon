@@ -34,6 +34,7 @@ interface InstanceDropdownProps {
   handleInstanceSelection: (instanceId: number) => void
   onDropdownOpenChange?: (isOpen: boolean) => void
   size?: "small" | "medium" | "large"
+  iconOnly?: boolean
 }
 
 export const InstanceDropdown = (props: InstanceDropdownProps) => {
@@ -147,8 +148,15 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
       }}
     >
       <DropdownMenuTrigger>
-        <Button class="w-52" variant="primary" size={props.size}>
-          <Trans key="instances:_trn_add_to_an_instance" />
+        <Button
+          class={props.iconOnly ? "" : "w-60"}
+          variant="primary"
+          size={props.size}
+        >
+          <div class="i-hugeicons:package-add h-5 w-5" />
+          <Show when={!props.iconOnly}>
+            <Trans key="instances:_trn_add_to_an_instance" />
+          </Show>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent class="w-80 p-0">

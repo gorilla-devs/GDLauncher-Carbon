@@ -17,7 +17,7 @@ import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { rspc } from "@/utils/rspcClient"
 import { getCurrentOccasion } from "@/utils/occasions"
-import Logo from "/assets/images/gdlauncher_wide_logo_blue.svg"
+import { wideLogoUrl } from "@/utils/logos"
 import BackgroundVideo from "/assets/images/login_background.webm"
 
 import "./styles/viewTransitions.css"
@@ -551,6 +551,7 @@ function AuthFlowContent() {
           case "welcome":
             return false
           case "terms":
+            return step.variant !== "forced"
           case "auth-method":
           case "enrolling":
           case "profile-creation":
@@ -725,7 +726,7 @@ function AuthFlowContent() {
       >
         {/* Logo */}
         <div class="h-30 flex justify-center">
-          <img class="w-60" src={Logo} alt="GDLauncher" />
+          <img class="w-60" src={wideLogoUrl} alt="GDLauncher" />
         </div>
 
         <Show
