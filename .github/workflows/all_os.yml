@@ -10,7 +10,7 @@ jobs:
     defaults:
       run:
         working-directory: ./GDL
-    runs-on: macos-15
+    runs-on: macos-14
     timeout-minutes: 80
     env:
       MACOSX_DEPLOYMENT_TARGET: "11.0"
