@@ -1,5 +1,5 @@
 import DefaultImg from "/assets/images/default-instance-img.png"
-import { McType } from "@gd/core_module/bindings"
+import { FEUnifiedSearchType, McType } from "@gd/core_module/bindings"
 import { Trans } from "@gd/i18n"
 import {
   Checkbox,
@@ -10,7 +10,7 @@ import {
   SelectValue
 } from "@gd/ui"
 import { useSearchParams } from "@solidjs/router"
-import { Match, Switch, createMemo, createSignal } from "solid-js"
+import { Match, Show, Switch, createMemo, createSignal } from "solid-js"
 import { createStore } from "solid-js/store"
 import { rspc } from "@/utils/rspcClient"
 import { useInfiniteVersionsQuery } from "../InfiniteScrollVersionsQueryWrapper"
@@ -39,6 +39,7 @@ const mapTypeToColor = (type: McType) => {
 interface Props {
   modplatform: "curseforge" | "modrinth"
   type: "modpack" | "mod"
+  addonType?: FEUnifiedSearchType
 }
 
 const ExploreVersionsNavbar = (props: Props) => {
@@ -50,6 +51,12 @@ const ExploreVersionsNavbar = (props: Props) => {
   const globalStore = useGlobalStore()
 
   const infiniteQuery = useInfiniteVersionsQuery()
+
+  // Helper to determine if modloader filter should be shown
+  // Currently only hides for resourcePack, easily extensible to other types
+  const shouldShowModloaderFilter = () => {
+    return props.addonType !== "resourcePack"
+  }
 
   const [overrideEnabled, setOverrideEnabled] = createSignal(
     instanceId() === null
@@ -181,43 +188,45 @@ const ExploreVersionsNavbar = (props: Props) => {
           <SelectContent />
         </Select>
       </div>
-      <div class="flex items-center gap-2">
-        <Select
-          value={infiniteQuery.query.modLoaderType || ""}
-          options={modloaders()}
-          disabled={!overrideEnabled()}
-          placeholder={
-            <div class="flex items-center gap-2">
-              <div class="i-hugeicons:tag-01" />
-              <span>
-                <Trans key="enums:_trn_modloader_all" />
-              </span>
-            </div>
-          }
-          onChange={(val) => {
-            infiniteQuery?.setQuery({
-              modLoaderType: val || null
-            })
-          }}
-          itemComponent={(props) => (
-            <SelectItem item={props.item}>
-              {getModloaderLabel(props.item.rawValue)}
-            </SelectItem>
-          )}
-        >
-          <SelectTrigger class="w-full">
-            <SelectValue<string>>
-              {(state) => (
-                <div class="flex items-center gap-2">
-                  <div class="i-hugeicons:tag-01" />
-                  <span>{state.selectedOption()}</span>
-                </div>
-              )}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent />
-        </Select>
-      </div>
+      <Show when={shouldShowModloaderFilter()}>
+        <div class="flex items-center gap-2">
+          <Select
+            value={infiniteQuery.query.modLoaderType || ""}
+            options={modloaders()}
+            disabled={!overrideEnabled()}
+            placeholder={
+              <div class="flex items-center gap-2">
+                <div class="i-hugeicons:tag-01" />
+                <span>
+                  <Trans key="enums:_trn_modloader_all" />
+                </span>
+              </div>
+            }
+            onChange={(val) => {
+              infiniteQuery?.setQuery({
+                modLoaderType: val || null
+              })
+            }}
+            itemComponent={(props) => (
+              <SelectItem item={props.item}>
+                {getModloaderLabel(props.item.rawValue)}
+              </SelectItem>
+            )}
+          >
+            <SelectTrigger class="w-full">
+              <SelectValue<string>>
+                {(state) => (
+                  <div class="flex items-center gap-2">
+                    <div class="i-hugeicons:tag-01" />
+                    <span>{state.selectedOption()}</span>
+                  </div>
+                )}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent />
+          </Select>
+        </div>
+      </Show>
     </div>
   )
 }

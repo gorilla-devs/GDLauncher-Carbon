@@ -23,7 +23,6 @@ const NAVBAR_HEIGHT = 60
 const GAP_LARGE = 16
 const GAP_SMALL = 10
 const TEXT_HEIGHT_FULL = 100
-const TEXT_HEIGHT_SMALL = 60
 
 const getTitlebarHeight = () => {
   const platform = os.platform() as keyof typeof TITLEBAR_HEIGHT
@@ -139,29 +138,22 @@ export default function getAdSize(display?: Display) {
 
   // Tier 3: Medium displays (≥1024×700 effective)
   // Designed for 1366×768 laptops with taskbar
-  // Uses STANDARD (400px), minWidth 1145px for ≤35% coverage (34.9%)
+  // Uses SKYSCRAPER (160px) to preserve content area on laptops
   if (width >= 1024 && height >= 700) {
-    // Determine if we have enough height for text (768px - 40px taskbar = 728px usable)
-    // With text (762px min) doesn't fit, without text (702px min) fits
-    const hasSpaceForText = height >= 780
-    const textHeight = hasSpaceForText ? TEXT_HEIGHT_SMALL : 0
-    const gap = GAP_SMALL
-
     const minHeight =
       getTitlebarHeight() +
       NAVBAR_HEIGHT +
-      AD_SIZES.STANDARD.height +
-      gap +
-      textHeight
+      AD_SIZES.SKYSCRAPER.height +
+      GAP_SMALL
 
     return {
-      minWidth: 1145,
+      minWidth: 900,
       minHeight,
-      width: Math.min(width - 60, 1280),
-      height: Math.min(height - 40, Math.max(minHeight, 780)),
+      width: Math.min(width - 60, 1100),
+      height: Math.min(height - 40, Math.max(minHeight, 750)),
       adSize: {
-        width: AD_SIZES.STANDARD.width,
-        height: AD_SIZES.STANDARD.height,
+        width: AD_SIZES.SKYSCRAPER.width,
+        height: AD_SIZES.SKYSCRAPER.height,
         shouldShow: true
       },
       bannerAdSize: {
@@ -169,7 +161,7 @@ export default function getAdSize(display?: Display) {
         height: 0,
         shouldShow: false
       },
-      hideAdText: !hasSpaceForText
+      hideAdText: true
     }
   }
 

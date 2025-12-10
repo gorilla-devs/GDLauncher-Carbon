@@ -79,25 +79,28 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     enabled: !!selectedInstanceId()
   }))
 
-  createAsyncEffect<number>((isStale, prevId) => {
+  // Track previous instance ID to detect changes
+  let prevInstanceId: number | undefined = undefined
+
+  // Use cached instance data to populate filters instantly
+  createEffect(() => {
     const currentId = selectedInstanceId()
-    if (currentId && currentId !== prevId) {
-      selectedInstanceMods.refetch()
-      selectedInstance.refetch().then((res) => {
-        // Check if still on same instance to avoid race conditions
-        if (!isStale()) {
-          const modloader = res.data?.modloaders[0]
-          const gameVersion = res.data?.version
-          setSearchQuery((prev) => ({
-            ...prev,
-            modloaders: modloader ? [modloader.type_] : null,
-            gameVersions: gameVersion ? [gameVersion] : null
-          }))
-        }
-      })
+    const instanceData = selectedInstance.data
+
+    // Only update filters when instance changes and data is available
+    if (currentId && currentId !== prevInstanceId && instanceData) {
+      const modloader = instanceData.modloaders[0]
+      const gameVersion = instanceData.version
+      setSearchQuery((prev) => ({
+        ...prev,
+        modloaders: modloader ? [modloader.type_] : null,
+        gameVersions: gameVersion ? [gameVersion] : null
+      }))
+      prevInstanceId = currentId
+    } else if (!currentId) {
+      prevInstanceId = undefined
     }
-    return currentId
-  }, undefined)
+  })
 
   const [searchQuery, _setSearchQuery] =
     createSignal<FEUnifiedSearchParameters>(

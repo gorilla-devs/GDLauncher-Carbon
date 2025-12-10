@@ -102,6 +102,10 @@ pub fn main() {
 
             let _guard = logger::setup_logger(&runtime_path).await;
 
+            // Clean up leftover temp files/folders from previous sessions
+            let temp_path = carbon_rt_path::TempPath::new(runtime_path.join("temp"));
+            temp_path.cleanup_all();
+
             info!("Starting Carbon App v{}", app_version::APP_VERSION);
 
             #[cfg(feature = "production")]

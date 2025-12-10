@@ -486,7 +486,11 @@ const AddonExplore = () => {
                   project.data?.type !== "modpack"
                 }
               >
-                <ExploreVersionsNavbar modplatform={platform()} type="mod" />
+                <ExploreVersionsNavbar
+                  modplatform={platform()}
+                  type="mod"
+                  addonType={project.data?.type}
+                />
               </Show>
             </div>
             <div class="z-0 flex flex-1 flex-col px-0 pt-4 min-w-0">

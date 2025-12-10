@@ -286,8 +286,8 @@ Skeleton.featuredHomeTile = () => {
 
 const SearchListItem = () => {
   return (
-    <div class="my-1 overflow-hidden rounded-md px-12 py-2">
-      <div class="relative flex h-full cursor-pointer gap-2 overflow-hidden rounded-md border border-transparent p-1.5">
+    <div class="my-2 overflow-hidden rounded-md">
+      <div class="relative flex h-full cursor-pointer gap-2 overflow-hidden rounded-md border border-transparent px-8 py-2">
         <div class="relative z-10 flex w-full items-center gap-4">
           <div class="bg-darkSlate-500 skeleton-shimmer h-16 w-16 rounded-md" />
           <div class="w-7/10 flex flex-col gap-2">
@@ -322,7 +322,7 @@ Skeleton.searchListItem = SearchListItem
 
 Skeleton.searchList = () => {
   return (
-    <div class="flex w-full flex-col gap-1">
+    <div class="flex w-full flex-col gap-4 px-6">
       <For each={new Array(12)}>{() => <SearchListItem />}</For>
     </div>
   )

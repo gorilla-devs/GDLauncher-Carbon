@@ -39,6 +39,32 @@ fn generate_logs_filters() -> String {
     filters.to_vec().join(",")
 }
 
+/// Cleanup old log files, keeping only the most recent `keep_count` files
+fn cleanup_old_logs(logs_path: &Path, keep_count: usize) {
+    let Ok(read_dir) = std::fs::read_dir(logs_path) else {
+        return;
+    };
+
+    let mut entries: Vec<_> = read_dir
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().map_or(false, |ext| ext == "log"))
+        .collect();
+
+    // Sort by modified time, newest first
+    entries.sort_by(|a, b| {
+        let time_a = a.metadata().ok().and_then(|m| m.modified().ok());
+        let time_b = b.metadata().ok().and_then(|m| m.modified().ok());
+        time_b.cmp(&time_a)
+    });
+
+    // Delete all but the newest `keep_count` files
+    for entry in entries.into_iter().skip(keep_count) {
+        if let Err(e) = std::fs::remove_file(entry.path()) {
+            eprintln!("Failed to delete old log file {:?}: {}", entry.path(), e);
+        }
+    }
+}
+
 pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
     let logs_path = runtime_path.join("__gdl_logs__");
 
@@ -47,6 +73,9 @@ pub async fn setup_logger(runtime_path: &Path) -> Option<WorkerGuard> {
     if !logs_path.exists() {
         tokio::fs::create_dir_all(&logs_path).await.unwrap();
     }
+
+    // Keep only the last 5 log files to prevent disk space issues
+    cleanup_old_logs(&logs_path, 5);
 
     let filter = EnvFilter::builder();
 

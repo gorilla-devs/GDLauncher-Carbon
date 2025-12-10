@@ -178,6 +178,10 @@ impl InstancePath {
 pub struct TempPath(PathBuf);
 
 impl TempPath {
+    pub fn new(path: PathBuf) -> Self {
+        Self(path)
+    }
+
     pub fn to_path(&self) -> PathBuf {
         self.0.clone()
     }
@@ -239,6 +243,22 @@ impl TempPath {
         tmp.try_rename_or_move(path).await?;
 
         Ok(())
+    }
+
+    /// Clean up all temp files/folders. Should be called on startup.
+    pub fn cleanup_all(&self) {
+        let Ok(read_dir) = std::fs::read_dir(&self.0) else {
+            return;
+        };
+
+        for entry in read_dir.filter_map(|e| e.ok()) {
+            let path = entry.path();
+            if path.is_dir() {
+                let _ = std::fs::remove_dir_all(&path);
+            } else {
+                let _ = std::fs::remove_file(&path);
+            }
+        }
     }
 }
 
