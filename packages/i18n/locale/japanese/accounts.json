@@ -22,7 +22,7 @@
 "_trn_microsoft_email": "Microsoftメールアドレス",
 "_trn_send_new_verification_email": "新しい確認メールを送信",
 "_trn_danger_zone": "危険エリア",
-"_trn_request_account_deletion_description": "GDLauncherアカウントの削除は恒久的な操作であり、取り消すことはできません。保存されているすべてのデータへのアクセスが失われます。",
+"_trn_request_account_deletion_description": "GDLauncherのアカウントを削除すると、二度と元に戻せません。保存していたデータもすべて消えてしまい、見ることができなくなります。",
 "_trn_request_account_deletion": "削除をリクエスト",
 "_trn_remove_ms_account_with_gdl_account_removal_description": "このMicrosoftアカウントはGDLauncherアカウントにリンクされています。このアカウントを削除すると、GDLauncherアカウントからもログアウトされ、データの同期が停止します。",
 "_trn_confirm_removal": "削除の確認",
