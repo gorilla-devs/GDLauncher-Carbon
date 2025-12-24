@@ -636,6 +636,7 @@ enum ListInstanceStatus {
 struct ValidListInstance {
     mc_version: Option<String>,
     modloader: Option<FEInstanceModloaderType>,
+    modloader_version: Option<String>,
     modpack: Option<Modpack>,
     state: LaunchState,
 }
@@ -1403,6 +1404,7 @@ impl From<manager::ValidListInstance> for ValidListInstance {
         Self {
             mc_version: value.mc_version,
             modloader: value.modloader.map(Into::into),
+            modloader_version: value.modloader_version,
             modpack: value.modpack.map(Into::into),
             state: value.state.into(),
         }

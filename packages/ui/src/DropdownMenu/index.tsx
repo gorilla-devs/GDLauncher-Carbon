@@ -5,6 +5,7 @@ import * as DropdownMenuPrimitive from "@kobalte/core/dropdown-menu"
 import type { PolymorphicProps } from "@kobalte/core/polymorphic"
 
 import { cn } from "../util"
+import { PRESS_CLASSES } from "../Clickable"
 
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
 const DropdownMenuPortal = DropdownMenuPrimitive.Portal
@@ -52,7 +53,8 @@ const DropdownMenuItem = <T extends ValidComponent = "div">(
   return (
     <DropdownMenuPrimitive.Item
       class={cn(
-        "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-darkSlate-700 focus:text-lightSlate-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 active:scale-95",
+        "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-darkSlate-700 focus:text-lightSlate-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        PRESS_CLASSES,
         props.class
       )}
       {...rest}
@@ -119,7 +121,8 @@ const DropdownMenuSubTrigger = <T extends ValidComponent = "div">(
   return (
     <DropdownMenuPrimitive.SubTrigger
       class={cn(
-        "flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-darkSlate-700 data-[state=open]:bg-darkSlate-700 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 active:scale-95",
+        "flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-darkSlate-700 data-[state=open]:bg-darkSlate-700 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        PRESS_CLASSES,
         props.class
       )}
       {...rest}

@@ -498,7 +498,7 @@ export function SearchEnvironmentDropdown(_props: DropdownProps) {
 export function CurseforgeFiltersDropdown(_props: DropdownProps) {
   const searchResults = useSearchContext()
 
-  const sortFieldOptions = [
+  const sort_fieldOptions = [
     { value: "featured", key: "search:_trn_featured" },
     { value: "popularity", key: "search:_trn_popularity" },
     { value: "totalDownloads", key: "search:_trn_downloads" },
@@ -515,7 +515,9 @@ export function CurseforgeFiltersDropdown(_props: DropdownProps) {
     return { sort_field: null, sort_order: null }
   }
 
-  const updateCurseforgeFilters = (updates: Partial<typeof currentFilters>) => {
+  const updateCurseforgeFilters = (
+    updates: Partial<ReturnType<typeof currentFilters>>
+  ) => {
     searchResults?.setSearchQuery((prev) => ({
       ...prev,
       platformFilters: {
@@ -537,7 +539,7 @@ export function CurseforgeFiltersDropdown(_props: DropdownProps) {
         <DropdownMenuPortal>
           <DropdownMenuSubContent>
             <DropdownMenuRadioGroup value={currentFilters().sort_field ?? ""}>
-              <For each={sortFieldOptions}>
+              <For each={sort_fieldOptions}>
                 {(option) => (
                   <DropdownMenuRadioItem
                     value={option.value}
@@ -608,7 +610,9 @@ export function ModrinthFiltersDropdown(_props: DropdownProps) {
     return { sort_index: null }
   }
 
-  const updateModrinthFilters = (updates: Partial<typeof currentFilters>) => {
+  const updateModrinthFilters = (
+    updates: Partial<ReturnType<typeof currentFilters>>
+  ) => {
     searchResults?.setSearchQuery((prev) => ({
       ...prev,
       platformFilters: {

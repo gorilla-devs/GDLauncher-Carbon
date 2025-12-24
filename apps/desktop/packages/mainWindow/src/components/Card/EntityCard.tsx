@@ -1,5 +1,6 @@
 import { ImportEntityStatus } from "@gd/core_module/bindings"
 import { useTransContext, NamespacedTranslationKey } from "@gd/i18n"
+import { PRESS_CLASSES } from "@gd/ui"
 import { Show } from "solid-js"
 
 export interface EntityCardProps {
@@ -17,15 +18,15 @@ const EntityCard = (props: EntityCardProps) => {
     <li
       class={`h-32 w-32 rounded-lg p-4 text-center ${
         props.entity.supported ? "cursor-pointer" : ""
-      } flex-col gap-3  shadow-md ${
+      } flex-col gap-3 shadow-md ${
         props.entity.selection_type ? "hover:bg-[#1d2029ca]" : ""
-      }  flex list-none items-center hover:shadow-lg  ${
+      } flex list-none items-center hover:shadow-lg ${
         props.entity.supported ? "" : "bg-opacity-50"
       } inline-block justify-center backdrop-blur-lg ${
         props.className ? props.className : "h-20 w-auto"
       } bg-[#1D2028] ${
         props.selected ? "border-1 border-primary-500 border-solid" : ""
-      }`}
+      } ${props.entity.supported ? PRESS_CLASSES : ""}`}
       onClick={props.onClick}
     >
       {/* <div class={`${props.icon} text-red-400 text-5xl`}></div> */}

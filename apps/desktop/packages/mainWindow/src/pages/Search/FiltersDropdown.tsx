@@ -9,6 +9,7 @@ import {
 } from "@/components/NavSearchInputFilters"
 import { Trans } from "@gd/i18n"
 import useSearchContext from "@/components/SearchInputContext"
+import { ViewModeToggle } from "./ViewModeToggle"
 
 export function FiltersDropdown() {
   const searchContext = useSearchContext()
@@ -27,6 +28,13 @@ export function FiltersDropdown() {
 
   return (
     <>
+      <DropdownMenuLabel>
+        <div class="flex items-center justify-between gap-2">
+          <Trans key="search:_trn_view_mode" />
+          <ViewModeToggle />
+        </div>
+      </DropdownMenuLabel>
+      <DropdownMenuSeparator />
       <DropdownMenuLabel>
         <div class="flex items-center justify-between gap-2">
           <div>

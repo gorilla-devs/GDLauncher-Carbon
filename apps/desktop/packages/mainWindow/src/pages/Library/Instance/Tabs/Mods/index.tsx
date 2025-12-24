@@ -153,7 +153,7 @@ const Mods = () => {
   return (
     <div>
       <div
-        class="bg-darkSlate-900 border-darkSlate-700 border-1 shadow-darkSlate-900 w-130 fixed bottom-4 left-1/2 z-50 mx-auto flex h-16 origin-left -translate-x-1/2 items-center justify-between rounded-md border-solid pr-6 shadow-md transition-transform duration-100 ease-in-out"
+        class="bg-darkSlate-900 border-darkSlate-700 border-1 shadow-darkSlate-900 w-130 fixed bottom-4 left-1/2 z-50 mx-auto flex h-16 origin-left -translate-x-1/2 items-center justify-between rounded-md border-solid pr-6 shadow-md transition-transform duration-100 ease-spring"
         classList={{
           "translate-y-24": selectedMods()?.length === 0
         }}
@@ -250,7 +250,7 @@ const Mods = () => {
           </Show>
           <Show when={!isInstanceLocked()}>
             <div
-              class="text-lightSlate-700 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out hover:text-red-500"
+              class="text-lightSlate-700 flex cursor-pointer items-center gap-2 transition duration-100 ease-spring hover:text-red-500"
               onClick={() => {
                 Object.keys(selectedModsMap).forEach((mod) => {
                   deleteModMutation.mutate({
@@ -282,7 +282,7 @@ const Mods = () => {
             </Show>
             <Show when={!isInstanceLocked()}>
               <div
-                class="text-lightSlate-700 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out hover:text-green-500"
+                class="text-lightSlate-700 flex cursor-pointer items-center gap-2 transition duration-100 ease-spring hover:text-green-500"
                 onClick={() => {
                   updateSelectedMods()
                 }}
@@ -295,7 +295,7 @@ const Mods = () => {
         </div>
       </div>
 
-      <div class="bg-darkSlate-800 sticky top-14 z-10 flex flex-col px-6 transition-all duration-100 ease-in-out">
+      <div class="bg-darkSlate-800 sticky top-14 z-10 flex flex-col px-6 transition-all duration-100 ease-spring">
         <div class="flex flex-wrap items-center justify-between gap-1 pb-4">
           <div class="flex cursor-pointer items-center gap-4">
             <Checkbox
@@ -345,7 +345,7 @@ const Mods = () => {
               rounded
             /> */}
             {/* <div
-              class="flex items-center gap-2 cursor-pointer duration-100 ease-in-out transition hover:text-lightSlate-50 text-lightSlate-700"
+              class="flex items-center gap-2 cursor-pointer duration-100 ease-spring transition hover:text-lightSlate-50 text-lightSlate-700"
               onClick={() => {
                 openFolderMutation.mutate({
                   folder: "Mods",
@@ -389,7 +389,7 @@ const Mods = () => {
               <Tooltip placement="top">
                 <TooltipTrigger>
                   <div
-                    class="text-lightSlate-700 flex items-center gap-2 transition duration-100 ease-in-out hover:text-green-500"
+                    class="text-lightSlate-700 flex items-center gap-2 transition duration-100 ease-spring hover:text-green-500"
                     onClick={() => {
                       if (isInstanceLocked()) return
 
@@ -421,7 +421,7 @@ const Mods = () => {
             <Tooltip placement="top">
               <TooltipTrigger>
                 <div
-                  class="hover:text-lightSlate-50 text-lightSlate-700 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out"
+                  class="hover:text-lightSlate-50 text-lightSlate-700 flex cursor-pointer items-center gap-2 transition duration-100 ease-spring"
                   onClick={() => {
                     openFolderMutation.mutate({
                       folder: "Mods",

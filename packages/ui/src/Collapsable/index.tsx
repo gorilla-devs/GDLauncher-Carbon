@@ -1,4 +1,5 @@
 import { JSX, createSignal } from "solid-js"
+import { PRESS_CLASSES } from "../Clickable"
 
 interface Props {
   children: JSX.Element
@@ -15,7 +16,7 @@ const Collapsable = (props: Props) => {
   return (
     <div class="w-full box-border flex flex-col py-2 select-none max-w-full">
       <div
-        class="max-w-full h-8 flex gap-2 items-center cursor-pointer transition-transform duration-100 active:scale-95"
+        class={`max-w-full h-8 flex gap-2 items-center cursor-pointer ${PRESS_CLASSES}`}
         classList={{
           "px-6": props.size !== "small" && !props.noPadding,
           "px-2": props.size === "small" && !props.noPadding,
@@ -28,7 +29,7 @@ const Collapsable = (props: Props) => {
         }}
       >
         <div
-          class="i-hugeicons:arrow-down-01 min-w-4 min-h-4 transition ease-in-out text-lightSlate-700"
+          class="i-hugeicons:arrow-down-01 min-w-4 min-h-4 transition ease-spring text-lightSlate-700"
           classList={{
             "-rotate-180": !opened()
           }}

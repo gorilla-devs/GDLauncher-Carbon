@@ -78,7 +78,7 @@ specta = "1"
 rspc-axum = "0.1.1"
 serde = "1.0.219"
 serde_json = "1.0.140"
-daedalus = { git = "https://github.com/gorilla-devs/daedalus", rev = "69f0513fc3bf7a4a13d4629df1da69386b99906c" }
+daedalus = { git = "https://github.com/gorilla-devs/daedalus", rev = "d3c9eed96e280312c5650ff0cf2b139393d65687" }
 sha1 = "0.10.6"
 sha2 = "0.10.8"
 tar = "0.4.44"

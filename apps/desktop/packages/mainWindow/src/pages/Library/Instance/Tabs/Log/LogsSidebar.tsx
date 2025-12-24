@@ -112,7 +112,7 @@ const LogsSidebar = (props: LogsSidebarProps) => {
           }}
         >
           <div
-            class={`h-5 w-5 bg-lightSlate-800 transition-colors duration-200 ease-in-out ${
+            class={`h-5 w-5 bg-lightSlate-800 transition-colors duration-200 ease-spring ${
               sortDirection() === "asc"
                 ? "i-hugeicons:sort-by-up-01"
                 : "i-hugeicons:sort-by-down-01"

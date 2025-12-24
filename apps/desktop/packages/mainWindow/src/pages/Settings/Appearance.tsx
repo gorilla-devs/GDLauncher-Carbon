@@ -50,7 +50,7 @@ const Appearance = () => {
                 return (
                   <div>
                     <div
-                      class="w-42 relative rounded-md p-2 transition-transform duration-300 ease-in-out hover:scale-105"
+                      class="w-42 relative rounded-md p-2 transition-transform duration-300 ease-spring hover:scale-105"
                       style={{ "background-color": shade1 }}
                       classList={{
                         "scale-105": themeName() === theme
@@ -70,7 +70,7 @@ const Appearance = () => {
                       }}
                     >
                       <div
-                        class="bg-darkSlate-500 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full p-2 opacity-0 shadow-md transition-opacity duration-300 ease-in-out"
+                        class="bg-darkSlate-500 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full p-2 opacity-0 shadow-md transition-opacity duration-300 ease-spring"
                         classList={{
                           "opacity-100": themeName() === theme
                         }}

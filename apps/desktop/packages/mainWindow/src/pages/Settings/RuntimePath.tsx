@@ -62,7 +62,7 @@ const RuntimePath = () => {
               value={runtimePath()}
               icon={
                 <div
-                  class="i-hugeicons:folder-01 hover:text-lightSlate-700 h-5 w-5 cursor-pointer transition-colors ease-in-out"
+                  class="i-hugeicons:folder-01 hover:text-lightSlate-700 h-5 w-5 cursor-pointer transition-colors ease-spring"
                   onClick={async () => {
                     const result = await window.openFileDialog({
                       title: "Select Runtime Path",

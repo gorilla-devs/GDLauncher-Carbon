@@ -61,7 +61,7 @@ const input = cva(
 )
 
 const container = cva(
-  "outline-none has-[:focus-visible]:outline-darkSlate-500 hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-darkSlate-500 h-10 gap-2 box-border transition-all duration-200 rounded-md ease-in-out",
+  "outline-none has-[:focus-visible]:outline-darkSlate-500 hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-darkSlate-500 h-10 gap-2 box-border transition-[outline,background-color] duration-200 rounded-md ease-spring",
   {
     variants: {
       hasIcon: {

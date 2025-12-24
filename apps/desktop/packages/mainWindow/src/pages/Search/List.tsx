@@ -2,13 +2,14 @@ import { ListItem } from "./ListItem"
 import { VList } from "@/components/VirtuaWrapper"
 import useSearchContext from "@/components/SearchInputContext"
 import { Skeleton } from "@gd/ui"
-import { onMount, Show, createMemo } from "solid-js"
+import { Show, createMemo, Match, Switch } from "solid-js"
 import { FEUnifiedSearchType } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useParams } from "@solidjs/router"
 import { rspc } from "@/utils/rspcClient"
 import { Trans } from "@gd/i18n"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
+import { Grid } from "./Grid"
 
 export function List() {
   const searchContext = useSearchContext()
@@ -45,11 +46,8 @@ export function List() {
     }))
   }
 
-  onMount(() => {
-    queueMicrotask(() => {
-      searchContext?.ref()?.scrollTo(searchContext.lastScrollOffset())
-    })
-  })
+  // Note: Scroll restoration is handled in VList's ref callback
+  // to ensure it works when switching between view modes
 
   const installedMods = rspc.createQuery(() => ({
     queryKey: ["instance.getInstanceMods", instanceId()],
@@ -80,65 +78,76 @@ export function List() {
 
   return (
     <div class="flex h-full flex-col overflow-hidden">
-      <div class="flex-1 overflow-hidden pt-6">
-        <Show
-          when={!searchContext?.isInitialLoading()}
-          fallback={<Skeleton.searchList />}
-        >
-          <Show
-            when={(searchContext?.allRows() || []).length > 0}
-            fallback={
-              <div class="flex flex-col items-center justify-center px-6 py-16 text-center">
-                <PlaceholderGorilla
-                  size={12}
-                  variant="Searching Gorilla - Magnifying Glass"
-                />
-                <h3 class="mb-2 mt-6 text-xl font-semibold text-gray-300">
-                  <Trans key="search:_trn_no_results_found" />
-                </h3>
-                <p class="max-w-md text-gray-500">
-                  <Trans
-                    key="search:_trn_no_results_description"
-                    options={{ type: type() }}
-                  />
-                </p>
-              </div>
-            }
-          >
-            <VList
-              data={searchContext?.allRows() || []}
-              class="flex h-full max-w-full flex-col gap-4 overflow-auto px-6 pb-6"
-              ref={(v) => {
-                if (v) {
-                  searchContext?.setRef(v)
-                }
-              }}
-              onScroll={searchContext?.virtualOnScrollHandler}
+      <div class="flex-1 overflow-hidden">
+        <Switch>
+          <Match when={searchContext?.viewMode() === "grid"}>
+            <Grid />
+          </Match>
+          <Match when={searchContext?.viewMode() === "list"}>
+            <Show
+              when={!searchContext?.isInitialLoading()}
+              fallback={<Skeleton.searchList />}
             >
-              {(result) => {
-                if (result.type === "loader") {
-                  return <Skeleton.searchListItem />
+              <Show
+                when={(searchContext?.allRows() || []).length > 0}
+                fallback={
+                  <div class="flex flex-col items-center justify-center px-6 py-16 text-center">
+                    <PlaceholderGorilla
+                      size={12}
+                      variant="Searching Gorilla - Magnifying Glass"
+                    />
+                    <h3 class="mb-2 mt-6 text-xl font-semibold text-gray-300">
+                      <Trans key="search:_trn_no_results_found" />
+                    </h3>
+                    <p class="max-w-md text-gray-500">
+                      <Trans
+                        key="search:_trn_no_results_description"
+                        options={{ type: type() }}
+                      />
+                    </p>
+                  </div>
                 }
+              >
+                <VList
+                  data={searchContext?.allRows() || []}
+                  class="flex h-full max-w-full flex-col gap-4 overflow-auto px-6 pb-6"
+                  ref={(v) => {
+                    if (v) {
+                      searchContext?.setRef(v)
+                      // Restore scroll position when VList mounts
+                      queueMicrotask(() => {
+                        v.scrollTo(searchContext?.lastScrollOffset() ?? 0)
+                      })
+                    }
+                  }}
+                  onScroll={searchContext?.virtualOnScrollHandler}
+                >
+                  {(result) => {
+                    if (result.type === "loader") {
+                      return <Skeleton.searchListItem />
+                    }
 
-                return (
-                  <ListItem
-                    instanceMods={instanceMods()?.data ?? undefined}
-                    instanceId={instanceId()}
-                    result={result.value!}
-                    isInstalled={lookupTableInstalledMods().has(
-                      result.value!.id
-                    )}
-                    onItemClick={() => {
-                      navigator.navigate(
-                        `/addon/${result.value!.id}/${result.value!.platform}?instanceId=${instanceId()}`
-                      )
-                    }}
-                  />
-                )
-              }}
-            </VList>
-          </Show>
-        </Show>
+                    return (
+                      <ListItem
+                        instanceMods={instanceMods()?.data ?? undefined}
+                        instanceId={instanceId()}
+                        result={result.value!}
+                        isInstalled={lookupTableInstalledMods().has(
+                          result.value!.id
+                        )}
+                        onItemClick={() => {
+                          navigator.navigate(
+                            `/addon/${result.value!.id}/${result.value!.platform}?instanceId=${instanceId()}`
+                          )
+                        }}
+                      />
+                    )
+                  }}
+                </VList>
+              </Show>
+            </Show>
+          </Match>
+        </Switch>
       </div>
     </div>
   )

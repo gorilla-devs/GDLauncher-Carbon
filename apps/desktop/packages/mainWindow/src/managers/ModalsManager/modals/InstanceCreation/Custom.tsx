@@ -7,7 +7,8 @@ import {
   SelectContent,
   SelectItem,
   SelectValue,
-  Badge
+  Badge,
+  PRESS_CLASSES
 } from "@gd/ui"
 import { ModalProps, useModal } from "../.."
 import { Trans, useTransContext } from "@gd/i18n"
@@ -745,7 +746,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             <For each={modloaders}>
               {(modloader) => (
                 <button
-                  class="bg-darkSlate-800 hover:outline-darkSlate-600 hover:bg-darkSlate-700 group flex flex-col items-center gap-2 rounded-lg border-0 border-transparent p-3 outline-none transition-all duration-200 ease-in-out"
+                  class={`bg-darkSlate-800 hover:outline-darkSlate-600 hover:bg-darkSlate-700 group flex flex-col items-center gap-2 rounded-lg border-0 border-transparent p-3 outline-none ${PRESS_CLASSES}`}
                   classList={{
                     "!outline-primary-500": loader() === modloader.key
                   }}

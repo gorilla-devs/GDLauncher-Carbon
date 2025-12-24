@@ -20,15 +20,19 @@ const Addons = () => {
   const addonData = useAddonData()
 
   // Mutations and actions
-  const addonMutations = useAddonMutations(addonData.allAddons.refetch, {
-    optimisticToggleAddon: addonData.optimisticToggleAddon,
-    optimisticDeleteAddon: addonData.optimisticDeleteAddon,
-    optimisticDeleteAddons: addonData.optimisticDeleteAddons,
-    optimisticUpdateAddon: addonData.optimisticUpdateAddon,
-    rollbackToServerState: addonData.rollbackToServerState,
-    startUpdatingMod: addonData.startUpdatingMod,
-    stopUpdatingMod: addonData.stopUpdatingMod
-  })
+  const addonMutations = useAddonMutations(
+    addonData.allAddons.refetch,
+    {
+      optimisticToggleAddon: addonData.optimisticToggleAddon,
+      optimisticDeleteAddon: addonData.optimisticDeleteAddon,
+      optimisticDeleteAddons: addonData.optimisticDeleteAddons,
+      optimisticUpdateAddon: addonData.optimisticUpdateAddon,
+      rollbackToServerState: addonData.rollbackToServerState,
+      startUpdatingMod: addonData.startUpdatingMod,
+      stopUpdatingMod: addonData.stopUpdatingMod
+    },
+    addonData.setRowSelection
+  )
 
   const isInstanceLocked = () =>
     !!routeData.instanceDetails.data?.modpack?.locked

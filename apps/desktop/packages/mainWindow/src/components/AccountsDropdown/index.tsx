@@ -122,7 +122,7 @@ export const AccountsDropdown = (props: Props) => {
     >
       <PopoverTrigger>
         <div
-          class="group relative rounded-lg p-4 transition-all duration-100 ease-in-out"
+          class="group relative rounded-lg p-4 transition-all duration-100 ease-spring"
           classList={{
             "bg-darkSlate-700": showAccountsDropdown()
           }}
@@ -270,7 +270,7 @@ export const AccountsDropdown = (props: Props) => {
                 class="i-hugeicons:settings-01 text-2xl pointer-events-auto"
                 classList={{
                   "text-lightSlate-50": !!props.disabled,
-                  "hover:text-lightSlate-100 duration-100 ease-in-out":
+                  "hover:text-lightSlate-100 duration-100 ease-spring":
                     !!props.disabled
                 }}
               />

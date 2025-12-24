@@ -533,7 +533,9 @@ export class FlowControllerImpl implements FlowController {
         return { type: "none" }
       } catch (error) {
         console.error("[FlowController] Failed to peek GDL account:", error)
-        return { type: "none" }
+        const errorMessage =
+          error instanceof Error ? error.message : "Failed to check account"
+        return { type: "error", message: errorMessage }
       }
     } finally {
       // Don't hide loading here - caller is responsible
@@ -618,9 +620,14 @@ export class FlowControllerImpl implements FlowController {
         })
       } catch (error) {
         console.error("[FlowController] Failed to peek GDL account:", error)
+        const errorMessage =
+          error instanceof Error ? error.message : "Failed to check account"
         this.setState({
           phase: "content",
-          step: { type: "gdl-account", gdlAccount: { type: "none" } }
+          step: {
+            type: "gdl-account",
+            gdlAccount: { type: "error", message: errorMessage }
+          }
         })
       }
     } finally {
@@ -673,6 +680,15 @@ export class FlowControllerImpl implements FlowController {
           queryKey: ["account.getActiveUuid"]
         })
       ])
+
+      // Get the new active UUID from the backend and update local state
+      // This is critical for checkGDLAccount() to work correctly after enrollment
+      const activeUuid = await this.rspcContext.client.query([
+        "account.getActiveUuid"
+      ])
+      if (activeUuid) {
+        this.data.activeUuid = activeUuid
+      }
 
       // Update local accounts list
       const accountsResult = await this.accountsQuery.refetch()

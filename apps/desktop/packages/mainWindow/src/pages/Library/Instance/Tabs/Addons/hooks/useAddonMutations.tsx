@@ -15,7 +15,12 @@ export const useAddonMutations = (
     rollbackToServerState: () => void
     startUpdatingMod: (modId: string) => void
     stopUpdatingMod: (modId: string) => void
-  }
+  },
+  setRowSelection: (
+    fn:
+      | Record<string, boolean>
+      | ((prev: Record<string, boolean>) => Record<string, boolean>)
+  ) => void
 ) => {
   const params = useParams()
   const navigator = useGDNavigate()
@@ -119,6 +124,13 @@ export const useAddonMutations = (
   }
 
   const handleDeleteMod = async (mod: ModType) => {
+    // Deselect the addon being deleted
+    setRowSelection((prev) => {
+      const next = { ...prev }
+      delete next[mod.id]
+      return next
+    })
+
     // Optimistic update
     optimisticUpdates.optimisticDeleteAddon(mod.id)
 
@@ -137,6 +149,9 @@ export const useAddonMutations = (
   }
 
   const handleDeleteSelected = async (selectedMods: ModType[]) => {
+    // Clear selection (all selected items are being deleted)
+    setRowSelection({})
+
     const selectedIds = selectedMods.map((mod) => mod.id)
 
     // Optimistic update

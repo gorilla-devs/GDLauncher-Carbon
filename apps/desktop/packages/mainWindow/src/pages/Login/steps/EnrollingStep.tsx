@@ -5,7 +5,9 @@ import {
   toast,
   Popover,
   PopoverContent,
-  PopoverTrigger
+  PopoverTrigger,
+  CopyText,
+  Skeleton
 } from "@gd/ui"
 import {
   Show,
@@ -15,12 +17,12 @@ import {
   createEffect,
   onCleanup
 } from "solid-js"
+import QRCode from "qrcode"
 import { msToMinutes, msToSeconds, parseTwoDigitNumber } from "@/utils/helpers"
 import GateAnimationRiveWrapper from "@/utils/GateAnimationRiveWrapper"
 import GateAnimation from "../../../gate_animation.riv"
 import { useFlow } from "../flow/FlowContext"
 import type { AuthStep } from "../flow/types"
-import { DeviceCode } from "@/components/CodeInput"
 import { rspc } from "@/utils/rspcClient"
 
 /**
@@ -40,6 +42,8 @@ export function EnrollingStep(props: EnrollingStepProps) {
   const [t] = useTransContext()
   const [loading, setLoading] = createSignal(false)
 
+  let qrCanvasRef: HTMLCanvasElement | undefined
+
   const method = () => props.step.method
 
   // Poll enrollment status from backend
@@ -50,6 +54,12 @@ export function EnrollingStep(props: EnrollingStepProps) {
   }))
 
   const status = () => enrollmentStatus.data
+
+  // Check if polling code data is available
+  const hasPollingCode = () => {
+    const s = status()
+    return s && typeof s === "object" && "pollingCode" in s
+  }
 
   // Timer states - extract expiry based on status variant
   const expiresAtMs = () => {
@@ -126,6 +136,31 @@ export function EnrollingStep(props: EnrollingStepProps) {
       toast.success(t("auth:_trn_login.browser_opened_toast"))
     }
   }
+
+  // Generate QR code when device code is available
+  createEffect(async () => {
+    const s = status()
+    if (
+      s &&
+      typeof s === "object" &&
+      "pollingCode" in s &&
+      qrCanvasRef &&
+      method() === "device-code"
+    ) {
+      try {
+        await QRCode.toCanvas(qrCanvasRef, s.pollingCode.verificationUri, {
+          width: 120,
+          margin: 2,
+          color: {
+            dark: "#000000",
+            light: "#FFFFFF"
+          }
+        })
+      } catch (err) {
+        console.error("Error generating QR code:", err)
+      }
+    }
+  })
 
   // Handle enrollment status updates from backend
   createEffect(() => {
@@ -280,109 +315,181 @@ export function EnrollingStep(props: EnrollingStepProps) {
           </Popover>
         </div>
 
-        {/* Device code display */}
-        <div class="flex flex-col items-center justify-center">
-          <DeviceCode
-            expired={expired()}
-            value={(() => {
-              const s = status()
-              return s && typeof s === "object" && "pollingCode" in s
-                ? s.pollingCode.userCode
-                : ""
-            })()}
-            id="login-link-btn"
-          />
-          <Show when={expired()}>
-            <p class="text-sm text-red-500">
-              <Trans key="auth:_trn_login.code_expired_message" />
-            </p>
+        {/* Steps container */}
+        <div class="flex flex-col items-center gap-3">
+          {/* Step 1: Open the link */}
+          <Show when={!expired()}>
+            <div class="bg-darkSlate-800 flex flex-col items-center gap-3 rounded-xl px-6 py-4">
+              <p class="text-lightSlate-200 m-0 text-base font-semibold">
+                <Trans key="auth:_trn_login.step_1_open_link" />
+              </p>
+
+              {/* QR Code */}
+              <div class="rounded-lg bg-white p-2">
+                <Show
+                  when={hasPollingCode()}
+                  fallback={<Skeleton class="h-[120px] w-[120px] rounded" />}
+                >
+                  <canvas
+                    ref={qrCanvasRef}
+                    width="120"
+                    height="120"
+                    class="rounded"
+                  />
+                </Show>
+              </div>
+              <p class="text-lightSlate-500 m-0 text-xs">
+                <Trans key="auth:_trn_login.scan_to_open" />
+              </p>
+
+              {/* Divider */}
+              <div class="flex w-full max-w-xs items-center gap-3">
+                <div class="bg-darkSlate-600 h-px flex-1" />
+                <span class="text-lightSlate-600 text-xs">
+                  <Trans key="general:_trn_or" />
+                </span>
+                <div class="bg-darkSlate-600 h-px flex-1" />
+              </div>
+
+              {/* Manual URL */}
+              <Show
+                when={hasPollingCode()}
+                fallback={
+                  <div class="bg-darkSlate-700 flex items-center rounded px-3 py-2 gap-2">
+                    <Skeleton class="h-5 w-48" />
+                    <Skeleton class="h-9 w-16 rounded-md" />
+                  </div>
+                }
+              >
+                <CopyText
+                  value={(() => {
+                    const s = status()
+                    return s && typeof s === "object" && "pollingCode" in s
+                      ? s.pollingCode.verificationUri
+                      : ""
+                  })()}
+                  onCopy={() => toast.success(t("auth:_trn_login.link_copied"))}
+                />
+              </Show>
+            </div>
           </Show>
-        </div>
 
-        <Show when={!expired()}>
-          <p class="text-lightSlate-700 mt-2 text-sm">
-            <span class="text-lightSlate-500 mr-1">{countDown()}</span>
-            <Trans key="auth:_trn_login.before_expiring" />
-          </p>
-        </Show>
+          {/* Step 2: Enter the code */}
+          <div class="bg-darkSlate-800 flex flex-col items-center gap-2 rounded-xl px-6 py-4">
+            <Show when={!expired()}>
+              <p class="text-lightSlate-200 m-0 text-base font-semibold">
+                <Trans key="auth:_trn_login.step_2_enter_code" />
+              </p>
+            </Show>
 
-        {/* Open browser button */}
-        <Show when={!expired()}>
-          <div class="flex flex-col items-center justify-center">
-            <p class="text-lightSlate-700 font-bold">
-              <Trans key="auth:_trn_login.enter_code_in_browser" />
-            </p>
-            <Button
-              uppercase
-              id="login-btn"
-              class="mt-12 normal-case"
-              onClick={() => {
-                const s = status()
-                if (s && typeof s === "object" && "pollingCode" in s) {
-                  const userCode = s.pollingCode.userCode
-                  const link = s.pollingCode.verificationUri
-                  navigator.clipboard.writeText(userCode)
-                  window.openExternalLink(link)
-                }
-              }}
-              disabled={loading()}
+            <Show
+              when={!expired()}
+              fallback={
+                <span class="text-lightSlate-700 text-2xl font-bold tracking-wider">
+                  {(() => {
+                    const s = status()
+                    return s && typeof s === "object" && "pollingCode" in s
+                      ? s.pollingCode.userCode
+                      : ""
+                  })()}
+                </span>
+              }
             >
-              <Trans key="auth:_trn_login.open_in_browser" />
-              <div class="text-md i-hugeicons:link-square-02" />
-            </Button>
-          </div>
-        </Show>
-      </Show>
+              <Show
+                when={hasPollingCode()}
+                fallback={
+                  <div class="bg-darkSlate-700 flex items-center rounded px-6 py-3 gap-3">
+                    <Skeleton class="h-8 w-32" />
+                    <Skeleton class="h-9 w-20 rounded-md" />
+                  </div>
+                }
+              >
+                <CopyText
+                  size="large"
+                  value={(() => {
+                    const s = status()
+                    return s && typeof s === "object" && "pollingCode" in s
+                      ? s.pollingCode.userCode
+                      : ""
+                  })()}
+                  onCopy={() =>
+                    toast.success(t("general:_trn_general_copied_to_clipboard"))
+                  }
+                />
+              </Show>
+            </Show>
 
-      {/* Loading progress with stages (both methods) */}
-      <Show
-        when={
-          enrollmentStatus.data &&
-          typeof enrollmentStatus.data === "string" &&
-          !expired()
-        }
-      >
-        <div class="flex flex-col items-center gap-2">
-          <span class="text-lightSlate-700 text-xs">
-            <Switch>
-              <Match
-                when={
-                  enrollmentStatus.data &&
-                  typeof enrollmentStatus.data === "object" &&
-                  "waitingForBrowser" in enrollmentStatus.data
-                }
-              >
-                <Trans key="auth:_trn_login.waiting_for_browser_confirmation" />
-              </Match>
-              <Match
-                when={
-                  enrollmentStatus.data &&
-                  typeof enrollmentStatus.data === "object" &&
-                  "pollingCode" in enrollmentStatus.data
-                }
-              >
-                <Trans key="auth:_trn_login.polling_microsoft_auth" />
-              </Match>
-              <Match when={enrollmentStatus.data === "xboxAuth"}>
-                <Trans key="auth:_trn_login.authenticating_xbox" />
-              </Match>
-              <Match when={enrollmentStatus.data === "mcLogin"}>
-                <Trans key="auth:_trn_login.authenticating_minecraft" />
-              </Match>
-              <Match when={enrollmentStatus.data === "mcProfile"}>
-                <Trans key="auth:_trn_login.retrieving_minecraft_profile" />
-              </Match>
-              <Match when={enrollmentStatus.data === "mcentitlements"}>
-                <Trans key="auth:_trn_login.retrieving_minecraft_entitlements" />
-              </Match>
-              <Match when={true}>
-                <Trans key="auth:_trn_login.authenticating" />
-              </Match>
-            </Switch>
-          </span>
-          <Progress />
+            <Show when={expired()}>
+              <p class="text-sm text-red-500">
+                <Trans key="auth:_trn_login.code_expired_message" />
+              </p>
+            </Show>
+
+            <Show when={!expired()}>
+              <p class="text-lightSlate-700 m-0 text-sm">
+                <span class="text-lightSlate-500 mr-1">{countDown()}</span>
+                <Trans key="auth:_trn_login.before_expiring" />
+              </p>
+            </Show>
+          </div>
         </div>
       </Show>
+
+      {/* Loading progress with stages (both methods) - always rendered to prevent layout shift */}
+      <div
+        class="flex flex-col items-center gap-2 transition-opacity duration-200"
+        classList={{
+          "opacity-0 pointer-events-none": !(
+            enrollmentStatus.data &&
+            typeof enrollmentStatus.data === "string" &&
+            !expired()
+          ),
+          "opacity-100": !!(
+            enrollmentStatus.data &&
+            typeof enrollmentStatus.data === "string" &&
+            !expired()
+          )
+        }}
+      >
+        <span class="text-lightSlate-700 text-xs">
+          <Switch>
+            <Match
+              when={
+                enrollmentStatus.data &&
+                typeof enrollmentStatus.data === "object" &&
+                "waitingForBrowser" in enrollmentStatus.data
+              }
+            >
+              <Trans key="auth:_trn_login.waiting_for_browser_confirmation" />
+            </Match>
+            <Match
+              when={
+                enrollmentStatus.data &&
+                typeof enrollmentStatus.data === "object" &&
+                "pollingCode" in enrollmentStatus.data
+              }
+            >
+              <Trans key="auth:_trn_login.polling_microsoft_auth" />
+            </Match>
+            <Match when={enrollmentStatus.data === "xboxAuth"}>
+              <Trans key="auth:_trn_login.authenticating_xbox" />
+            </Match>
+            <Match when={enrollmentStatus.data === "mcLogin"}>
+              <Trans key="auth:_trn_login.authenticating_minecraft" />
+            </Match>
+            <Match when={enrollmentStatus.data === "mcProfile"}>
+              <Trans key="auth:_trn_login.retrieving_minecraft_profile" />
+            </Match>
+            <Match when={enrollmentStatus.data === "mcentitlements"}>
+              <Trans key="auth:_trn_login.retrieving_minecraft_entitlements" />
+            </Match>
+            <Match when={true}>
+              <Trans key="auth:_trn_login.authenticating" />
+            </Match>
+          </Switch>
+        </span>
+        <Progress />
+      </div>
 
       {/* Retry button when expired - moved from footer */}
       <Show when={expired()}>

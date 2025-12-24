@@ -9,6 +9,7 @@ import {
 } from "solid-js"
 import { Spinner } from "../Spinner"
 import { Dynamic } from "solid-js/web"
+import { getPressEffectClasses } from "../Clickable"
 
 type Size = "small" | "medium" | "large"
 type Type =
@@ -65,11 +66,8 @@ const getVariant = (
       [backgroundColor]: true,
       "hover:brightness-120": true
     }),
-    "transition-all": true,
+    ...getPressEffectClasses(isDisabled),
     "overflow-hidden": true,
-    "duration-100": true,
-    "ease-in-out": true,
-    "active:scale-95": !isDisabled,
     "font-main": true,
     "max-w-max": !isLoading && !fullWidth,
     "w-full": fullWidth,

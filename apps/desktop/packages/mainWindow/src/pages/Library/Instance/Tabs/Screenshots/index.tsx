@@ -102,7 +102,7 @@ const Screenshots = () => {
 
   return (
     <div>
-      <div class="top-30 bg-darkSlate-800 sticky z-10 flex flex-col pt-10 transition-all duration-100 ease-in-out">
+      <div class="top-30 bg-darkSlate-800 sticky z-10 flex flex-col pt-10 transition-all duration-100 ease-spring">
         <div class="text-lightSlate-700 z-10 mb-5 flex justify-between">
           <div class="flex gap-4">
             <div class="flex cursor-pointer items-center gap-2">
@@ -114,7 +114,7 @@ const Screenshots = () => {
                 }}
               />
             </div>
-            <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
+            <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-spring">
               <div class="i-hugeicons:folder-open text-2xl" />
               <Trans
                 key="content:_trn_open_screenshots_folder"
@@ -123,7 +123,7 @@ const Screenshots = () => {
                 }}
               />
             </div>
-            <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
+            <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-spring">
               <div class="i-hugeicons:unavailable text-2xl" />
               <Trans
                 key="content:_trn_disable_screenshot"
@@ -132,7 +132,7 @@ const Screenshots = () => {
                 }}
               />
             </div>
-            <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
+            <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-spring">
               <div class="i-hugeicons:delete-02 text-2xl" />
               <Trans
                 key="content:_trn_delete_screenshot"

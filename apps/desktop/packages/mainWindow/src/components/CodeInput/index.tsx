@@ -20,14 +20,14 @@ export const DeviceCode = (props: Props) => {
     if (animateDivRef) {
       animateDivRef.animate([{ opacity: 0 }, { opacity: 100 }], {
         duration: 150,
-        easing: "ease-in-out",
+        easing: "ease-spring",
         fill: "forwards"
       })
 
       setTimeout(() => {
         animateDivRef?.animate([{ opacity: 100 }, { opacity: 0 }], {
           duration: 150,
-          easing: "ease-in-out",
+          easing: "ease-spring",
           fill: "forwards"
         })
 
@@ -69,7 +69,7 @@ export const DeviceCode = (props: Props) => {
       </span>
       <span
         id={props.id}
-        class="transition-color hover:bg-lightSlate-50 duration-100 ease-in-out"
+        class="transition-color hover:bg-lightSlate-50 duration-100 ease-spring"
         classList={{
           "i-hugeicons:copy-01": !props.expired,
           "i-hugeicons:refresh": props.expired,

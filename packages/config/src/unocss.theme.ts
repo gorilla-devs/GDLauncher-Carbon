@@ -1,6 +1,6 @@
 type shade = 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900
 
-type Theme = {
+interface Theme {
   // Colors
   accent: string
   darkSlate: Record<shade, string>
@@ -195,18 +195,20 @@ const theme = {
       modalEnter: "300ms"
     },
     timingFns: {
+      // Standard spring easing - use for enter animations and interactive elements
+      spring: "cubic-bezier(0.34, 1.56, 0.64, 1)",
       loadingbar: "cubic-bezier(.4,0,.2,1)",
       enterWithOpacityChange: "cubic-bezier(.4,0,.2,1)",
       scaleBounce: "cubic-bezier(.4,0,.2,1)",
       wiggles: "cubic-bezier(.4,0,.2,1)",
       liveCirclePulse: "cubic-bezier(.4,0,.2,1)",
-      menuEnter: "cubic-bezier(.4,0,.2,1)",
+      menuEnter: "cubic-bezier(0.34, 1.56, 0.64, 1)",
       menuLeave: "cubic-bezier(.4,0,.2,1)",
-      popoverEnter: "cubic-bezier(.4,0,.2,1)",
+      popoverEnter: "cubic-bezier(0.34, 1.56, 0.64, 1)",
       popoverLeave: "cubic-bezier(.4,0,.2,1)",
-      selectEnter: "cubic-bezier(.4,0,.2,1)",
+      selectEnter: "cubic-bezier(0.34, 1.56, 0.64, 1)",
       selectLeave: "cubic-bezier(.4,0,.2,1)",
-      searchbarEnter: "cubic-bezier(.4,0,.2,1)",
+      searchbarEnter: "cubic-bezier(0.34, 1.56, 0.64, 1)",
       searchbarLeave: "cubic-bezier(.4,0,.2,1)",
       logoReveal: "cubic-bezier(0.22, 1, 0.36, 1)",
       modalEnter: "cubic-bezier(0.34, 1.56, 0.64, 1)"

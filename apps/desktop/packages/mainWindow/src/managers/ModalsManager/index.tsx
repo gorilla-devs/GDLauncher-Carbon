@@ -206,7 +206,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
     openModal: (modal: Modal, data: any) => {
       const overlay = document.getElementById("overlay")!
       overlay.style.display = "flex"
-      overlay.style.transition = "opacity 100ms ease-in-out"
+      overlay.style.transition = "opacity 100ms ease-spring"
       overlay.style.opacity = "0" // Set initial opacity to 0
       setTimeout(() => (overlay.style.opacity = "1"), 10) // Transition to opacity 1
       setModalStack((currentStack) => [

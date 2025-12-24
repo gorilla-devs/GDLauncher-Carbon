@@ -104,7 +104,7 @@ const News = (props: CarouselProps) => {
   const changeSlide = (direction: "right" | "left") => {
     resetInterval()
     setIsMoving(true)
-    slidesRef.style.transition = `transform 450ms ease-in-out`
+    slidesRef.style.transition = `transform 450ms ease-spring`
     if (currentImageIndex() > props.slides.length) return
     if (direction === "right") {
       setCurrentImageIndex((prev) => prev + 1)
@@ -176,7 +176,7 @@ const News = (props: CarouselProps) => {
     >
       <Show when={mergedProps.showArrows}>
         <div
-          class="bg-darkSlate-800 absolute left-5 top-1/2 z-40 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full opacity-0 duration-200 ease-in-out group-hover:opacity-100 "
+          class="bg-darkSlate-800 absolute left-5 top-1/2 z-40 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full opacity-0 duration-200 ease-spring group-hover:opacity-100 "
           onClick={() => {
             if (isMoving()) return
             changeSlide("left")
@@ -185,7 +185,7 @@ const News = (props: CarouselProps) => {
           <div class="i-hugeicons:arrow-left-01 text-3xl text-lightSlate-50" />
         </div>
         <div
-          class="bg-darkSlate-800 absolute right-5 top-1/2 z-40 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full opacity-0 duration-200 ease-in-out group-hover:opacity-100"
+          class="bg-darkSlate-800 absolute right-5 top-1/2 z-40 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full opacity-0 duration-200 ease-spring group-hover:opacity-100"
           onClick={() => {
             if (isMoving()) return
             changeSlide("right")
@@ -204,7 +204,7 @@ const News = (props: CarouselProps) => {
                 }`}
                 onClick={() => {
                   resetInterval()
-                  slidesRef.style.transition = `transform 450ms ease-in-out`
+                  slidesRef.style.transition = `transform 450ms ease-spring`
                   setCurrentImageIndex(i() + 1)
                   moveSlide()
                 }}

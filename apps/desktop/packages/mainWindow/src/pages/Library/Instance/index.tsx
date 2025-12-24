@@ -97,6 +97,12 @@ const Instance = () => {
 
   onMount(() => {
     headerRef.parentElement?.addEventListener("scroll", handleScroll)
+
+    // Mark instance as seen when navigating directly to instance page
+    const instanceId = parseInt(params.id, 10)
+    if (!isNaN(instanceId)) {
+      globalStore.markInstanceAsSeen(instanceId)
+    }
   })
 
   onCleanup(() => {
@@ -444,7 +450,7 @@ const Instance = () => {
         ref={(el) => {
           headerRef = el
         }}
-        class="transition-100 relative flex min-h-60 flex-col items-stretch justify-between overflow-hidden transition-all ease-in-out"
+        class="transition-100 relative flex min-h-60 flex-col items-stretch justify-between overflow-hidden transition-all ease-spring"
       >
         <img
           src={
@@ -575,7 +581,7 @@ const Instance = () => {
                         </h1>
                         <Show when={!editableName()}>
                           <div
-                            class="i-hugeicons:pencil-edit-01 transition-color hover:text-lightSlate-700 duration-100 ease-in-out"
+                            class="i-hugeicons:pencil-edit-01 transition-color hover:text-lightSlate-700 duration-100 ease-spring"
                             onClick={() => setEditableName(true)}
                           />
                         </Show>
@@ -585,14 +591,14 @@ const Instance = () => {
                         classList={{ "bg-darkSlate-800 pl-2": editableName() }}
                       >
                         <div
-                          class="text-lightSlate-50 duration-50 z-10 cursor-pointer text-3xl transition ease-in-out hover:text-green-500 i-hugeicons:tick-02"
+                          class="text-lightSlate-50 duration-50 z-10 cursor-pointer text-3xl transition ease-spring hover:text-green-500 i-hugeicons:tick-02"
                           classList={{
                             hidden: !editableName()
                           }}
                           onClick={() => handleNameChange()}
                         />
                         <div
-                          class="text-lightSlate-50 duration-50 z-10 cursor-pointer text-3xl transition ease-in-out hover:text-red-500 i-hugeicons:cancel-01"
+                          class="text-lightSlate-50 duration-50 z-10 cursor-pointer text-3xl transition ease-spring hover:text-red-500 i-hugeicons:cancel-01"
                           classList={{
                             hidden: !editableName()
                           }}
@@ -714,7 +720,7 @@ const Instance = () => {
             >
               <div class="flex h-full items-center">
                 <div
-                  class="overflow-hidden transition-all duration-150 ease-in-out flex items-center"
+                  class="overflow-hidden transition-all duration-150 ease-spring flex items-center"
                   classList={{
                     "w-14 mr-4 opacity-100": isSticky(),
                     "w-0 mr-0 opacity-0": !isSticky()
@@ -747,7 +753,7 @@ const Instance = () => {
                 </div>
               </div>
               <div
-                class="overflow-hidden transition-all duration-150 ease-in-out flex items-center justify-end"
+                class="overflow-hidden transition-all duration-150 ease-spring flex items-center justify-end"
                 classList={{
                   "w-14 ml-4 opacity-100": isSticky(),
                   "w-0 ml-0 opacity-0": !isSticky()

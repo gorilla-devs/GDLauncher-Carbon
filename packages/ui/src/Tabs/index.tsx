@@ -9,6 +9,7 @@ import {
 import type { PolymorphicProps } from "@kobalte/core/polymorphic"
 import { Tabs as TabsPrimitive } from "@kobalte/core/tabs"
 import { cn } from "../util"
+import { PRESS_CLASSES } from "../Clickable"
 
 type TabSize = "small" | "medium" | "large"
 
@@ -130,7 +131,7 @@ export const TabsTrigger = <T extends ValidComponent = "button">(
         "disabled:pointer-events-none disabled:opacity-50",
         "data-[selected]:text-lightSlate-50 data-[selected]:hover:text-lightSlate-50",
         "animate-icons-on-hover",
-        "active:scale-95",
+        PRESS_CLASSES,
         local.class
       )}
       {...rest}

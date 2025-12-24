@@ -188,6 +188,34 @@ export function GdlAccountStep(props: GdlAccountStepProps) {
           </p>
         </>
       </Show>
+
+      <Show when={gdlState().type === "error"}>
+        {(() => {
+          const state = gdlState()
+          const errorMessage =
+            state.type === "error" ? state.message : "Unknown error"
+
+          return (
+            <>
+              <div class="bg-red-500/10 flex h-20 w-20 items-center justify-center rounded-full">
+                <div class="i-hugeicons:alert-02 h-10 w-10 text-red-400" />
+              </div>
+
+              <div class="flex flex-col gap-2">
+                <h3 class="text-lightSlate-50 m-0 text-lg font-bold">
+                  <Trans key="auth:_trn_login.failed_to_check_account" />
+                </h3>
+                <p class="text-lightSlate-400 m-0 max-w-md text-sm leading-relaxed">
+                  <Trans key="auth:_trn_login.failed_to_check_account_description" />
+                </p>
+                <p class="text-lightSlate-600 m-0 max-w-md text-xs leading-relaxed font-mono">
+                  {errorMessage}
+                </p>
+              </div>
+            </>
+          )
+        })()}
+      </Show>
     </div>
   )
 }

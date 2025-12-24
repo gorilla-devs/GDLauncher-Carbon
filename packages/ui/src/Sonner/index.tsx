@@ -139,9 +139,9 @@ export const Toaster = (props: Parameters<typeof Sonner>[0]) => {
           closeButton:
             "!bg-darkSlate-700/50 !text-lightSlate-300 hover:!bg-darkSlate-600 hover:!text-lightSlate-50 !border-0 !shadow-none !rounded-md !p-1 transition-colors",
           actionButton:
-            "transition-all duration-100 ease-in-out hover:brightness-110 font-bold rounded-md",
+            "transition-all duration-100 ease-spring hover:brightness-110 font-bold rounded-md",
           cancelButton:
-            "transition-all duration-100 ease-in-out hover:brightness-110 hover:bg-darkSlate-500 font-bold rounded-md"
+            "transition-all duration-100 ease-spring hover:brightness-110 hover:bg-darkSlate-500 font-bold rounded-md"
         },
         style: {
           "background-color": "rgb(var(--darkSlate-800))",
@@ -156,7 +156,7 @@ export const Toaster = (props: Parameters<typeof Sonner>[0]) => {
           "font-weight": "700",
           border: "none",
           cursor: "pointer",
-          transition: "all 100ms ease-in-out",
+          transition: "all 100ms ease-spring",
           "font-family": "inherit"
         },
         cancelButtonStyle: {
@@ -167,7 +167,7 @@ export const Toaster = (props: Parameters<typeof Sonner>[0]) => {
           "font-weight": "700",
           border: "2px solid rgb(var(--darkSlate-600))",
           cursor: "pointer",
-          transition: "all 100ms ease-in-out",
+          transition: "all 100ms ease-spring",
           "font-family": "inherit"
         }
       }}

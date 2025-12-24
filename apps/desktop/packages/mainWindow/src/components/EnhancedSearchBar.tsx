@@ -56,10 +56,11 @@ export function EnhancedSearchBar() {
       }}
     >
       <div
-        class="overflow-hidden transition-[opacity,max-width] duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
+        class="shrink-0 transition-[opacity,max-width] duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
         classList={{
-          "opacity-0 pointer-events-none max-w-0": !isExpanded(),
-          "opacity-100 max-w-[200px] delay-[40ms]": isExpanded()
+          "opacity-0 pointer-events-none max-w-0 overflow-hidden":
+            !isExpanded(),
+          "opacity-100 delay-[40ms]": isExpanded()
         }}
       >
         <AddonTypeDropdown />
@@ -79,7 +80,7 @@ export function EnhancedSearchBar() {
         <input
           ref={simpleInputRef}
           placeholder={t("search:_trn_search_discover_anything")}
-          class="placeholder:text-darkSlate-400 text-lightSlate-50 h-full flex-1 cursor-pointer bg-transparent text-sm outline-none"
+          class="placeholder:text-darkSlate-400 text-lightSlate-50 h-full min-w-0 flex-1 cursor-pointer bg-transparent text-sm outline-none"
           value=""
           readOnly
           onClick={handleSimpleClick}
@@ -90,7 +91,7 @@ export function EnhancedSearchBar() {
         <input
           ref={expandedInputRef}
           placeholder={t("search:_trn_search_discover_anything")}
-          class="placeholder:text-darkSlate-400 text-lightSlate-50 h-full flex-1 bg-transparent text-sm outline-none"
+          class="placeholder:text-darkSlate-400 text-lightSlate-50 h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
           value={searchResults?.searchQuery().searchQuery ?? ""}
           onInput={(e) => {
             searchResults?.setSearchQuery((prev) => ({
@@ -111,7 +112,7 @@ export function EnhancedSearchBar() {
         }
       >
         <div
-          class="i-hugeicons:cancel-01 text-lg text-darkSlate-500 cursor-pointer transition-colors duration-200 ease-in-out hover:text-white"
+          class="i-hugeicons:cancel-01 text-lg text-darkSlate-500 cursor-pointer transition-colors duration-200 ease-spring hover:text-white"
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
@@ -135,10 +136,11 @@ export function EnhancedSearchBar() {
       />
 
       <div
-        class="overflow-hidden transition-[opacity,max-width] duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
+        class="shrink-0 transition-[opacity,max-width] duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
         classList={{
-          "opacity-0 pointer-events-none max-w-0": !isExpanded(),
-          "opacity-100 max-w-[200px] delay-[110ms]": isExpanded()
+          "opacity-0 pointer-events-none max-w-0 overflow-hidden":
+            !isExpanded(),
+          "opacity-100 delay-[110ms]": isExpanded()
         }}
       >
         <DropdownMenu>

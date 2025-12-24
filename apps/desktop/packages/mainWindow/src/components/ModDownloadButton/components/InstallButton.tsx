@@ -36,7 +36,7 @@ export const InstallButton = (props: InstallButtonProps) => {
             <Spinner />
             <Show when={!props.iconOnly}>
               <div
-                class="transition-width duration-100 ease-in-out"
+                class="transition-width duration-100 ease-spring"
                 classList={{
                   "w-0": props.progress() === null,
                   "w-14": props.progress() !== null

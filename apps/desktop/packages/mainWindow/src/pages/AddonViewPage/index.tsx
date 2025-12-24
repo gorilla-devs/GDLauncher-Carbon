@@ -246,7 +246,7 @@ const AddonExplore = () => {
 
   return (
     <div class="bg-darkSlate-800 relative flex h-full flex-col">
-      <div class="h-58 max-h-58 min-h-58 flex flex-col items-stretch justify-between transition-all ease-in-out">
+      <div class="h-58 max-h-58 min-h-58 flex flex-col items-stretch justify-between transition-all ease-spring">
         <div class="relative h-full">
           <div class="from-darkSlate-700 absolute left-0 right-0 top-0 z-20 h-full bg-gradient-to-t from-30%" />
           <div
@@ -405,7 +405,7 @@ const AddonExplore = () => {
               <div class="my-2 flex h-14 items-center justify-between">
                 <div class="flex items-center">
                   <div
-                    class="overflow-hidden transition-all duration-150 ease-in-out flex items-center"
+                    class="overflow-hidden transition-all duration-150 ease-spring flex items-center"
                     classList={{
                       "w-14 mr-4 opacity-100": isSticky(),
                       "w-0 mr-0 opacity-0": !isSticky()
@@ -445,7 +445,7 @@ const AddonExplore = () => {
                   </div>
                 </div>
                 <div
-                  class="overflow-hidden transition-all duration-150 ease-in-out flex items-center justify-end"
+                  class="overflow-hidden transition-all duration-150 ease-spring flex items-center justify-end"
                   classList={{
                     "w-14 ml-4 opacity-100": isSticky(),
                     "w-0 ml-0 opacity-0": !isSticky()

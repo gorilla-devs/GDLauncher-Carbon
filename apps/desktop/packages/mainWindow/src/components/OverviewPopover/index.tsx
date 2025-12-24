@@ -73,7 +73,7 @@ const OverviewPopover = (props: { data: ModRowProps }) => {
               if (url) window.openExternalLink(url)
             }}
           >
-            <div class="i-hugeicons:link-square-02 h-4 w-4 text-lightSlate-500 hover:text-lightSlate-50 transition-color transition-100 absolute right-4 top-4 z-30 ease-in-out shrink-0" />
+            <div class="i-hugeicons:link-square-02 h-4 w-4 text-lightSlate-500 hover:text-lightSlate-50 transition-color transition-100 absolute right-4 top-4 z-30 ease-spring shrink-0" />
           </div>
         </Show>
         <h4 class="text-lightSlate-100 z-30 mb-2 w-fit px-4 text-xl">

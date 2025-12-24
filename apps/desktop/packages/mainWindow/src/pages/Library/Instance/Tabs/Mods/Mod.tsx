@@ -285,7 +285,7 @@ const Mod = (props: Props) => {
       <div class="flex w-full items-center justify-between gap-4">
         <div class="flex items-center justify-between gap-4">
           <div
-            class="opacity-0 transition-opacity duration-100 ease-in-out group-hover:opacity-100"
+            class="opacity-0 transition-opacity duration-100 ease-spring group-hover:opacity-100"
             classList={{
               "opacity-100":
                 props.selectMods[props.mod.id] ||
@@ -417,7 +417,7 @@ const Mod = (props: Props) => {
             <Tooltip>
               <TooltipTrigger>
                 <div
-                  class="text-lightSlate-700 text-2xl duration-100 ease-in-out i-hugeicons:delete-02"
+                  class="text-lightSlate-700 text-2xl duration-100 ease-spring i-hugeicons:delete-02"
                   onClick={(e) => {
                     e.stopPropagation()
 
@@ -437,7 +437,7 @@ const Mod = (props: Props) => {
           </Show>
           <Show when={!props.isInstanceLocked}>
             <div
-              class="text-lightSlate-700 transition-color text-2xl duration-100 ease-in-out hover:text-red-500 i-hugeicons:delete-02"
+              class="text-lightSlate-700 transition-color text-2xl duration-100 ease-spring hover:text-red-500 i-hugeicons:delete-02"
               onClick={(e) => {
                 e.stopPropagation()
 
@@ -457,7 +457,7 @@ const Mod = (props: Props) => {
             >
               <PopoverTrigger>
                 <div
-                  class="text-lightSlate-700 transition-color hover:text-lightSlate-50 cursor-pointer text-2xl duration-100 ease-in-out i-hugeicons:information-circle"
+                  class="text-lightSlate-700 transition-color hover:text-lightSlate-50 cursor-pointer text-2xl duration-100 ease-spring i-hugeicons:information-circle"
                   classList={{
                     "text-lightSlate-50": isHoveringInfoCard()
                   }}
@@ -676,7 +676,7 @@ const Mod = (props: Props) => {
             <Popover placement="left">
               <PopoverTrigger>
                 <div
-                  class="text-lightSlate-700 transition-color hover:text-lightSlate-50 cursor-pointer text-2xl duration-100 ease-in-out i-hugeicons:more-horizontal"
+                  class="text-lightSlate-700 transition-color hover:text-lightSlate-50 cursor-pointer text-2xl duration-100 ease-spring i-hugeicons:more-horizontal"
                   classList={{
                     "text-lightSlate-50": isHoveringOptionsCard()
                   }}

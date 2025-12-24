@@ -12,7 +12,7 @@ export default function FullscreenToggle(props: Props) {
       }}
     >
       <div
-        class={`h-5 w-5 bg-lightSlate-800 transition-colors duration-200 ease-in-out ${
+        class={`h-5 w-5 bg-lightSlate-800 transition-colors duration-200 ease-spring ${
           props.isFullScreen()
             ? "i-hugeicons:minimize-screen"
             : "i-hugeicons:maximize-screen"

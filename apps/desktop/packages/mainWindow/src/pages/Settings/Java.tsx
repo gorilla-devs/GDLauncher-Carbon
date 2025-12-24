@@ -429,7 +429,7 @@ const Java = () => {
                                           }
                                         >
                                           <div
-                                            class="i-hugeicons:delete-02 text-lightSlate-700 text-lg transition-color duration-100 ease-in-out hover:text-red-400"
+                                            class="i-hugeicons:delete-02 text-lightSlate-700 text-lg transition-color duration-100 ease-spring hover:text-red-400"
                                             onClick={() =>
                                               deleteJavaMutation.mutate(java.id)
                                             }
@@ -539,7 +539,7 @@ const Java = () => {
                                   </Select>
                                   <Show when={i() === 1}>
                                     <div
-                                      class="i-hugeicons:delete-02 text-lightSlate-700 text-lg transition-color duration-100 ease-in-out hover:text-red-400"
+                                      class="i-hugeicons:delete-02 text-lightSlate-700 text-lg transition-color duration-100 ease-spring hover:text-red-400"
                                       onClick={() => {
                                         deleteProfile.mutate(profile.name)
                                       }}
@@ -548,7 +548,7 @@ const Java = () => {
                                   <Show when={profile.isSystem}>
                                     <Popover>
                                       <PopoverTrigger>
-                                        <div class="i-hugeicons:information-circle text-lightSlate-700 hover:text-lightSlate-100 text-lg transition-color duration-100 ease-in-out" />
+                                        <div class="i-hugeicons:information-circle text-lightSlate-700 hover:text-lightSlate-100 text-lg transition-color duration-100 ease-spring" />
                                       </PopoverTrigger>
                                       <PopoverContent>
                                         <div class="max-w-100 flex h-auto flex-col gap-8 p-4">

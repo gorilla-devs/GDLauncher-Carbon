@@ -462,7 +462,7 @@ const General = () => {
         <Row class="bg-darkSlate-900 rounded-xl px-6 py-4">
           <img
             src={wideLogoUrl}
-            class="h-14 cursor-pointer transition-opacity duration-200 ease-in-out hover:opacity-80"
+            class="h-14 cursor-pointer transition-opacity duration-200 ease-spring hover:opacity-80"
             onClick={() => {
               modalsContext?.openModal({
                 name: "changelogs"

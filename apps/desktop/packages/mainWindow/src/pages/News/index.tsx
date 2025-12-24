@@ -13,8 +13,9 @@ const NewsPage = () => {
   const navigation = useGDNavigate()
 
   const isComingFromNewsDetail = () => {
-    const lastPath = navigation.lastPathVisited().path
-    return isNewsDetailPath(lastPath)
+    const lastPathInfo = navigation?.lastPathVisited?.()
+    if (!lastPathInfo) return false
+    return isNewsDetailPath(lastPathInfo.path)
   }
 
   const shouldLoadSavedTab = isComingFromNewsDetail()

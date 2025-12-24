@@ -12,7 +12,13 @@ import {
 } from "@gd/core_module/bindings"
 import { RSPCError } from "@rspc/client"
 import { CreateQueryResult } from "@tanstack/solid-query"
-import { JSX, createContext, useContext } from "solid-js"
+import {
+  JSX,
+  createContext,
+  useContext,
+  createSignal,
+  createEffect
+} from "solid-js"
 
 interface Context {
   instances: CreateQueryResult<ListInstance[], RSPCError>
@@ -26,6 +32,8 @@ interface Context {
   categories: CreateQueryResult<FEUnifiedCategories, RSPCError>
   modloaders: CreateQueryResult<FEUnifiedModLoaders, RSPCError>
   minecraftVersions: CreateQueryResult<ManifestVersion[], RSPCError>
+  isNewInstance: (id: number) => boolean
+  markInstanceAsSeen: (id: number) => void
 }
 
 const GlobalStoreContext = createContext()
@@ -153,6 +161,34 @@ export const GlobalStoreProvider = (props: { children: JSX.Element }) => {
     queryKey: ["mc.getMinecraftVersions"]
   }))
 
+  // Track which instances existed at app load (for NEW badge feature)
+  const [baselineInstanceIds, setBaselineInstanceIds] = createSignal<
+    Set<number>
+  >(new Set())
+  const [baselineInitialized, setBaselineInitialized] = createSignal(false)
+
+  // Track which instances user has interacted with
+  const [seenInstanceIds, setSeenInstanceIds] = createSignal<Set<number>>(
+    new Set()
+  )
+
+  // Capture baseline on first successful instances load
+  createEffect(() => {
+    if (!baselineInitialized() && instances.data) {
+      setBaselineInstanceIds(new Set(instances.data.map((i) => i.id)))
+      setBaselineInitialized(true)
+    }
+  })
+
+  const isNewInstance = (id: number): boolean => {
+    if (!baselineInitialized()) return false
+    return !baselineInstanceIds().has(id) && !seenInstanceIds().has(id)
+  }
+
+  const markInstanceAsSeen = (id: number): void => {
+    setSeenInstanceIds((prev) => new Set([...prev, id]))
+  }
+
   const store: Context = {
     instances,
     instanceGroups: groups,
@@ -164,7 +200,9 @@ export const GlobalStoreProvider = (props: { children: JSX.Element }) => {
     announcements,
     categories,
     modloaders,
-    minecraftVersions
+    minecraftVersions,
+    isNewInstance,
+    markInstanceAsSeen
   }
 
   return (

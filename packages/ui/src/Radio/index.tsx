@@ -8,6 +8,7 @@ import {
   createSignal
 } from "solid-js"
 import { Button } from "../Button"
+import { PRESS_CLASSES } from "../Clickable"
 
 interface Props {
   value: string | number | string[] | undefined
@@ -42,8 +43,7 @@ const Radio = (props: Props) => {
   const id = `radio-${nextId++}`
 
   // Determine base and conditional classes based on buttonStyle
-  const baseClasses =
-    "relative flex gap-4 items-center w-full rounded-lg px-4 py-3 transition-colors"
+  const baseClasses = `relative flex gap-4 items-center w-full rounded-lg px-4 py-3 ${PRESS_CLASSES}`
   const indicatorBaseClasses = "w-5 h-5 min-w-5 min-h-5 rounded-full shrink-0"
 
   return (

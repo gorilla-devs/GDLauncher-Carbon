@@ -64,7 +64,7 @@ const Version = (props: Props) => {
           when={props.mainFileId === props.version.id}
           fallback={<Active />}
         >
-          <div class="text-darkSlate-300 hover:text-lightSlate-700 group flex cursor-pointer items-center gap-2 transition ease-in-out">
+          <div class="text-darkSlate-300 hover:text-lightSlate-700 group flex cursor-pointer items-center gap-2 transition ease-spring">
             <Trans
               key="instances:_trn_switch_version"
               options={{

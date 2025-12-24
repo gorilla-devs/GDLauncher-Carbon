@@ -360,6 +360,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     mrInfiniteResults,
     virtualOnScrollHandler,
     lastScrollOffset,
+    setLastScrollOffset,
     selectedInstance,
     selectedInstanceMods,
     setSelectedInstanceId,

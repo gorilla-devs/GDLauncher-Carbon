@@ -1,8 +1,9 @@
 import { createEffect, createSignal, Show, JSX } from "solid-js"
 import { cva, type VariantProps } from "class-variance-authority"
+import { PRESS_CLASSES } from "../Clickable"
 
 const checkboxStyles = cva(
-  "box-border flex h-5 min-h-5 w-5 min-w-5 items-center justify-center rounded-md transition-all duration-200 ease-in-out",
+  "box-border flex h-5 min-h-5 w-5 min-w-5 items-center justify-center rounded-md transition-all duration-200 ease-spring",
   {
     variants: {
       checked: {
@@ -56,7 +57,7 @@ function Checkbox(props: Props) {
 
   return (
     <div
-      class="flex items-center gap-2 rounded-md transition-transform duration-100 active:scale-95"
+      class={`flex items-center gap-2 rounded-md ${PRESS_CLASSES}`}
       classList={{
         "cursor-pointer": !props.disabled,
         "cursor-not-allowed": props.disabled

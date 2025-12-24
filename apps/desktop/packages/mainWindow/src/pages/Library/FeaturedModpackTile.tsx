@@ -2,7 +2,7 @@ import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { rspc } from "@/utils/rspcClient"
 import { Trans } from "@gd/i18n"
-import { Skeleton } from "@gd/ui"
+import { PRESS_CLASSES, Skeleton } from "@gd/ui"
 import {
   For,
   Match,
@@ -63,7 +63,7 @@ const FeaturedModpackTile = () => {
         <div class="bg-darkSlate-400 h-24 w-px" />
         <Show when={settings()?.showFeatured}>
           <div
-            class="w-70 outline-darkSlate-500 relative box-border h-24 overflow-hidden rounded-md outline-2 duration-200 ease-in-out"
+            class={`w-70 outline-darkSlate-500 relative box-border h-24 overflow-hidden rounded-md outline-2 ${PRESS_CLASSES}`}
             classList={{
               "group hover:outline hover:bg-darkSlate-700":
                 !!hexingTales()?.data
@@ -73,7 +73,7 @@ const FeaturedModpackTile = () => {
             }}
           >
             <div
-              class="z-1 text-lightSlate-900 hover:text-lightSlate-50 absolute right-2 top-2 opacity-50 duration-200 ease-in-out i-hugeicons:view h-4 w-4"
+              class="z-1 text-lightSlate-900 hover:text-lightSlate-50 absolute right-2 top-2 opacity-50 duration-200 ease-spring i-hugeicons:view h-4 w-4"
               onClick={(e) => {
                 e.stopPropagation()
                 settingsMutation.mutate({
@@ -83,7 +83,7 @@ const FeaturedModpackTile = () => {
                 })
               }}
             />
-            <div class="absolute left-0 top-0 duration-200 ease-in-out group-hover:-translate-y-full">
+            <div class="absolute left-0 top-0 duration-200 ease-spring group-hover:-translate-y-full">
               <Trans key="library:_trn_featured.try_featured_modpack" />
             </div>
             <Switch>
@@ -91,9 +91,9 @@ const FeaturedModpackTile = () => {
                 <div class="relative h-full w-full">
                   <img
                     src={hexingTales()?.data.logo?.url}
-                    class="group-hover:scale-130 absolute bottom-0 left-0 h-16 w-16 rounded-lg duration-200 ease-in-out group-hover:-translate-y-4 group-hover:translate-x-4"
+                    class="group-hover:scale-130 absolute bottom-0 left-0 h-16 w-16 rounded-lg duration-200 ease-spring group-hover:-translate-y-4 group-hover:translate-x-4"
                   />
-                  <div class="absolute bottom-0 left-20 duration-200 ease-in-out group-hover:opacity-0">
+                  <div class="absolute bottom-0 left-20 duration-200 ease-spring group-hover:opacity-0">
                     <div class="text-nowrap text-xl font-bold">
                       {hexingTales()?.data.name}
                     </div>
@@ -104,7 +104,7 @@ const FeaturedModpackTile = () => {
                     </div>
                   </div>
 
-                  <div class="absolute left-40 top-1/2 -translate-y-1/2 translate-x-[150%] duration-200 ease-in-out group-hover:translate-x-0">
+                  <div class="absolute left-40 top-1/2 -translate-y-1/2 translate-x-[150%] duration-200 ease-spring group-hover:translate-x-0">
                     <Trans key="library:_trn_featured.show_more" />
                   </div>
                 </div>
@@ -121,7 +121,7 @@ const FeaturedModpackTile = () => {
         </Show>
         <Show when={!settings()?.showFeatured}>
           <div
-            class="text-lightSlate-900 hover:text-lightSlate-50 my-2 mr-2 opacity-50 duration-200 ease-in-out i-hugeicons:view-off-slash h-4 w-4"
+            class="text-lightSlate-900 hover:text-lightSlate-50 my-2 mr-2 opacity-50 duration-200 ease-spring i-hugeicons:view-off-slash h-4 w-4"
             onClick={(e) => {
               e.stopPropagation()
               settingsMutation.mutate({

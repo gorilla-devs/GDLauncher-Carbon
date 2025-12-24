@@ -48,7 +48,7 @@ const WindowCloseWarning = (props: ModalProps) => {
               <Trans key="window:_trn_window_close_text_2">
                 {""}
                 <span
-                  class="text-lightSlate-300 hover:text-lightSlate-100 underline transition-colors duration-100 ease-in-out"
+                  class="text-lightSlate-300 hover:text-lightSlate-100 underline transition-colors duration-100 ease-spring"
                   onClick={() => {
                     navigator.navigate("/settings")
                     modalsManager?.closeModal()

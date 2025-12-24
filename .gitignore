@@ -99,3 +99,4 @@ crates/iridium
 .zed
 CLAUDE.md
 auto_update
+rust-analyzer-target

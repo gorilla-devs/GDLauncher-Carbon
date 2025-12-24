@@ -489,6 +489,18 @@ function AuthFlowContent() {
     }
   }
 
+  const handleRetryGdlCheck = async () => {
+    setButtonLoading(true)
+    try {
+      const gdlState = await flow.checkGDLAccount(true)
+      await flow.goToStep({ type: "gdl-account", gdlAccount: gdlState })
+    } catch (error) {
+      console.error("[AuthFlow] Failed to retry GDL check:", error)
+    } finally {
+      setButtonLoading(false)
+    }
+  }
+
   // DOM refs
   let sidebarRef: HTMLDivElement | undefined
   let videoRef: HTMLVideoElement | undefined
@@ -1081,6 +1093,21 @@ function AuthFlowContent() {
               >
                 <Trans key="general:_trn_continue" />
                 <div class="i-hugeicons:arrow-right-01 h-4 w-4" />
+              </Button>
+            </Show>
+
+            {/* GDL Account Step - Retry button (error state) */}
+            <Show when={getStepAs("gdl-account")?.gdlAccount?.type === "error"}>
+              <Button
+                size="large"
+                type="primary"
+                fullWidth
+                onClick={handleRetryGdlCheck}
+                loading={buttonLoading()}
+                disabled={buttonLoading()}
+              >
+                <Trans key="general:_trn_retry" />
+                <div class="i-hugeicons:refresh h-4 w-4" />
               </Button>
             </Show>
           </div>

@@ -13,6 +13,26 @@ export interface Changelog {
 const changelogs: Changelog = {
   new: [
     {
+      title: "Addons Grid View Mode",
+      description:
+        "New grid view mode for browsing addons with a visual card-based layout as an alternative to the list view."
+    },
+    {
+      title: "'New' Badge for Recently Installed Instances",
+      description:
+        "Newly installed instances now display a 'New' badge, making it easier to identify your latest additions."
+    },
+    {
+      title: "Log File Rotation & Cleanup",
+      description:
+        "Automatic log file rotation and cleanup to prevent log files from growing too large, along with temporary file cleanup on startup."
+    },
+    {
+      title: "Release Channel Branding",
+      description:
+        "Alpha and beta versions now display distinct logos to clearly indicate which release channel you're using."
+    },
+    {
       title: "Redesigned Addons Browser",
       description:
         "Completely rethought and redesigned addons browser with support for mods, resource packs, shaders, modpacks, data packs, and worlds. Features a unified search experience, enhanced filtering, type-aware installation, and a modern interface that replaces the old separate mod and modpack pages.",
@@ -70,6 +90,11 @@ const changelogs: Changelog = {
     }
   ],
   fixed: [
+    {
+      title: "Fixed navbar crash",
+      description:
+        "Resolved a crash that could occur in the navigation bar under certain conditions."
+    },
     {
       title: "Fixed instance export modal",
       description:
@@ -218,7 +243,7 @@ const changelogs: Changelog = {
     {
       title: "Smoother animations",
       description:
-        "Enhanced searchbar and page transition animations for a more polished experience, especially noticeable when first opening the app."
+        "Enhanced transitions with spring easing physics for more natural-feeling animations throughout the app, including searchbar and page transitions."
     },
     {
       title: "Enhanced Addon View & Install Experience",

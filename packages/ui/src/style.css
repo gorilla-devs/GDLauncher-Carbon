@@ -79,10 +79,112 @@ a {
   animation: skeleton-pulse 1.2s ease-in-out infinite;
 }
 
+/* CopyText component animations */
+@keyframes copyTextFill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes copyTextDropIn {
+  from {
+    opacity: 0;
+    transform: scale(1.15);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes copyTextDropOut {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes copyTextBlurIn {
+  0% {
+    backdrop-filter: blur(0);
+  }
+  50% {
+    backdrop-filter: blur(8px);
+  }
+  100% {
+    backdrop-filter: blur(0);
+  }
+}
+
+@keyframes copyTextBlurOut {
+  0% {
+    backdrop-filter: blur(0);
+  }
+  50% {
+    backdrop-filter: blur(8px);
+  }
+  100% {
+    backdrop-filter: blur(0);
+  }
+}
+
+@keyframes copyTextSolidIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes copyTextSolidOut {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.copy-text-fill {
+  animation: copyTextFill 2s linear forwards;
+}
+
+.copy-text-drop-in {
+  animation: copyTextDropIn 180ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.copy-text-drop-out {
+  animation: copyTextDropOut 150ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.copy-text-blur-in {
+  animation: copyTextBlurIn 400ms ease-out forwards;
+}
+
+.copy-text-blur-out {
+  animation: copyTextBlurOut 300ms ease-in forwards;
+}
+
+.copy-text-solid-in {
+  animation: copyTextSolidIn 300ms ease-out forwards;
+}
+
+.copy-text-solid-out {
+  animation: copyTextSolidOut 200ms ease-in forwards;
+}
+
 /* Animate icons when parent button/tab/input is hovered */
 .animate-icons-on-hover [class*="i-hugeicons:"],
 .animate-icons-on-hover img {
-  transition: transform 0.25s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   will-change: transform;
   overflow: visible;
 }

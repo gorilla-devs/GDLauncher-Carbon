@@ -24,7 +24,8 @@ import {
   Spinner,
   Tooltip,
   TooltipContent,
-  TooltipTrigger
+  TooltipTrigger,
+  PRESS_CLASSES
 } from "@gd/ui"
 import DefaultImg from "/assets/images/default-instance-img.png"
 import { useGDNavigate } from "@/managers/NavigationManager"
@@ -62,6 +63,8 @@ interface Props {
   onClick?: (_e: MouseEvent) => void
   size: 1 | 2 | 3 | 4 | 5
   shouldSetViewTransition: boolean
+  isNew?: boolean
+  onHover?: () => void
 }
 
 const Tile = (props: Props) => {
@@ -76,7 +79,6 @@ const Tile = (props: Props) => {
 
   const [copiedError, setCopiedError] = createSignal(false)
 
-  const rspcContext = rspc.useContext()
   const [t] = useTransContext()
   const navigate = useGDNavigate()
   const modalsContext = useModal()
@@ -163,12 +165,7 @@ const Tile = (props: Props) => {
       ? props.instance.status.value
       : undefined
 
-  const handleEdit = async () => {
-    const instanceDetails = await rspcContext.client.query([
-      "instance.getInstanceDetails",
-      props.instance.id
-    ])
-
+  const handleEdit = () => {
     modalsContext?.openModal(
       {
         name: "instanceCreation"
@@ -178,7 +175,7 @@ const Tile = (props: Props) => {
         modloader: validInstance()?.modloader,
         title: props.instance.name,
         mcVersion: validInstance()?.mc_version,
-        modloaderVersion: instanceDetails?.modloaders[0].version,
+        modloaderVersion: validInstance()?.modloader_version,
         img: props.img
       }
     )
@@ -346,7 +343,7 @@ const Tile = (props: Props) => {
           </ContextMenuContent>
           <ContextMenuTrigger>
             <div
-              class="group relative flex select-none flex-col items-start justify-center duration-200 ease-in-out"
+              class={`group relative flex select-none flex-col items-start justify-center ${PRESS_CLASSES}`}
               onClick={(e) => {
                 e.stopPropagation()
                 if (
@@ -358,15 +355,21 @@ const Tile = (props: Props) => {
                   props?.onClick?.(e)
                 }
               }}
+              onMouseEnter={() => props.onHover?.()}
             >
               <Tooltip
                 open={props.failError ? undefined : false}
                 placement="top"
               >
                 <TooltipTrigger>
-                  <div class="relative box-border overflow-hidden rounded-2xl p-[2px]">
+                  <div
+                    class="relative box-border overflow-hidden rounded-2xl p-[2px]"
+                    classList={{
+                      "instance-tile-new": props.isNew
+                    }}
+                  >
                     <div
-                      class="absolute left-0 top-0 h-full w-full transition-[opacity,background] duration-300 ease-in-out"
+                      class="absolute left-0 top-0 h-full w-full transition-[opacity,background] duration-300 ease-spring"
                       classList={{
                         "opacity-0 bg-transparent":
                           !isLoading() && !props.isRunning,
@@ -394,7 +397,7 @@ const Tile = (props: Props) => {
                       }
                     >
                       <div
-                        class="bg-darkSlate-800 relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-cover bg-center transition-all duration-300 ease-in-out"
+                        class="bg-darkSlate-800 relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-cover bg-center transition-all duration-300 ease-spring"
                         classList={{
                           grayscale: isLoading() || isInQueue(),
                           "group-hover:scale-120": !isLoading() && !isInQueue()
@@ -547,6 +550,11 @@ const Tile = (props: Props) => {
                           />
                         </div>
                       </Show>
+                      <Show when={props.isNew}>
+                        <div class="border-1 border-primary-400 bg-primary-500 z-3 absolute left-2 top-2 flex items-center justify-center rounded-lg border-solid px-2 py-0.5 text-xs font-bold text-white uppercase shadow-md">
+                          NEW
+                        </div>
+                      </Show>
                       <Show
                         when={isLoading() || isInQueue() || props.isDeleting}
                       >
@@ -585,7 +593,7 @@ const Tile = (props: Props) => {
                         />
                       </Show>
                       <div
-                        class="z-2 absolute left-1/2 top-1/2 hidden h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl transition-all duration-200 ease-in-out"
+                        class="z-2 absolute left-1/2 top-1/2 hidden h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl transition-all duration-200 ease-spring"
                         classList={{
                           "scale-100 bg-red-500": isLoading(),
                           "flex bg-primary-500 hover:bg-primary-400 text-2xl":
@@ -640,7 +648,7 @@ const Tile = (props: Props) => {
                             <div
                               class={`${copiedError() ? "i-hugeicons:tick-double-02" : "i-hugeicons:copy-01"} h-6 w-6 shrink-0`}
                               classList={{
-                                "text-lightSlate-700 hover:text-lightSlate-100 duration-100 ease-in-out":
+                                "text-lightSlate-700 hover:text-lightSlate-100 duration-100 ease-spring":
                                   !copiedError(),
                                 "text-green-400": copiedError()
                               }}

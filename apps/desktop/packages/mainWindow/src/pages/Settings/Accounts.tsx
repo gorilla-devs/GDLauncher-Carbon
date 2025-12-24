@@ -47,11 +47,11 @@ const GDLAccountRowItem = (props: {
         }}
       >
         <Show when={props.title}>
-          <div class="text-lightSlate-700 group-hover:text-lightSlate-50 flex items-center gap-4 text-base font-light uppercase transition-all duration-100 ease-in-out">
+          <div class="text-lightSlate-700 group-hover:text-lightSlate-50 flex items-center gap-4 text-base font-light uppercase transition-all duration-100 ease-spring">
             {props.title}
             <Show when={props.onEdit}>
               <div
-                class="text-md text-lightSlate-700 hover:text-lightSlate-50 underline transition-all duration-100 ease-in-out"
+                class="text-md text-lightSlate-700 hover:text-lightSlate-50 underline transition-all duration-100 ease-spring"
                 onClick={(e) => {
                   e.stopPropagation()
                   props.onEdit?.()
@@ -484,7 +484,7 @@ const Accounts = () => {
           <tbody>
             <For each={accountsTable.getRowModel().rows}>
               {(row) => (
-                <tr class="hover:bg-darkSlate-700 group/external transition-colors duration-100 ease-in-out">
+                <tr class="hover:bg-darkSlate-700 group/external transition-colors duration-100 ease-spring">
                   <For each={row.getVisibleCells()}>
                     {(cell, i) => (
                       <td
@@ -582,7 +582,7 @@ const Accounts = () => {
                                 globalStore.currentlySelectedAccountUuid.data
                             }
                           >
-                            <div class="flex items-center justify-center opacity-0 duration-100 ease-in-out group-hover/internal:opacity-100">
+                            <div class="flex items-center justify-center opacity-0 duration-100 ease-spring group-hover/internal:opacity-100">
                               <div class="i-hugeicons:tick-double-02 text-darkSlate-300 h-4 w-4" />
                             </div>
                           </Match>
@@ -592,7 +592,7 @@ const Accounts = () => {
                               cell.column.columnDef.id === "uuid"
                             }
                           >
-                            <div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 duration-100 ease-in-out group-hover/internal:opacity-100">
+                            <div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 duration-100 ease-spring group-hover/internal:opacity-100">
                               <div class="i-hugeicons:clipboard text-lightSlate-50 text-lg" />
                             </div>
                           </Match>

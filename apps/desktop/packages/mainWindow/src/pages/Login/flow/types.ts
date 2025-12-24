@@ -92,6 +92,7 @@ export type GDLAccountState =
   | { type: "none" } // No GDL account
   | { type: "found-existing"; data: FEGDLAccount } // Found existing account
   | { type: "linked" } // Already linked
+  | { type: "error"; message: string } // Error checking account
 
 // ============================================================================
 // Shared Data - Mutable State Across Flow

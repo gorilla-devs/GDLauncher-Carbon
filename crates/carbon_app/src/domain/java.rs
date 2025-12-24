@@ -317,6 +317,7 @@ pub enum SystemJavaProfileName {
     Gamma,
     GammaSnapshot,
     Delta,
+    Epsilon,
     MinecraftJavaExe,
 }
 
@@ -332,6 +333,7 @@ impl SystemJavaProfileName {
             Self::Gamma => java_version.major == 17,
             Self::GammaSnapshot => java_version.major == 17,
             Self::Delta => java_version.major == 21,
+            Self::Epsilon => java_version.major == 25,
             Self::MinecraftJavaExe => java_version.major == 14,
         }
     }
@@ -348,6 +350,7 @@ impl TryFrom<MinecraftJavaProfile> for SystemJavaProfileName {
             MinecraftJavaProfile::JavaRuntimeGamma => Ok(Self::Gamma),
             MinecraftJavaProfile::JavaRuntimeGammaSnapshot => Ok(Self::GammaSnapshot),
             MinecraftJavaProfile::JavaRuntimeDelta => Ok(Self::Delta),
+            MinecraftJavaProfile::JavaRuntimeEpsilon => Ok(Self::Epsilon),
             MinecraftJavaProfile::MinecraftJavaExe => Ok(Self::MinecraftJavaExe),
             MinecraftJavaProfile::Unknown(value) => {
                 bail!("Unknown MinecraftJavaProfile: {}", value)
@@ -368,6 +371,7 @@ impl ToString for SystemJavaProfileName {
             Self::Gamma => "gamma",
             Self::GammaSnapshot => "gamma_snapshot",
             Self::Delta => "delta",
+            Self::Epsilon => "epsilon",
             Self::MinecraftJavaExe => "mc_java_exe",
         };
 
@@ -393,6 +397,7 @@ impl TryFrom<&str> for SystemJavaProfileName {
             "gamma" => Ok(Self::Gamma),
             "gamma_snapshot" => Ok(Self::GammaSnapshot),
             "delta" => Ok(Self::Delta),
+            "epsilon" => Ok(Self::Epsilon),
             "mc_java_exe" => Ok(Self::MinecraftJavaExe),
             _ => bail!("Invalid system java profile name: {}", value),
         }

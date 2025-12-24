@@ -1,4 +1,4 @@
-import { toast } from "@gd/ui"
+import { PRESS_CLASSES, toast } from "@gd/ui"
 import { useModal } from "../.."
 import { Trans, useTransContext, NamespacedTranslationKey } from "@gd/i18n"
 import { createSignal, For, Show, createMemo } from "solid-js"
@@ -235,7 +235,7 @@ const Presets = () => {
           <div class="flex flex-col gap-3">
             {/* Vanilla preset - full width, featured */}
             <button
-              class="bg-darkSlate-800 group relative flex flex-col items-center justify-center gap-2 overflow-hidden rounded-xl border-2 p-4 shadow-md transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+              class={`bg-darkSlate-800 group relative flex flex-col items-center justify-center gap-2 overflow-hidden rounded-xl border-2 p-4 shadow-md disabled:cursor-not-allowed disabled:opacity-50 ${PRESS_CLASSES}`}
               classList={{
                 "border-emerald-500/30 hover:border-emerald-500/60 hover:shadow-xl hover:shadow-emerald-500/10 hover:scale-[1.01]":
                   creatingPreset() !== vanillaPreset.name,
@@ -294,7 +294,7 @@ const Presets = () => {
 
                   return (
                     <button
-                      class="group relative flex flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border p-4 shadow-md backdrop-blur-sm transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50"
+                      class={`group relative flex flex-col items-center justify-center gap-2 overflow-hidden rounded-lg border p-4 shadow-md backdrop-blur-sm disabled:cursor-not-allowed disabled:opacity-50 ${PRESS_CLASSES}`}
                       classList={{
                         "bg-darkSlate-800/50 border-white/5 hover:border-primary-500/50 hover:bg-darkSlate-700/60 hover:shadow-xl hover:shadow-black/20 hover:scale-[1.02]":
                           !creating,

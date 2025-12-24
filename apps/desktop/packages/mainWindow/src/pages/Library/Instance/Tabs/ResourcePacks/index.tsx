@@ -164,7 +164,7 @@ const ResourcePacks = () => {
   const [t] = useTransContext()
   return (
     <div>
-      <div class="bg-darkSlate-800 top-30 sticky z-10 flex flex-col pt-10 transition-all duration-100 ease-in-out">
+      <div class="bg-darkSlate-800 top-30 sticky z-10 flex flex-col pt-10 transition-all duration-100 ease-spring">
         <div class="flex flex-wrap items-center justify-between gap-1 pb-4">
           <Input
             placeholder={t("general:_trn_type_here")}
@@ -224,7 +224,7 @@ const ResourcePacks = () => {
                 }}
               />
             </div>
-            <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
+            <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-spring">
               <div class="i-hugeicons:folder-open text-2xl" />
               <Trans
                 key="content:_trn_open_resource_packs_folder"
@@ -233,7 +233,7 @@ const ResourcePacks = () => {
                 }}
               />
             </div>
-            <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
+            <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-spring">
               <div class="i-hugeicons:unavailable text-2xl" />
               <Trans
                 key="content:_trn_disable_resource_pack"
@@ -242,7 +242,7 @@ const ResourcePacks = () => {
                 }}
               />
             </div>
-            <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-in-out">
+            <div class="hover:text-lightSlate-50 flex cursor-pointer items-center gap-2 transition duration-100 ease-spring">
               <div class="i-hugeicons:delete-02 text-2xl" />
               <Trans
                 key="content:_trn_delete_resource_pack"

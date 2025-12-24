@@ -40,7 +40,7 @@ export default function LogsOptions(props: Props) {
   return (
     <DropdownMenu placement="left">
       <DropdownMenuTrigger class="b-0 bg-transparent p-0 animate-icons-on-hover">
-        <div class="i-hugeicons:settings-01 bg-lightSlate-800 transition-colors duration-200 ease-in-out h-5 w-5" />
+        <div class="i-hugeicons:settings-01 bg-lightSlate-800 transition-colors duration-200 ease-spring h-5 w-5" />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuSub>

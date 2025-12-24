@@ -60,7 +60,7 @@ export const createAddonColumns = (config: ColumnConfig) => {
       },
       cell: (props) => (
         <div
-          class={`transition-opacity duration-100 ease-in-out ${
+          class={`transition-opacity duration-100 ease-spring ${
             props.row.getIsSelected()
               ? "opacity-100"
               : "opacity-0 group-hover/row:opacity-100"

@@ -12,6 +12,7 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 import { rspc } from "@/utils/rspcClient"
 import { createStore } from "solid-js/store"
 import { bytesToMB } from "@/utils/helpers"
+import { useGlobalStore } from "../GlobalStoreContext"
 
 interface InstanceDownloadProgress {
   totalDownload: number
@@ -41,6 +42,7 @@ const InstanceTile = (props: {
   })
 
   const navigator = useGDNavigate()
+  const globalStore = useGlobalStore()
 
   const validInstance = () =>
     props.instance.status.status === "valid"
@@ -130,15 +132,33 @@ const InstanceTile = (props: {
       : undefined
   )
 
+  // Only show NEW badge on completely installed, valid instances
+  const isNew = () => {
+    // Instance must be valid
+    if (props.instance.status.status !== "valid") return false
+
+    // Instance must be in inactive state (not preparing, running, or deleting)
+    const state = validInstance()?.state
+    if (!state || state.state !== "inactive") return false
+
+    // Instance must not have a failed task (installation didn't error)
+    if (inactiveState()) return false
+
+    return globalStore.isNewInstance(props.instance.id)
+  }
+
   return (
     <Tile
       onClick={() => {
+        globalStore.markInstanceAsSeen(props.instance.id)
         setClickedInstanceId(props.identifier)
 
         requestAnimationFrame(() => {
           navigator.navigate(`/library/${props.instance.id}`)
         })
       }}
+      onHover={() => globalStore.markInstanceAsSeen(props.instance.id)}
+      isNew={isNew()}
       shouldSetViewTransition={clickedInstanceId() === props.identifier}
       identifier={props.identifier}
       instance={props.instance}

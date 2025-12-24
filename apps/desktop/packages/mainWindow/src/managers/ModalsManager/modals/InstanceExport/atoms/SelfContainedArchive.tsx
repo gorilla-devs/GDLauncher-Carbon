@@ -16,7 +16,7 @@ const SelfContainedArchive = () => {
         <div>{t("instances:_trn_self_contained_addons_bundling")}</div>
         <Tooltip>
           <TooltipTrigger>
-            <div class="i-hugeicons:information-circle text-darkSlate-400 hover:text-lightSlate-50 cursor-pointer transition-color duration-100 ease-in-out text-2xl" />
+            <div class="i-hugeicons:information-circle text-darkSlate-400 hover:text-lightSlate-50 cursor-pointer transition-color duration-100 ease-spring text-2xl" />
           </TooltipTrigger>
           <TooltipContent>
             {t("instances:_trn_self_contained_addons_bundling_tooltip")}

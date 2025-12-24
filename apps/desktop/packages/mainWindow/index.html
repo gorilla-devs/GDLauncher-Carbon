@@ -289,6 +289,23 @@
         inherits: false;
       }
 
+      @keyframes pulse-new-instance {
+        0%,
+        100% {
+          outline-color: rgb(var(--primary-500));
+        }
+        50% {
+          outline-color: transparent;
+        }
+      }
+
+      .instance-tile-new {
+        outline: 2px solid rgb(var(--primary-500));
+        outline-offset: 0px;
+        border-radius: 1rem;
+        animation: pulse-new-instance 1.5s ease-in-out infinite;
+      }
+
       .appFatalCrash {
         position: fixed;
         top: 0;
