@@ -6,8 +6,8 @@ use rusqlite_migration::{M, Migrations};
 pub mod db;
 pub mod pcr; // wip
 
-pub fn get_migrations() -> Migrations<'static> {
-    Migrations::new(vec![
+pub fn get_migrations() -> (Migrations<'static>, i32) {
+    let migration_list = vec![
         M::up(include_str!(concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/prisma/migrations/20240120134904_init/migration.sql"
@@ -76,5 +76,7 @@ pub fn get_migrations() -> Migrations<'static> {
             env!("CARGO_MANIFEST_DIR"),
             "/prisma/migrations/20251207000000_default_sort_by_created_desc/migration.sql"
         ))),
-    ])
+    ];
+    let count = migration_list.len() as i32;
+    (Migrations::new(migration_list), count)
 }

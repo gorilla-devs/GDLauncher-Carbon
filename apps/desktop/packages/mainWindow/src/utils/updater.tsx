@@ -177,16 +177,19 @@ window.onUpdateStateChanged((_, stateData) => {
       setDownloadProgress(stateData.progress)
 
       if (supportsAutoUpdate()) {
-        // Only create the toast once, let the signal update the UI
-        if (!isShowingDownloadToast) {
-          isShowingDownloadToast = true
-          toast.loading(<DownloadingTitle />, {
-            id: TOAST_ID_DOWNLOADING,
-            description: <DownloadProgress />,
-            duration: Infinity,
-            closeButton: false
-          })
-        }
+        // Add class to suppress animation on updates (not initial creation)
+        const isUpdate = isShowingDownloadToast
+        isShowingDownloadToast = true
+
+        // Re-create toast on every progress update to show current progress
+        // (somoto doesn't maintain SolidJS reactivity for already-rendered content)
+        toast.loading(<DownloadingTitle />, {
+          id: TOAST_ID_DOWNLOADING,
+          description: <DownloadProgress />,
+          duration: Infinity,
+          closeButton: false,
+          className: isUpdate ? "toast-no-animate" : undefined
+        })
       } else if (stateData.updateInfo && !isShowingDownloadToast) {
         // For builds without auto-update, show manual download link
         isShowingDownloadToast = true

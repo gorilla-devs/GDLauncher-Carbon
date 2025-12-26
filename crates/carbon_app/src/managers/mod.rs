@@ -115,6 +115,15 @@ mod app {
             {
                 Ok(client) => Arc::new(client),
                 Err(e) => {
+                    // Check if this is a backwards migration error
+                    if e.downcast_ref::<DatabaseError>()
+                        .map(|e| matches!(e, DatabaseError::BackwardsMigration))
+                        .unwrap_or(false)
+                    {
+                        // Exit gracefully - the status message was already printed
+                        error!("Backwards migration detected, exiting gracefully");
+                        std::process::exit(2);
+                    }
                     error!("Database migration failed: {}", e);
                     panic!("Database migration failed: {}", e);
                 }

@@ -28,6 +28,8 @@ pub enum DatabaseError {
     EnsureProfiles(anyhow::Error),
     #[error("error while fetching latest terms and privacy checksum")]
     TermsAndPrivacy(anyhow::Error),
+    #[error("database version is newer than app version (backwards migration)")]
+    BackwardsMigration,
 }
 
 #[instrument]
@@ -42,7 +44,7 @@ pub(super) async fn load_and_migrate(
         runtime_path.join("gdl_conf.db").to_str().unwrap()
     );
 
-    let migrations = carbon_repos::get_migrations();
+    let (migrations, migration_count) = carbon_repos::get_migrations();
 
     debug!("db uri: {}", db_uri);
 
@@ -72,6 +74,20 @@ pub(super) async fn load_and_migrate(
     }
 
     let _ = conn.execute("DROP TABLE IF EXISTS _prisma_migrations", []);
+
+    // Check for backwards migration before attempting to migrate
+    let user_version: i32 = conn
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .unwrap_or(0);
+
+    if user_version > migration_count {
+        debug!(
+            "Backwards migration detected: database version {} > app migrations {}",
+            user_version, migration_count
+        );
+        println!("_STATUS_:BACKWARDS_MIGRATION");
+        return Err(DatabaseError::BackwardsMigration.into());
+    }
 
     debug!("Migrating database");
 

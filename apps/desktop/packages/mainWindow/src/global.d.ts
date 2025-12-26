@@ -26,6 +26,7 @@ interface CheckForUpdatesResult {
 declare global {
   interface Window {
     fatalError: (error: string | Log[], moduleName?: string) => void
+    backwardsMigrationError: () => void
     ipcRenderer: import("electron").IpcRenderer
     report: any
     getAdSize: () => Promise<{
@@ -62,6 +63,9 @@ declare global {
       | {
           type: "error"
           logs: Log[]
+        }
+      | {
+          type: "backwardsMigration"
         }
     >
     getCurrentOS: () => Promise<{

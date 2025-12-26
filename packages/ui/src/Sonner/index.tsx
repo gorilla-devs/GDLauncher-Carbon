@@ -2,6 +2,20 @@ import { Toaster as Sonner, toast } from "somoto"
 
 export { toast }
 
+// Inject CSS utility class to suppress toast entrance animation
+// Use className="toast-no-animate" on any toast that updates content without needing animation
+if (typeof document !== "undefined") {
+  const style = document.createElement("style")
+  style.textContent = `
+    [data-somoto-toast].toast-no-animate {
+      transition: none !important;
+      opacity: 1 !important;
+      --y: translateY(0) !important;
+    }
+  `
+  document.head.appendChild(style)
+}
+
 const SuccessIcon = () => (
   <svg
     width="16"

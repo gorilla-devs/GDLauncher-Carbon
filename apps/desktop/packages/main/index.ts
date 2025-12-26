@@ -293,6 +293,9 @@ export type CoreModule = () => Promise<
       type: "error"
       logs: Log[]
     }
+  | {
+      type: "backwardsMigration"
+    }
 >
 
 const loadCoreModule: CoreModule = () =>
@@ -398,6 +401,11 @@ const loadCoreModule: CoreModule = () =>
                 port,
                 kill: () => coreModule?.kill()
               }
+            })
+          } else if (event === "BACKWARDS_MIGRATION") {
+            console.log("[CORE] Backwards migration detected")
+            resolve({
+              type: "backwardsMigration"
             })
           } else {
             let progress = 0

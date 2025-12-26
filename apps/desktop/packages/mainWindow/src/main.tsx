@@ -67,6 +67,10 @@ render(() => {
       if (coreModule?.type === "success") {
         const convertedPort = Number(coreModule.port)
         port = convertedPort
+      } else if (coreModule?.type === "backwardsMigration") {
+        console.log("Backwards migration detected, showing dedicated UI")
+        window.backwardsMigrationError()
+        port = new Error("BackwardsMigration")
       } else {
         if (coreModule.logs) {
           console.error(
