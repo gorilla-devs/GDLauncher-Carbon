@@ -190,38 +190,48 @@ fn get_processor_arguments<T: AsRef<str>>(
     arguments: &[T],
     data: &HashMap<String, SidedDataEntry>,
 ) -> anyhow::Result<Vec<String>> {
-    let mut new_arguments = Vec::new();
+    // Arguments can be:
+    // 1. Library references: [group:artifact:version] - resolve to library path
+    // 2. Variables: {KEY} or {KEY}/path - replace with values from data
+    // 3. Plain strings - pass through as-is
+    //
+    // Variables may be embedded in larger strings (e.g., "{ROOT}/libraries/"),
+    // so we use find-and-replace instead of exact matching.
+    arguments
+        .iter()
+        .map(|argument| {
+            let arg = argument.as_ref();
 
-    for argument in arguments {
-        let trimmed_arg = &argument.as_ref()[1..argument.as_ref().len() - 1];
-        if argument.as_ref().starts_with('{') {
-            if let Some(entry) = data.get(trimmed_arg) {
-                new_arguments.push(if entry.client.starts_with('[') {
+            // Handle library references: [group:artifact:version]
+            if let Some(lib_key) = arg.strip_prefix('[').and_then(|a| a.strip_suffix(']')) {
+                return Ok(libraries_path
+                    .join(lib_key.parse::<GradleSpecifier>()?.into_path())
+                    .to_string_lossy()
+                    .to_string());
+            }
+
+            // Replace all {KEY} variables with their values from data
+            let mut result = arg.to_string();
+            for (key, entry) in data {
+                let replacement = if let Some(lib_key) = entry
+                    .client
+                    .strip_prefix('[')
+                    .and_then(|a| a.strip_suffix(']'))
+                {
+                    // Data value is a library reference - resolve to path
                     libraries_path
-                        .join(
-                            entry.client[1..entry.client.len() - 1]
-                                .parse::<GradleSpecifier>()?
-                                .into_path(),
-                        )
+                        .join(lib_key.parse::<GradleSpecifier>()?.into_path())
                         .to_string_lossy()
                         .to_string()
                 } else {
                     entry.client.clone()
-                })
+                };
+                result = result.replace(&format!("{{{}}}", key), &replacement);
             }
-        } else if argument.as_ref().starts_with('[') {
-            new_arguments.push(
-                libraries_path
-                    .join(trimmed_arg.parse::<GradleSpecifier>()?.into_path())
-                    .to_string_lossy()
-                    .to_string(),
-            )
-        } else {
-            new_arguments.push(argument.as_ref().to_string())
-        }
-    }
 
-    Ok(new_arguments)
+            Ok(result)
+        })
+        .collect()
 }
 
 macro_rules! augment_data {
@@ -307,13 +317,23 @@ pub async fn execute_processors<'callback>(
                 anyhow::anyhow!("Could not execute processor {}: {}", processor.jar, err)
             })?;
 
-        // info!("{}", String::from_utf8_lossy(&child.stdout));
-
         if !child.status.success() {
-            bail!(
-                "Processor {} exited with code {}",
+            let stdout = String::from_utf8_lossy(&child.stdout);
+            let stderr = String::from_utf8_lossy(&child.stderr);
+
+            tracing::error!(
+                "Processor {} failed with code {}\nstdout: {}\nstderr: {}",
                 processor.jar,
-                child.status.code().unwrap_or(-1)
+                child.status.code().unwrap_or(-1),
+                stdout,
+                stderr
+            );
+
+            bail!(
+                "Processor {} exited with code {}\nstderr: {}",
+                processor.jar,
+                child.status.code().unwrap_or(-1),
+                stderr.trim()
             );
         }
 
