@@ -1,0 +1,22 @@
+{
+  "_trn_no_logs": "Sin registros disponibles",
+  "_trn_all_sessions": "Todas las sesiones",
+  "_trn_no_log_sessions_available": "Sin sesiones de registro disponibles",
+  "_trn_copy": "Copiar registros",
+  "_trn_new_logs": "{{logsCount}} nuevos registros",
+  "_trn_see_new_logs": "Ver nuevos registros",
+  "_trn_logs_paused_due_to_scroll": "Registros pausados debido al desplazamiento",
+  "_trn_autofollow": "Desplazarse automáticamente en nuevos registros",
+  "_trn_start_log_message_on_new_line": "Comenzar mensaje de registro en nueva línea",
+  "_trn_logs_density": "Densidad de registros",
+  "_trn_logs_density.low": "Baja",
+  "_trn_logs_density.comfortable": "Cómoda",
+  "_trn_logs_density.compact": "Compacta",
+  "_trn_columns": "Columnas",
+  "_trn_columns.timestamp": "Marca de tiempo",
+  "_trn_columns.logger": "Registrador",
+  "_trn_columns.source_kind": "Tipo de fuente",
+  "_trn_columns.thread_name": "Nombre del hilo",
+  "_trn_columns.level": "Nivel de registro",
+  "_trn_font_size": "Tamaño de fuente"
+}
